@@ -1,29 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Arctic Fuse 2 Inspired Colors -->
+    <!-- StreamNet TV Colors -->
 
-    <!-- Primary Colors (Light Gray on Black) -->
-    <color name="arctic_white">#EDEDED</color>
-    <color name="arctic_black">#000000</color>
-    <color name="arctic_gray">#4D4D4D</color>
-    <color name="arctic_gray_light">#B3B3B3</color>
+    <!-- Primary neutrals -->
+    <color name="arctic_white">#F2F2F2</color>
+    <color name="arctic_black">#141414</color>
+    <color name="arctic_gray">#2A2A2A</color>
+    <color name="arctic_gray_light">#BDBDBD</color>
 
     <!-- Accent Colors -->
     <color name="accent_white">#FFFFFF</color>
-    <color name="accent_yellow">#FFCD3C</color>
-    <color name="accent_green">#00D588</color>
+    <color name="accent_yellow">#E5A209</color>
+    <color name="accent_green">#32C76F</color>
 
-    <!-- Background Colors (Pure Black) -->
-    <color name="background_dark">#000000</color>
-    <color name="background_card">#0D0D0D</color>
-    <color name="background_elevated">#1A1A1A</color>
-    <color name="background_overlay">#E7000000</color>
+    <!-- Background Colors -->
+    <color name="background_dark">#141414</color>
+    <color name="background_card">#1A1A1A</color>
+    <color name="background_elevated">#1F1F1F</color>
+    <color name="background_overlay">#E6141414</color>
+    <color name="background_overlay_soft">#B3141414</color>
+    <color name="background_overlay_light">#80141414</color>
 
     <!-- Text Colors -->
-    <color name="text_primary">#EDEDED</color>
-    <color name="text_secondary">#B3EDEDED</color>
-    <color name="text_tertiary">#80EDEDED</color>
-    <color name="text_disabled">#4DEDEDED</color>
+    <color name="text_primary">#F2F2F2</color>
+    <color name="text_secondary">#B3F2F2F2</color>
+    <color name="text_tertiary">#80F2F2F2</color>
+    <color name="text_disabled">#4DF2F2F2</color>
 
     <!-- IMDb/Star Yellow -->
     <color name="imdb_yellow">#FFCD3C</color>
