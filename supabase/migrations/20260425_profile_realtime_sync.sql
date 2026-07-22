@@ -65,26 +65,36 @@ create table if not exists public.profile_sync_events (
   created_at timestamptz not null default now()
 );
 
-alter table public.watch_history
-  add column if not exists profile_id text;
+create index if not exists profile_settings_user_updated_idx
+  on public.profile_settings (user_id, updated_at desc);
+create index if not exists profile_addons_user_profile_updated_idx
+  on public.profile_addons (user_id, profile_id, updated_at desc);
+create index if not exists profile_catalogs_user_profile_updated_idx
+  on public.profile_catalogs (user_id, profile_id, updated_at desc);
+create index if not exists profile_iptv_state_user_updated_idx
+  on public.profile_iptv_state (user_id, updated_at desc);
+create index if not exists profile_sync_events_user_created_idx
+  on public.profile_sync_events (user_id, created_at desc);
+do $$
+begin
+  if to_regclass('public.watch_history') is not null then
+    execute 'alter table public.watch_history add column if not exists profile_id text';
+    execute "update public.watch_history set profile_id = 'default' where profile_id is null";
+    execute 'create index if not exists watch_history_user_profile_updated_idx on public.watch_history (user_id, profile_id, updated_at desc)';
+  end if;
 
-alter table public.watched_movies
-  add column if not exists profile_id text;
+  if to_regclass('public.watched_movies') is not null then
+    execute 'alter table public.watched_movies add column if not exists profile_id text';
+    execute "update public.watched_movies set profile_id = 'default' where profile_id is null";
+    execute 'create unique index if not exists watched_movies_user_profile_idx on public.watched_movies (user_id, profile_id, tmdb_id)';
+  end if;
 
-alter table public.watched_episodes
-  add column if not exists profile_id text;
-
-update public.watch_history
-set profile_id = 'default'
-where profile_id is null;
-
-update public.watched_movies
-set profile_id = 'default'
-where profile_id is null;
-
-update public.watched_episodes
-set profile_id = 'default'
-where profile_id is null;
+  if to_regclass('public.watched_episodes') is not null then
+    execute 'alter table public.watched_episodes add column if not exists profile_id text';
+    execute "update public.watched_episodes set profile_id = 'default' where profile_id is null";
+    execute 'create unique index if not exists watched_episodes_user_profile_idx on public.watched_episodes (user_id, profile_id, tmdb_id, season, episode)';
+  end if;
+end $$;
 
 create index if not exists profile_settings_user_updated_idx
   on public.profile_settings (user_id, updated_at desc);
@@ -96,13 +106,6 @@ create index if not exists profile_iptv_state_user_updated_idx
   on public.profile_iptv_state (user_id, updated_at desc);
 create index if not exists profile_sync_events_user_created_idx
   on public.profile_sync_events (user_id, created_at desc);
-create index if not exists watch_history_user_profile_updated_idx
-  on public.watch_history (user_id, profile_id, updated_at desc);
-create index if not exists watched_movies_user_profile_idx
-  on public.watched_movies (user_id, profile_id, tmdb_id);
-create index if not exists watched_episodes_user_profile_idx
-  on public.watched_episodes (user_id, profile_id, tmdb_id, season, episode);
-
 do $$
 declare
   sync_table_name text;
@@ -147,10 +150,10 @@ begin
       and t.relname = 'watched_movies'
       and c.contype in ('u', 'p')
       and (
-        select array_agg(a.attname order by a.attname)
+        select array_agg(a.attname::text order by a.attname::text)
         from unnest(c.conkey) key(attnum)
         join pg_attribute a on a.attrelid = t.oid and a.attnum = key.attnum
-      ) = array['tmdb_id','user_id']
+      ) = array['tmdb_id','user_id']::text[]
   loop
     execute format('alter table public.watched_movies drop constraint %I', legacy_constraint.conname);
   end loop;
@@ -164,20 +167,25 @@ begin
       and t.relname = 'watched_episodes'
       and c.contype in ('u', 'p')
       and (
-        select array_agg(a.attname order by a.attname)
+        select array_agg(a.attname::text order by a.attname::text)
         from unnest(c.conkey) key(attnum)
         join pg_attribute a on a.attrelid = t.oid and a.attnum = key.attnum
-      ) = array['episode','season','tmdb_id','user_id']
+      ) = array['episode','season','tmdb_id','user_id']::text[]
   loop
     execute format('alter table public.watched_episodes drop constraint %I', legacy_constraint.conname);
   end loop;
 end $$;
 
-create unique index if not exists watched_movies_user_profile_tmdb_uidx
-  on public.watched_movies (user_id, profile_id, tmdb_id);
+do $$
+begin
+  if to_regclass('public.watched_movies') is not null then
+    execute 'create unique index if not exists watched_movies_user_profile_tmdb_uidx on public.watched_movies (user_id, profile_id, tmdb_id)';
+  end if;
 
-create unique index if not exists watched_episodes_user_profile_episode_uidx
-  on public.watched_episodes (user_id, profile_id, tmdb_id, season, episode);
+  if to_regclass('public.watched_episodes') is not null then
+    execute 'create unique index if not exists watched_episodes_user_profile_episode_uidx on public.watched_episodes (user_id, profile_id, tmdb_id, season, episode)';
+  end if;
+end $$;
 
 create or replace function public.bump_profile_sync_revision()
 returns trigger
@@ -227,7 +235,8 @@ begin
     'profile_sync_events'
   ]
   loop
-    if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     if to_regclass(format('public.%I', sync_table_name)) is not null
+       and exists (select 1 from pg_publication where pubname = 'supabase_realtime')
        and not exists (
         select 1
         from pg_publication_tables

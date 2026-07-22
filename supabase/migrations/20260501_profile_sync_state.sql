@@ -1,4 +1,4 @@
--- Scope Trakt sync_state per ARVIO profile so profiles with separate Trakt
+-- Scope Trakt sync_state per StreamNet TV profile so profiles with separate Trakt
 -- accounts do not share last-activity cursors or sync progress.
 
 create table if not exists public.sync_state (
@@ -42,10 +42,10 @@ begin
       and t.relname = 'sync_state'
       and c.contype in ('u', 'p')
       and (
-        select array_agg(a.attname order by a.attname)
+        select array_agg(a.attname::text order by a.attname::text)
         from unnest(c.conkey) key(attnum)
         join pg_attribute a on a.attrelid = t.oid and a.attnum = key.attnum
-      ) = array['user_id']
+      ) = array['user_id']::text[]
   loop
     execute format('alter table public.sync_state drop constraint %I', legacy_constraint.conname);
   end loop;
@@ -56,3 +56,4 @@ create unique index if not exists sync_state_user_profile_uidx
 
 create index if not exists sync_state_user_profile_updated_idx
   on public.sync_state (user_id, profile_id, updated_at desc);
+

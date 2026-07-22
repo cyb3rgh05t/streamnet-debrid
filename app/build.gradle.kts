@@ -29,22 +29,26 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
-        targetSdk = 36
-        versionCode = 305
+        targetSdk = 35
+        versionCode = 304
         versionName = "1.9.982"
         buildConfigField("String", "GITHUB_OWNER", "\"ProdigyV21\"")
-        buildConfigField("String", "GITHUB_REPO", "\"ARVIO\"")
+        buildConfigField("String", "GITHUB_REPO", "\"StreamNet TV\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
-        // Emergency Supabase cost guard. Keep high-volume public metadata and
-        // idle realtime polling off Supabase unless explicitly re-enabled.
+        // Cloud sync uses a Netlify function layer for app-facing endpoints and
+        // Supabase for auth, storage, and the backing account sync tables.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "true")
         buildConfigField("Boolean", "ENABLE_REALTIME_WATCH_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "false")
         buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
-        buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")
-        buildConfigField("String", "NETLIFY_BACKEND_URL", "\"https://auth.arvio.tv/.netlify/functions\"")
+        buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "true")
+        buildConfigField(
+            "String",
+            "NETLIFY_BACKEND_URL",
+            "\"${escapeBuildConfigString(localSecretValue("NETLIFY_BACKEND_URL").ifBlank { "https://your-project.netlify.app/.netlify/functions" })}\""
+        )
         buildConfigField(
             "String",
             "APP_ANON_KEY",
@@ -503,5 +507,6 @@ dependencies {
     add("sideloadImplementation", "org.mozilla:rhino:1.8.1")
     add("sideloadImplementation", "com.google.re2j:re2j:1.8")
 }
+
 
 
