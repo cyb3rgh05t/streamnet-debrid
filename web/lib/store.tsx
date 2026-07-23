@@ -2,13 +2,13 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { getStreams, getStreamsProgressive, installAddon as installAddonManifest, loadLocalAddons, normalizeAddons, saveLocalAddons } from "./addons";
-import { AuthClient } from "./auth";
+import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
 import { defaultCatalogs, mergeCatalogs } from "./catalogs";
 import { getContinueWatching, pullCloudPayload, pullCloudProfiles, pullCloudTraktToken, pullCloudWatchlist, saveCloudAddons, saveCloudProfiles, saveCloudSettings, saveCloudTraktToken } from "./cloud";
 import { cachedDebridDirectUrl, parseDebridStream, resolveDebridDirectUrl, resolveTranscodeStream } from "./debrid";
 import { createPendingExternalPlayback } from "./externalPlayback";
 import { externalLaunchMode, openExternalPlayer } from "./externalPlayers";
-import { streamPlayability } from "./streamCompatibility";
+import { canDirectPlayMkvStream, streamPlayability } from "./streamCompatibility";
 import { loadHomeServerRows } from "./homeserver";
 import { buildXtreamCatchupUrl, loadIptvGuideForChannels, loadIptvSnapshot, loadPlaylists, savePlaylists } from "./iptv";
 import { dedupeMedia, historyToItem, hydrateTraktItems, traktItemToMedia, traktPlaybackToMedia, traktUpNextToMedia } from "./mappers";
@@ -349,7 +349,7 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
   // starved user-initiated fetches (opening a details page mid-boot timed out
   // and rendered without seasons/cast).
   const source = items.slice(0, 50);
-  const hydrated: MediaItem[] = new Array(source.length);
+  const hydrated: Array<MediaItem | null> = new Array(source.length).fill(null);
   let cursor = 0;
   const workers = Array.from({ length: Math.min(10, source.length) }, async () => {
     while (cursor < source.length) {
@@ -357,7 +357,7 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
       cursor += 1;
       const item = source[index];
       const details = await getDetails(item).catch(() => item);
-      hydrated[index] = {
+      hydrated[index] = clampUpNextEpisode({
         ...details,
         ...item,
         image: item.image || details.image,
@@ -365,11 +365,39 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
         overview: details.overview || item.overview,
         rating: details.rating || item.rating,
         duration: details.duration || item.duration
-      };
+      });
     }
   });
   await Promise.all(workers);
-  return hydrated;
+  return hydrated.filter((item): item is MediaItem => Boolean(item));
+}
+
+// Trakt's episode database can list MORE episodes than TMDB does for the same
+// season (specials folded in, split-release counting) — its next_episode then
+// points past the last episode the app can actually show ("Up next S1 E11" on
+// a 10-episode season, which plays nothing). Clamp against the hydrated TMDB
+// season data: advance to the next real season when one exists, otherwise the
+// show is finished and the row is dropped from Continue Watching.
+function clampUpNextEpisode(item: MediaItem): MediaItem | null {
+  if (item.timeRemainingLabel !== "Up next") return item;
+  const seasonNumber = item.seasonNumber;
+  const episodeNumber = item.episodeNumber;
+  if (item.mediaType !== "tv" || !seasonNumber || !episodeNumber) return item;
+  const seasons = (item.seasons ?? []).filter((season) => season.seasonNumber > 0);
+  if (!seasons.length) return item;
+  const current = seasons.find((season) => season.seasonNumber === seasonNumber);
+  if (!current?.episodeCount || episodeNumber <= current.episodeCount) return item;
+  const nextSeason = seasons
+    .filter((season) => season.seasonNumber > seasonNumber && (season.episodeCount ?? 0) > 0)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber)[0];
+  if (!nextSeason) return null; // watched past the final episode — show done
+  return {
+    ...item,
+    seasonNumber: nextSeason.seasonNumber,
+    episodeNumber: 1,
+    episodeTitle: null,
+    subtitle: `S${nextSeason.seasonNumber} E1`
+  };
 }
 
 function sameSettings(a: AppSettings, b: AppSettings) {
@@ -844,6 +872,54 @@ export function AppProvider({
   }, [iptvSnapshot.nowNext]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const hash = window.location.hash || "";
+    if (hash.includes("access_token=") && hash.includes("refresh_token=")) {
+      try {
+        const params = new URLSearchParams(hash.replace(/^#/, ""));
+        const access_token = params.get("access_token");
+        const refresh_token = params.get("refresh_token");
+        const email = params.get("email") || "";
+        const expires_in = Number(params.get("expires_in") || "3600");
+        if (access_token && refresh_token) {
+          const payload = decodeJwtPayload(access_token);
+          const userId = (payload.sub as string | undefined) ?? "";
+          const provider = ((payload.iss as string | undefined) === "arvio-netlify" ? "netlify" : "supabase") as "netlify" | "supabase";
+          const session = {
+            accessToken: access_token,
+            refreshToken: refresh_token,
+            userId,
+            email,
+            expiresAt: Date.now() + expires_in * 1000,
+            provider
+          };
+
+          saveStored(SESSION_KEY, session);
+          authClient.session = session;
+          setAuth(session);
+          setCloudProfilesHydrated(false);
+
+          // Clear hash parameters from URL without a page reload
+          const cleanUrl = window.location.pathname + window.location.search;
+          window.history.replaceState({}, document.title, cleanUrl);
+
+          // Redirect to appropriate view
+          const stored = loadStored<Profile[]>(PROFILES_KEY, []);
+          const activeId = loadStored<string | null>(ACTIVE_PROFILE_KEY, null);
+          const skip = settings.skipProfileSelection;
+          if (skip && activeId && stored.some((p) => p.id === activeId)) {
+            setView("app");
+          } else {
+            setView("profiles");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse callback auth parameters", err);
+      }
+    }
+  }, [settings.skipProfileSelection]);
+
+  useEffect(() => {
     // Also runs on the profile-selection screen ("profiles" view): the last-used
     // profile is almost always the one picked, so Continue Watching and the
     // rails are already loading (or loaded) by the time Home first mounts.
@@ -1200,7 +1276,24 @@ export function AppProvider({
     // handing the raw torrentio link to <video>, which can only fail and burn a
     // ~13s stall-timeout before escalating. This is the biggest "not instant"
     // win — the top pick is almost always an MKV.
+    //
+    // EXCEPT on Chromium, whose <video> demuxes Matroska natively: an MKV whose
+    // codecs the device decodes (H.264/HEVC + AAC/Opus) plays directly from the
+    // CDN URL — instant, zero remux CPU, and immune to remux-pipeline stalls.
+    // The player's ladder still auto-escalates to remux if direct really fails.
     const debrid = parseDebridStream(stream.url);
+    if (debrid && streamPlayability(stream).mode === "remux" && canDirectPlayMkvStream(stream)) {
+      const cachedDirect = cachedDebridDirectUrl(stream.url);
+      if (cachedDirect) {
+        setActiveStream({ ...stream, url: cachedDirect, originalUrl: stream.url });
+        return;
+      }
+      void resolveDebridDirectUrl(debrid).then((result) => {
+        if (result.url) setActiveStream({ ...stream, url: result.url, originalUrl: stream.url });
+        else { setToast(result.error ?? "Source not ready — trying the next one."); setActiveStream(stream); }
+      });
+      return;
+    }
     if (debrid && streamPlayability(stream).mode === "remux") {
       const cached = cachedDebridDirectUrl(stream.url);
       if (cached) {
