@@ -1021,7 +1021,7 @@ class CatalogRepository @Inject constructor(
         return withContext(Dispatchers.IO) {
             val request = Request.Builder()
                 .url(url)
-                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; ARVIO)"))
+                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
                 .build()
             try {
                 okHttpClient.newCall(request).execute().use { response ->
@@ -1345,3 +1345,4 @@ private object CatalogRepoRegexes {
         RegexOption.IGNORE_CASE
     )
 }
+

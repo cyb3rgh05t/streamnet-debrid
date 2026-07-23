@@ -964,7 +964,7 @@ class AuthRepository @Inject constructor(
         val rawMessage = error?.message ?: return fallback
         val message = rawMessage.lowercase()
         val netlifyPasswordHelp =
-            "Invalid email or password. If this is an existing ARVIO Cloud account, create a new password at auth.arvio.tv and then sign in again."
+            "Invalid email or password. If this is an existing StreamNet TV Cloud account, create a new password at streamnet-sync.netlify.app and then sign in again."
         return when {
             "arvio cloud moved" in message || "password setup" in message -> rawMessage
             Constants.USE_NETLIFY_CLOUD_SYNC && "invalid email or password" in message -> netlifyPasswordHelp
@@ -2151,3 +2151,4 @@ class AuthRepository @Inject constructor(
         }
     }
 }
+

@@ -39,6 +39,7 @@ import com.arflix.tv.data.repository.CollectionTemplateManifest
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.util.AppLogger
+import com.arflix.tv.util.APP_LANGUAGE_EXPLICIT_KEY
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
@@ -933,8 +934,13 @@ class HomeViewModel @Inject constructor(
     private suspend fun applyContentLanguageFromPrefs(): String {
         val prefs = context.settingsDataStore.data.first()
         val profileId = profileManager.getProfileId()
-        val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "en-US"
+        val explicitLanguage = prefs[APP_LANGUAGE_EXPLICIT_KEY] ?: false
+        val systemLanguage = com.arflix.tv.util.systemLanguageTag(context)
+        val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY]
+            ?.takeUnless { !explicitLanguage && it == "en-US" }
+            ?: systemLanguage
         val language = prefs[profileManager.profileStringKeyFor(profileId, "content_language")]
+            ?.takeUnless { !explicitLanguage && it == "en-US" }
             ?: fallbackLanguage
         mediaRepository.contentLanguage = if (language == "en-US") null else language
         return language
@@ -1381,33 +1387,48 @@ class HomeViewModel @Inject constructor(
                 }
         }
 
-        // Keep Home preferences bound to the active profile. Cloud restore and profile
-        // switching can update DataStore after this ViewModel has already been created.
+        // Load top-level UI preferences used on Home
         viewModelScope.launch {
             try {
-                observeHomeProfilePreferences(
-                    activeProfileId = profileManager.activeProfileId,
-                    preferences = context.settingsDataStore.data
-                ).collect { preferences ->
-                    val previousState = _uiState.value
-                    val autoplayJustEnabled = !previousState.trailerAutoPlay && preferences.trailerAutoPlay
-                    _uiState.value = previousState.copy(
-                        trailerAutoPlay = preferences.trailerAutoPlay,
-                        trailerSoundEnabled = preferences.trailerSoundEnabled,
-                        trailerDelaySeconds = preferences.trailerDelaySeconds,
-                        trailerInCards = preferences.trailerInCards,
-                        showBudget = preferences.showBudget,
-                        clockFormat = preferences.clockFormat,
-                        smoothScrolling = preferences.smoothScrolling
-                    )
-
-                    if (autoplayJustEnabled) {
-                        _uiState.value.heroItem?.let(::hydrateHeroDetailsIfNeeded)
-                    }
+                val prefs = context.settingsDataStore.data.first()
+                // Search for any profile key that matches trailer_auto_play
+                val trailerEnabled = prefs.asMap().any { (key, value) ->
+                    key.name.endsWith("_trailer_auto_play") && value == true
                 }
-            } catch (e: Exception) {
+                // show_budget_on_home defaults to TRUE so existing users see no change
+                // until they explicitly disable it. We check any active-profile key; if
+                // none exist yet the default of true is preserved. Issue #72.
+                val showBudgetExplicit = prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_show_budget_on_home") }
+                    ?.value as? Boolean
+                val showBudget = showBudgetExplicit ?: true
+                val clockFormat = prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_clock_format") }
+                    ?.value as? String ?: "24h"
+                val trailerSoundEnabled = prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_trailer_sound_enabled") }
+                    ?.value as? Boolean ?: false
+                val trailerDelaySeconds = (prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_trailer_delay_seconds") }
+                    ?.value as? String)?.toIntOrNull() ?: 2
+                val trailerInCards = prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_trailer_in_cards") }
+                    ?.value as? Boolean ?: true
+                val smoothScrollingExplicit = prefs.asMap().entries
+                    .firstOrNull { (key, _) -> key.name.endsWith("_smooth_scrolling") }
+                    ?.value as? Boolean
+                val smoothScrolling = smoothScrollingExplicit ?: false
+                _uiState.value = _uiState.value.copy(
+                    trailerAutoPlay = trailerEnabled,
+                    trailerSoundEnabled = trailerSoundEnabled,
+                    trailerDelaySeconds = trailerDelaySeconds,
+                    trailerInCards = trailerInCards,
+                    showBudget = showBudget,
+                    clockFormat = clockFormat,
+                    smoothScrolling = smoothScrolling
+                )
+                    } catch (e: Exception) {
                 if (e is CancellationException) throw e
-                AppLogger.e("HomeVM", "Failed to observe profile preferences: ${e.message}", e)
             }
         }
 
@@ -1549,7 +1570,7 @@ class HomeViewModel @Inject constructor(
                     val merged = mergeContinueWatchingResumeData(cached)
                     val cwCategory = Category(
                         id = "continue_watching",
-                        title = "Continue Watching",
+                        title = context.getString(R.string.continue_watching),
                         items = merged.map { it.toMediaItem() }
                     )
                     cwCategory.items.forEach { mediaRepository.cacheItem(it) }
@@ -1764,7 +1785,7 @@ class HomeViewModel @Inject constructor(
             }
             val placeholderContinueWatching = Category(
                 id = "continue_watching",
-                title = "Continue Watching",
+                title = context.getString(R.string.continue_watching),
                 items = placeholderItems
             )
             filteredCategories.add(0, placeholderContinueWatching)
@@ -1974,7 +1995,7 @@ class HomeViewModel @Inject constructor(
     private suspend fun publishContinueWatching(items: List<ContinueWatchingItem>) {
         val continueWatchingCategory = Category(
             id = "continue_watching",
-            title = "Continue Watching",
+            title = context.getString(R.string.continue_watching),
             items = items.map { it.toMediaItem() }
         )
         continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
@@ -2374,7 +2395,7 @@ class HomeViewModel @Inject constructor(
                     val merged = mergeContinueWatchingResumeData(cachedContinueWatching)
                     val cwCat = Category(
                         id = "continue_watching",
-                        title = "Continue Watching",
+                        title = context.getString(R.string.continue_watching),
                         items = merged.map { it.toMediaItem() }
                     )
                     categories.add(0, cwCat)
@@ -2586,7 +2607,7 @@ class HomeViewModel @Inject constructor(
                         val mergedContinueWatching = mergeContinueWatchingResumeData(freshContinueWatching)
                         val continueWatchingCategory = Category(
                             id = "continue_watching",
-                            title = "Continue Watching",
+                            title = context.getString(R.string.continue_watching),
                             items = mergedContinueWatching.map { it.toMediaItem() }
                         )
                         continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
@@ -2955,7 +2976,7 @@ class HomeViewModel @Inject constructor(
             rows.add(
                 Category(
                     id = "continue_watching",
-                    title = "Continue Watching",
+                    title = context.getString(R.string.continue_watching),
                     items = cachedContinueWatching.map { it.toMediaItem() }
                 )
             )
@@ -2963,7 +2984,7 @@ class HomeViewModel @Inject constructor(
             rows.add(
                 Category(
                     id = "continue_watching",
-                    title = "Continue Watching",
+                    title = context.getString(R.string.continue_watching),
                     items = placeholderItems
                 )
             )
@@ -3071,7 +3092,7 @@ class HomeViewModel @Inject constructor(
             // When connected to Trakt, use ONLY Trakt as the source of truth for
             // Continue Watching. The previous code merged local/history items which
             // polluted the CW row with shows not on the user's Trakt — e.g., items
-            // watched before connecting Trakt, or items from ARVIO Cloud watch_history
+            // watched before connecting Trakt, or items from StreamNet TV Cloud watch_history
             // that Trakt doesn't know about. Trakt users expect CW to match exactly
             // what Trakt shows as "Up Next."
             val traktItems = if (forceFresh) {
@@ -3219,7 +3240,7 @@ class HomeViewModel @Inject constructor(
                     val mergedContinueWatching = mergeContinueWatchingResumeData(resolvedContinueWatching)
                     val continueWatchingCategory = Category(
                         id = "continue_watching",
-                        title = "Continue Watching",
+                        title = context.getString(R.string.continue_watching),
                         items = mergedContinueWatching.map { it.toMediaItem() }
                     )
                     continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
@@ -3272,7 +3293,7 @@ class HomeViewModel @Inject constructor(
                         }
                         val continueWatchingCategory = Category(
                             id = "continue_watching",
-                            title = "Continue Watching",
+                            title = context.getString(R.string.continue_watching),
                             items = safeItems
                         )
                         latestCategories.add(0, continueWatchingCategory)
@@ -4554,3 +4575,4 @@ private object HomeVMRegexes {
     val ALPHANUMERIC_REGEX = Regex("[^A-Za-z0-9_.-]")
     val FILE_NAME_REGEX = Regex("[^a-zA-Z0-9._-]")
 }
+

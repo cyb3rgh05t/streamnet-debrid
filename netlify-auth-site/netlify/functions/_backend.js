@@ -311,7 +311,7 @@ function signArvioRefreshToken(account) {
 function verifyArvioToken(token, expectedType) {
   const parts = String(token || "").split(".");
   if (parts.length !== 3) {
-    throw new Error("Invalid ARVIO token");
+    throw new Error("Invalid StreamNet TV token");
   }
   const signingInput = `${parts[0]}.${parts[1]}`;
   const expected = crypto
@@ -325,22 +325,22 @@ function verifyArvioToken(token, expectedType) {
     expectedBuffer.length !== actualBuffer.length ||
     !crypto.timingSafeEqual(expectedBuffer, actualBuffer)
   ) {
-    throw new Error("Invalid ARVIO token signature");
+    throw new Error("Invalid StreamNet TV token signature");
   }
 
   let payload;
   try {
     payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
   } catch {
-    throw new Error("Invalid ARVIO token payload");
+    throw new Error("Invalid StreamNet TV token payload");
   }
   if (payload.iss !== AUTH_ISSUER || !payload.sub || !payload.email) {
-    throw new Error("Invalid ARVIO token claims");
+    throw new Error("Invalid StreamNet TV token claims");
   }
   const tokenType = payload.token_type || "access";
-  if (tokenType !== expectedType) throw new Error("Invalid ARVIO token type");
+  if (tokenType !== expectedType) throw new Error("Invalid StreamNet TV token type");
   if (Number(payload.exp || 0) <= Math.floor(Date.now() / 1000)) {
-    throw new Error("ARVIO token expired");
+    throw new Error("StreamNet TV token expired");
   }
   return {
     supabaseUserId: String(payload.sub),
@@ -571,7 +571,7 @@ async function sendTransactionalEmail(email, subject, text, html) {
     throw error;
   }
 
-  const from = process.env.AUTH_EMAIL_FROM || "ARVIO <noreply@auth.arvio.tv>";
+  const from = process.env.AUTH_EMAIL_FROM || "StreamNet TV <noreply@auth.arvio.tv>";
   if (provider === "resend") {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -613,7 +613,7 @@ async function sendTransactionalEmail(email, subject, text, html) {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
-        from: { email: from.replace(/^.*<(.+)>$/, "$1"), name: "ARVIO" },
+        from: { email: from.replace(/^.*<(.+)>$/, "$1"), name: "StreamNet TV" },
         subject,
         content: [
           { type: "text/plain", value: text },
@@ -628,16 +628,16 @@ async function sendTransactionalEmail(email, subject, text, html) {
 }
 
 async function sendPasswordSetupEmail(email, setupUrl) {
-  const subject = "Create your ARVIO Cloud password";
+  const subject = "Create your StreamNet TV Cloud password";
   const text = [
-    "ARVIO Cloud moved to a new secure server.",
-    "To keep your account protected, create a new ARVIO Cloud password:",
+    "StreamNet TV Cloud moved to a new secure server.",
+    "To keep your account protected, create a new StreamNet TV Cloud password:",
     setupUrl,
     "This link expires in 1 hour."
   ].join("\n\n");
   const html = `
-    <p>ARVIO Cloud moved to a new secure server.</p>
-    <p>To keep your account protected, create a new ARVIO Cloud password:</p>
+    <p>StreamNet TV Cloud moved to a new secure server.</p>
+    <p>To keep your account protected, create a new StreamNet TV Cloud password:</p>
     <p><a href="${setupUrl}">Create new password</a></p>
     <p>This link expires in 1 hour.</p>
   `;
@@ -645,14 +645,14 @@ async function sendPasswordSetupEmail(email, setupUrl) {
 }
 
 async function sendAccountDeletionConfirmation(email) {
-  const subject = "Your ARVIO account has been deleted";
+  const subject = "Your StreamNet TV account has been deleted";
   const text = [
-    "Your ARVIO account and cloud-synced data have been permanently deleted.",
+    "Your StreamNet TV account and cloud-synced data have been permanently deleted.",
     "No further action is required.",
     "If you did not request this deletion, contact arvio.app@gmail.com."
   ].join("\n\n");
   const html = `
-    <p>Your ARVIO account and cloud-synced data have been permanently deleted.</p>
+    <p>Your StreamNet TV account and cloud-synced data have been permanently deleted.</p>
     <p>No further action is required.</p>
     <p>If you did not request this deletion, contact <a href="mailto:arvio.app@gmail.com">arvio.app@gmail.com</a>.</p>
   `;
@@ -779,7 +779,7 @@ async function authenticateNetlifyPassword(event, email, password) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. To keep your data protected, create a new ARVIO Cloud password from the email we sent you."
+      "StreamNet TV Cloud moved to a new secure server. To keep your data protected, create a new StreamNet TV Cloud password from the email we sent you."
     );
   }
   if (!account || !account.passwordHash) {
@@ -788,7 +788,7 @@ async function authenticateNetlifyPassword(event, email, password) {
       await throwPasswordSetupRequired(
         event,
         email,
-        "ARVIO Cloud moved to a new secure server. To keep your data protected, create a new ARVIO Cloud password from the email we sent you."
+        "StreamNet TV Cloud moved to a new secure server. To keep your data protected, create a new StreamNet TV Cloud password from the email we sent you."
       );
     }
     const error = new Error("Invalid email or password");
@@ -820,14 +820,14 @@ async function createNetlifyAccount(event, email, password) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. Create a new ARVIO Cloud password to keep your existing data."
+      "StreamNet TV Cloud moved to a new secure server. Create a new StreamNet TV Cloud password to keep your existing data."
     );
   }
   if (legacy && !existing?.passwordHash) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. Create a new ARVIO Cloud password to keep your existing data."
+      "StreamNet TV Cloud moved to a new secure server. Create a new StreamNet TV Cloud password to keep your existing data."
     );
   }
   if (existing?.passwordHash) {
@@ -1273,7 +1273,7 @@ async function handleTmdbProxy(event) {
         accept: "application/json",
         "accept-encoding": "identity;q=1, *;q=0",
         "cache-control": "max-age=300",
-        "user-agent": "ARVIO-Netlify-TMDB-Proxy/1.0"
+        "user-agent": "StreamNet TV-Netlify-TMDB-Proxy/1.0"
       }
     });
     const text = await response.text();
@@ -2328,3 +2328,4 @@ module.exports = {
     safeTokenEqual
   }
 };
+

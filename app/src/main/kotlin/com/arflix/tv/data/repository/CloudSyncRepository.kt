@@ -282,7 +282,6 @@ class CloudSyncRepository @Inject constructor(
         val trailerInCards: Boolean = true,
         val clockFormat: String = "24h",
         val showBudget: Boolean = true,
-        val showEpisodeRatings: Boolean = true,
         val showLoadingStats: Boolean? = null,
         val spoilerBlurEnabled: Boolean = false,
         val volumeBoostDb: Int = 0,
@@ -313,8 +312,6 @@ class CloudSyncRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "clock_format")
     private fun showBudgetKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_budget_on_home")
-    private fun showEpisodeRatingsKeyFor(profileId: String) =
-        profileManager.profileBooleanKeyFor(profileId, "show_episode_ratings")
     private fun showLoadingStatsKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_loading_stats")
     private fun spoilerBlurKeyFor(profileId: String) =
@@ -605,7 +602,6 @@ class CloudSyncRepository @Inject constructor(
                         trailerInCards = prefs[trailerInCardsKeyFor(profile.id)] ?: true,
                         clockFormat = prefs[clockFormatKeyFor(profile.id)] ?: "24h",
                         showBudget = prefs[showBudgetKeyFor(profile.id)] ?: true,
-                        showEpisodeRatings = prefs[showEpisodeRatingsKeyFor(profile.id)] ?: true,
                         showLoadingStats = prefs[showLoadingStatsKeyFor(profile.id)] ?: true,
                         spoilerBlurEnabled = prefs[spoilerBlurKeyFor(profile.id)] ?: false,
                         volumeBoostDb = prefs[volumeBoostDbKeyFor(profile.id)]?.toIntOrNull()?.coerceIn(0, 15) ?: 0,
@@ -653,7 +649,7 @@ class CloudSyncRepository @Inject constructor(
         root.put("dnsProvider", globalDnsProvider)
         root.put("customUserAgent", prefs[customUserAgentKey] ?: "")
         root.put("oledBlackBackground", prefs[OLED_BLACK_BACKGROUND_KEY] ?: false)
-        val accentColor = prefs[ACCENT_COLOR_KEY] ?: "White"
+        val accentColor = prefs[ACCENT_COLOR_KEY] ?: "Orange"
         root.put("accentColor", accentColor)
         root.put("focusBorderColor", accentColor)
         root.put("subtitleUsageJson", prefs[subtitleUsageKey()] ?: "")
@@ -1308,7 +1304,6 @@ class CloudSyncRepository @Inject constructor(
                         prefs[trailerInCardsKeyFor(profileId)] = state.trailerInCards
                         prefs[clockFormatKeyFor(profileId)] = state.clockFormat
                         prefs[showBudgetKeyFor(profileId)] = state.showBudget
-                        prefs[showEpisodeRatingsKeyFor(profileId)] = state.showEpisodeRatings
                         state.showLoadingStats?.let { prefs[showLoadingStatsKeyFor(profileId)] = it }
                         prefs[spoilerBlurKeyFor(profileId)] = state.spoilerBlurEnabled
                         prefs[volumeBoostDbKeyFor(profileId)] = state.volumeBoostDb.coerceIn(0, 15).toString()

@@ -25,6 +25,7 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.ui.theme.BackgroundOverlay
+import com.arflix.tv.ui.theme.BackgroundDark
 import com.arflix.tv.ui.theme.Cyan
 import com.arflix.tv.ui.theme.ParticleCyan
 import com.arflix.tv.ui.theme.ParticlePurple
@@ -40,7 +41,7 @@ import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 
 /**
- * Premium ARVIO Loading Screen - Optimized for TV Performance
+ * Premium StreamNet TV Loading Screen - Optimized for TV Performance
  * Removed heavy effects: blur, particles, multiple animated layers
  * Clean, lightweight design that runs smooth on TV hardware
  */
@@ -73,7 +74,7 @@ fun ArvioLoadingScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0A0A0F))  // Static dark background - no gradient animation
+            .background(BackgroundDark)
     ) {
         // Center content - no particles for performance
         Column(
@@ -84,8 +85,8 @@ fun ArvioLoadingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Image(
-                painter = painterResource(id = R.drawable.arvio_loading_logo),
-                contentDescription = "ARVIO",
+                painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+                contentDescription = "StreamNet TV",
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxWidth(0.58f)
@@ -244,3 +245,4 @@ fun LoadingOverlay(
 }
 
 private val EaseInOutCubic = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+

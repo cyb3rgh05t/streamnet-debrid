@@ -7,6 +7,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.ui.draw.clip
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -44,6 +46,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -62,6 +65,7 @@ import com.arflix.tv.ui.components.Toast
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import com.arflix.tv.R
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -149,16 +153,17 @@ fun ProfileSelectionScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Title
-            Text(
-                text = "ARVIO",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color.White,
-                letterSpacing = 6.sp
+            // Brand logo
+            Image(
+                painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+                contentDescription = "StreamNet TV",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .padding(horizontal = 24.dp)
+                    .widthIn(max = if (isTouchDevice) 300.dp else 360.dp)
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             Text(
                 text = if (uiState.isManageMode) stringResource(R.string.manage_profiles) else stringResource(R.string.whos_watching),
@@ -604,30 +609,31 @@ private fun CloudConnectButton(
             modifier = Modifier
                 .clip(RoundedCornerShape(24.dp))
                 .background(
-                    brush = Brush.horizontalGradient(
+                    brush = Brush.linearGradient(
                         colors = listOf(
-                            Color(0xFF6C63FF).copy(alpha = 0.25f),
-                            Color(0xFF00D4FF).copy(alpha = 0.18f)
+                            Color(0xFFE5A209),
+                            Color(0xFFCE8017)
                         )
                     )
                 )
-                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(24.dp))
+                .border(2.dp, Color(0xFFF0A809).copy(alpha = 0.7f), RoundedCornerShape(24.dp))
                 .clickable { onClick() }
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .padding(horizontal = 28.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Cloud,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.85f),
-                modifier = Modifier.size(18.dp)
+                tint = Color(0xFF1a1a1a),
+                modifier = Modifier.size(22.dp)
             )
             Text(
                 text = stringResource(R.string.connect_to_cloud),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.85f)
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF1a1a1a),
+                letterSpacing = 0.5.sp
             )
         }
     } else {
@@ -636,38 +642,40 @@ private fun CloudConnectButton(
             modifier = Modifier.onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(24.dp)),
             colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color.White.copy(alpha = 0.06f),
-                focusedContainerColor = Color.White.copy(alpha = 0.18f)
+                containerColor = Color(0xFFE5A209).copy(alpha = 0.14f),
+                focusedContainerColor = Color(0xFFE5A209).copy(alpha = 0.28f)
             ),
             border = ClickableSurfaceDefaults.border(
                 border = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFE5A209).copy(alpha = 0.50f)),
                     shape = RoundedCornerShape(24.dp)
                 ),
                 focusedBorder = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White.copy(alpha = 0.6f)),
+                    border = androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFF0A809)),
                     shape = RoundedCornerShape(24.dp)
                 )
             )
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Icon(
                     imageVector = Icons.Default.Cloud,
                     contentDescription = null,
-                    tint = if (isFocused > 0) Color.White else Color.White.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp)
+                    tint = if (isFocused > 0) Color(0xFFF0A809) else Color(0xFFE5A209),
+                    modifier = Modifier.size(22.dp)
                 )
                 Text(
                     text = stringResource(R.string.connect_to_cloud),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (isFocused > 0) Color.White else Color.White.copy(alpha = 0.7f)
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isFocused > 0) Color(0xFFF0A809) else Color(0xFFE5A209),
+                    letterSpacing = 0.5.sp
                 )
             }
         }
     }
 }
+

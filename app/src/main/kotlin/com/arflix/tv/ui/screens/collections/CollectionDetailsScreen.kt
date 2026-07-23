@@ -54,6 +54,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dagger.hilt.android.qualifiers.ApplicationContext
 import androidx.tv.foundation.lazy.grid.TvGridCells
 import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
 import androidx.tv.foundation.lazy.grid.itemsIndexed
@@ -83,6 +84,7 @@ import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.util.LocalDeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -124,6 +126,7 @@ data class CollectionDetailsUiState(
 
 @HiltViewModel
 class CollectionDetailsViewModel @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val catalogRepository: CatalogRepository,
     private val mediaRepository: MediaRepository,
     private val sportsRepository: SportsRepository
@@ -157,7 +160,7 @@ class CollectionDetailsViewModel @Inject constructor(
                 _uiState.value = CollectionDetailsUiState(
                     isLoadingMovies = false,
                     isLoadingSeries = false,
-                    error = "Collection not found"
+                    error = context.getString(R.string.collection_not_found)
                 )
                 return@launch
             }

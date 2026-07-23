@@ -76,6 +76,15 @@ import com.arflix.tv.data.model.ProfileColors
 import com.arflix.tv.ui.components.AvatarIcon
 import com.arflix.tv.ui.components.AvatarRegistry
 import com.arflix.tv.ui.components.avatarCategoryLabel
+import com.arflix.tv.ui.theme.AccentYellow
+import com.arflix.tv.ui.theme.AccentYellowBright
+import com.arflix.tv.ui.theme.ArcticBlack
+import com.arflix.tv.ui.theme.BackgroundCard
+import com.arflix.tv.ui.theme.BackgroundDark
+import com.arflix.tv.ui.theme.BackgroundElevated
+import com.arflix.tv.ui.theme.ErrorRed
+import com.arflix.tv.ui.theme.TextPrimary
+import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.ProfileAvatarFiles
 import coil.compose.AsyncImage
@@ -273,7 +282,7 @@ private fun ProfileDialogContent(
                         .fillMaxWidth()
                         .heightIn(max = (configuration.screenHeightDp - 24).dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF141414))
+                        .background(BackgroundDark)
                         .verticalScroll(rememberScrollState())
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
@@ -282,7 +291,7 @@ private fun ProfileDialogContent(
                         text = title,
                         fontSize = 19.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = Color.White
+                        color = TextPrimary
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
@@ -313,7 +322,7 @@ private fun ProfileDialogContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF222222))
+                            .background(BackgroundElevated)
                             .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                             .clickable {
                                 editTextRef?.let { et ->
@@ -473,7 +482,7 @@ private fun ProfileDialogContent(
                             text = avatarCategoryLabel(label),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.5f),
+                            color = TextSecondary,
                             modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
                         )
 
@@ -510,7 +519,7 @@ private fun ProfileDialogContent(
                     modifier = Modifier
                         .padding(horizontal = 48.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(Color(0xFF141414))
+                        .background(BackgroundDark)
                         .padding(start = 28.dp, top = 28.dp, bottom = 28.dp, end = 12.dp),
                     verticalAlignment = Alignment.Top,
                     horizontalArrangement = Arrangement.spacedBy(28.dp)
@@ -524,7 +533,7 @@ private fun ProfileDialogContent(
                             text = title,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.SemiBold,
-                            color = Color.White
+                            color = TextPrimary
                         )
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -557,7 +566,7 @@ private fun ProfileDialogContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF222222))
+                                .background(BackgroundElevated)
                                 .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
                                 .clickable {
                                     editTextRef?.let { et ->
@@ -723,7 +732,7 @@ private fun ProfileDialogContent(
                                 text = avatarCategoryLabel(label),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.White.copy(alpha = 0.5f),
+                                color = TextSecondary,
                                 modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
                             )
 
@@ -935,7 +944,7 @@ private fun AvatarGridItem(
                 .clip(RoundedCornerShape(10.dp))
                 .border(
                     width = if (isSelected || isFocused > 0) 2.dp else 1.dp,
-                    color = if (isSelected || isFocused > 0) Color.White else Color.White.copy(alpha = 0.08f),
+                    color = if (isSelected || isFocused > 0) AccentYellow else Color.White.copy(alpha = 0.08f),
                     shape = RoundedCornerShape(10.dp)
                 )
                 .clickable { onClick() }
@@ -958,7 +967,7 @@ private fun AvatarGridItem(
             border = ClickableSurfaceDefaults.border(
                 border = if (isSelected) {
                     androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, AccentYellow),
                         shape = RoundedCornerShape(10.dp)
                     )
                 } else {
@@ -968,7 +977,7 @@ private fun AvatarGridItem(
                     )
                 },
                 focusedBorder = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, AccentYellowBright),
                     shape = RoundedCornerShape(10.dp)
                 )
             )
@@ -996,27 +1005,36 @@ private fun DialogButton(
     var isFocused by remember { mutableIntStateOf(0) }
 
     val containerColor = when {
-        isDestructive -> Color(0xFFDC2626)
-        isPrimary -> Color(0xFFE50914)
+        isDestructive -> ErrorRed
+        isPrimary -> AccentYellow
         else -> Color.Transparent
     }
     val focusedContainerColor = when {
-        isDestructive -> Color(0xFFEF4444)
-        isPrimary -> Color(0xFFFF1A1A)
-        else -> Color.White.copy(alpha = 0.1f)
+        isDestructive -> ErrorRed.copy(alpha = 0.9f)
+        isPrimary -> AccentYellowBright
+        else -> BackgroundCard
     }
 
     val buttonContent: @Composable () -> Unit = {
         Box(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 46.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (enabled) Color.White else Color.White.copy(alpha = 0.4f),
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                color = if (enabled) {
+                    when {
+                        isPrimary -> ArcticBlack
+                        else -> TextPrimary
+                    }
+                } else {
+                    TextSecondary
+                },
+                modifier = Modifier.padding(horizontal = 18.dp)
             )
         }
     }
@@ -1038,14 +1056,16 @@ private fun DialogButton(
                     }
                 )
                 .clickable { if (enabled) onClick() }
-                .heightIn(min = 44.dp)
+                .heightIn(min = 46.dp)
         ) {
             buttonContent()
         }
     } else {
         Surface(
             onClick = { if (enabled) onClick() },
-            modifier = modifier.onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
+            modifier = modifier
+                .heightIn(min = 46.dp)
+                .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
             shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(6.dp)),
             colors = ClickableSurfaceDefaults.colors(
                 containerColor = containerColor,

@@ -12,8 +12,8 @@ import com.arflix.tv.ui.skin.ProvideArvioSkin
 import com.arflix.tv.ui.skin.accentColorFromName
 
 /**
- * ARVIO Color scheme holder - Arctic Fuse 2 inspired
- * Minimal dark theme with light gray (#EDEDED) on pure black (#000000)
+ * StreamNet TV color scheme holder
+ * Dark surfaces (#141414 / #1F1F1F) with amber accent (#E5A209)
  */
 data class ArvioColors(
     // Arctic Fuse 2 Main Colors
@@ -60,7 +60,7 @@ data class ArvioColors(
     val imdbYellow: androidx.compose.ui.graphics.Color = ImdbYellow,
     val accentRed: androidx.compose.ui.graphics.Color = AccentRed,
 
-    // Focus states (White for Arctic Fuse 2)
+    // Focus states
     val focusRing: androidx.compose.ui.graphics.Color = FocusRing,
     val focusGlow: androidx.compose.ui.graphics.Color = FocusGlow,
 
@@ -82,8 +82,7 @@ fun appBackgroundDark(): Color {
 val LocalArflixColors = LocalArvioColors
 
 /**
- * Main ARVIO TV theme - Arctic Fuse 2 inspired
- * Pure black background, light gray text, white focus states
+ * Main StreamNet TV theme
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -95,17 +94,17 @@ fun ArvioTvTheme(
     val backgroundDark = if (oledBlackBackground) Color.Black else BackgroundDark
     val accentColor = accentColorName?.let { accentColorFromName(it) }
     val colorScheme = darkColorScheme(
-        primary = ArcticWhite,
+        primary = AccentYellow,
         onPrimary = ArcticBlack,
-        primaryContainer = ArcticGray,
+        primaryContainer = AccentYellowSoft,
         onPrimaryContainer = ArcticWhite,
-        secondary = ArcticWhite70,
+        secondary = AccentYellowBright,
         onSecondary = ArcticBlack,
-        secondaryContainer = ArcticGray,
+        secondaryContainer = BackgroundElevated,
         onSecondaryContainer = ArcticWhite,
         tertiary = AccentWhite,
         onTertiary = ArcticBlack,
-        tertiaryContainer = ArcticGray,
+        tertiaryContainer = BackgroundCard,
         onTertiaryContainer = ArcticWhite,
         background = backgroundDark,
         onBackground = TextPrimary,
@@ -115,7 +114,7 @@ fun ArvioTvTheme(
         onSurfaceVariant = TextSecondary,
         error = ErrorRed,
         onError = ArcticWhite,
-        border = BorderLight
+        border = BorderMedium
     )
 
     val arvioColors = ArvioColors(backgroundDark = backgroundDark)
@@ -148,7 +147,7 @@ fun ArflixTvTheme(
 )
 
 /**
- * Access custom ARVIO colors
+ * Access custom StreamNet TV colors
  */
 object ArvioTheme {
     val colors: ArvioColors
@@ -165,3 +164,4 @@ object ArflixTheme {
 
 // Type alias for backward compatibility
 typealias ArflixColors = ArvioColors
+

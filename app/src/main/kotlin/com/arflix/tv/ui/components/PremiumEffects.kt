@@ -40,7 +40,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Premium visual effects for ARVIO
+ * Premium visual effects for StreamNet TV
  * Inspired by NoopyTV's neon dark theme
  */
 
@@ -502,3 +502,4 @@ fun ShimmerEffect(
 // Easing functions
 private val EaseInOutCubic = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 private val EaseOut = CubicBezierEasing(0f, 0f, 0.2f, 1f)
+

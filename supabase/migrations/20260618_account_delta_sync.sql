@@ -1,4 +1,4 @@
--- Nuvio-style cloud sync foundation for ARVIO.
+-- Nuvio-style cloud sync foundation for StreamNet TV.
 --
 -- Keep the legacy account_sync_state full snapshot for old clients, but add
 -- small row-based current state + append-only delta events so newer clients can
@@ -472,3 +472,4 @@ end;
 $$;
 
 grant execute on function public.save_account_sync_payload(text) to authenticated;
+

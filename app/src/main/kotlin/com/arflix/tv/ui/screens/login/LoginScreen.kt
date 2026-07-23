@@ -169,7 +169,7 @@ fun LoginScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = "ARVIO",
+                    text = "StreamNet TV",
                     fontSize = 64.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 8.sp,
@@ -503,3 +503,4 @@ private fun GradientButton(
 }
 
 private val EaseInOutCubic = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
+

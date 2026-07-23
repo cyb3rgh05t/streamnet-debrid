@@ -69,6 +69,7 @@ import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.LocalHasTouchScreen
 import com.arflix.tv.util.LocalAppLanguage
+import com.arflix.tv.util.APP_LANGUAGE_EXPLICIT_KEY
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.util.deviceHasTouchScreen
@@ -108,6 +109,8 @@ import com.arflix.tv.navigation.Screen
 import com.arflix.tv.ui.screens.login.LoginScreen
 import com.arflix.tv.ui.startup.StartupViewModel
 import com.arflix.tv.ui.theme.ArflixTvTheme
+import com.arflix.tv.ui.theme.AccentYellow
+import com.arflix.tv.ui.theme.BackgroundDark
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.worker.TraktSyncWorker
@@ -171,9 +174,10 @@ class MainActivity : ComponentActivity() {
     private val startupViewModel: StartupViewModel by viewModels()
 
     override fun attachBaseContext(newBase: Context) {
-        val tag = newBase.getSharedPreferences("app_locale", Context.MODE_PRIVATE)
-            .getString("locale_tag", null)
-        if (!tag.isNullOrEmpty()) {
+        val localePrefs = newBase.getSharedPreferences("app_locale", Context.MODE_PRIVATE)
+        val tag = localePrefs.getString("locale_tag", null)
+        val isExplicit = localePrefs.getBoolean("locale_explicit", false)
+        if (isExplicit && !tag.isNullOrEmpty()) {
             val locale = java.util.Locale.forLanguageTag(tag)
             java.util.Locale.setDefault(locale)
             val config = Configuration(newBase.resources.configuration)
@@ -199,8 +203,9 @@ class MainActivity : ComponentActivity() {
         }
 
         super.onCreate(savedInstanceState)
-        window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
-        window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
+        val startupBg = android.graphics.Color.parseColor("#141414")
+        window.setBackgroundDrawable(ColorDrawable(startupBg))
+        window.decorView.setBackgroundColor(startupBg)
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
         pendingLauncherRequest = parseLauncherRequest(intent)
@@ -290,15 +295,25 @@ class MainActivity : ComponentActivity() {
             }.collectAsStateWithLifecycle(initialValue = null)
             val appLanguage by remember(activeProfileId) {
                 this@MainActivity.settingsDataStore.data.map { prefs ->
-                    val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "en-US"
+                    val explicitLanguage = prefs[APP_LANGUAGE_EXPLICIT_KEY] ?: false
+                    val systemLanguage = com.arflix.tv.util.systemLanguageTag(this@MainActivity)
+                    val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY]
+                        ?.takeUnless { !explicitLanguage && it == "en-US" }
+                        ?: systemLanguage
                     val profileId = activeProfileId
-                    if (profileId.isNullOrBlank()) {
+                    val profileLanguage = if (profileId.isNullOrBlank()) {
+                        null
+                    } else {
+                        prefs[stringPreferencesKey("profile_${profileId}_content_language")]
+                    }
+                    val resolved = profileLanguage?.takeUnless { !explicitLanguage && it == "en-US" }
+                    if (resolved.isNullOrBlank()) {
                         fallbackLanguage
                     } else {
-                        prefs[stringPreferencesKey("profile_${profileId}_content_language")] ?: fallbackLanguage
+                        resolved
                     }
                 }
-            }.collectAsStateWithLifecycle(initialValue = "en-US")
+            }.collectAsStateWithLifecycle(initialValue = com.arflix.tv.util.systemLanguageTag(this@MainActivity))
             LaunchedEffect(appLanguage) {
                 mediaRepository.get().contentLanguage = if (appLanguage == "en-US") null else appLanguage
             }
@@ -433,7 +448,7 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 }
 
 /**
- * Simple ARVIO loading screen - app logo + spinner
+ * Simple StreamNet TV loading screen - app logo + spinner
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -471,11 +486,11 @@ fun ArvioLoadingScreen() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(BackgroundDark),
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(color = Color.Black)
+            drawRect(color = BackgroundDark)
 
             val progress = reveal.value
             val logoCenterY = center.y - 8.dp.toPx()
@@ -485,7 +500,7 @@ fun ArvioLoadingScreen() {
             val lineStartX = center.x - halfWidth
             val lineEndX = center.x + halfWidth
             drawLine(
-                color = Color(0xFF00F0D0).copy(alpha = 0.32f * progress),
+                color = AccentYellow.copy(alpha = 0.40f * progress),
                 start = Offset(lineStartX, baselineY),
                 end = Offset(lineEndX, baselineY),
                 strokeWidth = 1.6.dp.toPx(),
@@ -496,7 +511,7 @@ fun ArvioLoadingScreen() {
             val sweepTravel = (halfWidth - sweepHalfWidth).coerceAtLeast(0f)
             val sweepX = center.x + (sweep * sweepTravel)
             drawLine(
-                color = Color.White.copy(alpha = 0.54f * progress),
+                color = AccentYellow.copy(alpha = 0.85f * progress),
                 start = Offset(sweepX - sweepHalfWidth, baselineY),
                 end = Offset(sweepX + sweepHalfWidth, baselineY),
                 strokeWidth = 1.2.dp.toPx(),
@@ -505,8 +520,8 @@ fun ArvioLoadingScreen() {
         }
 
         Image(
-            painter = painterResource(id = R.drawable.arvio_loading_logo),
-            contentDescription = "ARVIO",
+            painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+            contentDescription = "StreamNet TV",
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .fillMaxWidth(0.52f)
@@ -524,7 +539,7 @@ fun ArvioLoadingScreen() {
 }
 
 /**
- * Root composable for the ARVIO app
+ * Root composable for the StreamNet TV app
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -707,3 +722,4 @@ private fun enqueueFullTraktSync(context: android.content.Context) {
         request
     )
 }
+

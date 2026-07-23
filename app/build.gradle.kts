@@ -32,8 +32,8 @@ android {
         targetSdk = 35
         versionCode = 304
         versionName = "1.9.982"
-        buildConfigField("String", "GITHUB_OWNER", "\"ProdigyV21\"")
-        buildConfigField("String", "GITHUB_REPO", "\"StreamNet TV\"")
+        buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
+        buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
         // Cloud sync uses a Netlify function layer for app-facing endpoints and
         // Supabase for auth, storage, and the backing account sync tables.

@@ -94,7 +94,7 @@ import coil.compose.AsyncImage
 import com.arflix.tv.R
 
 // OLED source picker colors. Keep these deliberately monochrome so the sheet
-// feels like the rest of ARVIO instead of a separate dashboard.
+// feels like the rest of StreamNet TV instead of a separate dashboard.
 private val OledPanel = Color.White.copy(alpha = 0.055f)
 private val OledPanelStrong = Color.White.copy(alpha = 0.095f)
 private val OledBorder = Color.White.copy(alpha = 0.16f)
@@ -2615,3 +2615,4 @@ private fun qualityScore(quality: String): Int {
         else -> 0
     }
 }
+

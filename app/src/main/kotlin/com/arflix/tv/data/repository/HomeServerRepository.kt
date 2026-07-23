@@ -383,7 +383,7 @@ class HomeServerRepository @Inject constructor(
             ?.newBuilder()
             ?.addQueryParameter("strong", "true")
             ?.addQueryParameter("X-Plex-Client-Identifier", deviceId())
-            ?.addQueryParameter("X-Plex-Product", "ARVIO")
+            ?.addQueryParameter("X-Plex-Product", "StreamNet TV")
             ?.build()
             ?.toString()
             ?: error(context.getString(R.string.homeserver_invalid_code_url))
@@ -860,15 +860,15 @@ class HomeServerRepository @Inject constructor(
     }
 
     private fun authHeader(token: String? = null): String {
-        val base = "MediaBrowser Client=\"ARVIO\", Device=\"Android\", DeviceId=\"${deviceId()}\", Version=\"${BuildConfig.VERSION_NAME}\""
+        val base = "MediaBrowser Client=\"StreamNet TV\", Device=\"Android\", DeviceId=\"${deviceId()}\", Version=\"${BuildConfig.VERSION_NAME}\""
         return if (token.isNullOrBlank()) base else "$base, Token=\"$token\""
     }
 
     private fun plexPublicHeaders(): Headers = Headers.Builder()
         .add("Accept", "application/json")
-        .add("User-Agent", "ARVIO/${BuildConfig.VERSION_NAME}")
+        .add("User-Agent", "StreamNet TV/${BuildConfig.VERSION_NAME}")
         .add("X-Plex-Client-Identifier", deviceId())
-        .add("X-Plex-Product", "ARVIO")
+        .add("X-Plex-Product", "StreamNet TV")
         .add("X-Plex-Version", BuildConfig.VERSION_NAME)
         .add("X-Plex-Device", "Android")
         .add("X-Plex-Platform", "Android")
@@ -876,9 +876,9 @@ class HomeServerRepository @Inject constructor(
 
     private fun plexHeaders(token: String? = null): Map<String, String> = buildMap {
         put("Accept", "application/json")
-        put("User-Agent", "ARVIO/${BuildConfig.VERSION_NAME}")
+        put("User-Agent", "StreamNet TV/${BuildConfig.VERSION_NAME}")
         put("X-Plex-Client-Identifier", deviceId())
-        put("X-Plex-Product", "ARVIO")
+        put("X-Plex-Product", "StreamNet TV")
         put("X-Plex-Version", BuildConfig.VERSION_NAME)
         put("X-Plex-Device", "Android")
         put("X-Plex-Platform", "Android")
@@ -893,7 +893,7 @@ class HomeServerRepository @Inject constructor(
                 "!?" + listOf(
                     "clientID=${deviceId()}",
                     "code=$code",
-                    "$contextProductKey=ARVIO"
+                    "$contextProductKey=StreamNet TV"
                 ).joinToString("&")
             )
             ?.build()
@@ -905,7 +905,7 @@ class HomeServerRepository @Inject constructor(
         val builder = Request.Builder()
             .url(url)
             .header("Accept", "application/json")
-            .header("User-Agent", "ARVIO/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "StreamNet TV/${BuildConfig.VERSION_NAME}")
         if (connection?.serverKind == HomeServerKind.PLEX) {
             plexHeaders(connection.accessToken).forEach { (key, value) -> builder.header(key, value) }
         } else {
@@ -920,7 +920,7 @@ class HomeServerRepository @Inject constructor(
     private fun playbackHeaders(connection: HomeServerConnection): Map<String, String> {
         if (connection.serverKind == HomeServerKind.PLEX) return plexHeaders(connection.accessToken)
         return mapOf(
-            "User-Agent" to "ARVIO/${BuildConfig.VERSION_NAME}",
+            "User-Agent" to "StreamNet TV/${BuildConfig.VERSION_NAME}",
             "X-Emby-Authorization" to authHeader(connection.accessToken),
             "X-Emby-Token" to connection.accessToken
         )
@@ -2533,3 +2533,4 @@ private object HomeServerXmlRegexCache {
         }
     }
 }
+
