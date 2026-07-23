@@ -135,6 +135,8 @@ fun MediaCard(
     val isSportsCollectionTile = item.status?.startsWith("collection:sports_collection:") == true
     val showCollectionTitleOverlay = isCollectionTile && showTitle && !isSportsCollectionTile
     val isGenreCollectionTile = item.collectionGroup == CollectionGroupKind.GENRE
+    val isMgmPlusCollectionTile =
+        item.collectionGroup == CollectionGroupKind.SERVICE && item.title.equals("MGM+", ignoreCase = true)
     val rawImageUrl = if (visualFocused && enableFocusedImageSwap) {
         explicitFocusUrl ?: collectionFocusUrl ?: baseImageUrl
     } else {
@@ -218,10 +220,18 @@ fun MediaCard(
                 // so the card conveys what it's for instead of showing as a
                 // blank rectangle that used to look broken.
                 if (imageRequest != null) {
+                    if (isMgmPlusCollectionTile) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(Color.Black)
+                        )
+                    }
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
+                        contentScale = if (isMgmPlusCollectionTile) ContentScale.Fit else ContentScale.Crop,
+                        alignment = Alignment.Center,
                         modifier = Modifier.fillMaxSize(),
                     )
                 } else {

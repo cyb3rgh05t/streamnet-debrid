@@ -68,6 +68,7 @@ fun ProgramCell(
     isFocusTarget: Boolean,
     focusable: Boolean = true,
     enablePassiveMarquee: Boolean = false,
+    leadingContentInset: androidx.compose.ui.unit.Dp = 0.dp,
     isCatchupSupported: Boolean = false,
     onClick: () -> Unit,
     onFocused: () -> Unit = {},
@@ -205,7 +206,9 @@ fun ProgramCell(
             )
         }
         Column(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = leadingContentInset),
             verticalArrangement = Arrangement.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {

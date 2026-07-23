@@ -58,6 +58,7 @@ import com.arflix.tv.util.LocalDeviceType
 fun MiniPlayerRow(
     exoPlayer: ExoPlayer,
     channel: EnrichedChannel?,
+    infoChannel: EnrichedChannel? = channel,
     clockTickMillis: Long,
     nowNext: IptvNowNext?,
     favoriteSet: Set<String>,
@@ -83,10 +84,10 @@ fun MiniPlayerRow(
                 modifier = Modifier.fillMaxWidth(),
             )
             InfoColumn(
-                channel = channel,
+                channel = infoChannel,
                 clockTickMillis = clockTickMillis,
                 nowNext = nowNext,
-                isFavorite = channel?.id?.let { it in favoriteSet } == true,
+                isFavorite = infoChannel?.id?.let { it in favoriteSet } == true,
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
@@ -109,10 +110,10 @@ fun MiniPlayerRow(
                 modifier = Modifier.align(Alignment.Bottom),
             )
             InfoColumn(
-                channel = channel,
+                channel = infoChannel,
                 clockTickMillis = clockTickMillis,
                 nowNext = nowNext,
-                isFavorite = channel?.id?.let { it in favoriteSet } == true,
+                isFavorite = infoChannel?.id?.let { it in favoriteSet } == true,
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,

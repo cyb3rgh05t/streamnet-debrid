@@ -29,6 +29,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.key
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -454,12 +455,12 @@ fun EpgGrid(
                         if (ev.type != KeyEventType.KeyDown || (ev.key != Key.Back && ev.key != Key.Escape)) {
                             return@onKeyEvent false
                         }
-                        if (focusMode == EpgGridFocusMode.Epg) {
-                            onExitEpg(selectedChannel)
-                            runCatching { selectedChannelFocusRequester.requestFocus() }
-                        } else {
-                            onMoveLeftFromChannels()
+                        if (focusMode != EpgGridFocusMode.Epg) {
+                            // Let screen-level BackHandler handle exiting Live TV.
+                            return@onKeyEvent false
                         }
+                        onExitEpg(selectedChannel)
+                        runCatching { selectedChannelFocusRequester.requestFocus() }
                         true
                     }
             ) {
@@ -584,6 +585,7 @@ fun EpgGrid(
                                     windowEndMillis = windowEndMillis,
                                     totalWidth = totalWidth,
                                     pxPerMin = pxPerMin,
+                                    leftViewportOffset = with(density) { hScroll.value.toDp() },
                                     stripe = idx % 2 == 1,
                                     isActive = ch.id == selectedChannelId && focusMode == EpgGridFocusMode.Epg,
                                     isSelectedChannel = ch.id == selectedChannelId,
@@ -649,6 +651,7 @@ private fun ProgramsRow(
     windowEndMillis: Long,
     totalWidth: Dp,
     pxPerMin: Float,
+    leftViewportOffset: Dp,
     stripe: Boolean,
     isActive: Boolean,
     isSelectedChannel: Boolean,
@@ -729,51 +732,61 @@ private fun ProgramsRow(
                 val isFocusable = focusableIndex >= 0
                 val placementIsNow = placement.isNow(nowMillis)
                 val placementIsPast = placement.isPast(nowMillis)
-                ProgramCell(
-                    program = placement.program,
-                    clockTickMillis = clockTickMillis,
-                    width = width,
-                    isPlaceholder = placement.isPlaceholder,
-                    isNow = placementIsNow,
-                    isPast = placementIsPast,
-                    isFocusTarget = placementIsNow,
-                    focusable = isFocusable,
-                    enablePassiveMarquee = !epgMode && (isSelectedChannel || isActiveChannel) && placementIsNow,
-                    isCatchupSupported = isCatchupSupported,
-                    onClick = {
-                        if (placementIsPast && isCatchupSupported) {
-                            onClick(placement.program)
-                        } else if (!placementIsPast) {
-                            onClick(null)
-                        }
-                    },
-                    onFocused = onFocused,
-                    onMoveLeft = {
-                        if (focusableIndex > 0) {
-                            runCatching { rowFocusRequesters[focusableIndex - 1].requestFocus() }
-                            true
-                        } else {
-                            onMoveLeftFromStart()
-                        }
-                    },
-                    onMoveRight = {
-                        if (focusableIndex in 0 until rowFocusRequesters.lastIndex) {
-                            runCatching { rowFocusRequesters[focusableIndex + 1].requestFocus() }
-                            true
-                        } else {
-                            false
-                        }
-                    },
-                    onMoveUp = {
-                        onMoveVertically(rowIdx - 1, placement.startMin)
-                    },
-                    onMoveDown = {
-                        onMoveVertically(rowIdx + 1, placement.startMin)
-                    },
-                    rowHeight = rowHeight,
-                    focusRequester = rowFocusRequesters.getOrNull(focusableIndex),
-                    modifier = Modifier.offset(x = offset),
-                )
+                val leadingInset = if (placementIsNow) {
+                    (leftViewportOffset - offset)
+                        .coerceAtLeast(0.dp)
+                        .coerceAtMost((width - 18.dp).coerceAtLeast(0.dp))
+                } else {
+                    0.dp
+                }
+                key(channel.id, placement.program.startUtcMillis, placement.program.endUtcMillis, placement.program.title, placementIndex) {
+                    ProgramCell(
+                        program = placement.program,
+                        clockTickMillis = clockTickMillis,
+                        width = width,
+                        isPlaceholder = placement.isPlaceholder,
+                        isNow = placementIsNow,
+                        isPast = placementIsPast,
+                        isFocusTarget = placementIsNow,
+                        focusable = isFocusable,
+                        enablePassiveMarquee = !epgMode && (isSelectedChannel || isActiveChannel) && placementIsNow,
+                        leadingContentInset = leadingInset,
+                        isCatchupSupported = isCatchupSupported,
+                        onClick = {
+                            if (placementIsPast && isCatchupSupported) {
+                                onClick(placement.program)
+                            } else if (!placementIsPast) {
+                                onClick(null)
+                            }
+                        },
+                        onFocused = onFocused,
+                        onMoveLeft = {
+                            if (focusableIndex > 0) {
+                                runCatching { rowFocusRequesters[focusableIndex - 1].requestFocus() }
+                                true
+                            } else {
+                                onMoveLeftFromStart()
+                            }
+                        },
+                        onMoveRight = {
+                            if (focusableIndex in 0 until rowFocusRequesters.lastIndex) {
+                                runCatching { rowFocusRequesters[focusableIndex + 1].requestFocus() }
+                                true
+                            } else {
+                                false
+                            }
+                        },
+                        onMoveUp = {
+                            onMoveVertically(rowIdx - 1, placement.startMin)
+                        },
+                        onMoveDown = {
+                            onMoveVertically(rowIdx + 1, placement.startMin)
+                        },
+                        rowHeight = rowHeight,
+                        focusRequester = rowFocusRequesters.getOrNull(focusableIndex),
+                        modifier = Modifier.offset(x = offset),
+                    )
+                }
             }
         }
     }

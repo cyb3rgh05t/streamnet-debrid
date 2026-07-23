@@ -113,7 +113,7 @@ fun CategorySidebar(
     focusSearchSignal: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    val targetWidth = if (expanded) LiveDims.SidebarExpanded else LiveDims.SidebarCollapsed
+    val targetWidth = if (expanded) LiveDims.SidebarExpanded else 0.dp
     val animatedWidth by animateDpAsState(
         targetValue = targetWidth,
         animationSpec = tween(durationMillis = 240),
