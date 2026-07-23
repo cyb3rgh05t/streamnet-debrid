@@ -199,17 +199,6 @@ class ProfileViewModel @Inject constructor(
                     profileRepository.getActiveProfileId()
                 }
                 val isSameProfile = previousProfileId == profile.id
-                withContext(Dispatchers.Default) {
-                    // CRITICAL: Clear ALL profile caches BEFORE switching to ensure complete isolation.
-                    // Keep this off the main thread; some profiles carry enough data here to stall
-                    // touch devices during the profile tap transition.
-                    if (!isSameProfile) {
-                        traktRepository.clearAllProfileCaches()
-                        watchHistoryRepository.clearProfileCaches()
-                        watchlistRepository.clearWatchlistCache()
-                        iptvRepository.invalidateCache()
-                    }
-                }
 
                 // Update ProfileManager cache immediately so profile-scoped keys are correct
                 // for any work started after selection.
@@ -222,6 +211,19 @@ class ProfileViewModel @Inject constructor(
                 // Persist the active profile before the UI navigates away.
                 withContext(Dispatchers.IO) {
                     profileRepository.setActiveProfile(profile.id)
+                }
+
+                // Release the profile picker immediately after the active profile is stored.
+                // All expensive cleanup and network work continues in the background.
+                _uiState.value = _uiState.value.copy(isSwitchingProfile = false)
+
+                viewModelScope.launch(Dispatchers.Default) {
+                    if (!isSameProfile) {
+                        traktRepository.clearAllProfileCaches()
+                        watchHistoryRepository.clearProfileCaches()
+                        watchlistRepository.clearWatchlistCache()
+                        iptvRepository.invalidateCache()
+                    }
                 }
 
                 viewModelScope.launch(Dispatchers.IO) {
@@ -257,7 +259,9 @@ class ProfileViewModel @Inject constructor(
                     }
                 }
             } finally {
-                _uiState.value = _uiState.value.copy(isSwitchingProfile = false)
+                if (_uiState.value.isSwitchingProfile) {
+                    _uiState.value = _uiState.value.copy(isSwitchingProfile = false)
+                }
             }
         }
     }

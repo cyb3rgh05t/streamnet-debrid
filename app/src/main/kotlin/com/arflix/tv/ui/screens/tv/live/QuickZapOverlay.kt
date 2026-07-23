@@ -369,7 +369,7 @@ private fun FocusedCategoryRow(label: String, isFocused: Boolean) {
             .background(if (isFocused) LiveColors.PanelRaised else Color.Transparent)
             .border(
                 width = if (isFocused) 1.5.dp else 0.dp,
-                color = if (isFocused) LiveColors.FocusRing else Color.Transparent,
+                color = if (isFocused) liveFocusRingColor() else Color.Transparent,
                 shape = RoundedCornerShape(8.dp)
             )
             .padding(horizontal = 16.dp),
@@ -534,7 +534,7 @@ private fun FocusedChannelSlot(
             .clip(RoundedCornerShape(LiveDims.CardRadius))
             .border(
                 width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) LiveColors.FocusRing else Color.Transparent,
+                color = if (isFocused) liveFocusRingColor() else Color.Transparent,
                 shape = RoundedCornerShape(LiveDims.CardRadius)
             )
             .background(LiveColors.PanelRaised)

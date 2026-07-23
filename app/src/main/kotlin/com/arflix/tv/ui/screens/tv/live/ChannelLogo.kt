@@ -42,6 +42,7 @@ import java.nio.charset.StandardCharsets
 fun ChannelLogo(
     channel: EnrichedChannel,
     size: Dp,
+    chrome: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val initials = initialsFor(channel.name)
@@ -53,8 +54,15 @@ fun ChannelLogo(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape((size.value / 5.5f).dp))
-            .background(if (logoUrl.isNullOrBlank()) channel.brandBg else LiveColors.Panel),
+            .then(
+                if (chrome) {
+                    Modifier
+                        .clip(RoundedCornerShape((size.value / 5.5f).dp))
+                        .background(if (logoUrl.isNullOrBlank()) channel.brandBg else LiveColors.Panel)
+                } else {
+                    Modifier
+                }
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (showFallback) {
@@ -118,7 +126,13 @@ fun ChannelLogo(
                 onError = { showFallback = true },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding((size.value / 7f).coerceIn(4f, 8f).dp),
+                    .then(
+                        if (chrome) {
+                            Modifier.padding((size.value / 7f).coerceIn(4f, 8f).dp)
+                        } else {
+                            Modifier
+                        }
+                    ),
             )
         }
     }

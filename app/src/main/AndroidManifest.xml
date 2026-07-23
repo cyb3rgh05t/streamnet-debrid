@@ -21,7 +21,6 @@
         android:allowBackup="false"
         android:banner="@drawable/app_banner"
         android:enableOnBackInvokedCallback="false"
-        android:extractNativeLibs="false"
         android:hardwareAccelerated="true"
         android:largeHeap="true"
         android:icon="@mipmap/ic_launcher"

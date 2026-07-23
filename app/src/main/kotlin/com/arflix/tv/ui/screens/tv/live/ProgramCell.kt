@@ -3,6 +3,8 @@ package com.arflix.tv.ui.screens.tv.live
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -54,16 +56,18 @@ import com.arflix.tv.util.LocalDeviceType
  * A single EPG program cell placed inside a row with an absolute offset.
  * Width is determined by duration × px/min (handled by caller).
  */
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalTvMaterial3Api::class)
 @Composable
 fun ProgramCell(
     program: IptvProgram,
     clockTickMillis: Long,
     width: androidx.compose.ui.unit.Dp,
+    isPlaceholder: Boolean = false,
     isNow: Boolean,
     isPast: Boolean,
     isFocusTarget: Boolean,
     focusable: Boolean = true,
+    enablePassiveMarquee: Boolean = false,
     isCatchupSupported: Boolean = false,
     onClick: () -> Unit,
     onFocused: () -> Unit = {},
@@ -84,19 +88,19 @@ fun ProgramCell(
     }
     val bg = if (focused) LiveColors.PanelRaised else baseBg
     val borderColor = when {
-        focused -> LiveColors.FocusRing
+        focused -> liveFocusRingColor()
         isNow -> LiveColors.Accent.copy(alpha = 0.45f)
         else -> Color.Transparent
     }
     val borderWidth = if (focusable) {
         val animated by animateDpAsState(
-            targetValue = if (focused) 3.dp else 1.dp,
+            targetValue = if (focused) 1.5.dp else 1.dp,
             animationSpec = tween(durationMillis = 80),
             label = "program-cell-border",
         )
         animated
     } else {
-        if (focused) 3.dp else 1.dp
+        if (focused) 1.5.dp else 1.dp
     }
     val scale = if (focusable) {
         val animated by animateFloatAsState(
@@ -202,17 +206,14 @@ fun ProgramCell(
         }
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val nowMs = clockTickMillis
-                if (isNow) {
-                    Badge(stringResource(R.string.live_badge_live), Color.White, LiveColors.LiveRed)
-                    Spacer(Modifier.size(6.dp))
-                } else if (isPast && isCatchupSupported) {
+                if (!isPlaceholder && isPast && isCatchupSupported) {
                     Badge(stringResource(R.string.live_badge_archive), LiveColors.Bg, LiveColors.Accent)
                     Spacer(Modifier.size(6.dp))
-                } else if (!isPast) {
+                } else if (!isPlaceholder && !isPast) {
                     val isNewTag = (nowMs - program.startUtcMillis) in 0..24L * 60 * 60 * 1000L &&
                         !program.isLive(nowMs)
                     if (isNewTag) {
@@ -225,33 +226,19 @@ fun ProgramCell(
                     style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 11.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .weight(1f)
+                        .then(
+                            if (focused || enablePassiveMarquee) {
+                                Modifier.basicMarquee(
+                                    iterations = Int.MAX_VALUE,
+                                    initialDelayMillis = 700,
+                                )
+                            } else {
+                                Modifier
+                            }
+                        ),
                 )
-            }
-            if (!program.description.isNullOrBlank()) {
-                Text(
-                    text = program.description!!,
-                    style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim, fontSize = 9.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = formatClock(program.startUtcMillis),
-                    style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
-                )
-                val mins = ((program.endUtcMillis - program.startUtcMillis) / 60_000L)
-                    .coerceAtLeast(0L)
-                if (mins > 0) {
-                    Text(
-                        text = stringResource(R.string.live_label_duration_min, mins),
-                        style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
-                    )
-                }
             }
         }
     }

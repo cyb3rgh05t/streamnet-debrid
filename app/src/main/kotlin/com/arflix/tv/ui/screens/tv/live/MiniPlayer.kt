@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,7 +49,6 @@ import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
-import com.arflix.tv.util.formatGenreName
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LocalDeviceType
 
@@ -90,6 +90,7 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
+                compact = true,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -97,14 +98,15 @@ fun MiniPlayerRow(
         Row(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(start = 10.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
+                .padding(start = 12.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.Bottom,
         ) {
             VideoCard(
                 exoPlayer = exoPlayer,
                 channel = channel,
                 onFullscreenClick = onFullscreenClick,
+                modifier = Modifier.align(Alignment.Bottom),
             )
             InfoColumn(
                 channel = channel,
@@ -114,7 +116,10 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
-                modifier = Modifier.weight(1f),
+                compact = false,
+                modifier = Modifier
+                    .weight(1f)
+                    .align(Alignment.Bottom),
             )
         }
     }
@@ -254,15 +259,16 @@ private fun InfoColumn(
     onFavoriteToggle: (String) -> Unit,
     variantCount: Int,
     onOpenVariants: (() -> Unit)?,
+    compact: Boolean,
     modifier: Modifier = Modifier,
 ) {
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        ChannelIdentityRow(channel = channel, variantCount = variantCount, onOpenVariants = onOpenVariants)
+        ChannelIdentityRow(channel = channel)
         NowCard(channel = channel, clockTickMillis = clockTickMillis, nowNext = nowNext)
-        NextRow(nowNext = nowNext)
+        NextCard(nowNext = nowNext)
     }
 }
 
@@ -270,96 +276,38 @@ private fun InfoColumn(
 @Composable
 private fun ChannelIdentityRow(
     channel: EnrichedChannel?,
-    variantCount: Int,
-    onOpenVariants: (() -> Unit)?,
+    modifier: Modifier = Modifier,
 ) {
     Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(end = 6.dp, top = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         if (channel != null) {
-            ChannelLogo(channel = channel, size = 30.dp)
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        text = stringResource(R.string.live_label_ch, channel.number),
-                        style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
-                    )
-                    Text(
-                        text = formatGenreName(channel.genre.name),
-                        style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
-                    )
-                }
-                Text(
-                    text = channel.name,
-                    style = LiveType.ChannelName.copy(color = LiveColors.Fg),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    QualityBadge(channel.quality)
-                    if (variantCount > 1) {
-                        SourceBadge(variantCount, onOpenVariants)
-                    }
-                    channel.country?.takeIf { it != channel.lang }?.let { LangBadge(it) }
-                    LangBadge(channel.lang)
-                }
-            }
+            ChannelLogo(channel = channel, size = 56.dp, chrome = false)
+            Spacer(Modifier.width(10.dp))
+            Text(
+                text = channel.source.group.ifBlank { channel.name },
+                style = LiveType.SectionTag.copy(color = LiveColors.FgDim),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
+            )
         } else {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(LiveColors.Panel),
+                    .size(56.dp),
             )
+            Spacer(Modifier.width(10.dp))
             Text(
                 text = "—",
-                style = LiveType.ChannelName.copy(color = LiveColors.FgMute),
+                style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
+                textAlign = TextAlign.End,
+                modifier = Modifier.weight(1f),
             )
         }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun SourceBadge(count: Int, onOpenVariants: (() -> Unit)?) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(LiveColors.Panel)
-            .then(if (onOpenVariants != null) Modifier.clickable { onOpenVariants() } else Modifier)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(stringResource(R.string.live_label_sources, count), style = LiveType.Badge.copy(color = LiveColors.Accent))
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun QualityBadge(q: Quality) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(LiveColors.Panel)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(q.label, style = LiveType.Badge.copy(color = LiveColors.Fg))
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun LangBadge(text: String) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(LiveColors.Panel)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(text.uppercase(), style = LiveType.Badge.copy(color = LiveColors.FgDim))
     }
 }
 
@@ -421,24 +369,40 @@ private fun NowCard(channel: EnrichedChannel?, clockTickMillis: Long, nowNext: I
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun NextRow(nowNext: IptvNowNext?) {
+private fun NextCard(nowNext: IptvNowNext?) {
     val next = nowNext?.next ?: return
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(LiveDims.CardRadius))
+            .background(LiveColors.PanelRaised)
+            .padding(horizontal = 10.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(stringResource(R.string.live_badge_next), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
-        Text(
-            text = formatClock(next.startUtcMillis),
-            style = LiveType.TimeMono.copy(color = LiveColors.FgDim),
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(stringResource(R.string.live_badge_next), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
+            Text(
+                text = formatTimeWindow(next),
+                style = LiveType.TimeMono.copy(color = LiveColors.FgDim),
+            )
+        }
         Text(
             text = next.title,
-            style = LiveType.CellTitle.copy(color = LiveColors.FgDim),
-            maxLines = 1,
+            style = LiveType.ProgramTitle.copy(color = LiveColors.Fg),
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f),
         )
+        if (!next.description.isNullOrBlank()) {
+            Text(
+                text = next.description!!,
+                style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
     }
 }
 

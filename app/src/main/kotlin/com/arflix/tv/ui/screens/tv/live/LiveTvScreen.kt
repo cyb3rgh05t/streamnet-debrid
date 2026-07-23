@@ -426,12 +426,13 @@ fun LiveTvScreen(
     val coroutineScope = rememberCoroutineScope()
     val guideClockMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(30_000L)
+            delay(60_000L)
             value = System.currentTimeMillis()
         }
     }
     var selectedCategoryId by rememberSaveable { mutableStateOf("all") }
     var selectedProviderId by rememberSaveable { mutableStateOf("all") }
+    var startupCategoryApplied by rememberSaveable { mutableStateOf(false) }
     val recents = remember { mutableStateOf<LinkedHashSet<String>>(LinkedHashSet()) }
     val favSet = remember(state.snapshot.favoriteChannels) { state.snapshot.favoriteChannels.toSet() }
     val hiddenGroupSet = remember(state.snapshot.hiddenGroups) { state.snapshot.hiddenGroups.toSet() }
@@ -799,6 +800,29 @@ fun LiveTvScreen(
             selectedCategoryId = "all"
         }
     }
+    LaunchedEffect(state.tvSessionLoaded, visibleEnrichedState.value.tree, selectedProviderId, startupCategoryApplied) {
+        if (startupCategoryApplied || !state.tvSessionLoaded) return@LaunchedEffect
+        val tree = visibleEnrichedState.value.tree
+        val hasPlaylistCategories = tree.global.categories.any { it.count > 0 }
+        if (!hasPlaylistCategories && visibleEnrichedState.value.all.isNotEmpty()) {
+            return@LaunchedEffect
+        }
+        val sessionCategoryId = state.tvSession.lastGroupName
+            .takeIf { it.isNotBlank() }
+            ?.takeIf { categoryId -> tree.byId(categoryId)?.count?.let { it > 0 } == true }
+        val firstPlaylistCategoryId = tree.global.categories
+            .firstOrNull { it.count > 0 }
+            ?.id
+        val targetCategoryId = sessionCategoryId
+            ?: firstPlaylistCategoryId
+            ?: tree.top.firstOrNull { it.id != "all" && it.count > 0 }?.id
+            ?: "all"
+        if (targetCategoryId == "all" && !hasPlaylistCategories && sessionCategoryId == null) {
+            return@LaunchedEffect
+        }
+        selectedCategoryId = targetCategoryId
+        startupCategoryApplied = true
+    }
 
     // Selected category (persist across nav). Defaults to "all".
     val hasProfile = currentProfile != null
@@ -1024,6 +1048,10 @@ fun LiveTvScreen(
     }
     val selectedDisplayChannelId = remember(focusedChannelId, playingChannelId, visibleChannelsById, variantGroups) {
         displayChannelIdFor(focusedChannelId ?: playingChannelId, visibleChannelsById, variantGroups)
+    }
+    val activeDisplayChannelId = remember(playingChannelId, visibleChannelsById, variantGroups) {
+        displayChannelIdFor(playingChannelId, visibleChannelsById, variantGroups)
+            ?: playingChannelId
     }
     val indexedPlayingChannel = remember(playingChannelId, visibleEnrichedState.value, filteredChannels) {
         playingChannelId?.let { visibleEnrichedState.value.index.byId[it] }
@@ -1293,6 +1321,7 @@ fun LiveTvScreen(
                 eagerLimit = if (selectedCategoryTotalCount > 10_000) 8 else if (selectedCategoryId == "all") 12 else 24,
                 backgroundLimit = if (selectedCategoryTotalCount > 10_000) 24 else if (selectedCategoryId == "all") 48 else 96,
                 allowFocusedNetworkRefresh = true,
+                enableStaleWhileRevalidate = true,
             )
         }
     }
@@ -1419,9 +1448,10 @@ fun LiveTvScreen(
 
     val sidebarExpanded = !useTouchRail
     var searchOpen by rememberSaveable { mutableStateOf(false) }
+    var focusSelectedCategorySignal by remember { mutableIntStateOf(1) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
-    var focusSearchCategorySignal by remember { mutableIntStateOf(1) }
+    var focusSearchCategorySignal by remember { mutableIntStateOf(0) }
     // Full-screen playback mode — pressing OK on an EPG row expands the
     // mini-player to cover the whole screen. Back collapses back to the grid.
     var isFullScreen by rememberSaveable { mutableStateOf(initialStreamUrl != null) }
@@ -1545,13 +1575,12 @@ fun LiveTvScreen(
     fun focusPlaylistSearch() {
         noteGuideUserNavigation()
         focusZone = LiveTvFocusZone.CATEGORY_LIST
-        focusSearchCategorySignal += 1
-        runCatching { sidebarFocus.requestFocus() }
+        focusSelectedCategorySignal += 1
     }
 
     LaunchedEffect(focusZone, isTouchDevice) {
         if (!isTouchDevice && focusZone == LiveTvFocusZone.CATEGORY_LIST) {
-            runCatching { sidebarFocus.requestFocus() }
+            focusSelectedCategorySignal += 1
         }
     }
 
@@ -2349,6 +2378,7 @@ fun LiveTvScreen(
                         isGuideBackfillLoading = false,
                         hasGuideSource = state.hasPotentialGuideSource,
                         selectedChannelId = selectedDisplayChannelId,
+                        activeChannelId = activeDisplayChannelId,
                         focusSelectedChannelSignal = focusSelectedChannelSignal,
                         focusEpgSignal = focusEpgSignal,
                         focusMode = if (focusZone == LiveTvFocusZone.EPG) {
@@ -2389,6 +2419,11 @@ fun LiveTvScreen(
                     onSelect = { id ->
                         noteGuideUserNavigation()
                         selectedCategoryId = id
+                        viewModel.rememberTvSession(
+                            lastChannelId = focusedChannelId ?: playingChannelId,
+                            lastGroupName = id,
+                            lastFocusedZone = focusZone.name,
+                        )
                     },
                     onOpenSearch = { searchOpen = true },
                     onHideCategory = { playlistId, groupName ->
@@ -2428,6 +2463,7 @@ fun LiveTvScreen(
                             .coerceIn(0, maxTopBarIndex)
                         focusZone = LiveTvFocusZone.TOPBAR
                     },
+                    focusSelectedSignal = focusSelectedCategorySignal,
                     focusSearchSignal = focusSearchCategorySignal,
                     modifier = Modifier
                         .fillMaxHeight()
@@ -2483,6 +2519,7 @@ fun LiveTvScreen(
                         isGuideBackfillLoading = false,
                         hasGuideSource = state.hasPotentialGuideSource,
                         selectedChannelId = selectedDisplayChannelId,
+                        activeChannelId = activeDisplayChannelId,
                         focusSelectedChannelSignal = focusSelectedChannelSignal,
                         focusEpgSignal = focusEpgSignal,
                         focusMode = if (focusZone == LiveTvFocusZone.EPG) {

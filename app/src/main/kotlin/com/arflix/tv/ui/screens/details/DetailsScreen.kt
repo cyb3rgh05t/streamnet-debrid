@@ -398,7 +398,6 @@ fun DetailsScreen(
         } else {
             0
         }
-        ratingsIndex = episodeIndex / 12
     }
 
     // Sync seasonIndex with initialSeasonIndex from ViewModel

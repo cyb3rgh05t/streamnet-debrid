@@ -114,6 +114,7 @@ data class SettingsUiState(
     val trailerSoundEnabled: Boolean = false,
     val trailerDelaySeconds: Int = 2,
     val trailerInCards: Boolean = true,
+    val showEpisodeRatings: Boolean = true,
     val showBudget: Boolean = true,
     // Volume boost in decibels (0 = off, up to 15 dB). Applied via system LoudnessEnhancer
     // attached to the ExoPlayer audio session. Issue #88.
@@ -271,6 +272,7 @@ class SettingsViewModel @Inject constructor(
     private fun trailerSoundEnabledKey() = profileManager.profileBooleanKey("trailer_sound_enabled")
     private fun trailerDelayKey() = profileManager.profileStringKey("trailer_delay_seconds")
     private fun trailerInCardsKey() = profileManager.profileBooleanKey("trailer_in_cards")
+    private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
     private fun showBudgetKey() = profileManager.profileBooleanKey("show_budget_on_home")
     private fun clockFormatKey() = profileManager.profileStringKey("clock_format")
     private fun smoothScrollingKey() = profileManager.profileBooleanKey("smooth_scrolling")
@@ -462,6 +464,7 @@ class SettingsViewModel @Inject constructor(
             val trailerSoundEnabled = prefs[trailerSoundEnabledKey()] ?: false
             val trailerDelaySeconds = prefs[trailerDelayKey()]?.toIntOrNull() ?: 2
             val trailerInCards = prefs[trailerInCardsKey()] ?: true
+            val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
             val spoilerBlurEnabled = prefs[spoilerBlurKey()] ?: false
             val showBudget = prefs[showBudgetKey()] ?: true
             val clockFormat = prefs[clockFormatKey()] ?: "24h"
@@ -558,6 +561,7 @@ class SettingsViewModel @Inject constructor(
                 trailerSoundEnabled = trailerSoundEnabled,
                 trailerDelaySeconds = trailerDelaySeconds,
                 trailerInCards = trailerInCards,
+                showEpisodeRatings = showEpisodeRatings,
                 showBudget = showBudget,
                 volumeBoostDb = volumeBoostDb,
                 showLoadingStats = showLoadingStats,
@@ -1199,6 +1203,14 @@ class SettingsViewModel @Inject constructor(
 
     fun setTrailerInCards(enabled: Boolean) {
         viewModelScope.launch { context.settingsDataStore.edit { it[trailerInCardsKey()] = enabled }; _uiState.value = _uiState.value.copy(trailerInCards = enabled); syncLocalStateToCloud(silent = true) }
+    }
+
+    fun setShowEpisodeRatings(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[showEpisodeRatingsKey()] = enabled }
+            _uiState.value = _uiState.value.copy(showEpisodeRatings = enabled)
+            syncLocalStateToCloud(silent = true)
+        }
     }
 
     fun cycleTrailerDelay() {
