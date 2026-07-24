@@ -84,6 +84,7 @@ import com.arflix.tv.data.model.IptvChannel
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.data.model.Profile
+import com.arflix.tv.data.repository.IptvPlaybackTarget
 import com.arflix.tv.ui.screens.tv.TvUiState
 import com.arflix.tv.ui.screens.tv.TvViewModel
 import com.arflix.tv.network.OkHttpProvider
@@ -1894,6 +1895,7 @@ fun LiveTvScreen(
     }
 
     var lastPreparedStreamUrl by remember { mutableStateOf<String?>(null) }
+    var lastPreparedIsHls by remember { mutableStateOf(false) }
     var lastPreparedHeaders by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
     var lastPreparedCatchupOffsetMs by remember { mutableLongStateOf(-1L) }
     var playerRetryCount by remember { mutableIntStateOf(0) }
@@ -1901,6 +1903,7 @@ fun LiveTvScreen(
 
     fun prepareStream(
         stream: String,
+        isHls: Boolean,
         headers: Map<String, String>,
         resetRetry: Boolean,
         initialPositionMs: Long = 0L,
@@ -1913,7 +1916,9 @@ fun LiveTvScreen(
         val mediaItem = MediaItem.Builder()
             .setUri(stream)
             .apply {
-                if (looksLikeMpegTsUrl(stream)) {
+                if (isHls) {
+                    setMimeType(MimeTypes.APPLICATION_M3U8)
+                } else if (looksLikeMpegTsUrl(stream)) {
                     setMimeType(MimeTypes.VIDEO_MP2T)
                 }
                 if (playingCatchupProgram == null) {
@@ -1948,6 +1953,7 @@ fun LiveTvScreen(
         exoPlayer.playWhenReady = true
         exoPlayer.play()
         lastPreparedStreamUrl = stream
+        lastPreparedIsHls = isHls
         lastPreparedHeaders = headers
         lastPreparedCatchupOffsetMs = if (playingCatchupProgram != null) catchupUrlAnchorOffsetMs else -1L
         if (resetRetry) playerRetryCount = 0
@@ -2049,11 +2055,11 @@ fun LiveTvScreen(
         val rawStream = currentStreamUrl ?: return@LaunchedEffect
         val sourceChannel = playingChannel?.source
         val streamProgram = playingCatchupProgram?.shiftedForCatchup(catchupUrlAnchorOffsetMs)
-        val stream = runCatching {
+        val target = runCatching {
             if (sourceChannel != null) {
                 viewModel.resolvePlayableStreamUrl(sourceChannel, streamProgram, catchupAttempt = 0)
             } else {
-                rawStream
+                IptvPlaybackTarget(rawStream)
             }
         }.getOrElse { error ->
             playbackDiagnostic = PlaybackDiagnostic(
@@ -2067,10 +2073,12 @@ fun LiveTvScreen(
             )
             return@LaunchedEffect
         }
+        val stream = target.url
         val headers = sourceChannel?.requestHeaders.orEmpty()
         delay(90L)
         if (
             stream == lastPreparedStreamUrl &&
+            target.isHls == lastPreparedIsHls &&
             headers == lastPreparedHeaders &&
             catchupUrlAnchorOffsetMs == lastPreparedCatchupOffsetMs
         ) {
@@ -2078,6 +2086,7 @@ fun LiveTvScreen(
         }
         prepareStream(
             stream = stream,
+            isHls = target.isHls,
             headers = headers,
             resetRetry = true,
             initialPositionMs = if (playingCatchupProgram != null) catchupInSegmentSeekMs else 0L,
@@ -2101,6 +2110,7 @@ fun LiveTvScreen(
     DisposableEffect(
         exoPlayer,
         lastPreparedStreamUrl,
+        lastPreparedIsHls,
         lastPreparedHeaders,
         playingChannel?.id,
         playingCatchupProgram,
@@ -2115,6 +2125,7 @@ fun LiveTvScreen(
 
             override fun onPlayerError(error: PlaybackException) {
                 val prepared = lastPreparedStreamUrl ?: return
+                val preparedIsHls = lastPreparedIsHls
                 val nextAttempt = playerRetryCount + 1
                 playerRetryCount = nextAttempt
                 val retryChannel = playingChannel?.source
@@ -2150,7 +2161,7 @@ fun LiveTvScreen(
                 val retryHeaders = retryChannel?.requestHeaders ?: lastPreparedHeaders
                 coroutineScope.launch {
                     delay(350L * nextAttempt)
-                    val retryStream = runCatching {
+                    val retryTarget = runCatching {
                         if (retryChannel != null) {
                             viewModel.resolvePlayableStreamUrl(
                                 channel = retryChannel,
@@ -2159,7 +2170,7 @@ fun LiveTvScreen(
                                 catchupAttempt = if (retryProgram != null) nextAttempt else 0
                             )
                         } else {
-                            prepared
+                            IptvPlaybackTarget(prepared, preparedIsHls)
                         }
                     }.getOrElse { resolveError ->
                         playbackDiagnostic = PlaybackDiagnostic(
@@ -2175,8 +2186,8 @@ fun LiveTvScreen(
                     }
                     System.err.println(
                         "[IPTV] Retrying live playback attempt=$nextAttempt " +
-                            "code=${error.errorCodeName} status=${httpResponseCode(error) ?: "-"} " +
-                            "candidates=$catchupCandidateCount url=${redactPlaybackUrl(retryStream)}"
+                        "code=${error.errorCodeName} status=${httpResponseCode(error) ?: "-"} " +
+                            "candidates=$catchupCandidateCount url=${redactPlaybackUrl(retryTarget.url)}"
                     )
                     playbackDiagnostic = PlaybackDiagnostic(
                         title = context.getString(R.string.live_diag_retrying_source),
@@ -2184,7 +2195,8 @@ fun LiveTvScreen(
                         severity = PlaybackDiagnosticSeverity.Warning,
                     )
                     prepareStream(
-                        stream = retryStream,
+                        stream = retryTarget.url,
+                        isHls = retryTarget.isHls,
                         headers = retryHeaders,
                         resetRetry = false,
                         initialPositionMs = if (retryProgram != null) catchupInSegmentSeekMs else 0L,
