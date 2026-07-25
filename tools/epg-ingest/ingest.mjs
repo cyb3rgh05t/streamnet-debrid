@@ -88,7 +88,9 @@ function resolveRuntimeConfig() {
 
   if (!supabaseUrl) fail("SUPABASE_URL is missing");
   if (!serviceRole) {
-    fail("SUPABASE_SERVICE_ROLE_KEY is missing (set it or run supabase login for CLI fallback)");
+    fail(
+      "SUPABASE_SERVICE_ROLE_KEY is missing (set it or run supabase login for CLI fallback)",
+    );
   }
 }
 
@@ -118,7 +120,9 @@ function decodeXmlEntities(input) {
 function parseXmltvTime(value) {
   if (!value || typeof value !== "string") return null;
   const raw = value.trim();
-  const m = raw.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4}|Z)?/);
+  const m = raw.match(
+    /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})?\s*([+-]\d{4}|Z)?/,
+  );
   if (!m) return null;
 
   const year = Number(m[1]);
@@ -144,7 +148,10 @@ function parseXmltvTime(value) {
 }
 
 function extractFirstTag(block, tagName) {
-  const re = new RegExp(`<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}>`, "i");
+  const re = new RegExp(
+    `<${tagName}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${tagName}>`,
+    "i",
+  );
   const match = block.match(re);
   if (!match) return "";
   return decodeXmlEntities(match[1]).replace(/\s+/g, " ").trim();
@@ -162,7 +169,12 @@ function parseProgrammeBlock(block) {
   const channelId = decodeXmlEntities(channelMatch[1]).trim();
   const startSeconds = parseXmltvTime(startMatch[1]);
   const endSeconds = parseXmltvTime(stopMatch[1]);
-  if (!channelId || !startSeconds || !endSeconds || endSeconds <= startSeconds) {
+  if (
+    !channelId ||
+    !startSeconds ||
+    !endSeconds ||
+    endSeconds <= startSeconds
+  ) {
     return null;
   }
 
@@ -203,7 +215,11 @@ function decodeMaybeBase64(value) {
   if (typeof value !== "string") return "";
   const trimmed = value.trim();
   if (!trimmed) return "";
-  if (!/^[A-Za-z0-9+/=\s]+$/.test(trimmed) || trimmed.length < 8 || trimmed.length % 4 !== 0) {
+  if (
+    !/^[A-Za-z0-9+/=\s]+$/.test(trimmed) ||
+    trimmed.length < 8 ||
+    trimmed.length % 4 !== 0
+  ) {
     return decodeXmlEntities(trimmed);
   }
   try {
@@ -268,7 +284,9 @@ async function patchSource(sourceKey, patch) {
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`source patch failed (${sourceKey}): ${response.status} ${text}`);
+    throw new Error(
+      `source patch failed (${sourceKey}): ${response.status} ${text}`,
+    );
   }
 }
 
@@ -300,18 +318,23 @@ async function pruneSourceRows(sourceKey, windowStart, windowEnd) {
   params.set("source_key", `eq.${sourceKey}`);
   params.set("or", `(end_s.lte.${windowStart},start_s.gte.${windowEnd})`);
 
-  const response = await fetch(`${supabaseUrl}/rest/v1/epg_program?${params.toString()}`, {
-    method: "DELETE",
-    headers: {
-      apikey: serviceRole,
-      Authorization: `Bearer ${serviceRole}`,
-      Prefer: "return=minimal",
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/epg_program?${params.toString()}`,
+    {
+      method: "DELETE",
+      headers: {
+        apikey: serviceRole,
+        Authorization: `Bearer ${serviceRole}`,
+        Prefer: "return=minimal",
+      },
     },
-  });
+  );
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(`program prune failed (${sourceKey}): ${response.status} ${text}`);
+    throw new Error(
+      `program prune failed (${sourceKey}): ${response.status} ${text}`,
+    );
   }
 }
 
@@ -344,16 +367,21 @@ async function fetchXtreamShortEpg({ host, username, password, channelId }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(`${host}/player_api.php?${params.toString()}`, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "streamnet-epg-ingest/1.0",
-        Accept: "application/json,*/*",
+    const response = await fetch(
+      `${host}/player_api.php?${params.toString()}`,
+      {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "streamnet-epg-ingest/1.0",
+          Accept: "application/json,*/*",
+        },
       },
-    });
+    );
     if (!response.ok) {
       const text = await response.text().catch(() => "");
-      throw new Error(`xtream short epg failed (${response.status}): ${text.slice(0, 240)}`);
+      throw new Error(
+        `xtream short epg failed (${response.status}): ${text.slice(0, 240)}`,
+      );
     }
     return await response.json();
   } finally {
@@ -391,7 +419,9 @@ async function processXmltvSource(row) {
   }
   if (!response.ok || !response.body) {
     const body = await response.text().catch(() => "");
-    throw new Error(`xmltv fetch failed (${response.status}): ${body.slice(0, 300)}`);
+    throw new Error(
+      `xmltv fetch failed (${response.status}): ${body.slice(0, 300)}`,
+    );
   }
 
   const etag = response.headers.get("etag");
@@ -428,7 +458,11 @@ async function processXmltvSource(row) {
       const program = parseProgrammeBlock(block);
       if (!program) continue;
       if (wanted && !wanted.has(program.channelId)) continue;
-      if (program.endSeconds <= windowStart || program.startSeconds >= windowEnd) continue;
+      if (
+        program.endSeconds <= windowStart ||
+        program.startSeconds >= windowEnd
+      )
+        continue;
 
       batch.push({
         source_key: sourceKey,
@@ -470,16 +504,20 @@ async function processXmltvSource(row) {
 
 async function processXtreamSource(row) {
   const sourceKey = row.source_key;
-  const rawRef = String(row.xtream_ref || "").trim();
-  if (!rawRef) {
-    throw new Error("xtream source has empty xtream_ref");
-  }
-
+  const rawRef = row.xtream_ref;
   let ref;
-  try {
-    ref = JSON.parse(rawRef);
-  } catch {
-    throw new Error("xtream_ref is not valid JSON");
+  if (rawRef && typeof rawRef === "object") {
+    ref = rawRef;
+  } else {
+    const rawText = String(rawRef || "").trim();
+    if (!rawText) {
+      throw new Error("xtream source has empty xtream_ref");
+    }
+    try {
+      ref = JSON.parse(rawText);
+    } catch {
+      throw new Error("xtream_ref is not valid JSON");
+    }
   }
 
   const host = normalizeXtreamHost(ref.host);
@@ -511,10 +549,17 @@ async function processXtreamSource(row) {
   for (const channelId of channelIds) {
     let payload;
     try {
-      payload = await fetchXtreamShortEpg({ host, username, password, channelId });
+      payload = await fetchXtreamShortEpg({
+        host,
+        username,
+        password,
+        channelId,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[epg-ingest] xtream channel skip id=${channelId} error=${message}`);
+      console.warn(
+        `[epg-ingest] xtream channel skip id=${channelId} error=${message}`,
+      );
       continue;
     }
 
@@ -536,7 +581,9 @@ async function processXtreamSource(row) {
 
       const title = decodeMaybeBase64(String(item?.title || "")).slice(0, 300);
       if (!title) continue;
-      const descr = decodeMaybeBase64(String(item?.description || "")).slice(0, 1500) || null;
+      const descr =
+        decodeMaybeBase64(String(item?.description || "")).slice(0, 1500) ||
+        null;
 
       batch.push({
         source_key: sourceKey,
@@ -576,9 +623,10 @@ async function processCandidate(row) {
   }
 
   try {
-    const result = kind === "xmltv"
-      ? await processXmltvSource(row)
-      : await processXtreamSource(row);
+    const result =
+      kind === "xmltv"
+        ? await processXmltvSource(row)
+        : await processXtreamSource(row);
     const suffix = result.notModified
       ? "not-modified"
       : `upserted=${result.programs}`;
