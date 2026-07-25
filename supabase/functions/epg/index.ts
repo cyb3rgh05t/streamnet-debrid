@@ -155,6 +155,7 @@ async function buildSourceDescriptor(
   ownerUser: string | null;
   kind: EpgSourceKind;
   url: string | null;
+  xtreamRef: string | null;
 }> {
   const kind = source?.kind;
   if (kind === "xmltv") {
@@ -167,6 +168,7 @@ async function buildSourceDescriptor(
       ownerUser: null,
       kind,
       url: normalizedUrl,
+      xtreamRef: null,
     };
   }
 
@@ -184,11 +186,13 @@ async function buildSourceDescriptor(
     }
     const material = `${host}|${username}|${password}|${userId}`;
     const sourceKey = `xtream:${await sha256Hex(material)}`;
+    const xtreamRef = JSON.stringify({ host, username, password });
     return {
       sourceKey,
       ownerUser: userId,
       kind,
       url: null,
+      xtreamRef,
     };
   }
 
@@ -203,6 +207,7 @@ async function upsertSourceRegistration(
     kind: EpgSourceKind;
     ownerUser: string | null;
     url: string | null;
+    xtreamRef: string | null;
     channels: string[];
   },
 ): Promise<void> {
@@ -211,6 +216,7 @@ async function upsertSourceRegistration(
     kind: payload.kind,
     owner_user: payload.ownerUser,
     url: payload.url,
+    xtream_ref: payload.xtreamRef,
     wanted_channels: payload.channels,
     last_requested_at: new Date().toISOString(),
     status: "pending",
@@ -337,6 +343,7 @@ serve(async (req) => {
       kind: source.kind,
       ownerUser: source.ownerUser,
       url: source.url,
+      xtreamRef: source.xtreamRef,
       channels: channelIds,
     });
 

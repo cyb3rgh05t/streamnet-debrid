@@ -1,22 +1,96 @@
 #!/usr/bin/env node
 
-const supabaseUrl = process.env.SUPABASE_URL || "";
-const serviceRole = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+import fs from "node:fs";
+import path from "node:path";
+import { execSync } from "node:child_process";
+
 const refreshLimit = Number(process.env.EPG_REFRESH_LIMIT || "20");
 const batchSize = Number(process.env.EPG_UPSERT_BATCH_SIZE || "400");
 const defaultTtlMinutes = Number(process.env.EPG_SOURCE_TTL_MINUTES || "30");
 const enablePrune = String(process.env.EPG_ENABLE_PRUNE || "false") === "true";
+const xtreamMaxChannels = Number(process.env.EPG_XTREAM_MAX_CHANNELS || "60");
+const xtreamShortEpgLimit = Number(process.env.EPG_XTREAM_SHORT_LIMIT || "36");
 
 const WINDOW_PAST_SECONDS = 48 * 60 * 60;
 const WINDOW_FUTURE_SECONDS = 48 * 60 * 60;
+
+let supabaseUrl = "";
+let serviceRole = "";
 
 function fail(message) {
   console.error(`[epg-ingest] ${message}`);
   process.exit(1);
 }
 
-if (!supabaseUrl) fail("SUPABASE_URL is missing");
-if (!serviceRole) fail("SUPABASE_SERVICE_ROLE_KEY is missing");
+function loadSecretsProperties() {
+  const filePath = path.resolve("secrets.properties");
+  if (!fs.existsSync(filePath)) return {};
+  const out = {};
+  const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+  for (const lineRaw of lines) {
+    const line = lineRaw.trim();
+    if (!line || line.startsWith("#") || !line.includes("=")) continue;
+    const idx = line.indexOf("=");
+    const key = line.slice(0, idx).trim();
+    const value = line.slice(idx + 1).trim();
+    if (!key) continue;
+    out[key] = value;
+  }
+  return out;
+}
+
+function projectRefFromUrl(url) {
+  const m = String(url || "").match(/^https:\/\/([a-z0-9]+)\.supabase\.co/i);
+  return m ? m[1] : "";
+}
+
+function resolveServiceRoleFromCli(url) {
+  const ref = projectRefFromUrl(url);
+  if (!ref) return "";
+  try {
+    const raw = execSync(
+      `supabase projects api-keys --project-ref ${ref} -o json`,
+      { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    );
+    const keys = JSON.parse(raw);
+    if (!Array.isArray(keys)) return "";
+    const match = keys.find((item) => item && item.name === "service_role");
+    return String(match?.api_key || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function resolveRuntimeConfig() {
+  const secrets = loadSecretsProperties();
+
+  supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    secrets.SUPABASE_URL ||
+    "";
+
+  serviceRole =
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SERVICE_ROLE_KEY ||
+    secrets.SUPABASE_SERVICE_ROLE_KEY ||
+    secrets.SUPABASE_SECRET_KEY ||
+    "";
+
+  if (!serviceRole && supabaseUrl) {
+    const resolved = resolveServiceRoleFromCli(supabaseUrl);
+    if (resolved) {
+      serviceRole = resolved;
+      console.log("[epg-ingest] resolved service role via supabase CLI");
+    }
+  }
+
+  if (!supabaseUrl) fail("SUPABASE_URL is missing");
+  if (!serviceRole) {
+    fail("SUPABASE_SERVICE_ROLE_KEY is missing (set it or run supabase login for CLI fallback)");
+  }
+}
 
 function nowSeconds() {
   return Math.floor(Date.now() / 1000);
@@ -117,6 +191,44 @@ function toWantedChannelSet(raw) {
   return set.size > 0 ? set : null;
 }
 
+function normalizeXtreamHost(raw) {
+  let host = String(raw || "").trim();
+  if (!host) return "";
+  if (!/^https?:\/\//i.test(host)) host = `http://${host}`;
+  host = host.replace(/\/+$/, "");
+  return host;
+}
+
+function decodeMaybeBase64(value) {
+  if (typeof value !== "string") return "";
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  if (!/^[A-Za-z0-9+/=\s]+$/.test(trimmed) || trimmed.length < 8 || trimmed.length % 4 !== 0) {
+    return decodeXmlEntities(trimmed);
+  }
+  try {
+    const decoded = Buffer.from(trimmed, "base64").toString("utf8");
+    const printable = decoded.replace(/[\x20-\x7E\u00A0-\u024F]/g, "").length;
+    if (decoded && printable <= Math.floor(decoded.length * 0.2)) {
+      return decodeXmlEntities(decoded).replace(/\s+/g, " ").trim();
+    }
+  } catch {
+    // Ignore and fall back to raw.
+  }
+  return decodeXmlEntities(trimmed).replace(/\s+/g, " ").trim();
+}
+
+function parseXtreamSeconds(value) {
+  if (value == null) return null;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^\d{9,12}$/.test(text)) return Math.trunc(Number(text));
+  return parseXmltvTime(text);
+}
+
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, {
     ...options,
@@ -208,7 +320,7 @@ async function loadRefreshCandidates() {
   const params = new URLSearchParams();
   params.set(
     "select",
-    "source_key,kind,owner_user,url,wanted_channels,expires_at,status,etag,last_modified",
+    "source_key,kind,owner_user,url,xtream_ref,wanted_channels,expires_at,status,etag,last_modified",
   );
   params.set(
     "or",
@@ -219,6 +331,34 @@ async function loadRefreshCandidates() {
 
   const url = `${supabaseUrl}/rest/v1/epg_source?${params.toString()}`;
   return fetchJson(url);
+}
+
+async function fetchXtreamShortEpg({ host, username, password, channelId }) {
+  const params = new URLSearchParams();
+  params.set("username", username);
+  params.set("password", password);
+  params.set("action", "get_short_epg");
+  params.set("stream_id", channelId);
+  params.set("limit", String(xtreamShortEpgLimit));
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 12_000);
+  try {
+    const response = await fetch(`${host}/player_api.php?${params.toString()}`, {
+      signal: controller.signal,
+      headers: {
+        "User-Agent": "streamnet-epg-ingest/1.0",
+        Accept: "application/json,*/*",
+      },
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`xtream short epg failed (${response.status}): ${text.slice(0, 240)}`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 async function processXmltvSource(row) {
@@ -328,20 +468,121 @@ async function processXmltvSource(row) {
   return { programs: totalUpserted, refreshed: true, notModified: false };
 }
 
+async function processXtreamSource(row) {
+  const sourceKey = row.source_key;
+  const rawRef = String(row.xtream_ref || "").trim();
+  if (!rawRef) {
+    throw new Error("xtream source has empty xtream_ref");
+  }
+
+  let ref;
+  try {
+    ref = JSON.parse(rawRef);
+  } catch {
+    throw new Error("xtream_ref is not valid JSON");
+  }
+
+  const host = normalizeXtreamHost(ref.host);
+  const username = String(ref.username || "").trim();
+  const password = String(ref.password || "").trim();
+  if (!host || !username || !password) {
+    throw new Error("xtream_ref is missing host/username/password");
+  }
+
+  const wanted = Array.from(toWantedChannelSet(row.wanted_channels) || []);
+  if (wanted.length === 0) {
+    throw new Error("xtream source has no wanted_channels");
+  }
+
+  const now = nowSeconds();
+  const windowStart = now - WINDOW_PAST_SECONDS;
+  const windowEnd = now + WINDOW_FUTURE_SECONDS;
+  let batch = [];
+  let totalUpserted = 0;
+
+  async function flushBatch() {
+    if (!batch.length) return;
+    await upsertPrograms(batch);
+    totalUpserted += batch.length;
+    batch = [];
+  }
+
+  const channelIds = wanted.slice(0, xtreamMaxChannels);
+  for (const channelId of channelIds) {
+    let payload;
+    try {
+      payload = await fetchXtreamShortEpg({ host, username, password, channelId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[epg-ingest] xtream channel skip id=${channelId} error=${message}`);
+      continue;
+    }
+
+    const listings = Array.isArray(payload?.epg_listings)
+      ? payload.epg_listings
+      : Array.isArray(payload?.listings)
+        ? payload.listings
+        : [];
+
+    for (const item of listings) {
+      const startSeconds =
+        parseXtreamSeconds(item?.start_timestamp) ??
+        parseXtreamSeconds(item?.start);
+      const endSeconds =
+        parseXtreamSeconds(item?.stop_timestamp) ??
+        parseXtreamSeconds(item?.end);
+      if (!startSeconds || !endSeconds || endSeconds <= startSeconds) continue;
+      if (endSeconds <= windowStart || startSeconds >= windowEnd) continue;
+
+      const title = decodeMaybeBase64(String(item?.title || "")).slice(0, 300);
+      if (!title) continue;
+      const descr = decodeMaybeBase64(String(item?.description || "")).slice(0, 1500) || null;
+
+      batch.push({
+        source_key: sourceKey,
+        epg_channel_id: String(channelId),
+        start_s: startSeconds,
+        end_s: endSeconds,
+        title,
+        descr,
+      });
+
+      if (batch.length >= batchSize) {
+        await flushBatch();
+      }
+    }
+  }
+
+  await flushBatch();
+  await pruneSourceRows(sourceKey, windowStart, windowEnd);
+
+  await patchSource(sourceKey, {
+    fetched_at: isoFromSeconds(nowSeconds()),
+    expires_at: isoFromSeconds(nowSeconds() + defaultTtlMinutes * 60),
+    etag: null,
+    last_modified: null,
+    status: "ok",
+  });
+
+  return { programs: totalUpserted, refreshed: true, notModified: false };
+}
+
 async function processCandidate(row) {
   const sourceKey = row.source_key;
   const kind = row.kind;
-  if (kind !== "xmltv") {
-    console.log(`[epg-ingest] skip source=${sourceKey} kind=${kind} (phase1 xmltv only)`);
+  if (kind !== "xmltv" && kind !== "xtream") {
+    console.log(`[epg-ingest] skip source=${sourceKey} kind=${kind}`);
     return;
   }
 
   try {
-    const result = await processXmltvSource(row);
+    const result = kind === "xmltv"
+      ? await processXmltvSource(row)
+      : await processXtreamSource(row);
     const suffix = result.notModified
       ? "not-modified"
       : `upserted=${result.programs}`;
-    console.log(`[epg-ingest] ok source=${sourceKey} ${suffix}`);
+    console.log(`[epg-ingest] ok source=${sourceKey} kind=${kind} ${suffix}`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[epg-ingest] error source=${sourceKey} ${message}`);
@@ -355,7 +596,8 @@ async function processCandidate(row) {
 }
 
 async function main() {
-  console.log("[epg-ingest] worker phase1 starting");
+  resolveRuntimeConfig();
+  console.log("[epg-ingest] worker phase2 starting");
   const rows = await loadRefreshCandidates();
 
   console.log(`[epg-ingest] candidates=${rows.length}`);
@@ -363,7 +605,7 @@ async function main() {
     await processCandidate(row);
   }
 
-  console.log("[epg-ingest] phase1 completed");
+  console.log("[epg-ingest] phase2 completed");
 }
 
 main().catch((error) => {
