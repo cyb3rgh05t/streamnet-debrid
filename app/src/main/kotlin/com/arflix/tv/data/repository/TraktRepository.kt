@@ -71,7 +71,9 @@ class TraktRepository @Inject constructor(
     private val tmdbApi: TmdbApi,
     private val okHttpClient: OkHttpClient,
     private val syncServiceProvider: Provider<TraktSyncService>,
-    private val profileManager: ProfileManager
+    private val profileManager: ProfileManager,
+    private val mdbListRepository: MdbListRepository,
+    private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore
 ) {
     private val gson = Gson()
     private val watchlistHttpClient by lazy { okHttpClient }
@@ -1242,6 +1244,13 @@ class TraktRepository @Inject constructor(
     suspend fun getContinueWatching(forceRefresh: Boolean = false): List<ContinueWatchingItem> = coroutineScope {
         ensureProfileCacheScope()
         val requestProfileId = currentProfileId()
+
+        // MDBList profiles source Continue Watching from MDBList paused sessions
+        // (cross-device), reusing the same dismissal/hydration/cache pipeline.
+        if (syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST) {
+            return@coroutineScope getMdbListContinueWatching(requestProfileId, forceRefresh)
+        }
+
         val auth = getAuthHeader()
 
         // If this profile has Trakt stored but refresh is temporarily unavailable
@@ -1655,6 +1664,103 @@ class TraktRepository @Inject constructor(
             continueWatchingFetching = false
             continueWatchingFetchingProfileId = null
         }
+    }
+
+    /**
+     * Continue Watching for MDBList profiles, built from MDBList's paused
+     * sessions (/sync/playback) so progress roams across devices. Reuses the
+     * same watched-filter, dismissal, hydration, and cache path as Trakt.
+     */
+    private suspend fun getMdbListContinueWatching(
+        requestProfileId: String,
+        forceRefresh: Boolean
+    ): List<ContinueWatchingItem> {
+        val now = System.currentTimeMillis()
+        if (
+            !forceRefresh &&
+            cachedContinueWatchingProfileId == requestProfileId &&
+            cachedContinueWatching.isNotEmpty() &&
+            now - lastContinueWatchingFetch < CONTINUE_WATCHING_CACHE_MS
+        ) {
+            return cachedContinueWatching
+        }
+
+        initializeWatchedCache()
+
+        val paused = try {
+            mdbListRepository.getContinueWatching()
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            // Keep any existing cache instead of clearing the row on a transient error.
+            return if (cachedContinueWatchingProfileId == requestProfileId && cachedContinueWatching.isNotEmpty()) {
+                cachedContinueWatching
+            } else {
+                loadContinueWatchingCache().also {
+                    cachedContinueWatching = it
+                    cachedContinueWatchingProfileId = requestProfileId
+                }
+            }
+        }
+
+        // Drop already-watched items (Supabase remains the watched source of truth).
+        val candidates = paused.mapNotNull { item ->
+            val alreadyWatched = if (item.mediaType == MediaType.MOVIE) {
+                isMovieWatched(item.id)
+            } else {
+                val s = item.season
+                val e = item.episode
+                s != null && e != null && isEpisodeWatched(item.id, s, e)
+            }
+            if (alreadyWatched) {
+                null
+            } else {
+                ContinueWatchingCandidate(
+                    item = item,
+                    lastActivityAt = if (item.updatedAtMs > 0L) {
+                        java.time.Instant.ofEpochMilli(item.updatedAtMs).toString()
+                    } else {
+                        ""
+                    }
+                )
+            }
+        }
+
+        // Apply dismissals (identical rule to the Trakt path).
+        val dismissed = loadDismissedContinueWatching()
+        val filtered = if (dismissed.isNotEmpty()) {
+            val updatedDismissed = dismissed.toMutableMap()
+            val kept = candidates.filter { candidate ->
+                val key = buildContinueWatchingKey(candidate.item)
+                val showKey = buildContinueWatchingShowKey(candidate.item.mediaType, candidate.item.id)
+                val dismissedAt = listOfNotNull(key?.let { dismissed[it] }, dismissed[showKey]).maxOrNull()
+                if (dismissedAt == null) {
+                    true
+                } else {
+                    val activityAt = parseIso8601(candidate.lastActivityAt)
+                    if (activityAt > dismissedAt) {
+                        key?.let { updatedDismissed.remove(it) }
+                        updatedDismissed.remove(showKey)
+                        true
+                    } else {
+                        false
+                    }
+                }
+            }
+            if (updatedDismissed.size != dismissed.size) persistDismissedContinueWatching(updatedDismissed)
+            kept
+        } else {
+            candidates
+        }
+
+        val top = filtered.sortedByDescending { it.lastActivityAt }.take(Constants.MAX_CONTINUE_WATCHING)
+        val hydrated = hydrateTopCandidates(top)
+        val resolved = if (hydrated.isNotEmpty()) hydrated else top.map { it.item }
+
+        cachedContinueWatching = resolved
+        cachedContinueWatchingProfileId = requestProfileId
+        lastContinueWatchingFetch = System.currentTimeMillis()
+        persistContinueWatchingCache(resolved)
+        return resolved
     }
 
     private suspend fun hydrateTopCandidates(topCandidates: List<ContinueWatchingCandidate>): List<ContinueWatchingItem> = coroutineScope {
@@ -3551,6 +3657,12 @@ class TraktRepository @Inject constructor(
      * Mark entire season as watched
      */
     suspend fun markSeasonWatched(showTmdbId: Int, seasonNumber: Int, episodes: List<Int>): Boolean {
+        // MDBList profiles mirror the batch to MDBList's /sync/watched.
+        if (syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST) {
+            val ok = mdbListRepository.markSeasonWatched(showTmdbId, seasonNumber, episodes)
+            episodes.forEach { ep -> updateWatchedCache(showTmdbId, seasonNumber, ep, true) }
+            return ok
+        }
         val auth = getAuthHeader() ?: return false
         return try {
             val episodeIds = episodes.map {
@@ -3793,8 +3905,14 @@ class TraktRepository @Inject constructor(
             val supabaseMovies = syncService.getWatchedMovies()
             val supabaseEpisodes = syncService.getWatchedEpisodes()
 
-            // If no Trakt auth AND no Supabase data, leave caches empty
-            if (!hasTraktAuth && supabaseMovies.isEmpty() && supabaseEpisodes.isEmpty()) {
+            // MDBList profiles: also pull watched state marked outside Arvio (e.g. the
+            // MDBList website) so those badges show up. Keys are already cache-compatible.
+            val useMdbList = syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST
+            val mdbMovies = if (useMdbList) mdbListRepository.getWatchedMovies() else emptySet()
+            val mdbEpisodes = if (useMdbList) mdbListRepository.getWatchedEpisodes() else emptySet()
+
+            // If no Trakt auth AND no Supabase/MDBList data, leave caches empty
+            if (!hasTraktAuth && supabaseMovies.isEmpty() && supabaseEpisodes.isEmpty() && mdbMovies.isEmpty() && mdbEpisodes.isEmpty()) {
                 watchedMoviesCache.clear()
                 watchedMoviesCache.addAll(localSnapshotMovies)
                 watchedEpisodesCache.clear()
@@ -3810,10 +3928,12 @@ class TraktRepository @Inject constructor(
             watchedMoviesCache.clear()
             watchedMoviesCache.addAll(localSnapshotMovies)
             watchedMoviesCache.addAll(if (supabaseMovies.isNotEmpty()) supabaseMovies else traktMovies)
+            watchedMoviesCache.addAll(mdbMovies)
 
             watchedEpisodesCache.clear()
             watchedEpisodesCache.addAll(localSnapshotEpisodes)
             watchedEpisodesCache.addAll(if (supabaseEpisodes.isNotEmpty()) supabaseEpisodes else traktEpisodes)
+            watchedEpisodesCache.addAll(mdbEpisodes)
 
             cacheInitialized = true
         } catch (e: Exception) {
