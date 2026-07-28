@@ -1,5 +1,5 @@
 import { config, hasTraktConfig } from "./config";
-import { jsonRequest } from "./http";
+import { HttpError, jsonRequest } from "./http";
 import { loadStored, removeStored, saveStored } from "./storage";
 
 const TRAKT_TOKEN_KEY = "arvio.web.trakt.token";
@@ -159,6 +159,27 @@ export class TraktClient {
     return all;
   }
 
+  // Shows the user hid from their Trakt progress ("dropped"), across BOTH
+  // hidden sections Trakt keeps: progress_watched and progress_watched_reset.
+  // Trakt itself omits these from Up Next, so Continue Watching must too —
+  // otherwise a dropped show reappears here forever. Returns trakt show ids.
+  async hiddenProgressShowIds(): Promise<Set<number>> {
+    if (!this.token) return new Set();
+    await this.refreshIfNeeded();
+    const sections = ["progress_watched", "progress_watched_reset"];
+    const ids = new Set<number>();
+    const pages = await Promise.all(sections.map((section) =>
+      this.trakt<unknown[]>(`/users/hidden/${section}?type=show&limit=100`, {
+        headers: { "x-user-token": this.token!.access_token }
+      }).catch(() => [] as unknown[])
+    ));
+    pages.flat().forEach((raw) => {
+      const traktId = (raw as { show?: { ids?: { trakt?: number } } }).show?.ids?.trakt;
+      if (typeof traktId === "number") ids.add(traktId);
+    });
+    return ids;
+  }
+
   // `activityKey` (the show's last_watched_at) makes the persistent cache
   // activity-keyed: a show whose activity hasn't moved has IDENTICAL progress,
   // so entries stay valid for days instead of the blanket 15-minute TTL — a
@@ -267,19 +288,62 @@ export class TraktClient {
     // and Trakt intermittently blocks Netlify egress anyway. The proxy remains
     // the fallback for networks where Trakt challenges browser preflights, and
     // the primary path for oauth flows that need the backend secret.
-    if (this.canUseDirectFallback(path, init)) {
-      try {
-        return await this.directTrakt<T>(path, request);
-      } catch {
-        return jsonRequest<T>(url.toString(), request);
+    const send = async (): Promise<T> => {
+      if (this.canUseDirectFallback(path, init)) {
+        try {
+          return await this.directTrakt<T>(path, request);
+        } catch (error) {
+          // A 401 is an expired/revoked token, not a transport problem — the
+          // proxy would fail identically, so let it bubble to the retry below.
+          if ((error as { status?: number }).status === 401) throw error;
+          return jsonRequest<T>(url.toString(), request);
+        }
       }
-    }
+      try {
+        return await jsonRequest<T>(url.toString(), request);
+      } catch (error) {
+        if ((error as { status?: number }).status === 401) throw error;
+        if (!this.canUseDirectFallback(path, init)) throw error;
+        return this.directTrakt<T>(path, request);
+      }
+    };
+
     try {
-      return await jsonRequest<T>(url.toString(), request);
+      return await send();
     } catch (error) {
-      if (!this.canUseDirectFallback(path, init)) throw error;
-      return this.directTrakt<T>(path, request);
+      // Expired-token recovery. refreshIfNeeded() only fires when the STORED
+      // expiry says the token is stale; a token Trakt rejected early (revoked,
+      // clock skew, or an expiry we never recorded) left every call 401-ing
+      // forever, which silently froze Continue Watching until the user
+      // re-linked Trakt by hand. Refresh once on a real 401 and retry — the
+      // refresh itself goes direct to Trakt, so it works even though Trakt
+      // blocks our server egress.
+      const status = (error as { status?: number }).status;
+      if (status !== 401 || path.replace(/^\/+/, "").startsWith("oauth/")) throw error;
+      const refreshed = await this.forceRefresh();
+      if (!refreshed) throw error;
+      const retryHeaders = new Headers(request.headers as HeadersInit);
+      if (retryHeaders.has("x-user-token")) retryHeaders.set("x-user-token", refreshed);
+      if (retryHeaders.has("Authorization")) retryHeaders.set("Authorization", `Bearer ${refreshed}`);
+      const retry = { ...request, headers: Object.fromEntries(retryHeaders.entries()) };
+      if (this.canUseDirectFallback(path, retry)) return this.directTrakt<T>(path, retry);
+      return jsonRequest<T>(url.toString(), retry);
     }
+  }
+
+  /** Refresh regardless of the stored expiry. Returns the new access token. */
+  private async forceRefresh(): Promise<string | null> {
+    if (!this.token?.refresh_token) return null;
+    const previous = this.token.access_token;
+    try {
+      // Reuse the normal refresh by pretending the token is already stale.
+      this.token = { ...this.token, expires_at: 0 };
+      await this.refreshIfNeeded();
+    } catch {
+      return null;
+    }
+    const next = this.token?.access_token ?? null;
+    return next && next !== previous ? next : null;
   }
 
   private canUseDirectFallback(path: string, init: RequestInit) {
@@ -314,7 +378,9 @@ export class TraktClient {
     });
     if (!response.ok) {
       const raw = await response.text().catch(() => "");
-      throw new Error(raw.includes("Cloudflare") || raw.includes("<html")
+      // Carry the status: callers distinguish an expired token (401 → refresh
+      // and retry) from a network-level block (403 → try the proxy instead).
+      throw new HttpError(response.status, raw.includes("Cloudflare") || raw.includes("<html")
         ? "Trakt is blocking this network request right now."
         : raw || `Trakt request failed with ${response.status}`);
     }

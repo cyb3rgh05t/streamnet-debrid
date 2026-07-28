@@ -3,7 +3,8 @@
 import { Info, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IMDB_LOGO } from "@/lib/serviceLogos";
-import { genreNamesFromIds, getLogoUrl } from "@/lib/tmdb";
+import { genreNamesFromIds, getCardMeta, getLogoUrl } from "@/lib/tmdb";
+import { getImdbRating } from "@/lib/imdbRatings";
 import { useApp } from "@/lib/store";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
@@ -115,6 +116,24 @@ export function HomeScreen() {
   };
 
   const heroGenres = (displayHero?.genres?.length ? displayHero.genres : genreNamesFromIds(displayHero?.genreIds)).slice(0, 3);
+
+  // Real IMDb rating for the hero (Cinemeta by imdb id) — TMDB's vote_average
+  // is a different score and must not sit under an IMDb badge. The imdb id
+  // rides along on the cached per-card TMDB call.
+  const [heroImdbRating, setHeroImdbRating] = useState<string | null>(null);
+  useEffect(() => {
+    setHeroImdbRating(null);
+    if (!displayHero || displayHero.id <= 0 || displayHero.isHomeServer) return undefined;
+    let active = true;
+    void (async () => {
+      const imdbId = displayHero.imdbId
+        ?? (await getCardMeta({ mediaType: displayHero.mediaType, id: displayHero.id }).catch(() => null))?.imdbId;
+      if (!active || !imdbId) return;
+      const rating = await getImdbRating(displayHero.mediaType, imdbId).catch(() => null);
+      if (active && rating) setHeroImdbRating(rating);
+    })();
+    return () => { active = false; };
+  }, [displayHero?.id, displayHero?.mediaType, displayHero?.imdbId, displayHero?.isHomeServer]);
   const metaBits = [
     displayHero?.mediaType === "tv" ? "Series" : "Movie",
     displayHero?.releaseDate?.slice(0, 4) || displayHero?.year || null,
@@ -133,10 +152,10 @@ export function HomeScreen() {
               <h2>{displayHero.title}</h2>
             )}
             <div className="hero-meta">
-              {displayHero.rating && (
+              {heroImdbRating && (
                 <span className="hero-imdb">
                   <img src={IMDB_LOGO} alt="IMDb" />
-                  <b>{displayHero.rating}</b>
+                  <b>{heroImdbRating}</b>
                 </span>
               )}
               {metaBits.map((bit) => <span key={String(bit)}>{bit}</span>)}

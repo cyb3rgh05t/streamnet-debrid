@@ -2,6 +2,7 @@ package com.arflix.tv.ui.screens.player
 
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -34,8 +35,19 @@ private val BLOCKED_FINISH_REASONS = setOf(
 private const val GROQ_MODEL_ID = "llama-3.3-70b-versatile"
 private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 // gemini-2.5-flash was retired by Google (HTTP 404 "no longer available", July 2026).
-private const val GEMINI_MODEL_ID = "gemini-3.5-flash"
+// gemini-3.5-flash-lite: ~2x throughput (350 vs 165 tok/s) and ~3.5x cheaper than 3.5-flash,
+// positioned by Google for high-volume translation. Same v1beta API + thinkingLevel field.
+private const val GEMINI_MODEL_ID = "gemini-3.5-flash-lite"
 private const val GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/$GEMINI_MODEL_ID:generateContent"
+
+// Transient-failure retry (server overload / flaky network). 503/500/502 and IOExceptions are
+// Google-side capacity blips that usually clear within ~1s; retry the same batch a couple times
+// with short exponential backoff before falling back to English. Kept short so subtitles stay in
+// sync with playback. NOT applied to 429 (that's our own quota — retrying fast makes it worse;
+// the manager's 5s cooldown handles it) or 4xx/content blocks (retrying won't change the outcome).
+private const val GEMINI_MAX_TRANSIENT_RETRIES = 2        // 3 attempts total
+private const val GEMINI_RETRY_BASE_DELAY_MS = 400L       // 400ms, then 800ms (×2 each retry)
+private val GEMINI_RETRYABLE_HTTP = setOf(500, 502, 503)
 
 class SubtitleTranslationService(
     private val apiKeyProvider: () -> String,
@@ -209,11 +221,19 @@ class SubtitleTranslationService(
         }
     }
 
+    /** ±30% jittered exponential backoff so a fleet hitting the same overload spike doesn't re-sync. */
+    private suspend fun geminiBackoff(transientAttempt: Int) {
+        val factor = 1L shl transientAttempt          // 2^transientAttempt: 1, 2, ...
+        val jitter = 0.7 + Math.random() * 0.6        // 0.7 .. 1.3
+        delay((GEMINI_RETRY_BASE_DELAY_MS * factor * jitter).toLong())
+    }
+
     private suspend fun translateGemini(
         lines: List<String>,
         targetLanguage: String,
         apiKey: String,
-        attempt: Int = 0
+        attempt: Int = 0,
+        transientAttempt: Int = 0
     ): TranslationResult {
         val NL = "⏎"
         val inputArray = encodeIndexed(lines, NL)
@@ -279,6 +299,11 @@ class SubtitleTranslationService(
                     return@withContext TranslationResult(lines, false, "Empty response (${response.code})")
                 }
                 if (!response.isSuccessful) {
+                    if (response.code in GEMINI_RETRYABLE_HTTP && transientAttempt < GEMINI_MAX_TRANSIENT_RETRIES) {
+                        Log.w(TAG, "Gemini HTTP ${response.code} (transient) — retry ${transientAttempt + 1}/$GEMINI_MAX_TRANSIENT_RETRIES")
+                        geminiBackoff(transientAttempt)
+                        return@withContext translateGemini(lines, targetLanguage, apiKey, attempt, transientAttempt + 1)
+                    }
                     val errorMsg = if (response.code == 429) "RATE_LIMITED" else "HTTP ${response.code}: $responseBody"
                     return@withContext TranslationResult(lines, false, errorMsg)
                 }
@@ -336,6 +361,11 @@ class SubtitleTranslationService(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
 
+                if (e is java.io.IOException && transientAttempt < GEMINI_MAX_TRANSIENT_RETRIES) {
+                    Log.w(TAG, "translateGemini network error (${e.message}) — retry ${transientAttempt + 1}/$GEMINI_MAX_TRANSIENT_RETRIES")
+                    geminiBackoff(transientAttempt)
+                    return@withContext translateGemini(lines, targetLanguage, apiKey, attempt, transientAttempt + 1)
+                }
                 Log.e(TAG, "translateGemini exception: ${e.message}", e)
                 TranslationResult(lines, false, e.message)
             }

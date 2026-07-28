@@ -86,10 +86,27 @@ export function isUncachedDebridStream(stream: { url?: string | null; source?: s
 // Results are cached briefly so a prefetch at details-open makes the actual
 // Play press instant (no mylist/requestdl round-trips at click time).
 const directUrlCache = new Map<string, { at: number; result: TranscodeResult }>();
-const DIRECT_URL_TTL_MS = 8 * 60 * 1000;
+// Debrid CDN links are presigned and short-lived — TorBox answers an expired one
+// with "Invalid Presigned Token" (HTTP 400). Cache them for well under their
+// lifetime, and drop an entry the moment playback proves it dead (see
+// invalidateDebridDirectUrl) so the next attempt mints a fresh link instead of
+// replaying the broken one.
+const DIRECT_URL_TTL_MS = 3 * 60 * 1000;
 
 function directUrlCacheKey(info: DebridStreamInfo) {
   return `${info.provider}:${info.infoHash}:${info.fileName ?? ""}`;
+}
+
+/**
+ * Forget the cached CDN link for a stream. Called when playback fails, so a
+ * retry re-resolves rather than reusing a URL the CDN has already rejected —
+ * this is what made a whole run of sources "fail" in a row when the real
+ * problem was one stale token.
+ */
+export function invalidateDebridDirectUrl(url: string | null | undefined) {
+  const info = parseDebridStream(url);
+  if (!info) return false;
+  return directUrlCache.delete(directUrlCacheKey(info));
 }
 
 export async function resolveDebridDirectUrl(info: DebridStreamInfo): Promise<TranscodeResult> {

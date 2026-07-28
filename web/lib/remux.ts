@@ -34,6 +34,16 @@ export type RemuxHandle = {
 
 const LOSSLESS_AUDIO = /truehd|mlp|dts|dca/i;
 
+// Never await a mediabunny call unbounded: they read over range requests, and a
+// CDN that accepts the connection without answering leaves the promise pending
+// forever — the visible symptom is a blob: src stuck at readyState 0.
+function bounded<T>(promise: Promise<T>, ms: number): Promise<T | null> {
+  return Promise.race([
+    promise.catch(() => null),
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+  ]);
+}
+
 // Whether MSE can *mux* this audio codec inside fMP4 on this browser. Distinct
 // from WebCodecs decode support: Chrome can decode E-AC-3 via a WebCodecs
 // decoder but its MSE demuxer rejects ec-3 in the stsd box, so such tracks must
@@ -73,11 +83,11 @@ function audioLabel(codec: string, language: string | undefined, channels: numbe
 }
 
 async function describeAudioTrack(track: InputAudioTrack, index: number): Promise<RemuxAudioTrack> {
-  const codec = (await track.getCodecParameterString().catch(() => null)) ?? (track.codec ?? "");
+  const codec = (await bounded(track.getCodecParameterString(), 8000)) ?? (track.codec ?? "");
   const lossless = LOSSLESS_AUDIO.test(codec);
   // Lossless codecs are never browser-decodable; for the rest, ask mediabunny
   // whether this browser (natively or via a registered decoder) can decode it.
-  const browserPlayable = lossless ? false : await track.canDecode().catch(() => false);
+  const browserPlayable = lossless ? false : ((await bounded(track.canDecode(), 8000)) ?? false);
   return {
     index,
     codec,
@@ -130,18 +140,30 @@ export async function probeAndPrepareRemux(
     source: new UrlSource(url, requestHeaders ? { requestInit: { headers: requestHeaders } } : undefined)
   });
 
-  const format = await input.getFormat().catch(() => null);
-  const videoTrack = await input.getPrimaryVideoTrack().catch(() => null);
-  const audioInputTracks = await input.getAudioTracks().catch(() => []);
+  // Bound the probe. mediabunny reads the container header over range requests;
+  // when the CDN accepts the connection but never answers (dead debrid link,
+  // throttled host), these awaits never settle — the player then sits on a
+  // blob: src with readyState 0 and ZERO network activity, which is exactly the
+  // "nothing plays, spinner forever" symptom. A rejected probe lets the caller
+  // fall through to the next source instead of hanging.
+  const withTimeout = <T,>(promise: Promise<T>, ms = 12000): Promise<T | null> =>
+    Promise.race([
+      promise.catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+    ]);
+
+  const format = await withTimeout(input.getFormat());
+  const videoTrack = await withTimeout(input.getPrimaryVideoTrack());
+  const audioInputTracks = (await withTimeout(input.getAudioTracks())) ?? [];
   if (!videoTrack) {
     input.dispose?.();
     return null;
   }
 
-  const videoCodecParam = (await videoTrack.getCodecParameterString().catch(() => null)) ?? undefined;
-  const videoPlayable = await videoTrack.canDecode().catch(() => false);
+  const videoCodecParam = (await withTimeout(videoTrack.getCodecParameterString(), 8000)) ?? undefined;
+  const videoPlayable = (await withTimeout(videoTrack.canDecode(), 8000)) ?? false;
   const audioTracks = await Promise.all(audioInputTracks.map((track, i) => describeAudioTrack(track, i)));
-  const fileDuration = await input.computeDuration().catch(() => 0);
+  const fileDuration = (await withTimeout(input.computeDuration(), 8000)) ?? 0;
 
   // Prefer a browser-playable track. Honor the user's preferred audio language
   // first; among the remaining candidates prefer more channels, then the first

@@ -1241,6 +1241,10 @@ class TraktRepository @Inject constructor(
      * Get items to continue watching - Uses Trakt paused playback directly for accuracy and speed.
      * For profiles without Trakt, falls back to local Continue Watching storage.
      */
+    /** True when the active profile syncs Continue Watching from MDBList (not Trakt). */
+    suspend fun isMdbListActive(): Boolean =
+        syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST
+
     suspend fun getContinueWatching(forceRefresh: Boolean = false): List<ContinueWatchingItem> = coroutineScope {
         ensureProfileCacheScope()
         val requestProfileId = currentProfileId()
@@ -1703,7 +1707,7 @@ class TraktRepository @Inject constructor(
         }
 
         // Drop already-watched items (Supabase remains the watched source of truth).
-        val candidates = paused.mapNotNull { item ->
+        val pausedCandidates = paused.mapNotNull { item ->
             val alreadyWatched = if (item.mediaType == MediaType.MOVIE) {
                 isMovieWatched(item.id)
             } else {
@@ -1724,6 +1728,33 @@ class TraktRepository @Inject constructor(
                 )
             }
         }
+
+        // "Now Playing" (up-next): shows part-way through the series with a next episode to
+        // watch, derived from MDBList watched history. MDBList has no server-side next-episode
+        // endpoint, so resolve it from /sync/watched + TMDB. Exclude shows already surfaced as a
+        // paused session so a show never appears twice.
+        val pausedShowIds = pausedCandidates
+            .filter { it.item.mediaType == MediaType.TV }
+            .map { it.item.id }
+            .toSet()
+        val upNextCandidates = try {
+            val watchedShows = mdbListRepository.getWatchedShowsProgress()
+                .filter { it.showTmdbId !in pausedShowIds }
+                .sortedByDescending { it.lastWatchedAtMs }
+                .take(Constants.MAX_PROGRESS_ENTRIES)
+            val semaphore = Semaphore(8)
+            coroutineScope {
+                watchedShows.map { progress ->
+                    async { semaphore.withPermit { resolveMdbListUpNext(progress) } }
+                }.awaitAll().filterNotNull()
+            }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            System.err.println("TraktRepo:getMdbListCW: up-next failed: ${e.message}")
+            emptyList()
+        }
+
+        val candidates = pausedCandidates + upNextCandidates
 
         // Apply dismissals (identical rule to the Trakt path).
         val dismissed = loadDismissedContinueWatching()
@@ -1761,6 +1792,81 @@ class TraktRepository @Inject constructor(
         lastContinueWatchingFetch = System.currentTimeMillis()
         persistContinueWatchingCache(resolved)
         return resolved
+    }
+
+    /**
+     * Resolve the next episode to watch for an in-progress MDBList show. "Furthest reached" =
+     * highest watched (season, episode); the next episode is the following one in the same season,
+     * else episode 1 of the next real season. Returns null when the show is finished, the next
+     * episode hasn't aired, or TMDB lookups fail. Specials (season 0) are ignored.
+     */
+    private suspend fun resolveMdbListUpNext(progress: MdbShowWatchedProgress): ContinueWatchingCandidate? {
+        val watched = progress.watchedBySeason.filterKeys { it > 0 }
+        if (watched.isEmpty()) return null
+        val tmdbId = progress.showTmdbId
+
+        val lastSeason = watched.keys.max()
+        val lastEp = watched[lastSeason]?.maxOrNull() ?: return null
+
+        val details = try {
+            tmdbApi.getTvDetails(tmdbId, Constants.TMDB_API_KEY)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            return null
+        }
+        val realSeasons = details.seasons
+            .filter { it.seasonNumber > 0 && it.episodeCount > 0 }
+            .sortedBy { it.seasonNumber }
+        if (realSeasons.isEmpty()) return null
+
+        val lastSeasonCount = realSeasons.firstOrNull { it.seasonNumber == lastSeason }?.episodeCount ?: 0
+        val (nextSeason, nextEp) = if (lastEp < lastSeasonCount) {
+            lastSeason to (lastEp + 1)
+        } else {
+            val ns = realSeasons.firstOrNull { it.seasonNumber > lastSeason } ?: return null
+            ns.seasonNumber to 1
+        }
+
+        // Non-contiguous viewing: user already saw the computed "next" one — not up-next.
+        if (watched[nextSeason]?.contains(nextEp) == true) return null
+
+        val seasonDetails = try {
+            tmdbApi.getTvSeason(tmdbId, nextSeason, Constants.TMDB_API_KEY)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            return null
+        }
+        val episode = seasonDetails.episodes.firstOrNull { it.episodeNumber == nextEp } ?: return null
+        // ISO dates compare lexicographically; skip unaired / unknown-air-date episodes.
+        val today = java.time.LocalDate.now().toString()
+        if (episode.airDate.isNullOrBlank() || episode.airDate > today) return null
+
+        val totalEpisodes = details.numberOfEpisodes
+        val watchedCount = watched.values.sumOf { it.size }
+        val pct = if (totalEpisodes > 0) {
+            ((watchedCount.toFloat() / totalEpisodes.toFloat()) * 100f).toInt().coerceIn(0, 99)
+        } else 0
+
+        return ContinueWatchingCandidate(
+            item = ContinueWatchingItem(
+                id = tmdbId,
+                title = progress.title.ifBlank { details.name },
+                mediaType = MediaType.TV,
+                progress = pct,
+                resumePositionSeconds = 0L,
+                durationSeconds = 0L,
+                season = nextSeason,
+                episode = nextEp,
+                episodeTitle = episode.name.ifBlank { null },
+                year = progress.year,
+                isUpNext = true,
+                totalEpisodes = totalEpisodes.coerceAtLeast(0),
+                watchedEpisodes = watchedCount.coerceIn(0, totalEpisodes.coerceAtLeast(0))
+            ),
+            lastActivityAt = if (progress.lastWatchedAtMs > 0L) {
+                java.time.Instant.ofEpochMilli(progress.lastWatchedAtMs).toString()
+            } else ""
+        )
     }
 
     private suspend fun hydrateTopCandidates(topCandidates: List<ContinueWatchingCandidate>): List<ContinueWatchingItem> = coroutineScope {
@@ -1833,6 +1939,13 @@ class TraktRepository @Inject constructor(
         if (cachedContinueWatchingProfileId == profileId && cachedContinueWatching.isNotEmpty()) {
             cachedContinueWatching = filterDismissedContinueWatchingItems(cachedContinueWatching)
             return cachedContinueWatching
+        }
+
+        // MDBList profiles have no Trakt token; without this branch the Trakt-token check
+        // below falls through to local CW and the row shows only device-local history
+        // (e.g. a single locally-watched show) instead of the MDBList paused sessions.
+        if (syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST) {
+            return getMdbListContinueWatching(profileId, forceRefresh = false)
         }
 
         // Check if this profile has Trakt credentials STORED (not whether a

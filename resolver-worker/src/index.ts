@@ -250,7 +250,13 @@ const PROXY_ALLOWED_HOSTS = new Set([
   "api.alldebrid.com",
   "www.premiumize.me",
   "v3-cinemeta.strem.io",
-  "mdblist.com"
+  "mdblist.com",
+  // Trakt: the app's own Netlify functions are blocked by Trakt's Cloudflare
+  // (server IPs get an "Attention Required" page), which kills Continue
+  // Watching on the web. The Android app sidesteps this by calling Trakt
+  // directly from the device; the web client tries direct too and falls back
+  // here, where the egress IP is Cloudflare's rather than Netlify's.
+  "api.trakt.tv"
 ]);
 const PROXY_CACHEABLE_HOSTS = new Set(["v3-cinemeta.strem.io", "mdblist.com"]);
 
@@ -289,7 +295,9 @@ async function apiProxy(request: Request, env: Env) {
 
   const forwarded = new Headers({ accept: "application/json" });
   for (const [key, value] of Object.entries(decodeMediaHeaders(input.searchParams.get("h")))) {
-    if (/^(authorization|content-type|user-agent|x-api-key)$/i.test(key)) forwarded.set(key, value);
+    // trakt-api-* identify the calling app to Trakt and are required on every
+    // Trakt call; without them Trakt answers 403 regardless of the bearer token.
+    if (/^(authorization|content-type|user-agent|x-api-key|trakt-api-version|trakt-api-key)$/i.test(key)) forwarded.set(key, value);
   }
   let upstream: Response;
   try {

@@ -12,8 +12,9 @@ import { copyStreamUrl, downloadStreamUrl, downloadToVlc, externalLaunchMode, is
 import { fetchSubtitlesForItem } from "@/lib/addons";
 import { cachedDebridDirectUrl, isUncachedDebridStream, parseDebridStream, prefetchDebridDirectUrl, resolveDebridDirectUrl } from "@/lib/debrid";
 import { canonicalServiceName, IMDB_LOGO, serviceClearLogo } from "@/lib/serviceLogos";
+import { getImdbRating } from "@/lib/imdbRatings";
 import { sourcePickerScore } from "@/lib/sourceRank";
-import { isBrowserPlayableStream, isDirectPlayableStream, streamPlayability } from "@/lib/streamCompatibility";
+import { isBrowserPlayableStream, isDirectPlayableStream, playbackPlan, streamPlayability } from "@/lib/streamCompatibility";
 import { authClient, useApp } from "@/lib/store";
 import { syncClient } from "@/lib/sync";
 import { getDetails, getLogoUrl, getPersonDetails, getReviews, getSeasonEpisodes } from "@/lib/tmdb";
@@ -93,11 +94,25 @@ function DetailsView({ item }: { item: MediaItem }) {
     return () => { active = false; };
   }, [item.id, item.mediaType]);
 
-  const playableCount = streams.filter(isBrowserPlayableStream).length;
+  const playableCount = streams.filter((s) => playbackPlan(s).route === "here").length;
   const isTv = displayItem.mediaType === "tv";
   const inWatchlist = watchlist.some((entry) => entry.mediaType === item.mediaType && entry.id === item.id);
   const canPlayBest = streams.length > 0;
   const detailWatched = isWatched(displayItem, selectedEpisode?.season, selectedEpisode?.episode);
+
+  // Real IMDb rating for the title (Cinemeta by imdb id), matching the Android
+  // app. Episode rows get theirs from Agregarr (see getSeasonEpisodeRatings).
+  const [detailImdbRating, setDetailImdbRating] = useState<string | null>(null);
+  useEffect(() => {
+    setDetailImdbRating(null);
+    let active = true;
+    const imdbId = displayItem.imdbId;
+    if (!imdbId) return () => { active = false; };
+    void getImdbRating(displayItem.mediaType, imdbId).then((rating) => {
+      if (active && rating) setDetailImdbRating(rating);
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [displayItem.imdbId, displayItem.mediaType]);
   const continueLabel = buildContinueLabel(displayItem, selectedEpisode);
   const detailMeta = buildDetailMeta(displayItem, settings.showBudget);
   // Clearlogos (bundled from the app, no background tiles). Providers we have
@@ -220,10 +235,10 @@ function DetailsView({ item }: { item: MediaItem }) {
           </div>
           <p>{displayItem.overview || "No overview available."}</p>
           <div className="detail-rating-line">
-            {displayItem.rating ? (
+            {detailImdbRating ? (
               <span className="imdb-lockup">
                 <img src={IMDB_LOGO} alt="IMDb" />
-                <b>{displayItem.rating}</b>
+                <b>{detailImdbRating}</b>
               </span>
             ) : null}
             {detailWatched && <span className="detail-watched-chip"><BadgeCheck size={13} /> Watched</span>}
@@ -451,7 +466,7 @@ function SourcePickerModal({
     const needle = query.trim().toLowerCase();
     return streams.filter((stream) => {
       if (addonFilter !== "all" && (stream.addonId || stream.addonName) !== addonFilter) return false;
-      if (mode === "playable" && !isBrowserPlayableStream(stream)) return false;
+      if (mode === "playable" && playbackPlan(stream).route !== "here") return false;
       if (!needle) return true;
       return `${stream.source} ${stream.addonName} ${stream.description ?? ""} ${stream.quality ?? ""} ${stream.size ?? ""}`.toLowerCase().includes(needle);
     }).sort((a, b) => sourcePickerScore(b) - sourcePickerScore(a));
@@ -468,7 +483,7 @@ function SourcePickerModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefetchSignature]);
 
-  const playable = streams.filter(isBrowserPlayableStream).length;
+  const playable = streams.filter((s) => playbackPlan(s).route === "here").length;
   const title = selectedEpisode ? `${item.title} - S${selectedEpisode.season} E${selectedEpisode.episode}` : item.title;
   const openExternal = (player: "vlc" | "infuse", stream: StreamSource) => {
     if (!stream.url) {
@@ -609,21 +624,21 @@ function SourcePickerModal({
             <Search size={18} />
             <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search quality, release, provider" />
           </label>
+          {/* Single home for the playability filter. It briefly also existed as
+              a chip in the addon-tab row below, which meant two controls drove
+              one piece of state and could disagree about what was active. */}
           <div className="source-filter-group" aria-label="Source mode">
-            <button type="button" className={mode === "all" ? "is-active" : ""} onClick={() => setMode("all")}><Filter size={16} /> All sources</button>
-            <button type="button" className={mode === "playable" ? "is-active" : ""} onClick={() => setMode("playable")}>Browser playable</button>
+            <button type="button" className={mode === "all" ? "is-active" : ""} onClick={() => setMode("all")}>
+              <Filter size={16} /> All sources{streams.length ? ` ${streams.length}` : ""}
+            </button>
+            <button type="button" className={mode === "playable" ? "is-active" : ""} onClick={() => setMode("playable")}>
+              Browser playable{playable > 0 ? ` ${playable}` : ""}
+            </button>
           </div>
         </div>
 
         <div className="source-addon-tabs">
           <button type="button" className={addonFilter === "all" ? "is-active" : ""} onClick={() => setAddonFilter("all")}>All Addons</button>
-          <button
-            type="button"
-            className={mode === "playable" ? "is-active" : ""}
-            onClick={() => setMode(mode === "playable" ? "all" : "playable")}
-          >
-            Browser playable{playable > 0 ? ` ${playable}` : ""}
-          </button>
           {addons.map((addon) => (
             <button type="button" key={addon.id} className={addonFilter === addon.id ? "is-active" : ""} onClick={() => setAddonFilter(addon.id)}>
               {addon.name}{addon.count > 0 ? ` ${addon.count}` : ""}
@@ -643,13 +658,19 @@ function SourcePickerModal({
           )}
           {filtered.map((stream, index) => {
             const locked = !stream.url;
-            const playability = streamPlayability(stream);
-            const playable = playability.mode === "direct" || playability.mode === "remux" || playability.mode === "transcode";
+            const plan = playbackPlan(stream);
+            const playable = plan.route === "here";
             const uncached = isUncachedDebridStream(stream);
+            // One verdict per row, and it matches what Play actually does. The
+            // old copy said "external player recommended" on EVERY row —
+            // including ones that play here fine — so it read as noise.
             const statusLabel = uncached
               ? "Not cached — downloads first, slow start"
-              : "Use of external player is recommended";
-            const statusClass = uncached ? "needs-vlc" : "recommend-external";
+              : plan.detail ? `${plan.label} — ${plan.detail}` : plan.label;
+            const statusClass = uncached
+              ? "needs-vlc"
+              : plan.route !== "here" ? "needs-vlc"
+                : plan.method === "transcode" ? "is-transcode" : "is-web";
             return (
               <article key={`${stream.addonId}-${stream.source}-${index}`} className={`source-picker-row ${locked ? "is-locked" : ""}`}>
                 <span className="source-rank">{index + 1}</span>
@@ -669,12 +690,21 @@ function SourcePickerModal({
                 </span>
                 <span className="source-side">
                   <b>{stream.quality || "HD"}</b>
-                  <small>{locked ? "Needs resolver" : playability.mode === "direct" ? "Browser" : playability.mode === "remux" ? "Remux" : playability.mode === "transcode" ? "Transcode" : "External"}</small>
+                  <small>{locked ? "Needs resolver" : plan.route === "here" ? (plan.method === "direct" ? "Browser" : plan.method === "remux" ? "Remux" : "Transcode") : plan.route === "vlc" ? "External" : "Unplayable"}</small>
                   <span className="source-row-actions">
-                    <button type="button" className="source-action primary-action" disabled={locked || !playable} onClick={() => onPlay(stream)}>
-                      <Play size={13} fill="currentColor" /> Play
-                    </button>
-                    <button type="button" className="source-action" disabled={locked} onClick={() => openExternal("vlc", stream)}>
+                    {/* The route decides which action leads: pressing the big
+                        button should never be the one that cannot work. */}
+                    {/* No Play button at all when this source genuinely cannot
+                        play in the browser — a greyed-out button still reads as
+                        "this should work", which is exactly the confusion we're
+                        removing. It stays (disabled) while the source is locked
+                        behind a resolver, because that IS a temporary state. */}
+                    {(playable || locked) && (
+                      <button type="button" className={`source-action ${playable ? "primary-action" : ""}`} disabled={locked} onClick={() => onPlay(stream)}>
+                        <Play size={13} fill="currentColor" /> Play
+                      </button>
+                    )}
+                    <button type="button" className={`source-action ${!playable && !locked ? "primary-action" : ""}`} disabled={locked} onClick={() => openExternal("vlc", stream)}>
                       <ExternalLink size={13} /> VLC
                     </button>
                     <button type="button" className="source-action" disabled={locked} onClick={() => openAnyPlayer(stream)}>

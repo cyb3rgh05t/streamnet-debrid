@@ -31,13 +31,26 @@ function videoBlockReason(text: string): string | null {
   const explicitH264 = text.includes("x264") || text.includes("h.264") || text.includes("h264") || text.includes("avc");
   const impliedHevc = !explicitH264 && (text.includes("2160") || /\b4k\b/.test(text) || text.includes("uhd"));
   const hevc = explicitHevc || impliedHevc;
-  const dolbyVision = text.includes("dolby vision") || /\bdovi\b/.test(text) || /\bdv\b/.test(text);
+  // Release names separate words with dots as often as spaces, so match both —
+  // "Dolby.Vision" used to slip past a plain "dolby vision" check and play as a
+  // black picture with working sound.
+  const dolbyVision = /dolby[.\s_-]?vision/.test(text) || /\bdovi\b/.test(text) || /\bdv\b/.test(text);
   if ((hevc || dolbyVision) && !caps.hevc10 && !caps.hevc) return "This device has no HEVC decoder";
-  // Dolby Vision WITHOUT an HDR(10) fallback layer is profile 5 — browsers
-  // decode it but render a black/green picture (sound plays, no image).
-  // Remuxes are profile 7 with an HDR10 base layer, which plays fine.
-  if (dolbyVision && !text.includes("hdr") && !/\bremux\b/.test(text)) {
-    return "Dolby Vision-only video shows a black picture in browsers";
+  // Dolby Vision profile 5 has NO HDR10 base layer: browsers decode it but
+  // render a black/green picture while the audio plays fine. Profiles 7 and 8
+  // do carry an HDR10 base, so they display correctly.
+  //
+  // Profile is rarely stated, so infer it: an explicit p5 marker means blocked,
+  // an explicit p7/p8 marker (or an HDR10/HDR marker, or a REMUX, which is
+  // profile 7) means it has a base layer. Bare "DV" with nothing else is
+  // profile 5 in practice — that is the case that shows a black picture.
+  const dvProfile5 = /\b(dv|dovi)[.\s_-]?p?0?5\b/.test(text) || /profile[.\s_-]?5/.test(text);
+  const dvHasBaseLayer = /\b(dv|dovi)[.\s_-]?p?0?[78]\b/.test(text)
+    || /profile[.\s_-]?[78]/.test(text)
+    || text.includes("hdr")
+    || /\bremux\b/.test(text);
+  if (dolbyVision && (dvProfile5 || !dvHasBaseLayer)) {
+    return "Dolby Vision profile 5 shows a black picture in browsers";
   }
   if (text.includes("av1") && !caps.av1) return "This device has no AV1 decoder";
   return null;
@@ -124,6 +137,66 @@ export function streamPlayability(stream: CompatStream): StreamPlayability {
 export function isBrowserPlayableStream(stream: CompatStream) {
   const mode = streamPlayability(stream).mode;
   return mode === "direct" || mode === "remux" || mode === "transcode";
+}
+
+// ── Playback routing ────────────────────────────────────────────────────────
+// One verdict per source that BOTH the UI and the player act on, so what the
+// badge promises is exactly what pressing Play does. Previously the UI showed a
+// loose hint ("external player recommended") while the player independently
+// guessed and then burned a 13s stall-timeout per failed attempt.
+export type PlaybackPlan = {
+  /** "here" plays in the browser, "vlc" needs an external player, "dead" can't play at all. */
+  route: "here" | "vlc" | "dead";
+  /** How it plays in-browser, when route === "here". */
+  method: "direct" | "remux" | "transcode";
+  /** Short UI label, e.g. "Plays here" / "Needs VLC". */
+  label: string;
+  /** Why — shown as the row's secondary line. */
+  detail: string;
+};
+
+export function playbackPlan(stream: CompatStream): PlaybackPlan {
+  const { mode, reason } = streamPlayability(stream);
+  const text = streamText(stream);
+  const caps = getMediaCapabilities();
+
+  if (mode === "locked") return { route: "dead", method: "direct", label: "Not playable", detail: reason };
+  if (mode === "external") {
+    return {
+      route: "vlc",
+      method: "direct",
+      // ARCHIVE_CONTAINERS and torrent-only rows can't play ANYWHERE.
+      label: ARCHIVE_CONTAINERS.test(text) ? "Not playable" : "Needs VLC",
+      detail: reason
+    };
+  }
+  if (mode === "transcode") {
+    return { route: "here", method: "transcode", label: "Plays here", detail: "Converted by your debrid service" };
+  }
+  if (mode === "remux") {
+    // Chromium demuxes Matroska itself, so these actually direct-play.
+    if (canDirectPlayMkvStream(stream)) {
+      return { route: "here", method: "direct", label: "Plays here", detail: "MKV plays natively in this browser" };
+    }
+    // The remux repackages video untouched but must find an audio track this
+    // browser can decode. Lossless-only audio (TrueHD/DTS with no AC-3/AAC
+    // companion) is the common failure, and AC-3 itself is unsupported here.
+    //
+    // Be conservative: the release name lists the HEADLINE track, not every
+    // track, and most TrueHD/DTS releases also ship an AAC or AC-3 companion
+    // the remux can pick. Only route away from the browser when the name says
+    // lossless AND nothing suggests a companion — a full disc REMUX practically
+    // always carries one, so those keep their Play button and let the remux's
+    // own track probe decide. Guessing wrong here removes a button that would
+    // have worked, which is worse than a rare failed attempt.
+    const mentionsCompanion = /(aac|ac-?3|eac-?3|ddp|dd\+|opus|flac)/.test(text) || /\bremux\b/.test(text);
+    const losslessOnly = /truehd|dts/.test(text) && !mentionsCompanion;
+    if (losslessOnly && !caps.ac3 && !caps.eac3) {
+      return { route: "vlc", method: "remux", label: "Needs VLC", detail: "Only lossless audio this browser can't decode" };
+    }
+    return { route: "here", method: "remux", label: "Plays here", detail: reason };
+  }
+  return { route: "here", method: "direct", label: "Plays here", detail: "" };
 }
 
 // Chromium's <video> demuxes Matroska natively (Chrome/Edge/Opera/Brave, desktop

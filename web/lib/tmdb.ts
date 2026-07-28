@@ -690,7 +690,7 @@ function persistProviderCache() {
 
 // Per-card runtime (minutes), cached + persisted. List responses omit runtime,
 // so cards fetch it lazily when needed.
-type CardMeta = { runtime: number; image?: string; backdrop?: string | null };
+type CardMeta = { runtime: number; image?: string; backdrop?: string | null; imdbId?: string | null };
 const CARD_META_KEY = "arvio.web.cardMeta.v2";
 const cardMetaCache = new Map<string, CardMeta>();
 
@@ -714,28 +714,34 @@ function persistCardMetaCache() {
   }, 800);
 }
 
-export async function getCardMeta(item: { mediaType: MediaType; id: number }): Promise<{ runtime: number; image: string; backdrop: string | null }> {
+export async function getCardMeta(item: { mediaType: MediaType; id: number }): Promise<{ runtime: number; image: string; backdrop: string | null; imdbId: string | null }> {
   const key = `${item.mediaType}:${item.id}`;
   restoreCardMetaCache();
   const cached = cardMetaCache.get(key);
   // Older cache entries only stored runtime; treat a missing `image` field as a
   // miss so the card can back-fill its artwork (fixes grey CW thumbnails).
   if (cached && "image" in cached) {
-    return { runtime: cached.runtime, image: cached.image ?? "", backdrop: cached.backdrop ?? null };
+    return { runtime: cached.runtime, image: cached.image ?? "", backdrop: cached.backdrop ?? null, imdbId: cached.imdbId ?? null };
   }
   try {
-    const payload = await tmdb<{ runtime?: number; episode_run_time?: number[]; poster_path?: string | null; backdrop_path?: string | null }>(`${item.mediaType}/${item.id}`, {});
+    // external_ids rides along on the call this function already makes, so the
+    // imdb id needed for real IMDb ratings costs no extra request.
+    const payload = await tmdb<{ runtime?: number; episode_run_time?: number[]; poster_path?: string | null; backdrop_path?: string | null; external_ids?: { imdb_id?: string | null } }>(
+      `${item.mediaType}/${item.id}`,
+      { append_to_response: "external_ids" }
+    );
     const runtime = payload.runtime ?? payload.episode_run_time?.[0] ?? 0;
     const meta = {
       runtime,
       image: tmdbImageUrl(config.imageBase, payload.poster_path),
-      backdrop: tmdbImageUrl(config.backdropBase, payload.backdrop_path) || null
+      backdrop: tmdbImageUrl(config.backdropBase, payload.backdrop_path) || null,
+      imdbId: payload.external_ids?.imdb_id ?? null
     };
     cardMetaCache.set(key, meta);
     persistCardMetaCache();
     return meta;
   } catch {
-    const meta = { runtime: 0, image: "", backdrop: null };
+    const meta = { runtime: 0, image: "", backdrop: null, imdbId: null };
     cardMetaCache.set(key, meta);
     return meta;
   }
@@ -790,23 +796,23 @@ export async function getSeasonEpisodes(tvId: number, seasonNumber: number, lang
     // IMDb episode ratings (external_ids + cinemeta) run in parallel but are
     // capped at 2.5s — they are cosmetic and must never hold up the episode
     // list (the cinemeta proxy call has no timeout and can hang for a long time).
-    const ratingsPromise: Promise<Map<string, string>> = (async () => {
-      const externalIds = await tmdb<{ imdb_id?: string | null }>(`tv/${tvId}/external_ids`).catch(() => null);
-      if (!externalIds?.imdb_id) return new Map<string, string>();
-      return getSeriesEpisodeRatings(externalIds.imdb_id).catch(() => new Map<string, string>());
-    })();
-    ratingsPromise.catch(() => undefined);
     const season = await tmdb<{ episodes?: Array<{ id: number; episode_number: number; name?: string; overview?: string; still_path?: string | null; vote_average?: number; air_date?: string; runtime?: number }> }>(
       `tv/${tvId}/season/${seasonNumber}`,
       { language }
     );
+    // Real IMDb ratings need the episode numbers first (the imdb id lives on the
+    // per-episode endpoint), so this starts after the season lands and still
+    // races the 2.5s cap below — it is cosmetic and must never delay the list.
+    registerSeasonEpisodeNumbers(tvId, seasonNumber, (season.episodes ?? []).map((e) => e.episode_number).filter(Boolean));
+    const ratingsPromise = getSeasonEpisodeRatings(tvId, seasonNumber).catch(() => new Map<string, string>());
+    ratingsPromise.catch(() => undefined);
     let ratingsTimedOut = false;
     const imdbRatings = await Promise.race([
       ratingsPromise,
       new Promise<Map<string, string>>((resolve) => setTimeout(() => {
         ratingsTimedOut = true;
         resolve(new Map());
-      }, 2500))
+      }, 6000))
     ]);
     const episodes = (season.episodes ?? []).map((episode) => ({
       id: episode.id,
@@ -918,22 +924,72 @@ export async function getPersonDetails(personId: number, language = "en-US"): Pr
   }
 }
 
-async function getSeriesEpisodeRatings(imdbId: string) {
-  const normalized = imdbId.trim();
-  if (!normalized.startsWith("tt")) return new Map<string, string>();
-  if (seriesEpisodeRatingsCache.has(normalized)) return seriesEpisodeRatingsCache.get(normalized)!;
-  const payload = await jsonRequest<CinemetaSeries>(apiProxiedUrl(`https://v3-cinemeta.strem.io/meta/series/${encodeURIComponent(normalized)}.json`));
+// Per-episode IMDb ratings, keyed "season:episode".
+//
+// Cinemeta lists every episode but its per-episode `rating` is always 0 (checked
+// across several series), so reading it here left every episode falling back to
+// TMDB's vote_average — a different score under an IMDb badge. Cinemeta still
+// provides the episode->imdb-id MAP, and Agregarr turns a batch of those ids
+// into real IMDb ratings in one keyless call; that is the same pairing the
+// Android app uses (MediaRepository.getAgregarrImdbRatings).
+// Per-episode IMDb ratings for ONE season, keyed "season:episode".
+//
+// Cinemeta lists episodes but its per-episode `rating` is always 0 and it has
+// no per-episode imdb id (both verified across several series), so the old
+// implementation always came back empty and episodes silently fell back to
+// TMDB's vote_average under an IMDb badge. TMDB's season response CAN hand out
+// an imdb id per episode (append_to_response=external_ids), and Agregarr turns
+// a batch of those into real IMDb ratings in one keyless request — the same
+// pairing the Android app uses (MediaRepository.getAgregarrImdbRatings).
+async function getSeasonEpisodeRatings(tvId: number, seasonNumber: number) {
+  const cacheKey = `${tvId}:${seasonNumber}`;
+  if (seriesEpisodeRatingsCache.has(cacheKey)) return seriesEpisodeRatingsCache.get(cacheKey)!;
   const ratings = new Map<string, string>();
-  (payload.meta?.videos ?? []).forEach((video) => {
-    const season = Number(video.season);
-    const episode = Number(video.episode ?? video.number);
-    const rating = normalizeRating(video.rating);
-    if (Number.isFinite(season) && season >= 0 && Number.isFinite(episode) && episode > 0 && rating) {
-      ratings.set(`${season}:${episode}`, rating);
+  try {
+    // TMDB only exposes an episode's imdb id on the per-episode endpoint
+    // (append_to_response on the season response leaves external_ids null), so
+    // the ids are gathered with a small throttled fan-out — measured at ~740ms
+    // for a 10-episode season — and the result is cached per season.
+    const episodeNumbers = episodeNumbersFor(tvId, seasonNumber);
+    const slots: Array<{ key: string; imdbId: string }> = [];
+    let cursor = 0;
+    const workers = Array.from({ length: Math.min(8, episodeNumbers.length) }, async () => {
+      while (cursor < episodeNumbers.length) {
+        const index = cursor;
+        cursor += 1;
+        const number = episodeNumbers[index];
+        const payload = await tmdb<{ external_ids?: { imdb_id?: string | null } }>(
+          `tv/${tvId}/season/${seasonNumber}/episode/${number}`,
+          { append_to_response: "external_ids" }
+        ).catch(() => null);
+        const raw = String(payload?.external_ids?.imdb_id ?? "").trim();
+        if (/^tt\d+$/.test(raw)) slots.push({ key: `${seasonNumber}:${number}`, imdbId: raw });
+      }
+    });
+    await Promise.all(workers);
+    if (slots.length) {
+      const { getImdbRatings } = await import("./imdbRatings");
+      const byId = await getImdbRatings(slots.map((slot) => slot.imdbId));
+      slots.forEach((slot) => {
+        const rating = byId[slot.imdbId.toLowerCase()];
+        if (rating) ratings.set(slot.key, rating);
+      });
     }
-  });
-  seriesEpisodeRatingsCache.set(normalized, ratings);
+  } catch {
+    // Ratings are cosmetic; an empty map just means the row shows no badge.
+  }
+  seriesEpisodeRatingsCache.set(cacheKey, ratings);
   return ratings;
+}
+
+// Episode numbers of a season, taken from the season payload the caller has
+// already fetched (registered below) so this never costs an extra request.
+const seasonEpisodeNumbers = new Map<string, number[]>();
+function episodeNumbersFor(tvId: number, seasonNumber: number) {
+  return seasonEpisodeNumbers.get(`${tvId}:${seasonNumber}`) ?? [];
+}
+export function registerSeasonEpisodeNumbers(tvId: number, seasonNumber: number, numbers: number[]) {
+  seasonEpisodeNumbers.set(`${tvId}:${seasonNumber}`, numbers);
 }
 
 function normalizeRating(value: unknown) {

@@ -46,3 +46,6 @@ export function serviceClearLogo(providerName: string | null | undefined): strin
 }
 
 export const IMDB_LOGO = "/logos/logo_imdb_rectangle.svg";
+// Card/hero/episode scores come from TMDB (vote_average), NOT IMDb — badge them
+// accurately. Real IMDb ratings need an imdb id + a Cinemeta lookup per title.
+export const TMDB_LOGO = "/logos/logo_tmdb_rectangle.svg";

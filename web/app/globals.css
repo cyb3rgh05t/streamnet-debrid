@@ -319,6 +319,15 @@ p {
   align-items: center;
   gap: 16px;
   margin-top: clamp(14px, 2.4vh, 26px);
+  /* The first rail after the hero is pulled UP over it (Netflix-style overlap,
+     `.hero + .rail`, up to -150px). A tall hero block — a title treatment near
+     `.hero-logo`'s max-height plus a three-line synopsis — then grows down INTO
+     that overlap and the buttons end up glued to the rail heading. This reserve
+     mirrors the pull exactly, so the rail can never reach the buttons.
+     Verified harmless where the overlap doesn't apply: adding it left the
+     measured button-to-heading gap unchanged (the hero simply grows), so it
+     costs nothing on layouts that were already fine. */
+  margin-bottom: clamp(96px, 17vh, 150px);
 }
 
 .primary,

@@ -3639,6 +3639,11 @@ class PlayerViewModel @Inject constructor(
 
     fun disableSubtitles() {
         hasManualSubtitleSelection = true
+        // Turning subtitles Off is an explicit user action — stop any running "Find best match"/
+        // hearing scan (it also disconnects the Gemini Live audio stream). Without this, the scan
+        // kept running with no way to cancel it. Mirrors selectSubtitle()'s user-action path.
+        userPickedSubtitle = true
+        cancelFindBestMatch()
         subtitleSelectionJob?.cancel()
         translationManager.isEnabled = false
         aiSourceSubtitle = null

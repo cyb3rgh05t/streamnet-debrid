@@ -25,14 +25,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "@/lib/config";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
 import { saveProgress } from "@/lib/cloud";
-import { cachedDebridDirectUrl, isUncachedDebridStream, parseDebridStream, resolveDebridDirectUrl } from "@/lib/debrid";
+import { cachedDebridDirectUrl, invalidateDebridDirectUrl, isUncachedDebridStream, parseDebridStream, resolveDebridDirectUrl } from "@/lib/debrid";
 import type { RemuxAudioTrack } from "@/lib/remux";
 import { copyStreamUrl, externalLaunchMode, openExternalPlayer, openInAnyPlayer } from "@/lib/externalPlayers";
 import { proxiedUrl } from "@/lib/http";
 import { attachPlayback } from "@/lib/player";
 import { resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
 import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
-import { streamPlayability } from "@/lib/streamCompatibility";
+import { playbackPlan, streamPlayability } from "@/lib/streamCompatibility";
 import { authClient, useApp } from "@/lib/store";
 import { syncClient } from "@/lib/sync";
 import { SubtitleTranslator, subtitleLanguageName } from "@/lib/subtitleAi";
@@ -691,6 +691,16 @@ function VideoPlayer({
         if (video.readyState < 1) handlePlaybackError();
       }, liveTv ? 10000 : 13000);
     };
+    // Backstop for MSE sources (hls.js / remux): those attach a blob: src and
+    // can fire loadedmetadata — which clears the stall timer — while never
+    // delivering a frame, leaving the spinner up forever with zero network
+    // traffic. This watchdog is independent of those events and only cares
+    // whether playback ever became possible.
+    const playableWatchdog = window.setTimeout(() => {
+      if (cancelled) return;
+      if (video.readyState >= 2) return;
+      handlePlaybackError();
+    }, liveTv ? 15000 : 20000);
     const requestPlayback = () => {
       if (cancelled || !video.paused) return;
       setError(false);
@@ -705,9 +715,43 @@ function VideoPlayer({
         });
       }
     };
+    let refreshedLink = false;
     const handlePlaybackError = () => {
       if (cancelled || handlingError) return;
       handlingError = true;
+      // A debrid CDN link is presigned and short-lived. When one expires the
+      // CDN rejects it (TorBox: "Invalid Presigned Token", HTTP 400) and every
+      // remaining attempt for this source replays the SAME dead url — which is
+      // why a single stale token used to cascade into "source failed" across
+      // the whole list. Drop the cached link and re-resolve once before
+      // treating the source as dead; the sources themselves are usually fine,
+      // which is why they still play in VLC and the APK.
+      if (!refreshedLink && !liveTv && stream.originalUrl && parseDebridStream(stream.originalUrl)) {
+        refreshedLink = true;
+        invalidateDebridDirectUrl(stream.originalUrl);
+        const debridInfo = parseDebridStream(stream.originalUrl);
+        if (debridInfo) {
+          detach?.();
+          void resolveDebridDirectUrl(debridInfo).then((result) => {
+            if (cancelled) return;
+            if (result.url && result.url !== stream.url) {
+              setError(false);
+              setBuffering(true);
+              detach = attachPlayback(video, result.url, { onError: handlePlaybackError, live: liveTv });
+              armStallTimer();
+              requestPlayback();
+              handlingError = false;
+            } else {
+              handlingError = false;
+              handlePlaybackError();
+            }
+          }).catch(() => {
+            handlingError = false;
+            handlePlaybackError();
+          });
+          return;
+        }
+      }
       attemptIndex += 1;
       const nextUrl = uniqueAttempts[attemptIndex];
       if (nextUrl) {
@@ -723,7 +767,10 @@ function VideoPlayer({
       // Direct attempts exhausted. For a VOD source the browser couldn't decode
       // (MKV container / lossless audio), auto-escalate to the in-browser remux
       // path instead of surfacing an error — this is the instant-first ladder.
-      if (!liveTv && !stream.remux && streamPlayability(stream).mode === "remux") {
+      // Only when the plan says a remux can actually succeed here: escalating a
+      // source whose audio this browser cannot decode just burns CPU and time
+      // before failing, when the honest move is to fall through to VLC.
+      if (!liveTv && !stream.remux && playbackPlan(stream).route === "here" && playbackPlan(stream).method === "remux") {
         cancelled = true;
         detach?.();
         onSelectStream(stream, { forceRemux: true });
@@ -755,6 +802,7 @@ function VideoPlayer({
       window.clearTimeout(startTimer);
       window.clearTimeout(slowTimer);
       window.clearTimeout(stallTimer);
+      window.clearTimeout(playableWatchdog);
       video.removeEventListener("loadedmetadata", onReadyToStart);
       video.removeEventListener("canplay", onReadyToStart);
       video.removeEventListener("error", onErr);

@@ -9,7 +9,7 @@ import { getContinueWatching, pullCloudPayload, pullCloudProfiles, pullCloudTrak
 import { cachedDebridDirectUrl, parseDebridStream, resolveDebridDirectUrl, resolveTranscodeStream } from "./debrid";
 import { createPendingExternalPlayback } from "./externalPlayback";
 import { externalLaunchMode, openExternalPlayer } from "./externalPlayers";
-import { canDirectPlayMkvStream, streamPlayability } from "./streamCompatibility";
+import { canDirectPlayMkvStream, playbackPlan, streamPlayability } from "./streamCompatibility";
 import { loadHomeServerRows } from "./homeserver";
 import { buildXtreamCatchupUrl, loadIptvGuideForChannels, loadIptvSnapshot, loadPlaylists, savePlaylists } from "./iptv";
 import { dedupeMedia, historyToItem, hydrateTraktItems, traktItemToMedia, traktPlaybackToMedia, traktUpNextToMedia } from "./mappers";
@@ -17,7 +17,7 @@ import { loadStored, purgeLegacyStorage, removeStored, saveStored } from "./stor
 import { getDetails, loadCatalog, searchMedia } from "./tmdb";
 import { TraktClient, type TraktDeviceCode } from "./trakt";
 import { mdblistClient } from "./mdblist";
-import { syncClient } from "./sync";
+import { activeSyncProvider, syncClient } from "./sync";
 import type {
   AppSettings,
   AuthSession,
@@ -273,16 +273,32 @@ function traktActivityTime(raw: unknown) {
 // limits (their July 2026 API update made bursts much more failure-prone).
 const showProgressCache = new Map<string, unknown>();
 
-async function loadTraktUpNext(watchedShowsRows: unknown[], includeSpecials: boolean) {
+// How many watched shows we ask Trakt for per-show progress. The activity-keyed
+// progress cache means only shows whose last_watched_at MOVED cost a call on a
+// repeat refresh, so this ceiling mostly bounds the very first sync of a large
+// library. 120 silently truncated Up Next for heavy Trakt users.
+const UP_NEXT_SHOW_LIMIT = 300;
+// How many Continue Watching rows get the (expensive) per-item TMDB hydration.
+// Rows past this still render — they just use the data Trakt/cloud already gave
+// us — instead of being dropped from the rail entirely.
+const CW_HYDRATE_LIMIT = 50;
+
+async function loadTraktUpNext(watchedShowsRows: unknown[], includeSpecials: boolean, hiddenShowIds: Set<number>) {
   // Fetch per-show progress for the whole watched-shows list (newest-activity
   // first) so Continue Watching surfaces every show with an unwatched next
   // episode — not just the most recent handful. The activity-keyed cache means
   // repeat refreshes only hit shows whose last_watched_at actually changed, and
   // concurrency is throttled so this never becomes the old 48-parallel burst.
+  //
+  // Shows the user hid from progress on Trakt are dropped BEFORE the slice, so
+  // they neither appear in the rail nor consume one of the fetch slots.
   const watchedShows = watchedShowsRows
-    .slice()
+    .filter((raw) => {
+      const traktId = (raw as { show?: { ids?: { trakt?: number } } }).show?.ids?.trakt;
+      return !(typeof traktId === "number" && hiddenShowIds.has(traktId));
+    })
     .sort((a, b) => traktActivityTime(b) - traktActivityTime(a))
-    .slice(0, 120);
+    .slice(0, UP_NEXT_SHOW_LIMIT);
   const results: Array<MediaItem | null> = new Array(watchedShows.length).fill(null);
   let cursor = 0;
   // Distinguishes "progress fetch failed" (rate-limited/blocked) from "show has
@@ -350,8 +366,11 @@ function mergeTraktWithLocalResume(traktItems: MediaItem[], localItems: MediaIte
 async function hydrateContinueWatchingItems(items: MediaItem[]) {
   // Throttled pool (not one big Promise.all): 50 parallel TMDB calls at startup
   // starved user-initiated fetches (opening a details page mid-boot timed out
-  // and rendered without seasons/cast).
-  const source = items.slice(0, 50);
+  // and rendered without seasons/cast). Only the head of the rail pays for
+  // hydration; the tail is passed through unhydrated rather than DROPPED, which
+  // used to silently cut Continue Watching off at 50 rows.
+  const source = items.slice(0, CW_HYDRATE_LIMIT);
+  const tail = items.slice(CW_HYDRATE_LIMIT);
   const hydrated: Array<MediaItem | null> = new Array(source.length).fill(null);
   let cursor = 0;
   const workers = Array.from({ length: Math.min(10, source.length) }, async () => {
@@ -372,7 +391,11 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
     }
   });
   await Promise.all(workers);
-  return hydrated.filter((item): item is MediaItem => Boolean(item));
+  // The unhydrated tail still gets the episode clamp — that guard reads only
+  // TMDB season data the item may already carry, and returns the item as-is
+  // when it doesn't.
+  const tailClamped = tail.map(clampUpNextEpisode);
+  return [...hydrated, ...tailClamped].filter((item): item is MediaItem => Boolean(item));
 }
 
 // Trakt's episode database can list MORE episodes than TMDB does for the same
@@ -730,17 +753,30 @@ export function AppProvider({
 
       const client = syncClient();
       const traktReady = client.isConnected;
-      const [historyRows, traktRows, playbackRows, watchedMoviesRows, watchedShowsRows, cloudWatchlistRows] = await Promise.all([
+      const [historyRows, traktRows, playbackRows, watchedMoviesRows, watchedShowsRows, cloudWatchlistRows, hiddenShowIds] = await Promise.all([
         authClient.session ? getContinueWatching(authClient, profileId).catch(() => []) : Promise.resolve([]),
         traktReady ? client.watchlist().catch(() => []) : Promise.resolve([]),
         traktReady ? client.playback().catch(() => []) : Promise.resolve([]),
         traktReady ? client.watched("movies").catch(() => []) : Promise.resolve([]),
         traktReady ? client.watched("shows").catch(() => []) : Promise.resolve([]),
-        authClient.session ? pullCloudWatchlist(authClient, profileId).catch(() => []) : Promise.resolve([])
+        authClient.session ? pullCloudWatchlist(authClient, profileId).catch(() => []) : Promise.resolve([]),
+        // Only Trakt has a hidden-from-progress concept; MDBList reads return an
+        // empty set so the filters below are no-ops for it.
+        traktReady && activeSyncProvider() === "trakt"
+          ? traktClient.hiddenProgressShowIds().catch(() => new Set<number>())
+          : Promise.resolve(new Set<number>())
       ]);
 
+      // Shows dropped on Trakt ("hide from progress") must not resurface here —
+      // Trakt omits them from Up Next, so both the playback and up-next paths
+      // filter them out.
+      const isHiddenShow = (item: MediaItem) =>
+        item.mediaType === "tv" && typeof item.traktId === "number" && hiddenShowIds.has(item.traktId);
       const cloudCw = historyRows.map(historyToItem);
-      const traktPlaybackCw = playbackRows.map(traktPlaybackToMedia).filter(isPausedPlaybackItem);
+      const traktPlaybackCw = playbackRows
+        .map(traktPlaybackToMedia)
+        .filter(isPausedPlaybackItem)
+        .filter((item) => !isHiddenShow(item));
 
       // ── Fast paint ─────────────────────────────────────────────────────────
       // The cloud watchlist + cloud/playback CW are already available now (the
@@ -757,7 +793,20 @@ export function AppProvider({
           }
         }).catch(() => undefined);
       }
-      const fastCw = dedupeMedia([...traktPlaybackCw, ...cloudCw]).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
+      // Dedupe the fast paint at SHOW level, not per episode: the same series
+      // can sit at a different episode in Trakt playback than in the local cloud
+      // resume (you watched on another device), and dedupeMedia keys on the
+      // episode subtitle — which rendered that series twice until the enriched
+      // pass tidied up. Trakt playback is the newer truth, so it wins.
+      const fastSeen = new Set<string>();
+      const fastCw = [...traktPlaybackCw, ...cloudCw.filter((item) => !isHiddenShow(item))]
+        .filter((item) => {
+          const key = `${item.mediaType}:${item.id}`;
+          if (fastSeen.has(key)) return false;
+          fastSeen.add(key);
+          return true;
+        })
+        .sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
       if (fastCw.length) {
         void hydrateContinueWatchingItems(fastCw).then((hydrated) => {
           // Only fill an empty rail: replacing a seeded cache list with this
@@ -781,7 +830,7 @@ export function AppProvider({
       // ───────────────────────────────────────────────────────────────────────
 
       const upNext = traktReady
-        ? await loadTraktUpNext(watchedShowsRows, effectiveSettings.includeSpecials).catch(() => ({ items: [] as MediaItem[], fetchFailures: 1 }))
+        ? await loadTraktUpNext(watchedShowsRows, effectiveSettings.includeSpecials, hiddenShowIds).catch(() => ({ items: [] as MediaItem[], fetchFailures: 1 }))
         : { items: [] as MediaItem[], fetchFailures: 0 };
       const upNextRows = upNext.items;
       const playbackShowKeys = new Set(traktPlaybackCw.filter((item) => item.mediaType === "tv").map((item) => `${item.mediaType}:${item.id}`));
@@ -1350,7 +1399,10 @@ export function AppProvider({
       });
       return;
     }
-    if (debrid && streamPlayability(stream).mode === "remux") {
+    // Only pre-resolve into the remux pipeline when the plan actually calls for
+    // it. A source the plan routes to VLC must not silently start a CPU-heavy
+    // in-browser remux that is going to fail anyway.
+    if (debrid && playbackPlan(stream).method === "remux" && playbackPlan(stream).route === "here") {
       const cached = cachedDebridDirectUrl(stream.url);
       if (cached) {
         setActiveStream({ ...stream, url: cached, originalUrl: stream.url, remux: true });

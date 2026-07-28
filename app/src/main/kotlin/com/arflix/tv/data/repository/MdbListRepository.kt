@@ -38,6 +38,18 @@ import kotlin.math.roundToInt
  * talks to the MDBList remote. API contract is verified live — see the
  * project_mdblist_api memory.
  */
+/**
+ * A show the user is part-way through on MDBList: which episodes are watched (by season) and
+ * when they last watched. The next unwatched episode is resolved against TMDB by the caller.
+ */
+data class MdbShowWatchedProgress(
+    val showTmdbId: Int,
+    val title: String,
+    val year: String,
+    val watchedBySeason: Map<Int, Set<Int>>,
+    val lastWatchedAtMs: Long
+)
+
 @Singleton
 class MdbListRepository @Inject constructor(
     private val api: MdbListApi,
@@ -265,6 +277,56 @@ class MdbListRepository @Inject constructor(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
             emptySet()
+        }
+    }
+
+    /**
+     * Per-show watched progress from /sync/watched, grouped by show tmdb id. Powers MDBList's
+     * "Now Playing" (up-next) — shows with episodes watched but not finished. Unlike Trakt,
+     * MDBList has no server-side "next episode" endpoint, so the caller resolves the next
+     * episode from this watched set + TMDB.
+     */
+    suspend fun getWatchedShowsProgress(): List<MdbShowWatchedProgress> = withContext(Dispatchers.IO) {
+        val k = key() ?: return@withContext emptyList()
+        try {
+            class Acc(var title: String, var year: String) {
+                val eps = mutableMapOf<Int, MutableSet<Int>>()
+                var lastMs = 0L
+            }
+            val byShow = mutableMapOf<Int, Acc>()
+            var offset = 0
+            val limit = 1000
+            while (true) {
+                val resp = api.getWatched(k, limit = limit, offset = offset)
+                resp.episodes?.forEach { row ->
+                    val ep = row.episode ?: return@forEach
+                    val showTmdb = ep.show?.ids?.tmdb ?: return@forEach
+                    val s = ep.season ?: return@forEach
+                    val e = ep.number ?: return@forEach
+                    val acc = byShow.getOrPut(showTmdb) {
+                        Acc(ep.show?.title.orEmpty(), ep.show?.year?.toString().orEmpty())
+                    }
+                    if (acc.title.isBlank()) ep.show?.title?.let { acc.title = it }
+                    acc.eps.getOrPut(s) { mutableSetOf() }.add(e)
+                    val ts = parseIsoMillis(row.lastWatchedAt)
+                    if (ts > acc.lastMs) acc.lastMs = ts
+                }
+                if (resp.pagination?.hasMore != true) break
+                offset += limit
+            }
+            byShow.map { (id, acc) ->
+                MdbShowWatchedProgress(
+                    showTmdbId = id,
+                    title = acc.title,
+                    year = acc.year,
+                    watchedBySeason = acc.eps.mapValues { it.value.toSet() },
+                    lastWatchedAtMs = acc.lastMs
+                )
+            }
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            AppLogger.e(TAG, "watched shows progress fetch failed", e)
+            emptyList()
         }
     }
 

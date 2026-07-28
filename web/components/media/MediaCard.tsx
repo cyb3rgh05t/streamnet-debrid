@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useState } from "react";
+import { getImdbRating } from "@/lib/imdbRatings";
 import { IMDB_LOGO, serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
 import { getCardMeta, getCardProviders, getLogoUrl, prefetchDetails } from "@/lib/tmdb";
@@ -46,7 +47,12 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
   const [logo, setLogo] = useState<string | null>(null);
   const progress = item.progress ?? 0;
   const watched = isWatched(item);
-  const showProgress = !watched && progress >= 1 && progress <= 94;
+  // "Up next" rows carry SERIES completion (how far through the show you are),
+  // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
+  // reads as "you're 40% into that episode", which is wrong. Those rows get the
+  // "Up next" chip instead; the bar stays for genuinely resumable items.
+  const isUpNext = item.timeRemainingLabel === "Up next";
+  const showProgress = !watched && !isUpNext && progress >= 1 && progress <= 94;
   // CW/up-next items from Trakt arrive with no artwork, and a hydration that hit
   // a network/429 error leaves image+backdrop empty — the card renders grey while
   // the (separately cached) logo shows. Back-fill artwork lazily from TMDB.
@@ -86,11 +92,15 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
   // the same cached TMDB call, so fetch when either is missing.
   const [runtime, setRuntime] = useState<number | null>(null);
   const missingArtwork = !item.image && !item.backdrop;
+  // The badge shows the REAL IMDb rating (Cinemeta, keyed by imdb id) — the same
+  // source the Android app uses. TMDB's vote_average is a different score and
+  // must never be shown under an IMDb badge.
+  const [imdbRating, setImdbRating] = useState<string | null>(null);
   useEffect(() => {
     setRuntime(null);
     setFallbackArt(null);
+    setImdbRating(null);
     if (item.id <= 0 || item.isHomeServer) return undefined;
-    if (item.duration && !missingArtwork) return undefined;
     let active = true;
     void getCardMeta({ mediaType: item.mediaType, id: item.id }).then((meta) => {
       if (!active) return;
@@ -98,14 +108,18 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
       if (missingArtwork && (meta.image || meta.backdrop)) {
         setFallbackArt({ image: meta.image, backdrop: meta.backdrop });
       }
+      const imdbId = item.imdbId ?? meta.imdbId;
+      if (!imdbId) return;
+      return getImdbRating(item.mediaType, imdbId).then((rating) => {
+        if (active && rating) setImdbRating(rating);
+      });
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [item.id, item.mediaType, item.isHomeServer, item.duration, missingArtwork]);
+  }, [item.id, item.mediaType, item.isHomeServer, item.imdbId, missingArtwork]);
 
   const dateLabel = formatReleaseDate(item.releaseDate) || item.subtitle || year;
   const runtimeLabel = formatRuntime(item.duration || runtime);
   const episodeLine = formatEpisodeLine(item);
-  const isUpNext = item.timeRemainingLabel === "Up next";
 
   return (
     <button
@@ -125,10 +139,10 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
         )}
         {watched && <span className="watched-badge" aria-label="Watched"><BadgeCheck size={13} /></span>}
         {item.timeRemainingLabel && <span className="cw-badge top-right">{item.timeRemainingLabel}</span>}
-        {item.rating ? (
+        {imdbRating ? (
           <span className="card-imdb">
             <img src={IMDB_LOGO} alt="IMDb" loading="lazy" />
-            <b>{item.rating}</b>
+            <b>{imdbRating}</b>
           </span>
         ) : null}
         {showProgress && (
