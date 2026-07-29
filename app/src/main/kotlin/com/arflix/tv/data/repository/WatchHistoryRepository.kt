@@ -1,6 +1,7 @@
 package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.api.SupabaseApi
+import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.AppLogger
@@ -291,11 +292,20 @@ class WatchHistoryRepository @Inject constructor(
      */
     suspend fun getContinueWatching(): List<WatchHistoryEntry> {
         val profileId = currentProfileId()
+        fun filterLive(entries: List<WatchHistoryEntry>) = entries.filterNot { entry ->
+            val type = if (entry.media_type == "tv") MediaType.TV else MediaType.MOVIE
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = type,
+                id = entry.show_tmdb_id,
+                streamAddonId = entry.stream_addon_id,
+                title = entry.title
+            )
+        }
         if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            return cachedContinueWatchingByProfile[profileId].orEmpty()
+            return filterLive(cachedContinueWatchingByProfile[profileId].orEmpty())
         }
         val userId = authRepositoryProvider.get().getCurrentUserId()
-        if (userId == null) return cachedContinueWatchingByProfile[profileId].orEmpty()
+        if (userId == null) return filterLive(cachedContinueWatchingByProfile[profileId].orEmpty())
 
         return try {
             val records = executeSupabaseCall("get continue watching history") { auth ->
@@ -309,17 +319,17 @@ class WatchHistoryRepository @Inject constructor(
                 )
             }
             val allEntries = records.map { it.toEntry() }
-            val result = filterByProfile(allEntries)
-                .filter { isEntryInProgress(it) }
+            val result = filterLive(filterByProfile(allEntries).filter { isEntryInProgress(it) })
             // Cache the successful result for offline/error fallback
             cachedContinueWatching = result
             cachedContinueWatchingByProfile[profileId] = result
             result
         } catch (e: Exception) {
             AppLogger.e("WatchHistoryRepository", "Error getting continue watching, returning cache", e)
-            cachedContinueWatchingByProfile[profileId].orEmpty()
+            filterLive(cachedContinueWatchingByProfile[profileId].orEmpty())
         }
     }
+
 
     /**
      * Get progress for a specific item

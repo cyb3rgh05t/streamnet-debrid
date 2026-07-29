@@ -5,13 +5,13 @@ import { getStreams, getStreamsProgressive, installAddon as installAddonManifest
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
 import { getAuthPortalUrl } from "./config";
 import { defaultCatalogs, mergeCatalogs } from "./catalogs";
-import { getContinueWatching, pullCloudPayload, pullCloudProfiles, pullCloudTraktToken, pullCloudWatchlist, saveCloudAddons, saveCloudProfiles, saveCloudSettings, saveCloudTraktToken } from "./cloud";
+import { getContinueWatching, isLiveStreamOrSportsItem, pullCloudPayload, pullCloudProfiles, pullCloudTraktToken, pullCloudWatchlist, saveCloudAddons, saveCloudProfiles, saveCloudSettings, saveCloudTraktToken } from "./cloud";
 import { cachedDebridDirectUrl, parseDebridStream, resolveDebridDirectUrl, resolveTranscodeStream } from "./debrid";
 import { createPendingExternalPlayback } from "./externalPlayback";
 import { externalLaunchMode, openExternalPlayer } from "./externalPlayers";
 import { canDirectPlayMkvStream, playbackPlan, streamPlayability } from "./streamCompatibility";
 import { loadHomeServerRows } from "./homeserver";
-import { buildXtreamCatchupUrl, loadIptvGuideForChannels, loadIptvSnapshot, loadPlaylists, savePlaylists } from "./iptv";
+import { buildXtreamCatchupUrl, iptvPlaylistSignature, loadIptvGuideForChannels, loadIptvSnapshot, loadPlaylists, savePlaylists } from "./iptv";
 import { dedupeMedia, historyToItem, hydrateTraktItems, traktItemToMedia, traktPlaybackToMedia, traktUpNextToMedia } from "./mappers";
 import { loadStored, purgeLegacyStorage, removeStored, saveStored } from "./storage";
 import { getDetails, loadCatalog, searchMedia } from "./tmdb";
@@ -240,13 +240,15 @@ function traktWatchedKeys(movies: unknown[], shows: unknown[]) {
   return keys;
 }
 
-function filterWatchedContinueWatching(items: MediaItem[], watchedKeys: Set<string>) {
-  if (!watchedKeys.size) return items;
-  return items.filter((item) => {
+function filterWatchedContinueWatching(items: MediaItem[], watchedKeys: Set<string>, addons: InstalledAddon[]) {
+  const nonLive = items.filter((item) => !isLiveStreamOrSportsItem(item, addons));
+  if (!watchedKeys.size) return nonLive;
+  return nonLive.filter((item) => {
     const key = mediaWatchKey(item);
     return !key || !watchedKeys.has(key);
   });
 }
+
 
 function isMediaWatched(item: MediaItem, watchedKeys: Set<string>, seasonNumber?: number | null, episodeNumber?: number | null) {
   if (item.isWatched) return true;
@@ -754,7 +756,7 @@ export function AppProvider({
       const client = syncClient();
       const traktReady = client.isConnected;
       const [historyRows, traktRows, playbackRows, watchedMoviesRows, watchedShowsRows, cloudWatchlistRows, hiddenShowIds] = await Promise.all([
-        authClient.session ? getContinueWatching(authClient, profileId).catch(() => []) : Promise.resolve([]),
+        authClient.session ? getContinueWatching(authClient, profileId, addonState).catch(() => []) : Promise.resolve([]),
         traktReady ? client.watchlist().catch(() => []) : Promise.resolve([]),
         traktReady ? client.playback().catch(() => []) : Promise.resolve([]),
         traktReady ? client.watched("movies").catch(() => []) : Promise.resolve([]),
@@ -844,7 +846,7 @@ export function AppProvider({
       // Order newest-activity-first across playback + up-next (matches the app's
       // updatedAt-descending sort) so the row leads with what you last watched.
       const cwSorted = dedupeMedia(cwBase).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
-      const cw = await hydrateContinueWatchingItems(filterWatchedContinueWatching(cwSorted, watchedKeys));
+      const cw = await hydrateContinueWatchingItems(filterWatchedContinueWatching(cwSorted, watchedKeys, addonState));
       // Trakt outage guard: when Trakt is connected but every read came back
       // empty, the calls were blocked (Cloudflare challenges the CORS
       // preflight intermittently, especially on VPN/datacenter IPs) — keep
@@ -907,7 +909,9 @@ export function AppProvider({
         currentSettings.groupOrder,
         { userAgent: currentSettings.customUserAgent }
       );
-      setIptvSnapshot(loadedIptv);
+      // Stamp which playlists this snapshot came from so Live TV can reuse it
+      // on re-entry instead of rebuilding ~139k channels every visit.
+      setIptvSnapshot({ ...loadedIptv, signature: iptvPlaylistSignature(currentSettings.iptvPlaylists) });
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Failed to load Live TV");
     } finally {
@@ -1506,7 +1510,7 @@ export function AppProvider({
     setActiveChannel(null);
   }, []);
 
-  const loadCatalogRow = useCallback((catalog: CatalogConfig) => loadCatalog(catalog, settings.language, addonsRef.current), [settings.language]);
+  const loadCatalogRow = useCallback((catalog: CatalogConfig) => loadCatalog(catalog, settings.language, addonsRef.current, settingsRef.current.homeServers), [settings.language]);
 
   const installAddon = useCallback(async (url: string) => {
     const addon = await installAddonManifest(url);

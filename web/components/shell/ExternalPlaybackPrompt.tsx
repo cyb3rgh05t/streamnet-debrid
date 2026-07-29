@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Clock3, Play, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { saveProgress } from "@/lib/cloud";
+import { isLiveStreamOrSportsItem, saveProgress } from "@/lib/cloud";
 import { authClient, useApp } from "@/lib/store";
 import { syncClient } from "@/lib/sync";
 import {
@@ -21,7 +21,7 @@ function labelFor(pending: PendingExternalPlayback) {
 }
 
 export function ExternalPlaybackPrompt() {
-  const { refreshData, setToast, markWatchedLocally } = useApp();
+  const { addons, refreshData, setToast, markWatchedLocally } = useApp();
   const [pending, setPending] = useState<PendingExternalPlayback | null>(null);
   const [mode, setMode] = useState<PromptMode>("choice");
   const [saving, setSaving] = useState(false);
@@ -37,11 +37,22 @@ export function ExternalPlaybackPrompt() {
       setMode("choice");
       return;
     }
+    if (isLiveStreamOrSportsItem({
+      mediaType: next.mediaType,
+      id: next.tmdbId,
+      streamAddonId: next.streamAddonId,
+      title: next.title
+    }, addons)) {
+      clearPendingExternalPlayback(next.id);
+      setPending(null);
+      setMode("choice");
+      return;
+    }
     const age = Date.now() - next.openedAt;
     // Small grace so we don't fire the instant the scheme launch flips
     // visibility; a real trip to VLC is always longer than this.
     if (immediate ? age >= 1_500 : age >= 12_000) setPending(next);
-  }, []);
+  }, [addons]);
 
   useEffect(() => {
     const onReturn = () => {
@@ -115,7 +126,7 @@ export function ExternalPlaybackPrompt() {
           source: active.source,
           stream_addon_id: active.streamAddonId,
           stream_title: active.streamTitle
-        }, active.profileId).catch(() => undefined);
+        }, active.profileId, addons).catch(() => undefined);
       }
       setToast(finished ? "Marked watched and synced." : "Progress synced.");
       await refreshData(active.profileId);

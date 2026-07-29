@@ -243,10 +243,21 @@ button {
   z-index: 1;
   display: grid;
   gap: 0;
-  padding: 0 0 78px;
+  padding: clamp(120px, 15vh, 160px) 0 78px;
   width: 100%;
   min-width: 0;
   overflow-x: hidden;
+}
+
+/* Screens that already supply their own top offset must not stack this one:
+   .section-heading carries clamp(112px, 14.3vh, 154px) of its own padding
+   (Watchlist/Browse/Addons), a hero fills the space itself, and .livetv-shell
+   sets its own. Without these exclusions those pages rendered ~232px of empty
+   space above the first heading instead of ~112px. */
+.screen:has(.hero),
+.screen:has(> .section-heading:first-child),
+.screen.livetv-shell {
+  padding-top: 0;
 }
 
 .hero {
@@ -256,7 +267,7 @@ button {
   position: relative;
   display: flex;
   align-items: center;
-  padding: clamp(98px, 12.2vh, 132px) 3.35vw clamp(145px, 20.2vh, 218px);
+  padding: clamp(140px, 16vh, 195px) 3.35vw clamp(145px, 20.2vh, 218px);
   background-size: cover;
   background-position: center right;
   overflow: hidden;
@@ -274,7 +285,7 @@ button {
 .hero-copy {
   position: relative;
   width: min(760px, 52vw);
-  margin-top: -3.7vh;
+  margin-top: 0;
 }
 
 .eyebrow {
@@ -9235,7 +9246,7 @@ button,
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
-  margin: clamp(14px, 1.4vw, 20px) 0 0;
+  margin: clamp(12px, 1.2vw, 18px) 0 0;
   color: rgba(255, 255, 255, 0.72);
   font-size: clamp(14px, 1vw, 17px);
   font-weight: 700;
@@ -9248,9 +9259,9 @@ button,
   min-height: 26px;
   padding: 0 11px;
   border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.78);
   font-size: clamp(11px, 0.78vw, 13px);
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -9258,26 +9269,43 @@ button,
 }
 
 .detail-body .detail-metadata {
-  gap: 0;
-  margin: clamp(14px, 1.3vw, 22px) 0 clamp(14px, 1.5vw, 24px);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 0;
+  margin: clamp(10px, 1vw, 16px) 0 clamp(14px, 1.4vw, 20px);
+  line-height: 1.5;
 }
 
 .detail-body .detail-metadata span {
+  display: inline-flex;
+  align-items: center;
   min-height: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.82);
   padding: 0;
   backdrop-filter: none;
-  font-size: clamp(13px, 0.98vw, 17px);
+  font-size: clamp(13px, 0.95vw, 16px);
   font-weight: 650;
+  line-height: 1.5;
 }
 
 .detail-body .detail-metadata span + span::before {
   content: "\2022";
-  margin: 0 11px;
-  color: rgba(255, 255, 255, 0.34);
+  margin: 0 10px;
+  color: rgba(255, 255, 255, 0.38);
+  font-weight: 400;
+}
+
+.detail-body p.detail-overview,
+.detail-body p:not(.eyebrow) {
+  max-width: 900px;
+  margin: 0 0 clamp(18px, 1.8vw, 26px);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: clamp(15px, 1.15vw, 20px);
+  line-height: 1.55;
 }
 
 .detail-service-logos {
@@ -9459,7 +9487,7 @@ button,
 /* Final cinematic hero pass: long fades, no visible image boundary. */
 .hero {
   min-height: clamp(620px, 82vh, 880px) !important;
-  padding: clamp(96px, 11vh, 140px) 3.35vw clamp(150px, 20vh, 240px) !important;
+  padding: clamp(145px, 17.5vh, 200px) 3.35vw clamp(150px, 20vh, 240px) !important;
   background-position: 68% center !important;
   background-size: cover !important;
   isolation: isolate;
@@ -9491,7 +9519,7 @@ button,
 .hero-copy {
   z-index: 2 !important;
   width: min(800px, 50vw);
-  margin-top: clamp(-60px, -5vh, -24px);
+  margin-top: 0 !important;
 }
 
 .hero-logo,

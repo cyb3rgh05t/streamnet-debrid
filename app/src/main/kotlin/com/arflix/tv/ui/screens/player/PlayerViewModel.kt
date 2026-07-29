@@ -217,6 +217,8 @@ class PlayerViewModel @Inject constructor(
     private var currentPreferredSourceName: String? = null
     private var currentPreferredBingeGroup: String? = null
     private var currentAddonOrderedIds: List<String> = emptyList()
+    private var currentInstalledAddons: List<Addon> = emptyList()
+    private var currentIsLiveStreamPlayback: Boolean = false
     private var lastScrobbleTime: Long = 0
     private var lastWatchHistorySaveTime: Long = 0
     private var lastWatchHistorySavedPositionSeconds: Long = -1L
@@ -444,6 +446,7 @@ class PlayerViewModel @Inject constructor(
         preferredSourceName: String?,
         preferredBingeGroup: String?,
         startPositionMs: Long?,
+        isLiveStreamPlayback: Boolean = false,
         airDate: String? = null
     ) {
         currentAirDate = airDate
@@ -455,6 +458,7 @@ class PlayerViewModel @Inject constructor(
         currentPreferredAddonId = preferredAddonId?.trim()?.takeIf { it.isNotBlank() }
         currentPreferredSourceName = preferredSourceName?.trim()?.takeIf { it.isNotBlank() }
         currentPreferredBingeGroup = preferredBingeGroup?.trim()?.takeIf { it.isNotBlank() }
+        currentIsLiveStreamPlayback = isLiveStreamPlayback
         playbackSessionStartTime = System.currentTimeMillis()
         playbackDiag(
             "loadMedia type=$mediaType id=$mediaId season=$seasonNumber episode=$episodeNumber " +
@@ -531,7 +535,9 @@ class PlayerViewModel @Inject constructor(
             val showLoadingStats = prefs[showLoadingStatsKey()] ?: true
             val volumeBoostDb = prefs[profileManager.profileStringKey("volume_boost_db")]
                 ?.toIntOrNull()?.coerceIn(0, 15) ?: 0
-            val orderedAddonIds = streamRepository.installedAddons.first()
+            val installedAddons = streamRepository.installedAddons.first()
+            currentInstalledAddons = installedAddons
+            val orderedAddonIds = installedAddons
                 .filter { it.isVodStreamingAddon() }
                 .map { it.id }
             currentAddonOrderedIds = orderedAddonIds
@@ -3696,7 +3702,8 @@ class PlayerViewModel @Inject constructor(
             currentPreferredAddonId,
             currentPreferredSourceName,
             currentPreferredBingeGroup,
-            currentStartPositionMs
+            currentStartPositionMs,
+            currentIsLiveStreamPlayback
         )
     }
 
@@ -3866,9 +3873,19 @@ class PlayerViewModel @Inject constructor(
         progressSaveJob = viewModelScope.launch(Dispatchers.IO) {
             val currentTime = System.currentTimeMillis()
             val progressFraction = (progressPercent / 100f).coerceIn(0f, 1f)
+            val selectedStream = _uiState.value.selectedStream
+            val streamAddonIdForCheck = selectedStream?.addonId?.takeIf { it.isNotBlank() }
+            val isLiveStreamOrSports = SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = currentMediaType,
+                id = currentMediaId,
+                streamAddonId = streamAddonIdForCheck,
+                title = currentTitle,
+                isLiveStream = currentIsLiveStreamPlayback,
+                addons = currentInstalledAddons
+            )
 
             // Scrobble start/pause/updates with debounce
-            if (isPlaying && !lastIsPlaying) {
+            if (!isLiveStreamOrSports && isPlaying && !lastIsPlaying) {
                 try {
                     remoteSyncManager.scrobbleStart(
                         mediaType = currentMediaType,
@@ -3883,7 +3900,7 @@ class PlayerViewModel @Inject constructor(
                     // Scrobble start failed
                 }
                 lastScrobbleTime = currentTime
-            } else if (!isPlaying && lastIsPlaying) {
+            } else if (!isLiveStreamOrSports && !isPlaying && lastIsPlaying) {
                 try {
                     remoteSyncManager.scrobblePause(
                         mediaType = currentMediaType,
@@ -3898,7 +3915,7 @@ class PlayerViewModel @Inject constructor(
                     // Scrobble pause immediate failed
                 }
                 lastScrobbleTime = currentTime
-            } else if (isPlaying && currentTime - lastScrobbleTime >= SCROBBLE_UPDATE_INTERVAL_MS) {
+            } else if (!isLiveStreamOrSports && isPlaying && currentTime - lastScrobbleTime >= SCROBBLE_UPDATE_INTERVAL_MS) {
                 // Periodic scrobble update while playing (use scrobbleStart, not pause)
                 try {
                     remoteSyncManager.scrobbleStart(
@@ -3928,10 +3945,9 @@ class PlayerViewModel @Inject constructor(
             val shouldPersistWatchHistory = !isPlaying ||
                 currentTime - lastWatchHistorySaveTime >= WATCH_HISTORY_UPDATE_INTERVAL_MS ||
                 hasSeekJump
-            if (shouldPersistWatchHistory && !isAtWatchedThreshold) {
+            if (shouldPersistWatchHistory && !isAtWatchedThreshold && !isLiveStreamOrSports) {
                 lastWatchHistorySaveTime = currentTime
                 lastWatchHistorySavedPositionSeconds = positionSeconds
-                val selectedStream = _uiState.value.selectedStream
                 val shouldPersistStreamAffinity = positionSeconds >= 30L
                 val streamKey = if (shouldPersistStreamAffinity) buildStreamKey(selectedStream) else null
                 val streamAddonId = if (shouldPersistStreamAffinity) selectedStream?.addonId?.takeIf { it.isNotBlank() } else null
@@ -3984,6 +4000,7 @@ class PlayerViewModel @Inject constructor(
                     }
                 }
 
+
                 if (!isPlaying || playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD) {
                     runCatching { cloudSyncRepository.pushToCloud() }
                     runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
@@ -3991,7 +4008,9 @@ class PlayerViewModel @Inject constructor(
             }
 
             // Mark as watched when playback ends or crosses threshold
-            if (!hasMarkedWatched && (playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD)) {
+            if (!isLiveStreamOrSports && !hasMarkedWatched &&
+                (playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD)
+            ) {
                 hasMarkedWatched = true
                 try {
                     remoteSyncManager.scrobbleStop(

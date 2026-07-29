@@ -11,6 +11,7 @@ import com.arflix.tv.data.api.*
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.NextEpisode
+import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.util.ContinueWatchingSelector
 import com.arflix.tv.util.EpisodePointer
 import com.arflix.tv.util.EpisodeProgressSnapshot
@@ -2141,6 +2142,14 @@ class TraktRepository @Inject constructor(
         year: String = ""
     ) {
         ensureProfileCacheScope()
+        if (SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = mediaType,
+                id = tmdbId,
+                streamAddonId = streamAddonId,
+                title = title
+            )) {
+            return
+        }
         val hasMeaningfulPosition = positionSeconds >= 60L
 
         // Keep accidental taps out, but still keep real partial sessions on long content
@@ -2302,8 +2311,16 @@ class TraktRepository @Inject constructor(
         if (json == null) {
             return emptyList()
         }
-        return decodeContinueWatchingList(json)
+        return decodeContinueWatchingList(json).filterNot { item ->
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = item.mediaType,
+                id = item.id,
+                streamAddonId = item.streamAddonId,
+                title = item.title
+            )
+        }
     }
+
 
     /**
      * Get a single local Continue Watching entry (raw, without TMDB enrichment).
@@ -2366,10 +2383,19 @@ class TraktRepository @Inject constructor(
      * and Trakt paths render identical card details.
      */
     suspend fun enrichContinueWatchingItems(items: List<ContinueWatchingItem>): List<ContinueWatchingItem> = coroutineScope {
-        if (items.isEmpty()) return@coroutineScope emptyList()
+        val filtered = items.filterNot { item ->
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = item.mediaType,
+                id = item.id,
+                streamAddonId = item.streamAddonId,
+                title = item.title
+            )
+        }
+        if (filtered.isEmpty()) return@coroutineScope emptyList()
         val semaphore = kotlinx.coroutines.sync.Semaphore(5)
         val seasonCache = java.util.concurrent.ConcurrentHashMap<Pair<Int, Int>, Deferred<com.arflix.tv.data.api.TmdbSeasonDetails?>>()
-        items.map { item ->
+        filtered.map { item ->
+
             async {
                 semaphore.withPermit {
                     enrichLocalContinueWatchingItem(item, seasonCache)

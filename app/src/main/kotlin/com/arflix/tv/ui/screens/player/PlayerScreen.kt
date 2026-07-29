@@ -250,6 +250,7 @@ fun PlayerScreen(
     preferredSourceName: String? = null,
     preferredBingeGroup: String? = null,
     startPositionMs: Long? = null,
+    isLiveStream: Boolean = false,
     viewModel: PlayerViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
     onPlayNext: (Int, Int, String?, String?, String?) -> Unit = { _, _, _, _, _ -> }
@@ -627,7 +628,7 @@ fun PlayerScreen(
     }
 
     // Load media
-    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs) {
+    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs, isLiveStream) {
         playbackIssueReported = false
         startupRecoverAttempted = false
         startupHardFailureReported = false
@@ -658,7 +659,8 @@ fun PlayerScreen(
             preferredAddonId = preferredAddonId,
             preferredSourceName = preferredSourceName,
             preferredBingeGroup = preferredBingeGroup,
-            startPositionMs = startPositionMs
+            startPositionMs = startPositionMs,
+            isLiveStreamPlayback = isLiveStream
         )
     }
 

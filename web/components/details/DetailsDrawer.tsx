@@ -233,7 +233,6 @@ function DetailsView({ item }: { item: MediaItem }) {
           <div className="detail-title-line">
             {logo ? <img className="detail-clearlogo" src={logo} alt={displayItem.title} /> : <h2>{displayItem.title}</h2>}
           </div>
-          <p>{displayItem.overview || "No overview available."}</p>
           <div className="detail-rating-line">
             {detailImdbRating ? (
               <span className="imdb-lockup">
@@ -248,6 +247,7 @@ function DetailsView({ item }: { item: MediaItem }) {
             {detailMeta.map((meta) => <span key={meta}>{meta}</span>)}
             {streams.length > 0 && <span>{playableCount}/{streams.length} web playable</span>}
           </div>
+          <p className="detail-overview">{displayItem.overview || "No overview available."}</p>
           {serviceLogos.length ? (
             <div className="detail-service-logos" aria-label="Streaming and network availability">
               {serviceLogos.map((service) => (

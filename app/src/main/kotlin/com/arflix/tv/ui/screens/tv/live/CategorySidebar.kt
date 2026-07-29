@@ -174,7 +174,7 @@ fun CategorySidebar(
     }
 
     LaunchedEffect(focusSearchSignal) {
-        if (focusSearchSignal > 0) {
+        if (LiveTvStartup.shouldFocusSearch(focusSearchSignal)) {
             repeat(3) {
                 runCatching { searchFocusRequester.requestFocus() }
                 delay(50L)

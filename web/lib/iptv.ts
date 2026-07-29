@@ -884,3 +884,17 @@ function sha1Hex(input: string) {
 function rol(value: number, bits: number) {
   return (value << bits) | (value >>> (32 - bits));
 }
+
+/**
+ * Identity of a playlist set. Live TV reuses an in-memory snapshot while this
+ * is unchanged, instead of re-parsing every channel on each visit (a large
+ * provider is ~139k channels, measured at ~3.3s of pure CPU work per entry).
+ */
+export function iptvPlaylistSignature(playlists: IptvPlaylistEntry[]): string {
+  return playlists
+    .map((playlist) => `${playlist.id}:${playlist.enabled}:${playlist.m3uUrl}:${playlist.epgUrl ?? ""}:${playlist.epgUrls?.join("|") ?? ""}`)
+    .join("||");
+}
+
+/** How long an in-memory channel snapshot stays good before a rebuild. */
+export const IPTV_SNAPSHOT_TTL_MS = 6 * 60 * 60 * 1000;

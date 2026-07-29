@@ -81,7 +81,7 @@ sealed class Screen(val route: String) {
         }
     }
 
-    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}") {
+    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
         fun createRoute(
             mediaType: MediaType,
             mediaId: Int,
@@ -92,7 +92,8 @@ sealed class Screen(val route: String) {
             preferredAddonId: String? = null,
             preferredSourceName: String? = null,
             preferredBingeGroup: String? = null,
-            startPositionMs: Long? = null
+            startPositionMs: Long? = null,
+            isLiveStream: Boolean = false
         ): String {
             val base = "player/${mediaType.name.lowercase()}/$mediaId"
             val params = mutableListOf<String>()
@@ -104,6 +105,7 @@ sealed class Screen(val route: String) {
             preferredSourceName?.let { params.add("preferredSourceName=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             preferredBingeGroup?.let { params.add("preferredBingeGroup=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             startPositionMs?.let { params.add("startPositionMs=$it") }
+            if (isLiveStream) params.add("isLiveStream=true")
             return if (params.isNotEmpty()) "$base?${params.joinToString("&")}" else base
         }
     }
@@ -199,7 +201,8 @@ fun AppNavigation(
                             mediaId = mediaId,
                             streamUrl = streamUrl,
                             preferredAddonId = preferredAddonId,
-                            preferredSourceName = preferredSourceName
+                            preferredSourceName = preferredSourceName,
+                            isLiveStream = true
                         )
                     )
                 },
@@ -375,7 +378,8 @@ fun AppNavigation(
                             mediaId = mediaId,
                             streamUrl = streamUrl,
                             preferredAddonId = preferredAddonId,
-                            preferredSourceName = preferredSourceName
+                            preferredSourceName = preferredSourceName,
+                            isLiveStream = true
                         )
                     )
                 },
@@ -503,6 +507,10 @@ fun AppNavigation(
                 navArgument("startPositionMs") {
                     type = NavType.LongType
                     defaultValue = -1L
+                },
+                navArgument("isLiveStream") {
+                    type = NavType.BoolType
+                    defaultValue = false
                 }
             )
         ) { backStackEntry ->
@@ -516,6 +524,7 @@ fun AppNavigation(
             val preferredSourceName = backStackEntry.arguments?.getString("preferredSourceName")?.takeIf { it.isNotBlank() }
             val preferredBingeGroup = backStackEntry.arguments?.getString("preferredBingeGroup")?.takeIf { it.isNotBlank() }
             val startPositionMs = backStackEntry.arguments?.getLong("startPositionMs")?.takeIf { it >= 0L }
+            val isLiveStream = backStackEntry.arguments?.getBoolean("isLiveStream") ?: false
             val mediaType = if (mediaTypeStr == "tv") MediaType.TV else MediaType.MOVIE
 
             PlayerScreen(
@@ -529,6 +538,7 @@ fun AppNavigation(
                 preferredSourceName = preferredSourceName,
                 preferredBingeGroup = preferredBingeGroup,
                 startPositionMs = startPositionMs,
+                isLiveStream = isLiveStream,
                 onBack = { navController.popBackStack() },
                 onPlayNext = { nextSeason, nextEpisode, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
                     // Navigate to next episode

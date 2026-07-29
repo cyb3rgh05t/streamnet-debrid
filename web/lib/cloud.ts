@@ -928,25 +928,115 @@ export async function saveCloudProfiles(auth: AuthClient, profiles: Profile[], a
   });
 }
 
-export async function getContinueWatching(auth: AuthClient, profileId?: string | null) {
+const liveAddonIdMarkers = [
+  "livetv",
+  "live_tv",
+  "live-tv",
+  "live_stream",
+  "livestream",
+  "live-stream",
+  "tvchannels",
+  "tv-channels",
+  "iptv",
+  "sports"
+];
+
+const vodTypes = new Set(["movie", "film", "series", "show", "anime"]);
+const liveTypes = new Set(["tv", "channel", "channels", "live", "sport", "sports", "tvchannel", "live_tv", "livestream"]);
+
+function addonTypes(addon: InstalledAddon): string[] {
+  return [
+    ...(addon.types ?? []),
+    ...addon.catalogs.map((catalog) => catalog.type),
+    ...addon.resources.flatMap((resource) => typeof resource === "string" ? [] : resource.types ?? [])
+  ].map((type) => type.trim().toLowerCase());
+}
+
+function isLiveAddonId(value?: string | null): boolean {
+  const id = (value ?? "").trim().toLowerCase();
+  if (!id || id.includes("cinemeta") || id.includes("tmdb") || id.includes("torrentio")) return false;
+  return liveAddonIdMarkers.some((marker) => id.includes(marker));
+}
+
+function isLiveOnlyAddon(addon: InstalledAddon): boolean {
+  const types = addonTypes(addon);
+  if (types.some((type) => vodTypes.has(type))) return false;
+  if (isLiveAddonId(addon.id) || isLiveAddonId(addon.name)) return true;
+  if (types.some((type) => liveTypes.has(type))) return true;
+
+  const resourceNames = addon.resources.map((resource) =>
+    (typeof resource === "string" ? resource : resource.name).trim().toLowerCase()
+  );
+  const hasStream = resourceNames.some((name) => name === "stream" || name === "streams");
+  const hasCatalog = addon.catalogs.length > 0 ||
+    resourceNames.some((name) => name === "catalog" || name === "catalogs");
+  const text = [
+    addon.id,
+    addon.name,
+    addon.description ?? "",
+    ...addon.catalogs.flatMap((catalog) => [catalog.type, catalog.id, catalog.name])
+  ].join(" ").toLowerCase();
+  const hasSportsTerm = /(sport|football|soccer|basketball|tennis|racing|rugby|hockey|baseball|boxing|ufc|mma|cricket|golf)/.test(text);
+  const hasLiveTerm = /(live|event|match|game)/.test(text);
+  return hasStream && hasCatalog && hasSportsTerm && hasLiveTerm;
+}
+
+export function isLiveStreamOrSportsItem(item: {
+  mediaType?: string | null;
+  media_type?: string | null;
+  id?: number | string | null;
+  show_tmdb_id?: number | string | null;
+  streamAddonId?: string | null;
+  stream_addon_id?: string | null;
+  title?: string | null;
+}, addons: InstalledAddon[] = []): boolean {
+  const mediaType = (item.mediaType ?? item.media_type ?? "").toLowerCase();
+  const rawId = item.show_tmdb_id ?? item.id;
+  const id = typeof rawId === "number" ? rawId : Number(rawId ?? 0);
+
+  const addonId = (item.streamAddonId ?? item.stream_addon_id ?? "").toLowerCase();
+  const title = (item.title ?? "").toLowerCase();
+
+  if (mediaType && mediaType !== "movie" && mediaType !== "tv") {
+    return true;
+  }
+  if (!id || id <= 0) {
+    return true;
+  }
+  if (addonId) {
+    const addon = addons.find((candidate) => candidate.id.toLowerCase() === addonId);
+    if (addon) {
+      if (isLiveOnlyAddon(addon)) return true;
+    } else if (isLiveAddonId(addonId)) {
+      return true;
+    }
+  }
+  if (title.startsWith("live:") || title.startsWith("[live]")) {
+    return true;
+  }
+  return false;
+}
+
+export async function getContinueWatching(auth: AuthClient, profileId?: string | null, addons: InstalledAddon[] = []) {
   if (!auth.session) return [];
   if (canUseBackendSync(auth)) {
     const root = await pullRawPayload(auth);
     return androidContinueWatchingItems(root, profileId)
       .map((item) => androidCwToHistory(item, profileId))
       .filter((item): item is WatchHistoryEntry => Boolean(item))
-      .filter((item) => (item.progress ?? 0) < 0.9)
+      .filter((item) => (item.progress ?? 0) < 0.9 && !isLiveStreamOrSportsItem(item, addons))
       .sort((a, b) => Date.parse(b.updated_at ?? "") - Date.parse(a.updated_at ?? ""))
       .slice(0, 50);
   }
   const profileFilter = profileId ? `&profile_id=eq.${encodeURIComponent(profileId)}` : "";
-  return auth.supabase<WatchHistoryEntry[]>(
+  const records = await auth.supabase<WatchHistoryEntry[]>(
     `/rest/v1/watch_history?user_id=eq.${auth.session.userId}${profileFilter}&progress=lt.0.9&select=*&order=updated_at.desc&limit=50`
   );
+  return records.filter((item) => !isLiveStreamOrSportsItem(item, addons));
 }
 
-export async function saveProgress(auth: AuthClient, entry: Omit<WatchHistoryEntry, "user_id">, profileId?: string | null) {
-  if (!auth.session) return;
+export async function saveProgress(auth: AuthClient, entry: Omit<WatchHistoryEntry, "user_id">, profileId?: string | null, addons: InstalledAddon[] = []) {
+  if (!auth.session || isLiveStreamOrSportsItem(entry, addons)) return;
   if (canUseBackendSync(auth)) {
     await mutateCloudPayload(auth, (root) => {
       const targetProfileId = entry.profile_id ?? profileId ?? "default";
@@ -976,6 +1066,7 @@ export async function saveProgress(auth: AuthClient, entry: Omit<WatchHistoryEnt
     })
   });
 }
+
 
 export async function markWatched(auth: AuthClient, entry: Omit<WatchHistoryEntry, "user_id" | "progress" | "position_seconds">, profileId?: string | null) {
   await saveProgress(auth, {

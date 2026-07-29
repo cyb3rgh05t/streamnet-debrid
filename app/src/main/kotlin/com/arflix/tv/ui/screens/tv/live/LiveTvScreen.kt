@@ -1015,9 +1015,18 @@ fun LiveTvScreen(
     DisposableEffect(Unit) {
         onDispose { viewModel.setLiveTvPlaybackActive(false) }
     }
-    var focusedChannelId by rememberSaveable { mutableStateOf<String?>(initialChannelId) }
-    var heroPreviewChannelId by rememberSaveable { mutableStateOf<String?>(initialChannelId) }
-    var epgPrefetchAnchorId by rememberSaveable { mutableStateOf<String?>(initialChannelId) }
+    // Open on the channel the user last watched. The session already persists
+    // lastChannelId, but nothing consumed it on entry, so Live TV always
+    // started at the top of the list. Rules live in LiveTvStartup so they are
+    // unit tested rather than only verifiable on a device.
+    val resumeChannelId = LiveTvStartup.resumeChannelId(
+        explicitChannelId = initialChannelId,
+        lastChannelId = state.tvSession.lastChannelId,
+        availableChannelIds = LiveTvStartup.channelIds(state.snapshot.channels),
+    )
+    var focusedChannelId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
+    var heroPreviewChannelId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
+    var epgPrefetchAnchorId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
     var startupChannelApplied by rememberSaveable(selectedProviderId) { mutableStateOf(false) }
     var playingCatchupProgram by remember { mutableStateOf<IptvProgram?>(null) }
     var catchupPlaybackOffsetMs by remember { mutableLongStateOf(0L) }
@@ -1459,6 +1468,11 @@ fun LiveTvScreen(
     var focusSelectedCategorySignal by remember { mutableIntStateOf(1) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
+    // Starts at 0 so opening Live TV does NOT slam focus into the channel
+    // search field. It seeded to 1, and the sidebar focuses search for any
+    // value > 0, so every entry began with the selector trapped in the search
+    // box. focusPlaylistSearch() still bumps it when the user actually asks
+    // for search.
     var focusSearchCategorySignal by remember { mutableIntStateOf(0) }
     // Full-screen playback mode — pressing OK on an EPG row expands the
     // mini-player to cover the whole screen. Back collapses back to the grid.
@@ -1587,9 +1601,22 @@ fun LiveTvScreen(
         runCatching { sidebarFocus.requestFocus() }
     }
 
-    LaunchedEffect(focusZone, isTouchDevice) {
-        if (!isTouchDevice && focusZone == LiveTvFocusZone.CATEGORY_LIST) {
-            focusSelectedCategorySignal += 1
+    // Keep focus in the sidebar while that zone is active — but NOT while the
+    // channel list is still loading. During a load the list is recomposing
+    // underneath the focused item, so Compose keeps dropping focus and this
+    // effect kept re-grabbing it: pressing a direction key while loading sent
+    // the selector jumping in unrelated directions, and it stayed pinned to the
+    // search field until everything had finished. Once channels exist the
+    // layout is stable and normal focus handling behaves predictably.
+    val channelsReady = currentUiState.snapshot.channels.isNotEmpty()
+    LaunchedEffect(focusZone, isTouchDevice, channelsReady) {
+        if (LiveTvStartup.shouldClaimSidebarFocus(
+                isTouchDevice = isTouchDevice,
+                isCategoryZoneActive = focusZone == LiveTvFocusZone.CATEGORY_LIST,
+                channelsLoaded = channelsReady,
+            )
+        ) {
+            runCatching { sidebarFocus.requestFocus() }
         }
     }
 

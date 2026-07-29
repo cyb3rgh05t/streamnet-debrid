@@ -95,6 +95,89 @@ class SportsAddonCapabilitiesTest {
     }
 
     @Test
+    fun `generic live addon is detected from manifest metadata`() {
+        val manifest = AddonManifest(
+            id = "community.provider",
+            name = "Community Provider",
+            version = "1.0.0",
+            description = "Live football matches",
+            types = listOf("sport"),
+            resources = listOf(
+                AddonResource(name = "catalog", types = listOf("sport")),
+                AddonResource(name = "stream", types = listOf("sport"))
+            ),
+            catalogs = listOf(
+                AddonCatalog(type = "sport", id = "football", name = "Football")
+            )
+        )
+        val addon = Addon(
+            id = manifest.id,
+            name = manifest.name,
+            version = manifest.version,
+            description = manifest.description,
+            isInstalled = true,
+            type = AddonType.COMMUNITY,
+            manifest = manifest
+        )
+
+        assertTrue(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.TV,
+                id = SportsAddonCapabilities.sportsSyntheticId("community.provider:event"),
+                streamAddonId = addon.id,
+                addons = listOf(addon)
+            )
+        )
+    }
+
+    @Test
+    fun `hybrid addon keeps vod while explicit sports playback is excluded`() {
+        val manifest = AddonManifest(
+            id = "sports-documentaries",
+            name = "Sports and Movies",
+            version = "1.0.0",
+            description = "Movies, series, and live sports",
+            types = listOf("movie", "series", "tv"),
+            resources = listOf(
+                AddonResource(name = "catalog"),
+                AddonResource(name = "stream")
+            ),
+            catalogs = listOf(
+                AddonCatalog(type = "movie", id = "movies", name = "Movies"),
+                AddonCatalog(type = "tv", id = "live-sports", name = "Live Sports")
+            )
+        )
+        val addon = Addon(
+            id = manifest.id,
+            name = manifest.name,
+            version = manifest.version,
+            description = manifest.description,
+            isInstalled = true,
+            type = AddonType.COMMUNITY,
+            manifest = manifest
+        )
+
+        assertFalse(SportsAddonCapabilities.isLiveStreamAddon(addon))
+        assertFalse(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.MOVIE,
+                id = 123,
+                streamAddonId = addon.id,
+                addons = listOf(addon)
+            )
+        )
+        assertTrue(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.TV,
+                id = SportsAddonCapabilities.sportsSyntheticId("sports-documentaries:event"),
+                streamAddonId = addon.id,
+                isLiveStream = true,
+                addons = listOf(addon)
+            )
+        )
+    }
+
+    @Test
     fun `sports statuses are recognized as home sports items`() {
         assertTrue(SportsAddonCapabilities.isSportsHomeStatus("sports:football"))
         assertTrue(SportsAddonCapabilities.isSportsHomeStatus("sports_event:addon|sports|event"))

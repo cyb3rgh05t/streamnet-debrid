@@ -4,10 +4,13 @@ import { CalendarClock, ChevronDown, ExternalLink, Eye, EyeOff, History, LayoutG
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { externalLaunchMode, openExternalPlayer } from "@/lib/externalPlayers";
 import { groupKey, loadXtreamCatchup, type CatchupProgram } from "@/lib/iptv";
+import { IPTV_SNAPSHOT_TTL_MS, iptvPlaylistSignature } from "@/lib/iptv";
+import { loadStored, saveStored } from "@/lib/storage";
 import { useApp } from "@/lib/store";
 import type { IptvChannel, IptvSnapshot } from "@/lib/types";
 
 const CHANNEL_PAGE_SIZE = 300;
+const LAST_CHANNEL_KEY = "arvio.web.livetv.lastChannel";
 const GUIDE_BATCH_DELAY_MS = 500;
 const GUIDE_WINDOW_HOURS = 4;
 const GUIDE_PX_PER_MIN = 6;
@@ -56,7 +59,12 @@ export function LiveTvScreen() {
   const [epgUrl, setEpgUrl] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [query, setQuery] = useState("");
-  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(null);
+  // Re-open Live TV where the user left off (requested: "start at the last
+  // channel you left"). Persisted per device; falls back to the first channel
+  // when that channel is gone from the current playlists.
+  const [selectedChannelId, setSelectedChannelId] = useState<string | null>(
+    () => loadStored<string | null>(LAST_CHANNEL_KEY, null)
+  );
   const [managing, setManaging] = useState(false);
   const [view, setView] = useState<"list" | "guide">("list");
   const [visibleCount, setVisibleCount] = useState(CHANNEL_PAGE_SIZE);
@@ -68,13 +76,23 @@ export function LiveTvScreen() {
   const favoriteChannels = channels.filter((channel) => favorites.includes(channel.id));
   const isLoadingTv = Boolean(busy && (busy.toLowerCase().includes("syncing") || busy.toLowerCase().includes("loading tv")));
   const hasWarnings = Boolean(iptvSnapshot.playlistWarnings?.length);
-  const playlistSignature = playlists
-    .map((playlist) => `${playlist.id}:${playlist.enabled}:${playlist.m3uUrl}:${playlist.epgUrl ?? ""}:${playlist.epgUrls?.join("|") ?? ""}`)
-    .join("||");
+  // Same helper the store stamps onto the snapshot, so both sides agree on when
+  // a cached channel list still matches the configured playlists.
+  const playlistSignature = iptvPlaylistSignature(playlists);
 
+  // Re-entering Live TV used to rebuild the whole snapshot every time — with a
+  // large provider that is ~139k channels re-parsed and re-grouped on each
+  // visit, measured at ~3.3s with ZERO network calls (the playlist text itself
+  // is already cached). Reuse the snapshot that is still in memory and only
+  // rebuild when the playlists actually changed, or when it has gone stale.
   useEffect(() => {
     if (!playlists.length) return;
+    const snapshotMatchesPlaylists = iptvSnapshot.channels.length > 0
+      && iptvSnapshot.signature === playlistSignature;
+    const age = Date.now() - (iptvSnapshot.loadedAt ?? 0);
+    if (snapshotMatchesPlaylists && age < IPTV_SNAPSHOT_TTL_MS) return;
     void refreshIptv();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistSignature, refreshIptv, playlists.length]);
 
   const categories = useMemo(() => {
@@ -123,6 +141,11 @@ export function LiveTvScreen() {
   const renderedChannels = useMemo(() => visibleChannels.slice(0, visibleCount), [visibleChannels, visibleCount]);
   const selectedChannel = channels.find((channel) => channel.id === selectedChannelId) ?? renderedChannels[0] ?? null;
   const selectedGuide = selectedChannel ? iptvSnapshot.nowNext[selectedChannel.id] : undefined;
+
+  // Remember the channel across sessions so the next visit opens on it.
+  useEffect(() => {
+    if (selectedChannel?.id) saveStored(LAST_CHANNEL_KEY, selectedChannel.id);
+  }, [selectedChannel?.id]);
 
   // Catch-up listings for the selected channel (channels the panel archives).
   useEffect(() => {

@@ -17,11 +17,13 @@ import androidx.tvprovider.media.tv.WatchNextProgram
 import com.arflix.tv.MainActivity
 import com.arflix.tv.R
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.navigation.Screen
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,7 +41,8 @@ class LauncherContinueWatchingRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val profileManager: ProfileManager,
     private val traktRepository: TraktRepository,
-    private val watchHistoryRepository: WatchHistoryRepository
+    private val watchHistoryRepository: WatchHistoryRepository,
+    private val streamRepository: StreamRepository
 ) {
     companion object {
         private const val TAG = "LauncherCW"
@@ -94,9 +97,19 @@ class LauncherContinueWatchingRepository @Inject constructor(
     }
 
     private suspend fun loadPublisherItems(): List<ContinueWatchingItem> {
+        val installedAddons = streamRepository.installedAddons.first()
         val primaryItems = runCatching { traktRepository.getContinueWatching() }.getOrDefault(emptyList())
-        if (primaryItems.isNotEmpty()) {
-            return primaryItems.take(Constants.MAX_CONTINUE_WATCHING)
+        val filteredPrimary = primaryItems.filterNot { item ->
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = item.mediaType,
+                id = item.id,
+                streamAddonId = item.streamAddonId,
+                title = item.title,
+                addons = installedAddons
+            )
+        }
+        if (filteredPrimary.isNotEmpty()) {
+            return filteredPrimary.take(Constants.MAX_CONTINUE_WATCHING)
         }
 
         val historyFallback = runCatching { watchHistoryRepository.getContinueWatching() }.getOrDefault(emptyList())
@@ -114,12 +127,23 @@ class LauncherContinueWatchingRepository @Inject constructor(
                     posterPath = entry.poster_path,
                     backdropPath = entry.backdrop_path,
                     resumePositionSeconds = entry.position_seconds,
-                    durationSeconds = entry.duration_seconds
+                    durationSeconds = entry.duration_seconds,
+                    streamAddonId = entry.stream_addon_id
+                )
+            }
+            .filterNot { item ->
+                SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                    mediaType = item.mediaType,
+                    id = item.id,
+                    streamAddonId = item.streamAddonId,
+                    title = item.title,
+                    addons = installedAddons
                 )
             }
             .distinctBy { "${it.mediaType}:${it.id}:${it.season ?: -1}:${it.episode ?: -1}" }
             .take(Constants.MAX_CONTINUE_WATCHING)
     }
+
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun syncPublishedRows(items: List<ContinueWatchingItem>) {

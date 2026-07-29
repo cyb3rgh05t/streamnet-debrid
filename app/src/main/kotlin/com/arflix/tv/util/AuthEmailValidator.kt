@@ -21,7 +21,19 @@ object AuthEmailValidator {
         "10minutemail.com",
         "tempmail.com",
         "temp-mail.org",
-        "yopmail.com"
+        "yopmail.com",
+        "trashmail.com",
+        "trashmail.at",
+        "trashmail.io",
+        "sharklasers.com",
+        "throwam.com",
+        "dispostable.com",
+        "mailnull.com",
+        "spamgourmet.com",
+        "discard.email",
+        "fakeinbox.com",
+        "spamherelots.com",
+        "maildrop.cc"
     )
 
     fun normalize(email: String): String = email.trim().lowercase()

@@ -2,7 +2,7 @@ import { config } from "./config";
 import { apiProxiedUrl, jsonRequest, proxiedUrl } from "./http";
 import { tmdbImageUrl } from "./mediaImages";
 import { loadStored, saveStored } from "./storage";
-import type { CatalogConfig, Category, CollectionSourceConfig, EpisodeInfo, InstalledAddon, MediaItem, MediaType, PersonDetails, ReviewInfo } from "./types";
+import type { CatalogConfig, Category, CollectionSourceConfig, EpisodeInfo, HomeServerConfig, InstalledAddon, MediaItem, MediaType, PersonDetails, ReviewInfo } from "./types";
 
 type TmdbItem = {
   id: number;
@@ -179,10 +179,15 @@ export async function loadHomeCategories(language = "en-US", catalogs?: CatalogC
   }
 }
 
-export async function loadCatalog(catalog: CatalogConfig, language = "en-US", addons: InstalledAddon[] = []): Promise<Category | null> {
+export async function loadCatalog(
+  catalog: CatalogConfig,
+  language = "en-US",
+  addons: InstalledAddon[] = [],
+  homeServers: HomeServerConfig[] = []
+): Promise<Category | null> {
   if (!catalog.enabled) return null;
   if (isCollectionCatalog(catalog)) {
-    const items = await loadCollectionCatalog(catalog, language, addons);
+    const items = await loadCollectionCatalog(catalog, language, addons, homeServers);
     return {
       id: catalog.id,
       title: catalog.name,
@@ -256,6 +261,32 @@ export async function loadCatalog(catalog: CatalogConfig, language = "en-US", ad
     };
   }
 
+  if (catalog.sourceType === "home-server") {
+    const { loadHomeServerLibraryItems, loadHomeServerRows } = await import("./homeserver");
+    const servers = homeServers ?? [];
+    if (catalog.sourceUrl?.startsWith("hslib:")) {
+      const items = await loadHomeServerLibraryItems(servers, catalog.sourceUrl);
+      return {
+        id: catalog.id,
+        title: catalog.name,
+        items,
+        sourceLabel: "HOME SERVER",
+        sourceUrl: catalog.sourceUrl,
+        layout: catalog.layout ?? "landscape"
+      };
+    }
+    const rows = await loadHomeServerRows(servers);
+    const row = rows.find((r) => r.id === catalog.id || r.title.toLowerCase().includes(catalog.name.toLowerCase()));
+    return {
+      id: catalog.id,
+      title: catalog.name,
+      items: row?.items ?? [],
+      sourceLabel: "HOME SERVER",
+      sourceUrl: catalog.sourceUrl,
+      layout: catalog.layout ?? "landscape"
+    };
+  }
+
   return null;
 }
 
@@ -264,17 +295,29 @@ function isCollectionCatalog(catalog: CatalogConfig) {
   return kind === "COLLECTION" || kind === "COLLECTION_RAIL" || Boolean(catalog.collectionSources?.length);
 }
 
-async function loadCollectionCatalog(catalog: CatalogConfig, language: string, addons: InstalledAddon[]) {
+async function loadCollectionCatalog(
+  catalog: CatalogConfig,
+  language: string,
+  addons: InstalledAddon[],
+  homeServers: HomeServerConfig[] = []
+) {
   const sources = catalog.collectionSources ?? [];
   if (!sources.length) {
     if (catalog.sourceType === "mdblist" && catalog.sourceUrl) return loadMdblist(catalog, language);
     return [];
   }
-  const batches = await Promise.all(sources.map((source) => loadCollectionSource(source, language, addons).catch(() => [])));
+  const batches = await Promise.all(
+    sources.map((source) => loadCollectionSource(source, language, addons, homeServers).catch(() => []))
+  );
   return dedupeItems(batches.flat());
 }
 
-async function loadCollectionSource(source: CollectionSourceConfig, language: string, addons: InstalledAddon[]) {
+async function loadCollectionSource(
+  source: CollectionSourceConfig,
+  language: string,
+  addons: InstalledAddon[],
+  homeServers: HomeServerConfig[] = []
+) {
   const kind = String(source.kind ?? "").toUpperCase();
   const mediaType = sourceMediaType(source);
   if (kind === "CURATED_IDS") {
@@ -361,6 +404,15 @@ async function loadCollectionSource(source: CollectionSourceConfig, language: st
       addonCatalogId: source.addonCatalogId,
       enabled: true
     }, addons, language);
+  }
+  if (kind === "HOME_SERVER" || kind === "HOMESERVER") {
+    const { loadHomeServerLibraryItems, loadHomeServerRows } = await import("./homeserver");
+    const servers = homeServers ?? [];
+    if (source.homeServerLibraryKey) {
+      return loadHomeServerLibraryItems(servers, `hslib:${source.homeServerId ?? ""}:${source.homeServerLibraryKey}`);
+    }
+    const rows = await loadHomeServerRows(servers);
+    return rows.flatMap((r) => r.items);
   }
   return [];
 }
