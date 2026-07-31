@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ARVIO</string>
+    <string name="app_name">StreamNet TV</string>
     <string name="now_playing">Reproduciendo ahora</string>
 
     <!-- Navigation -->
@@ -133,7 +133,7 @@
     <string name="volume_boost">Potenciador de volumen</string>
     <string name="dns_provider">Proveedor DNS</string>
     <string name="custom_user_agent">User-Agent personalizado</string>
-    <string name="custom_user_agent_desc">Déjalo en blanco para usar los predeterminados de ARVIO. Los valores personalizados se aplican cuando una fuente no proporciona su propio User-Agent.</string>
+    <string name="custom_user_agent_desc">Déjalo en blanco para usar los predeterminados de StreamNet TV. Los valores personalizados se aplican cuando una fuente no proporciona su propio User-Agent.</string>
     <string name="add_playlist">Añadir lista (M3U)</string>
     <string name="refresh_iptv">Actualizar datos de TV (EPG)</string>
     <string name="delete_iptv">Eliminar listas de TV</string>
@@ -220,7 +220,7 @@
     <string name="set_profile_pin">Establecer PIN de perfil</string>
     <string name="done">Hecho</string>
     <string name="save">Guardar</string>
-    <string name="connect_to_cloud">Conectar a ARVIO Cloud</string>
+    <string name="connect_to_cloud">Conectar a StreamNet TV Cloud</string>
     <string name="view_collection">Ver colección</string>
 
     <!-- In-player subtitle settings panel -->
@@ -300,7 +300,7 @@
 
     <!-- Extracted from code: Settings screen -->
     <string name="settings_home_server">Servidor local</string>
-    <string name="settings_app_version_label">ARVIO V%1$s</string>
+    <string name="settings_app_version_label">StreamNet TV V%1$s</string>
     <string name="settings_label_url">URL</string>
     <string name="settings_home_server_https_note">Usa HTTPS donde sea posible. Las URLs de servidores HTTP se permiten en redes locales pero no están cifradas.</string>
     <string name="settings_label_server_name">Nombre del servidor</string>
@@ -315,7 +315,7 @@
     <string name="settings_ph_server_url_discover">Déjalo vacío para descubrir automáticamente</string>
     <string name="settings_edit_tv_playlist">Editar lista de TV</string>
     <string name="settings_add_tv_playlist">Añadir lista de TV</string>
-    <string name="settings_iptv_epg_note">El EPG soporta múltiples fuentes para esta lista. Añade una URL por línea; ARVIO las buscará en orden.</string>
+    <string name="settings_iptv_epg_note">El EPG soporta múltiples fuentes para esta lista. Añade una URL por línea; StreamNet TV las buscará en orden.</string>
     <string name="settings_label_playlist_name">Nombre de la lista</string>
     <string name="settings_label_m3u_or_xtream">URL M3U o Servidor Xtream</string>
     <string name="settings_ph_provider_host">https://proveedor.host:puerto</string>
@@ -327,22 +327,22 @@
     <string name="settings_label_title">Título</string>
     <string name="settings_add_quality_filter">Añadir filtro de calidad</string>
     <string name="settings_edit_quality_filter">Editar filtro de calidad</string>
-    <string name="settings_plex_auth_touch_instruction">Abre la página de autorización, inicia sesión y vuelve a ARVIO. Esta pantalla finalizará automáticamente.</string>
+    <string name="settings_plex_auth_touch_instruction">Abre la página de autorización, inicia sesión y vuelve a StreamNet TV. Esta pantalla finalizará automáticamente.</string>
     <string name="settings_plex_auth_tv_instruction">Escanea el código QR o abre la página de autorización y confirma este código</string>
-    <string name="settings_jellyfin_auth_instruction">Abre tu app de Jellyfin o la interfaz web, ve a Conexión Rápida, introduce este código y vuelve a ARVIO.</string>
+    <string name="settings_jellyfin_auth_instruction">Abre tu app de Jellyfin o la interfaz web, ve a Conexión Rápida, introduce este código y vuelve a StreamNet TV.</string>
     <string name="settings_quality_filters_subtitle">Filtros locales del dispositivo. Se excluirán los streams coincidentes.</string>
     <string name="settings_no_filters_yet">Aún no hay filtros configurados.</string>
     <string name="settings_unnamed_device">Dispositivo sin nombre</string>
     <string name="settings_add_filter">Añadir filtro</string>
     <string name="settings_label_device_preset_name">Nombre del dispositivo / preajuste</string>
     <string name="settings_label_regex_pattern">Patrón Regex</string>
-    <string name="settings_cloud_signin_title">Iniciar sesión en ARVIO Cloud</string>
+    <string name="settings_cloud_signin_title">Iniciar sesión en StreamNet TV Cloud</string>
     <string name="settings_label_email">Correo electrónico</string>
     <string name="settings_label_password">Contraseña</string>
     <string name="settings_btn_create">Crear</string>
     <string name="settings_cloud_signin_hint_touch">Introduce tu correo y contraseña para iniciar sesión.</string>
     <string name="settings_cloud_signin_hint_tv">Consejo: Usa el teclado en pantalla. Usa la cruceta (D-pad) para moverte.</string>
-    <string name="settings_cloud_pairing_title">Vinculación con ARVIO Cloud</string>
+    <string name="settings_cloud_pairing_title">Vinculación con StreamNet TV Cloud</string>
     <string name="settings_pair_signin_link_device">Inicia sesión con tu correo y contraseña para vincular este dispositivo.</string>
     <string name="settings_pair_scan_qr_link_tv">Escanea este código QR para iniciar sesión y vincular este TV.</string>
     <string name="settings_pair_code">Código: %1$s</string>
@@ -362,7 +362,7 @@
     <string name="settings_section_user_account">INFO DE USUARIO Y CUENTA</string>
     <string name="settings_force_sync">Forzar sincronización</string>
     <string name="settings_disconnect">Desconectar</string>
-    <string name="settings_cloud_disconnect_confirm_title">¿Desconectar ARVIO Cloud?</string>
+    <string name="settings_cloud_disconnect_confirm_title">¿Desconectar StreamNet TV Cloud?</string>
     <string name="settings_cloud_disconnect_confirm_desc">Tendrás que volver a iniciar sesión para sincronizar tus ajustes.</string>
     <string name="settings_trakt_disconnect_confirm_title">¿Desconectar Trakt.tv?</string>
     <string name="settings_trakt_disconnect_confirm_desc">Tu historial de visionado y listas ya no se sincronizarán.</string>
@@ -375,7 +375,7 @@
     <string name="settings_section_audio">AUDIO</string>
     <string name="settings_section_appearance">APARIENCIA</string>
     <string name="settings_allow_unknown_sources">Permitir orígenes desconocidos</string>
-    <string name="settings_allow_unknown_sources_desc">Permitir instalaciones desde orígenes desconocidos para ARVIO para que se pueda instalar la APK descargada.</string>
+    <string name="settings_allow_unknown_sources_desc">Permitir instalaciones desde orígenes desconocidos para StreamNet TV para que se pueda instalar la APK descargada.</string>
     <string name="settings_open_settings">Abrir ajustes</string>
     <string name="settings_overview">Resumen</string>
     <string name="settings_focused_setting">Ajuste enfocado</string>
@@ -395,7 +395,7 @@
     <string name="settings_desc_catalogs">Descubrir, renombrar, ordenar y eliminar filas de inicio y catálogos de listas.</string>
     <string name="settings_desc_stremio">Gestionar addons de terceros usados para descubrimiento de catálogos y fuentes.</string>
     <string name="settings_desc_accounts">Sincronización en la nube, conexión a Trakt, actualizaciones de la app y controles de cuenta.</string>
-    <string name="settings_desc_default">Configurar ARVIO para este perfil.</string>
+    <string name="settings_desc_default">Configurar StreamNet TV para este perfil.</string>
     <string name="settings_pill_app">App %1$s</string>
     <string name="settings_pill_audio">Audio %1$s</string>
     <string name="settings_pill_default">Por defecto %1$s</string>
@@ -477,7 +477,7 @@
     <string name="settings_play_build">Versión de Play Store</string>
     <string name="settings_help_choose_title">Elige un ajuste</string>
     <string name="settings_help_choose_desc">Muévete al panel central para editar la sección seleccionada.</string>
-    <string name="settings_help_app_language_desc">Cambia el idioma de la interfaz y metadatos usados por ARVIO.</string>
+    <string name="settings_help_app_language_desc">Cambia el idioma de la interfaz y metadatos usados por StreamNet TV.</string>
     <string name="settings_help_default_audio_desc">Idioma de audio preferido cuando existan múltiples pistas.</string>
     <string name="settings_help_default_subtitle_desc">Idioma de subtítulo preferido cuando comience la reproducción.</string>
     <string name="settings_help_secondary_subtitle">Subtítulo secundario</string>
@@ -510,7 +510,7 @@
     <string name="settings_help_catalog_row_desc">Renombra, reordena, cambia el diseño o elimina este catálogo.</string>
     <string name="settings_help_addon">Addon</string>
     <string name="settings_help_addon_desc">Activa, desactiva, añade o elimina fuentes de addons de terceros.</string>
-    <string name="settings_help_cloud_account_desc">Conecta o desconecta la sincronización con ARVIO Cloud.</string>
+    <string name="settings_help_cloud_account_desc">Conecta o desconecta la sincronización con StreamNet TV Cloud.</string>
     <string name="settings_help_trakt">Trakt</string>
     <string name="settings_help_trakt_desc">Conecta o desconecta el historial de visionado y listas de Trakt.</string>
     <string name="settings_help_force_sync_desc">Sincroniza los últimos datos del perfil ahora mismo.</string>
@@ -606,29 +606,29 @@
     <string name="settings_section_stremio_addons">ADDONS STREMIO</string>
     <string name="settings_status_installed">Instalado</string>
     <string name="settings_disabled">Desactivado</string>
-    <string name="settings_arvio_cloud">ARVIO Cloud</string>
+    <string name="settings_arvio_cloud">StreamNet TV Cloud</string>
     <string name="settings_cloud_account_desc">Cuenta opcional para sincronizar perfiles, addons, catálogos y ajustes IPTV</string>
     <string name="settings_trakt_desc">Sincroniza historial de visionado, progreso y tu lista</string>
     <string name="settings_telegram_desc">Busca archivos de vídeo en tus canales y grupos</string>
     <string name="settings_badge_open">ABRIR</string>
     <string name="settings_sync_local_cloud_now">Sincronizando estado local y en la nube ahora</string>
     <string name="settings_upload_restore_now">Subir estado local y luego restaurar desde la nube ahora</string>
-    <string name="settings_signin_to_force_sync">Inicia sesión en ARVIO Cloud para forzar la sincronización</string>
+    <string name="settings_signin_to_force_sync">Inicia sesión en StreamNet TV Cloud para forzar la sincronización</string>
     <string name="settings_badge_syncing">SINCRONIZANDO</string>
     <string name="settings_badge_sync">SINCRONIZAR</string>
     <string name="settings_update_managed_play">Esta instalación está gestionada por la Play Store</string>
     <string name="settings_update_ready_install">Última actualización descargada y lista para instalar</string>
     <string name="settings_update_checking">Buscando una APK más reciente en GitHub Releases</string>
     <string name="settings_update_available_format">Actualización disponible: %1$s</string>
-    <string name="settings_update_latest">Ya tienes la última versión de ARVIO</string>
-    <string name="settings_update_check_releases">Buscar la última APK de ARVIO en GitHub Releases</string>
+    <string name="settings_update_latest">Ya tienes la última versión de StreamNet TV</string>
+    <string name="settings_update_check_releases">Buscar la última APK de StreamNet TV en GitHub Releases</string>
     <string name="settings_badge_play">PLAY</string>
     <string name="settings_badge_install">INSTALAR</string>
     <string name="settings_badge_checking">COMPROBANDO</string>
     <string name="settings_badge_update">ACTUALIZAR</string>
     <string name="settings_badge_check">COMPROBAR</string>
     <string name="settings_privacy_data_deletion">Privacidad y eliminación de datos</string>
-    <string name="settings_privacy_data_deletion_desc">Abre las instrucciones de privacidad y eliminación de cuentas de ARVIO Cloud</string>
+    <string name="settings_privacy_data_deletion_desc">Abre las instrucciones de privacidad y eliminación de cuentas de StreamNet TV Cloud</string>
     <string name="settings_go_to">Ir a: %1$s</string>
     <string name="settings_cd_paste">Pegar</string>
     <string name="settings_paste_from_clipboard">Pegar del portapapeles</string>
@@ -672,7 +672,7 @@
     <string name="telegram_preparing_qr">Preparando código QR...</string>
     <string name="telegram_connect_title">Conectar Telegram</string>
     <string name="telegram_connect_desc">Busca archivos de vídeo en tus canales y grupos siempre que abras una película o serie.</string>
-    <string name="telegram_disclaimer">Arvio no se hace responsable del contenido transmitido a través de esta función. Conecta solo tu propia cuenta y úsala de forma justa — respeta los derechos de autor y las leyes aplicables.</string>
+    <string name="telegram_disclaimer">StreamNet TV no se hace responsable del contenido transmitido a través de esta función. Conecta solo tu propia cuenta y úsala de forma justa — respeta los derechos de autor y las leyes aplicables.</string>
     <string name="telegram_scan_title">Escanear con Telegram</string>
     <string name="telegram_scan_instructions">Abre Telegram en tu teléfono → Ajustes → Dispositivos → Vincular dispositivo de escritorio</string>
     <string name="telegram_qr_code_desc">Código QR de Telegram</string>
@@ -877,7 +877,7 @@
     <string name="update_msg_current_to_latest">Versión actual %1$s -&gt; última %2$s</string>
     <string name="update_msg_current_uptodate">La versión actual %1$s está al día</string>
     <string name="update_msg_preparing">Preparando...</string>
-    <string name="update_msg_ready">La última actualización de ARVIO se ha descargado y está lista para instalarse.</string>
+    <string name="update_msg_ready">La última actualización de StreamNet TV se ha descargado y está lista para instalarse.</string>
     <string name="update_msg_installer_hint">El instalador de paquetes de Android debería aparecer. Si no es así, puedes intentar pulsar Instalar de nuevo.</string>
     <string name="stream_tab_all_sources">Todas las fuentes</string>
     <string name="stream_title_select_source">Seleccionar Fuente</string>
@@ -1153,3 +1153,4 @@
     <string name="live_menu_unhide_category">Mostrar categoría</string>
     <string name="ratings">Puntuaciones de Episodios</string>
 </resources>
+
