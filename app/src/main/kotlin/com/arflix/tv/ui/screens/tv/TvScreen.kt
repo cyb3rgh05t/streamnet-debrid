@@ -592,7 +592,7 @@ fun TvScreen(
     }
     val iptvDataSourceFactory = remember(iptvHttpClient) {
         OkHttpDataSource.Factory(iptvHttpClient)
-            .setUserAgent("StreamNet TV/1.2.0 (Android TV)")
+            .setUserAgent("ARVIO/1.2.0 (Android TV)")
     }
     // HLS factory with chunkless preparation (used when stream is detected as HLS)
     val iptvHlsFactory = remember(iptvDataSourceFactory) {
@@ -2471,4 +2471,3 @@ private val programTimeFormatter = DateTimeFormatter.ofPattern("h:mm a")
 private fun formatProgramTime(utcMillis: Long): String {
     return programTimeFormatter.format(Instant.ofEpochMilli(utcMillis).atZone(ZoneId.systemDefault()))
 }
-

@@ -109,11 +109,10 @@ fun CategorySidebar(
     onMoveRight: () -> Unit = {},
     onMoveUpFromSearch: () -> Unit = {},
     onTopBoundaryFocusChanged: (Boolean) -> Unit = {},
-    focusSelectedSignal: Int = 0,
     focusSearchSignal: Int = 0,
     modifier: Modifier = Modifier,
 ) {
-    val targetWidth = if (expanded) LiveDims.SidebarExpanded else 0.dp
+    val targetWidth = if (expanded) LiveDims.SidebarExpanded else LiveDims.SidebarCollapsed
     val animatedWidth by animateDpAsState(
         targetValue = targetWidth,
         animationSpec = tween(durationMillis = 240),
@@ -177,15 +176,6 @@ fun CategorySidebar(
         if (LiveTvStartup.shouldFocusSearch(focusSearchSignal)) {
             repeat(3) {
                 runCatching { searchFocusRequester.requestFocus() }
-                delay(50L)
-            }
-        }
-    }
-
-    LaunchedEffect(focusSelectedSignal) {
-        if (focusSelectedSignal > 0) {
-            repeat(3) {
-                runCatching { selectedCategoryFocusRequester.requestFocus() }
                 delay(50L)
             }
         }
@@ -487,7 +477,7 @@ private fun SearchEntry(
             }
             .border(
                 width = if (focused) 3.dp else 0.dp,
-                color = if (focused) liveFocusRingColor() else Color.Transparent,
+                color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(10.dp),
             )
             .clip(RoundedCornerShape(10.dp))
@@ -610,8 +600,8 @@ private fun SidebarRow(
                 }
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .border(
-                    width = if (focused) 1.5.dp else 0.dp,
-                    color = if (focused) liveFocusRingColor() else Color.Transparent,
+                    width = if (focused) 3.dp else 0.dp,
+                    color = if (focused) LiveColors.FocusRing else Color.Transparent,
                     shape = RoundedCornerShape(8.dp),
                 )
                 .clip(RoundedCornerShape(8.dp))
@@ -752,7 +742,7 @@ private fun CategoryContextMenu(
             modifier = Modifier
                 .width(184.dp)
                 .background(LiveColors.PanelRaised, RoundedCornerShape(10.dp))
-                .border(1.dp, liveFocusRingColor().copy(alpha = 0.7f), RoundedCornerShape(10.dp))
+                .border(1.dp, LiveColors.FocusRing.copy(alpha = 0.7f), RoundedCornerShape(10.dp))
                 .padding(4.dp),
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
@@ -818,7 +808,7 @@ private fun CategoryMenuItem(
             .fillMaxWidth()
             .height(36.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(if (focused) liveFocusRingColor() else Color.Transparent)
+            .background(if (focused) LiveColors.FocusRing else Color.Transparent)
             .clickable { onClick() }
             .pointerInput(onClick) { detectTapGestures(onTap = { onClick() }) }
             .padding(horizontal = 10.dp),

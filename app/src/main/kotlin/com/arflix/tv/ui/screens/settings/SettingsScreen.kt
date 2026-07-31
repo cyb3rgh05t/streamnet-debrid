@@ -7867,7 +7867,7 @@ private fun AccountsSettings(
         }
 
         AccountRow(
-            name = "StreamNet TV Cloud",
+            name = stringResource(R.string.settings_arvio_cloud),
             description = cloudEmail ?: stringResource(R.string.settings_cloud_account_desc),
             isConnected = isCloudAuthenticated,
             isWorking = false,

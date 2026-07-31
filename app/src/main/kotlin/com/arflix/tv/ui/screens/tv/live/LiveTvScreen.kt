@@ -427,13 +427,12 @@ fun LiveTvScreen(
     val coroutineScope = rememberCoroutineScope()
     val guideClockMillis by produceState(initialValue = System.currentTimeMillis()) {
         while (true) {
-            delay(60_000L)
+            delay(30_000L)
             value = System.currentTimeMillis()
         }
     }
     var selectedCategoryId by rememberSaveable { mutableStateOf("all") }
     var selectedProviderId by rememberSaveable { mutableStateOf("all") }
-    var startupCategoryApplied by rememberSaveable { mutableStateOf(false) }
     val recents = remember { mutableStateOf<LinkedHashSet<String>>(LinkedHashSet()) }
     val favSet = remember(state.snapshot.favoriteChannels) { state.snapshot.favoriteChannels.toSet() }
     val hiddenGroupSet = remember(state.snapshot.hiddenGroups) { state.snapshot.hiddenGroups.toSet() }
@@ -801,29 +800,6 @@ fun LiveTvScreen(
             selectedCategoryId = "all"
         }
     }
-    LaunchedEffect(state.tvSessionLoaded, visibleEnrichedState.value.tree, selectedProviderId, startupCategoryApplied) {
-        if (startupCategoryApplied || !state.tvSessionLoaded) return@LaunchedEffect
-        val tree = visibleEnrichedState.value.tree
-        val hasPlaylistCategories = tree.global.categories.any { it.count > 0 }
-        if (!hasPlaylistCategories && visibleEnrichedState.value.all.isNotEmpty()) {
-            return@LaunchedEffect
-        }
-        val sessionCategoryId = state.tvSession.lastGroupName
-            .takeIf { it.isNotBlank() }
-            ?.takeIf { categoryId -> tree.byId(categoryId)?.count?.let { it > 0 } == true }
-        val firstPlaylistCategoryId = tree.global.categories
-            .firstOrNull { it.count > 0 }
-            ?.id
-        val targetCategoryId = sessionCategoryId
-            ?: firstPlaylistCategoryId
-            ?: tree.top.firstOrNull { it.id != "all" && it.count > 0 }?.id
-            ?: "all"
-        if (targetCategoryId == "all" && !hasPlaylistCategories && sessionCategoryId == null) {
-            return@LaunchedEffect
-        }
-        selectedCategoryId = targetCategoryId
-        startupCategoryApplied = true
-    }
 
     // Selected category (persist across nav). Defaults to "all".
     val hasProfile = currentProfile != null
@@ -1025,7 +1001,6 @@ fun LiveTvScreen(
         availableChannelIds = LiveTvStartup.channelIds(state.snapshot.channels),
     )
     var focusedChannelId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
-    var heroPreviewChannelId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
     var epgPrefetchAnchorId by rememberSaveable { mutableStateOf<String?>(resumeChannelId) }
     var startupChannelApplied by rememberSaveable(selectedProviderId) { mutableStateOf(false) }
     var playingCatchupProgram by remember { mutableStateOf<IptvProgram?>(null) }
@@ -1060,10 +1035,6 @@ fun LiveTvScreen(
     val selectedDisplayChannelId = remember(focusedChannelId, playingChannelId, visibleChannelsById, variantGroups) {
         displayChannelIdFor(focusedChannelId ?: playingChannelId, visibleChannelsById, variantGroups)
     }
-    val activeDisplayChannelId = remember(playingChannelId, visibleChannelsById, variantGroups) {
-        displayChannelIdFor(playingChannelId, visibleChannelsById, variantGroups)
-            ?: playingChannelId
-    }
     val indexedPlayingChannel = remember(playingChannelId, visibleEnrichedState.value, filteredChannels) {
         playingChannelId?.let { visibleEnrichedState.value.index.byId[it] }
             ?: filteredChannels.firstOrNull { it.id == playingChannelId }
@@ -1078,22 +1049,16 @@ fun LiveTvScreen(
         }
     }
     val playingChannel = indexedPlayingChannel ?: retainedPlayingChannel?.takeIf { it.id == playingChannelId }
-    val heroDisplayChannelId = heroPreviewChannelId
-        ?: selectedDisplayChannelId
-        ?: activeDisplayChannelId
-    val heroInfoChannel = remember(heroDisplayChannelId, visibleChannelsById, playingChannel) {
-        heroDisplayChannelId?.let { id -> visibleChannelsById[id] } ?: playingChannel
-    }
     val catchupUrlAnchorOffsetMs = remember(playingChannel?.source, catchupPlaybackOffsetMs) {
         playingChannel?.source?.catchupUrlAnchorOffset(catchupPlaybackOffsetMs) ?: 0L
     }
     val catchupInSegmentSeekMs = remember(playingChannel?.source, catchupPlaybackOffsetMs) {
         playingChannel?.source?.catchupInSegmentSeekOffset(catchupPlaybackOffsetMs) ?: 0L
     }
-    val currentNowNext = remember(playingChannel, heroInfoChannel, playingCatchupProgram, state.snapshot.nowNext) {
-        val live = guideForChannel(heroInfoChannel)
+    val currentNowNext = remember(playingChannel, playingCatchupProgram, state.snapshot.nowNext) {
+        val live = guideForChannel(playingChannel)
         val catchup = playingCatchupProgram
-        if (catchup != null && heroInfoChannel?.id == playingChannel?.id) {
+        if (catchup != null) {
             com.arflix.tv.data.model.IptvNowNext(
                 now = catchup,
                 next = null,
@@ -1338,7 +1303,6 @@ fun LiveTvScreen(
                 eagerLimit = if (selectedCategoryTotalCount > 10_000) 8 else if (selectedCategoryId == "all") 12 else 24,
                 backgroundLimit = if (selectedCategoryTotalCount > 10_000) 24 else if (selectedCategoryId == "all") 48 else 96,
                 allowFocusedNetworkRefresh = true,
-                enableStaleWhileRevalidate = true,
             )
         }
     }
@@ -1463,9 +1427,8 @@ fun LiveTvScreen(
         }
     }
 
-    val sidebarExpanded = !useTouchRail && focusZone == LiveTvFocusZone.CATEGORY_LIST
+    val sidebarExpanded = !useTouchRail
     var searchOpen by rememberSaveable { mutableStateOf(false) }
-    var focusSelectedCategorySignal by remember { mutableIntStateOf(1) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
     // Starts at 0 so opening Live TV does NOT slam focus into the channel
@@ -1597,7 +1560,7 @@ fun LiveTvScreen(
     fun focusPlaylistSearch() {
         noteGuideUserNavigation()
         focusZone = LiveTvFocusZone.CATEGORY_LIST
-        focusSelectedCategorySignal += 1
+        focusSearchCategorySignal += 1
         runCatching { sidebarFocus.requestFocus() }
     }
 
@@ -1634,7 +1597,6 @@ fun LiveTvScreen(
         noteGuideUserNavigation()
         channelId?.let {
             focusedChannelId = it
-            heroPreviewChannelId = it
             epgPrefetchAnchorId = it
             rememberedChannelByCategory[selectedCategoryId] = it
             val index = filteredChannelIndexById[it]
@@ -1677,7 +1639,6 @@ fun LiveTvScreen(
     fun selectChannel(channel: EnrichedChannel) {
         noteGuideUserNavigation()
         focusedChannelId = channel.id
-        heroPreviewChannelId = channel.id
         epgPrefetchAnchorId = channel.id
         rememberedChannelByCategory[selectedCategoryId] = channel.id
         val currentDisplayId = displayChannelIdFor(playingChannelId, visibleEnrichedState.value.index.byId, variantGroups)
@@ -1731,7 +1692,6 @@ fun LiveTvScreen(
             )
         }
         focusedChannelId = playbackChannel.id
-        heroPreviewChannelId = playbackChannel.id
         epgPrefetchAnchorId = playbackChannel.id
         rememberedChannelByCategory[selectedCategoryId] = playbackChannel.id
         playingChannelId = playbackChannel.id
@@ -2389,7 +2349,6 @@ fun LiveTvScreen(
                             selectedProviderId = id
                             selectedCategoryId = "all"
                             focusedChannelId = null
-                            heroPreviewChannelId = null
                             epgPrefetchAnchorId = null
                         },
                         onMoveDown = { focusPlaylistSearch() },
@@ -2398,14 +2357,13 @@ fun LiveTvScreen(
                     MiniPlayerRow(
                         exoPlayer = exoPlayer,
                         channel = playingChannel,
-                        infoChannel = heroInfoChannel,
                         clockTickMillis = guideClockMillis,
                         nowNext = currentNowNext,
                         onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
                         favoriteSet = favSet,
                         onFullscreenClick = openFullScreenPlayer,
-                        variantCount = heroInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = heroInfoChannel?.let { channel -> { openVariantPicker(channel) } },
+                        variantCount = playingChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -2430,7 +2388,6 @@ fun LiveTvScreen(
                         isGuideBackfillLoading = false,
                         hasGuideSource = state.hasPotentialGuideSource,
                         selectedChannelId = selectedDisplayChannelId,
-                        activeChannelId = activeDisplayChannelId,
                         focusSelectedChannelSignal = focusSelectedChannelSignal,
                         focusEpgSignal = focusEpgSignal,
                         focusMode = if (focusZone == LiveTvFocusZone.EPG) {
@@ -2446,10 +2403,7 @@ fun LiveTvScreen(
                             selectChannel(channel)
                         },
                         onProgramSelect = { channel, program -> playProgramInMini(channel, program) },
-                        onChannelFocused = { channel ->
-                            heroPreviewChannelId = channel.id
-                            commitFocusedChannel(channel)
-                        },
+                        onChannelFocused = { channel -> commitFocusedChannel(channel) },
                         onChannelFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
                         favorites = favSet,
                         variantCountFor = { channel -> variantCountFor(channel, variantGroups) },
@@ -2474,11 +2428,6 @@ fun LiveTvScreen(
                     onSelect = { id ->
                         noteGuideUserNavigation()
                         selectedCategoryId = id
-                        viewModel.rememberTvSession(
-                            lastChannelId = focusedChannelId ?: playingChannelId,
-                            lastGroupName = id,
-                            lastFocusedZone = focusZone.name,
-                        )
                     },
                     onOpenSearch = { searchOpen = true },
                     onHideCategory = { playlistId, groupName ->
@@ -2518,7 +2467,6 @@ fun LiveTvScreen(
                             .coerceIn(0, maxTopBarIndex)
                         focusZone = LiveTvFocusZone.TOPBAR
                     },
-                    focusSelectedSignal = focusSelectedCategorySignal,
                     focusSearchSignal = focusSearchCategorySignal,
                     modifier = Modifier
                         .fillMaxHeight()
@@ -2539,7 +2487,6 @@ fun LiveTvScreen(
                             selectedProviderId = id
                             selectedCategoryId = "all"
                             focusedChannelId = null
-                            heroPreviewChannelId = null
                             epgPrefetchAnchorId = null
                         },
                         focusRequester = providerFocus,
@@ -2554,14 +2501,13 @@ fun LiveTvScreen(
                     MiniPlayerRow(
                         exoPlayer = exoPlayer,
                         channel = playingChannel,
-                        infoChannel = heroInfoChannel,
                         clockTickMillis = guideClockMillis,
                         nowNext = currentNowNext,
                         onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
                         favoriteSet = favSet,
                         onFullscreenClick = openFullScreenPlayer,
-                        variantCount = heroInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = heroInfoChannel?.let { channel -> { openVariantPicker(channel) } },
+                        variantCount = playingChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -2576,7 +2522,6 @@ fun LiveTvScreen(
                         isGuideBackfillLoading = false,
                         hasGuideSource = state.hasPotentialGuideSource,
                         selectedChannelId = selectedDisplayChannelId,
-                        activeChannelId = activeDisplayChannelId,
                         focusSelectedChannelSignal = focusSelectedChannelSignal,
                         focusEpgSignal = focusEpgSignal,
                         focusMode = if (focusZone == LiveTvFocusZone.EPG) {
@@ -2589,10 +2534,7 @@ fun LiveTvScreen(
                         gridFocused = focusZone == LiveTvFocusZone.CHANNEL_LIST || focusZone == LiveTvFocusZone.EPG,
                         onChannelSelect = { channel, _ -> selectChannel(channel) },
                         onProgramSelect = { channel, program -> playProgramInMini(channel, program) },
-                        onChannelFocused = { channel ->
-                            heroPreviewChannelId = channel.id
-                            commitFocusedChannel(channel)
-                        },
+                        onChannelFocused = { channel -> commitFocusedChannel(channel) },
                         onChannelFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
                         favorites = favSet,
                         variantCountFor = { channel -> variantCountFor(channel, variantGroups) },

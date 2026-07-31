@@ -536,8 +536,8 @@ fun buildCategoryTree(
     val adultCategories = listOf(
         LiveCategory("adult", "Adult", adultCount, CategoryIcon.Lock),
     ).filter { it.count > 0 }
-    val top = listOfNotNull(
-        LiveCategory("fav", "Favorites", favoritesCount, CategoryIcon.Favorite).takeIf { favoritesCount > 0 },
+    val top = listOf(
+        LiveCategory("fav", "Favorites", favoritesCount, CategoryIcon.Favorite),
         LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent),
         LiveCategory(
             id = "all",
@@ -712,9 +712,8 @@ fun buildCategoryTree(
         .filterNot { channel -> isAdultGroup(channel.group, channel.name) || isHiddenPlaylistGroup(channel, hiddenGroups) }
         .map { it.id }
         .toHashSet()
-    val favoriteCount = favorites.count { it in channelIds }
-    val top = listOfNotNull(
-        LiveCategory("fav", "Favorites", favoriteCount, CategoryIcon.Favorite).takeIf { favoriteCount > 0 },
+    val top = listOf(
+        LiveCategory("fav", "Favorites", favorites.count { it in channelIds }, CategoryIcon.Favorite),
         LiveCategory("recent", "Recently Watched", recents.count { it in channelIds }, CategoryIcon.Recent),
         LiveCategory(
             id = "all",
@@ -907,8 +906,8 @@ fun buildFastStartupChannelState(
     val adultCategories = listOf(
         LiveCategory("adult", "Adult", adultCount, CategoryIcon.Lock),
     ).filter { it.count > 0 }
-    val top = listOfNotNull(
-        LiveCategory("fav", "Favorites", favoriteCount, CategoryIcon.Favorite).takeIf { favoriteCount > 0 },
+    val top = listOf(
+        LiveCategory("fav", "Favorites", favoriteCount, CategoryIcon.Favorite),
         LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent),
         LiveCategory(
             id = "all",
@@ -1013,8 +1012,8 @@ fun buildPagedStartupChannelState(
         }
     }
     val totalVisible = totalChannelCount.takeIf { it > 0 } ?: visibleTotal
-    val top = listOfNotNull(
-        LiveCategory("fav", "Favorites", favorites.size, CategoryIcon.Favorite).takeIf { favorites.isNotEmpty() },
+    val top = listOf(
+        LiveCategory("fav", "Favorites", favorites.size, CategoryIcon.Favorite),
         LiveCategory("recent", "Recently Watched", recents.size, CategoryIcon.Recent),
         LiveCategory(
             id = "all",

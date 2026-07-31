@@ -210,14 +210,14 @@ private object HomeRegexes {
     val WHITESPACE = Regex("\\s+")
 }
 
-private fun cleanOverviewText(value: String, fallbackText: String): String {
+private fun cleanOverviewText(value: String): String {
     return value
         .replace(HomeRegexes.HTML_TAG, " ")
         .replace(HomeRegexes.NON_BREAKING_SPACE, " ")
         .replace(HomeRegexes.UNICODE_SPACE, " ")
         .replace(HomeRegexes.WHITESPACE, " ")
         .trim()
-    .ifBlank { fallbackText }
+        .ifBlank { "No description available." }
 }
 
 // Genre ID to name mapping (TMDB standard)
@@ -395,7 +395,7 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
     val heroDataSourceFactory =
-        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("StreamNet TV/1.7.0 (Android TV)")
+        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("ARVIO/1.7.0 (Android TV)")
     val heroHlsFactory = HlsMediaSource.Factory(heroDataSourceFactory)
         .setAllowChunklessPreparation(true)
     val heroDefaultFactory = DefaultMediaSourceFactory(context)
@@ -1657,9 +1657,8 @@ private fun HeroSection(
                 Spacer(modifier = Modifier.height(6.dp))
 
                 // Overview text (EPG data for IPTV, synopsis for movies/shows)
-                val noDescriptionText = stringResource(R.string.no_description_available)
-                val displayOverview = remember(overviewOverride, currentItem.overview, noDescriptionText) {
-                    cleanOverviewText(overviewOverride ?: currentItem.overview, noDescriptionText)
+                val displayOverview = remember(overviewOverride, currentItem.overview) {
+                    cleanOverviewText(overviewOverride ?: currentItem.overview)
                 }
 
                 val overviewMaxHeight = 72.dp
@@ -1833,9 +1832,8 @@ private fun MobileHeroOverlay(
     val ratingValue = parseRatingValue(rating)
     val hasMetadata = genreText.isNotEmpty() || year.isNotEmpty() || ratingValue > 0f
 
-    val noDescriptionText = stringResource(R.string.no_description_available)
-    val displayOverview = remember(overviewOverride, item.overview, noDescriptionText) {
-        cleanOverviewText(overviewOverride ?: item.overview, noDescriptionText)
+    val displayOverview = remember(overviewOverride, item.overview) {
+        cleanOverviewText(overviewOverride ?: item.overview)
     }
 
     Box(
@@ -3748,4 +3746,3 @@ private fun ContentRow(
         }  // Close Box
     }  // Close Column
 }
-

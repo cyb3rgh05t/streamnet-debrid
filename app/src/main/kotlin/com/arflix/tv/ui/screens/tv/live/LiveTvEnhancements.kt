@@ -212,7 +212,7 @@ fun ProviderSelector(
                     .border(
                         width = if (focused) 2.dp else 1.dp,
                         color = when {
-                            focused -> liveFocusRingColor()
+                            focused -> LiveColors.FocusRing
                             selected -> LiveColors.Accent
                             else -> LiveColors.Divider
                         },
@@ -505,7 +505,7 @@ private fun VariantRow(
             .background(if (focused) LiveColors.Panel else LiveColors.PanelDeep)
             .border(
                 width = if (focused) 2.dp else 1.dp,
-                color = if (focused) liveFocusRingColor() else LiveColors.Divider,
+                color = if (focused) LiveColors.FocusRing else LiveColors.Divider,
                 shape = RoundedCornerShape(10.dp),
             )
             .onFocusChanged { focused = it.hasFocus }

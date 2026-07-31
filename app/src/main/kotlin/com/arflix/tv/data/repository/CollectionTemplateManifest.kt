@@ -6,7 +6,6 @@ import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.CollectionSourceConfig
 import com.arflix.tv.data.model.CollectionSourceKind
 import com.arflix.tv.data.model.CollectionTileShape
-import com.arflix.tv.R
 import java.util.Locale
 
 internal data class CollectionSourceListMetadata(
@@ -294,7 +293,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "MGM+",
             group = CollectionGroupKind.SERVICE,
-            coverImageUrl = "android.resource://com.arvio.tv/${R.raw.logo_mgm_plus}",
+            coverImageUrl = "${UPLOADED_COVER_BASE}886dd8ac-2c7f-4ad6-9fe9-dab115ca7c00.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,

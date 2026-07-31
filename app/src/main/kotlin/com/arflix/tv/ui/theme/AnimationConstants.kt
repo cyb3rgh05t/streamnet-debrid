@@ -4,7 +4,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Spring
 
 /**
- * StreamNet TV Animation Constants - Premium TV Motion Design
+ * ARVIO Animation Constants - Premium TV Motion Design
  * Smooth, fluid transitions optimized for TV viewing distance
  */
 object AnimationConstants {
@@ -132,4 +132,3 @@ object AnimationConstants {
     /** Ambient glow radius */
     const val GLOW_RADIUS_AMBIENT = 8
 }
-

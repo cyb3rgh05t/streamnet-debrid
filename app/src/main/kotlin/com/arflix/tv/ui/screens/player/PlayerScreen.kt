@@ -3859,7 +3859,7 @@ fun PlayerScreen(
             // episode's metadata would require an extra TMDB round-trip during playback.
             // Fall back to a generic "Episode N" label — the show title, S/E number, and
             // backdrop image still give users enough context to decide Continue/Cancel.
-            episodeTitle = stringResource(R.string.episode, pendingNextEpisode),
+            episodeTitle = "Episode $pendingNextEpisode",
             seasonNumber = pendingNextSeason,
             episodeNumber = pendingNextEpisode,
             episodeImage = uiState.backdropUrl,
@@ -6087,7 +6087,6 @@ private fun PlayerMetaSeparator() {
     )
 }
 
-@Composable
 private fun buildPlaybackBaseMetaLine(
     uiState: PlayerUiState,
     mediaType: MediaType,
@@ -6096,8 +6095,8 @@ private fun buildPlaybackBaseMetaLine(
 ): String {
     val parts = mutableListOf<String>()
     if (mediaType == MediaType.TV) {
-        seasonNumber?.let { parts.add(stringResource(R.string.season, it)) }
-        episodeNumber?.let { parts.add(stringResource(R.string.episode, it)) }
+        seasonNumber?.let { parts.add("Season $it") }
+        episodeNumber?.let { parts.add("Episode $it") }
     } else {
         uiState.releaseYear?.trim()?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
     }

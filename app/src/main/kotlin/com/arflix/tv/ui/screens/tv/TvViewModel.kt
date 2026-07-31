@@ -13,7 +13,6 @@ import com.arflix.tv.data.repository.IptvPlaybackTarget
 import com.arflix.tv.data.repository.IptvPlaybackUrlResolver
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvTvSessionState
-import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,7 +49,6 @@ private const val RichCatchupRecentTarget = 6
 private const val CatchupHistoryWindowMs = 48L * 60L * 60_000L
 private const val RichCatchupRefreshThrottleMs = 45_000L
 private const val CurrentChannelEpgRefreshThrottleMs = 12_000L
-private const val VisibleGuideSwrThrottleMs = 60_000L
 private const val LargeListCompleteGuideCoverageTarget = 0.75f
 private const val PlaybackEpgBackfillResumeDelayMs = 90_000L
 private const val LargeListCompleteEpgBackfillStartupDelayMs = 180_000L
@@ -86,7 +84,6 @@ data class TvUiState(
 class TvViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     val iptvRepository: IptvRepository,
-    private val mediaRepository: MediaRepository,
     private val cloudSyncRepository: CloudSyncRepository
 ) : ViewModel() {
 
@@ -133,55 +130,13 @@ class TvViewModel @Inject constructor(
     }
     private val catchupHistoryRefreshAt = LinkedHashMap<String, Long>()
     private val currentChannelEpgRefreshAt = LinkedHashMap<String, Long>()
-    private val visibleGuideSwrRefreshAt = LinkedHashMap<String, Long>()
     private val epgNetworkRefreshLock = Any()
     private val epgNetworkRefreshInFlight = LinkedHashSet<String>()
-    private val liveHeroBackdropCache = LinkedHashMap<String, String?>()
 
     private data class VisibleEpgDrain(
         val ids: List<String>,
         val selectedId: String?
     )
-
-    suspend fun resolveLiveHeroBackdrop(programTitle: String?, channelName: String?): String? {
-        val title = programTitle?.trim().orEmpty()
-        if (title.isBlank()) return null
-
-        val key = title.lowercase()
-        synchronized(liveHeroBackdropCache) {
-            if (liveHeroBackdropCache.containsKey(key)) {
-                return liveHeroBackdropCache[key]
-            }
-        }
-
-        val candidates = buildList {
-            add(title)
-            val beforeColon = title.substringBefore(':', missingDelimiterValue = "").trim()
-            if (beforeColon.length >= 3) add(beforeColon)
-            val beforeDash = title.substringBefore(" - ", missingDelimiterValue = "").trim()
-            if (beforeDash.length >= 3) add(beforeDash)
-            channelName?.trim()?.takeIf { it.isNotBlank() }?.let { add("$title $it") }
-        }
-            .map { it.replace(TvViewModelRegexes.NON_ALPHANUMERIC_REGEX, " ").trim() }
-            .filter { it.length >= 2 }
-            .distinct()
-
-        var backdropUrl: String? = null
-        for (query in candidates) {
-            val items = runCatching { mediaRepository.search(query) }.getOrNull().orEmpty()
-            backdropUrl = items.firstOrNull { !it.backdrop.isNullOrBlank() }?.backdrop
-            if (!backdropUrl.isNullOrBlank()) break
-        }
-
-        synchronized(liveHeroBackdropCache) {
-            if (liveHeroBackdropCache.size >= 120) {
-                val oldestKey = liveHeroBackdropCache.keys.firstOrNull()
-                if (oldestKey != null) liveHeroBackdropCache.remove(oldestKey)
-            }
-            liveHeroBackdropCache[key] = backdropUrl
-        }
-        return backdropUrl
-    }
 
     /**
      * In-memory cache of the live-TV enriched channel list + category tree.
@@ -1322,8 +1277,7 @@ class TvViewModel @Inject constructor(
         selectedChannelId: String?,
         eagerLimit: Int = 96,
         backgroundLimit: Int = 640,
-        allowFocusedNetworkRefresh: Boolean = false,
-        enableStaleWhileRevalidate: Boolean = false,
+        allowFocusedNetworkRefresh: Boolean = false
     ) {
         if (channelIds.isEmpty()) return
         val largeList = isActiveLargeIptvList()
@@ -1346,8 +1300,7 @@ class TvViewModel @Inject constructor(
         val missingCount = orderedIds.count { id ->
             !hasUsefulVisibleGuideData(currentNowNext[id])
         }
-        if (missingCount == 0 && !enableStaleWhileRevalidate) return
-        val swrOnly = missingCount == 0
+        if (missingCount == 0) return
 
         val refreshKey = buildString {
             append(_uiState.value.config.syncSignature())
@@ -1361,8 +1314,6 @@ class TvViewModel @Inject constructor(
             append(orderedIds.firstOrNull().orEmpty())
             append('|')
             append(orderedIds.lastOrNull().orEmpty())
-            append('|')
-            append(enableStaleWhileRevalidate)
         }
         val now = System.currentTimeMillis()
         if (refreshKey == lastVisibleEpgRefreshKey && now - lastVisibleEpgRefreshAt < 20_000L) return
@@ -1372,17 +1323,6 @@ class TvViewModel @Inject constructor(
         val requestLimit = maxOf(firstPaintLimit, eagerLimit, backgroundLimit)
             .coerceAtMost(orderedIds.size)
             .coerceAtMost(if (largeList) 36 else 240)
-
-        if (swrOnly) {
-            val swrIds = orderedIds.take(if (largeList) 4 else 12)
-            refreshVisibleGuideSwr(
-                channelIds = swrIds,
-                selectedChannelId = selectedId,
-                allowLargeListFocusedRefresh = allowFocusedNetworkRefresh || largeList,
-            )
-            return
-        }
-
         val missingIds = orderedIds
             .filterNot { id ->
                 hasUsefulVisibleGuideData(_uiState.value.snapshot.nowNext[id])
@@ -1501,57 +1441,6 @@ class TvViewModel @Inject constructor(
 
         markEpgLoading(missingIds)
         enqueueVisibleEpgRefresh(missingIds, selectedId)
-    }
-
-    private fun refreshVisibleGuideSwr(
-        channelIds: List<String>,
-        selectedChannelId: String?,
-        allowLargeListFocusedRefresh: Boolean,
-    ) {
-        if (channelIds.isEmpty()) return
-        val now = System.currentTimeMillis()
-        val ordered = buildList {
-            val selectedId = selectedChannelId?.takeIf { it in channelIds }
-            selectedId?.let { add(it) }
-            channelIds.forEach { id -> if (id != selectedId) add(id) }
-        }
-        val eligible = synchronized(visibleGuideSwrRefreshAt) {
-            ordered.filter { id ->
-                val last = visibleGuideSwrRefreshAt[id] ?: 0L
-                now - last >= VisibleGuideSwrThrottleMs
-            }.also { ids ->
-                ids.forEach { id -> visibleGuideSwrRefreshAt[id] = now }
-                while (visibleGuideSwrRefreshAt.size > 512) {
-                    val firstKey = visibleGuideSwrRefreshAt.keys.firstOrNull() ?: break
-                    visibleGuideSwrRefreshAt.remove(firstKey)
-                }
-            }
-        }
-        if (eligible.isEmpty()) return
-
-        viewModelScope.launch {
-            val claimedIds = claimEpgNetworkRefresh(
-                eligible.toSet(),
-                allowLargeListFocusedRefresh = allowLargeListFocusedRefresh
-            )
-            if (claimedIds.isEmpty()) return@launch
-            val refreshed = try {
-                withContext(Dispatchers.IO) {
-                    runCatching {
-                        iptvRepository.refreshEpgForChannels(
-                            channelIds = claimedIds,
-                            maxChannels = claimedIds.size,
-                            preferFullCatchupHistory = false,
-                        )
-                    }.getOrNull()
-                }
-            } finally {
-                releaseEpgNetworkRefresh(claimedIds)
-            }
-            if (!refreshed.isNullOrEmpty()) {
-                mergeNowNext(refreshed)
-            }
-        }
     }
 
     fun refreshCurrentChannelEpg(channelId: String?, forceNetworkForLargeList: Boolean = false) {

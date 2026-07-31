@@ -327,7 +327,7 @@ private fun SearchResultRow(
             .background(if (focused) LiveColors.Panel else Color.Transparent)
             .border(
                 width = if (focused) 3.dp else 0.dp,
-                color = if (focused) liveFocusRingColor() else Color.Transparent,
+                color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(10.dp),
             )
             .onFocusChanged { focused = it.hasFocus }

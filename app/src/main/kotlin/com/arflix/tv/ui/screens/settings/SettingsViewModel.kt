@@ -56,7 +56,6 @@ import com.arflix.tv.updater.AppUpdate
 import com.arflix.tv.updater.AppUpdateRepository
 import com.arflix.tv.updater.UpdatePreferences
 import com.arflix.tv.updater.VersionUtils
-import com.arflix.tv.util.APP_LANGUAGE_EXPLICIT_KEY
 import com.arflix.tv.util.AuthEmailValidator
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.settingsDataStore
@@ -114,8 +113,8 @@ data class SettingsUiState(
     val trailerSoundEnabled: Boolean = false,
     val trailerDelaySeconds: Int = 2,
     val trailerInCards: Boolean = true,
-    val showEpisodeRatings: Boolean = true,
     val showBudget: Boolean = true,
+    val showEpisodeRatings: Boolean = true,
     // Volume boost in decibels (0 = off, up to 15 dB). Applied via system LoudnessEnhancer
     // attached to the ExoPlayer audio session. Issue #88.
     val volumeBoostDb: Int = 0,
@@ -277,8 +276,8 @@ class SettingsViewModel @Inject constructor(
     private fun trailerSoundEnabledKey() = profileManager.profileBooleanKey("trailer_sound_enabled")
     private fun trailerDelayKey() = profileManager.profileStringKey("trailer_delay_seconds")
     private fun trailerInCardsKey() = profileManager.profileBooleanKey("trailer_in_cards")
-    private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
     private fun showBudgetKey() = profileManager.profileBooleanKey("show_budget_on_home")
+    private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
     private fun clockFormatKey() = profileManager.profileStringKey("clock_format")
     private fun smoothScrollingKey() = profileManager.profileBooleanKey("smooth_scrolling")
     private fun spoilerBlurKey() = profileManager.profileBooleanKey("spoiler_blur")
@@ -444,14 +443,7 @@ class SettingsViewModel @Inject constructor(
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
             val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
-            val explicitLanguage = prefs[APP_LANGUAGE_EXPLICIT_KEY] ?: false
-            val systemLanguage = com.arflix.tv.util.systemLanguageTag(context)
-            val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY]
-                ?.takeUnless { !explicitLanguage && it == "en-US" }
-                ?: systemLanguage
-            val contentLang = prefs[contentLanguageKey()]
-                ?.takeUnless { !explicitLanguage && it == "en-US" }
-                ?: fallbackLanguage
+            val contentLang = prefs[contentLanguageKey()] ?: "en-US"
             // Apply content language to MediaRepository immediately
             mediaRepository.contentLanguage = if (contentLang == "en-US") null else contentLang
             var autoPlay = prefs[autoPlayNextKey()] ?: true
@@ -469,9 +461,9 @@ class SettingsViewModel @Inject constructor(
             val trailerSoundEnabled = prefs[trailerSoundEnabledKey()] ?: false
             val trailerDelaySeconds = prefs[trailerDelayKey()]?.toIntOrNull() ?: 2
             val trailerInCards = prefs[trailerInCardsKey()] ?: true
-            val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
             val spoilerBlurEnabled = prefs[spoilerBlurKey()] ?: false
             val showBudget = prefs[showBudgetKey()] ?: true
+            val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
             val clockFormat = prefs[clockFormatKey()] ?: "24h"
             // One-time migration: read old "focus_border_color" key if new "accent_color" is absent
             val OLD_FOCUS_BORDER_COLOR_KEY = stringPreferencesKey("focus_border_color")
@@ -484,14 +476,6 @@ class SettingsViewModel @Inject constructor(
                         val old = it[OLD_FOCUS_BORDER_COLOR_KEY] ?: return@edit
                         it[com.arflix.tv.util.ACCENT_COLOR_KEY] = old
                         it.remove(OLD_FOCUS_BORDER_COLOR_KEY)
-                    }
-                }
-            }
-            // Ensure default accent color is persisted to DataStore so MainActivity can read it
-            if (prefs[com.arflix.tv.util.ACCENT_COLOR_KEY] == null && legacyColor == null) {
-                viewModelScope.launch {
-                    context.settingsDataStore.edit {
-                        it[com.arflix.tv.util.ACCENT_COLOR_KEY] = "Orange"
                     }
                 }
             }
@@ -567,8 +551,8 @@ class SettingsViewModel @Inject constructor(
                 trailerSoundEnabled = trailerSoundEnabled,
                 trailerDelaySeconds = trailerDelaySeconds,
                 trailerInCards = trailerInCards,
-                showEpisodeRatings = showEpisodeRatings,
                 showBudget = showBudget,
+                showEpisodeRatings = showEpisodeRatings,
                 volumeBoostDb = volumeBoostDb,
                 showLoadingStats = showLoadingStats,
 
@@ -1102,14 +1086,10 @@ class SettingsViewModel @Inject constructor(
             context.settingsDataStore.edit { prefs ->
                 prefs[contentLanguageKey()] = lang
                 prefs[LAST_APP_LANGUAGE_KEY] = lang
-                prefs[APP_LANGUAGE_EXPLICIT_KEY] = true
             }
             // Mirror to SharedPreferences so attachBaseContext can read it synchronously on next launch
             context.getSharedPreferences("app_locale", android.content.Context.MODE_PRIVATE)
-                .edit()
-                .putString("locale_tag", lang)
-                .putBoolean("locale_explicit", true)
-                .apply()
+                .edit().putString("locale_tag", lang).apply()
             mediaRepository.contentLanguage = if (lang == "en-US") null else lang
             _uiState.value = _uiState.value.copy(contentLanguage = lang)
             syncLocalStateToCloud(silent = true)
@@ -1212,14 +1192,6 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { context.settingsDataStore.edit { it[trailerInCardsKey()] = enabled }; _uiState.value = _uiState.value.copy(trailerInCards = enabled); syncLocalStateToCloud(silent = true) }
     }
 
-    fun setShowEpisodeRatings(enabled: Boolean) {
-        viewModelScope.launch {
-            context.settingsDataStore.edit { it[showEpisodeRatingsKey()] = enabled }
-            _uiState.value = _uiState.value.copy(showEpisodeRatings = enabled)
-            syncLocalStateToCloud(silent = true)
-        }
-    }
-
     fun cycleTrailerDelay() {
         val next = when (_uiState.value.trailerDelaySeconds) {
             0 -> 1
@@ -1239,6 +1211,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             context.settingsDataStore.edit { it[showBudgetKey()] = enabled }
             _uiState.value = _uiState.value.copy(showBudget = enabled)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun setShowEpisodeRatings(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[showEpisodeRatingsKey()] = enabled }
+            _uiState.value = _uiState.value.copy(showEpisodeRatings = enabled)
             syncLocalStateToCloud(silent = true)
         }
     }
@@ -2842,8 +2822,8 @@ class SettingsViewModel @Inject constructor(
             if (!ensureCloudSyncSession()) {
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet TV Cloud, then sync again.",
-                    toastMessage = "Reconnect StreamNet TV Cloud to sync",
+                    lastCloudSyncStatus = "Cloud session expired. Reconnect ARVIO Cloud, then sync again.",
+                    toastMessage = "Reconnect ARVIO Cloud to sync",
                     toastType = ToastType.INFO
                 )
                 return@launch
@@ -3370,4 +3350,3 @@ private fun IptvConfig.syncSignature(): String {
         playlistsSignature
     ).joinToString("||")
 }
-

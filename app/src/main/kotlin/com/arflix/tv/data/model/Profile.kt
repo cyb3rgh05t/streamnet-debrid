@@ -24,7 +24,7 @@ data class Profile(
  */
 object ProfileColors {
     val colors = listOf(
-        0xFFE5A209L, // StreamNet accent
+        0xFFE50914L, // Netflix Red
         0xFF1DB954L, // Green
         0xFF3B82F6L, // Blue
         0xFFF59E0BL, // Orange

@@ -3,12 +3,12 @@
 
 [[redirects]]
   from = "/app"
-  to = "https://streamnet-sync.netlify.app/login"
+  to = "https://web.arvio.tv"
   status = 302
   force = true
 
 [[redirects]]
   from = "/app/*"
-  to = "https://streamnet-sync.netlify.app/:splat"
+  to = "https://web.arvio.tv/:splat"
   status = 302
   force = true

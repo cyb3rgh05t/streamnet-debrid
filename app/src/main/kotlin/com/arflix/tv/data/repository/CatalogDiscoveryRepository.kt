@@ -109,7 +109,7 @@ class CatalogDiscoveryRepository @Inject constructor(
         val encodedQuery = URLEncoder.encode(query, Charsets.UTF_8.name())
         val request = Request.Builder()
             .url("https://mdblist.com/toplists/?public_list_name=$encodedQuery&preferences=bot_test_message")
-            .header("User-Agent", "StreamNet TV")
+            .header("User-Agent", "ARVIO")
             .get()
             .build()
         val html = okHttpClient.newCall(request).execute().use { response ->
@@ -217,4 +217,3 @@ class CatalogDiscoveryRepository @Inject constructor(
 private object CatalogDiscoveryRepoRegexes {
     val NON_ALPHA_NUM_REGEX = Regex("[^a-z0-9]+")
 }
-

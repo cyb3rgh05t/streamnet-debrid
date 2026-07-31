@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
@@ -55,7 +56,7 @@ import com.arflix.tv.data.model.IptvNowNext
  *
  *   ┌─ [number mono] ─ [logo 44] ─ [name / program / progress / time] ─ [HD/HI] ─┐
  *
- * Active channel: slim accent indicator + persistent tint, CH number cyan.
+ * Active channel: 3dp cyan left indicator, accent bg tint, CH number cyan.
  * Focused: full row sits on PanelRaised so the selection is obvious.
  */
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -84,17 +85,13 @@ fun ChannelRow(
     val visuallyFocused = focused || forceFocused
     val bg = when {
         visuallyFocused -> LiveColors.PanelRaised
-        isActive -> LiveColors.Accent.copy(alpha = 0.16f)
+        isActive -> LiveColors.FocusBg
         stripe -> LiveColors.RowStripe
         else -> Color.Transparent
     }
     val now = nowNext?.now
     val animatedBorderWidth by animateDpAsState(
-        targetValue = when {
-            visuallyFocused -> 1.5.dp
-            isActive -> 1.dp
-            else -> 0.dp
-        },
+        targetValue = if (visuallyFocused) 3.dp else 0.dp,
         animationSpec = tween(durationMillis = 70),
         label = "channel-row-border",
     )
@@ -117,11 +114,7 @@ fun ChannelRow(
             }
             .border(
                 width = animatedBorderWidth,
-                color = when {
-                    visuallyFocused -> liveFocusRingColor()
-                    isActive -> LiveColors.Accent.copy(alpha = 0.9f)
-                    else -> Color.Transparent
-                },
+                color = if (visuallyFocused) LiveColors.FocusRing else Color.Transparent,
             )
             .background(if (visuallyFocused) LiveColors.PanelRaised else bg)
             .focusable()
@@ -236,6 +229,27 @@ fun ChannelRow(
             }
         }
 
-        Spacer(Modifier.width(12.dp))
+        // ─ stacked badges (quality + lang) ───────────────────
+        Column(
+            modifier = Modifier.padding(end = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalAlignment = Alignment.End,
+        ) {
+            SmallPillBadge(if (variantCount > 1) stringResource(R.string.live_label_quality_variants, channel.quality.label, variantCount) else channel.quality.label)
+            SmallPillBadge(channel.lang)
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun SmallPillBadge(text: String) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(3.dp))
+            .background(LiveColors.Panel)
+            .padding(horizontal = 6.dp, vertical = 2.dp),
+    ) {
+        Text(text.uppercase(), style = LiveType.Badge.copy(color = LiveColors.FgDim))
     }
 }

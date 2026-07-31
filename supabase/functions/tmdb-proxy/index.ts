@@ -117,7 +117,7 @@ async function fetchTmdbJson(tmdbUrl: URL): Promise<TmdbFetchResult> {
           'Accept-Encoding': 'identity;q=1, *;q=0',
           'Cache-Control': attempt === 0 ? 'max-age=300' : 'no-store',
           'Pragma': 'no-cache',
-          'User-Agent': 'StreamNet TV-TMDB-Proxy/1.0',
+          'User-Agent': 'ARVIO-TMDB-Proxy/1.0',
         },
       })
 
@@ -230,4 +230,3 @@ serve(async (req) => {
     })
   }
 })
-

@@ -1,4 +1,4 @@
-﻿package com.arflix.tv.ui.screens.crash
+package com.arflix.tv.ui.screens.crash
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -111,7 +111,7 @@ fun CrashReportScreen(
 
     val formattedReport = remember(crashId, sentryLink, crashMsg, crashVersion, timeString) {
         """
-        **🚨 StreamNet TV Crash Report**
+        **🚨 ARVIO Crash Report**
         **Crash ID:** `$crashId`
         **Sentry Link:** $sentryLink
         **Version:** $crashVersion
@@ -123,7 +123,7 @@ fun CrashReportScreen(
     val webBridgeUrl = remember(crashId, crashVersion, crashMsg, crashTime) {
         val encodedErr = Uri.encode(crashMsg.take(300))
         val encodedV = Uri.encode(crashVersion)
-        "https://streamnet-sync.netlify.app/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
+        "https://arvio.tv/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
     }
 
     Box(
@@ -141,7 +141,7 @@ fun CrashReportScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "⚠️ StreamNet TV Encountered an Error",
+                text = "⚠️ ARVIO Encountered an Error",
                 color = Color.White,
                 fontSize = if (isTv) 26.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -160,7 +160,7 @@ fun CrashReportScreen(
             )
 
             if (isTv) {
-                // TV layout: Show clean QR Code prominently pointing to streamnet-sync.netlify.app/report
+                // TV layout: Show clean QR Code prominently pointing to arvio.tv/report
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,
@@ -176,7 +176,7 @@ fun CrashReportScreen(
                 }
 
                 Text(
-                    text = "Scan to open StreamNet TV — 1 tap to copy report & jump into Discord.",
+                    text = "Scan to open arvio.tv — 1 tap to copy report & jump into Discord.",
                     color = Color(0xFF00F0D0),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -220,7 +220,7 @@ fun CrashReportScreen(
                     Button(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("StreamNet TV Crash Report", formattedReport)
+                            val clip = ClipData.newPlainText("ARVIO Crash Report", formattedReport)
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, "Crash details copied! Opening Discord...", Toast.LENGTH_LONG).show()
 
@@ -255,10 +255,9 @@ fun CrashReportScreen(
                             }
                         )
                 ) {
-                    Text("Restart StreamNet TV", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Restart ARVIO", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }
     }
 }
-

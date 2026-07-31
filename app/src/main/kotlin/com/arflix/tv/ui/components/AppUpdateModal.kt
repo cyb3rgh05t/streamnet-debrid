@@ -205,7 +205,7 @@ fun AppUpdateModal(
                         LinearProgressIndicator(
                             progress = status.progress ?: 0f,
                             modifier = Modifier.fillMaxWidth(),
-                            color = Pink, // Uses StreamNet TV's Pink accent instead of SuccessGreen
+                            color = Pink, // Uses ARVIO's Pink accent instead of SuccessGreen
                             trackColor = Color.White.copy(alpha = 0.08f)
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -321,4 +321,3 @@ private fun UpdateActionButton(
         )
     }
 }
-

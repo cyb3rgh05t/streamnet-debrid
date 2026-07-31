@@ -254,7 +254,7 @@ class SportsRepository @Inject constructor(
                     key = "locked",
                     title = "Add Sports Live TV Addon",
                     subtitle = "Required for playback",
-                    overview = "Install a sports live TV addon before StreamNet TV can show or play live sports events.",
+                    overview = "Install a sports live TV addon before ARVIO can show or play live sports events.",
                     badge = "LOCKED"
                 )
             )
@@ -476,7 +476,7 @@ class SportsRepository @Inject constructor(
         if (blockedPhrases.any { phrase -> text.contains(phrase) }) return false
 
         // Highfly marks some real HLS channels as notWebReady because browser
-        // playback is restricted. They are still valid for StreamNet TV's native
+        // playback is restricted. They are still valid for ARVIO's native
         // ExoPlayer path, so only reject notWebReady when the URL itself does
         // not look like a native stream.
         if (behaviorHints?.notWebReady == true && !isNativePlayableSportsUrl(rawUrl)) return false
@@ -619,4 +619,3 @@ class SportsRepository @Inject constructor(
 private object SportsRepoRegexes {
     val SIZE_REGEX = Regex("""(?i)(\d+(?:[.,]\d+)?)\s*(TB|GB|MB|KB)""")
 }
-
