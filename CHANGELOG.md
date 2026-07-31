@@ -7,6 +7,73 @@ All notable changes to this project are documented in this file.
 ### Added
 - (Nothing yet)
 
+## [1.9.983] - 2026-07-30
+
+### Player, subtitles, and playback
+- Moved ordinary subtitles into the full player viewport so they can use letterbox space instead of being forced above the bottom black bar.
+- Preserved authored ASS/SSA/WebVTT positioning and bitmap subtitle coordinates while applying the new letterbox behavior to normal text subtitles.
+- Fixed the Next Episode close button restarting its countdown instead of cancelling playback progression and returning to the show.
+- Fixed duplicate source names causing a source-selector crash by guaranteeing stable, unique list keys.
+- Restored trailer autoplay after profile and cloud settings are loaded.
+- Remembered the last played episode and browsing season when returning from the player, including brief plays without a resume point. Contributor: @silentbil via #468.
+- Fixed extensionless IPTV HLS redirects so redirected streams are detected and played with the correct media type.
+- Made aborted Telegram source requests end quietly instead of surfacing as crashes.
+
+### Live TV, IPTV, and Continue Watching
+- Fixed Live TV focus being trapped in search and reduced category/channel focus jumps while data is loading.
+- Stabilized paged IPTV channel snapshots so channel windows remain available while navigating very large playlists.
+- Added regression coverage for Live TV startup, channel availability, search focus, and guide-loading rules.
+- Removed live channels and live-addon events from Continue Watching, including delayed live metadata results. Contributor: @Himanth-reddy via #492.
+- Reused the web Live TV channel snapshot on entry to reduce unnecessary list rebuilding and improve startup responsiveness.
+
+### Catalogs, details, and integrations
+- Added Catalog Packs so multiple catalogs can be discovered, installed, grouped, deep-linked, and removed together. Contributor: @Himanth-reddy via #463.
+- Added MDBList as a remote sync provider alongside Trakt across Android TV, mobile, and web, with follow-up matching and sync fixes. Contributor: @silentbil via #488 and #489.
+- Added a configurable episode-rating heatmap to TV and mobile details pages without additional metadata requests. Contributor: @NightCorpse via #469.
+- Added compatibility for Nuvio-style JavaScript scraper plugins and redesigned plugin settings for TV and mobile. Contributor: @Himanth-reddy via #466.
+- Preserved legacy catalog-kind fallback behavior so older catalog configurations continue to load.
+- Switched AI subtitle translation to Gemini 3.5 Flash Lite and improved MDBList integration behavior. Contributor: @silentbil via #489.
+- Added rounded launcher icons and Android 13+ themed icon support. Contributor: @Himanth-reddy via #499.
+- Corrected the Spanish translation resources. Contributor: @Aaronnn17 via #497.
+
+### Reliability and platform support
+- Updated Android targeting to API level 36 while retaining support for older Android and Fire TV devices.
+- Improved cancellation propagation, network diagnostics, regex reuse, and exception safety across catalogs, cloud sync, home servers, IPTV, Trakt, analytics, and playback. Contributor: @Himanth-reddy via #476.
+- Fixed sideload production-plugin routing, extractor unloading, mobile routing, and TV focus limits. Contributor: @Himanth-reddy via #466.
+- Fixed analytics compilation and logging consistency introduced by the broader reliability work. Contributor: @Himanth-reddy via #476.
+
+### ARVIO Cloud, security, and accounts
+- Centralized web and TV-pairing authentication through `auth.arvio.tv` for a consistent ARVIO Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
+- Hardened Catalog Pack submissions with URL validation, SSRF protection, rate limiting, and safer manifest handling. Contributor: @Himanth-reddy via #463.
+- Expanded disposable-email blocking for cloud account registration. Contributor: @mvanhorn via #496.
+- Fixed web login redirect loops, stale-account profile leakage, signup routing, and login wordmark overlap. Contributor: @Himanth-reddy via #475.
+- Added the ARVIO Web membership and trial flow while keeping the Android APK free.
+- Improved linked Ko-fi entitlement refresh and made membership-trial failures report their actual cause.
+
+### Web app
+- Added one-click external-player support for VLC and compatible players on Windows, macOS, Linux, and Android, including protocol setup and URL repair.
+- Added TV-style D-pad spatial navigation and remote-key handling for browser-based TV platforms.
+- Improved Chromium MKV direct play and added a remux watchdog for playback that stalls before video starts.
+- Unified web source playability decisions so badges, filters, and Play buttons agree; unsupported sources no longer expose a broken Play action.
+- Re-resolved expired debrid links before failing playback and detected Dolby Vision releases that could otherwise produce a black picture.
+- Clarified provider-gated IPTV VOD sources and removed duplicated add-on names from their source descriptions.
+- Replaced mislabeled TMDB scores with real IMDb ratings on movies, shows, and episodes.
+- Aligned Continue Watching with Trakt Up Next, recovered expired Trakt sessions, and clamped invalid next-episode results.
+- Added Telegram web integration. Contributor: @silentbil via #478.
+- Improved MDBList, watched-state, and web synchronization behavior. Contributor: @silentbil via #488 and #489.
+- Fixed home-server catalog titles and retained artwork placeholders for items without images. Contributor: @Himanth-reddy via #493.
+- Fixed overlapping details metadata, genre chips, overview content, hero spacing, and stacked page padding. Contributor: @Himanth-reddy via #494.
+- Refined the responsive settings navigation, sidebar focus, mobile overlay bounds, and active-state styling. Contributor: @Himanth-reddy via #474.
+- Added a dedicated VLC integration section with Linux support and protocol diagnostics. Contributor: @Himanth-reddy via #473.
+- Updated the website and README with ARVIO Web and iPad information.
+
+### Contributors
+- @Himanth-reddy
+- @silentbil
+- @NightCorpse
+- @Aaronnn17
+- @mvanhorn
+
 ## [1.9.92] - 2026-05-11
 
 ### Home server sources and catalogs

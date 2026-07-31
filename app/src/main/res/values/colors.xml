@@ -41,4 +41,6 @@
     <color name="pink_primary">#EDEDED</color>
     <color name="pink_secondary">#EDEDED</color>
     <color name="purple_accent">#EDEDED</color>
+    <!-- Launcher Icon Background -->
+    <color name="ic_launcher_background">#020204</color>
 </resources>

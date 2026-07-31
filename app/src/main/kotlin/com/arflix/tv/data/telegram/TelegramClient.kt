@@ -21,7 +21,17 @@ import javax.inject.Singleton
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
-class TelegramApiException(message: String) : Exception(message)
+class TelegramApiException(
+    val code: Int,
+    message: String
+) : Exception(message)
+
+internal fun TdApi.Error.toTelegramApiExceptionOrNull(): TelegramApiException? {
+    if (message?.trim()?.equals("Request aborted", ignoreCase = true) == true) {
+        return null
+    }
+    return TelegramApiException(code, message ?: "Unknown Telegram error")
+}
 
 @Singleton
 class TelegramClient @Inject constructor(
@@ -146,13 +156,25 @@ class TelegramClient @Inject constructor(
                 _authState.value = TelegramAuthState.WaitPassword
             }
             is TdApi.AuthorizationStateReady -> {
+                val readyClient = client ?: return
                 scope.launch {
-                    val user = sendRequest(TdApi.GetMe()) as? TdApi.User
-                    File(context.filesDir, "tdlib_session_ok").createNewFile()
-                    _authState.value = TelegramAuthState.Ready(
-                        firstName = user?.firstName ?: "",
-                        userId = user?.id ?: 0L
-                    )
+                    try {
+                        val user = sendRequest(TdApi.GetMe()) as? TdApi.User
+                        if (client !== readyClient) return@launch
+
+                        File(context.filesDir, "tdlib_session_ok").createNewFile()
+                        _authState.value = TelegramAuthState.Ready(
+                            firstName = user?.firstName ?: "",
+                            userId = user?.id ?: 0L
+                        )
+                    } catch (e: TelegramApiException) {
+                        if (client !== readyClient) return@launch
+
+                        Log.w(TAG, "Failed to load the authenticated Telegram user", e)
+                        _authState.value = TelegramAuthState.Error(
+                            context.getString(R.string.telegram_error_raw, e.message ?: "")
+                        )
+                    }
                 }
             }
             is TdApi.AuthorizationStateClosing,
@@ -191,8 +213,17 @@ class TelegramClient @Inject constructor(
             }
             c.send(function) { result ->
                 if (cont.isActive) {
-                    if (result is TdApi.Error) cont.resumeWithException(TelegramApiException(result.message))
-                    else cont.resume(result)
+                    if (result is TdApi.Error) {
+                        val exception = result.toTelegramApiExceptionOrNull()
+                        if (exception == null) {
+                            Log.d(TAG, "TDLib request aborted: ${function::class.simpleName}")
+                            cont.resume(null)
+                        } else {
+                            cont.resumeWithException(exception)
+                        }
+                    } else {
+                        cont.resume(result)
+                    }
                 }
             }
         }
