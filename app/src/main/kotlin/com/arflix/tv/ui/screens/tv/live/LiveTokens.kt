@@ -1,13 +1,18 @@
 package com.arflix.tv.ui.screens.tv.live
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.InterFontFamily
+import com.arflix.tv.ui.theme.LocalArvioColors
+import com.arflix.tv.ui.theme.appBackgroundDark
 
 // ARVIO Live TV — design tokens. OKLCH reference kept in spec.md §2.
 // Mapped from handoff/tokens.kt. `InterFontFamily` ships; JetBrains Mono
@@ -15,28 +20,67 @@ import com.arflix.tv.ui.theme.InterFontFamily
 // for the numeric/badge slots; can swap for bundled JBMono later).
 
 object LiveColors {
+    private val AccentFallback = Color(0xFFE5A209)
+
     // Unified near-black palette so the AppTopBar gradient blends cleanly
     // into the TV page. Each step lifts just a few lumens above the last —
     // enough for panels/cells to pop without creating a visible seam under
     // the top bar.
-    val Bg           = Color(0xFF070709)
-    val Panel        = Color(0xFF121319)
-    val PanelDeep    = Color(0xFF0B0B0F)
-    val PanelRaised  = Color(0xFF1B1D25)
-    val RowStripe    = Color(0xFF0D0D11)
+    val Bg: Color
+        @Composable
+        get() = appBackgroundDark()
 
-    val Divider       = Color(0x992B2D36)
-    val DividerStrong = Color(0xE6333542)
+    val Panel: Color
+        @Composable
+        get() = lerp(Bg, Color.White, 0.05f)
 
-    val Fg     = Color(0xFFF5F5F8)
-    val FgDim  = Color(0xFFB5B6BE)
-    val FgMute = Color(0xFF7D7E86)
+    val PanelDeep: Color
+        @Composable
+        get() = lerp(Bg, Color.Black, 0.18f)
 
-    // StreamNet accent set. NOW pill, progress bars and active indicators
-    // use the warm brand yellow; focus uses a subtle tinted row background.
-    val Accent    = Color(0xFFE5A209)
-    val AccentDim = Color(0xFF9C7A2E)
-    val FocusBg   = Color(0x26E5A209) // 15% alpha for softer row tint
+    val PanelRaised: Color
+        @Composable
+        get() = lerp(Bg, Color.White, 0.10f)
+
+    val RowStripe: Color
+        @Composable
+        get() = lerp(Bg, Color.White, 0.03f)
+
+    val Divider: Color
+        @Composable
+        get() = LocalArvioColors.current.borderLight.copy(alpha = 0.45f)
+
+    val DividerStrong: Color
+        @Composable
+        get() = LocalArvioColors.current.borderLight.copy(alpha = 0.78f)
+
+    val Fg: Color
+        @Composable
+        get() = LocalArvioColors.current.textPrimary
+
+    val FgDim: Color
+        @Composable
+        get() = LocalArvioColors.current.textSecondary
+
+    val FgMute: Color
+        @Composable
+        get() = LocalArvioColors.current.textTertiary
+
+    // LiveTV accent follows the user-selected Accent Color from Settings.
+    // If none is selected, fall back to StreamNet brand yellow.
+    val Accent: Color
+        @Composable
+        get() = resolveAccentColor(fallback = AccentFallback)
+
+    // Slightly dimmed accent for less prominent accents on dark surfaces.
+    val AccentDim: Color
+        @Composable
+        get() = lerp(Accent, Panel, 0.34f)
+
+    // Accent-tinted row background for active/focused states.
+    val FocusBg: Color
+        @Composable
+        get() = Accent.copy(alpha = 0.15f)
 
     // Focus ring color — always pure white on TV for maximum clarity.
     val FocusRing = Color(0xFFFFFFFF)
