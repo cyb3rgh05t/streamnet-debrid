@@ -503,7 +503,7 @@ fun ArvioLoadingScreen() {
             val lineStartX = center.x - halfWidth
             val lineEndX = center.x + halfWidth
             drawLine(
-                color = Color(0xFF00F0D0).copy(alpha = 0.32f * progress),
+                color = Color(0xFFE5A209).copy(alpha = 0.36f * progress),
                 start = Offset(lineStartX, baselineY),
                 end = Offset(lineEndX, baselineY),
                 strokeWidth = 1.6.dp.toPx(),
@@ -514,7 +514,7 @@ fun ArvioLoadingScreen() {
             val sweepTravel = (halfWidth - sweepHalfWidth).coerceAtLeast(0f)
             val sweepX = center.x + (sweep * sweepTravel)
             drawLine(
-                color = Color.White.copy(alpha = 0.54f * progress),
+                color = Color(0xFFE5A209).copy(alpha = 0.9f * progress),
                 start = Offset(sweepX - sweepHalfWidth, baselineY),
                 end = Offset(sweepX + sweepHalfWidth, baselineY),
                 strokeWidth = 1.2.dp.toPx(),
@@ -523,8 +523,8 @@ fun ArvioLoadingScreen() {
         }
 
         Image(
-            painter = painterResource(id = R.drawable.arvio_loading_logo),
-            contentDescription = "ARVIO",
+            painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+            contentDescription = "StreamNet TV",
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .fillMaxWidth(0.52f)
@@ -542,7 +542,7 @@ fun ArvioLoadingScreen() {
 }
 
 /**
- * Root composable for the ARVIO app
+ * Root composable for the StreamNet TV app
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

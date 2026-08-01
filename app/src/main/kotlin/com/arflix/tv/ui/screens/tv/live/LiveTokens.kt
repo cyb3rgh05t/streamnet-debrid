@@ -32,12 +32,11 @@ object LiveColors {
     val FgDim  = Color(0xFFB5B6BE)
     val FgMute = Color(0xFF7D7E86)
 
-    // Modern dark-blue accent. Less saturated than the prior cyan — reads as
-    // a sophisticated "black-blue" for the TV grid. NOW pill, progress bars
-    // and active indicators use this. Pure white drives focus rings.
-    val Accent    = Color(0xFF4F7FB0)
-    val AccentDim = Color(0xFF355578)
-    val FocusBg   = Color(0x264F7FB0) // 15% alpha for softer row tint
+    // StreamNet accent set. NOW pill, progress bars and active indicators
+    // use the warm brand yellow; focus uses a subtle tinted row background.
+    val Accent    = Color(0xFFE5A209)
+    val AccentDim = Color(0xFF9C7A2E)
+    val FocusBg   = Color(0x26E5A209) // 15% alpha for softer row tint
 
     // Focus ring color — always pure white on TV for maximum clarity.
     val FocusRing = Color(0xFFFFFFFF)
