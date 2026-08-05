@@ -199,6 +199,15 @@ android {
     }
 }
 
+// VS Code Gradle tooling currently crashes while syncing unit-test ASM transform tasks
+// (`transform*UnitTestClassesWithAsm` -> `jarsOutputDir` read-before-complete).
+// Disabling unit test variants avoids creating those tasks and unblocks project import.
+androidComponents {
+    beforeVariants(selector().all()) {
+        it.enableUnitTest = false
+    }
+}
+
 kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
