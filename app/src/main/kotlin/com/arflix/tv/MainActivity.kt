@@ -292,7 +292,9 @@ class MainActivity : ComponentActivity() {
             }.collectAsStateWithLifecycle(initialValue = null)
             val appLanguage by remember(activeProfileId) {
                 this@MainActivity.settingsDataStore.data.map { prefs ->
-                    val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "en-US"
+                    // Fall back to device system locale on fresh install instead of hardcoded en-US
+                    val systemLanguage = java.util.Locale.getDefault().toLanguageTag()
+                    val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: systemLanguage
                     val profileId = activeProfileId
                     if (profileId.isNullOrBlank()) {
                         fallbackLanguage
@@ -300,7 +302,7 @@ class MainActivity : ComponentActivity() {
                         prefs[stringPreferencesKey("profile_${profileId}_content_language")] ?: fallbackLanguage
                     }
                 }
-            }.collectAsStateWithLifecycle(initialValue = "en-US")
+            }.collectAsStateWithLifecycle(initialValue = java.util.Locale.getDefault().toLanguageTag())
             LaunchedEffect(appLanguage) {
                 mediaRepository.get().contentLanguage = if (appLanguage == "en-US") null else appLanguage
             }

@@ -44,7 +44,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -603,78 +602,47 @@ private fun CloudConnectButton(
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     var isFocused by remember { mutableIntStateOf(0) }
+    val accentColor = Color(0xFFE5A209)
+    val accentFocused = Color(0xFFF0A809)
 
-    if (isTouchDevice) {
+    Surface(
+        onClick = if (isTouchDevice) ({}) else onClick,
+        modifier = Modifier
+            .then(if (isTouchDevice) Modifier.clickable { onClick() } else Modifier)
+            .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(4.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color.Transparent,
+            focusedContainerColor = accentColor.copy(alpha = 0.12f)
+        ),
+        border = ClickableSurfaceDefaults.border(
+            border = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.6f)),
+                shape = RoundedCornerShape(4.dp)
+            ),
+            focusedBorder = androidx.tv.material3.Border(
+                border = androidx.compose.foundation.BorderStroke(2.dp, accentFocused),
+                shape = RoundedCornerShape(4.dp)
+            )
+        )
+    ) {
         Row(
-            modifier = Modifier
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    brush = Brush.linearGradient(
-                        colors = listOf(
-                            Color(0xFFE5A209),
-                            Color(0xFFCE8017)
-                        )
-                    )
-                )
-                .border(2.dp, Color(0xFFF0A809).copy(alpha = 0.7f), RoundedCornerShape(24.dp))
-                .clickable { onClick() }
-                .padding(horizontal = 28.dp, vertical = 14.dp),
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Icon(
                 imageVector = Icons.Default.Cloud,
                 contentDescription = null,
-                tint = Color(0xFF1a1a1a),
-                modifier = Modifier.size(22.dp)
+                tint = if (isFocused > 0) accentFocused else accentColor,
+                modifier = Modifier.size(18.dp)
             )
             Text(
                 text = stringResource(R.string.connect_to_cloud),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold,
-                color = Color(0xFF1a1a1a),
-                letterSpacing = 0.5.sp
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (isFocused > 0) accentFocused else accentColor
             )
-        }
-    } else {
-        Surface(
-            onClick = onClick,
-            modifier = Modifier.onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
-            shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(24.dp)),
-            colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color(0xFFE5A209).copy(alpha = 0.14f),
-                focusedContainerColor = Color(0xFFE5A209).copy(alpha = 0.28f)
-            ),
-            border = ClickableSurfaceDefaults.border(
-                border = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Color(0xFFE5A209).copy(alpha = 0.50f)),
-                    shape = RoundedCornerShape(24.dp)
-                ),
-                focusedBorder = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFFF0A809)),
-                    shape = RoundedCornerShape(24.dp)
-                )
-            )
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Cloud,
-                    contentDescription = null,
-                    tint = if (isFocused > 0) Color(0xFFF0A809) else Color(0xFFE5A209),
-                    modifier = Modifier.size(22.dp)
-                )
-                Text(
-                    text = stringResource(R.string.connect_to_cloud),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isFocused > 0) Color(0xFFF0A809) else Color(0xFFE5A209),
-                    letterSpacing = 0.5.sp
-                )
-            }
         }
     }
 }
