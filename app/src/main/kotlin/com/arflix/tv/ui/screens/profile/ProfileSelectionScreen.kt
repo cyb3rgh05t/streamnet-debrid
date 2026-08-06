@@ -61,6 +61,7 @@ import androidx.tv.material3.Text
 import com.arflix.tv.data.model.Profile
 import com.arflix.tv.ui.components.ProfileAvatarVisual
 import com.arflix.tv.ui.components.Toast
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.ui.res.stringResource
@@ -399,6 +400,7 @@ private fun ProfileAvatar(
         animationSpec = tween(150),
         label = "scale"
     )
+    val accentColor = resolveAccentColor(fallback = Color.White)
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     Column(
@@ -442,7 +444,7 @@ private fun ProfileAvatar(
                     ),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = androidx.tv.material3.Border(
-                            border = androidx.compose.foundation.BorderStroke(3.dp, Color.White),
+                            border = androidx.compose.foundation.BorderStroke(3.dp, accentColor),
                             shape = RoundedCornerShape(8.dp)
                         )
                     )
@@ -495,6 +497,7 @@ private fun AddProfileButton(
         animationSpec = tween(150),
         label = "scale"
     )
+    val accentColor = resolveAccentColor(fallback = Color.White)
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     Column(
@@ -534,7 +537,7 @@ private fun AddProfileButton(
                         shape = RoundedCornerShape(8.dp)
                     ),
                     focusedBorder = androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(3.dp, Color.White),
+                        border = androidx.compose.foundation.BorderStroke(3.dp, accentColor),
                         shape = RoundedCornerShape(8.dp)
                     )
                 )
@@ -560,6 +563,7 @@ private fun ManageProfilesButton(
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableIntStateOf(0) }
+    val accentColor = resolveAccentColor(fallback = Color.White)
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     Surface(
@@ -576,11 +580,11 @@ private fun ManageProfilesButton(
         ),
         border = ClickableSurfaceDefaults.border(
             border = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.5f)),
+                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.5f)),
                 shape = RoundedCornerShape(4.dp)
             ),
             focusedBorder = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                border = androidx.compose.foundation.BorderStroke(2.dp, accentColor),
                 shape = RoundedCornerShape(4.dp)
             )
         )

@@ -162,11 +162,6 @@ private fun chooseStartupChannelId(
         ?.let { return it }
     if (explicitInitialChannelId != null && !isFullyEnriched) return null
 
-    favoriteChannelIds
-        .firstOrNull { id -> id in filteredChannelIds }
-        ?.let { return it }
-    if (favoriteChannelIds.isNotEmpty() && !isFullyEnriched) return null
-
     if (hasOpenedBefore) {
         sessionLastChannelId
             .takeIf { id -> id.isNotBlank() && id in filteredChannelIds }
@@ -175,7 +170,20 @@ private fun chooseStartupChannelId(
         if (sessionLastChannelId.isNotBlank() && !isFullyEnriched) return null
     }
 
+    favoriteChannelIds
+        .firstOrNull { id -> id in filteredChannelIds }
+        ?.let { return it }
+    if (favoriteChannelIds.isNotEmpty() && !isFullyEnriched) return null
+
     return filteredChannels.first().id
+}
+
+private fun firstPlaylistCategoryId(tree: LiveCategoryTree): String {
+    return tree.top.firstOrNull { it.id != "all" && it.id != "fav" && it.id != "recent" }?.id
+        ?: tree.global.categories.firstOrNull()?.id
+        ?: tree.countries.categories.firstOrNull()?.id
+        ?: tree.adult.categories.firstOrNull()?.id
+        ?: "all"
 }
 
 internal fun selectPagedChannelsInProviderOrder(
@@ -420,7 +428,7 @@ fun LiveTvScreen(
     val configuration = LocalConfiguration.current
     val deviceType = LocalDeviceType.current
     val isTouchDevice = deviceType.isTouchDevice()
-    val useTouchRail = isTouchDevice && configuration.smallestScreenWidthDp < 600
+    val useTouchRail = isTouchDevice
     val compactTouchLayout = isTouchDevice && configuration.screenWidthDp < 900
     val showTopBar = !isTouchDevice
     val contentTopPadding = if (showTopBar) AppTopBarHeight else 0.dp
@@ -673,6 +681,7 @@ fun LiveTvScreen(
                     recents = recents.value,
                     hiddenGroups = hiddenGroupSet,
                     groupOrder = state.snapshot.groupOrder,
+                    showSpecialCategories = state.config.showSpecialCategories,
                 )
             }
             enrichedState.value = value
@@ -706,6 +715,7 @@ fun LiveTvScreen(
                 recents = recents.value,
                 hiddenGroups = hiddenGroupSet,
                 groupOrder = state.snapshot.groupOrder,
+                showSpecialCategories = state.config.showSpecialCategories,
             )
         }
         enrichedState.value = initialValue
@@ -725,6 +735,7 @@ fun LiveTvScreen(
                 recentCount = recents.value.count { index.isVisibleNonAdultChannel(it) },
                 hiddenGroups = hiddenGroupSet,
                 groupOrder = state.snapshot.groupOrder,
+                showSpecialCategories = state.config.showSpecialCategories,
             )
         }
         val value = EnrichedChannels(all = enriched, tree = tree, index = index)
@@ -747,6 +758,7 @@ fun LiveTvScreen(
                 recentCount = recents.value.count { current.index.isVisibleNonAdultChannel(it) },
                 hiddenGroups = hiddenGroupSet,
                 groupOrder = state.snapshot.groupOrder,
+                showSpecialCategories = state.config.showSpecialCategories,
             )
         }
         enrichedState.value = current.copy(tree = tree)
@@ -795,9 +807,15 @@ fun LiveTvScreen(
         }
         visibleEnrichedState.value = EnrichedChannels(all = visibleChannels, tree = tree, index = index)
     }
-    LaunchedEffect(hiddenGroupSet, selectedCategoryId, visibleEnrichedState.value.tree) {
-        if (selectedCategoryId != "all" && visibleEnrichedState.value.tree.byId(selectedCategoryId) == null) {
-            selectedCategoryId = "all"
+    LaunchedEffect(hiddenGroupSet, selectedCategoryId, visibleEnrichedState.value.tree, state.config.showSpecialCategories) {
+        val tree = visibleEnrichedState.value.tree
+        val fallbackCategoryId = firstPlaylistCategoryId(tree)
+        if (selectedCategoryId == "all" && !state.config.showSpecialCategories) {
+            selectedCategoryId = fallbackCategoryId
+            return@LaunchedEffect
+        }
+        if (selectedCategoryId != "all" && tree.byId(selectedCategoryId) == null) {
+            selectedCategoryId = fallbackCategoryId
         }
     }
 
@@ -912,7 +930,13 @@ fun LiveTvScreen(
             return@LaunchedEffect
         }
         filteredChannelsCategoryKey = selectedCategoryId
-        filteredChannelsState.value = result
+        val sortMode = state.snapshot.sortOrder
+        val sortedResult = when (sortMode) {
+            "number" -> result.sortedWith(compareBy<EnrichedChannel> { it.number ?: Int.MAX_VALUE }.thenBy { it.name })
+            "name" -> result.sortedBy { it.name }
+            else -> result
+        }
+        filteredChannelsState.value = sortedResult
     }
     val visibleChannels = visibleEnrichedState.value.all
     // Variant grouping + collapsing + index building are O(channels). Doing them
@@ -1059,6 +1083,38 @@ fun LiveTvScreen(
         val live = guideForChannel(playingChannel)
         val catchup = playingCatchupProgram
         if (catchup != null) {
+            com.arflix.tv.data.model.IptvNowNext(
+                now = catchup,
+                next = null,
+                later = null,
+                upcoming = emptyList(),
+                recent = emptyList()
+            )
+        } else {
+            live
+        }
+    }
+    val previewInfoChannel = remember(
+        focusZone,
+        selectedDisplayChannelId,
+        focusedChannelId,
+        playingChannel,
+        visibleChannelsById,
+        filteredChannels,
+    ) {
+        val browsingGuide =
+            focusZone == LiveTvFocusZone.CHANNEL_LIST || focusZone == LiveTvFocusZone.EPG
+        if (!browsingGuide) return@remember playingChannel
+
+        val targetId = selectedDisplayChannelId ?: focusedChannelId
+        targetId
+            ?.let { id -> visibleChannelsById[id] ?: filteredChannels.firstOrNull { it.id == id } }
+            ?: playingChannel
+    }
+    val previewNowNext = remember(previewInfoChannel, playingChannel, playingCatchupProgram, state.snapshot.nowNext) {
+        val live = guideForChannel(previewInfoChannel)
+        val catchup = playingCatchupProgram
+        if (catchup != null && previewInfoChannel?.id == playingChannel?.id) {
             com.arflix.tv.data.model.IptvNowNext(
                 now = catchup,
                 next = null,
@@ -1431,6 +1487,7 @@ fun LiveTvScreen(
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
+    var focusSelectedCategorySignal by remember { mutableIntStateOf(0) }
     // Starts at 0 so opening Live TV does NOT slam focus into the channel
     // search field. It seeded to 1, and the sidebar focuses search for any
     // value > 0, so every entry began with the selector trapped in the search
@@ -1439,7 +1496,11 @@ fun LiveTvScreen(
     var focusSearchCategorySignal by remember { mutableIntStateOf(0) }
     // Full-screen playback mode — pressing OK on an EPG row expands the
     // mini-player to cover the whole screen. Back collapses back to the grid.
-    var isFullScreen by rememberSaveable { mutableStateOf(initialStreamUrl != null) }
+    var isFullScreen by if (isTouchDevice) {
+        remember { mutableStateOf(initialStreamUrl != null) }
+    } else {
+        rememberSaveable { mutableStateOf(initialStreamUrl != null) }
+    }
     var fullscreenGuideOpen by remember { mutableStateOf(false) }
     var variantPickerChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
     LaunchedEffect(isFullScreen) {
@@ -1461,6 +1522,51 @@ fun LiveTvScreen(
     var isHudVisible by remember { mutableStateOf(false) }
     var guideOpenedFromQuickZap by remember { mutableStateOf(false) }
     var guideChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
+
+    LaunchedEffect(
+        visibleEnrichedState.value.tree,
+        state.tvSessionLoaded,
+        state.iptvPreferencesLoaded,
+        state.tvSession.lastGroupName,
+        state.tvSession.lastChannelId,
+    ) {
+        val tree = visibleEnrichedState.value.tree
+        if (!state.tvSessionLoaded || !state.iptvPreferencesLoaded || tree.top.isEmpty()) return@LaunchedEffect
+
+        val restoredCategoryId = when {
+            state.tvSession.lastGroupName.isNotBlank() && tree.byId(state.tvSession.lastGroupName) != null -> {
+                state.tvSession.lastGroupName
+            }
+            state.tvSession.lastChannelId.isNotBlank() -> {
+                val restoredChannel = visibleEnrichedState.value.index.byId[state.tvSession.lastChannelId]
+                restoredChannel?.let { bestCategoryIdForChannel(it, tree) }
+            }
+            else -> null
+        }
+
+        val nextCategoryId = restoredCategoryId ?: firstPlaylistCategoryId(tree)
+        if (selectedCategoryId == "all" || tree.byId(selectedCategoryId) == null) {
+            selectedCategoryId = nextCategoryId
+        }
+    }
+
+    // Persist sidebar category/channel navigation even before playback starts,
+    // so app restarts reopen in the same Live TV context.
+    LaunchedEffect(
+        state.tvSessionLoaded,
+        state.iptvPreferencesLoaded,
+        selectedCategoryId,
+        focusedChannelId,
+        playingChannelId,
+    ) {
+        if (!state.tvSessionLoaded || !state.iptvPreferencesLoaded) return@LaunchedEffect
+        val lastChannel = (playingChannelId ?: focusedChannelId).orEmpty().trim().ifBlank { null }
+        viewModel.rememberTvSession(
+            lastChannelId = lastChannel,
+            lastGroupName = selectedCategoryId,
+            lastFocusedZone = "GUIDE",
+        )
+    }
 
     fun getAvailableCategoryIds(tree: LiveCategoryTree): List<String> {
         val list = mutableListOf<String>()
@@ -1580,6 +1686,7 @@ fun LiveTvScreen(
             )
         ) {
             runCatching { sidebarFocus.requestFocus() }
+            focusSelectedCategorySignal += 1
         }
     }
 
@@ -2356,15 +2463,15 @@ fun LiveTvScreen(
                     )
                     MiniPlayerRow(
                         exoPlayer = exoPlayer,
-                        channel = playingChannel,
+                        channel = previewInfoChannel,
                         clockTickMillis = guideClockMillis,
-                        nowNext = currentNowNext,
+                        nowNext = previewNowNext,
                         onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
                         favoriteSet = favSet,
                         onFullscreenClick = openFullScreenPlayer,
-                        variantCount = playingChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
-                        compact = true,
+                        variantCount = previewInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
+                        compact = compactTouchLayout,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(
@@ -2396,7 +2503,7 @@ fun LiveTvScreen(
                             EpgGridFocusMode.ChannelList
                         },
                         scrollResetKey = "$selectedProviderId|$selectedCategoryId|$filteredChannelsWindowKey|$normalizedGuideStart",
-                        compact = true,
+                        compact = compactTouchLayout,
                         gridFocused = focusZone == LiveTvFocusZone.EPG,
                         onChannelSelect = { channel, _ ->
                             focusZone = LiveTvFocusZone.CHANNEL_LIST
@@ -2467,6 +2574,7 @@ fun LiveTvScreen(
                             .coerceIn(0, maxTopBarIndex)
                         focusZone = LiveTvFocusZone.TOPBAR
                     },
+                    focusSelectedCategorySignal = focusSelectedCategorySignal,
                     focusSearchSignal = focusSearchCategorySignal,
                     modifier = Modifier
                         .fillMaxHeight()
@@ -2500,14 +2608,14 @@ fun LiveTvScreen(
                     )
                     MiniPlayerRow(
                         exoPlayer = exoPlayer,
-                        channel = playingChannel,
+                        channel = previewInfoChannel,
                         clockTickMillis = guideClockMillis,
-                        nowNext = currentNowNext,
+                        nowNext = previewNowNext,
                         onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
                         favoriteSet = favSet,
                         onFullscreenClick = openFullScreenPlayer,
-                        variantCount = playingChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
+                        variantCount = previewInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
                         modifier = Modifier.fillMaxWidth(),
                     )

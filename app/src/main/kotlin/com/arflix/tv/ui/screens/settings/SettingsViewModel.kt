@@ -151,6 +151,8 @@ data class SettingsUiState(
     val iptvPlaylists: List<IptvPlaylistEntry> = emptyList(),
     val iptvStalkerUrl: String = "",
     val iptvStalkerMac: String = "",
+    val iptvSortOrder: String = "provider",
+    val iptvShowSpecialCategories: Boolean = true,
     val iptvChannelCount: Int = 0,
     val isIptvLoading: Boolean = false,
     val iptvError: String? = null,
@@ -179,6 +181,7 @@ data class SettingsUiState(
     val packError: String? = null,
     // Addons
     val addons: List<Addon> = emptyList(),
+    val isRefreshingAddons: Boolean = false,
     val torrServerBaseUrl: String = "",
     val homeServerConnection: HomeServerConnection? = null,
     val homeServerConnections: List<HomeServerConnection> = emptyList(),
@@ -1677,6 +1680,36 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun refreshAddons() {
+        if (_uiState.value.isRefreshingAddons) return
+        _uiState.value = _uiState.value.copy(isRefreshingAddons = true)
+        viewModelScope.launch {
+            try {
+                if (authRepository.hasValidCloudSyncSession()) {
+                    restoreCloudStateToLocalInternal(silent = true, pushPendingLocalFirst = false)
+                }
+                val report = streamRepository.refreshInstalledAddons()
+                val updatedAddons = streamRepository.installedAddons.first()
+                runCatching { catalogRepository.syncAddonCatalogs(updatedAddons) }
+                val toast = "${report.refreshed} addons refreshed, ${report.failed} failed"
+                _uiState.value = _uiState.value.copy(
+                    addons = updatedAddons,
+                    isRefreshingAddons = false,
+                    toastMessage = toast,
+                    toastType = if (report.failed == 0) ToastType.SUCCESS else ToastType.INFO
+                )
+                syncLocalStateToCloud(silent = true)
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                _uiState.value = _uiState.value.copy(
+                    isRefreshingAddons = false,
+                    toastMessage = "Failed to refresh addons",
+                    toastType = ToastType.ERROR
+                )
+            }
+        }
+    }
+
     private fun observeAuthState() {
         viewModelScope.launch {
             authRepository.authState.collect { state ->
@@ -1715,13 +1748,15 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.observeConfig().collect { config ->
                 val current = _uiState.value
-                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists) {
+                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories) {
                     _uiState.value = current.copy(
                         iptvM3uUrl = config.m3uUrl,
                         iptvEpgUrl = config.epgUrl,
                         iptvPlaylists = config.playlists,
                         iptvStalkerUrl = config.stalkerPortalUrl,
-                        iptvStalkerMac = config.stalkerMacAddress
+                        iptvStalkerMac = config.stalkerMacAddress,
+                        iptvSortOrder = config.sortOrder,
+                        iptvShowSpecialCategories = config.showSpecialCategories
                     )
                 }
                 if (!hasObservedIptvConfig) {
@@ -2220,6 +2255,18 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
             }
+        }
+    }
+
+    fun setIptvSortOrder(mode: String) {
+        viewModelScope.launch {
+            iptvRepository.saveSortOrder(mode)
+        }
+    }
+
+    fun setIptvShowSpecialCategories(show: Boolean) {
+        viewModelScope.launch {
+            iptvRepository.saveShowSpecialCategories(show)
         }
     }
 

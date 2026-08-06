@@ -213,4 +213,11 @@
     <string name="settings_dns_system">System-DNS</string>
     <string name="settings_clock_12h">12-Stunden</string>
     <string name="settings_clock_24h">24-Stunden</string>
+    <string name="settings_iptv_sort_order_title">Sortierreihenfolge</string>
+    <string name="settings_iptv_sort_order_subtitle">Wähle, wie Live-Kanäle und Gruppen in der Liste sortiert werden</string>
+    <string name="settings_iptv_sort_provider_order">Anbieter-Reihenfolge</string>
+    <string name="settings_iptv_sort_channel_number">Kanalnummer</string>
+    <string name="settings_iptv_sort_alphabetical">Alphabetisch (A-Z)</string>
+    <string name="settings_iptv_special_categories_title">Spezialkategorien</string>
+    <string name="settings_iptv_special_categories_subtitle">All Channels und Recently Watched in Live TV ein- oder ausblenden</string>
 </resources>

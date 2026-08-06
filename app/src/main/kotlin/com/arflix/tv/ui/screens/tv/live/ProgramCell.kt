@@ -77,6 +77,8 @@ fun ProgramCell(
 ) {
     val deviceType = LocalDeviceType.current
     val isTouchDevice = deviceType.isTouchDevice()
+    val narrowCell = width < 92.dp
+    val compactCell = width < 136.dp
     var focused by remember { mutableStateOf(false) }
     val baseBg = when {
         isNow -> LiveColors.FocusBg
@@ -90,13 +92,13 @@ fun ProgramCell(
     }
     val borderWidth = if (focusable) {
         val animated by animateDpAsState(
-            targetValue = if (focused) 3.dp else 1.dp,
+            targetValue = if (focused) 1.dp else 1.dp,
             animationSpec = tween(durationMillis = 80),
             label = "program-cell-border",
         )
         animated
     } else {
-        if (focused) 3.dp else 1.dp
+        if (focused) 1.dp else 1.dp
     }
     val scale = if (focusable) {
         val animated by animateFloatAsState(
@@ -206,13 +208,13 @@ fun ProgramCell(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val nowMs = clockTickMillis
-                if (isNow) {
+                if (isNow && !narrowCell) {
                     Badge(stringResource(R.string.live_badge_live), Color.White, LiveColors.LiveRed)
                     Spacer(Modifier.size(6.dp))
-                } else if (isPast && isCatchupSupported) {
+                } else if (isPast && isCatchupSupported && !narrowCell) {
                     Badge(stringResource(R.string.live_badge_archive), LiveColors.Bg, LiveColors.Accent)
                     Spacer(Modifier.size(6.dp))
-                } else if (!isPast) {
+                } else if (!isPast && !narrowCell) {
                     val isNewTag = (nowMs - program.startUtcMillis) in 0..24L * 60 * 60 * 1000L &&
                         !program.isLive(nowMs)
                     if (isNewTag) {
@@ -228,7 +230,7 @@ fun ProgramCell(
                     modifier = Modifier.weight(1f),
                 )
             }
-            if (!program.description.isNullOrBlank()) {
+            if (!compactCell && !program.description.isNullOrBlank()) {
                 Text(
                     text = program.description!!,
                     style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim, fontSize = 9.sp),
@@ -236,21 +238,23 @@ fun ProgramCell(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text(
-                    text = formatClock(program.startUtcMillis),
-                    style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
-                )
-                val mins = ((program.endUtcMillis - program.startUtcMillis) / 60_000L)
-                    .coerceAtLeast(0L)
-                if (mins > 0) {
+            if (!narrowCell) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     Text(
-                        text = stringResource(R.string.live_label_duration_min, mins),
+                        text = formatClock(program.startUtcMillis),
                         style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
                     )
+                    val mins = ((program.endUtcMillis - program.startUtcMillis) / 60_000L)
+                        .coerceAtLeast(0L)
+                    if (mins > 0) {
+                        Text(
+                            text = stringResource(R.string.live_label_duration_min, mins),
+                            style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
+                        )
+                    }
                 }
             }
         }

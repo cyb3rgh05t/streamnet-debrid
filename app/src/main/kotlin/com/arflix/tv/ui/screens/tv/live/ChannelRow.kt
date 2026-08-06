@@ -91,7 +91,7 @@ fun ChannelRow(
     }
     val now = nowNext?.now
     val animatedBorderWidth by animateDpAsState(
-        targetValue = if (visuallyFocused) 3.dp else 0.dp,
+        targetValue = if (visuallyFocused) 1.dp else 0.dp,
         animationSpec = tween(durationMillis = 70),
         label = "channel-row-border",
     )

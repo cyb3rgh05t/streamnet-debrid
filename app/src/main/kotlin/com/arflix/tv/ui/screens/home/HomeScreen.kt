@@ -143,6 +143,7 @@ import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
 import com.arflix.tv.ui.components.MobileHeroBanner
 import com.arflix.tv.ui.components.ProfileAvatarVisual
+import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.ui.components.MediaContextMenu
 import com.arflix.tv.ui.components.rememberCardLayoutMode
@@ -2016,6 +2017,12 @@ private fun MobileHeroCarousel(
     onSwitchProfile: () -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit
 ) {
+    val isTablet = LocalDeviceType.current == DeviceType.TABLET
+    val heroAspectRatio = if (isTablet) 2.5f else 3f / 4f
+    val tabletHeroMaxHeight = if (isTablet) 340.dp else Dp.Unspecified
+    val pagerHorizontalPadding = if (isTablet) 180.dp else 64.dp
+    val pagerPageSpacing = if (isTablet) 24.dp else 18.dp
+
     val heroItems = remember(categories) {
         val nonCwCats = categories.filter { it.id != "continue_watching" }
         val firstCat = nonCwCats.getOrNull(0)
@@ -2096,8 +2103,8 @@ private fun MobileHeroCarousel(
         // Banner card pager — circular, peeks at adjacent cards on both sides
         HorizontalPager(
             state = pagerState,
-            contentPadding = PaddingValues(horizontal = 64.dp),
-            pageSpacing = 18.dp,
+            contentPadding = PaddingValues(horizontal = pagerHorizontalPadding),
+            pageSpacing = pagerPageSpacing,
             beyondBoundsPageCount = 1,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
@@ -2137,6 +2144,8 @@ private fun MobileHeroCarousel(
                 genres = genres,
                 year = year,
                 rating = rating,
+                cardAspectRatio = heroAspectRatio,
+                maxCardHeight = tabletHeroMaxHeight,
                 logoUrl = logoUrl,
                 onClick = { onNavigateToDetails(item.mediaType, item.id, null, null) },
                 modifier = Modifier.graphicsLayer {

@@ -6,6 +6,7 @@ import android.security.keystore.KeyProperties
 import android.util.Base64
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import com.arflix.tv.data.model.IptvChannel
 import com.arflix.tv.data.model.DrmInfo
 import com.arflix.tv.data.model.IptvNowNext
@@ -156,7 +157,9 @@ data class IptvConfig(
     val epgUrl: String = "",
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val stalkerPortalUrl: String = "",
-    val stalkerMacAddress: String = ""
+    val stalkerMacAddress: String = "",
+    val sortOrder: String = "provider",
+    val showSpecialCategories: Boolean = true
 )
 
 data class IptvPlaylistEntry(
@@ -455,7 +458,9 @@ class IptvRepository @Inject constructor(
                 epgUrl = primary?.epgUrl ?: legacyEpgUrls.firstOrNull().orEmpty(),
                 playlists = playlists,
                 stalkerPortalUrl = decryptConfigValue(prefs[stalkerPortalUrlKey()].orEmpty()),
-                stalkerMacAddress = prefs[stalkerMacAddressKey()].orEmpty()
+                stalkerMacAddress = prefs[stalkerMacAddressKey()].orEmpty(),
+                sortOrder = prefs[sortOrderKey()] ?: "provider",
+                showSpecialCategories = prefs[showSpecialCategoriesKey()] ?: true
             )
         }
 
@@ -610,6 +615,20 @@ class IptvRepository @Inject constructor(
         }
         invalidateCache()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save stalker config")
+    }
+
+    suspend fun saveSortOrder(sortOrder: String) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[sortOrderKey()] = sortOrder
+        }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv sort order")
+    }
+
+    suspend fun saveShowSpecialCategories(showSpecialCategories: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[showSpecialCategoriesKey()] = showSpecialCategories
+        }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv special categories visibility")
     }
 
     /**
@@ -2820,6 +2839,8 @@ class IptvRepository @Inject constructor(
     private fun playlistsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_playlists_json")
     private fun stalkerPortalUrlKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_portal_url")
     private fun stalkerMacAddressKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_mac_address")
+    private fun sortOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_sort_order")
+    private fun showSpecialCategoriesKey(): Preferences.Key<Boolean> = booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_show_special_categories")
     private fun epgUrlKeyFor(profileId: String): Preferences.Key<String> =
         profileManager.profileStringKeyFor(profileId, "iptv_epg_url")
     private fun favoriteGroupsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_favorite_groups")

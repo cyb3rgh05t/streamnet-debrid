@@ -44,6 +44,7 @@ import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.skin.rememberArvioCardShape
 import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.foundation.shape.CircleShape
@@ -107,6 +108,7 @@ fun MediaCard(
     var isFocused by remember { mutableStateOf(false) }
     val visualFocused = isFocusedOverride || isFocused
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val progressAccentColor = resolveAccentColor(ArvioSkin.colors.accent)
 
     val aspectRatio = if (isLandscape) 16f / 9f else 2f / 3f
     // Landscape cards should prefer wide artwork/backdrops.
@@ -362,7 +364,7 @@ fun MediaCard(
                             modifier = Modifier
                                 .fillMaxWidth(item.progress / 100f)
                                 .fillMaxSize()
-                                .background(Color.White.copy(alpha = 0.92f))
+                                .background(progressAccentColor)
                         )
                     }
                 }

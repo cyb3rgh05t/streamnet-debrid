@@ -405,6 +405,7 @@ fun buildCategoryTree(
     recentCount: Int,
     hiddenGroups: Set<String> = emptySet(),
     groupOrder: List<String> = emptyList(),
+    showSpecialCategories: Boolean = true,
 ): LiveCategoryTree {
     data class CountryAccumulator(
         var total: Int = 0,
@@ -536,17 +537,21 @@ fun buildCategoryTree(
     val adultCategories = listOf(
         LiveCategory("adult", "Adult", adultCount, CategoryIcon.Lock),
     ).filter { it.count > 0 }
-    val top = listOf(
-        LiveCategory("fav", "Favorites", favoritesCount, CategoryIcon.Favorite),
-        LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent),
-        LiveCategory(
-            id = "all",
-            label = "All Channels",
-            count = allCount,
-            iconToken = CategoryIcon.All,
-            children = autoGlobal + countryCategories + adultCategories,
-        ),
-    )
+    val top = buildList {
+        add(LiveCategory("fav", "Favorites", favoritesCount, CategoryIcon.Favorite))
+        if (showSpecialCategories) {
+            add(LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent))
+            add(
+                LiveCategory(
+                    id = "all",
+                    label = "All Channels",
+                    count = allCount,
+                    iconToken = CategoryIcon.All,
+                    children = autoGlobal + countryCategories + adultCategories,
+                )
+            )
+        }
+    }
     val playlistGroups = orderPlaylistGroups(playlistGroupCounts, groupOrder).map { (id, value) ->
         LiveCategory(
             id = id,
@@ -838,6 +843,7 @@ fun buildFastStartupChannelState(
     recents: Set<String>,
     hiddenGroups: Set<String> = emptySet(),
     groupOrder: List<String> = emptyList(),
+    showSpecialCategories: Boolean = true,
 ): EnrichedChannels {
     if (channels.isEmpty()) return EnrichedChannels.Empty
 
@@ -906,17 +912,21 @@ fun buildFastStartupChannelState(
     val adultCategories = listOf(
         LiveCategory("adult", "Adult", adultCount, CategoryIcon.Lock),
     ).filter { it.count > 0 }
-    val top = listOf(
-        LiveCategory("fav", "Favorites", favoriteCount, CategoryIcon.Favorite),
-        LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent),
-        LiveCategory(
-            id = "all",
-            label = "All Channels",
-            count = allCount,
-            iconToken = CategoryIcon.All,
-            children = autoGlobal + adultCategories,
-        ),
-    )
+    val top = buildList {
+        add(LiveCategory("fav", "Favorites", favoriteCount, CategoryIcon.Favorite))
+        if (showSpecialCategories) {
+            add(LiveCategory("recent", "Recently Watched", recentCount, CategoryIcon.Recent))
+            add(
+                LiveCategory(
+                    id = "all",
+                    label = "All Channels",
+                    count = allCount,
+                    iconToken = CategoryIcon.All,
+                    children = autoGlobal + adultCategories,
+                )
+            )
+        }
+    }
     val playlistGroups = orderPlaylistGroups(playlistGroupCounts, groupOrder).map { (id, value) ->
         LiveCategory(
             id = id,
@@ -962,6 +972,7 @@ fun buildPagedStartupChannelState(
     recents: Set<String>,
     hiddenGroups: Set<String> = emptySet(),
     groupOrder: List<String> = emptyList(),
+    showSpecialCategories: Boolean = true,
     windowOffset: Int = 0,
 ): EnrichedChannels {
     val visibleWindow = channels.mapIndexed { index, rawChannel ->
@@ -1012,20 +1023,24 @@ fun buildPagedStartupChannelState(
         }
     }
     val totalVisible = totalChannelCount.takeIf { it > 0 } ?: visibleTotal
-    val top = listOf(
-        LiveCategory("fav", "Favorites", favorites.size, CategoryIcon.Favorite),
-        LiveCategory("recent", "Recently Watched", recents.size, CategoryIcon.Recent),
-        LiveCategory(
-            id = "all",
-            label = "All Channels",
-            count = totalVisible,
-            iconToken = CategoryIcon.All,
-            children = listOf(
-                LiveCategory("g-4k", "4K | Ultra HD", 0, CategoryIcon.Grid),
-                LiveCategory("adult", "Adult", hiddenTotal, CategoryIcon.Lock),
-            ).filter { it.count > 0 },
-        ),
-    )
+    val top = buildList {
+        add(LiveCategory("fav", "Favorites", favorites.size, CategoryIcon.Favorite))
+        if (showSpecialCategories) {
+            add(LiveCategory("recent", "Recently Watched", recents.size, CategoryIcon.Recent))
+            add(
+                LiveCategory(
+                    id = "all",
+                    label = "All Channels",
+                    count = totalVisible,
+                    iconToken = CategoryIcon.All,
+                    children = listOf(
+                        LiveCategory("g-4k", "4K | Ultra HD", 0, CategoryIcon.Grid),
+                        LiveCategory("adult", "Adult", hiddenTotal, CategoryIcon.Lock),
+                    ).filter { it.count > 0 },
+                )
+            )
+        }
+    }
     val playlistGroups = orderPlaylistGroups(visibleGroupCounts, groupOrder).map { (id, value) ->
         LiveCategory(
             id = id,

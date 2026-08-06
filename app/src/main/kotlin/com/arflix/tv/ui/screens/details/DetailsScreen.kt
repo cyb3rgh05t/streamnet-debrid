@@ -169,6 +169,7 @@ import com.arflix.tv.ui.skin.rememberArvioCardShape
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.ui.theme.BackgroundCard
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.Pink
@@ -3422,15 +3423,20 @@ private fun MobileActionButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     val shape = RoundedCornerShape(percent = 50)
     val bgColor = when {
-        isPrimary -> Color.White
+        isPrimary -> accentColor
         isOutlined -> Color.Transparent
-        isActive -> Color.White.copy(alpha = 0.15f)
+        isActive -> accentColor.copy(alpha = 0.18f)
         else -> Color.White.copy(alpha = 0.08f)
     }
     val contentColor = if (isPrimary) Color.Black else Color.White.copy(alpha = 0.92f)
-    val borderColor = if (isOutlined) Color.White.copy(alpha = if (isActive) 0.55f else 0.22f) else Color.Transparent
+    val borderColor = when {
+        isOutlined -> accentColor.copy(alpha = if (isActive) 0.6f else 0.28f)
+        isActive -> accentColor.copy(alpha = 0.45f)
+        else -> Color.Transparent
+    }
 
     Row(
         modifier = modifier
@@ -3473,19 +3479,20 @@ private fun MobileIconActionButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     val shape = RoundedCornerShape(20.dp)
     val backgroundColor = when {
         !enabled -> Color.White.copy(alpha = 0.04f)
-        isActive -> Color.White.copy(alpha = 0.18f)
+        isActive -> accentColor.copy(alpha = 0.2f)
         else -> Color.White.copy(alpha = 0.08f)
     }
     val contentColor = if (enabled) {
-        Color.White.copy(alpha = if (isActive) 0.96f else 0.88f)
+        if (isActive) accentColor else Color.White.copy(alpha = 0.88f)
     } else {
         Color.White.copy(alpha = 0.3f)
     }
     val borderColor = if (isActive) {
-        Color.White.copy(alpha = 0.28f)
+        accentColor.copy(alpha = 0.65f)
     } else {
         Color.White.copy(alpha = 0.12f)
     }

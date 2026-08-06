@@ -326,7 +326,7 @@ private fun SearchResultRow(
             .clip(RoundedCornerShape(10.dp))
             .background(if (focused) LiveColors.Panel else Color.Transparent)
             .border(
-                width = if (focused) 3.dp else 0.dp,
+                width = if (focused) 1.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(10.dp),
             )

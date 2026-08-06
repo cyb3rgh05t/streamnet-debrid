@@ -597,6 +597,16 @@
     <string name="settings_from_source">From %1$s</string>
     <string name="settings_from_home_server">From Home Server</string>
     <string name="settings_custom_catalog">Custom catalog</string>
+    <string name="refresh_addons">Refresh Addons</string>
+    <string name="settings_refresh_addons_desc">Pull latest addon changes for current profile</string>
+    <string name="settings_pulling_latest_addon">Pulling latest addons</string>
+    <string name="settings_iptv_sort_order_title">Sort order</string>
+    <string name="settings_iptv_sort_order_subtitle">Choose how live channels and groups are ordered in the list</string>
+    <string name="settings_iptv_sort_provider_order">Provider Order</string>
+    <string name="settings_iptv_sort_channel_number">Channel Number</string>
+    <string name="settings_iptv_sort_alphabetical">Alphabetical (A-Z)</string>
+    <string name="settings_iptv_special_categories_title">Special categories</string>
+    <string name="settings_iptv_special_categories_subtitle">Show or hide All Channels and Recently Watched in Live TV</string>
     <string name="settings_section_add_addon">ADD ADDON</string>
     <string name="settings_install_custom_addon">Install a custom Stremio addon by URL</string>
     <string name="settings_section_my_addons">MY ADDONS</string>

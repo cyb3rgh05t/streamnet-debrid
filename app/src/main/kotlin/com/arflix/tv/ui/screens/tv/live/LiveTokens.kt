@@ -82,8 +82,10 @@ object LiveColors {
         @Composable
         get() = Accent.copy(alpha = 0.15f)
 
-    // Focus ring color — always pure white on TV for maximum clarity.
-    val FocusRing = Color(0xFFFFFFFF)
+    // Focus ring color — follows the user-selected accent color.
+    val FocusRing: Color
+        @Composable
+        get() = Accent
 
     val LiveRed = Color(0xFFFF3B30)
     val Online  = Color(0xFF4ADE80)

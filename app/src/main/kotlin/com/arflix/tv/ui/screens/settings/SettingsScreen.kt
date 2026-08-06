@@ -62,6 +62,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.LiveTv
@@ -130,6 +131,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -178,8 +180,10 @@ import com.arflix.tv.ui.components.topBarMaxIndex
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.BackgroundElevated
+import com.arflix.tv.ui.theme.ErrorRed
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.SuccessGreen
 import com.arflix.tv.ui.theme.TextPrimary
@@ -447,11 +451,11 @@ fun SettingsScreen(
                     groupOrder = uiState.iptvGroupOrder
                 ).size // Reset row + category rows
             } else {
-                2 + uiState.iptvPlaylists.size // Add + rows + refresh + clear
+                2 + uiState.iptvPlaylists.size + 3 // Add + rows + refresh + clear + sort + special categories
             }
             "home_server" -> uiState.homeServerConnections.size + 3
             "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
-            "stremio" -> stremioAddons.size // rows + add button
+            "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
             "accounts" -> 6 // Cloud + Trakt + Telegram + Force Sync + App Update + Privacy/Data + MDBList
             else -> 0
@@ -1023,6 +1027,13 @@ fun SettingsScreen(
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 2 -> {
                                                     viewModel.clearIptvConfig()
                                                 }
+                                                contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
+                                                    val next = when (uiState.iptvSortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
+                                                    viewModel.setIptvSortOrder(next)
+                                                }
+                                                contentFocusIndex == uiState.iptvPlaylists.size + 4 -> {
+                                                    viewModel.setIptvShowSpecialCategories(!uiState.iptvShowSpecialCategories)
+                                                }
                                             }
                                         }
                                         "home_server" -> {
@@ -1108,6 +1119,9 @@ fun SettingsScreen(
                                                         }
                                                         else -> viewModel.toggleAddon(addon.id)
                                                     }
+                                                }
+                                                contentFocusIndex == stremioAddons.size -> {
+                                                    viewModel.refreshAddons()
                                                 }
                                                 else -> {
                                                     showCustomAddonInput = true
@@ -1521,7 +1535,11 @@ fun SettingsScreen(
                             },
                             onRefresh = { viewModel.refreshIptv() },
                             onDelete = { viewModel.clearIptvConfig() },
-                            onManageCategories = openIptvCategories
+                            onManageCategories = openIptvCategories,
+                            sortOrder = uiState.iptvSortOrder,
+                            showSpecialCategories = uiState.iptvShowSpecialCategories,
+                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
+                            onSortOrderChange = { viewModel.setIptvSortOrder(it) }
                         )
                         "TV" -> IptvSettings(
                             playlists = uiState.iptvPlaylists,
@@ -1621,13 +1639,15 @@ fun SettingsScreen(
                         )
                         "stremio" -> StremioAddonsSettings(
                             addons = stremioAddons,
+                            isRefreshingAddons = uiState.isRefreshingAddons,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
                             focusedActionIndex = addonActionIndex,
                             onToggleAddon = { viewModel.toggleAddon(it) },
                             onMoveAddonUp = { viewModel.moveAddonUp(it) },
                             onMoveAddonDown = { viewModel.moveAddonDown(it) },
                             onDeleteAddon = { viewModel.removeAddon(it) },
-                            onAddCustomAddon = { showCustomAddonInput = true }
+                            onAddCustomAddon = { showCustomAddonInput = true },
+                            onRefreshAddons = { viewModel.refreshAddons() }
                         )
                         "plugins" -> {
                             com.arflix.tv.ui.screens.plugin.PluginScreen(
@@ -2697,6 +2717,7 @@ private fun CloudEmailPasswordModal(
     onSignIn: () -> Unit,
     onCreateAccount: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     // Focus order: 0 email, 1 password, 2 cancel, 3 sign in, 4 create
     var focusedIndex by remember { mutableIntStateOf(0) }
     val emailRequester = remember { FocusRequester() }
@@ -2724,6 +2745,7 @@ private fun CloudEmailPasswordModal(
                     .fillMaxWidth(if (LocalDeviceType.current.isTouchDevice()) 0.92f else 1f)
                     .widthIn(max = 600.dp)
                     .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 32.dp)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown) {
@@ -2786,11 +2808,29 @@ private fun CloudEmailPasswordModal(
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
 
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(100.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    accentColor.copy(alpha = 0.35f),
+                                    accentColor,
+                                    accentColor.copy(alpha = 0.35f)
+                                )
+                            )
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.settings_label_email),
                         style = ArflixTypography.caption,
-                        color = if (focusedIndex == 0) Pink else TextSecondary,
+                        color = if (focusedIndex == 0) accentColor else TextSecondary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     androidx.compose.material3.TextField(
@@ -2803,16 +2843,16 @@ private fun CloudEmailPasswordModal(
                             unfocusedTextColor = TextPrimary,
                             focusedContainerColor = Color.White.copy(alpha = 0.1f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                            focusedIndicatorColor = Pink,
+                            focusedIndicatorColor = accentColor,
                             unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Pink
+                            cursorColor = accentColor
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(emailRequester)
                             .border(
                                 width = if (focusedIndex == 0) 2.dp else 1.dp,
-                                color = if (focusedIndex == 0) Pink else Color.White.copy(alpha = 0.2f),
+                                color = if (focusedIndex == 0) accentColor else Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(8.dp)
                             )
                     )
@@ -2824,7 +2864,7 @@ private fun CloudEmailPasswordModal(
                     Text(
                         text = stringResource(R.string.settings_label_password),
                         style = ArflixTypography.caption,
-                        color = if (focusedIndex == 1) Pink else TextSecondary,
+                        color = if (focusedIndex == 1) accentColor else TextSecondary,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     androidx.compose.material3.TextField(
@@ -2838,16 +2878,16 @@ private fun CloudEmailPasswordModal(
                             unfocusedTextColor = TextPrimary,
                             focusedContainerColor = Color.White.copy(alpha = 0.1f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                            focusedIndicatorColor = Pink,
+                            focusedIndicatorColor = accentColor,
                             unfocusedIndicatorColor = Color.Transparent,
-                            cursorColor = Pink
+                            cursorColor = accentColor
                         ),
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(passwordRequester)
                             .border(
                                 width = if (focusedIndex == 1) 2.dp else 1.dp,
-                                color = if (focusedIndex == 1) Pink else Color.White.copy(alpha = 0.2f),
+                                color = if (focusedIndex == 1) accentColor else Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(8.dp)
                             )
                     )
@@ -2889,12 +2929,12 @@ private fun CloudEmailPasswordModal(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                color = if (isSignInFocused) SuccessGreen else Pink.copy(alpha = 0.6f)
+                                color = if (isSignInFocused) accentColor else accentColor.copy(alpha = 0.56f)
                             )
                             .clickable { onSignIn() }
                             .border(
                                 width = if (isSignInFocused) 2.dp else 0.dp,
-                                color = if (isSignInFocused) SuccessGreen.copy(alpha = 0.5f) else Color.Transparent,
+                                color = if (isSignInFocused) accentColor.copy(alpha = 0.7f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(vertical = 14.dp),
@@ -2903,7 +2943,7 @@ private fun CloudEmailPasswordModal(
                         Text(
                             text = stringResource(R.string.sign_in),
                             style = ArflixTypography.button,
-                            color = if (isSignInFocused) Color.White else Color.Black
+                            color = if (isSignInFocused) Color.Black else Color.White
                         )
                     }
 
@@ -2913,12 +2953,12 @@ private fun CloudEmailPasswordModal(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                color = if (isCreateFocused) SuccessGreen else Color.White.copy(alpha = 0.08f)
+                                color = if (isCreateFocused) accentColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f)
                             )
                             .clickable { onCreateAccount() }
                             .border(
-                                width = if (isCreateFocused) 2.dp else 0.dp,
-                                color = if (isCreateFocused) SuccessGreen.copy(alpha = 0.5f) else Color.Transparent,
+                                width = if (isCreateFocused) 2.dp else 1.dp,
+                                color = if (isCreateFocused) accentColor else Color.White.copy(alpha = 0.16f),
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(vertical = 14.dp),
@@ -2927,7 +2967,7 @@ private fun CloudEmailPasswordModal(
                         Text(
                             text = stringResource(R.string.settings_btn_create),
                             style = ArflixTypography.button,
-                            color = Color.White
+                            color = if (isCreateFocused) accentColor else Color.White
                         )
                     }
                 }
@@ -2936,7 +2976,7 @@ private fun CloudEmailPasswordModal(
                 Text(
                     text = if (LocalDeviceType.current.isTouchDevice()) stringResource(R.string.settings_cloud_signin_hint_touch) else stringResource(R.string.settings_cloud_signin_hint_tv),
                     style = ArflixTypography.caption,
-                    color = TextSecondary.copy(alpha = 0.5f)
+                    color = accentColor.copy(alpha = 0.9f)
                 )
             }
         }
@@ -2952,6 +2992,7 @@ private fun CloudPairModal(
     onDismiss: () -> Unit,
     onUseEmailPassword: () -> Unit,
 ) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     val effectiveVerificationUrl = remember(verificationUrl, userCode) {
         verificationUrl.ifBlank {
             userCode.takeIf { it.isNotBlank() }?.let { code ->
@@ -2989,6 +3030,7 @@ private fun CloudPairModal(
                         else Modifier.widthIn(max = modalWidth).fillMaxWidth(0.62f)
                     )
                     .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                     .padding(horizontal = if (isMobile) 20.dp else 24.dp, vertical = if (isMobile) 24.dp else 20.dp)
                     .focusRequester(modalFocusRequester)
                     .focusable()
@@ -3052,7 +3094,7 @@ private fun CloudPairModal(
                         modifier = Modifier
                             .size(qrContainerSize)
                             .background(appBackgroundDark().copy(alpha = 0.92f), RoundedCornerShape(16.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                             .padding(12.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -3123,7 +3165,7 @@ private fun CloudPairModal(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    color = SuccessGreen,
+                                    color = accentColor,
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable { onUseEmailPassword() }
@@ -3179,7 +3221,7 @@ private fun CloudPairModal(
                                 )
                                 .border(
                                     width = if (isCancelFocused) 2.dp else 0.dp,
-                                    color = if (isCancelFocused) Pink else Color.Transparent,
+                                    color = if (isCancelFocused) accentColor else Color.Transparent,
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable { onDismiss() }
@@ -3206,12 +3248,12 @@ private fun CloudPairModal(
                         Box(
                             modifier = Modifier
                                 .background(
-                                    color = if (isFallbackFocused) SuccessGreen else Pink.copy(alpha = 0.6f),
+                                    color = if (isFallbackFocused) accentColor else accentColor.copy(alpha = 0.58f),
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .border(
                                     width = if (isFallbackFocused) 2.dp else 0.dp,
-                                    color = if (isFallbackFocused) SuccessGreen.copy(alpha = 0.5f) else Color.Transparent,
+                                    color = if (isFallbackFocused) accentColor.copy(alpha = 0.75f) else Color.Transparent,
                                     shape = RoundedCornerShape(10.dp)
                                 )
                                 .clickable { onUseEmailPassword() }
@@ -3251,6 +3293,7 @@ private fun TraktActivationModal(
     instruction: String? = null,
     onOpenUrl: (() -> Unit)? = null
 ) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     val resolvedTitle = title ?: stringResource(R.string.settings_connect_trakt)
     val resolvedInstruction = instruction ?: stringResource(R.string.settings_trakt_instruction, verificationUrl)
     val focusRequester = remember { FocusRequester() }
@@ -3279,7 +3322,7 @@ private fun TraktActivationModal(
                         else Modifier.width(560.dp)
                     )
                     .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                     .padding(if (isMobile) 20.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
@@ -3338,7 +3381,7 @@ private fun TraktActivationModal(
                         Text(
                             text = userCode,
                             style = ArflixTypography.heroTitle.copy(fontSize = 42.sp),
-                            color = Pink,
+                            color = accentColor,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -3357,7 +3400,7 @@ private fun TraktActivationModal(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Pink, RoundedCornerShape(10.dp))
+                            .background(accentColor, RoundedCornerShape(10.dp))
                             .clickable { onOpenUrl() }
                             .padding(vertical = 13.dp, horizontal = 18.dp),
                         contentAlignment = Alignment.Center
@@ -3393,7 +3436,7 @@ private fun TraktActivationModal(
                 Box(
                     modifier = Modifier
                         .background(
-                            if (isMobile && onOpenUrl != null) Color.White.copy(alpha = 0.08f) else Pink,
+                            if (isMobile && onOpenUrl != null) Color.White.copy(alpha = 0.08f) else accentColor,
                             RoundedCornerShape(10.dp)
                         )
                         .then(if (isMobile && onOpenUrl != null) Modifier.fillMaxWidth() else Modifier)
@@ -4092,13 +4135,15 @@ private fun MobileSettingsSubPage(
             "Addons" -> {
                 StremioAddonsSettings(
                     addons = stremioAddons,
+                    isRefreshingAddons = uiState.isRefreshingAddons,
                     focusedIndex = -1,
                     focusedActionIndex = 0,
                     onToggleAddon = { viewModel.toggleAddon(it) },
                     onMoveAddonUp = { viewModel.moveAddonUp(it) },
                     onMoveAddonDown = { viewModel.moveAddonDown(it) },
                     onDeleteAddon = { viewModel.removeAddon(it) },
-                    onAddCustomAddon = onAddCustomAddonClick
+                    onAddCustomAddon = onAddCustomAddonClick,
+                    onRefreshAddons = { viewModel.refreshAddons() }
                 )
             }
             "Plugins & Extensions" -> {
@@ -4173,7 +4218,11 @@ private fun MobileSettingsSubPage(
                     onManageCategories = { playlistId ->
                         viewModel.setIptvSelectedPlaylistId(playlistId)
                         onNavigate("IPTV_CATEGORIES")
-                    }
+                    },
+                    sortOrder = uiState.iptvSortOrder,
+                    showSpecialCategories = uiState.iptvShowSpecialCategories,
+                    onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
+                    onSortOrderChange = { viewModel.setIptvSortOrder(it) }
                 )
             }
             "IPTV_CATEGORIES" -> {
@@ -6192,7 +6241,11 @@ private fun IptvSettings(
     onDeletePlaylist: (Int) -> Unit,
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
-    onManageCategories: (String) -> Unit = {}
+    onManageCategories: (String) -> Unit = {},
+    sortOrder: String = "provider",
+    showSpecialCategories: Boolean = true,
+    onShowSpecialCategoriesChange: (Boolean) -> Unit = {},
+    onSortOrderChange: (String) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
     var selectionMode by remember { mutableStateOf(false) }
@@ -6273,6 +6326,32 @@ private fun IptvSettings(
                     }
                 }
             }
+            MobileSettingsCategory(title = "Options") {
+                val sortDisplayValue = when (sortOrder) {
+                    "number" -> stringResource(R.string.settings_iptv_sort_channel_number)
+                    "name" -> stringResource(R.string.settings_iptv_sort_alphabetical)
+                    else -> stringResource(R.string.settings_iptv_sort_provider_order)
+                }
+                MobileSettingsRow(
+                    icon = Icons.Default.List,
+                    title = stringResource(R.string.settings_iptv_sort_order_title),
+                    subtitle = stringResource(R.string.settings_iptv_sort_order_subtitle),
+                    value = sortDisplayValue,
+                    isFocused = false,
+                    onClick = {
+                        val next = when (sortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
+                        onSortOrderChange(next)
+                    }
+                )
+                MobileSettingsRow(
+                    icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    title = stringResource(R.string.settings_iptv_special_categories_title),
+                    subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
+                    value = if (showSpecialCategories) stringResource(R.string.on) else stringResource(R.string.off),
+                    isFocused = false,
+                    onClick = { onShowSpecialCategoriesChange(!showSpecialCategories) }
+                )
+            }
             MobileSettingsCategory(title = stringResource(R.string.settings_section_actions)) {
                 val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
                 MobileSettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.loading_label) else "", isFocused = false, onClick = onRefresh)
@@ -6344,6 +6423,33 @@ private fun IptvSettings(
             SettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.settings_badge_loading) else stringResource(R.string.settings_badge_refresh), isFocused = focusedIndex == playlists.size + 1, onClick = onRefresh, modifier = Modifier.settingsFocusSlot(playlists.size + 1))
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 2, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 2))
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsRow(
+                icon = Icons.Default.List,
+                title = stringResource(R.string.settings_iptv_sort_order_title),
+                subtitle = stringResource(R.string.settings_iptv_sort_order_subtitle),
+                value = when (sortOrder) {
+                    "number" -> stringResource(R.string.settings_iptv_sort_channel_number)
+                    "name" -> stringResource(R.string.settings_iptv_sort_alphabetical)
+                    else -> stringResource(R.string.settings_iptv_sort_provider_order)
+                },
+                isFocused = focusedIndex == playlists.size + 3,
+                onClick = {
+                    val next = when (sortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
+                    onSortOrderChange(next)
+                },
+                modifier = Modifier.settingsFocusSlot(playlists.size + 3)
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsRow(
+                icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                title = stringResource(R.string.settings_iptv_special_categories_title),
+                subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
+                value = if (showSpecialCategories) stringResource(R.string.on) else stringResource(R.string.off),
+                isFocused = focusedIndex == playlists.size + 4,
+                onClick = { onShowSpecialCategoriesChange(!showSpecialCategories) },
+                modifier = Modifier.settingsFocusSlot(playlists.size + 4)
+            )
             if (isLoading && !progressText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(stringResource(R.string.settings_progress_format, progressText, progressPercent.coerceIn(0, 100)), style = ArflixTypography.caption, color = TextSecondary)
@@ -7543,13 +7649,15 @@ private fun CatalogActionChip(
 @Composable
 private fun StremioAddonsSettings(
     addons: List<com.arflix.tv.data.model.Addon> = emptyList(),
+    isRefreshingAddons: Boolean = false,
     focusedIndex: Int = -1,
     focusedActionIndex: Int = 0,
     onToggleAddon: (String) -> Unit = {},
     onMoveAddonUp: (String) -> Unit = {},
     onMoveAddonDown: (String) -> Unit = {},
     onDeleteAddon: (String) -> Unit = {},
-    onAddCustomAddon: () -> Unit = {}
+    onAddCustomAddon: () -> Unit = {},
+    onRefreshAddons: () -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
 
@@ -7649,7 +7757,13 @@ private fun StremioAddonsSettings(
                 }
             }
             Spacer(modifier = Modifier.height(24.dp))
-            Row(modifier = Modifier.settingsFocusSlot(addons.size).fillMaxWidth().clickable(onClick = onAddCustomAddon).background(if (focusedIndex == addons.size) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == addons.size) 2.dp else 0.dp, color = if (focusedIndex == addons.size) Pink else Color.Transparent, shape = RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Row(modifier = Modifier.settingsFocusSlot(addons.size).fillMaxWidth().clickable(onClick = onRefreshAddons).background(if (focusedIndex == addons.size) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == addons.size) 2.dp else 0.dp, color = if (focusedIndex == addons.size) Pink else Color.Transparent, shape = RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = Pink, modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(stringResource(R.string.refresh_addons), style = ArflixTypography.button, color = Pink)
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(modifier = Modifier.settingsFocusSlot(addons.size + 1).fillMaxWidth().clickable(onClick = onAddCustomAddon).background(if (focusedIndex == addons.size + 1) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == addons.size + 1) 2.dp else 0.dp, color = if (focusedIndex == addons.size + 1) Pink else Color.Transparent, shape = RoundedCornerShape(12.dp)).padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
                 Icon(Icons.Default.Widgets, contentDescription = null, tint = Pink, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(stringResource(R.string.add_addon), style = ArflixTypography.button, color = Pink)
@@ -7994,39 +8108,164 @@ private fun MdbListConnectDialog(
     onDismiss: () -> Unit
 ) {
     var apiKey by remember { mutableStateOf("") }
-    androidx.compose.material3.AlertDialog(
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    var focusedButton by remember { mutableIntStateOf(1) } // 0 cancel, 1 connect
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.mdblist_connect_title)) },
-        text = {
-            Column {
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false
+        )
+    ) {
+        ModalScrim(onDismiss = onDismiss) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(if (LocalDeviceType.current.isTouchDevice()) 0.92f else 1f)
+                    .widthIn(max = 560.dp)
+                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
+                    .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 24.dp)
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.Back, Key.Escape -> {
+                                onDismiss()
+                                true
+                            }
+                            Key.DirectionLeft -> {
+                                focusedButton = 0
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                focusedButton = 1
+                                true
+                            }
+                            Key.Enter, Key.DirectionCenter -> {
+                                when (focusedButton) {
+                                    0 -> {
+                                        onDismiss()
+                                        true
+                                    }
+                                    1 -> {
+                                        if (!connecting && apiKey.isNotBlank()) {
+                                            onConnect(apiKey)
+                                            true
+                                        } else {
+                                            false
+                                        }
+                                    }
+                                    else -> false
+                                }
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
+                Text(
+                    text = stringResource(R.string.mdblist_connect_title),
+                    style = ArflixTypography.sectionTitle,
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 androidx.compose.material3.TextField(
                     value = apiKey,
                     onValueChange = { apiKey = it },
                     singleLine = true,
                     enabled = !connecting,
                     label = { Text(stringResource(R.string.mdblist_key_hint)) },
-                    modifier = Modifier.fillMaxWidth()
+                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                        focusedTextColor = TextPrimary,
+                        unfocusedTextColor = TextPrimary,
+                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
+                        focusedIndicatorColor = accentColor,
+                        unfocusedIndicatorColor = Color.Transparent,
+                        cursorColor = accentColor
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = Color.White.copy(alpha = 0.16f),
+                            shape = RoundedCornerShape(10.dp)
+                        )
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+
+                Spacer(modifier = Modifier.height(10.dp))
+
                 Text(
                     text = stringResource(R.string.mdblist_key_help),
                     style = ArflixTypography.caption,
                     color = TextSecondary
                 )
-            }
-        },
-        confirmButton = {
-            androidx.compose.material3.TextButton(
-                onClick = { if (apiKey.isNotBlank()) onConnect(apiKey) },
-                enabled = !connecting && apiKey.isNotBlank()
-            ) { Text(stringResource(R.string.connect)) }
-        },
-        dismissButton = {
-            androidx.compose.material3.TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (focusedButton == 0) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.08f))
+                            .border(
+                                width = if (focusedButton == 0) 2.dp else 1.dp,
+                                color = if (focusedButton == 0) accentColor else Color.White.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable { onDismiss() }
+                            .padding(vertical = 13.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = stringResource(R.string.cancel),
+                            style = ArflixTypography.button,
+                            color = TextPrimary
+                        )
+                    }
+
+                    val canConnect = !connecting && apiKey.isNotBlank()
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(
+                                if (canConnect) {
+                                    if (focusedButton == 1) accentColor else accentColor.copy(alpha = 0.62f)
+                                } else {
+                                    Color.White.copy(alpha = 0.08f)
+                                }
+                            )
+                            .border(
+                                width = if (focusedButton == 1) 2.dp else 1.dp,
+                                color = if (focusedButton == 1) accentColor.copy(alpha = 0.78f) else Color.White.copy(alpha = 0.14f),
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .clickable(enabled = canConnect) { onConnect(apiKey) }
+                            .padding(vertical = 13.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (connecting) stringResource(R.string.syncing) else stringResource(R.string.connect),
+                            style = ArflixTypography.button,
+                            color = if (canConnect) Color.Black else TextSecondary
+                        )
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -8173,6 +8412,7 @@ private fun AccountDisconnectConfirmDialog(
     onDismiss: () -> Unit
 ) {
     val focusRequester = remember { FocusRequester() }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     var focusedButton by remember { mutableIntStateOf(0) } // 0 = cancel, 1 = disconnect
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
@@ -8208,6 +8448,7 @@ private fun AccountDisconnectConfirmDialog(
             modifier = Modifier
                 .widthIn(max = 360.dp)
                 .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                .border(1.dp, accentColor.copy(alpha = 0.22f), RoundedCornerShape(16.dp))
                 .clickable(enabled = false) {}
                 .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -8235,7 +8476,7 @@ private fun AccountDisconnectConfirmDialog(
                         )
                         .border(
                             width = if (focusedButton == 0) 2.dp else 0.dp,
-                            color = if (focusedButton == 0) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                            color = if (focusedButton == 0) accentColor else Color.Transparent,
                             shape = RoundedCornerShape(8.dp)
                         )
                         .clickable { onDismiss() }
@@ -8252,12 +8493,12 @@ private fun AccountDisconnectConfirmDialog(
                     modifier = Modifier
                         .weight(1f)
                         .background(
-                            if (focusedButton == 1) Pink.copy(alpha = 0.3f) else Pink.copy(alpha = 0.12f),
+                            if (focusedButton == 1) ErrorRed.copy(alpha = 0.32f) else ErrorRed.copy(alpha = 0.14f),
                             RoundedCornerShape(8.dp)
                         )
                         .border(
                             width = if (focusedButton == 1) 2.dp else 1.dp,
-                            color = if (focusedButton == 1) Pink else Pink.copy(alpha = 0.35f),
+                            color = if (focusedButton == 1) ErrorRed else ErrorRed.copy(alpha = 0.45f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .clickable { onConfirm() }
@@ -8267,7 +8508,7 @@ private fun AccountDisconnectConfirmDialog(
                     Text(
                         text = stringResource(R.string.settings_disconnect).uppercase(),
                         style = ArflixTypography.label.copy(fontSize = 12.sp),
-                        color = Pink
+                        color = Color.White
                     )
                 }
             }

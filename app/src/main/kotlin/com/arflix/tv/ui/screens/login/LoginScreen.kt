@@ -39,6 +39,7 @@ import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.data.repository.AuthState
 import com.arflix.tv.ui.components.*
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.*
 
 /**
@@ -51,6 +52,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val accentColor = resolveAccentColor(AccentYellow)
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -62,18 +64,6 @@ fun LoginScreen(
     val buttonFocusRequester = remember { FocusRequester() }
     val toggleFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
-
-    // Simple logo animation
-    val infiniteTransition = rememberInfiniteTransition(label = "login")
-    val logoAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOutCubic),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "logoAlpha"
-    )
 
     // Handle successful login
     LaunchedEffect(uiState.loginReady) {
@@ -93,11 +83,11 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.linearGradient(
+                Brush.verticalGradient(
                     colors = listOf(
-                        Color(0xFF0A0A0F),
-                        Color(0xFF0F172A),
-                        Color(0xFF0A0A0F)
+                        appBackgroundDark(),
+                        BackgroundElevated,
+                        appBackgroundDark()
                     )
                 )
             )
@@ -149,10 +139,24 @@ fun LoginScreen(
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            Color(0xFF1F2937).copy(alpha = 0.25f),
+                            accentColor.copy(alpha = 0.2f),
                             Color.Transparent
                         ),
-                        radius = 900f
+                        radius = 760f
+                    )
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            accentColor.copy(alpha = 0.08f),
+                            Color.Transparent
+                        )
                     )
                 )
         )
@@ -168,61 +172,134 @@ fun LoginScreen(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.Center
             ) {
+                val authStateText = when (uiState.authState) {
+                    is AuthState.Authenticated -> stringResource(R.string.settings_cloud_connected)
+                    is AuthState.Error -> stringResource(R.string.cloud_sync_failed)
+                    AuthState.Loading -> stringResource(R.string.syncing)
+                    AuthState.NotAuthenticated -> stringResource(R.string.settings_cloud_off)
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(100.dp))
+                        .background(accentColor.copy(alpha = 0.14f))
+                        .border(
+                            width = 1.dp,
+                            color = accentColor.copy(alpha = 0.52f),
+                            shape = RoundedCornerShape(100.dp)
+                        )
+                        .padding(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = authStateText.uppercase(),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
                 Text(
-                    text = "ARVIO",
-                    fontSize = 64.sp,
+                    text = "STREAMNET TV",
+                    fontSize = 56.sp,
                     fontWeight = FontWeight.Bold,
-                    letterSpacing = 8.sp,
+                    letterSpacing = 5.sp,
                     style = TextStyle(
                         brush = Brush.linearGradient(
                             colors = listOf(
-                                Color(0xFF8B5CF6),
-                                Color(0xFFa78bfa),
-                                Color(0xFFEC4899)
+                                TextPrimary,
+                                accentColor,
+                                TextPrimary
                             )
                         )
                     ),
-                    modifier = Modifier.alpha(logoAlpha)
+                    lineHeight = 60.sp
                 )
 
-                Spacer(modifier = Modifier.height(18.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                Text(
+                    text = stringResource(R.string.settings_cloud_signin_title),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
 
                 Text(
                     text = stringResource(R.string.login_tagline_main),
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color.White.copy(alpha = 0.85f)
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = TextSecondary
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Text(
-                    text = stringResource(R.string.login_tagline_sub),
+                    text = stringResource(R.string.settings_cloud_account_desc),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color.White.copy(alpha = 0.6f),
-                    modifier = Modifier.width(420.dp)
+                    color = TextTertiary,
+                    modifier = Modifier.width(500.dp)
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = stringResource(R.string.settings_cloud_signin_hint_tv),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = accentColor.copy(alpha = 0.92f),
+                    modifier = Modifier.width(500.dp)
                 )
             }
 
             Column(
                 modifier = Modifier
-                    .width(420.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(Color(0xFF151520))
+                    .width(460.dp)
+                    .clip(RoundedCornerShape(22.dp))
+                    .background(BackgroundCard.copy(alpha = 0.96f))
                     .border(
                         1.dp,
-                        Color.White.copy(alpha = 0.08f),
-                        RoundedCornerShape(18.dp)
+                        accentColor.copy(alpha = 0.24f),
+                        RoundedCornerShape(22.dp)
                     )
-                    .padding(32.dp),
+                    .padding(30.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(100.dp))
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    accentColor.copy(alpha = 0.38f),
+                                    accentColor,
+                                    accentColor.copy(alpha = 0.38f)
+                                )
+                            )
+                        )
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
                 Text(
                     text = if (isSignUpMode) stringResource(R.string.login_create_account) else stringResource(R.string.login_sign_in_continue),
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White.copy(alpha = 0.8f)
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = TextPrimary
+                )
+
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Text(
+                    text = stringResource(R.string.settings_cloud_signin_hint_touch),
+                    fontSize = 12.sp,
+                    color = TextTertiary
                 )
 
                 Spacer(modifier = Modifier.height(28.dp))
@@ -232,14 +309,19 @@ fun LoginScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF3D1515))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(ErrorRed.copy(alpha = 0.12f))
+                            .border(
+                                width = 1.dp,
+                                color = ErrorRed.copy(alpha = 0.42f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
                             .padding(12.dp)
                     ) {
                         Text(
                             text = uiState.error!!,
                             fontSize = 13.sp,
-                            color = Color(0xFFEF4444)
+                            color = ErrorRed
                         )
                     }
                     Spacer(modifier = Modifier.height(20.dp))
@@ -337,7 +419,7 @@ fun LoginScreen(
                     SimpleLoadingDots(
                         dotCount = 3,
                         dotSize = 6.dp,
-                        color = Color(0xFF8B5CF6)
+                        color = accentColor
                     )
                 }
             }
@@ -363,6 +445,7 @@ private fun PremiumTextField(
     modifier: Modifier = Modifier
 ) {
     val backgroundColor = appBackgroundDark().copy(alpha = 0.6f)
+    val accentColor = resolveAccentColor(AccentYellow)
 
     Box(
         modifier = modifier
@@ -371,7 +454,11 @@ private fun PremiumTextField(
                 if (isFocused) {
                     Modifier.background(
                         Brush.linearGradient(
-                            colors = listOf(Cyan, Purple, Pink)
+                            colors = listOf(
+                                accentColor.copy(alpha = 0.5f),
+                                accentColor,
+                                accentColor.copy(alpha = 0.5f)
+                            )
                         ),
                         RoundedCornerShape(12.dp)
                     )
@@ -416,7 +503,7 @@ private fun PremiumTextField(
             ),
             keyboardActions = keyboardActions,
             singleLine = true,
-            cursorBrush = SolidColor(Cyan),
+            cursorBrush = SolidColor(accentColor),
             visualTransformation = if (isPassword) PasswordVisualTransformation() else VisualTransformation.None,
             decorationBox = { innerTextField ->
                 Box {
@@ -447,7 +534,8 @@ private fun GradientButton(
     enabled: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val focusedBackground = AccentWhite
+    val accentColor = resolveAccentColor(AccentYellow)
+    val focusedBackground = accentColor
     val focusedText = ArcticBlack
     val noScale = ButtonDefaults.scale(1f, 1f, 1f, 1f, 1f)
 
@@ -461,19 +549,23 @@ private fun GradientButton(
                         Modifier.background(focusedBackground)
                     } else {
                         Modifier.background(
-                            Color.Black,
+                            accentColor.copy(alpha = 0.24f),
                             RoundedCornerShape(12.dp)
+                        ).border(
+                            width = 1.dp,
+                            color = accentColor.copy(alpha = 0.4f),
+                            shape = RoundedCornerShape(12.dp)
                         )
                     }
                 } else {
                     Modifier
                         .background(
-                            if (isFocused) focusedBackground else BackgroundCard,
+                            if (isFocused) focusedBackground.copy(alpha = 0.2f) else BackgroundCard,
                             RoundedCornerShape(12.dp)
                         )
                         .border(
                             width = 1.dp,
-                            brush = Brush.linearGradient(listOf(BorderLight, BorderLight)),
+                            color = if (isFocused) focusedBackground else BorderLight,
                             shape = RoundedCornerShape(12.dp)
                         )
                 }
@@ -501,5 +593,3 @@ private fun GradientButton(
         }
     }
 }
-
-private val EaseInOutCubic = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -70,16 +72,24 @@ fun MobileHeroBanner(
     genres: List<String>,
     year: String = "",
     rating: String = "",
+    cardAspectRatio: Float = 3f / 4f,
+    maxCardHeight: Dp = Dp.Unspecified,
     logoUrl: String? = null,
     onClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val maxHeightModifier = if (maxCardHeight != Dp.Unspecified) {
+        Modifier.heightIn(max = maxCardHeight)
+    } else {
+        Modifier
+    }
 
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .aspectRatio(3f / 4f)
+            .aspectRatio(cardAspectRatio)
+            .then(maxHeightModifier)
             .shadow(elevation = 8.dp, shape = BannerShape, clip = false)
             .clip(BannerShape)
             .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)

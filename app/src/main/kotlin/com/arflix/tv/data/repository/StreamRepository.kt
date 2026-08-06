@@ -626,87 +626,96 @@ class StreamRepository @Inject constructor(
         return true
     }
 
+    private suspend fun hydrateCustomAddon(url: String, customName: String? = null): Addon {
+        val normalizedUrl = resolveAddonInstallUrl(url)
+        if (normalizedUrl.isBlank()) {
+            throw IllegalArgumentException(context.getString(R.string.addon_error_url_empty))
+        }
+
+        httpLocalScraperRuntime.fetchInstallCandidate(
+            url = normalizedUrl,
+            customName = customName
+        )?.let { candidate ->
+            val addonId = buildAddonInstanceId(candidate.manifest.id, normalizedUrl)
+            return Addon(
+                id = addonId,
+                name = candidate.name,
+                version = candidate.version,
+                description = candidate.description,
+                isInstalled = true,
+                isEnabled = true,
+                type = AddonType.CUSTOM,
+                url = normalizedUrl,
+                logo = candidate.logo,
+                manifest = candidate.manifest,
+                transportUrl = candidate.transportUrl
+            )
+        }
+
+        val manifestUrl = getManifestUrl(normalizedUrl)
+
+        val manifest = try {
+            streamApi.getAddonManifest(manifestUrl)
+        } catch (manifestError: Exception) {
+            val candidate = httpLocalScraperRuntime.fetchInstallCandidate(
+                url = normalizedUrl,
+                customName = customName
+            ) ?: throw manifestError
+            val addonId = buildAddonInstanceId(candidate.manifest.id, normalizedUrl)
+            return Addon(
+                id = addonId,
+                name = candidate.name,
+                version = candidate.version,
+                description = candidate.description,
+                isInstalled = true,
+                isEnabled = true,
+                type = AddonType.CUSTOM,
+                url = normalizedUrl,
+                logo = candidate.logo,
+                manifest = candidate.manifest,
+                transportUrl = candidate.transportUrl
+            )
+        }
+
+        val transportUrl = getTransportUrl(normalizedUrl)
+        val addonManifest = convertToAddonManifest(manifest)
+        val resolvedName = customName?.trim()?.takeIf { it.isNotBlank() } ?: manifest.name
+        val addonId = buildAddonInstanceId(manifest.id, normalizedUrl)
+
+        val resourceNames = addonManifest.resources.map { it.name }.toSet()
+        val hasSubtitles = "subtitles" in resourceNames
+        val hasStream = "stream" in resourceNames
+        val addonType = when {
+            hasSubtitles && !hasStream -> AddonType.SUBTITLE
+            else -> AddonType.CUSTOM
+        }
+
+        return Addon(
+            id = addonId,
+            name = resolvedName,
+            version = manifest.version,
+            description = manifest.description ?: "",
+            isInstalled = true,
+            isEnabled = true,
+            type = addonType,
+            url = normalizedUrl,
+            logo = manifest.logo,
+            manifest = addonManifest,
+            transportUrl = transportUrl
+        )
+    }
+
     /**
      * Add a custom Stremio addon from URL -
      * Fetches manifest and stores addon info
      */
     suspend fun addCustomAddon(url: String, customName: String? = null): Result<Addon> = withContext(Dispatchers.IO) {
         try {
-            val normalizedUrl = resolveAddonInstallUrl(url)
-            if (normalizedUrl.isBlank()) {
-                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.addon_error_url_empty)))
-            }
-
-            httpLocalScraperRuntime.fetchInstallCandidate(
-                url = normalizedUrl,
-                customName = customName
-            )?.let { httpCandidate ->
-                return@withContext Result.success(
-                    installHttpLocalScraperCandidate(
-                        normalizedUrl = normalizedUrl,
-                        candidate = httpCandidate
-                    )
-                )
-            }
-
-            val manifestUrl = getManifestUrl(normalizedUrl)
-
-            val manifest = try {
-                streamApi.getAddonManifest(manifestUrl)
-            } catch (manifestError: Exception) {
-                val httpCandidate = httpLocalScraperRuntime.fetchInstallCandidate(
-                    url = normalizedUrl,
-                    customName = customName
-                ) ?: throw manifestError
-                return@withContext Result.success(
-                    installHttpLocalScraperCandidate(
-                        normalizedUrl = normalizedUrl,
-                        candidate = httpCandidate
-                    )
-                )
-            }
-
-            val transportUrl = getTransportUrl(normalizedUrl)
-            val addonManifest = convertToAddonManifest(manifest)
-            val resolvedName = customName?.trim()?.takeIf { it.isNotBlank() } ?: manifest.name
-            val addonId = buildAddonInstanceId(manifest.id, normalizedUrl)
-
-            // Classify the addon based on the resources its manifest declares.
-            // - If it declares `subtitles` but NOT `stream`, it's a pure subtitle addon
-            //   (e.g. Wizdom, Ktuvit) and gets AddonType.SUBTITLE so the subtitle fetcher
-            //   picks it up and the stream resolver correctly ignores it.
-            // - If it declares `stream` (with or without subtitles), keep it as CUSTOM so
-            //   the stream resolver queries it. The subtitle fetcher has been updated
-            //   separately to also include CUSTOM addons whose manifest declares a
-            //   subtitles resource, so hybrid addons still get queried for both.
-            // - Everything else stays CUSTOM, matching the previous default.
-            // Fixes issue #80 where Wizdom/Ktuvit were installed but never queried because
-            // every user-added addon was hardcoded to CUSTOM regardless of its manifest.
-            val resourceNames = addonManifest.resources.map { it.name }.toSet()
-            val hasSubtitles = "subtitles" in resourceNames
-            val hasStream = "stream" in resourceNames
-            val addonType = when {
-                hasSubtitles && !hasStream -> AddonType.SUBTITLE
-                else -> AddonType.CUSTOM
-            }
-
-            val newAddon = Addon(
-                id = addonId,
-                name = resolvedName,
-                version = manifest.version,
-                description = manifest.description ?: "",
-                isInstalled = true,
-                isEnabled = true,
-                type = addonType,
-                url = normalizedUrl,
-                logo = manifest.logo,
-                manifest = addonManifest,
-                transportUrl = transportUrl
-            )
+            val newAddon = hydrateCustomAddon(url, customName)
 
             val addons = installedAddons.first().toMutableList()
             // Remove existing addon with same ID if present
-            addons.removeAll { it.id == addonId }
+            addons.removeAll { it.id == newAddon.id }
             addons.add(newAddon)
             saveAddons(addons)
 
@@ -716,6 +725,48 @@ class StreamRepository @Inject constructor(
 
             Result.failure(e)
         }
+    }
+
+    suspend fun refreshInstalledAddons(): AddonRefreshReport = withContext(Dispatchers.IO) {
+        val currentAddons = installedAddons.first()
+        var refreshedCount = 0
+        var failedCount = 0
+
+        val updatedAddons = currentAddons.map { oldAddon ->
+            val addonUrl = oldAddon.url?.takeIf { it.isNotBlank() }
+            if (addonUrl == null) {
+                oldAddon
+            } else {
+                try {
+                    val hydrated = hydrateCustomAddon(url = addonUrl, customName = oldAddon.name)
+                    refreshedCount++
+                    hydrated.copy(
+                        id = oldAddon.id,
+                        isEnabled = oldAddon.isEnabled,
+                        isInstalled = oldAddon.isInstalled
+                    )
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    Log.w(TAG, "[AddonRefresh] Failed to refresh addon ${oldAddon.id} from $addonUrl", e)
+                    failedCount++
+                    oldAddon
+                }
+            }
+        }
+
+        saveAddons(updatedAddons)
+        synchronized(streamResultCache) { streamResultCache.clear() }
+        resolvedStreamCache.clear()
+        synchronized(streamAddonsCache) {
+            streamAddonsCache.clear()
+            cachedStreamAddonsFingerprint = null
+        }
+        runCatching {
+            val activeProfileId = profileManager.getProfileIdSync()
+            val bundleKey = streamResultCacheBundleKey(activeProfileId)
+            context.streamDataStore.edit { prefs -> prefs.remove(bundleKey) }
+        }
+        AddonRefreshReport(refreshed = refreshedCount, failed = failedCount)
     }
 
     private suspend fun installHttpLocalScraperCandidate(
@@ -4021,4 +4072,9 @@ data class ProgressiveStreamResult(
     val completedAddons: Int,
     val totalAddons: Int,
     val isFinal: Boolean
+)
+
+data class AddonRefreshReport(
+    val refreshed: Int = 0,
+    val failed: Int = 0
 )

@@ -5,11 +5,25 @@ All notable changes to this project are documented in this file.
 ## [Unreleased]
 
 ### Added
-- (Nothing yet)
+
+- Added an IPTV setting to show or hide the Live TV special categories (All Channels and Recently Watched), including TV and mobile settings UI and persisted per-profile behavior.
+
+### Live TV, IPTV, and focus
+
+- Reduced Live TV selector border thickness to 1dp across category sidebar, channel list, search results, and EPG program cells for TV mode.
+- Restored and hardened Live TV startup focus so it lands on the selected/remembered category instead of falling into Search.
+- Enforced explicit-only Search focus in the category sidebar so Search only takes focus when intentionally opened.
+- Persisted last used Live TV category and channel during navigation so app restarts restore the previous context more reliably.
+- Updated mini-player side EPG info to follow the currently focused channel while scrolling the channel list up/down.
+
+### Localization
+
+- Added new IPTV sort/special-category labels to string resources and added German translations for the new settings text.
 
 ## [1.9.983] - 2026-07-30
 
 ### Player, subtitles, and playback
+
 - Moved ordinary subtitles into the full player viewport so they can use letterbox space instead of being forced above the bottom black bar.
 - Preserved authored ASS/SSA/WebVTT positioning and bitmap subtitle coordinates while applying the new letterbox behavior to normal text subtitles.
 - Fixed the Next Episode close button restarting its countdown instead of cancelling playback progression and returning to the show.
@@ -20,6 +34,7 @@ All notable changes to this project are documented in this file.
 - Made aborted Telegram source requests end quietly instead of surfacing as crashes.
 
 ### Live TV, IPTV, and Continue Watching
+
 - Fixed Live TV focus being trapped in search and reduced category/channel focus jumps while data is loading.
 - Stabilized paged IPTV channel snapshots so channel windows remain available while navigating very large playlists.
 - Added regression coverage for Live TV startup, channel availability, search focus, and guide-loading rules.
@@ -27,6 +42,7 @@ All notable changes to this project are documented in this file.
 - Reused the web Live TV channel snapshot on entry to reduce unnecessary list rebuilding and improve startup responsiveness.
 
 ### Catalogs, details, and integrations
+
 - Added Catalog Packs so multiple catalogs can be discovered, installed, grouped, deep-linked, and removed together. Contributor: @Himanth-reddy via #463.
 - Added MDBList as a remote sync provider alongside Trakt across Android TV, mobile, and web, with follow-up matching and sync fixes. Contributor: @silentbil via #488 and #489.
 - Added a configurable episode-rating heatmap to TV and mobile details pages without additional metadata requests. Contributor: @NightCorpse via #469.
@@ -37,12 +53,14 @@ All notable changes to this project are documented in this file.
 - Corrected the Spanish translation resources. Contributor: @Aaronnn17 via #497.
 
 ### Reliability and platform support
+
 - Updated Android targeting to API level 36 while retaining support for older Android and Fire TV devices.
 - Improved cancellation propagation, network diagnostics, regex reuse, and exception safety across catalogs, cloud sync, home servers, IPTV, Trakt, analytics, and playback. Contributor: @Himanth-reddy via #476.
 - Fixed sideload production-plugin routing, extractor unloading, mobile routing, and TV focus limits. Contributor: @Himanth-reddy via #466.
 - Fixed analytics compilation and logging consistency introduced by the broader reliability work. Contributor: @Himanth-reddy via #476.
 
 ### ARVIO Cloud, security, and accounts
+
 - Centralized web and TV-pairing authentication through `auth.arvio.tv` for a consistent ARVIO Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
 - Hardened Catalog Pack submissions with URL validation, SSRF protection, rate limiting, and safer manifest handling. Contributor: @Himanth-reddy via #463.
 - Expanded disposable-email blocking for cloud account registration. Contributor: @mvanhorn via #496.
@@ -51,6 +69,7 @@ All notable changes to this project are documented in this file.
 - Improved linked Ko-fi entitlement refresh and made membership-trial failures report their actual cause.
 
 ### Web app
+
 - Added one-click external-player support for VLC and compatible players on Windows, macOS, Linux, and Android, including protocol setup and URL repair.
 - Added TV-style D-pad spatial navigation and remote-key handling for browser-based TV platforms.
 - Improved Chromium MKV direct play and added a remux watchdog for playback that stalls before video starts.
@@ -68,6 +87,7 @@ All notable changes to this project are documented in this file.
 - Updated the website and README with ARVIO Web and iPad information.
 
 ### Contributors
+
 - @Himanth-reddy
 - @silentbil
 - @NightCorpse
@@ -77,6 +97,7 @@ All notable changes to this project are documented in this file.
 ## [1.9.92] - 2026-05-11
 
 ### Home server sources and catalogs
+
 - Added Home Server source support for user-owned Jellyfin, Emby, and Plex libraries.
 - Added Home Server catalog import so personal server collections can appear as ARVIO catalogs.
 - Added distinct server labels in sources so multiple connected servers can be identified clearly.
@@ -84,6 +105,7 @@ All notable changes to this project are documented in this file.
 - Improved Plex authentication discovery and matching reliability.
 
 ### TV, IPTV, and VOD
+
 - Improved full IPTV EPG backfill coverage so more channels receive guide data.
 - Improved live TV category context actions, category reorder behavior, and left-navigation focus.
 - Improved channel logo loading performance in the TV page.
@@ -91,6 +113,7 @@ All notable changes to this project are documented in this file.
 - Improved IPTV VOD quality handling for episodes and sources.
 
 ### Details, search, and navigation
+
 - Added TMDB movie collections to details pages and moved collection rows above More Like This.
 - Fixed duplicate "Collection" naming in details pages.
 - Fixed several details-page spacing, cast-row, collection-row, and poster-clipping issues.
@@ -100,6 +123,7 @@ All notable changes to this project are documented in this file.
 - Improved focus border behavior and added focus-border color support.
 
 ### Continue Watching, profiles, and cloud
+
 - Added continue-watching card enhancements, including clearer season/episode progress badges.
 - Fixed false "continue at" resume times on new or unwatched upcoming episodes.
 - Refreshed Continue Watching after cloud restore so cloud login restores visible progress sooner.
@@ -108,6 +132,7 @@ All notable changes to this project are documented in this file.
 - Fixed Trakt-connected watchlist add/remove failures after token refresh by using the secured Trakt auth proxy.
 
 ### Player, subtitles, and accessibility
+
 - Fixed remote selection for the next-episode prompt and routed up-next remote keys correctly.
 - Added AI subtitles support and upgraded Media3/ExoPlayer to 1.9.0.
 - Added AI subtitle settings on mobile.
@@ -118,11 +143,13 @@ All notable changes to this project are documented in this file.
 - Added trailer sound controls and improved trailer setting behavior on mobile.
 
 ### Policy and cleanup
+
 - Removed the non-working CloudStream integration path from the app for this build.
 - Tightened Play/GitHub policy wording, README content, and source disclosure.
 - Removed Advertising ID usage from the Play build path and clarified privacy/account deletion documentation.
 
 ### Contributors
+
 - Sage Gavin Davids: search focus/filter fixes, details collection visibility, continue-watching cards, poster episode badges, subtitle/trailer/spoiler settings, and TV layout fixes.
 - EierkopZA: spoiler blur fallback, focus border color support, TV details poster clipping, search filter focus borders, and collection/watchlist focus fixes.
 - Himanth Reddy: regex/performance optimization work, codebase optimization, README maintenance, and catalog/settings stability work.
@@ -131,6 +158,7 @@ All notable changes to this project are documented in this file.
 ## [1.9.91] - 2026-05-01
 
 ### IPTV and TV page
+
 - Reworked IPTV category handling so provider playlist groups can stay in the same order users configured in their IPTV list.
 - Added the expandable All Channels grouping for automatically matched categories.
 - Added category context actions for hiding and restoring IPTV groups.
@@ -140,6 +168,7 @@ All notable changes to this project are documented in this file.
 - Improved IPTV VOD source handling so multiple available qualities can appear instead of only one VOD quality.
 
 ### Watchlist and Continue Watching
+
 - Fixed Trakt watchlist order so items better follow the latest-added order.
 - Fixed Trakt watchlist matching so the app is less likely to choose the wrong remake or wrong year.
 - Fixed a regression where the watchlist could briefly load and then disappear into an empty state.
@@ -148,6 +177,7 @@ All notable changes to this project are documented in this file.
 - Improved Continue Watching behavior with and without Trakt so profile-specific progress is used more consistently.
 
 ### Playback and sources
+
 - Improved source switching reliability in the player. Contributor: EierkopZA.
 - Improved source loading from fast Search-to-Details navigation. Contributor: EierkopZA.
 - Improved player back behavior and playback navigation. Contributor: Himanth Reddy.
@@ -157,6 +187,7 @@ All notable changes to this project are documented in this file.
 - Improved Android TV stability on lower-memory devices by reducing image-cache pressure during catalog scrolling and before stream playback starts.
 
 ### Catalogs and discovery
+
 - Added Discover Catalogs search for public Trakt and MDBList lists.
 - Improved Discover Catalogs TV focus outlines and navigation.
 - Improved Discover Catalogs mobile layout.
@@ -166,6 +197,7 @@ All notable changes to this project are documented in this file.
 - Improved catalog navigation restoration. Contributor: silentbil.
 
 ### Details, anime, and metadata
+
 - Fixed anime episode source matching for multi-season anime.
 - Fixed details page metadata behavior. Contributor: EierkopZA.
 - Improved details/source reliability by waiting for IMDb ID where needed. Contributor: EierkopZA.
@@ -173,6 +205,7 @@ All notable changes to this project are documented in this file.
 - Added and refined Crunchyroll assets. Contributor: Himanth Reddy.
 
 ### Settings, language, profiles, and cloud
+
 - Improved app language resources. Contributor: silentbil.
 - Added subtitle language filtering UI. Contributor: silentbil.
 - Fixed DNS persistence. Contributor: Himanth Reddy.
@@ -183,28 +216,33 @@ All notable changes to this project are documented in this file.
 ## [1.9.9] - 2026-04-28
 
 ### Android TV / IPTV overhaul
+
 - Reworked the TV page for very large IPTV lists, including lists with 50,000+ channels.
 - Improved channel loading, first EPG appearance, favorites, recent channels, and startup behavior.
 - Fixed major DPAD focus and navigation issues across IPTV rows and channel lists.
 
 ### Smoother TV navigation
+
 - Improved rail scrolling, focus behavior, and animation timing across the home, details, watchlist, collections, and TV pages.
 - Reduced jank in heavy catalog sections such as genres, franchises, Top 10, and recently added rows.
 - Fixed multiple focus cropping and blinking issues without lowering artwork quality or removing video previews.
 
 ### Playback and source loading
+
 - Improved source discovery speed and reliability for HTTP, VOD, IPTV VOD, and debrid sources.
 - Restored and improved MP4/service video playback behavior.
 - Improved autoplay selection so higher-quality and larger sources are preferred while keeping startup faster.
 - Added frame-rate matching before playback to reduce stutter.
 
 ### Trakt, watchlist, and continue watching
+
 - Reworked Trakt watchlist ordering and matching so items better follow the newest-added order from Trakt.
 - Improved matching by title, year, and type to avoid wrong versions, such as older remakes or unrelated entries.
 - Fixed continue watching logic so it uses real in-progress Trakt data instead of everything that was ever left unfinished.
 - Improved profile isolation for Trakt data, watch history, watchlist, and continue watching.
 
 ### Profile isolation and cloud sync
+
 - Profiles now have isolated settings, catalogs, Trakt connections, history, watchlists, and continue watching.
 - Addons and IPTV can still be shared where intended.
 - Improved real-time cloud sync behavior across profiles and devices.
@@ -212,12 +250,14 @@ All notable changes to this project are documented in this file.
 - Added and refined profile PIN support, including fixes for mobile profile creation.
 
 ### Mobile and settings improvements
+
 - Reworked the mobile settings layout and naming, including renaming "Stremio" to "Addons".
 - Improved profile creation and editing on mobile, including keyboard handling and avatar picker scaling.
 - Added app-wide language coverage for the languages listed in app settings.
 - Added better catalog and IPTV management controls on mobile.
 
 ### Collections, catalogs, and metadata
+
 - Fixed several genre, service, franchise, and Top 10 catalog issues.
 - Top 10 Movies and Top 10 Shows are now capped correctly.
 - Removed unwanted Favorite TV catalog behavior from the homescreen.
@@ -226,7 +266,9 @@ All notable changes to this project are documented in this file.
 - Added cleaner provider logos, including Netflix, HBO Max, Disney+, Prime Video, Hulu, Paramount+, Peacock, Apple TV+, IMDb, and others.
 
 ### Contributors
+
 Thank you to everyone who helped with this release, including:
+
 - EierkopZA
 - Himanth Reddy
 - chrishudson918
@@ -234,6 +276,7 @@ Thank you to everyone who helped with this release, including:
 - And many more people who contributed smaller fixes, ideas, testing, and feedback. Thank you.
 
 ### Sources
+
 - Metadata and discovery: TMDB, IMDb metadata/logo assets, Trakt.
 - Sync/auth: Supabase and ARVIO Cloud.
 - Playback/addons: IPTV M3U/Xtream/Stalker sources, Stremio-compatible addons, and community HTTP sources.
@@ -242,6 +285,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.9.8] - 2026-04-10
 
 ### Added
+
 - Premium source picker overhaul shared between Details and Player, with richer source cards, improved metadata chips, better sorting, and clearer quality/release/audio/provider presentation.
 - Clock format setting in Settings (`12-hour` / `24-hour`) with app-wide top bar clock support.
 - Volume Boost setting using Android `LoudnessEnhancer`.
@@ -252,6 +296,7 @@ Thank you to everyone who helped with this release, including:
 - Multiple named IPTV playlist backend support (up to 3 lists) with enabled/disabled state.
 
 ### Improved
+
 - Top navigation bar redesigned: centered nav items, settings gear on the right, avatar-only profile entry, cleaner visual hierarchy.
 - Home screen startup speed: categories cached to disk for near-instant relaunch, Continue Watching fetch decoupled from `loadHomeData` so it can complete independently.
 - Image loading and perceived loading speed improved via dedicated Coil client, larger disk/memory caches, DNS warm-up, better preload behavior, and empty-image-url guards.
@@ -262,6 +307,7 @@ Thank you to everyone who helped with this release, including:
 - TV page EPG now loads up front when stale/missing instead of trickling in after page open.
 
 ### Fixed
+
 - In-app updater downloads but never installs (missing PackageInstaller broadcast receiver / confirmation flow).
 - Profile dialog focus flow and input handling.
 - Deleted catalogs flashing back on home load.
@@ -282,6 +328,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.9.74] - 2026-04-03
 
 ### Fixed
+
 - Fixed unreadable white-on-white buttons throughout the app
 - Fixed cloud sign-in failing with misleading "expired" error
 - Fixed app startup crash on certain TV devices
@@ -291,6 +338,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.9.7] - 2026-04-01
 
 ### Added
+
 - Trakt watchlist two-way sync: items added in ARVIO sync to Trakt and vice versa
 - Clearlogo overlays on watchlist cards
 - Clearlogo repositioned to bottom-left corner on all landscape cards for a cleaner look
@@ -299,6 +347,7 @@ Thank you to everyone who helped with this release, including:
 - Automated release pipeline (GitHub Actions: build, GitHub Release, Play Store, Discord)
 
 ### Improved
+
 - Player buttons: focused state now shows white filled circle with black icon
 - Subtitle system: only the selected subtitle is loaded instead of all 30+, significantly faster playback startup
 - Non-English subtitles (OpenSubtitles) now work reliably across all languages
@@ -311,6 +360,7 @@ Thank you to everyone who helped with this release, including:
 - Addon save reliability: fixed race condition where addon showed as added but wasn't persisted
 
 ### Fixed
+
 - Continue Watching showing episodes/seasons that don't exist (e.g., S2E1 for a 1-season show)
 - Watchlist page: left D-pad navigation to sidebar now works correctly
 - Watchlist/sidebar: selecting Home/TV/Settings no longer accidentally opens a details page
@@ -319,6 +369,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.9.2] - 2026-03-19
 
 ### Added
+
 - Full mobile/tablet support: same APK now works on phones, tablets, and TV with adaptive UI.
 - Mobile bottom navigation bar replacing TV topbar on touch devices.
 - Mobile Home: swipeable hero carousel with clearlogo, IMDb badge, auto-scroll, page indicators.
@@ -339,6 +390,7 @@ Thank you to everyone who helped with this release, including:
 - Frame rate matching: real display mode switching via Display.Mode API with stabilization polling.
 
 ### Improved
+
 - Playback startup speed through progressive source loading, background prefetch, and smart autoplay window.
 - Player buffering tuned for large debrid files (80MB byte cap, cache bypass for heavy streams).
 - Subtitle ordering: embedded subtitles appear first and are auto-selected over addon subtitles.
@@ -351,6 +403,7 @@ Thank you to everyone who helped with this release, including:
 - Bottom bar visual upgrade: top border, larger icons, pill highlight, indicator dot.
 
 ### Fixed
+
 - Major play-button crash from SimpleCache folder lock conflict (singleton fix).
 - Mobile-only crash after profile selection from TV launcher channel provider on non-TV devices.
 - Continue Watching wrong resume time: removed ALL stale position leak paths (Supabase history cleanup, CW cache purge, zero-value placeholders).
@@ -370,6 +423,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.9.1] - 2026-03-14
 
 ### Improved
+
 - Playback startup speed improved ~300% through progressive source loading and background stream prefetching on Details page open.
 - Smart autoplay: when stream cache is warm (prefetched), playback starts instantly. When cold, a 3.5s collection window ensures the best source is selected from all responding addons.
 - Player buffering reduced with larger buffer window, 256MB disk media cache, and stronger connection reuse for large files.
@@ -379,6 +433,7 @@ Thank you to everyone who helped with this release, including:
 - Details action buttons (Sources, Trailer, etc.) now render instantly without waiting for external IDs to load.
 
 ### Fixed
+
 - Major crash when pressing play caused by SimpleCache folder lock conflict when re-entering the player. Fixed with a process-wide singleton cache.
 - Intermittent crash from ExoPlayer race conditions during rapid navigation and force-unwrap on nullable season/episode fields.
 - Continue Watching showing wrong resume time on unwatched next episodes (e.g. "Continue S2E2 33:02" after finishing S2E1).
@@ -392,12 +447,14 @@ Thank you to everyone who helped with this release, including:
 ## [1.9] - 2026-03-13
 
 ### Added
+
 - GitHub Releases in-app updater for non-Play installs, including download, installer handoff, and unknown-sources guidance.
 - Android TV / launcher Continue Watching publishing support for launcher channels and Watch Next style surfaces.
 - Cloud backup/restore coverage for non-Trakt local watched state and local Continue Watching across profiles.
 - Downloader code `3366110` documented for direct-install users.
 
 ### Changed
+
 - App version updated to `1.9` (`versionCode 190`) and Settings version label now reads from `BuildConfig`.
 - Home / Details navigation, focus ownership, and topbar entry were reworked so topbar is entered via `Up` instead of left-edge drift.
 - Home and Details metadata/description layout was refined for more stable hero placement and clearer text hierarchy.
@@ -405,6 +462,7 @@ Thank you to everyone who helped with this release, including:
 - IPTV group/category ordering now preserves playlist-provided order instead of forcing alphabetical sorting.
 
 ### Fixed
+
 - Home open-item crash paths caused by placeholder Continue Watching entries and invalid hero/logo fetches.
 - Continue Watching now refreshes more reliably across Trakt and non-Trakt profiles, including remove/dismiss persistence and next-episode advancement.
 - Details now keeps the correct Continue Watching target and watched markers when opening into a resumed episode/season path.
@@ -416,10 +474,12 @@ Thank you to everyone who helped with this release, including:
 ## [1.8.4] - 2026-03-04
 
 ### Added
+
 - Player binge-group-aware next-episode preference handoff for more consistent source continuity.
 - TMDB watch-provider data support in repository layer (used for details enrichment and future UI extensions).
 
 ### Changed
+
 - App version label and package version updated to `1.8.4` (`versionCode 184`).
 - Home vertical catalog navigation tuned for smoother up/down transitions and lower frame-skip risk.
 - Home focus retention now survives category/custom-catalog list updates more reliably.
@@ -428,6 +488,7 @@ Thank you to everyone who helped with this release, including:
 - Home and Details metadata/description spacing and typography refined for improved readability.
 
 ### Fixed
+
 - Focus could drift off-screen on some pages when navigating back across rows/lists; viewport correction logic now clamps and recenters focus targets.
 - Source-switch flow hardened in Player to reduce black/stuck states during stream changes.
 - Subtitle switching no longer requires full media-source rebuild in normal track-switch cases.
@@ -435,15 +496,18 @@ Thank you to everyone who helped with this release, including:
 - Cross-screen focus loss regressions when custom catalogs finished loading on Home.
 
 ### Removed
+
 - Search suggestions/typeahead flow from Search screen, including D-pad suggestion navigation and inline suggestion list.
 
 ## [1.8.2] - 2026-03-02
 
 ### Changed
+
 - Cross-device cloud sync (IPTV, addons, catalogs, watchlist, settings) now triggers on every profile selection instead of only on first app launch.
 - Playback starts significantly faster — removed redundant startup buffer gate and lowered initial buffer threshold.
 
 ### Fixed
+
 - Continue Watching no longer shows a 60-second empty gap when auto-playing the next episode.
 - "Mark as Watched" from the context menu now correctly removes the item from Continue Watching.
 - "Mark as Watched" now automatically adds the next episode to Continue Watching.
@@ -461,6 +525,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.6.0] - 2026-02-22
 
 ### Added
+
 - Extended Live TV EPG timeline model to support multiple upcoming programs per channel (beyond now/next).
 - Per-profile cloud snapshot payload maps for settings, addons, catalogs, IPTV config/favorites, and watchlist.
 - Repository helpers for profile-specific export/import of addons, catalogs, IPTV config, and watchlist state.
@@ -470,6 +535,7 @@ Thank you to everyone who helped with this release, including:
 - Default audio language option in Settings with profile-scoped persistence.
 
 ### Changed
+
 - App version updated to `1.6.0` (`versionCode 160`) and Settings label updated to `ARVIO V1.6`.
 - Live TV EPG lane now uses real upcoming program blocks and only shows filler when timeline data is genuinely unavailable.
 - IPTV loading/retry strategy tuned to reduce multi-minute startup delays and improve responsiveness.
@@ -479,6 +545,7 @@ Thank you to everyone who helped with this release, including:
 - Live TV and Settings surfaces received additional UI polish and focus/navigation refinements for Android TV remote use.
 
 ### Fixed
+
 - IPTV Refresh action could fail with cancellation errors (`StandaloneCoroutine was canceled`) and not reload channels.
 - Live TV timeline third/fourth blocks incorrectly showing `No EPG data` despite available EPG entries.
 - Cross-profile leakage risk where addon sets could appear across profiles due to account-wide startup sync behavior.
@@ -489,6 +556,7 @@ Thank you to everyone who helped with this release, including:
 ## [1.5.0] - 2026-02-17
 
 ### Added
+
 - ARVIO Cloud TV pairing flow via QR sign-in/register and direct account linking.
 - VOD sources available inside source selection for playback.
 - Skip Intro integration in player with dedicated button and backend wiring.
@@ -496,6 +564,7 @@ Thank you to everyone who helped with this release, including:
 - IPTV support now includes Xtream Codes connections.
 
 ### Changed
+
 - App version bumped to `1.5.0` (`versionCode 150`).
 - Updated Downloader install code to `5955104`.
 - Catalog limits increased from `20` to `40` entries for built-in catalogs and added Trakt/MDBList catalogs.
@@ -506,6 +575,7 @@ Thank you to everyone who helped with this release, including:
 - Framerate matching behavior refined in playback flow.
 
 ### Fixed
+
 - Source discovery regression where results became very slow or stalled after initial successful loads.
 - Autoplay/source fallback behavior that switched too aggressively across sources.
 - Playback start issues at `00:00` for some streams and large files.
@@ -519,31 +589,37 @@ Thank you to everyone who helped with this release, including:
 ## [1.4.0] - 2026-02-14
 
 ### Added
+
 - Optional `ARVIO Cloud` account connection in Settings for syncing profiles, addons, catalogs, and IPTV settings.
 - Supabase migration and edge functions for TV device auth flow: `tv-auth-start`, `tv-auth-status`, `tv-auth-complete`.
 
 ### Fixed
+
 - Trakt connect now displays activation URL and code while authorization is pending.
 - Cloud sign-in/sign-up modal D-pad navigation (Down/Up/Left/Right) is now consistent on Android TV remotes.
 
 ## [1.3.0] - 2026-02-11
 
 ### Added
+
 - IPTV settings now include a dedicated `Delete M3U Playlist` action to remove configured M3U/EPG and IPTV favorites.
 - Updated release screenshots for Catalogs and Live TV (`v1.3`).
 
 ### Changed
+
 - Player controls overlay no longer adds a dark background scrim behind play/pause controls.
 - Sidebar focus visibility and section handoff behavior improved for clearer TV remote navigation.
 - Continue Watching cards show resume timestamp and a subtle progress track.
 
 ### Fixed
+
 - Resume metadata flow to keep Continue Watching playback start position aligned with player start.
 - Multiple focus/scroll consistency issues across Home/Settings/TV surfaces.
 
 ## [1.2.0] - 2026-02-10
 
 ### Added
+
 - Live TV page in sidebar with IPTV support.
 - M3U playlist configuration in Settings.
 - Catalogs tab in Settings for custom Trakt and MDBList URLs.
@@ -552,12 +628,14 @@ Thank you to everyone who helped with this release, including:
 - New screenshots for Live TV and Catalogs in README.
 
 ### Changed
+
 - Home and catalog loading behavior across profiles.
 - Focus and scroll behavior improvements across Home, Details, Search, Watchlist, and TV surfaces.
 - Player/stream handling refinements for smoother transitions.
 - App release version updated to `1.2.0`.
 
 ### Fixed
+
 - Continue Watching visibility and persistence regressions.
 - Custom catalog rows not appearing on Home in some profile states.
 - IPTV and mini-player stability issues including focus restore and state persistence.

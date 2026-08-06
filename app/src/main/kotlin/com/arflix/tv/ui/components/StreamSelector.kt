@@ -85,10 +85,12 @@ import androidx.tv.material3.Text
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.skin.resolveAccentColor
 import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import com.arflix.tv.R
@@ -234,6 +236,7 @@ fun StreamSelector(
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val pluginPrefix = stringResource(R.string.plugin_prefix)
+    val accentColor = resolveAccentColor(AccentYellow)
 
     var elapsedSeconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(streamSearchStartTime) {
@@ -570,11 +573,11 @@ fun StreamSelector(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(16.dp))
                                         .background(
-                                            if (isSelected) Pink.copy(alpha = 0.3f)
+                                            if (isSelected) accentColor.copy(alpha = 0.3f)
                                             else Color.White.copy(alpha = 0.08f)
                                         )
                                         .then(
-                                            if (isSelected) Modifier.border(1.dp, Pink.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+                                            if (isSelected) Modifier.border(1.dp, accentColor.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
                                             else Modifier.border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                                         )
                                         .clickable {
@@ -589,7 +592,7 @@ fun StreamSelector(
                                             fontSize = 12.sp,
                                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
                                         ),
-                                        color = if (isSelected) Pink else TextSecondary,
+                                        color = if (isSelected) accentColor else TextSecondary,
                                         maxLines = 1
                                     )
                                 }
@@ -614,7 +617,7 @@ fun StreamSelector(
                                     .padding(32.dp)
                             ) {
                                 if (stillSearching) {
-                                    LoadingIndicator(color = Pink, size = 40.dp)
+                                    LoadingIndicator(color = accentColor, size = 40.dp)
                                     Spacer(modifier = Modifier.height(12.dp))
                                     Text(
                                         text = buildString {

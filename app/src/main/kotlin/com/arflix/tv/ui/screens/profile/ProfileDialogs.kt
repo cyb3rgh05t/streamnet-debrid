@@ -997,13 +997,18 @@ private fun DialogButton(
 
     val containerColor = when {
         isDestructive -> Color(0xFFDC2626)
-        isPrimary -> Color(0xFFE50914)
+        isPrimary -> Color(0xFFE5A209)
         else -> Color.Transparent
     }
     val focusedContainerColor = when {
         isDestructive -> Color(0xFFEF4444)
-        isPrimary -> Color(0xFFFF1A1A)
+        isPrimary -> Color(0xFFF0A809)
         else -> Color.White.copy(alpha = 0.1f)
+    }
+    val textColor = when {
+        !enabled -> Color.White.copy(alpha = 0.4f)
+        isPrimary -> Color(0xFF1A1A1A)
+        else -> Color.White
     }
 
     val buttonContent: @Composable () -> Unit = {
@@ -1015,7 +1020,7 @@ private fun DialogButton(
                 text = text,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
-                color = if (enabled) Color.White else Color.White.copy(alpha = 0.4f),
+                color = textColor,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
             )
         }
@@ -1038,7 +1043,8 @@ private fun DialogButton(
                     }
                 )
                 .clickable { if (enabled) onClick() }
-                .heightIn(min = 44.dp)
+                .heightIn(min = 44.dp),
+            contentAlignment = Alignment.Center
         ) {
             buttonContent()
         }

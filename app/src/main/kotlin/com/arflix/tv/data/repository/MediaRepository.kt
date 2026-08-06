@@ -2993,7 +2993,14 @@ class MediaRepository @Inject constructor(
 
         val type = if (mediaType == MediaType.TV) "tv" else "movie"
         return try {
-            val images = tmdbApi.getImages(type, mediaId, apiKey)
+            // Request English + language-agnostic logos explicitly so logo availability
+            // is stable even when app locale is non-English.
+            val images = tmdbApi.getImages(
+                mediaType = type,
+                id = mediaId,
+                apiKey = apiKey,
+                includeImageLanguage = "en,null"
+            )
             // Quality ranking for clearlogos: prefer PNG over SVG (the app has
             // no SVG decoder), English over other locales, and among the
             // survivors pick the highest community-rated logo (vote_average
@@ -3008,7 +3015,6 @@ class MediaRepository @Inject constructor(
                         .thenByDescending { it.width }
                 )
                 .firstOrNull()
-                ?: images.logos.firstOrNull()
             val url = logo?.filePath?.let { "${Constants.LOGO_BASE}$it" }
             logoCache[cacheKey] = CacheEntry(url, System.currentTimeMillis())
             url

@@ -37,6 +37,7 @@ import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.skin.rememberArvioCardShape
 
 /**
@@ -58,6 +59,7 @@ fun ContinueWatchingCard(
     onClick: () -> Unit = {},
 ) {
     val shape = rememberArvioCardShape(ArvioSkin.radius.md)
+    val progressAccentColor = resolveAccentColor(ArvioSkin.colors.accent)
 
     Column(modifier = Modifier.width(width)) {
         ArvioFocusableSurface(
@@ -141,7 +143,7 @@ fun ContinueWatchingCard(
                         modifier = Modifier
                             .fillMaxWidth(progress.coerceIn(0f, 1f))
                             .height(3.dp)
-                            .background(ArvioSkin.colors.accent),
+                            .background(progressAccentColor),
                     )
                 }
 
@@ -232,6 +234,7 @@ fun ContinueWatchingCardCompact(
     onClick: () -> Unit = {},
 ) {
     val shape = rememberArvioCardShape(ArvioSkin.radius.md)
+    val progressAccentColor = resolveAccentColor(ArvioSkin.colors.accent)
 
     ArvioFocusableSurface(
         modifier = Modifier.width(380.dp),
@@ -278,7 +281,7 @@ fun ContinueWatchingCardCompact(
                         modifier = Modifier
                             .fillMaxWidth(progress.coerceIn(0f, 1f))
                             .fillMaxSize()
-                            .background(ArvioSkin.colors.accent),
+                            .background(progressAccentColor),
                     )
                 }
             }

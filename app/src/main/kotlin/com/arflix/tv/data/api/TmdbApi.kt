@@ -118,7 +118,8 @@ interface TmdbApi {
     suspend fun getImages(
         @Path("media_type") mediaType: String,
         @Path("id") id: Int,
-        @Query("api_key") apiKey: String
+        @Query("api_key") apiKey: String,
+        @Query("include_image_language") includeImageLanguage: String? = null
     ): TmdbImagesResponse
 
     @GET("{media_type}/{id}/videos")

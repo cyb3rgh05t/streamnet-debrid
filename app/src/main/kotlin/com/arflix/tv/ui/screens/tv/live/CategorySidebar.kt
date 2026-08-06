@@ -109,6 +109,7 @@ fun CategorySidebar(
     onMoveRight: () -> Unit = {},
     onMoveUpFromSearch: () -> Unit = {},
     onTopBoundaryFocusChanged: (Boolean) -> Unit = {},
+    focusSelectedCategorySignal: Int = 0,
     focusSearchSignal: Int = 0,
     modifier: Modifier = Modifier,
 ) {
@@ -121,6 +122,7 @@ fun CategorySidebar(
     var expandedCountry by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedAll by rememberSaveable { mutableStateOf(false) }
     var activeMenu by remember { mutableStateOf<CategoryMenuState?>(null) }
+    var allowSearchFocus by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     val selectedCategoryFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -172,12 +174,89 @@ fun CategorySidebar(
             ?.invoke()
     }
 
+    fun selectedCategoryLazyIndex(): Int? {
+        var idx = 0
+        tree.top.forEach { cat ->
+            if (cat.id == "fav" && cat.count == 0) return@forEach
+            if (selectedId == cat.id) return idx
+            idx += 1
+
+            val isAllGroup = cat.id == "all" && cat.children.isNotEmpty()
+            val isOpen = isAllGroup && expandedAll && expanded
+            if (isOpen) {
+                cat.children.forEach { child ->
+                    if (selectedId == child.id) return idx
+                    idx += 1
+                    if (child.containsId(selectedId)) {
+                        child.children.forEach { grandchild ->
+                            if (selectedId == grandchild.id) return idx
+                            idx += 1
+                        }
+                    }
+                }
+            }
+        }
+
+        if (tree.global.categories.isNotEmpty()) {
+            idx += 1 // section header
+            tree.global.categories.forEach { cat ->
+                if (selectedId == cat.id) return idx
+                idx += 1
+            }
+        }
+
+        if (tree.hidden.categories.isNotEmpty()) {
+            idx += 1 // section header
+            tree.hidden.categories.forEach { cat ->
+                if (selectedId == cat.id) return idx
+                idx += 1
+            }
+        }
+
+        if (tree.countries.categories.isNotEmpty()) {
+            idx += 1 // section header
+            tree.countries.categories.forEach { country ->
+                if (selectedId == country.id) return idx
+                idx += 1
+                val isExpanded = expandedCountry == country.id
+                if (isExpanded && expanded) {
+                    country.children.forEach { child ->
+                        if (selectedId == child.id) return idx
+                        idx += 1
+                    }
+                }
+            }
+        }
+
+        if (tree.adult.categories.isNotEmpty()) {
+            idx += 1 // section header
+            tree.adult.categories.forEach { cat ->
+                if (selectedId == cat.id) return idx
+                idx += 1
+            }
+        }
+
+        return null
+    }
+
     LaunchedEffect(focusSearchSignal) {
         if (LiveTvStartup.shouldFocusSearch(focusSearchSignal)) {
+            allowSearchFocus = true
             repeat(3) {
                 runCatching { searchFocusRequester.requestFocus() }
                 delay(50L)
             }
+        }
+    }
+
+    LaunchedEffect(focusSelectedCategorySignal, selectedId, tree, expandedAll, expandedCountry, expanded) {
+        if (focusSelectedCategorySignal <= 0) return@LaunchedEffect
+        selectedCategoryLazyIndex()?.let { rowIndex ->
+            runCatching { listState.scrollToItem(rowIndex) }
+        }
+        repeat(4) {
+            runCatching { selectedCategoryFocusRequester.requestFocus() }
+            delay(40L)
         }
     }
 
@@ -254,7 +333,17 @@ fun CategorySidebar(
                     onSelect(first.id)
                 }
             },
-            onFocusChanged = onTopBoundaryFocusChanged,
+            onFocusChanged = { isFocused ->
+                onTopBoundaryFocusChanged(isFocused)
+                if (isFocused) {
+                    if (allowSearchFocus) {
+                        allowSearchFocus = false
+                    } else {
+                        // Guard against accidental focus fallback to search.
+                        runCatching { selectedCategoryFocusRequester.requestFocus() }
+                    }
+                }
+            },
             focusRequester = searchFocusRequester,
         )
         Spacer(Modifier.height(8.dp))
@@ -263,6 +352,7 @@ fun CategorySidebar(
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             itemsIndexed(tree.top, key = { index, cat -> "top:${cat.id}:$index" }) { _, cat ->
+                if (cat.id == "fav" && cat.count == 0) return@itemsIndexed
                 val isAllGroup = cat.id == "all" && cat.children.isNotEmpty()
                 val isOpen = isAllGroup && expandedAll
                 SidebarRow(
@@ -476,7 +566,7 @@ private fun SearchEntry(
                 }
             }
             .border(
-                width = if (focused) 3.dp else 0.dp,
+                width = if (focused) 1.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(10.dp),
             )
@@ -600,7 +690,7 @@ private fun SidebarRow(
                 }
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
                 .border(
-                    width = if (focused) 3.dp else 0.dp,
+                    width = if (focused) 1.dp else 0.dp,
                     color = if (focused) LiveColors.FocusRing else Color.Transparent,
                     shape = RoundedCornerShape(8.dp),
                 )

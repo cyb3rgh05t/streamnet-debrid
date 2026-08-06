@@ -1001,6 +1001,8 @@ class HomeViewModel @Inject constructor(
     private val EPG_LOCAL_REFRESH_MS = 60_000L
     /** Network refresh: fetch fresh short EPG for favorite channels (Xtream only). */
     private val EPG_NETWORK_REFRESH_MS = 5 * 60_000L
+    /** If startup cache is older than this, do one early network refresh for Favorite TV. */
+    private val EPG_STARTUP_NETWORK_STALE_MS = 2 * 60_000L
     private var epgRefreshJob: Job? = null
     private var activeEpgRefreshJob: Job? = null
     private var lastEpgNetworkRefreshMs: Long = 0L
@@ -1663,7 +1665,10 @@ class HomeViewModel @Inject constructor(
                         .map { it.id }
                         .toSet()
                     if (favChannelIds.isNotEmpty()) {
-                        refreshFavoriteTvEpg(networkFetch = false)
+                        val epgAgeMs = iptvRepository.cachedEpgAgeMs()
+                        val shouldNetworkRefresh =
+                            epgAgeMs == Long.MAX_VALUE || epgAgeMs >= EPG_STARTUP_NETWORK_STALE_MS
+                        refreshFavoriteTvEpg(networkFetch = shouldNetworkRefresh)
                     }
                 }
                     } catch (e: Exception) {
