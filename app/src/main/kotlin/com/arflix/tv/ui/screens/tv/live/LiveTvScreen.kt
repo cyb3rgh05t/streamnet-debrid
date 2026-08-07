@@ -1488,6 +1488,10 @@ fun LiveTvScreen(
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
     var focusSelectedCategorySignal by remember { mutableIntStateOf(0) }
+    // After startup channel selection, scroll the Netflix rail to the restored position.
+    LaunchedEffect(startupChannelApplied) {
+        if (startupChannelApplied && !isTouchDevice) focusSelectedChannelSignal += 1
+    }
     // Starts at 0 so opening Live TV does NOT slam focus into the channel
     // search field. It seeded to 1, and the sidebar focuses search for any
     // value > 0, so every entry began with the selector trapped in the search
@@ -1523,6 +1527,18 @@ fun LiveTvScreen(
     var guideOpenedFromQuickZap by remember { mutableStateOf(false) }
     var guideChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
 
+    var programBackdropUrl by remember { mutableStateOf<String?>(null) }
+    val currentProgramTitle = playingChannel?.let { state.snapshot.nowNext[it.id]?.now?.title }.orEmpty()
+    LaunchedEffect(currentProgramTitle) {
+        if (currentProgramTitle.isBlank()) {
+            programBackdropUrl = null
+            return@LaunchedEffect
+        }
+        delay(200L)
+        val url = runCatching { viewModel.lookupProgramBackdrop(currentProgramTitle) }.getOrNull()
+        programBackdropUrl = url
+    }
+
     LaunchedEffect(
         visibleEnrichedState.value.tree,
         state.tvSessionLoaded,
@@ -1547,6 +1563,8 @@ fun LiveTvScreen(
         val nextCategoryId = restoredCategoryId ?: firstPlaylistCategoryId(tree)
         if (selectedCategoryId == "all" || tree.byId(selectedCategoryId) == null) {
             selectedCategoryId = nextCategoryId
+            // Scroll the Netflix category chip row to the restored category.
+            focusSelectedCategorySignal += 1
         }
     }
 
@@ -2523,145 +2541,50 @@ fun LiveTvScreen(
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
-            } else Row(
-                modifier = Modifier.fillMaxSize(),
-            ) {
-                CategorySidebar(
+            } else {
+                LiveTvNetflixLayout(
                     tree = visibleEnrichedState.value.tree,
-                    selectedId = selectedCategoryId,
-                    expanded = sidebarExpanded,
-                    listState = sidebarListState,
-                    focusRequester = sidebarFocus,
-                    onSelect = { id ->
+                    selectedCategoryId = selectedCategoryId,
+                    channels = filteredChannels,
+                    playingChannelId = playingChannelId,
+                    focusedChannelId = focusedChannelId,
+                    playingChannel = playingChannel,
+                    nowNextMap = state.snapshot.nowNext,
+                    favoriteSet = favSet,
+                    exoPlayer = exoPlayer,
+                    guideClockMillis = guideClockMillis,
+                    variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
+                    programBackdropUrl = programBackdropUrl,
+                    isFullScreen = isFullScreen,
+                    lookupBackdrop = { title ->
+                        runCatching { viewModel.lookupProgramBackdrop(title) }.getOrNull()
+                    },
+                    onSelectCategory = { id ->
                         noteGuideUserNavigation()
                         selectedCategoryId = id
+                        focusZone = LiveTvFocusZone.CATEGORY_LIST
                     },
                     onOpenSearch = { searchOpen = true },
-                    onHideCategory = { playlistId, groupName ->
-                        noteGuideUserNavigation()
-                        selectedCategoryId = "all"
-                        viewModel.toggleHiddenGroup(playlistId, groupName)
+                    onCategoryFocused = { focusZone = LiveTvFocusZone.CATEGORY_LIST },
+                    onChannelFocused = { ch ->
+                        focusZone = LiveTvFocusZone.CHANNEL_LIST
+                        commitFocusedChannel(ch)
                     },
-                    onUnhideCategory = { playlistId, groupName ->
-                        noteGuideUserNavigation()
-                        viewModel.toggleHiddenGroup(playlistId, groupName)
-                    },
-                    onMoveCategoryUp = { playlistId, groupName ->
-                        viewModel.moveGroupUp(playlistId, groupName)
-                    },
-                    onMoveCategoryToTop = { playlistId, groupName ->
-                        viewModel.moveGroupToTop(playlistId, groupName)
-                    },
-                    onMoveCategoryDown = { playlistId, groupName ->
-                        viewModel.moveGroupDown(playlistId, groupName)
-                    },
-                    onFocusEnter = {
-                        if (focusZone != LiveTvFocusZone.TOPBAR) {
-                            focusZone = LiveTvFocusZone.CATEGORY_LIST
-                        }
-                    },
-                    onMoveRight = {
-                        val remembered = rememberedChannelByCategory[selectedCategoryId]
-                            ?.takeIf { id -> id in filteredChannelIndexById }
-                        val target = remembered
-                            ?: focusedChannelId?.takeIf { id -> id in filteredChannelIndexById }
-                            ?: playingChannelId?.takeIf { id -> id in filteredChannelIndexById }
-                            ?: filteredChannels.firstOrNull()?.id
-                        focusChannelList(target)
-                    },
-                    onMoveUpFromSearch = {
+                    onChannelSelected = { ch -> selectChannel(ch) },
+                    onFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
+                    onOpenVariants = { ch -> openVariantPicker(ch) },
+                    onMoveUpFromCategory = {
                         topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile)
                             .coerceIn(0, maxTopBarIndex)
                         focusZone = LiveTvFocusZone.TOPBAR
                     },
+                    focusSelectedChannelSignal = focusSelectedChannelSignal,
                     focusSelectedCategorySignal = focusSelectedCategorySignal,
-                    focusSearchSignal = focusSearchCategorySignal,
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .padding(top = contentTopPadding)
-                        .focusGroup(),
-                )
-
-                Column(
+                    categoryFocusRequester = sidebarFocus,
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(top = contentTopPadding),
-                ) {
-                    ProviderSelector(
-                        providers = providerFilters,
-                        selectedId = selectedProviderId,
-                        onSelect = { id ->
-                            noteGuideUserNavigation()
-                            selectedProviderId = id
-                            selectedCategoryId = "all"
-                            focusedChannelId = null
-                            epgPrefetchAnchorId = null
-                        },
-                        focusRequester = providerFocus,
-                        onMoveUp = {
-                            topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile)
-                                .coerceIn(0, maxTopBarIndex)
-                            focusZone = LiveTvFocusZone.TOPBAR
-                        },
-                        onMoveDown = { focusPlaylistSearch() },
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    MiniPlayerRow(
-                        exoPlayer = exoPlayer,
-                        channel = previewInfoChannel,
-                        clockTickMillis = guideClockMillis,
-                        nowNext = previewNowNext,
-                        onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
-                        favoriteSet = favSet,
-                        onFullscreenClick = openFullScreenPlayer,
-                        variantCount = previewInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
-                        compact = compactTouchLayout,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                    EpgGrid(
-                        channels = guideChannels,
-                        channelWindowOffset = normalizedGuideStart,
-                        totalChannelCount = selectedCategoryTotalCount,
-                        clockTickMillis = guideClockMillis,
-                        nowNext = effectiveGuideNowNext,
-                        epgLoadingChannelIds = state.epgLoadingChannelIds,
-                        epgAttemptedChannelIds = state.epgAttemptedChannelIds,
-                        isGuideBackfillLoading = false,
-                        hasGuideSource = state.hasPotentialGuideSource,
-                        selectedChannelId = selectedDisplayChannelId,
-                        focusSelectedChannelSignal = focusSelectedChannelSignal,
-                        focusEpgSignal = focusEpgSignal,
-                        focusMode = if (focusZone == LiveTvFocusZone.EPG) {
-                            EpgGridFocusMode.Epg
-                        } else {
-                            EpgGridFocusMode.ChannelList
-                        },
-                        scrollResetKey = "$selectedProviderId|$selectedCategoryId|$filteredChannelsWindowKey|$normalizedGuideStart",
-                        compact = compactTouchLayout,
-                        gridFocused = focusZone == LiveTvFocusZone.CHANNEL_LIST || focusZone == LiveTvFocusZone.EPG,
-                        onChannelSelect = { channel, _ -> selectChannel(channel) },
-                        onProgramSelect = { channel, program -> playProgramInMini(channel, program) },
-                        onChannelFocused = { channel -> commitFocusedChannel(channel) },
-                        onChannelFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
-                        favorites = favSet,
-                        variantCountFor = { channel -> variantCountFor(channel, variantGroups) },
-                        onOpenVariants = { channel -> openVariantPicker(channel) },
-                        onMoveLeftFromChannels = { focusPlaylistSearch() },
-                        onEnterEpg = { channel -> focusEpg(channel.id) },
-                        onExitEpg = { channel -> focusChannelList(channel?.id ?: focusedChannelId ?: playingChannelId) },
-                        onRequestPreviousChannels = ::requestGuideWindowBefore,
-                        onRequestNextChannels = ::requestGuideWindowAfter,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .onFocusChanged {
-                                if (it.hasFocus && focusZone == LiveTvFocusZone.CATEGORY_LIST) {
-                                    focusZone = LiveTvFocusZone.CHANNEL_LIST
-                                }
-                            }
-                            .then(if (!isTouchDevice) Modifier.focusRequester(epgFocus) else Modifier),
-                    )
-                }
+                )
             }
         }
 

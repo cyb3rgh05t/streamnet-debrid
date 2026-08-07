@@ -13,6 +13,7 @@ import com.arflix.tv.data.repository.IptvPlaybackTarget
 import com.arflix.tv.data.repository.IptvPlaybackUrlResolver
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvTvSessionState
+import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -84,7 +85,8 @@ data class TvUiState(
 class TvViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     val iptvRepository: IptvRepository,
-    private val cloudSyncRepository: CloudSyncRepository
+    private val cloudSyncRepository: CloudSyncRepository,
+    private val mediaRepository: MediaRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(TvUiState())
@@ -1883,6 +1885,41 @@ class TvViewModel @Inject constructor(
             .filter { it.isNotBlank() && it !in hidden }
             .distinct()
             .toList()
+    }
+
+    private val programBackdropCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val programBackdropNegativeCache = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+
+    suspend fun lookupProgramBackdrop(rawTitle: String): String? {
+        val cleaned = cleanProgramTitle(rawTitle)
+        if (cleaned.length < 3) return null
+        val key = cleaned.lowercase()
+        programBackdropCache[key]?.let { return it }
+        if (key in programBackdropNegativeCache) return null
+        return runCatching {
+            val results = mediaRepository.search(cleaned)
+            val best = results.firstOrNull { !it.backdrop.isNullOrBlank() }
+            val backdrop = best?.backdrop
+            if (backdrop.isNullOrBlank()) {
+                programBackdropNegativeCache.add(key)
+                null
+            } else {
+                programBackdropCache[key] = backdrop
+                backdrop
+            }
+        }.getOrElse {
+            programBackdropNegativeCache.add(key)
+            null
+        }
+    }
+
+    private fun cleanProgramTitle(raw: String): String {
+        return raw
+            .replace(Regex("""\([^)]*\)"""), " ")
+            .replace(Regex("""\[[^]]*]"""), " ")
+            .replace(Regex("""(?i)\b(live|hd|uhd|4k|ep\.?\s*\d+|s\d+e\d+)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
     }
 
     fun rememberTvSession(

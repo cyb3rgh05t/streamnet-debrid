@@ -43,6 +43,7 @@ fun ChannelLogo(
     channel: EnrichedChannel,
     size: Dp,
     modifier: Modifier = Modifier,
+    showBackground: Boolean = true,
 ) {
     val initials = initialsFor(channel.name)
     val variant = (channel.name.firstOrNull()?.code ?: 0) % 3
@@ -50,11 +51,19 @@ fun ChannelLogo(
     val density = LocalDensity.current
     val logoUrl = safeChannelLogoUrl(channel.logo)
     var showFallback by remember(logoUrl) { mutableStateOf(logoUrl.isNullOrBlank()) }
+    val effectiveBackground = when {
+        showFallback -> channel.brandBg
+        !showBackground -> null
+        else -> LiveColors.Panel
+    }
     Box(
         modifier = modifier
             .size(size)
             .clip(RoundedCornerShape((size.value / 5.5f).dp))
-            .background(if (logoUrl.isNullOrBlank()) channel.brandBg else LiveColors.Panel),
+            .then(
+                if (effectiveBackground != null) Modifier.background(effectiveBackground)
+                else Modifier
+            ),
         contentAlignment = Alignment.Center,
     ) {
         if (showFallback) {
