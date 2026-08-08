@@ -55,6 +55,12 @@ data class MediaItem(
     val timeRemainingLabel: String? = null,
     // Continue Watching: true only when progress represents current movie/episode playback.
     val showPlaybackProgress: Boolean = true,
+    val liveChannelNumber: String? = null,
+    val liveProgramTitle: String? = null,
+    val liveProgramStartMs: Long? = null,
+    val liveProgramEndMs: Long? = null,
+    val liveProgramDescription: String? = null,
+    val liveNextProgramTitle: String? = null,
 ) : Serializable
 
 enum class MediaType {

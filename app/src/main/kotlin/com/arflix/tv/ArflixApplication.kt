@@ -8,8 +8,10 @@ import android.os.Build
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
+import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -37,6 +39,7 @@ import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.SentryCrashReporter
 import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.worker.TraktSyncWorker
+import com.arflix.tv.worker.IptvRefreshWorker
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -300,6 +303,27 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
             TraktSyncWorker.WORK_NAME,
             ExistingPeriodicWorkPolicy.KEEP,
             syncRequest
+        )
+    }
+
+    fun scheduleIptvRefreshIfNeeded() {
+        val refreshRequest = PeriodicWorkRequestBuilder<IptvRefreshWorker>(
+            IptvRefreshWorker.REFRESH_INTERVAL_HOURS,
+            TimeUnit.HOURS,
+        )
+            .setInitialDelay(IptvRefreshWorker.REFRESH_INTERVAL_HOURS, TimeUnit.HOURS)
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .addTag(IptvRefreshWorker.TAG)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            IptvRefreshWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            refreshRequest,
         )
     }
 

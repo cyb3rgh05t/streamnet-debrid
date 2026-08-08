@@ -59,6 +59,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -73,6 +74,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -160,6 +162,7 @@ import com.arflix.tv.ui.focus.rememberArvioDpadRepeatGate
 import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.rememberArvioCardShape
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.BackgroundCard
@@ -607,6 +610,7 @@ fun HomeScreen(
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 viewModel.refreshContinueWatchingOnly(force = true)
+                viewModel.refreshIptvHomeCatalogs()
                 // Pull the full cloud state (addons, catalogs, settings) on resume.
                 // This catches any changes pushed by another device while this one
                 // was backgrounded — the WebSocket may have been killed by Android,
@@ -963,11 +967,27 @@ fun HomeScreen(
             .fillMaxSize()
             .background(appBackgroundDark())
       ) {
+        val iptvHeroBackdrop by produceState<String?>(null, displayHeroItem?.liveProgramTitle) {
+            val title = displayHeroItem
+                ?.takeIf(viewModel::isIptvItem)
+                ?.liveProgramTitle
+                ?.takeIf { it.isNotBlank() }
+                ?: return@produceState
+            value = viewModel.lookupIptvProgramBackdrop(title)
+        }
+        val iptvHeroProgramLogo by produceState<String?>(null, displayHeroItem?.liveProgramTitle) {
+            val title = displayHeroItem
+                ?.takeIf(viewModel::isIptvItem)
+                ?.liveProgramTitle
+                ?.takeIf { it.isNotBlank() }
+                ?: return@produceState
+            value = viewModel.lookupIptvProgramLogo(title)
+        }
         val currentBackdrop = displayHeroItem?.let { item ->
-            if (viewModel.isCollectionItem(item)) {
-                viewModel.getCollectionHeroImageUrl(item) ?: item.image
-            } else {
-                item.backdrop ?: item.image
+            when {
+                viewModel.isIptvItem(item) -> iptvHeroBackdrop
+                viewModel.isCollectionItem(item) -> viewModel.getCollectionHeroImageUrl(item) ?: item.image
+                else -> item.backdrop ?: item.image
             }
         }
         var settledBackdrop by remember { mutableStateOf<String?>(null) }
@@ -1176,6 +1196,7 @@ fun HomeScreen(
             onNavigateToWatchlist = onNavigateToWatchlist,
             onNavigateToTv = onNavigateToTv,
             getIptvStreamUrl = { itemId -> viewModel.getIptvStreamUrl(itemId) },
+            lookupIptvProgramBackdrop = viewModel::lookupIptvProgramBackdrop,
             isSportsHomeItem = { item -> viewModel.isSportsHomeItem(item) },
             onSportsHomeItemClick = openSportsHomeItem,
             onNavigateToSettings = onNavigateToSettings,
@@ -1196,7 +1217,7 @@ fun HomeScreen(
             Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = trailerOverlayAlpha.value }) {
             HomeHeroLayer(
                 heroItem = displayHeroItem,
-                heroLogoUrl = displayHeroLogo,
+                heroLogoUrl = if (isHeroIptv) iptvHeroProgramLogo else displayHeroLogo,
                 heroOverviewOverride = displayHeroOverview,
                 contentStartPadding = contentStartPadding,
                 isMobile = isMobile,
@@ -1321,6 +1342,152 @@ fun HomeScreen(
     }
 }
 
+@Composable
+private fun IptvHeroSection(
+    item: MediaItem,
+    programLogoUrl: String?,
+    modifier: Modifier = Modifier,
+) {
+    val accent = resolveAccentColor(fallback = AccentRed)
+    val nowMs by produceState(System.currentTimeMillis(), item.id) {
+        while (true) {
+            delay(30_000L)
+            value = System.currentTimeMillis()
+        }
+    }
+    val startMs = item.liveProgramStartMs
+    val endMs = item.liveProgramEndMs
+    val hasSchedule = startMs != null && endMs != null && endMs > startMs
+    val progress = if (hasSchedule) {
+        ((nowMs - startMs!!).toFloat() / (endMs!! - startMs).toFloat()).coerceIn(0f, 1f)
+    } else {
+        0f
+    }
+    val minutesLeft = endMs
+        ?.takeIf { it > nowMs }
+        ?.let { ((it - nowMs + 59_999L) / 60_000L).coerceAtLeast(1L) }
+    val textShadow = Shadow(
+        color = Color.Black.copy(alpha = 0.9f),
+        offset = Offset(0f, 2f),
+        blurRadius = 8f,
+    )
+
+    Column(
+        modifier = modifier.width(440.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        if (item.image.isNotBlank()) {
+            AsyncImage(
+                model = item.image,
+                contentDescription = item.title,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                modifier = Modifier.width(118.dp).height(48.dp),
+            )
+        }
+
+        if (!programLogoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = programLogoUrl,
+                contentDescription = item.liveProgramTitle,
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+                modifier = Modifier.width(320.dp).height(68.dp),
+            )
+        } else {
+            Text(
+                text = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                style = ArflixTypography.heroTitle.copy(
+                    fontSize = 26.sp,
+                    lineHeight = 31.sp,
+                    fontWeight = FontWeight.Bold,
+                    letterSpacing = 0.sp,
+                    shadow = textShadow,
+                ),
+                color = Color.White,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        if (hasSchedule) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    text = "${formatIptvCardClock(startMs!!)} - ${formatIptvCardClock(endMs!!)}",
+                    style = ArflixTypography.caption.copy(fontSize = 12.sp, shadow = textShadow),
+                    color = Color.White.copy(alpha = 0.82f),
+                )
+                LinearProgressIndicator(
+                    progress = { progress },
+                    color = accent,
+                    trackColor = Color.White.copy(alpha = 0.18f),
+                    modifier = Modifier
+                        .width(180.dp)
+                        .height(3.dp)
+                        .clip(RoundedCornerShape(99.dp)),
+                )
+                minutesLeft?.let {
+                    Text(
+                        text = "$it min",
+                        style = ArflixTypography.caption.copy(
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            shadow = textShadow,
+                        ),
+                        color = accent,
+                    )
+                }
+            }
+        }
+
+        item.liveProgramDescription?.takeIf { it.isNotBlank() }?.let { description ->
+            Text(
+                text = cleanOverviewText(description),
+                style = ArflixTypography.body.copy(
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp,
+                    shadow = textShadow,
+                ),
+                color = Color.White.copy(alpha = 0.82f),
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        item.liveNextProgramTitle?.takeIf { it.isNotBlank() }?.let { nextTitle ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.next).uppercase(),
+                    style = ArflixTypography.caption.copy(
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        shadow = textShadow,
+                    ),
+                    color = accent,
+                )
+                Text(
+                    text = nextTitle,
+                    style = ArflixTypography.caption.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        shadow = textShadow,
+                    ),
+                    color = Color.White.copy(alpha = 0.68f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun HeroSection(
@@ -1334,6 +1501,11 @@ private fun HeroSection(
     showBudget: Boolean = true,
     modifier: Modifier = Modifier
 ) {
+    if (item.status?.startsWith("iptv:") == true) {
+        IptvHeroSection(item = item, programLogoUrl = logoUrl, modifier = modifier)
+        return
+    }
+
     val context = LocalContext.current
     val metadataLogoImageLoader = context.imageLoader
     val density = LocalDensity.current
@@ -2222,6 +2394,7 @@ private fun HomeInputLayer(
     onNavigateToWatchlist: () -> Unit,
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit,
     getIptvStreamUrl: (itemId: Int) -> String?,
+    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
     isSportsHomeItem: (MediaItem) -> Boolean = { false },
     onSportsHomeItemClick: (MediaItem) -> Unit = {},
     onNavigateToSettings: () -> Unit,
@@ -2620,6 +2793,7 @@ private fun HomeInputLayer(
             featuredTrailerKey = featuredTrailerKey,
             featuredTrailerDelayMs = featuredTrailerDelayMs,
             featuredTrailerVolume = featuredTrailerVolume,
+            lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
             onItemClick = { item ->
                 if (!isActionableHomeItem(item)) {
                     return@HomeRowsLayer
@@ -2677,6 +2851,7 @@ private fun HomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
+    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null
 ) {
@@ -2720,6 +2895,7 @@ private fun HomeRowsLayer(
             featuredTrailerKey = featuredTrailerKey,
             featuredTrailerDelayMs = featuredTrailerDelayMs,
             featuredTrailerVolume = featuredTrailerVolume,
+            lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
             onItemClick = onItemClick
         )
     }
@@ -2951,6 +3127,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
+    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
     onItemClick: (MediaItem) -> Unit
 ) {
     // ── Focus-row stabilizer ──
@@ -3156,6 +3333,7 @@ private fun TvHomeRowsLayer(
                             featuredTrailerKey = if (rowIsFocused) featuredTrailerKey else null,
                             featuredTrailerDelayMs = featuredTrailerDelayMs,
                             featuredTrailerVolume = featuredTrailerVolume,
+                            lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
                             onItemClick = onItemClick,
                             onItemFocused = onRowItemFocused
                         )
@@ -3372,6 +3550,7 @@ private fun ContentRow(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
+    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit
 ) {
@@ -3423,7 +3602,9 @@ private fun ContentRow(
     val itemSpanPx = remember(density, itemWidth, itemSpacing) {
         with(density) { (itemWidth + itemSpacing).toPx().coerceAtLeast(1f) }
     }
-    val hasFeaturedCard = !effectivePosterMode && featuredTrailerKey != null
+    val isIptvCategory = category.id == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
+        category.id == HomeViewModel.RECENT_TV_CATEGORY_ID
+    val hasFeaturedCard = !isIptvCategory && !effectivePosterMode && featuredTrailerKey != null
     // Tracks which item index has held focus long enough to expand.
     // Using an index (not a boolean) means the derived `featuredExpanded`
     // evaluates to false immediately in the same composition frame when
@@ -3458,7 +3639,7 @@ private fun ContentRow(
             featuredExpandedForIndex = focusedItemIndex
         }
     }
-    val railFocusOverlayActive = isCurrentRow && isScrollable && focusedItemIndex >= 0 && totalItems > 0 &&
+    val railFocusOverlayActive = !isIptvCategory && isCurrentRow && isScrollable && focusedItemIndex >= 0 && totalItems > 0 &&
         !hasFeaturedCard &&
         focusedItemIndex <= maxFirstIndex &&
         focusedItemIndex == rowState.firstVisibleItemIndex &&
@@ -3657,6 +3838,15 @@ private fun ContentRow(
                                     .padding(start = 8.dp)
                             )
                         }
+                    } else if (isIptvCategory || item.status?.startsWith("iptv:") == true) {
+                        IptvHomeCard(
+                            item = item,
+                            width = itemWidth,
+                            isFocused = itemIsFocused && !railFocusOverlayActive,
+                            lookupBackdrop = lookupIptvProgramBackdrop,
+                            onFocused = onCardFocused,
+                            onClick = onCardClick,
+                        )
                     } else {
                         // Collapsed: plain constant width — no animation state, no frame delay.
                         // The LazyRow item is immediately itemWidth, same as non-ranked cards,
@@ -3698,7 +3888,16 @@ private fun ContentRow(
                         animationSpec = if (cardExpanded) spring() else snap(),
                         label = "featuredCardWidth"
                     )
-                    if (cardExpanded) {
+                    if (isIptvCategory || item.status?.startsWith("iptv:") == true) {
+                        IptvHomeCard(
+                            item = item,
+                            width = itemWidth,
+                            isFocused = itemIsFocused && !railFocusOverlayActive,
+                            lookupBackdrop = lookupIptvProgramBackdrop,
+                            onFocused = onCardFocused,
+                            onClick = onCardClick,
+                        )
+                    } else if (cardExpanded) {
                         FeaturedMediaCard(
                             item = item,
                             width = animatedCardWidth,
@@ -3736,7 +3935,10 @@ private fun ContentRow(
                     modifier = Modifier
                         .padding(start = startPadding, top = 8.dp)
                         .width(itemWidth)
-                        .aspectRatio(cardAspectRatio)
+                        .then(
+                            if (isIptvCategory) Modifier.height(154.dp)
+                            else Modifier.aspectRatio(cardAspectRatio)
+                        )
                         .zIndex(4f),
                     shape = railFocusShape,
                     backgroundColor = Color.Transparent,
@@ -3755,3 +3957,195 @@ private fun ContentRow(
         }  // Close Box
     }  // Close Column
 }
+
+@Composable
+private fun IptvHomeCard(
+    item: MediaItem,
+    width: Dp,
+    isFocused: Boolean,
+    lookupBackdrop: suspend (String) -> String?,
+    onFocused: () -> Unit,
+    onClick: () -> Unit,
+) {
+    var logoGradient by remember(item.image, item.title) {
+        mutableStateOf(iptvLogoFallbackGradient(item.title))
+    }
+    val nowMs by produceState(System.currentTimeMillis()) {
+        while (true) {
+            delay(30_000L)
+            value = System.currentTimeMillis()
+        }
+    }
+    val backdropUrl by produceState<String?>(null, item.liveProgramTitle) {
+        val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
+        delay(200L)
+        value = lookupBackdrop(title)
+    }
+    val start = item.liveProgramStartMs
+    val end = item.liveProgramEndMs
+    val progress = if (start != null && end != null && end > start) {
+        ((nowMs - start).toFloat() / (end - start).toFloat()).coerceIn(0f, 1f)
+    } else 0f
+    val minsLeft = end?.let { ((it - nowMs) / 60_000L).coerceAtLeast(0L) }
+    val shape = RoundedCornerShape(8.dp)
+    val accent = resolveAccentColor(fallback = AccentRed)
+
+    ArvioFocusableSurface(
+        modifier = Modifier.width(width).height(154.dp),
+        shape = shape,
+        backgroundColor = Color(0xFF12151A),
+        outlineColor = accent,
+        outlineWidth = 2.dp,
+        focusedScale = 1f,
+        animateFocus = false,
+        enableSystemFocus = false,
+        isFocusedOverride = isFocused,
+        onClick = onClick,
+        onFocusChanged = { if (it) onFocused() },
+    ) {
+        Column(Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().height(80.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.linearGradient(logoGradient))
+                )
+                if (!backdropUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = backdropUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().alpha(0.58f),
+                    )
+                }
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF12151A).copy(alpha = 0.92f)))
+                    )
+                )
+                if (item.image.isNotBlank()) {
+                    AsyncImage(
+                        model = item.image,
+                        contentDescription = item.title,
+                        contentScale = ContentScale.Fit,
+                        onSuccess = { success ->
+                            logoGradient = iptvLogoGradient(success.result.drawable, item.title)
+                        },
+                        modifier = Modifier.size(50.dp),
+                    )
+                }
+                Box(
+                    modifier = Modifier.align(Alignment.TopStart).padding(7.dp)
+                        .background(AccentRed, RoundedCornerShape(3.dp))
+                        .padding(horizontal = 5.dp, vertical = 2.dp)
+                ) {
+                    Text("LIVE", style = ArflixTypography.caption.copy(fontSize = 8.sp, fontWeight = FontWeight.Black), color = Color.White)
+                }
+            }
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 9.dp, vertical = 5.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    item.liveChannelNumber?.takeIf { it.isNotBlank() }?.let {
+                        Text("CH $it", style = ArflixTypography.caption.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = accent)
+                    }
+                    Text(item.title, style = ArflixTypography.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(1.dp)
+                        .background(Color.White.copy(alpha = 0.14f))
+                )
+                Text(item.liveProgramTitle ?: "Guide pending", style = ArflixTypography.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (start != null && end != null) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(formatIptvCardClock(start), style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.58f))
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            color = accent,
+                            trackColor = Color.White.copy(alpha = 0.12f),
+                            modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(99.dp)),
+                        )
+                        if (minsLeft != null && minsLeft > 0) {
+                            Text("${minsLeft}m", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = accent)
+                        }
+                    }
+                }
+                item.liveNextProgramTitle?.takeIf { it.isNotBlank() }?.let {
+                    Text("Next  $it", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.5f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+}
+
+private fun iptvLogoFallbackGradient(seed: String): List<Color> {
+    val hue = (seed.hashCode().toLong().let { if (it < 0L) -it else it } % 360L).toFloat()
+    return listOf(
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 0.58f, 0.42f))),
+        Color(android.graphics.Color.HSVToColor(floatArrayOf((hue + 28f) % 360f, 0.68f, 0.24f))),
+        Color(0xFF12151A),
+    )
+}
+
+private fun iptvLogoGradient(
+    drawable: android.graphics.drawable.Drawable,
+    seed: String,
+): List<Color> {
+    return runCatching {
+        val bitmap = android.graphics.Bitmap.createBitmap(24, 24, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        val previousBounds = android.graphics.Rect(drawable.bounds)
+        drawable.setBounds(0, 0, bitmap.width, bitmap.height)
+        drawable.draw(canvas)
+        drawable.bounds = previousBounds
+
+        var red = 0L
+        var green = 0L
+        var blue = 0L
+        var weight = 0L
+        for (y in 0 until bitmap.height) {
+            for (x in 0 until bitmap.width) {
+                val pixel = bitmap.getPixel(x, y)
+                val alpha = android.graphics.Color.alpha(pixel)
+                if (alpha < 48) continue
+                val pixelRed = android.graphics.Color.red(pixel)
+                val pixelGreen = android.graphics.Color.green(pixel)
+                val pixelBlue = android.graphics.Color.blue(pixel)
+                val brightness = (pixelRed + pixelGreen + pixelBlue) / 3
+                if (brightness > 246 || brightness < 8) continue
+                red += pixelRed * alpha
+                green += pixelGreen * alpha
+                blue += pixelBlue * alpha
+                weight += alpha
+            }
+        }
+        bitmap.recycle()
+        if (weight == 0L) return@runCatching iptvLogoFallbackGradient(seed)
+
+        val average = android.graphics.Color.rgb(
+            (red / weight).toInt(),
+            (green / weight).toInt(),
+            (blue / weight).toInt(),
+        )
+        val hsv = FloatArray(3)
+        android.graphics.Color.colorToHSV(average, hsv)
+        val primary = android.graphics.Color.HSVToColor(
+            floatArrayOf(hsv[0], hsv[1].coerceAtLeast(0.42f), 0.42f)
+        )
+        val secondary = android.graphics.Color.HSVToColor(
+            floatArrayOf((hsv[0] + 24f) % 360f, hsv[1].coerceAtLeast(0.5f), 0.22f)
+        )
+        listOf(Color(primary), Color(secondary), Color(0xFF12151A))
+    }.getOrElse {
+        iptvLogoFallbackGradient(seed)
+    }
+}
+
+private fun formatIptvCardClock(timestampMs: Long): String =
+    java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault()).format(java.util.Date(timestampMs))

@@ -151,7 +151,6 @@ data class SettingsUiState(
     val iptvPlaylists: List<IptvPlaylistEntry> = emptyList(),
     val iptvStalkerUrl: String = "",
     val iptvStalkerMac: String = "",
-    val iptvSortOrder: String = "provider",
     val iptvShowSpecialCategories: Boolean = true,
     val iptvChannelCount: Int = 0,
     val isIptvLoading: Boolean = false,
@@ -1748,14 +1747,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.observeConfig().collect { config ->
                 val current = _uiState.value
-                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories) {
+                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvShowSpecialCategories != config.showSpecialCategories) {
                     _uiState.value = current.copy(
                         iptvM3uUrl = config.m3uUrl,
                         iptvEpgUrl = config.epgUrl,
                         iptvPlaylists = config.playlists,
                         iptvStalkerUrl = config.stalkerPortalUrl,
                         iptvStalkerMac = config.stalkerMacAddress,
-                        iptvSortOrder = config.sortOrder,
                         iptvShowSpecialCategories = config.showSpecialCategories
                     )
                 }
@@ -2255,12 +2253,6 @@ class SettingsViewModel @Inject constructor(
                     }
                 }
             }
-        }
-    }
-
-    fun setIptvSortOrder(mode: String) {
-        viewModelScope.launch {
-            iptvRepository.saveSortOrder(mode)
         }
     }
 

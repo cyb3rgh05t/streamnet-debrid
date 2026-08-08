@@ -17,6 +17,13 @@ import org.junit.Test
  */
 class PreinstalledServicesTest {
 
+    @Test
+    fun `IPTV dashboard catalogs are first and adjacent`() {
+        val ids = MediaRepository.buildPreinstalledDefaults().map { it.id }
+
+        assertEquals(listOf("favorite_tv", "recent_tv"), ids.take(2))
+    }
+
     private val serviceOrder = listOf(
         "collection_service_netflix",
         "collection_service_disneyplus",

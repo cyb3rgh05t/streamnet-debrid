@@ -198,7 +198,7 @@ private fun TopBarNavChip(
 
     val containerColor by animateColorAsState(
         targetValue = when {
-            isFocused -> Color.White.copy(alpha = 0.2f)
+            isFocused -> accent.copy(alpha = 0.32f)
             isSelected -> Color.White.copy(alpha = 0.1f)
             else -> Color.Transparent
         },
@@ -286,7 +286,7 @@ private fun TopBarSettingsGear(
     )
     val containerColor by animateColorAsState(
         targetValue = when {
-            isFocused -> Color.White.copy(alpha = 0.2f)
+            isFocused -> accent.copy(alpha = 0.32f)
             isSelected -> Color.White.copy(alpha = 0.1f)
             else -> Color.Transparent
         },
@@ -341,8 +341,9 @@ private fun TopBarProfileAvatar(
     profile: Profile,
     isFocused: Boolean
 ) {
+    val accent = resolveAccentColor(fallback = Color.White)
     val containerColor by animateColorAsState(
-        targetValue = if (isFocused) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+        targetValue = if (isFocused) accent.copy(alpha = 0.32f) else Color.Transparent,
         animationSpec = tween(AnimationConstants.DURATION_FAST),
         label = "topbar_profile_bg"
     )

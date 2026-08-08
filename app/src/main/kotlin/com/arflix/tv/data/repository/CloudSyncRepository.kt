@@ -451,6 +451,14 @@ class CloudSyncRepository @Inject constructor(
                 }
             }
         }
+        root.optJSONObject("iptvByProfile")?.let { iptv ->
+            for (pid in iptv.keys()) {
+                val profile = iptv.optJSONObject(pid) ?: continue
+                if (profile.has("showSpecialCategories")) {
+                    keys.add("i:$pid:showSpecialCategories")
+                }
+            }
+        }
         return keys
     }
 
@@ -458,6 +466,13 @@ class CloudSyncRepository @Inject constructor(
         if (key.startsWith("g:")) {
             val k = key.substring(2)
             return if (root.has(k)) root.get(k) else null
+        }
+        if (key.startsWith("i:")) {
+            val rest = key.substring(2)
+            val pid = rest.substringBefore(':')
+            val field = rest.substringAfter(':')
+            val profile = root.optJSONObject("iptvByProfile")?.optJSONObject(pid) ?: return null
+            return if (profile.has(field)) profile.get(field) else null
         }
         val rest = key.substring(2)
         val pid = rest.substringBefore(':')
@@ -469,6 +484,16 @@ class CloudSyncRepository @Inject constructor(
     private fun setMergeFieldValue(root: JSONObject, key: String, value: Any) {
         if (key.startsWith("g:")) {
             root.put(key.substring(2), value)
+            return
+        }
+        if (key.startsWith("i:")) {
+            val rest = key.substring(2)
+            val pid = rest.substringBefore(':')
+            val field = rest.substringAfter(':')
+            val profiles = root.optJSONObject("iptvByProfile")
+                ?: JSONObject().also { root.put("iptvByProfile", it) }
+            val profile = profiles.optJSONObject(pid) ?: JSONObject().also { profiles.put(pid, it) }
+            profile.put(field, value)
             return
         }
         val rest = key.substring(2)
@@ -505,6 +530,9 @@ class CloudSyncRepository @Inject constructor(
                 // it — it stays untimestamped (loses to any real cloud timestamp) until the user
                 // actually changes it, which the next build detects via this baseline.
                 baseMap.put(key, current)
+                if (key.startsWith("i:") && isPushDirty) {
+                    tsMap.put(key, now)
+                }
                 changed = true
             } else if (base != current) {
                 baseMap.put(key, current)

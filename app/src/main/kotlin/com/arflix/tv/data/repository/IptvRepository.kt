@@ -158,7 +158,6 @@ data class IptvConfig(
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val stalkerPortalUrl: String = "",
     val stalkerMacAddress: String = "",
-    val sortOrder: String = "provider",
     val showSpecialCategories: Boolean = true
 )
 
@@ -186,7 +185,6 @@ data class IptvCloudProfileState(
     val groupOrderSchema: Int = 0,
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
-    val sortOrder: String = "provider",
     val showSpecialCategories: Boolean = true,
 )
 
@@ -461,7 +459,6 @@ class IptvRepository @Inject constructor(
                 playlists = playlists,
                 stalkerPortalUrl = decryptConfigValue(prefs[stalkerPortalUrlKey()].orEmpty()),
                 stalkerMacAddress = prefs[stalkerMacAddressKey()].orEmpty(),
-                sortOrder = prefs[sortOrderKey()] ?: "provider",
                 showSpecialCategories = prefs[showSpecialCategoriesKey()] ?: true
             )
         }
@@ -617,13 +614,6 @@ class IptvRepository @Inject constructor(
         }
         invalidateCache()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save stalker config")
-    }
-
-    suspend fun saveSortOrder(sortOrder: String) {
-        context.settingsDataStore.edit { prefs ->
-            prefs[sortOrderKey()] = sortOrder
-        }
-        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv sort order")
     }
 
     suspend fun saveShowSpecialCategories(showSpecialCategories: Boolean) {
@@ -2746,7 +2736,6 @@ class IptvRepository @Inject constructor(
             warmupFromCacheOnly()
             val config = observeConfig().first()
             if (!hasAnyConfiguredSource(config)) return
-
             val cached = getMemoryCachedSnapshot() ?: getCachedSnapshotOrNull()
             if (cached == null || cached.channels.isEmpty()) {
                 val fresh = withTimeoutOrNull(25_000L) {
@@ -2755,8 +2744,23 @@ class IptvRepository @Inject constructor(
                 if (fresh != null) {
                     storeStartupChannels(config, fresh.first, fresh.second)
                 }
-                return
             }
+        } finally {
+            startupPrefetchInFlight.set(false)
+        }
+    }
+
+    suspend fun refreshConfiguredSourcesAtStartup() {
+        if (!startupPrefetchInFlight.compareAndSet(false, true)) return
+        try {
+            warmupFromCacheOnly()
+            val config = observeConfig().first()
+            if (!hasAnyConfiguredSource(config)) return
+            loadSnapshot(
+                forcePlaylistReload = true,
+                forceEpgReload = true,
+                allowNetworkEpgFetch = true,
+            )
         } finally {
             startupPrefetchInFlight.set(false)
         }
@@ -2841,9 +2845,6 @@ class IptvRepository @Inject constructor(
     private fun playlistsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_playlists_json")
     private fun stalkerPortalUrlKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_portal_url")
     private fun stalkerMacAddressKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_mac_address")
-    private fun sortOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_sort_order")
-    private fun sortOrderKeyFor(profileId: String): Preferences.Key<String> =
-        profileManager.profileStringKeyFor(profileId, "iptv_sort_order")
     private fun showSpecialCategoriesKey(): Preferences.Key<Boolean> = booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_show_special_categories")
     private fun showSpecialCategoriesKeyFor(profileId: String): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileId}_iptv_show_special_categories")
@@ -3050,7 +3051,6 @@ class IptvRepository @Inject constructor(
             groupOrderSchema = IPTV_GROUP_ORDER_SCHEMA,
             playlists = playlists,
             tvSession = decodeTvSessionState(tvSessionRaw),
-            sortOrder = prefs[sortOrderKeyFor(safeProfileId)] ?: "provider",
             showSpecialCategories = prefs[showSpecialCategoriesKeyFor(safeProfileId)] ?: true,
         )
     }
@@ -3110,8 +3110,6 @@ class IptvRepository @Inject constructor(
             } else {
                 prefs.remove(tvSessionKeyFor(safeProfileId))
             }
-            val importedSortOrder = state.sortOrder.trim().ifBlank { "provider" }
-            prefs[sortOrderKeyFor(safeProfileId)] = importedSortOrder
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
         }
         groupOrderLocallyDirty = false

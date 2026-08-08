@@ -395,14 +395,16 @@ private fun ProfileAvatar(
     onDelete: () -> Unit
 ) {
     var isFocused by remember { mutableIntStateOf(0) }
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val scale by animateFloatAsState(
-        targetValue = if (isFocused > 0) 1.1f else 1f,
+        targetValue = if (isFocused > 0) {
+            if (isTouchDevice) 1.1f else 1.04f
+        } else 1f,
         animationSpec = tween(150),
         label = "scale"
     )
     val accentColor = resolveAccentColor(fallback = Color.White)
 
-    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -441,6 +443,10 @@ private fun ProfileAvatar(
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = Color.Transparent,
                         focusedContainerColor = Color.Transparent
+                    ),
+                    scale = ClickableSurfaceDefaults.scale(
+                        focusedScale = 1f,
+                        pressedScale = 1f
                     ),
                     border = ClickableSurfaceDefaults.border(
                         focusedBorder = androidx.tv.material3.Border(
@@ -492,14 +498,16 @@ private fun AddProfileButton(
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableIntStateOf(0) }
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val scale by animateFloatAsState(
-        targetValue = if (isFocused > 0) 1.1f else 1f,
+        targetValue = if (isFocused > 0) {
+            if (isTouchDevice) 1.1f else 1.04f
+        } else 1f,
         animationSpec = tween(150),
         label = "scale"
     )
     val accentColor = resolveAccentColor(fallback = Color.White)
 
-    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
@@ -530,6 +538,10 @@ private fun AddProfileButton(
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = Color.White.copy(alpha = 0.1f),
                     focusedContainerColor = Color.White.copy(alpha = 0.2f)
+                ),
+                scale = ClickableSurfaceDefaults.scale(
+                    focusedScale = 1f,
+                    pressedScale = 1f
                 ),
                 border = ClickableSurfaceDefaults.border(
                     border = androidx.tv.material3.Border(

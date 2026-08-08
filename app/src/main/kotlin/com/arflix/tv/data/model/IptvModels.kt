@@ -79,7 +79,6 @@ data class IptvSnapshot(
     val favoriteChannels: List<String> = emptyList(),
     val hiddenGroups: List<String> = emptyList(),
     val groupOrder: List<String> = emptyList(),
-    val sortOrder: String = "provider",
     val epgWarning: String? = null,
     val loadedAt: Instant = Instant.now()
 )

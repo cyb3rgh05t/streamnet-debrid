@@ -133,6 +133,36 @@ class LiveCategoryIndexTest {
     }
 
     @Test
+    fun customCategoryOrderIsAppliedWithSpecialCategoriesEnabled() {
+        assertCustomCategoryOrder(showSpecialCategories = true)
+    }
+
+    @Test
+    fun customCategoryOrderIsAppliedWithSpecialCategoriesDisabled() {
+        assertCustomCategoryOrder(showSpecialCategories = false)
+    }
+
+    private fun assertCustomCategoryOrder(showSpecialCategories: Boolean) {
+        val channels = listOf(
+            channel("list:1", "News One", "News"),
+            channel("list:2", "Sports One", "Sports"),
+            channel("list:3", "Movies One", "Movies"),
+        )
+
+        val state = buildFastStartupChannelState(
+            channels = channels,
+            favorites = setOf("list:1"),
+            recents = setOf("list:2"),
+            groupOrder = listOf("list|Movies", "list|News", "list|Sports"),
+            showSpecialCategories = showSpecialCategories,
+        )
+
+        assertThat(state.tree.global.categories.map { it.label })
+            .containsExactly("Movies", "News", "Sports")
+            .inOrder()
+    }
+
+    @Test
     fun configSignatureChangesWhenPlaylistOrderChanges() {
         val first = IptvPlaylistEntry("first", "First", "https://example.test/first.m3u")
         val second = IptvPlaylistEntry("second", "Second", "https://example.test/second.m3u")

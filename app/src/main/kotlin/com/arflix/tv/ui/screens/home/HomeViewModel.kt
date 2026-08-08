@@ -74,6 +74,28 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 
+internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
+    channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
+
+internal fun mergeIptvHomeCategories(
+    current: List<Category>,
+    freshById: Map<String, Category>,
+    catalogOrder: List<String>,
+): List<Category> {
+    val tvCategoryIds = setOf(HomeViewModel.FAVORITE_TV_CATEGORY_ID, HomeViewModel.RECENT_TV_CATEGORY_ID)
+    val merged = current.filterNot { it.id in tvCategoryIds }.toMutableList()
+    catalogOrder.forEachIndexed { orderIndex, categoryId ->
+        if (categoryId !in tvCategoryIds) return@forEachIndexed
+        val category = freshById[categoryId] ?: return@forEachIndexed
+        val laterCatalogIds = catalogOrder.drop(orderIndex + 1).toSet()
+        val insertionIndex = merged.indexOfFirst { it.id in laterCatalogIds }
+            .takeIf { it >= 0 }
+            ?: merged.size
+        merged.add(insertionIndex, category)
+    }
+    return merged
+}
+
 @androidx.compose.runtime.Immutable
 data class HomeUiState(
     val isLoading: Boolean = false,
@@ -172,6 +194,10 @@ class HomeViewModel @Inject constructor(
 
     // IPTV favorite channels — maps MediaItem.id (Int hash) to channel data
     private val iptvChannelMap = mutableMapOf<Int, com.arflix.tv.data.model.IptvChannel>()
+    private val programBackdropCache = ConcurrentHashMap<String, String>()
+    private val programBackdropMisses = Collections.synchronizedSet(mutableSetOf<String>())
+    private val programLogoCache = ConcurrentHashMap<String, String>()
+    private val programLogoMisses = Collections.synchronizedSet(mutableSetOf<String>())
     private val _sportsHomeRows = MutableStateFlow(sportsRepository.defaultHomeRows())
     val sportsHomeRows: StateFlow<List<Category>> = combine(
         _sportsHomeRows,
@@ -189,6 +215,7 @@ class HomeViewModel @Inject constructor(
 
     companion object {
         const val FAVORITE_TV_CATEGORY_ID = "favorite_tv"
+        const val RECENT_TV_CATEGORY_ID = "recent_tv"
         /** Prefix used in MediaItem.status to identify IPTV items. */
         const val IPTV_STATUS_PREFIX = "iptv:"
         private const val TOP_10_ITEM_LIMIT = 10
@@ -727,6 +754,54 @@ class HomeViewModel @Inject constructor(
     /** Get the stream URL for an IPTV MediaItem. */
     fun getIptvStreamUrl(itemId: Int): String? = iptvChannelMap[itemId]?.streamUrl
 
+    suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
+        val cleaned = rawTitle
+            .replace(Regex("""\([^)]*\)"""), " ")
+            .replace(Regex("""\[[^]]*]"""), " ")
+            .replace(Regex("""(?i)\b(live|hd|uhd|4k|ep\.?\s*\d+|s\d+e\d+)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        if (cleaned.length < 3) return null
+        val key = cleaned.lowercase(Locale.US)
+        programBackdropCache[key]?.let { return it }
+        if (key in programBackdropMisses) return null
+        return runCatching {
+            mediaRepository.search(cleaned)
+                .firstOrNull { !it.backdrop.isNullOrBlank() }
+                ?.backdrop
+                ?.also { programBackdropCache[key] = it }
+                ?: run { programBackdropMisses.add(key); null }
+        }.getOrElse {
+            programBackdropMisses.add(key)
+            null
+        }
+    }
+
+    suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
+        val cleaned = rawTitle
+            .replace(Regex("""\([^)]*\)"""), " ")
+            .replace(Regex("""\[[^]]*]"""), " ")
+            .replace(Regex("""(?i)\b(live|hd|uhd|4k|ep\.?\s*\d+|s\d+e\d+)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        if (cleaned.length < 3) return null
+        val key = cleaned.lowercase(Locale.US)
+        programLogoCache[key]?.let { return it }
+        if (key in programLogoMisses) return null
+        return runCatching {
+            val results = mediaRepository.search(cleaned)
+            val match = results.firstOrNull { result ->
+                result.title.equals(cleaned, ignoreCase = true)
+            } ?: results.firstOrNull()
+            match?.let { mediaRepository.getLogoUrl(it.mediaType, it.id) }
+                ?.also { programLogoCache[key] = it }
+                ?: run { programLogoMisses.add(key); null }
+        }.getOrElse {
+            programLogoMisses.add(key)
+            null
+        }
+    }
+
     private fun iptvChannelToMediaItem(
         channel: com.arflix.tv.data.model.IptvChannel,
         epg: com.arflix.tv.data.model.IptvNowNext?
@@ -765,41 +840,50 @@ class HomeViewModel @Inject constructor(
             backdrop = channel.logo,
             badge = "LIVE",
             status = "$IPTV_STATUS_PREFIX${channel.id}",
-            isOngoing = true
+            isOngoing = true,
+            liveChannelNumber = channel.providerChannelNumber,
+            liveProgramTitle = nowProgram?.title,
+            liveProgramStartMs = nowProgram?.startUtcMillis,
+            liveProgramEndMs = nowProgram?.endUtcMillis,
+            liveProgramDescription = nowProgram?.description,
+            liveNextProgramTitle = nextProgram?.title,
         )
     }
 
-    private suspend fun buildFavoriteTvCategory(): Category? {
-        // Use non-blocking memory read first; fall back to mutex-guarded disk read
+    private suspend fun buildTvCategories(): Map<String, Category> {
         val snapshot = iptvRepository.getMemoryCachedSnapshot()
-            ?: return null
+            ?: iptvRepository.getCachedSnapshotOrNull()
+            ?: return emptyMap()
         val favoriteIds = snapshot.favoriteChannels.toHashSet()
-        if (favoriteIds.isEmpty()) return null
-
-        // Re-derive now/next from cached programs so "Now" shifts when a program ends.
-        // This is free (no network) — just recalculates which program is live.
-        val favoriteChannelIds = snapshot.channels
-            .filter { favoriteIds.contains(it.id) }
-            .map { it.id }
-            .toSet()
-        iptvRepository.reDeriveCachedNowNext(favoriteChannelIds)
-        // Re-read snapshot after re-derive to get updated nowNext
-        val freshSnapshot = iptvRepository.getMemoryCachedSnapshot() ?: snapshot
-
-        // Iterate channels in their original list order (matching TV page order)
-        val items = freshSnapshot.channels
-            .filter { favoriteIds.contains(it.id) }
-            .mapNotNull { channel ->
-                val epg = freshSnapshot.nowNext[channel.id]
-                iptvChannelToMediaItem(channel, epg)
-            }
-        if (items.isEmpty()) return null
-
-        return Category(
-            id = FAVORITE_TV_CATEGORY_ID,
-            title = "Favorite TV",
-            items = items
+        val recentIds = newestFirstChannelIds(
+            iptvRepository.observeTvSessionState().first().recentChannelIds
         )
+        val relevantIds = favoriteIds + recentIds
+        if (relevantIds.isEmpty()) return emptyMap()
+
+        iptvRepository.reDeriveCachedNowNext(relevantIds)
+        val freshSnapshot = iptvRepository.getMemoryCachedSnapshot() ?: snapshot
+        val channelsById = freshSnapshot.channels.associateBy { it.id }
+
+        fun category(id: String, title: String, channels: List<com.arflix.tv.data.model.IptvChannel>): Category? {
+            val items = channels.map { channel ->
+                iptvChannelToMediaItem(channel, freshSnapshot.nowNext[channel.id])
+            }
+            return items.takeIf { it.isNotEmpty() }?.let { Category(id = id, title = title, items = it) }
+        }
+
+        return buildMap {
+            category(
+                FAVORITE_TV_CATEGORY_ID,
+                "Favorite TV",
+                freshSnapshot.channels.filter { it.id in favoriteIds }
+            )?.let { put(it.id, it) }
+            category(
+                RECENT_TV_CATEGORY_ID,
+                "Recently Watched TV",
+                recentIds.mapNotNull(channelsById::get)
+            )?.let { put(it.id, it) }
+        }
     }
 
     private fun isCustomCatalogConfig(cfg: CatalogConfig): Boolean {
@@ -839,61 +923,81 @@ class HomeViewModel @Inject constructor(
             ?: categories.firstOrNull()?.items?.firstOrNull()
     }
 
-    /**
-     * Refresh the Favorite TV category's EPG data (Now/Next display).
-     * @param networkFetch If true, also fetch fresh EPG from the Xtream short EPG API.
-     *                     If false, only re-derive from cached program data (free, no network).
-     */
-    private fun refreshFavoriteTvEpg(networkFetch: Boolean = false) {
+    private fun refreshTvCatalogEpg(networkFetch: Boolean = false) {
         activeEpgRefreshJob?.cancel()
         activeEpgRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             try {
                 val categories = _uiState.value.categories
-                val favTvIndex = categories.indexOfFirst { it.id == FAVORITE_TV_CATEGORY_ID }
-                if (favTvIndex < 0) return@launch
-
-                val currentFavTv = categories[favTvIndex]
-                // Collect channel IDs from current items
-                val channelIds = currentFavTv.items.mapNotNull { getIptvChannelId(it) }.toSet()
+                val tvCategoryIds = setOf(FAVORITE_TV_CATEGORY_ID, RECENT_TV_CATEGORY_ID)
+                val tvCategories = categories
+                    .filter { it.id in tvCategoryIds }
+                val channelIds = tvCategories
+                    .flatMap { it.items }
+                    .mapNotNull(::getIptvChannelId)
+                    .toSet()
                 if (channelIds.isEmpty()) return@launch
 
                 // Optionally do network refresh first
                 if (networkFetch) {
                     val now = SystemClock.elapsedRealtime()
-                    if (now - lastEpgNetworkRefreshMs >= EPG_NETWORK_REFRESH_MS) {
+                    if (
+                        lastEpgNetworkRefreshMs == 0L ||
+                        now - lastEpgNetworkRefreshMs >= EPG_NETWORK_REFRESH_MS
+                    ) {
                         lastEpgNetworkRefreshMs = now
-                        runCatching { iptvRepository.refreshEpgForChannels(channelIds) }
+                        val snapshot = iptvRepository.getMemoryCachedSnapshot()
+                        val prioritizedMissingIds = buildSet {
+                            tvCategories
+                                .sortedBy { if (it.id == RECENT_TV_CATEGORY_ID) 0 else 1 }
+                                .flatMap { it.items }
+                                .mapNotNull(::getIptvChannelId)
+                                .filter { channelId ->
+                                    val guide = snapshot?.nowNext?.get(channelId)
+                                    guide?.now == null && guide?.next == null && guide?.later == null
+                                }
+                                .forEach(::add)
+                        }
+                        val requestedIds = prioritizedMissingIds.ifEmpty { channelIds }
+                        runCatching { iptvRepository.refreshEpgForChannels(requestedIds) }
                     }
                 }
 
                 // Re-derive now/next from (possibly updated) cached data
                 iptvRepository.reDeriveCachedNowNext(channelIds)
 
-                // Rebuild the category with updated EPG text
-                val freshCategory = withContext(Dispatchers.IO) {
-                    runCatching { buildFavoriteTvCategory() }.getOrNull()
-                } ?: return@launch
-
-                // Check if anything actually changed to avoid needless recomposition
-                val oldOverviews = currentFavTv.items.map { it.overview }
-                val newOverviews = freshCategory.items.map { it.overview }
-                if (oldOverviews == newOverviews) return@launch
-
-                // Apply user-renamed title if applicable
-                val cfg = savedCatalogById[FAVORITE_TV_CATEGORY_ID]
-                val titled = if (cfg != null && cfg.title.isNotBlank() && cfg.title != freshCategory.title) {
-                    freshCategory.copy(title = cfg.title)
-                } else {
-                    freshCategory
-                }
+                val freshCategories = runCatching { buildTvCategories() }.getOrDefault(emptyMap())
+                if (freshCategories.isEmpty()) return@launch
 
                 withContext(Dispatchers.Main.immediate) {
                     val current = _uiState.value.categories.toMutableList()
-                    val idx = current.indexOfFirst { it.id == FAVORITE_TV_CATEGORY_ID }
-                    if (idx >= 0) {
-                        current[idx] = titled
+                    var changed = false
+                    freshCategories.forEach { (categoryId, freshCategory) ->
+                        val idx = current.indexOfFirst { it.id == categoryId }
+                        if (idx < 0) return@forEach
+                        val configuredTitle = savedCatalogById[categoryId]?.title.orEmpty()
+                        val titled = if (configuredTitle.isNotBlank()) {
+                            freshCategory.copy(title = configuredTitle)
+                        } else {
+                            freshCategory
+                        }
+                        if (current[idx] != titled) {
+                            current[idx] = titled
+                            changed = true
+                        }
+                    }
+                    if (changed) {
+                        val currentHero = _uiState.value.heroItem
+                        val updatedHero = currentHero
+                            ?.takeIf(::isIptvItem)
+                            ?.let { hero ->
+                                current.asSequence()
+                                    .flatMap { it.items.asSequence() }
+                                    .firstOrNull { it.id == hero.id }
+                            }
                         _uiState.value = _uiState.value.copy(categories = current)
-                        System.err.println("[EPG-Refresh] Updated Favorite TV row (network=$networkFetch)")
+                        if (updatedHero != null) {
+                            _uiState.value = _uiState.value.copy(heroItem = updatedHero)
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -903,7 +1007,7 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    /** Start periodic EPG refresh for the Favorite TV home row. */
+    /** Start periodic EPG refresh for IPTV home rows. */
     private fun startEpgRefreshTimer() {
         epgRefreshJob?.cancel()
         activeEpgRefreshJob?.cancel()
@@ -916,7 +1020,7 @@ class HomeViewModel @Inject constructor(
                 // Every tick (60s): local re-derive
                 // Every 5th tick (5 min): also do network refresh
                 val doNetwork = tickCount % ((EPG_NETWORK_REFRESH_MS / EPG_LOCAL_REFRESH_MS).coerceAtLeast(1)) == 0L
-                refreshFavoriteTvEpg(networkFetch = doNetwork)
+                refreshTvCatalogEpg(networkFetch = doNetwork)
                 delay(EPG_LOCAL_REFRESH_MS)
             }
         }
@@ -996,12 +1100,12 @@ class HomeViewModel @Inject constructor(
     private var lastWatchedBadgesRefreshMs: Long = 0L
     private val HOME_PLACEHOLDER_ITEM_COUNT = 8
 
-    // EPG refresh intervals for Favorite TV row
+    // EPG refresh intervals for IPTV rows
     /** Local re-derive: shift now/next from cached programs when a program ends. */
     private val EPG_LOCAL_REFRESH_MS = 60_000L
-    /** Network refresh: fetch fresh short EPG for favorite channels (Xtream only). */
+    /** Network refresh: fetch fresh short EPG for dashboard IPTV channels (Xtream only). */
     private val EPG_NETWORK_REFRESH_MS = 5 * 60_000L
-    /** If startup cache is older than this, do one early network refresh for Favorite TV. */
+    /** If startup cache is older than this, do one early network refresh for IPTV rows. */
     private val EPG_STARTUP_NETWORK_STALE_MS = 2 * 60_000L
     private var epgRefreshJob: Job? = null
     private var activeEpgRefreshJob: Job? = null
@@ -1668,14 +1772,14 @@ class HomeViewModel @Inject constructor(
                         val epgAgeMs = iptvRepository.cachedEpgAgeMs()
                         val shouldNetworkRefresh =
                             epgAgeMs == Long.MAX_VALUE || epgAgeMs >= EPG_STARTUP_NETWORK_STALE_MS
-                        refreshFavoriteTvEpg(networkFetch = shouldNetworkRefresh)
+                        refreshTvCatalogEpg(networkFetch = shouldNetworkRefresh)
                     }
                 }
                     } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
         }
-        // Periodically refresh EPG data for Favorite TV row after Home settles.
+        // Periodically refresh EPG data for IPTV rows after Home settles.
         viewModelScope.launch {
             delay(if (isLowRamDevice) 8 * 60_000L else 6 * 60_000L)
             startEpgRefreshTimer()
@@ -2131,9 +2235,8 @@ class HomeViewModel @Inject constructor(
                 val currentBaseCategories = _uiState.value.categories.filter {
                     it.id != "continue_watching" && !it.id.startsWith("collection_row_")
                 }
-                // Build Favorite TV category from IPTV cache (runs on IO)
-                val favoriteTvCategory = withContext(Dispatchers.IO) {
-                    runCatching { buildFavoriteTvCategory() }.getOrNull()
+                val tvCategories = withContext(Dispatchers.IO) {
+                    runCatching { buildTvCategories() }.getOrDefault(emptyMap())
                 }
 
                 var categories = withContext(networkDispatcher) {
@@ -2145,12 +2248,9 @@ class HomeViewModel @Inject constructor(
                         currentBaseCategories.forEach { put(it.id, it) }
                         baseCategories.forEach { put(it.id, it) }
                         _sportsHomeRows.value.forEach { put(it.id, it) }
-                        // Inject Favorite TV so catalog ordering picks it up, or remove
-                        // stale skeleton/placeholder if no favorites exist for this profile.
-                        if (favoriteTvCategory != null) {
-                            put(FAVORITE_TV_CATEGORY_ID, favoriteTvCategory)
-                        } else {
-                            remove(FAVORITE_TV_CATEGORY_ID)
+                        listOf(FAVORITE_TV_CATEGORY_ID, RECENT_TV_CATEGORY_ID).forEach { categoryId ->
+                            val category = tvCategories[categoryId]
+                            if (category != null) put(categoryId, category) else remove(categoryId)
                         }
                     }
 
@@ -2582,28 +2682,17 @@ class HomeViewModel @Inject constructor(
                     }
                 }
 
-                // If the cached Favorite TV row has stale/empty EPG text, refresh it
+                // If cached IPTV rows have stale/empty EPG text, refresh them
                 // after Home has had time to settle. Doing network EPG work during
                 // startup competes with TV D-pad navigation and causes GC stalls.
-                val favTvCat = _uiState.value.categories.firstOrNull { it.id == FAVORITE_TV_CATEGORY_ID }
-                if (favTvCat != null && favTvCat.items.any { it.overview == "Live TV" }) {
+                val staleTvCategory = _uiState.value.categories.firstOrNull { category ->
+                    category.id in setOf(FAVORITE_TV_CATEGORY_ID, RECENT_TV_CATEGORY_ID) &&
+                        category.items.any { it.overview == "Live TV" }
+                }
+                if (staleTvCategory != null) {
                     viewModelScope.launch(Dispatchers.IO) {
                         delay(if (isLowRamDevice) 8 * 60_000L else 6 * 60_000L)
-                        val channelIds = favTvCat.items.mapNotNull { getIptvChannelId(it) }.toSet()
-                        if (channelIds.isNotEmpty()) {
-                            refreshFavoriteTvEpg(networkFetch = false)
-                            // Also update hero if it's an IPTV item showing stale EPG
-                            val currentHero = _uiState.value.heroItem
-                            if (currentHero != null && isIptvItem(currentHero) && currentHero.overview == "Live TV") {
-                                val updatedCat = _uiState.value.categories.firstOrNull { it.id == FAVORITE_TV_CATEGORY_ID }
-                                val updatedHero = updatedCat?.items?.firstOrNull { it.id == currentHero.id }
-                                if (updatedHero != null) {
-                                    withContext(Dispatchers.Main.immediate) {
-                                        _uiState.value = _uiState.value.copy(heroItem = updatedHero)
-                                    }
-                                }
-                            }
-                        }
+                        refreshTvCatalogEpg(networkFetch = false)
                     }
                 }
 
@@ -2722,15 +2811,15 @@ class HomeViewModel @Inject constructor(
                     }
                 }
 
-                // Also update Favorite TV if it exists in base but not yet in displayed list
-                val favTv = baseById[FAVORITE_TV_CATEGORY_ID]
-                if (favTv != null && favTv.items.isNotEmpty()) {
-                    val favIdx = currentCategories.indexOfFirst { it.id == FAVORITE_TV_CATEGORY_ID }
-                    if (favIdx >= 0) {
-                        currentCategories[favIdx] = favTv
-                        anyChange = true
-                    } else {
-                        currentCategories.add(favTv)
+                listOf(FAVORITE_TV_CATEGORY_ID, RECENT_TV_CATEGORY_ID).forEach { categoryId ->
+                    val tvCategory = baseById[categoryId]
+                    if (tvCategory != null && tvCategory.items.isNotEmpty()) {
+                        val index = currentCategories.indexOfFirst { it.id == categoryId }
+                        if (index >= 0) {
+                            currentCategories[index] = tvCategory
+                        } else {
+                            currentCategories.add(tvCategory)
+                        }
                         anyChange = true
                     }
                 }
@@ -3099,6 +3188,45 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         loadHomeData()
+    }
+
+    fun refreshIptvHomeCatalogs() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val catalogs = runCatching { catalogRepository.getCatalogs() }.getOrDefault(emptyList())
+            val catalogOrder = catalogs.map { it.id }
+            val configuredTitles = catalogs.associate { it.id to it.title }
+            val freshCategories = runCatching { buildTvCategories() }
+                .getOrDefault(emptyMap())
+                .mapValues { (categoryId, category) ->
+                    configuredTitles[categoryId]
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { category.copy(title = it) }
+                        ?: category
+                }
+
+            withContext(Dispatchers.Main.immediate) {
+                val currentState = _uiState.value
+                val merged = mergeIptvHomeCategories(
+                    current = currentState.categories,
+                    freshById = freshCategories,
+                    catalogOrder = catalogOrder,
+                )
+                if (merged == currentState.categories) return@withContext
+
+                val updatedHero = currentState.heroItem
+                    ?.takeIf(::isIptvItem)
+                    ?.let { hero ->
+                        merged.asSequence()
+                            .flatMap { it.items.asSequence() }
+                            .firstOrNull { it.id == hero.id }
+                    }
+                _uiState.value = currentState.copy(
+                    categories = merged,
+                    heroItem = updatedHero ?: currentState.heroItem,
+                )
+            }
+            refreshTvCatalogEpg(networkFetch = true)
+        }
     }
 
     private suspend fun resolveContinueWatchingItems(forceFresh: Boolean): List<ContinueWatchingItem> {

@@ -100,7 +100,6 @@ internal fun LiveTvNetflixLayout(
     exoPlayer: ExoPlayer,
     guideClockMillis: Long,
     variantCountFor: (EnrichedChannel) -> Int,
-    programBackdropUrl: String?,
     isFullScreen: Boolean,
     lookupBackdrop: suspend (String) -> String? = { null },
     onSelectCategory: (String) -> Unit,
@@ -111,13 +110,36 @@ internal fun LiveTvNetflixLayout(
     onFavoriteToggle: (String) -> Unit,
     onOpenVariants: (EnrichedChannel) -> Unit,
     onMoveUpFromCategory: () -> Unit,
+    onMoveDownToChannels: () -> Unit,
+    onOpenFullscreen: () -> Unit,
     focusSelectedChannelSignal: Int,
     focusSelectedCategorySignal: Int,
     categoryFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     var railEntrySignal by remember { mutableIntStateOf(0) }
+    var railFocusPending by remember { mutableStateOf(false) }
+    val heroFocusRequester = remember { FocusRequester() }
     var heroVideoAspectRatio by remember { mutableStateOf(16f / 9f) }
+    var previewChannelId by remember { mutableStateOf(focusedChannelId ?: playingChannelId) }
+    LaunchedEffect(channels, focusedChannelId, playingChannelId) {
+        if (channels.none { it.id == previewChannelId }) {
+            previewChannelId = focusedChannelId?.takeIf { id -> channels.any { it.id == id } }
+                ?: playingChannelId?.takeIf { id -> channels.any { it.id == id } }
+                ?: channels.firstOrNull()?.id
+        }
+    }
+    val previewChannel = channels.firstOrNull { it.id == previewChannelId }
+        ?: playingChannel
+    val previewNowNext = previewChannel?.let { nowNextMap[it.id] }
+    val previewBackdropUrl by produceState<String?>(
+        initialValue = null,
+        key1 = previewNowNext?.now?.title,
+    ) {
+        val title = previewNowNext?.now?.title?.takeIf { it.isNotBlank() } ?: return@produceState
+        delay(200L)
+        value = runCatching { lookupBackdrop(title) }.getOrNull()
+    }
     Column(modifier = modifier.fillMaxSize().background(LiveColors.Bg)) {
         Row(
             modifier = Modifier
@@ -130,17 +152,21 @@ internal fun LiveTvNetflixLayout(
                 exoPlayer = exoPlayer,
                 channel = playingChannel,
                 isFullScreen = isFullScreen,
+                focusRequester = heroFocusRequester,
+                onClick = onOpenFullscreen,
+                onMoveUp = onMoveUpFromCategory,
+                onMoveDown = { runCatching { categoryFocusRequester.requestFocus() } },
                 onVideoAspectRatioChanged = { heroVideoAspectRatio = it },
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(heroVideoAspectRatio, matchHeightConstraintsFirst = true),
             )
             HeroInfoPanel(
-                channel = playingChannel,
+                channel = previewChannel,
                 clockTickMillis = guideClockMillis,
-                nowNext = playingChannel?.let { nowNextMap[it.id] },
-                isFavorite = playingChannel?.id?.let { it in favoriteSet } == true,
-                backdropUrl = programBackdropUrl,
+                nowNext = previewNowNext,
+                isFavorite = previewChannel?.id?.let { it in favoriteSet } == true,
+                backdropUrl = previewBackdropUrl,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
@@ -153,8 +179,12 @@ internal fun LiveTvNetflixLayout(
             onSelect = onSelectCategory,
             onOpenSearch = onOpenSearch,
             onFocused = onCategoryFocused,
-            onMoveUp = onMoveUpFromCategory,
-            onMoveDown = { railEntrySignal += 1 },
+            onMoveUp = { runCatching { heroFocusRequester.requestFocus() } },
+            onMoveDown = {
+                onMoveDownToChannels()
+                railFocusPending = true
+                railEntrySignal += 1
+            },
             focusRequester = categoryFocusRequester,
             focusSelectedCategorySignal = focusSelectedCategorySignal,
             modifier = Modifier
@@ -171,7 +201,10 @@ internal fun LiveTvNetflixLayout(
             favoriteSet = favoriteSet,
             clockTickMillis = guideClockMillis,
             lookupBackdrop = lookupBackdrop,
-            onChannelFocused = onChannelFocused,
+            onChannelFocused = { channel ->
+                previewChannelId = channel.id
+                onChannelFocused(channel)
+            },
             onChannelSelected = onChannelSelected,
             onFavoriteToggle = onFavoriteToggle,
             variantCountFor = variantCountFor,
@@ -179,6 +212,8 @@ internal fun LiveTvNetflixLayout(
             onMoveUp = { runCatching { categoryFocusRequester.requestFocus() } },
             focusSelectedChannelSignal = focusSelectedChannelSignal,
             railEntrySignal = railEntrySignal,
+            railFocusPending = railFocusPending,
+            onRailFocusSettled = { railFocusPending = false },
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -193,10 +228,15 @@ private fun HeroVideoCard(
     exoPlayer: ExoPlayer,
     channel: EnrichedChannel?,
     isFullScreen: Boolean,
+    focusRequester: FocusRequester,
+    onClick: () -> Unit,
+    onMoveUp: () -> Unit,
+    onMoveDown: () -> Unit,
     onVideoAspectRatioChanged: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
+    var focused by remember { mutableStateOf(false) }
 
     LaunchedEffect(isFullScreen) {
         if (!isFullScreen) {
@@ -225,7 +265,25 @@ private fun HeroVideoCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HeroCornerRadius))
-            .background(LiveColors.PanelDeep),
+            .background(LiveColors.PanelDeep)
+            .border(
+                width = if (focused) 3.dp else 0.dp,
+                color = if (focused) LiveColors.FocusRing else Color.Transparent,
+                shape = RoundedCornerShape(HeroCornerRadius),
+            )
+            .focusRequester(focusRequester)
+            .onFocusChanged { focused = it.hasFocus }
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    Key.DirectionUp -> { onMoveUp(); true }
+                    Key.DirectionDown -> { onMoveDown(); true }
+                    Key.DirectionCenter, Key.Enter -> { onClick(); true }
+                    else -> false
+                }
+            }
+            .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         if (channel != null) {
@@ -437,8 +495,12 @@ private fun NetflixChip(
     iconContent: (@Composable () -> Unit)? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val bg = when { focused -> LiveColors.PanelRaised; isSelected -> LiveColors.Accent; else -> LiveColors.Panel }
-    val fg = when { focused -> LiveColors.Fg; isSelected -> LiveColors.Bg; else -> LiveColors.FgDim }
+    val bg = when {
+        focused -> LiveColors.PanelRaised
+        isSelected -> LiveColors.Accent.copy(alpha = 0.32f)
+        else -> LiveColors.Panel
+    }
+    val fg = when { focused -> LiveColors.Fg; isSelected -> LiveColors.Fg; else -> LiveColors.FgDim }
     Row(
         modifier = Modifier
             .height(36.dp)
@@ -507,6 +569,8 @@ private fun NetflixChannelRail(
     onMoveUp: () -> Unit,
     focusSelectedChannelSignal: Int,
     railEntrySignal: Int,
+    railFocusPending: Boolean,
+    onRailFocusSettled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     if (channels.isEmpty()) {
@@ -518,22 +582,35 @@ private fun NetflixChannelRail(
         return
     }
     val listState = rememberLazyListState()
-    val focusRequesters = remember(channels) { LinkedHashMap<String, FocusRequester>() }
+    val focusRequesters = remember { LinkedHashMap<String, FocusRequester>() }
     val anchorId = focusedChannelId ?: playingChannelId
     val anchorIndex = remember(channels, anchorId) {
         channels.indexOfFirst { it.id == anchorId }.takeIf { it >= 0 } ?: 0
     }
     // rememberUpdatedState: anchorIndex NOT in key set → browsing never re-triggers a scroll snap.
     val latestAnchorIndex by rememberUpdatedState(anchorIndex)
-    LaunchedEffect(focusSelectedChannelSignal, railEntrySignal) {
-        if (focusSelectedChannelSignal == 0 && railEntrySignal == 0) return@LaunchedEffect
+    val channelWindowKey = remember(channels) {
+        "${channels.size}:${channels.firstOrNull()?.id.orEmpty()}:${channels.lastOrNull()?.id.orEmpty()}"
+    }
+    suspend fun requestAnchorFocus(): Boolean {
         val index = latestAnchorIndex.coerceAtLeast(0)
         runCatching { listState.scrollToItem(index) }
-        repeat(10) {
-            delay(30L)
+        repeat(40) {
+            delay(50L)
             val id = channels.getOrNull(index)?.id
             val req = id?.let { focusRequesters[it] }
-            if (req != null && runCatching { req.requestFocus() }.isSuccess) return@LaunchedEffect
+            if (req != null && runCatching { req.requestFocus() }.isSuccess) {
+                return true
+            }
+        }
+        return false
+    }
+    LaunchedEffect(focusSelectedChannelSignal) {
+        if (focusSelectedChannelSignal > 0) requestAnchorFocus()
+    }
+    LaunchedEffect(railEntrySignal, railFocusPending, channelWindowKey) {
+        if (railFocusPending && requestAnchorFocus()) {
+            onRailFocusSettled()
         }
     }
 
@@ -582,6 +659,7 @@ private fun NetflixChannelCard(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var centerLongPressHandled by remember { mutableStateOf(false) }
     val now = nowNext?.now
     val progress = now?.let {
         ((clockTickMillis - it.startUtcMillis).toFloat() /
@@ -620,15 +698,22 @@ private fun NetflixChannelCard(
                 if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionUp) {
                     onKeyMoveUp(); return@onPreviewKeyEvent true
                 }
+                val isCenterKey = ev.key == Key.DirectionCenter || ev.key == Key.Enter
+                if (isCenterKey && ev.type == KeyEventType.KeyDown && ev.nativeKeyEvent.repeatCount >= 1) {
+                    if (!centerLongPressHandled) {
+                        centerLongPressHandled = true
+                        onLongPress()
+                    }
+                    return@onPreviewKeyEvent true
+                }
+                if (isCenterKey && ev.type == KeyEventType.KeyUp && centerLongPressHandled) {
+                    centerLongPressHandled = false
+                    return@onPreviewKeyEvent true
+                }
                 false
             }
             .combinedClickable(onClick = onClick, onLongClick = onLongPress)
-            .onKeyEvent { ev ->
-                val isLongHoldCenter = ev.type == KeyEventType.KeyDown &&
-                    (ev.key == Key.DirectionCenter || ev.key == Key.Enter) &&
-                    ev.nativeKeyEvent.repeatCount == 1
-                if (isLongHoldCenter) { onLongPress(); true } else false
-            },
+            ,
     ) {
         // — Logo / backdrop area
         Box(

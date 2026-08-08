@@ -50,6 +50,8 @@ private const val RichCatchupRecentTarget = 6
 private const val CatchupHistoryWindowMs = 48L * 60L * 60_000L
 private const val RichCatchupRefreshThrottleMs = 45_000L
 private const val CurrentChannelEpgRefreshThrottleMs = 12_000L
+private const val PeriodicIptvNetworkRefreshIntervalMs = 4L * 60L * 60_000L
+private const val PeriodicIptvRefreshCheckIntervalMs = 60_000L
 private const val LargeListCompleteGuideCoverageTarget = 0.75f
 private const val PlaybackEpgBackfillResumeDelayMs = 90_000L
 private const val LargeListCompleteEpgBackfillStartupDelayMs = 180_000L
@@ -78,7 +80,12 @@ data class TvUiState(
             config.stalkerPortalUrl.isNotBlank() ||
             config.playlists.any { it.enabled && it.m3uUrl.isNotBlank() }
 
-    val hasPotentialGuideSource: Boolean get() = config.hasConfiguredEpgSource()
+    val hasPotentialGuideSource: Boolean get() =
+        !iptvPreferencesLoaded ||
+            config.hasConfiguredEpgSource() ||
+            snapshot.nowNext.isNotEmpty() ||
+            epgBackfillInProgress ||
+            epgLoadingChannelIds.isNotEmpty()
 }
 
 @HiltViewModel
@@ -98,6 +105,7 @@ class TvViewModel @Inject constructor(
     private var periodicEpgJob: Job? = null
     private var iptvCloudSyncJob: Job? = null
     private var lastObservedConfigSignature: String? = null
+    @Volatile private var cacheBootstrapComplete: Boolean = false
     private var lastAutomaticEpgReloadAt: Long = 0L
     private var visibleEpgRefreshJob: Job? = null
     private var lastVisibleEpgRefreshKey: String? = null
@@ -162,10 +170,15 @@ class TvViewModel @Inject constructor(
         observeConfigAndFavorites()
         observeTvSession()
         viewModelScope.launch {
-            runCatching { iptvRepository.warmupFromCacheOnly() }
-            // Try fast non-blocking in-memory read first; fall back to mutex-guarded disk read
-            val cached = iptvRepository.getMemoryCachedSnapshot()
-                ?: iptvRepository.getCachedSnapshotOrNull()
+            // MainActivity usually warms this before navigation. Read memory first so
+            // opening Live TV never waits behind a background playlist/EPG refresh
+            // holding the repository load mutex. Only touch disk when memory is empty.
+            var cached = iptvRepository.getMemoryCachedSnapshot()
+            if (cached == null) {
+                runCatching { iptvRepository.warmupFromCacheOnly() }
+                cached = iptvRepository.getMemoryCachedSnapshot()
+                    ?: iptvRepository.getCachedSnapshotOrNull()
+            }
             if (cached != null) {
                 val config = iptvRepository.observeConfig().first()
                 // The observeConfigAndFavorites() coroutine may have already read fresh
@@ -221,6 +234,7 @@ class TvViewModel @Inject constructor(
             } else {
                 refresh(force = false, showLoading = false, forceEpg = false)
             }
+            cacheBootstrapComplete = true
             startPeriodicEpgRefresh()
         }
     }
@@ -259,8 +273,7 @@ class TvViewModel @Inject constructor(
                     favoriteGroups = favoriteGroups,
                     favoriteChannels = favoriteChannels,
                     hiddenGroups = hiddenGroups,
-                    groupOrder = groupOrder,
-                    sortOrder = config.sortOrder
+                    groupOrder = groupOrder
                 )
                 setUiState(
                     _uiState.value.copy(
@@ -277,7 +290,7 @@ class TvViewModel @Inject constructor(
                     config.playlists.any { it.enabled && it.m3uUrl.isNotBlank() }
 
                 // Auto-heal cases where the app has IPTV config but an empty in-memory snapshot.
-                if (hasAnyIptvConfig && snapshot.channels.isEmpty() && refreshJob?.isActive != true) {
+                if (cacheBootstrapComplete && hasAnyIptvConfig && snapshot.channels.isEmpty() && refreshJob?.isActive != true) {
                     refresh(force = false, showLoading = false)
                 } else if (configChanged && refreshJob?.isActive != true) {
                     cachedEnrichedChannels = null
@@ -293,6 +306,9 @@ class TvViewModel @Inject constructor(
         if (force) {
             epgRefreshJob?.cancel()
         }
+        if (forceEpg) {
+            completeEpgBackfillJob?.cancel()
+        }
 
         refreshJob = viewModelScope.launch {
             val hasExistingChannels = _uiState.value.snapshot.channels.isNotEmpty()
@@ -305,11 +321,11 @@ class TvViewModel @Inject constructor(
                 )
             }
             runCatching {
-                kotlinx.coroutines.withTimeoutOrNull(180_000L) {
+                kotlinx.coroutines.withTimeoutOrNull(if (forceEpg) 900_000L else 180_000L) {
                     iptvRepository.loadSnapshot(
                         forcePlaylistReload = force,
                         forceEpgReload = forceEpg,
-                        allowNetworkEpgFetch = false,
+                        allowNetworkEpgFetch = forceEpg,
                         onProgress = { progress ->
                             if (showLoading && !hasExistingChannels) {
                                 _uiState.value = _uiState.value.copy(
@@ -370,7 +386,7 @@ class TvViewModel @Inject constructor(
                                 )
                             )
                             startFullEpgWarmup()
-                            startCompleteEpgBackfill()
+                            if (!forceEpg) startCompleteEpgBackfill()
                         }
                     )
                 } ?: throw IllegalStateException("IPTV load timed out")
@@ -407,7 +423,7 @@ class TvViewModel @Inject constructor(
                 )
                 maybeWarmStartupGuide()
                 startFullEpgWarmup()
-                startCompleteEpgBackfill()
+                if (!forceEpg) startCompleteEpgBackfill()
                 warmXtreamVodCache()
             }.onFailure { error ->
                 logIptvRefreshFailure(
@@ -879,10 +895,27 @@ class TvViewModel @Inject constructor(
         if (periodicEpgJob?.isActive == true) return
         periodicEpgJob = viewModelScope.launch {
             while (true) {
-                kotlinx.coroutines.delay(60_000L)
+                kotlinx.coroutines.delay(PeriodicIptvRefreshCheckIntervalMs)
                 val state = _uiState.value
                 if (state.isConfigured && state.snapshot.channels.isNotEmpty()) {
                     refreshGuideFromCache()
+                    val now = System.currentTimeMillis()
+                    val playlistAgeMs = (now - state.snapshot.loadedAt.toEpochMilli()).coerceAtLeast(0L)
+                    val epgAgeMs = iptvRepository.cachedEpgAgeMs()
+                    val refreshDue = playlistAgeMs >= PeriodicIptvNetworkRefreshIntervalMs ||
+                        epgAgeMs >= PeriodicIptvNetworkRefreshIntervalMs
+                    val retryWindowElapsed = now - lastAutomaticEpgReloadAt >=
+                        PeriodicIptvNetworkRefreshIntervalMs
+                    if (refreshDue && retryWindowElapsed && !liveTvPlaybackActive &&
+                        refreshJob?.isActive != true && completeEpgBackfillJob?.isActive != true
+                    ) {
+                        lastAutomaticEpgReloadAt = now
+                        System.err.println(
+                            "[IPTV-Periodic] Refreshing playlist and EPG in background " +
+                                "playlistAge=${playlistAgeMs / 1000}s epgAge=${epgAgeMs / 1000}s"
+                        )
+                        refresh(force = true, showLoading = false, forceEpg = true)
+                    }
                 }
             }
         }
@@ -1926,7 +1959,8 @@ class TvViewModel @Inject constructor(
         lastChannelId: String?,
         lastGroupName: String?,
         lastFocusedZone: String,
-        markOpened: Boolean = false
+        markOpened: Boolean = false,
+        flushImmediately: Boolean = false,
     ) {
         val current = _uiState.value.tvSession
         val normalizedChannelId = lastChannelId.orEmpty().trim().ifBlank { current.lastChannelId }
@@ -1954,7 +1988,6 @@ class TvViewModel @Inject constructor(
         maybeWarmStartupGuide()
         tvSessionSaveJob?.cancel()
         tvSessionSaveJob = viewModelScope.launch(Dispatchers.IO) {
-            kotlinx.coroutines.delay(if (markOpened || channelChanged) 0L else 220L)
             iptvRepository.saveTvSessionState(next)
             if (markOpened || channelChanged) {
                 scheduleIptvCloudSync()

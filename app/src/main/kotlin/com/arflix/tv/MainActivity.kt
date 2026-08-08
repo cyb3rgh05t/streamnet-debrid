@@ -387,10 +387,12 @@ class MainActivity : ComponentActivity() {
                 authRepository.get().checkAuthState()
             }
             ArflixApplication.instance.scheduleTraktSyncIfNeeded()
+            ArflixApplication.instance.scheduleIptvRefreshIfNeeded()
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 val repo = iptvRepository.get()
-                runCatching { repo.warmupFromCacheOnly() }
-                kotlinx.coroutines.delay(60_000L)
+                // Cache is already warmed before setContent. Only fetch on app start
+                // when no usable channel cache exists; the periodic worker handles
+                // normal four-hour playlist/EPG refreshes without delaying Live TV.
                 runCatching { repo.prefetchFreshStartupData() }
             }
         }

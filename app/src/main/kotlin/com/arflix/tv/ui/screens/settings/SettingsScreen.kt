@@ -143,6 +143,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -451,7 +452,7 @@ fun SettingsScreen(
                     groupOrder = uiState.iptvGroupOrder
                 ).size // Reset row + category rows
             } else {
-                2 + uiState.iptvPlaylists.size + 3 // Add + rows + refresh + clear + sort + special categories
+                uiState.iptvPlaylists.size + 3 // Add + rows + refresh + clear + special categories
             }
             "home_server" -> uiState.homeServerConnections.size + 3
             "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
@@ -1028,10 +1029,6 @@ fun SettingsScreen(
                                                     viewModel.clearIptvConfig()
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
-                                                    val next = when (uiState.iptvSortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
-                                                    viewModel.setIptvSortOrder(next)
-                                                }
-                                                contentFocusIndex == uiState.iptvPlaylists.size + 4 -> {
                                                     viewModel.setIptvShowSpecialCategories(!uiState.iptvShowSpecialCategories)
                                                 }
                                             }
@@ -1536,10 +1533,8 @@ fun SettingsScreen(
                             onRefresh = { viewModel.refreshIptv() },
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
-                            sortOrder = uiState.iptvSortOrder,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
-                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
-                            onSortOrderChange = { viewModel.setIptvSortOrder(it) }
+                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
                         )
                         "TV" -> IptvSettings(
                             playlists = uiState.iptvPlaylists,
@@ -1583,7 +1578,9 @@ fun SettingsScreen(
                             },
                             onRefresh = { viewModel.refreshIptv() },
                             onDelete = { viewModel.clearIptvConfig() },
-                            onManageCategories = openIptvCategories
+                            onManageCategories = openIptvCategories,
+                            showSpecialCategories = uiState.iptvShowSpecialCategories,
+                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
                         )
                         "home_server" -> HomeServerSettings(
                             connections = uiState.homeServerConnections,
@@ -2287,7 +2284,7 @@ private fun ModalScrim(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
+            .background(Color.Black.copy(alpha = 0.84f))
             .clickable(
                 interactionSource = scrimInteraction,
                 indication = null,
@@ -4219,10 +4216,8 @@ private fun MobileSettingsSubPage(
                         viewModel.setIptvSelectedPlaylistId(playlistId)
                         onNavigate("IPTV_CATEGORIES")
                     },
-                    sortOrder = uiState.iptvSortOrder,
                     showSpecialCategories = uiState.iptvShowSpecialCategories,
-                    onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
-                    onSortOrderChange = { viewModel.setIptvSortOrder(it) }
+                    onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
                 )
             }
             "IPTV_CATEGORIES" -> {
@@ -6242,10 +6237,8 @@ private fun IptvSettings(
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
     onManageCategories: (String) -> Unit = {},
-    sortOrder: String = "provider",
     showSpecialCategories: Boolean = true,
-    onShowSpecialCategoriesChange: (Boolean) -> Unit = {},
-    onSortOrderChange: (String) -> Unit = {}
+    onShowSpecialCategoriesChange: (Boolean) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
     var selectionMode by remember { mutableStateOf(false) }
@@ -6327,22 +6320,6 @@ private fun IptvSettings(
                 }
             }
             MobileSettingsCategory(title = "Options") {
-                val sortDisplayValue = when (sortOrder) {
-                    "number" -> stringResource(R.string.settings_iptv_sort_channel_number)
-                    "name" -> stringResource(R.string.settings_iptv_sort_alphabetical)
-                    else -> stringResource(R.string.settings_iptv_sort_provider_order)
-                }
-                MobileSettingsRow(
-                    icon = Icons.Default.List,
-                    title = stringResource(R.string.settings_iptv_sort_order_title),
-                    subtitle = stringResource(R.string.settings_iptv_sort_order_subtitle),
-                    value = sortDisplayValue,
-                    isFocused = false,
-                    onClick = {
-                        val next = when (sortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
-                        onSortOrderChange(next)
-                    }
-                )
                 MobileSettingsRow(
                     icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                     title = stringResource(R.string.settings_iptv_special_categories_title),
@@ -6425,30 +6402,13 @@ private fun IptvSettings(
             SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 2, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 2))
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(
-                icon = Icons.Default.List,
-                title = stringResource(R.string.settings_iptv_sort_order_title),
-                subtitle = stringResource(R.string.settings_iptv_sort_order_subtitle),
-                value = when (sortOrder) {
-                    "number" -> stringResource(R.string.settings_iptv_sort_channel_number)
-                    "name" -> stringResource(R.string.settings_iptv_sort_alphabetical)
-                    else -> stringResource(R.string.settings_iptv_sort_provider_order)
-                },
-                isFocused = focusedIndex == playlists.size + 3,
-                onClick = {
-                    val next = when (sortOrder) { "provider" -> "number"; "number" -> "name"; else -> "provider" }
-                    onSortOrderChange(next)
-                },
-                modifier = Modifier.settingsFocusSlot(playlists.size + 3)
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            SettingsRow(
                 icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                 title = stringResource(R.string.settings_iptv_special_categories_title),
                 subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
                 value = if (showSpecialCategories) stringResource(R.string.on) else stringResource(R.string.off),
-                isFocused = focusedIndex == playlists.size + 4,
+                isFocused = focusedIndex == playlists.size + 3,
                 onClick = { onShowSpecialCategoriesChange(!showSpecialCategories) },
-                modifier = Modifier.settingsFocusSlot(playlists.size + 4)
+                modifier = Modifier.settingsFocusSlot(playlists.size + 3)
             )
             if (isLoading && !progressText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -6483,6 +6443,7 @@ private fun CatalogDiscoveryModal(
 ) {
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     var editingInput by remember { mutableStateOf<CatalogDiscoveryInputTarget?>(null) }
     var optimisticAddedUrls by remember { mutableStateOf(emptySet<String>()) }
     val normalizedAddedCatalogUrls = remember(addedCatalogUrls) {
@@ -6514,7 +6475,7 @@ private fun CatalogDiscoveryModal(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.86f))
+                    .background(Color.Black.copy(alpha = 0.90f))
                     .padding(
                         horizontal = if (isCompact) 10.dp else 48.dp,
                         vertical = if (isCompact) 10.dp else 34.dp
@@ -6524,18 +6485,18 @@ private fun CatalogDiscoveryModal(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(if (isCompact) 12.dp else 18.dp))
-                    .background(Color.Black.copy(alpha = 0.34f), RoundedCornerShape(if (isCompact) 12.dp else 18.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(if (isCompact) 12.dp else 18.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
                     .padding(if (isCompact) 10.dp else 18.dp)
             ) {
                 if (isCompact) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(14.dp))
-                            .background(Color.Black.copy(alpha = 0.32f))
-                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(14.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(BackgroundElevated)
+                            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
                             .padding(10.dp)
                     ) {
                         CatalogDiscoveryInputButton(
@@ -6580,9 +6541,9 @@ private fun CatalogDiscoveryModal(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(Color.Black.copy(alpha = 0.32f))
-                            .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp))
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(BackgroundElevated)
+                            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -6670,9 +6631,9 @@ private fun CatalogDiscoveryModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(Color.Black.copy(alpha = 0.20f))
-                        .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(BackgroundElevated)
+                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
                         .padding(if (isCompact) 8.dp else 12.dp)
                 ) {
                     when {
@@ -6772,15 +6733,15 @@ private fun CatalogDiscoveryInputButton(
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
-    val inputFocusColor = resolveAccentColor(fallback = Color.White)
+    val inputFocusColor = resolveAccentColor(fallback = AccentYellow)
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isFocused) Color.White else Color.Black.copy(alpha = 0.36f))
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isFocused) inputFocusColor.copy(alpha = 0.16f) else appBackgroundDark())
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
                 color = if (isFocused) inputFocusColor else Color.White.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(6.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)
@@ -6789,7 +6750,7 @@ private fun CatalogDiscoveryInputButton(
         Text(
             text = label,
             style = ArflixTypography.caption,
-            color = if (isFocused) Color.Black.copy(alpha = 0.68f) else TextSecondary,
+            color = if (isFocused) inputFocusColor else TextSecondary,
             maxLines = 1
         )
         Spacer(modifier = Modifier.height(4.dp))
@@ -6797,7 +6758,7 @@ private fun CatalogDiscoveryInputButton(
             text = value.ifBlank { placeholder },
             style = ArflixTypography.body,
             color = when {
-                isFocused -> Color.Black
+                isFocused -> TextPrimary
                 value.isBlank() -> TextSecondary.copy(alpha = 0.7f)
                 else -> TextPrimary
             },
@@ -6818,6 +6779,7 @@ private fun CatalogDiscoveryTextInputDialog(
     onDismiss: () -> Unit
 ) {
     var value by remember(initialValue) { mutableStateOf(initialValue) }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(
@@ -6835,9 +6797,9 @@ private fun CatalogDiscoveryTextInputDialog(
                 modifier = Modifier
                     .widthIn(max = 680.dp)
                     .fillMaxWidth(if (isCompact) 0.92f else 0.76f)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xFF181818), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
                     .padding(if (isCompact) 16.dp else 20.dp)
             ) {
             Text(title, style = ArflixTypography.sectionTitle, color = TextPrimary)
@@ -6851,9 +6813,9 @@ private fun CatalogDiscoveryTextInputDialog(
                 colors = androidx.compose.material3.TextFieldDefaults.colors(
                     focusedTextColor = TextPrimary,
                     unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = Color.White.copy(alpha = 0.08f),
-                    unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
-                    focusedIndicatorColor = Color.White,
+                    focusedContainerColor = BackgroundElevated,
+                    unfocusedContainerColor = BackgroundElevated,
+                    focusedIndicatorColor = accentColor,
                     unfocusedIndicatorColor = Color.White.copy(alpha = 0.18f),
                     focusedPlaceholderColor = TextSecondary,
                     unfocusedPlaceholderColor = TextSecondary
@@ -7243,28 +7205,28 @@ private fun DiscoveryActionButton(
     modifier: Modifier = Modifier
 ) {
     var isFocused by remember { mutableStateOf(false) }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     Box(
         modifier = modifier
             .widthIn(min = if (label.length <= 5) 112.dp else 132.dp)
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(6.dp))
             .background(
                 when {
                     !enabled -> Color.Black.copy(alpha = 0.18f)
-                    isFocused -> Color.White
-                    highlighted -> Color.Black.copy(alpha = 0.46f)
-                    else -> Color.Black.copy(alpha = 0.36f)
+                    isFocused -> accentColor
+                    highlighted -> accentColor.copy(alpha = 0.16f)
+                    else -> appBackgroundDark()
                 },
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(6.dp)
             )
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
                 color = when {
                     !enabled -> Color.White.copy(alpha = 0.18f)
-                    isFocused -> Color.White
-                    highlighted -> Color.White.copy(alpha = 0.74f)
-                    else -> Color.White.copy(alpha = 0.55f)
+                    isFocused || highlighted -> accentColor
+                    else -> Color.White.copy(alpha = 0.22f)
                 },
-                shape = RoundedCornerShape(10.dp)
+                shape = RoundedCornerShape(6.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(enabled = enabled, onClick = onClick)
@@ -8984,6 +8946,7 @@ private fun InputModal(
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
     val maxDialogHeight = (screenHeightDp * 0.88f).coerceAtMost(if (isTouchDevice) 620.dp else 660.dp)
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
 
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
@@ -9084,14 +9047,14 @@ private fun InputModal(
                 modifier = Modifier
                     .then(
                         if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 640.dp)
-                        else Modifier.width(620.dp)
+                        else Modifier.width(680.dp)
                     )
                     .navigationBarsPadding()
                     .imePadding()
                     .heightIn(max = maxDialogHeight)
-                    .background(BackgroundElevated, RoundedCornerShape(14.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
-                    .padding(horizontal = if (isTouchDevice) 16.dp else 20.dp, vertical = 18.dp)
+                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = if (isTouchDevice) 16.dp else 24.dp, vertical = 20.dp)
                     .focusRequester(modalFocusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -9157,29 +9120,31 @@ private fun InputModal(
                     },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(
-                    text = title,
-                    style = ArflixTypography.sectionTitle,
-                    color = TextPrimary
-                )
-                Text(
-                    text = if (LocalDeviceType.current.isTouchDevice()) {
-                        stringResource(R.string.settings_modal_hint_touch)
-                    } else {
-                        stringResource(R.string.settings_modal_hint_tv)
-                    },
-                    style = ArflixTypography.caption,
-                    color = TextSecondary.copy(alpha = 0.75f),
-                    modifier = Modifier.padding(top = 2.dp, bottom = if (supportingText == null) 12.dp else 4.dp)
-                )
-                if (supportingText != null) {
-                    Text(
-                        text = supportingText,
-                        style = ArflixTypography.caption,
-                        color = TextSecondary.copy(alpha = 0.68f),
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(42.dp)
+                            .background(accentColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = title, style = ArflixTypography.sectionTitle, color = TextPrimary)
+                        Text(
+                            text = supportingText ?: stringResource(
+                                if (isTouchDevice) R.string.settings_modal_hint_touch else R.string.settings_modal_hint_tv
+                            ),
+                            style = ArflixTypography.caption,
+                            color = TextSecondary.copy(alpha = 0.72f),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 Column(
@@ -9196,31 +9161,12 @@ private fun InputModal(
                                 verticalAlignment = Alignment.CenterVertically,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(22.dp)
-                                        .background(
-                                            if (isFocused) Pink.copy(alpha = 0.20f) else Color.White.copy(alpha = 0.08f),
-                                            RoundedCornerShape(11.dp)
-                                        )
-                                        .border(
-                                            1.dp,
-                                            if (isFocused) Pink else Color.White.copy(alpha = 0.12f),
-                                            RoundedCornerShape(11.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${index + 1}",
-                                        style = ArflixTypography.caption,
-                                        color = if (isFocused) Pink else TextSecondary
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(Modifier.width(3.dp).height(16.dp).background(if (isFocused) accentColor else Color.White.copy(alpha = 0.12f), RoundedCornerShape(2.dp)))
+                                Spacer(modifier = Modifier.width(9.dp))
                                 Text(
                                     text = field.label,
-                                    style = ArflixTypography.caption,
-                                    color = if (isFocused) Pink else TextSecondary
+                                    style = ArflixTypography.caption.copy(fontWeight = FontWeight.SemiBold),
+                                    color = if (isFocused) TextPrimary else TextSecondary
                                 )
                             }
                             if (field.helper.isNotBlank()) {
@@ -9238,11 +9184,11 @@ private fun InputModal(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color.White.copy(alpha = if (isFocused) 0.12f else 0.05f), RoundedCornerShape(10.dp))
+                                    .background(BackgroundElevated, RoundedCornerShape(6.dp))
                                     .border(
                                         width = if (isFocused) 2.dp else 1.dp,
-                                        color = if (isFocused) regexFieldFocusColor else Color.White.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(10.dp)
+                                        color = if (isFocused) accentColor else Color.White.copy(alpha = 0.16f),
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .padding(2.dp)
                             ) {
@@ -9374,15 +9320,15 @@ private fun InputModal(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(10.dp))
+                        .clip(RoundedCornerShape(6.dp))
                         .background(
-                            color = if (isPasteFocused) Color.White else Color.Black.copy(alpha = 0.82f),
-                            shape = RoundedCornerShape(10.dp)
+                            color = if (isPasteFocused) accentColor.copy(alpha = 0.18f) else BackgroundElevated,
+                            shape = RoundedCornerShape(6.dp)
                         )
                         .border(
-                            width = 1.dp,
-                            color = if (isPasteFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(10.dp)
+                            width = if (isPasteFocused) 2.dp else 1.dp,
+                            color = if (isPasteFocused) accentColor else Color.White.copy(alpha = 0.14f),
+                            shape = RoundedCornerShape(6.dp)
                         )
                         .clickable {
                             pasteClipboardIntoTarget()
@@ -9394,14 +9340,14 @@ private fun InputModal(
                     Icon(
                         imageVector = Icons.Default.ContentPaste,
                         contentDescription = stringResource(R.string.settings_cd_paste),
-                        tint = if (isPasteFocused) Color.Black else Color.White,
+                        tint = if (isPasteFocused) accentColor else TextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = stringResource(R.string.settings_paste_into, pasteTargetLabel),
                         style = ArflixTypography.button,
-                        color = if (isPasteFocused) Color.Black else Color.White,
+                        color = if (isPasteFocused) TextPrimary else TextSecondary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -9417,15 +9363,15 @@ private fun InputModal(
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(
-                                color = if (isCancelFocused) Color.White else Color.Black.copy(alpha = 0.82f),
-                                shape = RoundedCornerShape(10.dp)
+                                color = BackgroundElevated,
+                                shape = RoundedCornerShape(6.dp)
                             )
                             .border(
-                                width = 1.dp,
+                                width = if (isCancelFocused) 2.dp else 1.dp,
                                 color = if (isCancelFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(10.dp)
+                                shape = RoundedCornerShape(6.dp)
                             )
                             .clickable {
                                 hideKeyboardAll()
@@ -9434,26 +9380,25 @@ private fun InputModal(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = tr("Cancel"),
-                            style = ArflixTypography.button,
-                            color = if (isCancelFocused) Color.Black else Color.White
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(17.dp))
+                            Text(text = tr("Cancel"), style = ArflixTypography.button, color = TextPrimary)
+                        }
                     }
 
                     val isConfirmFocused = focusedIndex == fields.size + 2
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(6.dp))
                             .background(
-                                color = if (isConfirmFocused) Color.White else Color.Black.copy(alpha = 0.82f),
-                                shape = RoundedCornerShape(10.dp)
+                                color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(6.dp)
                             )
                             .border(
-                                width = 1.dp,
-                                color = if (isConfirmFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(10.dp)
+                                width = if (isConfirmFocused) 2.dp else 1.dp,
+                                color = accentColor,
+                                shape = RoundedCornerShape(6.dp)
                             )
                             .clickable {
                                 hideKeyboardAll()
@@ -9462,11 +9407,10 @@ private fun InputModal(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = tr("Confirm"),
-                            style = ArflixTypography.button,
-                            color = if (isConfirmFocused) Color.Black else Color.White
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Check, contentDescription = null, tint = if (isConfirmFocused) Color.Black else accentColor, modifier = Modifier.size(17.dp))
+                            Text(text = tr("Confirm"), style = ArflixTypography.button, color = if (isConfirmFocused) Color.Black else TextPrimary)
+                        }
                     }
                 }
 
@@ -9974,6 +9918,7 @@ private fun CatalogPackImportDialog(
     val focusRequester = remember { FocusRequester() }
     var focusedIndex by remember(pendingPack) { mutableIntStateOf(0) } // 0 = Confirm, 1 = Cancel/Dismiss
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
 
     LaunchedEffect(pendingPack, isLoading, error) {
         focusRequester.requestFocus()
@@ -9991,11 +9936,12 @@ private fun CatalogPackImportDialog(
             Column(
                 modifier = Modifier
                     .then(
-                        if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 480.dp)
-                        else Modifier.width(480.dp)
+                        if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 560.dp)
+                        else Modifier.width(560.dp)
                     )
-                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                    .padding(if (isTouchDevice) 20.dp else 28.dp)
+                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
+                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                    .padding(if (isTouchDevice) 20.dp else 24.dp)
                     .focusRequester(focusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -10077,17 +10023,20 @@ private fun CatalogPackImportDialog(
                     }
                 } else if (pendingPack != null) {
                     Column(modifier = Modifier.fillMaxWidth()) {
-                        Text(
-                            text = "Import Catalog Pack",
-                            style = ArflixTypography.sectionTitle,
-                            color = TextPrimary
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Text(
-                            text = pendingPack.name ?: "",
-                            style = ArflixTypography.cardTitle.copy(fontSize = 18.sp),
-                            color = resolveAccentColor(fallback = Pink)
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Box(
+                                modifier = Modifier.size(42.dp)
+                                    .background(accentColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+                                    .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.Unarchive, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
+                            }
+                            Column {
+                                Text(text = "Import Catalog Pack", style = ArflixTypography.sectionTitle, color = TextPrimary)
+                                Text(text = pendingPack.name ?: "", style = ArflixTypography.body, color = accentColor)
+                            }
+                        }
                         if (!pendingPack.author.isNullOrBlank()) {
                             Text(
                                 text = "Author: ${pendingPack.author} • v${pendingPack.version ?: "1.0.0"}",
@@ -10117,8 +10066,9 @@ private fun CatalogPackImportDialog(
                                 .fillMaxWidth()
                                 .heightIn(max = 160.dp)
                                 .verticalScroll(previewScrollState)
-                                .background(Color.Black.copy(alpha = 0.25f), RoundedCornerShape(8.dp))
-                                .padding(8.dp)
+                                .background(BackgroundElevated, RoundedCornerShape(6.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
+                                .padding(10.dp)
                         ) {
                             pendingPack.catalogs?.forEach { cat ->
                                 Row(
@@ -10152,50 +10102,45 @@ private fun CatalogPackImportDialog(
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
+                                    .clip(RoundedCornerShape(6.dp))
                                     .background(
-                                        color = if (isConfirmFocused) Color.White else Color.Black.copy(alpha = 0.82f),
-                                        shape = RoundedCornerShape(10.dp)
+                                        color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.16f),
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .border(
-                                        width = 1.dp,
-                                        color = if (isConfirmFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                                        shape = RoundedCornerShape(10.dp)
+                                        width = if (isConfirmFocused) 2.dp else 1.dp,
+                                        color = accentColor,
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .clickable { onConfirm(pendingPack) }
                                     .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Install Pack",
-                                    style = ArflixTypography.button,
-                                    color = if (isConfirmFocused) Color.Black else Color.White
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = if (isConfirmFocused) Color.Black else accentColor, modifier = Modifier.size(17.dp))
+                                    Text(text = "Install Pack", style = ArflixTypography.button, color = if (isConfirmFocused) Color.Black else TextPrimary)
+                                }
                             }
 
                             val isCancelFocused = focusedIndex == 1
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(
-                                        color = if (isCancelFocused) Color.White else Color.Black.copy(alpha = 0.82f),
-                                        shape = RoundedCornerShape(10.dp)
-                                    )
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(BackgroundElevated, RoundedCornerShape(6.dp))
                                     .border(
-                                        width = 1.dp,
+                                        width = if (isCancelFocused) 2.dp else 1.dp,
                                         color = if (isCancelFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                                        shape = RoundedCornerShape(10.dp)
+                                        shape = RoundedCornerShape(6.dp)
                                     )
                                     .clickable { onDismiss() }
                                     .padding(vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = "Cancel",
-                                    style = ArflixTypography.button,
-                                    color = if (isCancelFocused) Color.Black else Color.White
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(17.dp))
+                                    Text(text = "Cancel", style = ArflixTypography.button, color = TextPrimary)
+                                }
                             }
                         }
                     }
