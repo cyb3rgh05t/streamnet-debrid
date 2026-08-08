@@ -2867,6 +2867,7 @@ private fun HomeRowsLayer(
             categoryHasMoreMap = categoryHasMoreMap,
             onLoadMoreCategory = onLoadMoreCategory,
             onNavigateToDetails = onNavigateToDetails,
+            lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
             onItemClick = onItemClick,
             onItemLongClick = onItemLongClick,
             onCategoryVisiblePosition = { categoryId, lastVisibleItemIndex ->
@@ -2914,6 +2915,7 @@ private fun MobileHomeRowsLayer(
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     onLoadMoreCategory: (String) -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
+    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null,
     onCategoryVisiblePosition: (String, Int) -> Unit = { _, _ -> }
@@ -2945,6 +2947,8 @@ private fun MobileHomeRowsLayer(
             val isContinueWatching = category.id == "continue_watching"
             val isRanked = category.title.contains("Top 10", ignoreCase = true)
             val isCollectionRow = category.id.startsWith("collection_row_")
+            val isIptvCategory = category.id == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
+                category.id == HomeViewModel.RECENT_TV_CATEGORY_ID
             val rowKey = remember(category.id) { "home:${category.id}" }
             val rowUsePosterCards = rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
             val isPortrait = category.isPortrait(rowUsePosterCards)
@@ -3064,19 +3068,31 @@ private fun MobileHomeRowsLayer(
                                 modifier = Modifier.width(rowMobileItemWidth)
                             ) {
                                 val cardLogoUrl = if (isCollectionRow) null else cardLogoUrls["${item.mediaType}_${item.id}"]
-                                ArvioMediaCard(
-                                    item = item,
-                                    width = rowMobileItemWidth,
-                                    isLandscape = !isPortrait,
-                                    logoImageUrl = cardLogoUrl,
-                                    showProgress = false,
-                                    showTitle = !item.collectionHideTitle,
-                                    isFocusedOverride = false,
-                                    enableSystemFocus = false,
-                                    onFocused = {},
-                                    onClick = onCardClick,
-                                    onLongClick = onCardLongClick,
-                                )
+                                if (isIptvCategory || item.status?.startsWith("iptv:") == true) {
+                                    IptvHomeCard(
+                                        item = item,
+                                        width = rowMobileItemWidth,
+                                        isFocused = false,
+                                        lookupBackdrop = lookupIptvProgramBackdrop,
+                                        onFocused = {},
+                                        onClick = onCardClick,
+                                        onLongClick = onCardLongClick,
+                                    )
+                                } else {
+                                    ArvioMediaCard(
+                                        item = item,
+                                        width = rowMobileItemWidth,
+                                        isLandscape = !isPortrait,
+                                        logoImageUrl = cardLogoUrl,
+                                        showProgress = false,
+                                        showTitle = !item.collectionHideTitle,
+                                        isFocusedOverride = false,
+                                        enableSystemFocus = false,
+                                        onFocused = {},
+                                        onClick = onCardClick,
+                                        onLongClick = onCardLongClick,
+                                    )
+                                }
                                 TopRankRibbon(
                                     rank = index + 1,
                                     isFocused = false,
@@ -3089,19 +3105,31 @@ private fun MobileHomeRowsLayer(
                             }
                         } else {
                             val cardLogoUrl = if (isCollectionRow) null else cardLogoUrls["${item.mediaType}_${item.id}"]
-                            ArvioMediaCard(
-                                item = item,
-                                width = rowMobileItemWidth,
-                                isLandscape = !isPortrait,
-                                logoImageUrl = cardLogoUrl,
-                                showProgress = isContinueWatching,
-                                showTitle = !item.collectionHideTitle,
-                                isFocusedOverride = false,
-                                enableSystemFocus = false,
-                                onFocused = {},
-                                onClick = onCardClick,
-                                onLongClick = onCardLongClick,
-                            )
+                            if (isIptvCategory || item.status?.startsWith("iptv:") == true) {
+                                IptvHomeCard(
+                                    item = item,
+                                    width = rowMobileItemWidth,
+                                    isFocused = false,
+                                    lookupBackdrop = lookupIptvProgramBackdrop,
+                                    onFocused = {},
+                                    onClick = onCardClick,
+                                    onLongClick = onCardLongClick,
+                                )
+                            } else {
+                                ArvioMediaCard(
+                                    item = item,
+                                    width = rowMobileItemWidth,
+                                    isLandscape = !isPortrait,
+                                    logoImageUrl = cardLogoUrl,
+                                    showProgress = isContinueWatching,
+                                    showTitle = !item.collectionHideTitle,
+                                    isFocusedOverride = false,
+                                    enableSystemFocus = false,
+                                    onFocused = {},
+                                    onClick = onCardClick,
+                                    onLongClick = onCardLongClick,
+                                )
+                            }
                         }
                     }
                 }
@@ -3966,6 +3994,7 @@ private fun IptvHomeCard(
     lookupBackdrop: suspend (String) -> String?,
     onFocused: () -> Unit,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     var logoGradient by remember(item.image, item.title) {
         mutableStateOf(iptvLogoFallbackGradient(item.title))
@@ -4001,6 +4030,7 @@ private fun IptvHomeCard(
         enableSystemFocus = false,
         isFocusedOverride = isFocused,
         onClick = onClick,
+        onLongClick = onLongClick,
         onFocusChanged = { if (it) onFocused() },
     ) {
         Column(Modifier.fillMaxSize()) {
