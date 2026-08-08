@@ -24,6 +24,9 @@ import com.google.gson.reflect.TypeToken
 import com.google.gson.stream.JsonReader
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
@@ -152,6 +155,30 @@ private object IptvIdSentinels {
 private const val LargeIptvListChannelCount = 10_000
 internal const val IPTV_GROUP_ORDER_SCHEMA = 3
 
+internal fun mergeIptvProgramsPreferRichFresh(
+    existing: List<IptvProgram>,
+    fresh: List<IptvProgram>,
+): List<IptvProgram> {
+    val byProgram = LinkedHashMap<String, IptvProgram>(existing.size + fresh.size)
+    fun merge(program: IptvProgram) {
+        if (program.title.isBlank() || program.endUtcMillis <= program.startUtcMillis) return
+        val key = "${program.startUtcMillis}|${program.endUtcMillis}|${program.title}"
+        val previous = byProgram[key]
+        byProgram[key] = if (previous == null) {
+            program
+        } else {
+            program.copy(
+                description = program.description?.takeIf { it.isNotBlank() }
+                    ?: previous.description?.takeIf { it.isNotBlank() },
+                catchupAvailable = program.catchupAvailable ?: previous.catchupAvailable,
+            )
+        }
+    }
+    existing.forEach(::merge)
+    fresh.forEach(::merge)
+    return byProgram.values.sortedBy { it.startUtcMillis }
+}
+
 data class IptvConfig(
     val m3uUrl: String = "",
     val epgUrl: String = "",
@@ -203,6 +230,8 @@ class IptvRepository @Inject constructor(
     private val profileManager: ProfileManager,
     private val invalidationBus: CloudSyncInvalidationBus
 ) {
+    private val _dataRefreshEvents = MutableSharedFlow<Unit>(replay = 1, extraBufferCapacity = 1)
+    val dataRefreshEvents: SharedFlow<Unit> = _dataRefreshEvents.asSharedFlow()
     private val gson = Gson()
     private val loadMutex = Mutex()
     private val xtreamDataMutex = Mutex()
@@ -211,6 +240,10 @@ class IptvRepository @Inject constructor(
     private val epgIndex by lazy { IptvEpgIndex(context) }
     private val channelStore by lazy { IptvChannelStore(context) }
     private val maxSeriesEpisodeCacheEntries = 8
+
+    fun notifyDataRefresh() {
+        _dataRefreshEvents.tryEmit(Unit)
+    }
 
     @Volatile
     private var cachedChannels: List<IptvChannel> = emptyList()
@@ -1765,8 +1798,14 @@ class IptvRepository @Inject constructor(
                         System.err.println("[EPG] Xtream short EPG result: ${parsed?.size ?: 0} channels, hasData=$parsedHasData")
                         if (parsed != null && parsedHasData) {
                             shortEpgResult = parsed
-                            // Provide immediate results: merge short EPG with cached data (no stale removal)
-                            cachedNowNext.putAll(parsed) // Short EPG data takes priority (fresher)
+                            // Short EPG has the freshest slots, but often omits descriptions.
+                            // Preserve richer cached/XML text for matching programmes.
+                            parsed.forEach { (channelId, freshGuide) ->
+                                cachedNowNext[channelId] = mergeCachedGuideSlice(
+                                    cachedNowNext[channelId],
+                                    freshGuide,
+                                )
+                            }
                             resolvedNowNext = cachedNowNext
                             cachedEpgAt = System.currentTimeMillis()
                             persistEpgIndexChannels(config, parsed, cachedEpgAt)
@@ -1818,10 +1857,8 @@ class IptvRepository @Inject constructor(
                                 xmltvChanged = true
                                 parsed.forEach { (channelId, nowNext) ->
                                     val current = mergedXmlNowNext[channelId]
-                                    if (!hasProgramData(current) && hasProgramData(nowNext)) {
-                                        mergedXmlNowNext[channelId] = nowNext
-                                    } else if (current == null) {
-                                        mergedXmlNowNext[channelId] = nowNext
+                                    if (hasProgramData(nowNext)) {
+                                        mergedXmlNowNext[channelId] = mergeCachedGuideSlice(current, nowNext)
                                     }
                                 }
                                 val coverage = epgCoverageRatio(channels, mergedXmlNowNext)
@@ -1847,10 +1884,8 @@ class IptvRepository @Inject constructor(
                                 }.getOrDefault(emptyMap())
                                 existing.forEach { (channelId, nowNext) ->
                                     val current = mergedXmlNowNext[channelId]
-                                    if (!hasProgramData(current) && hasProgramData(nowNext)) {
-                                        mergedXmlNowNext[channelId] = nowNext
-                                    } else if (current == null) {
-                                        mergedXmlNowNext[channelId] = nowNext
+                                    if (hasProgramData(nowNext)) {
+                                        mergedXmlNowNext[channelId] = mergeCachedGuideSlice(current, nowNext)
                                     }
                                 }
                                 resolved = true
@@ -1861,7 +1896,12 @@ class IptvRepository @Inject constructor(
                         }
                     }
                     if (resolved) {
-                        shortEpgResult?.let { mergedXmlNowNext.putAll(it) } // Short EPG wins for channels it covers
+                        shortEpgResult?.forEach { (channelId, shortGuide) ->
+                            mergedXmlNowNext[channelId] = mergeCachedGuideSlice(
+                                mergedXmlNowNext[channelId],
+                                shortGuide,
+                            )
+                        }
                         resolvedNowNext = mergedXmlNowNext
                         cachedNowNext = mergedXmlNowNext
                         cachedEpgAt = System.currentTimeMillis()
@@ -2207,7 +2247,7 @@ class IptvRepository @Inject constructor(
             existing.later?.let { allPrograms.add(it) }
             allPrograms.addAll(existing.upcoming)
             allPrograms.addAll(existing.recent)
-            allPrograms.sortBy { it.startUtcMillis }
+            val deduplicatedPrograms = mergeIptvProgramsPreferRichFresh(emptyList(), allPrograms)
 
             var now: IptvProgram? = null
             var next: IptvProgram? = null
@@ -2215,19 +2255,19 @@ class IptvRepository @Inject constructor(
             val upcoming = java.util.ArrayList<IptvProgram>(epgUpcomingProgramLimit)
             val recent = java.util.ArrayList<IptvProgram>()
 
-            if (allPrograms.isNotEmpty()) {
-                var startIndex = allPrograms.binarySearch { it.startUtcMillis.compareTo(recentCutoff) }
+            if (deduplicatedPrograms.isNotEmpty()) {
+                var startIndex = deduplicatedPrograms.binarySearch { it.startUtcMillis.compareTo(recentCutoff) }
                 if (startIndex < 0) {
                     startIndex = -(startIndex + 1)
                 }
 
                 // Walk backward to include programs starting before recentCutoff but ending after
-                while (startIndex > 0 && allPrograms[startIndex - 1].endUtcMillis > recentCutoff) {
+                while (startIndex > 0 && deduplicatedPrograms[startIndex - 1].endUtcMillis > recentCutoff) {
                     startIndex--
                 }
 
-                for (i in startIndex until allPrograms.size) {
-                    val p = allPrograms[i]
+                for (i in startIndex until deduplicatedPrograms.size) {
+                    val p = deduplicatedPrograms[i]
                     when {
                         p.endUtcMillis <= nowMs && p.endUtcMillis > recentCutoff -> {
                             addRecentCandidate(recent, p, recentProgramLimitForChannel(channelsById[channelId]))
@@ -5643,6 +5683,7 @@ class IptvRepository @Inject constructor(
         val lang: String? = null,
         val start: String? = null,
         val end: String? = null,
+        @SerializedName(value = "description", alternate = ["desc", "plot"])
         val description: String? = null,
         @SerializedName("channel_id") val channelId: String? = null,
         @SerializedName("start_timestamp") val startTimestamp: String? = null,
@@ -7140,10 +7181,19 @@ class IptvRepository @Inject constructor(
 
     private fun mergeCachedGuideSlice(existing: IptvNowNext?, fresh: IptvNowNext): IptvNowNext {
         if (existing == null) return fresh
+        fun mergeSlot(previous: IptvProgram?, updated: IptvProgram?): IptvProgram? {
+            if (updated == null) return previous
+            if (previous == null || programKey(previous) != programKey(updated)) return updated
+            return updated.copy(
+                description = updated.description?.takeIf { it.isNotBlank() }
+                    ?: previous.description?.takeIf { it.isNotBlank() },
+                catchupAvailable = updated.catchupAvailable ?: previous.catchupAvailable,
+            )
+        }
         return IptvNowNext(
-            now = fresh.now ?: existing.now,
-            next = fresh.next ?: existing.next,
-            later = fresh.later ?: existing.later,
+            now = mergeSlot(existing.now, fresh.now),
+            next = mergeSlot(existing.next, fresh.next),
+            later = mergeSlot(existing.later, fresh.later),
             upcoming = mergeCachedPrograms(existing.upcoming, fresh.upcoming)
                 .asSequence()
                 .filter { it.startUtcMillis > 0L }
@@ -7158,13 +7208,7 @@ class IptvRepository @Inject constructor(
         existing: List<IptvProgram>,
         fresh: List<IptvProgram>
     ): List<IptvProgram> {
-        if (existing.isEmpty()) return fresh
-        if (fresh.isEmpty()) return existing
-        return (existing.asSequence() + fresh.asSequence())
-            .filter { it.title.isNotBlank() && it.endUtcMillis > it.startUtcMillis }
-            .distinctBy { programKey(it) }
-            .sortedBy { it.startUtcMillis }
-            .toList()
+        return mergeIptvProgramsPreferRichFresh(existing, fresh)
     }
 
     private fun programKey(program: IptvProgram): String {

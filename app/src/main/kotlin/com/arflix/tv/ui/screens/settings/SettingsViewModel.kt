@@ -2184,7 +2184,8 @@ class SettingsViewModel @Inject constructor(
             runCatching {
                 val snapshot = iptvRepository.loadSnapshot(
                     forcePlaylistReload = force,
-                    forceEpgReload = false,
+                    forceEpgReload = force,
+                    allowNetworkEpgFetch = true,
                     onProgress = { progress ->
                         _uiState.value = _uiState.value.copy(
                             isIptvLoading = true,
@@ -2227,6 +2228,7 @@ class SettingsViewModel @Inject constructor(
                     } else _uiState.value.toastMessage,
                     toastType = if (showToast) ToastType.SUCCESS else _uiState.value.toastType
                 )
+                iptvRepository.notifyDataRefresh()
                 launch {
                     runCatching { iptvRepository.warmXtreamVodCachesIfPossible() }
                 }

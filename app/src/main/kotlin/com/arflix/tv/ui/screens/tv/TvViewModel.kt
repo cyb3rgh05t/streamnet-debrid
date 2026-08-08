@@ -170,6 +170,32 @@ class TvViewModel @Inject constructor(
         observeConfigAndFavorites()
         observeTvSession()
         viewModelScope.launch {
+            iptvRepository.dataRefreshEvents.collect {
+                val refreshed = iptvRepository.getMemoryCachedSnapshot()
+                    ?: iptvRepository.getCachedSnapshotOrNull()
+                    ?: return@collect
+                cachedEnrichedChannels = null
+                cachedChannelsSignature = null
+                val current = _uiState.value
+                val cappedSnapshot = capLargeListGuideSnapshot(
+                    snapshot = refreshed,
+                    channelsByGroup = refreshed.grouped,
+                    tvSession = current.tvSession,
+                    keepChannelIds = refreshed.nowNext.keys,
+                )
+                setUiState(
+                    current.copy(
+                        isLoading = false,
+                        error = null,
+                        snapshot = cappedSnapshot,
+                        loadingMessage = null,
+                        loadingPercent = 0,
+                    )
+                )
+                maybeWarmStartupGuide()
+            }
+        }
+        viewModelScope.launch {
             // MainActivity usually warms this before navigation. Read memory first so
             // opening Live TV never waits behind a background playlist/EPG refresh
             // holding the repository load mutex. Only touch disk when memory is empty.

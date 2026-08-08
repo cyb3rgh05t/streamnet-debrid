@@ -1481,6 +1481,11 @@ class HomeViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
+            iptvRepository.dataRefreshEvents.collect {
+                refreshIptvHomeCatalogs()
+            }
+        }
+        viewModelScope.launch {
             streamRepository.installedAddons.collectLatest { addons ->
                 _sportsHomeRows.value = sportsRepository.buildHomeRows(addons, selectedSportsCategoryId)
             }

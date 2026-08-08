@@ -28,13 +28,21 @@ class IptvRefreshWorker @AssistedInject constructor(
         if (!isConfigured) return Result.success()
 
         return try {
+            val bootstrapIfStale = inputData.getBoolean(KEY_BOOTSTRAP_IF_STALE, false)
+            if (bootstrapIfStale) {
+                iptvRepository.warmupFromCacheOnly()
+                if (iptvRepository.cachedEpgAgeMs() < BOOTSTRAP_STALE_AFTER_MS) {
+                    return Result.success()
+                }
+            }
             withTimeout(9 * 60_000L) {
                 iptvRepository.loadSnapshot(
-                    forcePlaylistReload = true,
+                    forcePlaylistReload = !bootstrapIfStale,
                     forceEpgReload = true,
                     allowNetworkEpgFetch = true,
                 )
             }
+            iptvRepository.notifyDataRefresh()
             Log.i(TAG, "Background playlist and EPG refresh completed")
             Result.success()
         } catch (error: TimeoutCancellationException) {
@@ -51,6 +59,9 @@ class IptvRefreshWorker @AssistedInject constructor(
     companion object {
         const val TAG = "IptvRefreshWorker"
         const val WORK_NAME = "iptv_playlist_epg_refresh"
+        const val BOOTSTRAP_WORK_NAME = "iptv_epg_startup_bootstrap"
+        const val KEY_BOOTSTRAP_IF_STALE = "bootstrap_if_stale"
         const val REFRESH_INTERVAL_HOURS = 4L
+        private const val BOOTSTRAP_STALE_AFTER_MS = 2L * 60L * 60L * 1000L
     }
 }

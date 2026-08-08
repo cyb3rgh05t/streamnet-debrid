@@ -4,6 +4,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import com.arflix.tv.data.model.IptvProgram
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
@@ -14,6 +15,37 @@ import java.util.Collections
 import java.util.concurrent.atomic.AtomicInteger
 
 class IptvRepositoryOptimizationTest {
+
+    @Test
+    fun mergeIptvProgramsPreferRichFresh_replacesMissingDescription() {
+        val existing = IptvProgram(
+            title = "Example programme",
+            description = null,
+            startUtcMillis = 1_000L,
+            endUtcMillis = 2_000L,
+        )
+        val fresh = existing.copy(description = "Fresh provider synopsis")
+
+        val merged = mergeIptvProgramsPreferRichFresh(listOf(existing), listOf(fresh))
+
+        assertEquals(1, merged.size)
+        assertEquals("Fresh provider synopsis", merged.single().description)
+    }
+
+    @Test
+    fun mergeIptvProgramsPreferRichFresh_keepsDescriptionWhenRefreshOmitsIt() {
+        val existing = IptvProgram(
+            title = "Example programme",
+            description = "Cached synopsis",
+            startUtcMillis = 1_000L,
+            endUtcMillis = 2_000L,
+        )
+        val fresh = existing.copy(description = null)
+
+        val merged = mergeIptvProgramsPreferRichFresh(listOf(existing), listOf(fresh))
+
+        assertEquals("Cached synopsis", merged.single().description)
+    }
 
     // Helper to instantiate private class BackslashEscapeSanitizingInputStream using reflection
     private fun createSanitizingStream(input: InputStream): InputStream {

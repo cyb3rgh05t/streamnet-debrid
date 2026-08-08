@@ -307,16 +307,28 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
     }
 
     fun scheduleIptvRefreshIfNeeded() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+        val bootstrapRequest = OneTimeWorkRequestBuilder<IptvRefreshWorker>()
+            .setInitialDelay(20, TimeUnit.SECONDS)
+            .setConstraints(constraints)
+            .setInputData(workDataOf(IptvRefreshWorker.KEY_BOOTSTRAP_IF_STALE to true))
+            .addTag(IptvRefreshWorker.TAG)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniqueWork(
+            IptvRefreshWorker.BOOTSTRAP_WORK_NAME,
+            ExistingWorkPolicy.KEEP,
+            bootstrapRequest,
+        )
+
         val refreshRequest = PeriodicWorkRequestBuilder<IptvRefreshWorker>(
             IptvRefreshWorker.REFRESH_INTERVAL_HOURS,
             TimeUnit.HOURS,
         )
             .setInitialDelay(IptvRefreshWorker.REFRESH_INTERVAL_HOURS, TimeUnit.HOURS)
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build()
-            )
+            .setConstraints(constraints)
             .addTag(IptvRefreshWorker.TAG)
             .build()
 
