@@ -2,13 +2,17 @@
 
 package com.arflix.tv.ui.screens.tv.live
 
+import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,11 +20,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentHeight
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.FastForward
+import androidx.compose.material.icons.filled.FastRewind
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,29 +45,36 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.coerceAtLeast
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.ui.graphics.vector.ImageVector
 import kotlinx.coroutines.delay
+import java.time.Instant
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
- * Fullscreen playback HUD. Auto-hides 5s after the last `pokeSignal`
- * bump; parent bumps the counter on any DPAD key so the HUD re-surfaces.
+ * Fullscreen playback HUD matching the full-width reference player layout.
+ * Auto-hides 5s after the last `pokeSignal` bump; parent bumps the counter on any DPAD key so the HUD re-surfaces.
+ * Initial focus immediately lands on the central Play/Pause button when surfaced from hidden state.
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -61,14 +82,23 @@ fun FullscreenHud(
     channel: EnrichedChannel?,
     nowNext: IptvNowNext?,
     pokeSignal: Int,
+    categoryName: String? = null,
     isCatchupMode: Boolean = false,
     isPlaying: Boolean = true,
+    isBuffering: Boolean = false,
     playbackPositionMs: Long = 0L,
     playbackDurationMs: Long = 0L,
     onBackClick: (() -> Unit)? = null,
     onGuideClick: (() -> Unit)? = null,
     onPlayPauseClick: (() -> Unit)? = null,
+    onRewindClick: (() -> Unit)? = null,
+    onFastForwardClick: (() -> Unit)? = null,
+    onPreviousCatchupClick: (() -> Unit)? = null,
+    onNextCatchupClick: (() -> Unit)? = null,
+    onReplayClick: (() -> Unit)? = null,
     onGoLiveClick: (() -> Unit)? = null,
+    onSeekToPosition: ((Long) -> Unit)? = null,
+    onOpenQuickZap: (() -> Unit)? = null,
     onVisibilityChanged: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -96,7 +126,48 @@ fun FullscreenHud(
     LaunchedEffect(Unit) {
         while (true) {
             clockMillis = System.currentTimeMillis()
-            delay(30_000)
+            delay(1_000)
+        }
+    }
+
+    // Instant local play/pause icon state toggle for immediate UI feedback (0ms delay)
+    var localIsPlaying by remember(isPlaying) { mutableStateOf(isPlaying) }
+
+    val playPauseFocusRequester = remember { FocusRequester() }
+    var initialFocusApplied by remember { mutableStateOf(false) }
+
+    // Request initial focus ONLY when HUD first becomes visible from hidden state
+    LaunchedEffect(visible) {
+        if (visible && !initialFocusApplied) {
+            initialFocusApplied = true
+            delay(100)
+            runCatching {
+                playPauseFocusRequester.requestFocus()
+            }
+        } else if (!visible) {
+            initialFocusApplied = false
+        }
+    }
+
+    // --- Loading Ring Overlay in Center of Screen ---
+    if (isBuffering) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(76.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.65f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(44.dp),
+                    color = LiveColors.Accent,
+                    strokeWidth = 4.dp,
+                )
+            }
         }
     }
 
@@ -107,214 +178,428 @@ fun FullscreenHud(
         modifier = modifier.fillMaxSize(),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
+            // Full screen gradient overlay (dark at top and bottom)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.55f to Color.Transparent,
-                            1f to Color(0xCC000000),
+                            0f to Color.Black.copy(alpha = 0.7f),
+                            0.25f to Color.Transparent,
+                            0.45f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.95f),
                         )
                     ),
             )
 
-            if (channel != null) {
+            // --- Top Header Row (Category Name & Formatted Date/Time) ---
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Row(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(start = if (onBackClick != null) 80.dp else 20.dp, top = 20.dp, end = 20.dp, bottom = 20.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0x66000000))
-                        .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    ChannelLogo(channel = channel, size = 40.dp)
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        Text(
-                            text = stringResource(R.string.live_label_ch, channel.number),
-                            style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
-                        )
-                        Text(
-                            text = channel.name,
-                            style = LiveType.ChannelName.copy(
-                                color = LiveColors.Fg,
-                                fontSize = 16.sp,
-                            ),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                        Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                            HudBadge(channel.quality.label, LiveColors.Fg, LiveColors.Panel)
-                            channel.country?.takeIf { it != channel.lang }?.let {
-                                HudBadge(it.uppercase(), LiveColors.FgDim, LiveColors.Panel)
-                            }
-                            HudBadge(channel.lang.uppercase(), LiveColors.FgDim, LiveColors.Panel)
+                    if (onBackClick != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .clickable { onBackClick() },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.back),
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp),
+                            )
                         }
                     }
-                }
-            }
 
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(20.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0x66000000))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-            ) {
+                    if (!categoryName.isNullOrBlank()) {
+                        Text(
+                            text = categoryName.uppercase(),
+                            style = LiveType.SectionTag.copy(
+                                color = Color.White.copy(alpha = 0.9f),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp,
+                            ),
+                        )
+                    }
+                }
+
                 Text(
-                    text = formatClock(clockMillis),
+                    text = formatHeaderDateTime(clockMillis),
                     style = LiveType.TimeMono.copy(
-                        color = LiveColors.Fg,
-                        fontSize = 18.sp,
+                        color = Color.White.copy(alpha = 0.9f),
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
                     ),
                 )
             }
 
-            Box(
+            // --- Bottom Sheet Layout (Full-Width) ---
+            val now = nowNext?.now
+            val next = nowNext?.next
+
+            // Elapsed time passed on current show
+            var frozenElapsedMs by remember { mutableStateOf<Long?>(null) }
+
+            val currentElapsedShowMs = if (isCatchupMode && playbackPositionMs > 0L) {
+                playbackPositionMs
+            } else if (now != null && now.startUtcMillis > 0L) {
+                (clockMillis - now.startUtcMillis).coerceAtLeast(0L)
+            } else {
+                playbackPositionMs
+            }
+
+            // Freeze the timer while buffering so it doesn't continue advancing
+            LaunchedEffect(isBuffering) {
+                if (isBuffering) {
+                    if (frozenElapsedMs == null) {
+                        frozenElapsedMs = currentElapsedShowMs
+                    }
+                } else {
+                    frozenElapsedMs = null
+                }
+            }
+
+            val elapsedShowMs = if (isBuffering) {
+                frozenElapsedMs ?: currentElapsedShowMs
+            } else {
+                currentElapsedShowMs
+            }
+
+            val totalShowMs = if (isCatchupMode && playbackDurationMs > 0L) {
+                playbackDurationMs
+            } else if (now != null && now.endUtcMillis > now.startUtcMillis) {
+                now.endUtcMillis - now.startUtcMillis
+            } else {
+                playbackDurationMs
+            }
+
+            val progress = if (totalShowMs > 0L) {
+                (elapsedShowMs.toFloat() / totalShowMs.toFloat()).coerceIn(0f, 1f)
+            } else {
+                progressOf(now) ?: 0f
+            }
+
+            val positionText = formatPlaybackDuration(elapsedShowMs)
+
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth(0.6f)
-                    .padding(horizontal = 24.dp, vertical = 24.dp)
-                    .wrapContentHeight()
-                    .clip(RoundedCornerShape(LiveDims.CardRadius))
-                    .background(LiveColors.PanelRaised.copy(alpha = 0.85f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 48.dp, vertical = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                val now = nowNext?.now
-                val next = nowNext?.next
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    ) {
-                        Text(
-                            text = if (isCatchupMode) stringResource(R.string.live_badge_catchup) else stringResource(R.string.live_badge_now),
-                            style = LiveType.SectionTag.copy(color = LiveColors.Accent),
-                        )
-                        Text(
-                            text = formatTimeWindow(now),
-                            style = LiveType.TimeMono.copy(color = LiveColors.Fg),
-                        )
-                        Spacer(Modifier.weight(1f))
-                        val positionLabel = if (isCatchupMode && playbackDurationMs > 0L) {
-                            "${formatPlaybackDuration(playbackPositionMs)} / ${formatPlaybackDuration(playbackDurationMs)}"
-                        } else {
-                            remainingLabel(now)
-                        }
-                        if (positionLabel.isNotBlank()) {
-                            Text(
-                                text = positionLabel,
-                                style = LiveType.TimeMono.copy(color = LiveColors.Accent),
-                            )
-                        }
-                        if (onGuideClick != null) {
-                            HudActionButton(stringResource(R.string.live_btn_guide), onGuideClick)
-                        }
+                // --- Row 1: Channel Logo & Program Metadata ---
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    if (channel != null) {
+                        ChannelLogo(channel = channel, size = 68.dp)
                     }
-                    Text(
-                        text = now?.title
-                            ?: channel?.name
-                            ?: stringResource(R.string.live_empty_no_programme),
-                        style = LiveType.ProgramTitle.copy(
-                            color = LiveColors.Fg,
-                            fontSize = 18.sp,
-                        ),
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                    )
-                    if (!now?.description.isNullOrBlank()) {
+
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        // Program Title
                         Text(
-                            text = now!!.description!!,
-                            style = LiveType.BodySynopsis.copy(
-                                color = LiveColors.FgDim,
-                                fontSize = 12.sp,
+                            text = now?.title
+                                ?: channel?.name
+                                ?: stringResource(R.string.live_empty_no_programme),
+                            style = LiveType.ProgramTitle.copy(
+                                color = Color.White,
+                                fontSize = 24.sp,
+                                fontWeight = FontWeight.Bold,
                             ),
-                            maxLines = 2,
+                            maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
-                    }
-                    val progress = if (isCatchupMode && playbackDurationMs > 0L) {
-                        (playbackPositionMs.toFloat() / playbackDurationMs.toFloat()).coerceIn(0f, 1f)
-                    } else {
-                        progressOf(now)
-                    }
-                    if (progress != null) {
-                        LinearProgressIndicator(
-                            progress = { progress },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(3.dp)
-                                .clip(RoundedCornerShape(2.dp)),
-                            color = LiveColors.Accent,
-                            trackColor = LiveColors.Panel,
-                        )
-                    }
-                    if (isCatchupMode) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center,
-                        ) {
-                            HudIconButton(
-                                icon = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (isPlaying) stringResource(R.string.live_cd_pause) else stringResource(R.string.play),
-                                emphasis = true,
-                                onClick = { onPlayPauseClick?.invoke() },
-                            )
-                            Spacer(Modifier.width(14.dp))
-                            HudActionButton(stringResource(R.string.live_badge_live), onClick = { onGoLiveClick?.invoke() })
-                        }
-                    } else if (next != null) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(1.dp)
-                                .background(LiveColors.Divider),
-                        )
+
+                        // Time window + remaining duration + channel number & name
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Text(stringResource(R.string.live_badge_next), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
-                            Text(
-                                text = formatClock(next.startUtcMillis),
-                                style = LiveType.TimeMono.copy(color = LiveColors.FgDim),
+                            val timeWin = formatTimeWindow(now)
+                            if (timeWin.isNotBlank()) {
+                                Text(
+                                    text = timeWin,
+                                    style = LiveType.TimeMono.copy(
+                                        color = Color.White.copy(alpha = 0.9f),
+                                        fontSize = 14.sp,
+                                    ),
+                                )
+                                Text(
+                                    text = "—",
+                                    style = LiveType.TimeMono.copy(
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        fontSize = 14.sp,
+                                    ),
+                                )
+                            }
+
+                            val remaining = remainingLabel(now)
+                            if (remaining.isNotBlank()) {
+                                Text(
+                                    text = remaining,
+                                    style = LiveType.TimeMono.copy(
+                                        color = Color.White.copy(alpha = 0.75f),
+                                        fontSize = 14.sp,
+                                    ),
+                                )
+                            }
+
+                            if (channel != null) {
+                                Text(
+                                    text = "${channel.number}  ${channel.name}",
+                                    style = LiveType.ChannelName.copy(
+                                        color = Color.White,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+
+                        // Next Program Preview
+                        if (next != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text(
+                                    text = "${formatClock(next.startUtcMillis)} — ${formatClock(next.endUtcMillis)}",
+                                    style = LiveType.TimeMono.copy(
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        fontSize = 13.sp,
+                                    ),
+                                )
+                                Text(
+                                    text = next.title,
+                                    style = LiveType.CellTitle.copy(
+                                        color = Color.White.copy(alpha = 0.6f),
+                                        fontSize = 13.sp,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // --- Row 2: Full-Width Seek Bar with Scrubber Ball ---
+                HudSeekBar(
+                    progress = progress,
+                    positionMs = elapsedShowMs,
+                    durationMs = totalShowMs,
+                    onSeekToPosition = onSeekToPosition,
+                    onOpenQuickZap = onOpenQuickZap,
+                )
+
+                // --- Row 3: Bottom Control Bar (Exact Centering & Time on Left) ---
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                ) {
+                    // Left Side: Time Text below Seek Bar
+                    Box(
+                        modifier = Modifier.align(Alignment.CenterStart),
+                    ) {
+                        Text(
+                            text = positionText,
+                            style = LiveType.TimeMono.copy(
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                            ),
+                        )
+                    }
+
+                    // EXACT CENTER: Playback Controls Bar
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Previous catchup program / channel (|<)
+                        HudIconButton(
+                            icon = Icons.Filled.SkipPrevious,
+                            contentDescription = "Previous Program",
+                            onClick = { onPreviousCatchupClick?.invoke() },
+                        )
+
+                        // Rewind (<<)
+                        HudIconButton(
+                            icon = Icons.Filled.FastRewind,
+                            contentDescription = "Rewind",
+                            onClick = { onRewindClick?.invoke() },
+                        )
+
+                        // Central Play/Pause button (Instant local state toggle!)
+                        HudIconButton(
+                            icon = if (localIsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (localIsPlaying) "Pause" else "Play",
+                            emphasis = true,
+                            focusRequester = playPauseFocusRequester,
+                            onClick = {
+                                localIsPlaying = !localIsPlaying
+                                onPlayPauseClick?.invoke()
+                            },
+                        )
+
+                        // Fast Forward (>>)
+                        HudIconButton(
+                            icon = Icons.Filled.FastForward,
+                            contentDescription = "Fast Forward",
+                            onClick = { onFastForwardClick?.invoke() },
+                        )
+
+                        // Next catchup program / channel (>|)
+                        HudIconButton(
+                            icon = Icons.Filled.SkipNext,
+                            contentDescription = "Next Program",
+                            onClick = { onNextCatchupClick?.invoke() },
+                        )
+                    }
+
+                    // Right Side: Replay, LIVE, GUIDE
+                    Row(
+                        modifier = Modifier.align(Alignment.CenterEnd),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        // Replay / Restart
+                        HudIconButton(
+                            icon = Icons.Filled.Replay,
+                            contentDescription = "Replay",
+                            onClick = { onReplayClick?.invoke() },
+                        )
+
+                        // LIVE button
+                        if (isCatchupMode) {
+                            HudActionButton(
+                                label = stringResource(R.string.live_badge_live),
+                                onClick = { onGoLiveClick?.invoke() },
                             )
-                            Text(
-                                text = next.title,
-                                style = LiveType.CellTitle.copy(
-                                    color = LiveColors.FgDim,
-                                    fontSize = 12.sp,
-                                ),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f),
+                        }
+
+                        // Guide button at far right
+                        if (onGuideClick != null) {
+                            HudActionButton(
+                                label = stringResource(R.string.live_btn_guide),
+                                onClick = onGuideClick,
                             )
                         }
                     }
                 }
             }
-            if (onBackClick != null) {
+        }
+    }
+}
+
+@Composable
+private fun HudSeekBar(
+    progress: Float,
+    positionMs: Long,
+    durationMs: Long,
+    onSeekToPosition: ((Long) -> Unit)?,
+    onOpenQuickZap: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .onFocusChanged { isFocused = it.isFocused }
+            .focusable()
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown) {
+                    val stepMs = 10_000L
+                    when (event.nativeKeyEvent.keyCode) {
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                            if (onSeekToPosition != null) {
+                                val newPos = (positionMs - stepMs).coerceAtLeast(0L)
+                                onSeekToPosition(newPos)
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_RIGHT -> {
+                            if (onSeekToPosition != null) {
+                                val maxDuration = if (durationMs > 0L) durationMs else positionMs + 300_000L
+                                val newPos = (positionMs + stepMs).coerceAtMost(maxDuration)
+                                onSeekToPosition(newPos)
+                                true
+                            } else false
+                        }
+                        AndroidKeyEvent.KEYCODE_DPAD_UP -> {
+                            if (onOpenQuickZap != null) {
+                                onOpenQuickZap()
+                                true
+                            } else false
+                        }
+                        else -> false
+                    }
+                } else false
+            }
+            .padding(vertical = 4.dp),
+    ) {
+        BoxWithConstraints(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(if (isFocused) 16.dp else 6.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            val trackWidth = maxWidth
+            val clampedProgress = progress.coerceIn(0f, 1f)
+
+            // Progress track background
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(if (isFocused) 6.dp else 4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isFocused) Color.White.copy(alpha = 0.35f) else LiveColors.Panel),
+            )
+
+            // Active progress fill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(clampedProgress)
+                    .height(if (isFocused) 6.dp else 4.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(LiveColors.Accent),
+            )
+
+            // Circular white Scrubber Thumb Ball when focused
+            if (isFocused) {
+                val maxThumbStart = (trackWidth - 16.dp).coerceAtLeast(0.dp)
+                val thumbOffset = (trackWidth * clampedProgress - 8.dp).coerceIn(0.dp, maxThumbStart)
                 Box(
                     modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(20.dp)
-                        .size(44.dp)
+                        .padding(start = thumbOffset)
+                        .size(16.dp)
                         .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.62f))
-                        .clickable { onBackClick() },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.back),
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp),
-                    )
-                }
+                        .background(Color.White),
+                )
             }
         }
     }
@@ -324,23 +609,55 @@ fun FullscreenHud(
 private fun HudIconButton(
     icon: ImageVector,
     contentDescription: String,
+    modifier: Modifier = Modifier,
     emphasis: Boolean = false,
+    focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
+    var isFocused by remember { mutableStateOf(false) }
+
+    val size = if (emphasis) 54.dp else 42.dp
+    val iconSize = if (emphasis) 28.dp else 22.dp
+
+    val bgColor = when {
+        isFocused -> Color.White
+        emphasis -> LiveColors.Accent
+        else -> Color.Black.copy(alpha = 0.55f)
+    }
+
+    val iconColor = when {
+        isFocused -> Color.Black
+        emphasis -> LiveColors.Bg
+        else -> Color.White
+    }
+
     Box(
-        modifier = Modifier
-            .size(if (emphasis) 42.dp else 36.dp)
+        modifier = modifier
+            .size(size)
             .clip(CircleShape)
-            .background(if (emphasis) LiveColors.Accent else LiveColors.Panel)
+            .onFocusChanged { isFocused = it.isFocused }
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .background(bgColor)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (emphasis) LiveColors.Bg else LiveColors.Fg,
-            modifier = Modifier.size(if (emphasis) 24.dp else 20.dp),
+            tint = iconColor,
+            modifier = Modifier.size(iconSize),
         )
+    }
+}
+
+private fun formatHeaderDateTime(millis: Long): String {
+    return try {
+        val instant = Instant.ofEpochMilli(millis)
+        val zdt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
+        val formatter = DateTimeFormatter.ofPattern("EEE, MMM d, h:mm a", Locale.US)
+        zdt.format(formatter)
+    } catch (_: Exception) {
+        ""
     }
 }
 
@@ -358,30 +675,27 @@ private fun formatPlaybackDuration(ms: Long): String {
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun HudBadge(label: String, fg: Color, bg: Color) {
-    Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(bg)
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-    ) {
-        Text(label, style = LiveType.Badge.copy(color = fg, fontSize = 10.sp))
-    }
-}
+private fun HudActionButton(
+    label: String,
+    onClick: () -> Unit,
+) {
+    var isFocused by remember { mutableStateOf(false) }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun HudActionButton(label: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
-            .background(LiveColors.Accent)
+            .onFocusChanged { isFocused = it.isFocused }
+            .background(if (isFocused) Color.White else LiveColors.Accent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
+            .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         Text(
             text = label,
-            style = LiveType.Badge.copy(color = LiveColors.Bg, fontSize = 10.sp),
+            style = LiveType.Badge.copy(
+                color = if (isFocused) Color.Black else LiveColors.Bg,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+            ),
         )
     }
 }

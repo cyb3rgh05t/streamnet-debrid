@@ -167,3 +167,6 @@ gradle-8.4-bin.zip
 *.zip
 _tmp_tv_perf/
 .vscode/settings.json
+
+# Agent skills & customizations
+.agents/
