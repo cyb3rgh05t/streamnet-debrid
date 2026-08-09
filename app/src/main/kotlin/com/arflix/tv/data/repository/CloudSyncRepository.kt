@@ -266,7 +266,7 @@ class CloudSyncRepository @Inject constructor(
     data class CloudProfileSettings(
         val defaultSubtitle: String = "Off",
         val defaultAudioLanguage: String = "Auto (Original)",
-        val contentLanguage: String = "en-US",
+        val contentLanguage: String = "de-DE",
         val subtitleSize: String = "Medium",
         val subtitleColor: String = "White",
         val subtitleStyle: String = "Bold",
@@ -623,7 +623,7 @@ class CloudSyncRepository @Inject constructor(
                     CloudProfileSettings(
                         defaultSubtitle = prefs[defaultSubtitleKeyFor(profile.id)] ?: "Off",
                         defaultAudioLanguage = prefs[defaultAudioLanguageKeyFor(profile.id)] ?: "Auto (Original)",
-                        contentLanguage = prefs[contentLanguageKeyFor(profile.id)] ?: "en-US",
+                        contentLanguage = prefs[contentLanguageKeyFor(profile.id)] ?: "de-DE",
 
                         trailerAutoPlay = prefs[trailerAutoPlayKeyFor(profile.id)] ?: false,
                         trailerSoundEnabled = prefs[trailerSoundEnabledKeyFor(profile.id)] ?: false,

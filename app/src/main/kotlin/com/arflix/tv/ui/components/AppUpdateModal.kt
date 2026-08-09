@@ -1,8 +1,11 @@
 package com.arflix.tv.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -14,9 +17,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.SystemUpdate
+import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -46,11 +54,10 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.arflix.tv.BuildConfig
 import com.arflix.tv.R
 import com.arflix.tv.util.LocalDeviceType
+import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
-import com.arflix.tv.ui.theme.BackgroundElevated
-import com.arflix.tv.ui.theme.Pink
-import com.arflix.tv.ui.theme.TextPrimary
-import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.updater.AppUpdate
 import com.arflix.tv.updater.UpdateStatus
 
 private data class ActionButtonConfig(
@@ -114,6 +121,9 @@ fun AppUpdateModal(
 
     var focusedIndex by remember(buttons) { mutableIntStateOf(buttons.lastIndex) }
     val focusRequester = remember { FocusRequester() }
+    val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
+    val update = status.updateOrNull()
+    val cardShape = RoundedCornerShape(12.dp)
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -134,7 +144,9 @@ fun AppUpdateModal(
                         if (LocalDeviceType.current.isTouchDevice()) Modifier.fillMaxWidth(0.92f).widthIn(max = 600.dp)
                         else Modifier.width(760.dp)
                     )
-                    .background(BackgroundElevated, RoundedCornerShape(18.dp))
+                    .clip(cardShape)
+                    .background(ArvioSkin.colors.surface)
+                    .border(1.dp, accent.copy(alpha = 0.38f), cardShape)
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
@@ -158,12 +170,39 @@ fun AppUpdateModal(
                         }
                     }
             ) {
-                androidx.compose.material3.Text(
-                    text = stringResource(R.string.app_update),
-                    style = ArflixTypography.sectionTitle,
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(accent.copy(alpha = 0.16f), RoundedCornerShape(10.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.SystemUpdate,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(25.dp),
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.update_github_releases),
+                            style = ArflixTypography.sectionTitle,
+                            color = ArvioSkin.colors.textPrimary,
+                        )
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.app_update),
+                            style = ArflixTypography.caption,
+                            color = ArvioSkin.colors.textMuted,
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
 
                 val subtitle = when (status) {
                     is UpdateStatus.Checking -> stringResource(R.string.update_msg_checking)
@@ -175,28 +214,62 @@ fun AppUpdateModal(
                     is UpdateStatus.Success -> stringResource(R.string.update_msg_uptodate)
                     is UpdateStatus.Idle -> stringResource(R.string.update_msg_no_info)
                 }
-                androidx.compose.material3.Text(subtitle, style = ArflixTypography.body, color = TextSecondary)
+                androidx.compose.material3.Text(subtitle, style = ArflixTypography.body, color = ArvioSkin.colors.textMuted)
 
-                if (status is UpdateStatus.UpdateAvailable) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    androidx.compose.material3.Text(
-                        text = stringResource(R.string.update_msg_current_to_latest, BuildConfig.VERSION_NAME, status.update.tag),
-                        style = ArflixTypography.caption,
-                        color = TextSecondary.copy(alpha = 0.78f)
-                    )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                if (update != null) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ArvioSkin.colors.background.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
+                            .padding(horizontal = 16.dp, vertical = 13.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        VersionBlock(
+                            label = stringResource(R.string.update_installed_version),
+                            value = BuildConfig.VERSION_NAME,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.padding(horizontal = 14.dp).size(20.dp),
+                        )
+                        VersionBlock(
+                            label = stringResource(R.string.update_available_version),
+                            value = update.tag,
+                            valueColor = accent,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Column(horizontalAlignment = Alignment.End) {
+                            androidx.compose.material3.Text(
+                                text = update.assetName,
+                                style = ArflixTypography.caption,
+                                color = ArvioSkin.colors.textMuted,
+                            )
+                            update.assetSizeBytes?.let { size ->
+                                androidx.compose.material3.Text(
+                                    text = formatUpdateSize(size),
+                                    style = ArflixTypography.badge,
+                                    color = ArvioSkin.colors.textMuted,
+                                )
+                            }
+                        }
+                    }
                 } else if (status is UpdateStatus.Success) {
-                    Spacer(modifier = Modifier.height(8.dp))
                     androidx.compose.material3.Text(
                         text = stringResource(R.string.update_msg_current_uptodate, BuildConfig.VERSION_NAME),
                         style = ArflixTypography.caption,
-                        color = TextSecondary.copy(alpha = 0.78f)
+                        color = accent,
                     )
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 if (status is UpdateStatus.Failure) {
-                    androidx.compose.material3.Text(status.message, style = ArflixTypography.body, color = Pink)
+                    androidx.compose.material3.Text(status.message, style = ArflixTypography.body, color = Color(0xFFFF6B6B))
                     Spacer(modifier = Modifier.height(12.dp))
                 }
 
@@ -205,30 +278,43 @@ fun AppUpdateModal(
                         LinearProgressIndicator(
                             progress = status.progress ?: 0f,
                             modifier = Modifier.fillMaxWidth(),
-                            color = Pink, // Uses ARVIO's Pink accent instead of SuccessGreen
-                            trackColor = Color.White.copy(alpha = 0.08f)
+                            color = accent,
+                            trackColor = ArvioSkin.colors.surfaceRaised,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         androidx.compose.material3.Text(
                             text = status.progress?.let { "${(it * 100).toInt()}%" } ?: stringResource(R.string.update_msg_preparing),
                             style = ArflixTypography.caption,
-                            color = TextSecondary
+                            color = ArvioSkin.colors.textMuted,
                         )
                     }
                     is UpdateStatus.ReadyToInstall -> {
-                        androidx.compose.material3.Text(stringResource(R.string.update_msg_ready), style = ArflixTypography.body, color = TextPrimary)
+                        androidx.compose.material3.Text(stringResource(R.string.update_msg_ready), style = ArflixTypography.body, color = accent)
                     }
                     is UpdateStatus.Installing -> {
-                        androidx.compose.material3.Text(stringResource(R.string.update_msg_installer_hint), style = ArflixTypography.body, color = TextPrimary)
+                        androidx.compose.material3.Text(stringResource(R.string.update_msg_installer_hint), style = ArflixTypography.body, color = ArvioSkin.colors.textPrimary)
                     }
                     is UpdateStatus.UpdateAvailable -> {
                         if (status.update.notes.isNotBlank()) {
-                            androidx.compose.material3.Text(
-                                text = status.update.notes.take(900),
-                                style = ArflixTypography.caption.copy(lineHeight = 18.sp),
-                                color = TextSecondary,
-                                modifier = Modifier.heightIn(max = 260.dp)
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(ArvioSkin.colors.surfaceRaised.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
+                                    .padding(14.dp),
+                            ) {
+                                androidx.compose.material3.Text(
+                                    text = stringResource(R.string.update_release_notes),
+                                    style = ArflixTypography.label,
+                                    color = accent,
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                androidx.compose.material3.Text(
+                                    text = status.update.notes.take(1800),
+                                    style = ArflixTypography.caption.copy(lineHeight = 18.sp),
+                                    color = ArvioSkin.colors.textMuted,
+                                    modifier = Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState()),
+                                )
+                            }
                         }
                     }
                     else -> {}
@@ -236,7 +322,10 @@ fun AppUpdateModal(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                ) {
                     buttons.forEachIndexed { index, btn ->
                         UpdateActionButton(
                             label = btn.label,
@@ -290,25 +379,29 @@ private fun UpdateActionButton(
     highlighted: Boolean = false,
     enabled: Boolean = true
 ) {
+    val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
     val background = when {
-        !enabled -> Color.White.copy(alpha = 0.06f)
-        highlighted && isFocused -> Pink
-        isFocused -> Color.White.copy(alpha = 0.16f)
-        highlighted -> Pink.copy(alpha = 0.18f)
-        else -> Color.White.copy(alpha = 0.08f)
+        !enabled -> ArvioSkin.colors.surfaceRaised.copy(alpha = 0.45f)
+        isFocused -> accent
+        highlighted -> accent.copy(alpha = 0.18f)
+        else -> ArvioSkin.colors.surfaceRaised
     }
     val textColor = when {
-        !enabled -> TextSecondary.copy(alpha = 0.6f)
-        highlighted && isFocused -> Color.Black
-        highlighted -> Color.White
-        isFocused -> TextPrimary
-        else -> TextSecondary
+        !enabled -> ArvioSkin.colors.textMuted.copy(alpha = 0.6f)
+        isFocused -> ArvioSkin.colors.background
+        highlighted -> accent
+        else -> ArvioSkin.colors.textMuted
     }
 
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
             .background(background)
+            .border(
+                width = 1.dp,
+                color = if (isFocused) accent else ArvioSkin.colors.focusOutline.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(10.dp),
+            )
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
@@ -321,3 +414,29 @@ private fun UpdateActionButton(
         )
     }
 }
+
+@Composable
+private fun VersionBlock(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    valueColor: Color = ArvioSkin.colors.textPrimary,
+) {
+    Column(modifier = modifier) {
+        androidx.compose.material3.Text(label, style = ArflixTypography.badge, color = ArvioSkin.colors.textMuted)
+        Spacer(modifier = Modifier.height(3.dp))
+        androidx.compose.material3.Text(value, style = ArflixTypography.cardTitle, color = valueColor)
+    }
+}
+
+private fun UpdateStatus.updateOrNull(): AppUpdate? = when (this) {
+    is UpdateStatus.UpdateAvailable -> update
+    is UpdateStatus.Downloading -> update
+    is UpdateStatus.ReadyToInstall -> update
+    is UpdateStatus.Installing -> update
+    is UpdateStatus.Failure -> update
+    else -> null
+}
+
+private fun formatUpdateSize(bytes: Long): String =
+    "%.1f MB".format(bytes.toDouble() / (1024.0 * 1024.0))

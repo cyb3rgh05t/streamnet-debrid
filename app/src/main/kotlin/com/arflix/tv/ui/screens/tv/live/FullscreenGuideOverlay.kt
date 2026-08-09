@@ -99,6 +99,7 @@ internal fun FullscreenGuideOverlay(
     guide: IptvNowNext?,
     selectedProgram: IptvProgram?,
     isTouchDevice: Boolean,
+    clockFormat: String = "24h",
     onDismiss: () -> Unit,
     onProgramSelect: (IptvProgram?) -> Unit,
     onLeftClick: (() -> Unit)? = null,
@@ -238,13 +239,13 @@ internal fun FullscreenGuideOverlay(
                     }
                     .clip(panelShape)
                     .border(
-                        BorderStroke(1.dp, Color.White.copy(alpha = if (isTouchDevice) 0.16f else 0.12f)),
+                        BorderStroke(1.dp, LiveColors.Accent.copy(alpha = if (isTouchDevice) 0.34f else 0.26f)),
                         panelShape
                     )
                     .background(
                         Brush.verticalGradient(
-                            0f to if (isTouchDevice) Color(0xF520222B) else Color(0xF2191B22),
-                            1f to Color(0xF0090A0E),
+                            0f to LiveColors.PanelDeep.copy(alpha = if (isTouchDevice) 0.98f else 0.96f),
+                            1f to LiveColors.Bg.copy(alpha = 0.98f),
                         )
                     )
                     .padding(if (isTouchDevice) 14.dp else 18.dp),
@@ -260,6 +261,7 @@ internal fun FullscreenGuideOverlay(
                     catchupSupported = catchupSupported,
                     nowMillis = nowMillis,
                     isTouchDevice = isTouchDevice,
+                    clockFormat = clockFormat,
                     onDismiss = onDismiss,
                     onProgramSelect = onProgramSelect,
                 )
@@ -281,6 +283,7 @@ private fun FullscreenGuideContent(
     catchupSupported: Boolean,
     nowMillis: Long,
     isTouchDevice: Boolean,
+    clockFormat: String,
     onDismiss: () -> Unit,
     onProgramSelect: (IptvProgram?) -> Unit,
 ) {
@@ -379,6 +382,7 @@ private fun FullscreenGuideContent(
                         nowMillis = nowMillis,
                         focusRequester = if (index == anchorIndex) anchorFocusRequester else null,
                         isTouchDevice = isTouchDevice,
+                        clockFormat = clockFormat,
                         onClick = {
                             when (item.state) {
                                 GuideProgramState.PastPlayable -> onProgramSelect(item.program)
@@ -492,19 +496,19 @@ private fun GuideProgramRow(
     nowMillis: Long,
     focusRequester: FocusRequester?,
     isTouchDevice: Boolean,
+    clockFormat: String,
     onClick: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     val playable = item.state == GuideProgramState.PastPlayable || item.state == GuideProgramState.Live
     val active = focused || selected
     val bg = when {
-        active -> LiveColors.PanelRaised.copy(alpha = 0.94f)
+        active -> LiveColors.Accent.copy(alpha = if (selected) 0.18f else 0.12f)
         item.state == GuideProgramState.Future -> Color.White.copy(alpha = 0.045f)
         else -> Color.White.copy(alpha = 0.07f)
     }
     val border = when {
-        selected -> LiveColors.Accent
-        focused -> LiveColors.Fg.copy(alpha = 0.42f)
+        selected || focused -> LiveColors.Accent
         else -> Color.White.copy(alpha = 0.08f)
     }
 
@@ -551,7 +555,7 @@ private fun GuideProgramRow(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                text = formatTimeWindow(item.program),
+                text = formatTimeWindow(item.program, clockFormat),
                 style = LiveType.TimeMono.copy(color = LiveColors.FgDim, fontSize = if (isTouchDevice) 8.sp else 9.sp),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

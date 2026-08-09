@@ -353,10 +353,21 @@ private fun HeroInfoPanel(
                 }
                 val group = channel?.source?.group?.takeIf { it.isNotBlank() }
                 Column(modifier = Modifier.weight(1f)) {
+                    channel?.name?.takeIf { it.isNotBlank() }?.let { channelName ->
+                        Text(
+                            text = channelName,
+                            style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 14.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
                     if (!group.isNullOrBlank()) {
-                        Text(text = group,
-                            style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 13.sp),
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            text = liveCategoryLabel(group),
+                            style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 10.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
                 if (isFavorite) {
@@ -369,7 +380,7 @@ private fun HeroInfoPanel(
 
             val nowProgram = nowNext?.now
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(text = "NOW", style = LiveType.SectionTag.copy(color = LiveColors.Accent))
+                Text(text = stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
                 Text(
                     text = nowProgram?.title ?: stringResource(R.string.live_placeholder_guide_pending),
                     style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
@@ -391,7 +402,7 @@ private fun HeroInfoPanel(
                         )
                         if (minsLeft > 0L) {
                             Text("·", style = LiveType.TimeMono.copy(color = LiveColors.FgMute))
-                            Text("$minsLeft min left", style = LiveType.TimeMono.copy(color = LiveColors.Accent))
+                            Text(stringResource(R.string.live_label_minutes_left, minsLeft), style = LiveType.TimeMono.copy(color = LiveColors.Accent))
                         }
                     }
                     LinearProgressIndicator(
@@ -404,7 +415,7 @@ private fun HeroInfoPanel(
             val upcoming = remember(nowNext) { collectUpcoming(nowNext).take(HeroUpcomingMax) }
             if (upcoming.isNotEmpty()) {
                 Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(text = "UPCOMING", style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
+                    Text(text = stringResource(R.string.live_label_upcoming), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
                     upcoming.forEach { program ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             Text(text = formatClock(program.startUtcMillis),

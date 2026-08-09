@@ -1,5 +1,7 @@
 package com.arflix.tv.ui.screens.home
 
+import com.arflix.tv.data.model.Category
+import com.arflix.tv.data.model.MediaItem
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -48,5 +50,47 @@ class HomeRowStateTest {
         )
 
         assertThat(resolvedIndex).isEqualTo(1)
+    }
+
+    @Test
+    fun `cold start prefers real continue watching over all other rows`() {
+        val categories = listOf(
+            Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Channel"))),
+            Category("trending_movies", "Trending Movies", listOf(MediaItem(20, "Movie"))),
+            Category("continue_watching", "Continue Watching", listOf(MediaItem(30, "Resume"))),
+        )
+
+        assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(2)
+    }
+
+    @Test
+    fun `cold start falls back to trending movies and not IPTV`() {
+        val categories = listOf(
+            Category("recent_tv", "Recently Watched TV", listOf(MediaItem(10, "Channel"))),
+            Category("favorite_tv", "Favorite TV", listOf(MediaItem(11, "Favorite"))),
+            Category("trending_movies", "Trending Movies", listOf(MediaItem(-1, "", isPlaceholder = true))),
+        )
+
+        assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(2)
+    }
+
+    @Test
+    fun `touch hero uses only continue watching items`() {
+        val continueWatching = MediaItem(id = 1, title = "Continue")
+        val recentlyWatchedTv = MediaItem(id = 2, title = "Recent TV")
+        val categories = listOf(
+            Category("recent_tv", "Recently Watched TV", listOf(recentlyWatchedTv)),
+            Category("continue_watching", "Continue Watching", listOf(continueWatching)),
+        )
+
+        assertThat(mobileHeroItems(categories)).containsExactly(continueWatching)
+    }
+
+    @Test
+    fun `recent TV row is hidden until it has real items`() {
+        val placeholder = MediaItem(id = -1, title = "", isPlaceholder = true)
+
+        assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(placeholder)))).isFalse()
+        assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(MediaItem(2, "Channel"))))).isTrue()
     }
 }

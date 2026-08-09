@@ -83,6 +83,7 @@ fun FullscreenHud(
     nowNext: IptvNowNext?,
     pokeSignal: Int,
     categoryName: String? = null,
+    clockFormat: String = "24h",
     isCatchupMode: Boolean = false,
     isPlaying: Boolean = true,
     isBuffering: Boolean = false,
@@ -192,7 +193,7 @@ fun FullscreenHud(
                     ),
             )
 
-            // --- Top Header Row (Category Name & Formatted Date/Time) ---
+            // --- Top Header Row (Channel, category & formatted date/time) ---
             Row(
                 modifier = Modifier
                     .align(Alignment.TopStart)
@@ -202,6 +203,7 @@ fun FullscreenHud(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Row(
+                    modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
@@ -223,21 +225,41 @@ fun FullscreenHud(
                         }
                     }
 
-                    if (!categoryName.isNullOrBlank()) {
-                        Text(
-                            text = categoryName.uppercase(),
-                            style = LiveType.SectionTag.copy(
-                                color = Color.White.copy(alpha = 0.9f),
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.sp,
-                            ),
-                        )
+                    if (channel != null || !categoryName.isNullOrBlank()) {
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            channel?.let {
+                                Text(
+                                    text = it.name,
+                                    style = LiveType.ChannelName.copy(
+                                        color = Color.White,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                            if (!categoryName.isNullOrBlank()) {
+                                Text(
+                                    text = liveCategoryLabel(categoryName),
+                                    style = LiveType.SectionTag.copy(
+                                        color = LiveColors.Accent,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                    ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
                     }
                 }
 
                 Text(
-                    text = formatHeaderDateTime(clockMillis),
+                    text = formatHeaderDateTime(clockMillis, clockFormat),
                     style = LiveType.TimeMono.copy(
                         color = Color.White.copy(alpha = 0.9f),
                         fontSize = 16.sp,
@@ -334,7 +356,7 @@ fun FullscreenHud(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            val timeWin = formatTimeWindow(now)
+                            val timeWin = formatTimeWindow(now, clockFormat)
                             if (timeWin.isNotBlank()) {
                                 Text(
                                     text = timeWin,
@@ -384,7 +406,7 @@ fun FullscreenHud(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
                                 Text(
-                                    text = "${formatClock(next.startUtcMillis)} — ${formatClock(next.endUtcMillis)}",
+                                    text = "${formatClock(next.startUtcMillis, clockFormat)} — ${formatClock(next.endUtcMillis, clockFormat)}",
                                     style = LiveType.TimeMono.copy(
                                         color = Color.White.copy(alpha = 0.5f),
                                         fontSize = 13.sp,
@@ -589,7 +611,7 @@ private fun HudSeekBar(
                     .background(LiveColors.Accent),
             )
 
-            // Circular white Scrubber Thumb Ball when focused
+            // Accent-colored scrubber thumb when focused
             if (isFocused) {
                 val maxThumbStart = (trackWidth - 16.dp).coerceAtLeast(0.dp)
                 val thumbOffset = (trackWidth * clampedProgress - 8.dp).coerceIn(0.dp, maxThumbStart)
@@ -598,7 +620,7 @@ private fun HudSeekBar(
                         .padding(start = thumbOffset)
                         .size(16.dp)
                         .clip(CircleShape)
-                        .background(Color.White),
+                        .background(LiveColors.Accent),
                 )
             }
         }
@@ -620,13 +642,13 @@ private fun HudIconButton(
     val iconSize = if (emphasis) 28.dp else 22.dp
 
     val bgColor = when {
-        isFocused -> Color.White
-        emphasis -> LiveColors.Accent
+        isFocused -> LiveColors.Accent
+        emphasis -> LiveColors.AccentDim
         else -> Color.Black.copy(alpha = 0.55f)
     }
 
     val iconColor = when {
-        isFocused -> Color.Black
+        isFocused -> LiveColors.Bg
         emphasis -> LiveColors.Bg
         else -> Color.White
     }
@@ -650,11 +672,12 @@ private fun HudIconButton(
     }
 }
 
-private fun formatHeaderDateTime(millis: Long): String {
+internal fun formatHeaderDateTime(millis: Long, clockFormat: String): String {
     return try {
         val instant = Instant.ofEpochMilli(millis)
         val zdt = LocalDateTime.ofInstant(instant, ZoneId.systemDefault())
-        val formatter = DateTimeFormatter.ofPattern("EEE, MMM d, h:mm a", Locale.US)
+        val pattern = if (clockFormat == "12h") "EEE, MMM d, h:mm a" else "EEE, MMM d, HH:mm"
+        val formatter = DateTimeFormatter.ofPattern(pattern, Locale.getDefault())
         zdt.format(formatter)
     } catch (_: Exception) {
         ""
@@ -685,14 +708,14 @@ private fun HudActionButton(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .onFocusChanged { isFocused = it.isFocused }
-            .background(if (isFocused) Color.White else LiveColors.Accent)
+            .background(if (isFocused) LiveColors.Accent else Color.Black.copy(alpha = 0.55f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp),
     ) {
         Text(
             text = label,
             style = LiveType.Badge.copy(
-                color = if (isFocused) Color.Black else LiveColors.Bg,
+                color = if (isFocused) LiveColors.Bg else Color.White,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
             ),

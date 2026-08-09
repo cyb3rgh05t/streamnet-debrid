@@ -543,6 +543,12 @@ class IptvRepository @Inject constructor(
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save tv session")
     }
 
+    fun saveTvSessionStateInRepositoryScope(state: IptvTvSessionState) {
+        iptvCacheScope.launch {
+            saveTvSessionState(state)
+        }
+    }
+
     suspend fun saveConfig(m3uUrl: String, epgUrl: String) {
         val profileId = profileManager.getProfileIdSync()
         val previousConfig = observeConfig().first()

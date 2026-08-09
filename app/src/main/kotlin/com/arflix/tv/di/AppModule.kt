@@ -40,7 +40,7 @@ object AppModule {
                 val originalHttpUrl = original.url
 
                 val langPrefs = context.getSharedPreferences("app_locale", android.content.Context.MODE_PRIVATE)
-                val lang = langPrefs.getString("locale_tag", "en-US") ?: "en-US"
+                val lang = com.arflix.tv.util.normalizeAppLanguage(langPrefs.getString("locale_tag", "de-DE"))
 
                 // Only inject if it's not the default English. Map "iw" to "he".
                 val urlBuilder = originalHttpUrl.newBuilder()

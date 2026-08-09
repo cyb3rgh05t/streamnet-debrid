@@ -148,4 +148,13 @@ class LiveTvStartupTest {
         assertThat(LiveTvStartup.shouldFocusSearch(1)).isTrue()
         assertThat(LiveTvStartup.shouldFocusSearch(7)).isTrue()
     }
+
+    @Test
+    fun fullscreenHeaderUsesSelectedClockFormat() {
+        val twelveHour = formatHeaderDateTime(0L, "12h")
+        val twentyFourHour = formatHeaderDateTime(0L, "24h")
+
+        assertThat(twelveHour).containsMatch("(?i)\\b(am|pm)\\b")
+        assertThat(twentyFourHour).doesNotContainMatch("(?i)\\b(am|pm)\\b")
+    }
 }

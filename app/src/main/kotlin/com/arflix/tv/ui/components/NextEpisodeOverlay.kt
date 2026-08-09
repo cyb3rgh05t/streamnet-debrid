@@ -54,10 +54,9 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import coil.compose.AsyncImage
+import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
-import com.arflix.tv.ui.theme.Pink
-import com.arflix.tv.ui.theme.TextPrimary
-import com.arflix.tv.ui.theme.TextSecondary
 import kotlinx.coroutines.delay
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
@@ -85,6 +84,8 @@ fun NextEpisodeOverlay(
     var countdown by remember(isVisible) { mutableIntStateOf(countdownSeconds) }
     var progress by remember(isVisible) { mutableFloatStateOf(1f) }
     var actionTaken by remember(seasonNumber, episodeNumber) { mutableStateOf(false) }
+    val accentColor = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
+    val cardShape = RoundedCornerShape(20.dp)
     val overlayFocusRequester = remember { FocusRequester() }
     val focusedButton = focusedButtonOverride ?: internalFocusedButton
     fun updateFocusedButton(value: Int) {
@@ -169,19 +170,31 @@ fun NextEpisodeOverlay(
                 modifier = Modifier
                     .padding(48.dp)
                     .width(500.dp)
-                    .background(
-                        brush = Brush.horizontalGradient(
-                            colors = listOf(
-                                Color.Black.copy(alpha = 0.95f),
-                                Color(0xFF1A1A1A).copy(alpha = 0.98f)
-                            )
-                        ),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .border(1.dp, Color.White.copy(alpha = 0.1f), RoundedCornerShape(20.dp))
-                    .padding(24.dp)
+                    .clip(cardShape)
+                    .background(ArvioSkin.colors.surface)
+                    .border(1.dp, accentColor.copy(alpha = 0.45f), cardShape)
             ) {
-                Column {
+                if (!episodeImage.isNullOrBlank()) {
+                    AsyncImage(
+                        model = episodeImage,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                colors = listOf(
+                                    ArvioSkin.colors.background.copy(alpha = 0.98f),
+                                    ArvioSkin.colors.surface.copy(alpha = 0.88f),
+                                )
+                            )
+                        )
+                )
+                Column(modifier = Modifier.padding(24.dp)) {
                     // Header
                     Row(
                         verticalAlignment = Alignment.CenterVertically
@@ -189,20 +202,20 @@ fun NextEpisodeOverlay(
                         Icon(
                             imageVector = Icons.Default.SkipNext,
                             contentDescription = null,
-                            tint = Pink,
+                            tint = accentColor,
                             modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
                             text = stringResource(R.string.next).uppercase(),
                             style = ArflixTypography.label,
-                            color = Pink
+                            color = accentColor
                         )
                         Spacer(modifier = Modifier.weight(1f))
                         Text(
                             text = "in ${countdown}s",
                             style = ArflixTypography.body,
-                            color = TextSecondary
+                            color = ArvioSkin.colors.textMuted
                         )
                     }
 
@@ -230,13 +243,13 @@ fun NextEpisodeOverlay(
                                 Box(
                                     modifier = Modifier
                                         .fillMaxSize()
-                                        .background(Color(0xFF222222)),
+                                        .background(ArvioSkin.colors.surfaceRaised),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.PlayArrow,
                                         contentDescription = null,
-                                        tint = TextSecondary,
+                                        tint = ArvioSkin.colors.textMuted,
                                         modifier = Modifier.size(32.dp)
                                     )
                                 }
@@ -253,13 +266,13 @@ fun NextEpisodeOverlay(
                                     modifier = Modifier
                                         .fillMaxHeight()
                                         .fillMaxSize()
-                                        .background(Color.White.copy(alpha = 0.3f))
+                                        .background(ArvioSkin.colors.textMuted.copy(alpha = 0.3f))
                                 )
                                 Box(
                                     modifier = Modifier
                                         .fillMaxHeight()
                                         .width((160 * progress).dp)
-                                        .background(Pink)
+                                        .background(accentColor)
                                 )
                             }
                         }
@@ -271,12 +284,12 @@ fun NextEpisodeOverlay(
                             Text(
                                 text = showTitle,
                                 style = ArflixTypography.caption,
-                                color = TextSecondary
+                                color = ArvioSkin.colors.textMuted
                             )
                             Text(
                                 text = episodeTitle,
                                 style = ArflixTypography.cardTitle,
-                                color = TextPrimary,
+                                color = ArvioSkin.colors.textPrimary,
                                 maxLines = 2,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -284,7 +297,7 @@ fun NextEpisodeOverlay(
                             Text(
                                 text = "S$seasonNumber E$episodeNumber",
                                 style = ArflixTypography.badge,
-                                color = TextSecondary
+                                color = ArvioSkin.colors.textMuted
                             )
                         }
                     }
@@ -301,12 +314,12 @@ fun NextEpisodeOverlay(
                                 .weight(1f)
                                 .height(48.dp)
                                 .background(
-                                    if (focusedButton == 0) Pink else Color.White.copy(alpha = 0.1f),
+                                    if (focusedButton == 0) accentColor else ArvioSkin.colors.surfaceRaised.copy(alpha = 0.82f),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .border(
-                                    width = if (focusedButton == 0) 0.dp else 1.dp,
-                                    color = Color.White.copy(alpha = 0.2f),
+                                    width = 1.dp,
+                                    color = if (focusedButton == 0) accentColor else ArvioSkin.colors.focusOutline.copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable { playNextOnce() },
@@ -319,14 +332,14 @@ fun NextEpisodeOverlay(
                                 Icon(
                                     imageVector = Icons.Default.PlayArrow,
                                     contentDescription = null,
-                                    tint = if (focusedButton == 0) Color.Black else TextSecondary,
+                                    tint = if (focusedButton == 0) ArvioSkin.colors.background else ArvioSkin.colors.textMuted,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = stringResource(R.string.play).uppercase(),
                                     style = ArflixTypography.button,
-                                    color = if (focusedButton == 0) Color.Black else TextSecondary
+                                    color = if (focusedButton == 0) ArvioSkin.colors.background else ArvioSkin.colors.textMuted
                                 )
                             }
                         }
@@ -336,12 +349,12 @@ fun NextEpisodeOverlay(
                             modifier = Modifier
                                 .size(48.dp)
                                 .background(
-                                    if (focusedButton == 1) Color.White else Color.White.copy(alpha = 0.1f),
+                                    if (focusedButton == 1) accentColor else ArvioSkin.colors.surfaceRaised.copy(alpha = 0.82f),
                                     RoundedCornerShape(12.dp)
                                 )
                                 .border(
-                                    width = if (focusedButton == 1) 0.dp else 1.dp,
-                                    color = Color.White.copy(alpha = 0.2f),
+                                    width = 1.dp,
+                                    color = if (focusedButton == 1) accentColor else ArvioSkin.colors.focusOutline.copy(alpha = 0.2f),
                                     shape = RoundedCornerShape(12.dp)
                                 )
                                 .clickable { cancelOnce() },
@@ -350,7 +363,7 @@ fun NextEpisodeOverlay(
                             Icon(
                                 imageVector = Icons.Default.Close,
                                 contentDescription = stringResource(R.string.cancel),
-                                tint = if (focusedButton == 1) Color.Black else TextSecondary,
+                                tint = if (focusedButton == 1) ArvioSkin.colors.background else ArvioSkin.colors.textMuted,
                                 modifier = Modifier.size(24.dp)
                             )
                         }

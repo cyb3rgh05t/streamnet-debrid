@@ -202,6 +202,7 @@ private fun ProfileDialogContent(
     val useMobileLayout = isTouchDevice && configuration.screenWidthDp < 700
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
     val confirmButtonFocusRequester = remember { FocusRequester() }
+    val avatarInitialFocusRequester = remember { FocusRequester() }
 
     fun showKeyboard(editText: EditText) {
         editText.post {
@@ -222,6 +223,31 @@ private fun ProfileDialogContent(
         }
     }
 
+    fun moveFocusFromNameInput(editText: EditText, target: FocusRequester) {
+        val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(editText.windowToken, 0)
+        editText.clearFocus()
+        editText.post { runCatching { target.requestFocus() } }
+    }
+
+    fun installTvNameInputNavigation(editText: EditText) {
+        editText.setOnKeyListener { _, keyCode, event ->
+            if (isTouchDevice || event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_RIGHT,
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    moveFocusFromNameInput(editText, avatarInitialFocusRequester)
+                    true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    moveFocusFromNameInput(editText, confirmButtonFocusRequester)
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             onAvatarImageSelected(uri.toString())
@@ -236,15 +262,22 @@ private fun ProfileDialogContent(
     }
 
     LaunchedEffect(isTouchDevice, autoFocusNameInput) {
-        if (!isTouchDevice && !autoFocusNameInput) {
-            // Always give the dialog a visible focused control on TV.
-            runCatching { confirmButtonFocusRequester.requestFocus() }
+        if (!isTouchDevice) {
+            kotlinx.coroutines.delay(80)
+            // A native EditText traps TV focus during profile creation. Start on
+            // the avatar picker instead; the name field remains reachable by D-pad.
+            val initialRequester = if (autoFocusNameInput) {
+                avatarInitialFocusRequester
+            } else {
+                confirmButtonFocusRequester
+            }
+            runCatching { initialRequester.requestFocus() }
         }
     }
 
     LaunchedEffect(autoFocusNameInput, editTextRef) {
         val editText = editTextRef ?: return@LaunchedEffect
-        if (autoFocusNameInput) {
+        if (autoFocusNameInput && isTouchDevice) {
             editText.requestFocus()
             editText.setSelection(editText.text?.length ?: 0)
             showKeyboard(editText)
@@ -338,6 +371,7 @@ private fun ProfileDialogContent(
                                     imeOptions = EditorInfo.IME_ACTION_DONE
                                     isFocusable = true
                                     isFocusableInTouchMode = true
+                                    installTvNameInputNavigation(this)
                                     doAfterTextChanged { editable ->
                                         onNameChange(editable?.toString() ?: "")
                                     }
@@ -488,7 +522,8 @@ private fun ProfileDialogContent(
                                         avatarId = 0,
                                         isSelected = selectedAvatarId == 0,
                                         onClick = { onAvatarSelected(0) },
-                                        isNone = true
+                                        isNone = true,
+                                        modifier = Modifier.focusRequester(avatarInitialFocusRequester),
                                     )
                                 }
                             }
@@ -582,6 +617,7 @@ private fun ProfileDialogContent(
                                         imeOptions = EditorInfo.IME_ACTION_DONE
                                         isFocusable = true
                                         isFocusableInTouchMode = true
+                                        installTvNameInputNavigation(this)
                                         doAfterTextChanged { editable ->
                                             onNameChange(editable?.toString() ?: "")
                                         }
@@ -738,7 +774,8 @@ private fun ProfileDialogContent(
                                             avatarId = 0,
                                             isSelected = selectedAvatarId == 0,
                                             onClick = { onAvatarSelected(0) },
-                                            isNone = true
+                                            isNone = true,
+                                            modifier = Modifier.focusRequester(avatarInitialFocusRequester),
                                         )
                                     }
                                 }
@@ -872,7 +909,8 @@ private fun AvatarGridItem(
     avatarId: Int,
     isSelected: Boolean,
     onClick: () -> Unit,
-    isNone: Boolean = false
+    isNone: Boolean = false,
+    modifier: Modifier = Modifier,
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     var isFocused by remember { mutableIntStateOf(0) }
@@ -930,7 +968,7 @@ private fun AvatarGridItem(
 
     if (isTouchDevice) {
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .size(54.dp)
                 .clip(RoundedCornerShape(10.dp))
                 .border(
@@ -946,7 +984,7 @@ private fun AvatarGridItem(
     } else {
         Surface(
             onClick = onClick,
-            modifier = Modifier
+            modifier = modifier
                 .size(54.dp)
                 .scale(scale)
                 .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },

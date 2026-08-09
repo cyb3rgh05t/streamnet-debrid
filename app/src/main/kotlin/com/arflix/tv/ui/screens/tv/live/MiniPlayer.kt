@@ -442,15 +442,21 @@ private fun NextRow(nowNext: IptvNowNext?) {
     }
 }
 
-internal fun formatTimeWindow(p: IptvProgram?): String {
+internal fun formatTimeWindow(p: IptvProgram?, clockFormat: String = "24h"): String {
     if (p == null) return "—"
-    return "${formatClock(p.startUtcMillis)} – ${formatClock(p.endUtcMillis)}"
+    return "${formatClock(p.startUtcMillis, clockFormat)} – ${formatClock(p.endUtcMillis, clockFormat)}"
 }
 
-internal fun formatClock(utcMillis: Long): String {
+internal fun formatClock(utcMillis: Long, clockFormat: String = "24h"): String {
     val c = java.util.Calendar.getInstance()
     c.timeInMillis = utcMillis
-    return "%02d:%02d".format(c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE))
+    return if (clockFormat == "12h") {
+        val hour = c.get(java.util.Calendar.HOUR).let { if (it == 0) 12 else it }
+        val suffix = if (c.get(java.util.Calendar.AM_PM) == java.util.Calendar.AM) "AM" else "PM"
+        "%d:%02d %s".format(hour, c.get(java.util.Calendar.MINUTE), suffix)
+    } else {
+        "%02d:%02d".format(c.get(java.util.Calendar.HOUR_OF_DAY), c.get(java.util.Calendar.MINUTE))
+    }
 }
 
 internal fun remainingLabel(p: IptvProgram?): String {

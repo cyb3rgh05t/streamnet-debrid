@@ -65,6 +65,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -96,6 +97,7 @@ import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
 import com.arflix.tv.ui.components.topBarSelectedIndex
 import com.arflix.tv.util.LocalDeviceType
+import com.arflix.tv.util.settingsDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
@@ -428,6 +430,12 @@ fun LiveTvScreen(
     val configuration = LocalConfiguration.current
     val deviceType = LocalDeviceType.current
     val isTouchDevice = deviceType.isTouchDevice()
+    val clockFormatKey = remember(currentProfile?.id) {
+        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_clock_format")
+    }
+    val clockFormat by remember(context, clockFormatKey) {
+        context.settingsDataStore.data.map { preferences -> preferences[clockFormatKey] ?: "24h" }
+    }.collectAsStateWithLifecycle(initialValue = "24h")
     val useTouchRail = isTouchDevice
     val compactTouchLayout = isTouchDevice && configuration.screenWidthDp < 900
     val showTopBar = !isTouchDevice
@@ -1591,6 +1599,7 @@ fun LiveTvScreen(
         selectedCategoryId,
         filteredChannelsWindowKey,
         selectedDisplayChannelId,
+        state.tvSession.lastFocusedZone,
         startupFocusApplied,
     ) {
         if (startupFocusApplied || isTouchDevice || !startupChannelApplied || !startupCategoryApplied) {
@@ -1604,8 +1613,19 @@ fun LiveTvScreen(
         rememberedChannelByCategory[selectedCategoryId] = displayId
         filteredChannelIndexById[displayId]
             ?.let { setGuideWindow(guideWindowAround(it, filteredChannels.size)) }
-        focusZone = LiveTvFocusZone.CHANNEL_LIST
-        focusSelectedChannelSignal += 1
+        val restoredFocusZone = runCatching {
+            LiveTvFocusZone.valueOf(state.tvSession.lastFocusedZone)
+        }.getOrDefault(LiveTvFocusZone.CHANNEL_LIST)
+        focusZone = when (restoredFocusZone) {
+            LiveTvFocusZone.CATEGORY_LIST -> LiveTvFocusZone.CATEGORY_LIST
+            LiveTvFocusZone.EPG -> LiveTvFocusZone.EPG
+            else -> LiveTvFocusZone.CHANNEL_LIST
+        }
+        if (focusZone == LiveTvFocusZone.CATEGORY_LIST) {
+            focusSelectedCategorySignal += 1
+        } else {
+            focusSelectedChannelSignal += 1
+        }
         startupFocusApplied = true
     }
 
@@ -1617,6 +1637,7 @@ fun LiveTvScreen(
         selectedCategoryId,
         focusedChannelId,
         playingChannelId,
+        focusZone,
         startupCategoryApplied,
     ) {
         if (!state.tvSessionLoaded || !state.iptvPreferencesLoaded || !startupCategoryApplied) return@LaunchedEffect
@@ -1624,12 +1645,13 @@ fun LiveTvScreen(
         viewModel.rememberTvSession(
             lastChannelId = lastChannel,
             lastGroupName = selectedCategoryId,
-            lastFocusedZone = "GUIDE",
+            lastFocusedZone = focusZone.name,
         )
     }
     val latestSessionCategoryId by rememberUpdatedState(selectedCategoryId)
     val latestSessionFocusedChannelId by rememberUpdatedState(focusedChannelId)
     val latestSessionPlayingChannelId by rememberUpdatedState(playingChannelId)
+    val latestSessionFocusZone by rememberUpdatedState(focusZone)
     val latestStartupCategoryApplied by rememberUpdatedState(startupCategoryApplied)
     DisposableEffect(Unit) {
         onDispose {
@@ -1641,7 +1663,7 @@ fun LiveTvScreen(
             viewModel.rememberTvSession(
                 lastChannelId = lastChannel,
                 lastGroupName = latestSessionCategoryId,
-                lastFocusedZone = "GUIDE",
+                lastFocusedZone = latestSessionFocusZone.name,
                 flushImmediately = true,
             )
         }
@@ -2858,6 +2880,7 @@ fun LiveTvScreen(
                         nowNext = currentNowNext,
                         pokeSignal = hudPokeSignal,
                         categoryName = categoryTitle,
+                        clockFormat = clockFormat,
                         isCatchupMode = playingCatchupProgram != null,
                         isPlaying = if (playingCatchupProgram != null) playerPlayWhenReady else playerIsPlaying,
                         isBuffering = playerIsBuffering,
@@ -2956,6 +2979,7 @@ fun LiveTvScreen(
                     guide = guideForChannel(guideChannel ?: playingChannel),
                     selectedProgram = playingCatchupProgram,
                     isTouchDevice = isTouchDevice,
+                    clockFormat = clockFormat,
                     onDismiss = {
                         fullscreenGuideOpen = false
                         if (guideOpenedFromQuickZap) {

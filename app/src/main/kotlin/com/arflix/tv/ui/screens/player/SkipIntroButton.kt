@@ -40,6 +40,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import com.arflix.tv.data.repository.SkipInterval
+import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
 import kotlinx.coroutines.delay
 
@@ -91,6 +93,7 @@ fun SkipIntroButton(
     }
 
     val shape = RoundedCornerShape(20.dp) // match PlayerTextButtonFocusable
+    val accentColor = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
     val scale by animateFloatAsState(if (isFocused) 1.08f else 1f, label = "skip_scale")
 
     AnimatedVisibility(
@@ -124,12 +127,12 @@ fun SkipIntroButton(
                     scaleY = scale
                 }
                 .background(
-                    if (isFocused) Color.White else Color.White.copy(alpha = 0.1f),
+                    if (isFocused) accentColor else ArvioSkin.colors.surfaceRaised.copy(alpha = 0.82f),
                     shape
                 )
                 .border(
                     width = 1.dp,
-                    color = Color.White.copy(alpha = 0.2f),
+                    color = if (isFocused) accentColor else ArvioSkin.colors.focusOutline.copy(alpha = 0.2f),
                     shape = shape
                 )
                 .padding(horizontal = 20.dp, vertical = 10.dp),
@@ -141,7 +144,7 @@ fun SkipIntroButton(
                     fontSize = 14.sp,
                     fontWeight = if (isFocused) FontWeight.SemiBold else FontWeight.Normal
                 ),
-                color = if (isFocused) Color.Black else Color.White
+                color = if (isFocused) ArvioSkin.colors.background else ArvioSkin.colors.textPrimary
             )
         }
     }

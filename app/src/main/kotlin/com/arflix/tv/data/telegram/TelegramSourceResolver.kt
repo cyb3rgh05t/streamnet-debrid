@@ -95,8 +95,10 @@ class TelegramSourceResolver @Inject constructor(
         val excludedIds = repository.getExcludedChatIds().first()
         // Read content language from SharedPreferences (same store SettingsViewModel writes to).
         // Avoids a DI cycle: StreamRepository → TelegramSourceResolver → MediaRepository → StreamRepository.
-        val rawLang = context.getSharedPreferences("app_locale", android.content.Context.MODE_PRIVATE)
-            .getString("locale_tag", "en-US") ?: "en-US"
+        val rawLang = com.arflix.tv.util.normalizeAppLanguage(
+            context.getSharedPreferences("app_locale", android.content.Context.MODE_PRIVATE)
+                .getString("locale_tag", "de-DE")
+        )
         val langCode = rawLang.replace("iw", "he").substringBefore("-")
         val (englishTitle, localizedTitle) = fetchTitles(imdbId, isMovie, langCode)
 

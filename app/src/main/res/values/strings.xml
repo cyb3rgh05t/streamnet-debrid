@@ -23,6 +23,8 @@
 
     <!-- Home screen labels -->
     <string name="continue_watching">Continue Watching</string>
+    <string name="home_favorite_tv">Favorite TV</string>
+    <string name="home_recently_watched_tv">Recently Watched TV</string>
     <string name="trending_movies">Trending Movies</string>
     <string name="trending_series">Trending Series</string>
     <string name="trending_anime">Trending Anime</string>
@@ -803,6 +805,8 @@
     <string name="live_label_channels">CHANNELS</string>
     <string name="live_label_now_time">NOW %1$s</string>
     <string name="live_label_duration_min">·  %1$dmin</string>
+    <string name="live_label_minutes_left">%1$d min left</string>
+    <string name="live_label_upcoming">UPCOMING</string>
     <string name="live_label_quality_variants">%1$s %2$dx</string>
     <string name="live_label_all_channels">All Channels</string>
     <string name="live_label_search_channels">Search channels</string>
@@ -873,6 +877,10 @@
     <string name="loading_resolving_from">Resolving from %1$s</string>
     <string name="loading_finding_best_quality">Finding best quality stream...</string>
     <string name="update_btn_ignore">Ignore</string>
+    <string name="update_github_releases">GitHub Releases</string>
+    <string name="update_installed_version">INSTALLED</string>
+    <string name="update_available_version">AVAILABLE</string>
+    <string name="update_release_notes">RELEASE NOTES</string>
     <string name="update_btn_download">Download</string>
     <string name="update_btn_install">Install</string>
     <string name="update_btn_hide">Hide</string>

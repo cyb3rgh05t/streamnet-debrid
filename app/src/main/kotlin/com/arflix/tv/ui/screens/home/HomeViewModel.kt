@@ -1054,9 +1054,10 @@ class HomeViewModel @Inject constructor(
     private suspend fun applyContentLanguageFromPrefs(): String {
         val prefs = context.settingsDataStore.data.first()
         val profileId = profileManager.getProfileId()
-        val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "en-US"
-        val language = prefs[profileManager.profileStringKeyFor(profileId, "content_language")]
-            ?: fallbackLanguage
+        val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "de-DE"
+        val language = com.arflix.tv.util.normalizeAppLanguage(
+            prefs[profileManager.profileStringKeyFor(profileId, "content_language")] ?: fallbackLanguage
+        )
         mediaRepository.contentLanguage = if (language == "en-US") null else language
         return language
     }
@@ -3102,6 +3103,7 @@ class HomeViewModel @Inject constructor(
 
         savedCatalogs.forEach { cfg ->
             if (isCollectionTileConfig(cfg)) return@forEach
+            if (cfg.id == RECENT_TV_CATEGORY_ID) return@forEach
             val rowItems = if (isCollectionRailConfig(cfg)) {
                 val group = cfg.collectionGroup
                 val matchingConfigs = savedCatalogs.filter {

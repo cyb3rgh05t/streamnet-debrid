@@ -2008,11 +2008,20 @@ class TvViewModel @Inject constructor(
             lastOpenedAt = if (markOpened || channelChanged) System.currentTimeMillis() else current.lastOpenedAt,
             recentChannelIds = recentChannelIds
         )
-        if (next == current) return
+        if (next == current) {
+            if (flushImmediately) {
+                iptvRepository.saveTvSessionStateInRepositoryScope(next)
+            }
+            return
+        }
 
         _uiState.value = _uiState.value.copy(tvSession = next)
         maybeWarmStartupGuide()
         tvSessionSaveJob?.cancel()
+        if (flushImmediately) {
+            iptvRepository.saveTvSessionStateInRepositoryScope(next)
+            return
+        }
         tvSessionSaveJob = viewModelScope.launch(Dispatchers.IO) {
             iptvRepository.saveTvSessionState(next)
             if (markOpened || channelChanged) {

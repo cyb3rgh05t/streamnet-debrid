@@ -189,7 +189,7 @@ data class SettingsUiState(
     val plexHomeServerAuth: PlexPinAuthSession? = null,
     val isPlexHomeServerPolling: Boolean = false,
     // Content language (TMDB metadata)
-    val contentLanguage: String = "en-US",
+    val contentLanguage: String = "de-DE",
     // Device mode override
     val deviceModeOverride: String = "auto",
     // Skip profile selection
@@ -445,7 +445,7 @@ class SettingsViewModel @Inject constructor(
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
             val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
-            val contentLang = prefs[contentLanguageKey()] ?: "en-US"
+            val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
             mediaRepository.contentLanguage = if (contentLang == "en-US") null else contentLang
             var autoPlay = prefs[autoPlayNextKey()] ?: true
