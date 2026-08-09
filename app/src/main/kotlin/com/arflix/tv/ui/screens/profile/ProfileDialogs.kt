@@ -76,6 +76,7 @@ import com.arflix.tv.data.model.ProfileColors
 import com.arflix.tv.ui.components.AvatarIcon
 import com.arflix.tv.ui.components.AvatarRegistry
 import com.arflix.tv.ui.components.avatarCategoryLabel
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.ProfileAvatarFiles
 import coil.compose.AsyncImage
@@ -913,6 +914,7 @@ private fun AvatarGridItem(
     modifier: Modifier = Modifier,
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val focusRingColor = resolveAccentColor(fallback = Color.White)
     var isFocused by remember { mutableIntStateOf(0) }
     val scale by animateFloatAsState(
         targetValue = if (isFocused > 0) 1.12f else 1f,
@@ -973,7 +975,7 @@ private fun AvatarGridItem(
                 .clip(RoundedCornerShape(10.dp))
                 .border(
                     width = if (isSelected || isFocused > 0) 2.dp else 1.dp,
-                    color = if (isSelected || isFocused > 0) Color.White else Color.White.copy(alpha = 0.08f),
+                    color = if (isSelected || isFocused > 0) focusRingColor else Color.White.copy(alpha = 0.08f),
                     shape = RoundedCornerShape(10.dp)
                 )
                 .clickable { onClick() }
@@ -996,7 +998,7 @@ private fun AvatarGridItem(
             border = ClickableSurfaceDefaults.border(
                 border = if (isSelected) {
                     androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, focusRingColor),
                         shape = RoundedCornerShape(10.dp)
                     )
                 } else {
@@ -1006,7 +1008,7 @@ private fun AvatarGridItem(
                     )
                 },
                 focusedBorder = androidx.tv.material3.Border(
-                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                    border = androidx.compose.foundation.BorderStroke(2.dp, focusRingColor),
                     shape = RoundedCornerShape(10.dp)
                 )
             )

@@ -46,6 +46,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -64,7 +65,6 @@ import com.arflix.tv.ui.components.Toast
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.util.LocalDeviceType
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import com.arflix.tv.R
 
@@ -509,8 +509,7 @@ private fun AddProfileButton(
     val accentColor = resolveAccentColor(fallback = Color.White)
 
     Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
         val addContent: @Composable () -> Unit = {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -519,18 +518,23 @@ private fun AddProfileButton(
         }
         if (isTouchDevice) {
             Box(
-                modifier = Modifier
+                modifier = modifier
                     .size(avatarSize)
                     .scale(scale)
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.White.copy(alpha = 0.1f))
-                    .border(2.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                    .border(
+                        width = if (isFocused > 0) 3.dp else 2.dp,
+                        color = if (isFocused > 0) accentColor else Color.White.copy(alpha = 0.3f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 }
                     .clickable { onClick() }
             ) { addContent() }
         } else {
             Surface(
                 onClick = onClick,
-                modifier = Modifier
+                modifier = modifier
                     .size(avatarSize)
                     .scale(scale)
                     .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },

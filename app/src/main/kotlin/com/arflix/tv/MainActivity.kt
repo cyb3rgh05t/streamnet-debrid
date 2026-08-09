@@ -47,6 +47,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -70,6 +71,7 @@ import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.LocalHasTouchScreen
 import com.arflix.tv.util.LocalAppLanguage
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
+import com.arflix.tv.util.detectAutoDeviceType
 import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.util.deviceHasTouchScreen
 import com.arflix.tv.util.settingsDataStore
@@ -305,11 +307,19 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(appLanguage) {
                 mediaRepository.get().contentLanguage = if (appLanguage == "en-US") null else appLanguage
             }
+            val currentConfiguration = LocalConfiguration.current
+            val autoDeviceType = remember(
+                currentConfiguration.smallestScreenWidthDp,
+                currentConfiguration.screenWidthDp,
+                currentConfiguration.screenHeightDp,
+            ) {
+                detectAutoDeviceType(this@MainActivity, currentConfiguration)
+            }
             val deviceType = when (deviceModeOverride) {
                 "tv" -> DeviceType.TV
                 "tablet" -> DeviceType.TABLET
                 "phone" -> DeviceType.PHONE
-                else -> initialDeviceType
+                else -> autoDeviceType
             }
             val hasTouchScreen = remember { deviceHasTouchScreen(this@MainActivity) }
             // If no touchscreen, force TV mode regardless of override setting

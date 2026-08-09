@@ -6,6 +6,7 @@ import android.content.res.Configuration
 import androidx.compose.runtime.compositionLocalOf
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlin.math.min
 
 enum class DeviceType {
     TV,
@@ -78,6 +79,14 @@ fun detectDeviceType(context: Context): DeviceType {
         // "auto" or null -> fall through to auto-detection
     }
 
+    return detectAutoDeviceType(context, context.resources.configuration)
+}
+
+fun detectAutoDeviceType(
+    context: Context,
+    configuration: Configuration,
+): DeviceType {
+
     val packageManager = context.packageManager
 
     if (packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
@@ -92,7 +101,8 @@ fun detectDeviceType(context: Context): DeviceType {
         return DeviceType.TV
     }
 
-    val smallestWidthDp = context.resources.configuration.smallestScreenWidthDp
+    val smallestWidthDp = configuration.smallestScreenWidthDp.takeIf { it > 0 }
+        ?: min(configuration.screenWidthDp, configuration.screenHeightDp)
     if (smallestWidthDp >= 600) {
         return DeviceType.TABLET
     }
