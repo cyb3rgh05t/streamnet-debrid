@@ -784,7 +784,6 @@ class StreamRepository @Inject constructor(
     suspend fun addCustomAddon(url: String, customName: String? = null): Result<Addon> = withContext(Dispatchers.IO) {
         try {
             val newAddon = hydrateCustomAddon(url, customName)
-
             val addons = installedAddons.first().toMutableList()
             // Remove existing addon with same ID if present
             addons.removeAll { it.id == newAddon.id }
@@ -799,13 +798,20 @@ class StreamRepository @Inject constructor(
         }
     }
 
+    /**
+     * Refresh all installed custom addons by re-fetching manifests, invalidating stream caches,
+     * and returning a refresh report.
+     */
     suspend fun refreshInstalledAddons(): AddonRefreshReport = withContext(Dispatchers.IO) {
         val currentAddons = installedAddons.first()
         var refreshedCount = 0
         var failedCount = 0
 
         val updatedAddons = currentAddons.map { oldAddon ->
-            val addonUrl = oldAddon.url?.takeIf { it.isNotBlank() }
+            val isRefreshable = oldAddon.isInstalled &&
+                oldAddon.runtimeKind == RuntimeKind.STREMIO &&
+                defaultAddons.none { it.id == oldAddon.id }
+            val addonUrl = oldAddon.url?.takeIf { isRefreshable && it.isNotBlank() }
             if (addonUrl == null) {
                 oldAddon
             } else {
@@ -815,7 +821,9 @@ class StreamRepository @Inject constructor(
                     hydrated.copy(
                         id = oldAddon.id,
                         isEnabled = oldAddon.isEnabled,
-                        isInstalled = oldAddon.isInstalled
+                        isInstalled = oldAddon.isInstalled,
+                        runtimeKind = oldAddon.runtimeKind,
+                        installSource = oldAddon.installSource
                     )
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -836,7 +844,9 @@ class StreamRepository @Inject constructor(
         runCatching {
             val activeProfileId = profileManager.getProfileIdSync()
             val bundleKey = streamResultCacheBundleKey(activeProfileId)
-            context.streamDataStore.edit { prefs -> prefs.remove(bundleKey) }
+            context.streamDataStore.edit { prefs ->
+                prefs.remove(bundleKey)
+            }
         }
         AddonRefreshReport(refreshed = refreshedCount, failed = failedCount)
     }

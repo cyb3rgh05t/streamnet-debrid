@@ -433,7 +433,7 @@ fun localSecretValue(name: String): String {
     val secretsFile = rootProject.file("secrets.properties")
     if (secretsFile.exists()) {
         val properties = Properties()
-        secretsFile.inputStream().use { properties.load(it) }
+        secretsFile.readText(Charsets.UTF_8).removePrefix("\uFEFF").reader().use { properties.load(it) }
         properties.getProperty(name)?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
     }
     providers.gradleProperty(name).orNull?.trim()?.takeIf { it.isNotBlank() }?.let { return it }
@@ -449,8 +449,19 @@ fun escapeBuildConfigString(value: String): String =
 val validateReleaseCloudSecrets = tasks.register("validateReleaseCloudSecrets") {
     doLast {
         val appAnonKey = localSecretValue("APP_ANON_KEY").ifBlank { localSecretValue("SUPABASE_ANON_KEY") }
+        val supabaseUrl = localSecretValue("SUPABASE_URL")
         val traktClientId = localSecretValue("TRAKT_CLIENT_ID")
         val traktClientSecret = localSecretValue("TRAKT_CLIENT_SECRET")
+        val supabaseHost = supabaseUrl.substringAfter("://", missingDelimiterValue = "").substringBefore('/')
+        val hasValidSupabaseUrl =
+            (supabaseUrl.startsWith("https://") || supabaseUrl.startsWith("http://")) &&
+                supabaseHost.contains('.') &&
+                '*' !in supabaseUrl
+        require(hasValidSupabaseUrl) {
+            "Release builds require a valid HTTP(S) SUPABASE_URL " +
+                "(length=${supabaseUrl.length}, http=${supabaseUrl.startsWith("http")}, " +
+                "hostPresent=${supabaseHost.isNotBlank()}, hostHasDot=${supabaseHost.contains('.')}, redacted=${'*' in supabaseUrl})."
+        }
         require(
             appAnonKey.length > 40 &&
                 !appAnonKey.equals("your-supabase-anon-key", ignoreCase = true) &&

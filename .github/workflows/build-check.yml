@@ -51,6 +51,7 @@ jobs:
       - name: Validate required credentials
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
@@ -60,6 +61,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           : "${APP_ANON_KEY:?Missing APP_ANON_KEY repository secret}"
+          : "${SUPABASE_URL:?Missing SUPABASE_URL repository secret}"
+          case "$SUPABASE_URL" in
+            http://*|https://*) ;;
+            *) echo "SUPABASE_URL must be an HTTP(S) URL" >&2; exit 1 ;;
+          esac
           : "${TMDB_API_KEY:?Missing TMDB_API_KEY repository secret}"
           : "${TRAKT_CLIENT_ID:?Missing TRAKT_CLIENT_ID repository secret}"
           : "${TRAKT_CLIENT_SECRET:?Missing TRAKT_CLIENT_SECRET repository secret}"

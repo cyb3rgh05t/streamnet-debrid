@@ -1699,11 +1699,24 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 if (authRepository.hasValidCloudSyncSession()) {
-                    restoreCloudStateToLocalInternal(silent = true, pushPendingLocalFirst = false)
+                    val restoreResult = restoreCloudStateToLocalInternal(
+                        silent = true,
+                        pushPendingLocalFirst = false
+                    )
+                    if (restoreResult == CloudRestoreResult.FAILED) {
+                        _uiState.value = _uiState.value.copy(
+                            isRefreshingAddons = false,
+                            toastMessage = "Cloud restore failed; addons were not changed",
+                            toastType = ToastType.ERROR
+                        )
+                        return@launch
+                    }
                 }
                 val report = streamRepository.refreshInstalledAddons()
                 val updatedAddons = streamRepository.installedAddons.first()
-                runCatching { catalogRepository.syncAddonCatalogs(updatedAddons) }
+                runCatching {
+                    catalogRepository.syncAddonCatalogs(updatedAddons)
+                }
                 val toast = "${report.refreshed} addons refreshed, ${report.failed} failed"
                 _uiState.value = _uiState.value.copy(
                     addons = updatedAddons,
