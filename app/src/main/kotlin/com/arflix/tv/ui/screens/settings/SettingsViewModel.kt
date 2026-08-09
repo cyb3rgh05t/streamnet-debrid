@@ -901,19 +901,24 @@ class SettingsViewModel @Inject constructor(
             "French",
             "German",
             "Greek",
+            "Gujarati",
             "Hebrew",
             "Hindi",
             "Hungarian",
             "Indonesian",
             "Italian",
             "Japanese",
+            "Kannada",
             "Korean",
             "Lithuanian",
+            "Malayalam",
+            "Marathi",
             "Norwegian",
             "Persian",
             "Polish",
             "Portuguese",
             "Portuguese (Brazil)",
+            "Punjabi",
             "Romanian",
             "Russian",
             "Serbian",
@@ -921,6 +926,8 @@ class SettingsViewModel @Inject constructor(
             "Slovenian",
             "Spanish",
             "Swedish",
+            "Tamil",
+            "Telugu",
             "Thai",
             "Turkish",
             "Ukrainian",
@@ -955,19 +962,24 @@ class SettingsViewModel @Inject constructor(
             "French",
             "German",
             "Greek",
+            "Gujarati",
             "Hebrew",
             "Hindi",
             "Hungarian",
             "Indonesian",
             "Italian",
             "Japanese",
+            "Kannada",
             "Korean",
             "Lithuanian",
+            "Malayalam",
+            "Marathi",
             "Norwegian",
             "Persian",
             "Polish",
             "Portuguese",
             "Portuguese (Brazil)",
+            "Punjabi",
             "Romanian",
             "Russian",
             "Serbian",
@@ -975,6 +987,8 @@ class SettingsViewModel @Inject constructor(
             "Slovenian",
             "Spanish",
             "Swedish",
+            "Tamil",
+            "Telugu",
             "Thai",
             "Turkish",
             "Ukrainian",
@@ -3204,9 +3218,10 @@ class SettingsViewModel @Inject constructor(
         traktPollingJob = viewModelScope.launch {
             val expiresAt = System.currentTimeMillis() + (deviceCode.expiresIn * 1000)
             var lastFailure: String? = null
+            var pollDelayMs = deviceCode.interval.coerceAtLeast(1) * 1000L
 
             while (System.currentTimeMillis() < expiresAt) {
-                delay(deviceCode.interval * 1000L)
+                delay(pollDelayMs)
 
                 try {
                     traktRepository.pollForToken(deviceCode.deviceCode)
@@ -3237,21 +3252,38 @@ class SettingsViewModel @Inject constructor(
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
 
-                    // Keep polling on 400 (pending) - user hasn't entered code yet
-                    // Check both HttpException code and message for 400
-                    val is400 = when (e) {
-                        is retrofit2.HttpException -> e.code() == 400
+                    val httpError = e as? retrofit2.HttpException
+                    val isPending = when {
+                        httpError?.code() == 400 -> true
                         else -> e.message?.contains("400") == true ||
-                                e.message?.contains("pending") == true
+                            e.message?.contains("pending", ignoreCase = true) == true
                     }
-                    if (!is400) {
-                        lastFailure = when (e) {
-                            is retrofit2.HttpException -> "Trakt authorization failed (${e.code()})"
-                            else -> e.message?.takeIf { it.isNotBlank() } ?: "Trakt authorization failed"
-                        }
-                        break
+                    if (isPending) continue
+
+                    // Trakt uses 429 to ask device clients to slow down. Keep the
+                    // activation alive and honor Retry-After instead of aborting it.
+                    if (httpError?.code() == 429) {
+                        val retryAfterMs = httpError.response()
+                            ?.headers()
+                            ?.get("Retry-After")
+                            ?.toLongOrNull()
+                            ?.times(1000L)
+                        pollDelayMs = maxOf(
+                            pollDelayMs + 1_000L,
+                            retryAfterMs ?: 0L
+                        ).coerceAtMost(30_000L)
+                        continue
                     }
-                    // 400 = pending, continue polling
+
+                    lastFailure = when (httpError?.code()) {
+                        404 -> "Trakt activation code is invalid"
+                        409 -> "Trakt activation code was already used"
+                        410 -> "Trakt activation code expired"
+                        418 -> "Trakt authorization was denied"
+                        null -> e.message?.takeIf { it.isNotBlank() } ?: "Trakt authorization failed"
+                        else -> "Trakt authorization failed (${httpError.code()})"
+                    }
+                    break
                 }
             }
 

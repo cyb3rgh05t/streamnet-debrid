@@ -449,12 +449,22 @@ fun escapeBuildConfigString(value: String): String =
 val validateReleaseCloudSecrets = tasks.register("validateReleaseCloudSecrets") {
     doLast {
         val appAnonKey = localSecretValue("APP_ANON_KEY").ifBlank { localSecretValue("SUPABASE_ANON_KEY") }
+        val traktClientId = localSecretValue("TRAKT_CLIENT_ID")
+        val traktClientSecret = localSecretValue("TRAKT_CLIENT_SECRET")
         require(
             appAnonKey.length > 40 &&
                 !appAnonKey.equals("your-supabase-anon-key", ignoreCase = true) &&
                 !appAnonKey.startsWith("your-", ignoreCase = true)
         ) {
             "Release builds require a real APP_ANON_KEY in secrets.properties, Gradle properties, or the environment."
+        }
+        require(
+            traktClientId.length > 20 &&
+                !traktClientId.startsWith("your-", ignoreCase = true) &&
+                traktClientSecret.length > 20 &&
+                !traktClientSecret.startsWith("your-", ignoreCase = true)
+        ) {
+            "Release builds require real TRAKT_CLIENT_ID and TRAKT_CLIENT_SECRET values."
         }
     }
 }

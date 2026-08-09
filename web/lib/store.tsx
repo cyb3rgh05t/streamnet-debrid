@@ -181,7 +181,8 @@ export const defaultSettings: AppSettings = {
   favoriteChannelIds: [],
   favoriteGroupIds: [],
   hiddenGroupIds: [],
-  groupOrder: []
+  groupOrder: [],
+  iptvSortOrder: "provider"
 };
 
 const emptyIptv: IptvSnapshot = {

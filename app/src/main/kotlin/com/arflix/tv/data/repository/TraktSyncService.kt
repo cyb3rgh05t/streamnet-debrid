@@ -1197,6 +1197,7 @@ class TraktSyncService @Inject constructor(
 
     private suspend fun fetchAllWatchedMovies(): List<TraktWatchedMovie> {
         val all = mutableListOf<TraktWatchedMovie>()
+        val seen = LinkedHashSet<String>()
         var page = 1
         val limit = 250
 
@@ -1210,9 +1211,7 @@ class TraktSyncService @Inject constructor(
                     limit = limit
                 )
             }
-            if (pageItems.isEmpty()) break
-            all.addAll(pageItems)
-            if (pageItems.size < limit) break
+            if (appendUniqueTraktPage(all, seen, pageItems, ::watchedMovieIdentity) == 0) break
             page++
         }
 
@@ -1221,6 +1220,7 @@ class TraktSyncService @Inject constructor(
 
     private suspend fun fetchAllWatchedShows(): List<TraktWatchedShow> {
         val all = mutableListOf<TraktWatchedShow>()
+        val seen = LinkedHashSet<String>()
         var page = 1
         val limit = 250
 
@@ -1235,9 +1235,7 @@ class TraktSyncService @Inject constructor(
                     extended = "progress"
                 )
             }
-            if (pageItems.isEmpty()) break
-            all.addAll(pageItems)
-            if (pageItems.size < limit) break
+            if (appendUniqueTraktPage(all, seen, pageItems, ::watchedShowIdentity) == 0) break
             page++
         }
 

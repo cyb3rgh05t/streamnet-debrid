@@ -1223,6 +1223,40 @@ class PluginRuntime @Inject constructor() {
                 };
             }
 
+            // Timer polyfills (setTimeout / clearTimeout / setInterval / clearInterval).
+            //
+            // The plugin runtime executes synchronously: okhttp fetches block the
+            // QuickJS thread and there is no wall-clock event loop pumping timers
+            // between calls, so a delayed callback has no safe point to fire during a
+            // run. We therefore register the timer and hand back a numeric handle, but
+            // never invoke the callback mid-run.
+            //
+            // This lets plugins that use these standard web APIs run unchanged instead
+            // of throwing ReferenceError. The most common pattern is a fetch guarded by
+            // `setTimeout(() => controller.abort(), ms)`: without this shim the timer
+            // call throws, the fetch helper's catch swallows it, every request returns
+            // null, and the scraper yields zero results. With the shim the abort simply
+            // never trips and the request completes under okhttp's own 30s timeout —
+            // the behavior the plugin author intended.
+            if (typeof globalThis.setTimeout === 'undefined') {
+                var __timerCallbacks = {};
+                var __timerNextId = 1;
+                globalThis.setTimeout = function(callback, delay) {
+                    var id = __timerNextId++;
+                    if (typeof callback === 'function') {
+                        __timerCallbacks[id] = callback;
+                    }
+                    return id;
+                };
+                globalThis.clearTimeout = function(id) {
+                    delete __timerCallbacks[id];
+                };
+            }
+            if (typeof globalThis.setInterval === 'undefined') {
+                globalThis.setInterval = function() { return 0; };
+                globalThis.clearInterval = function() {};
+            }
+
             // String.prototype.replaceAll polyfill
             if (!String.prototype.replaceAll) {
                 String.prototype.replaceAll = function(search, replace) {

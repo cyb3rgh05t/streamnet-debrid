@@ -1845,6 +1845,17 @@ function TvSettingsSection() {
 
   return (
     <Panel title="TV (IPTV)">
+      <Row label="Sort order" hint="Choose how live channels and groups are ordered in the list">
+        <Select
+          value={settings.iptvSortOrder ?? "provider"}
+          onChange={(v) => updateSettings({ iptvSortOrder: v as "provider" | "number" | "name" })}
+          options={[
+            ["provider", "Provider Order (Default)"],
+            ["number", "Channel Number"],
+            ["name", "Alphabetical (A-Z)"]
+          ]}
+        />
+      </Row>
       <p className="empty">
         {playlists.length} playlist(s) configured. These are cloud-saved and
         used by the TV page.

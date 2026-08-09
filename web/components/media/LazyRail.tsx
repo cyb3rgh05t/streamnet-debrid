@@ -21,11 +21,11 @@ export function LazyRail({ catalog, eager = false, posterMode, onOpen, onFocus, 
   onLoaded?: (category: Category) => void;
 }) {
   const { loadCatalogRow, settings } = useApp();
-  const effectivePosterMode = posterMode ?? (catalog.layout ? catalog.layout === "poster" : settings.cardLayoutMode === "poster");
   const cacheKey = catalogCacheKey(catalog, settings.language);
   const ref = useRef<HTMLDivElement | null>(null);
   const startedRef = useRef(false);
   const [category, setCategory] = useState<Category | null>(() => readCachedCatalog(cacheKey));
+  const effectivePosterMode = catalog.layout === "poster" || category?.layout === "poster" || (posterMode ?? (settings.cardLayoutMode === "poster"));
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 

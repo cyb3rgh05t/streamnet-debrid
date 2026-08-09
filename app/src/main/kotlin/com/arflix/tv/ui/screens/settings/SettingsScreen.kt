@@ -227,8 +227,8 @@ private val tvGeneralSectionIds = setOf(
 
 private fun tvGeneralRowsForSection(section: String): List<Int> {
     return when (section) {
-        "language" -> listOf(0, 3)
-        "subtitles" -> listOf(1, 2, 38, 39, 4, 5, 6, 7, 8, 9)
+        "language" -> listOf(0, 3, 1, 2)
+        "subtitles" -> listOf(4, 5, 6, 7, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
         "appearance" -> listOf(17, 18, 20, 21, 24, 23, 22, 41, 36)
@@ -2073,7 +2073,7 @@ fun SettingsScreen(
 
         if (showContentLanguagePicker) {
             SubtitlePickerModal(
-                title = stringResource(R.string.app_language),
+                title = stringResource(R.string.content_language),
                 options = TMDB_LANGUAGES.map { it.second },
                 selected = TMDB_LANGUAGES.firstOrNull { it.first == uiState.contentLanguage }?.second ?: "English",
                 focusedIndex = contentLanguagePickerIndex,
@@ -3646,13 +3646,23 @@ private fun MobileSettingsMainPage(
                     icon = Icons.Default.Language,
                     title = stringResource(R.string.content_language),
                     value = TMDB_LANGUAGES.firstOrNull { it.first == uiState.contentLanguage }?.second ?: uiState.contentLanguage,
+                    isToggle = false,
                     isFocused = false,
                     onClick = openContentLanguagePicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.VolumeUp,
+                    title = stringResource(R.string.default_audio),
+                    value = uiState.defaultAudioLanguage,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openAudioLanguagePicker
                 )
                 MobileSettingsRow(
                     icon = Icons.Default.Subtitles,
                     title = stringResource(R.string.default_subtitle),
                     value = uiState.defaultSubtitle,
+                    isToggle = false,
                     isFocused = false,
                     onClick = openSubtitlePicker
                 )
@@ -3660,40 +3670,10 @@ private fun MobileSettingsMainPage(
                     icon = Icons.Default.Subtitles,
                     title = stringResource(R.string.secondary_subtitle),
                     value = uiState.secondarySubtitle,
-                    isFocused = false,
-                    onClick = openSecondarySubtitlePicker
-                )
-                // AI-independent: the timing-based match scan needs no API key.
-                MobileSettingsRow(
-                    icon = Icons.Default.Subtitles,
-                    title = stringResource(R.string.ai_find_best_match_title),
-                    subtitle = stringResource(R.string.ai_find_best_match_desc),
-                    value = if (uiState.subtitleAiFindBestMatch) "On" else "Off",
-                    isFocused = false,
-                    onClick = { viewModel.setSubtitleAiFindBestMatch(!uiState.subtitleAiFindBestMatch) }
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Subtitles,
-                    title = stringResource(R.string.subtitle_preload_title),
-                    subtitle = stringResource(R.string.subtitle_preload_desc),
-                    value = if (uiState.subtitlePreloadEnabled) "On" else "Off",
-                    isFocused = false,
-                    onClick = { viewModel.setSubtitlePreloadEnabled(!uiState.subtitlePreloadEnabled) }
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Subtitles,
-                    title = stringResource(R.string.filter_subtitles),
-                    value = if (uiState.filterSubtitlesByLanguage) "On" else "Off",
-                    isFocused = false,
-                    onClick = { viewModel.setFilterSubtitlesByLanguage(!uiState.filterSubtitlesByLanguage) }
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.VolumeUp,
-                    title = stringResource(R.string.default_audio),
-                    value = uiState.defaultAudioLanguage,
+                    isToggle = false,
                     isFocused = false,
                     showDivider = false,
-                    onClick = openAudioLanguagePicker
+                    onClick = openSecondarySubtitlePicker
                 )
             }
         }
@@ -3964,14 +3944,35 @@ private fun MobileSettingsSubPage(
                         title = stringResource(R.string.subtitle_stylized),
                         subtitle = stringResource(R.string.subtitle_stylized_desc),
                         value = if (uiState.subtitleStylized) "On" else "Off",
+                        isToggle = true,
                         isFocused = false,
                         onClick = { viewModel.toggleSubtitleStylized() }
+                    )
+                    // AI-independent: the timing-based match scan needs no API key.
+                    MobileSettingsRow(
+                        icon = Icons.Default.Subtitles,
+                        title = stringResource(R.string.ai_find_best_match_title),
+                        subtitle = stringResource(R.string.ai_find_best_match_desc),
+                        value = if (uiState.subtitleAiFindBestMatch) "On" else "Off",
+                        isToggle = true,
+                        isFocused = false,
+                        onClick = { viewModel.setSubtitleAiFindBestMatch(!uiState.subtitleAiFindBestMatch) }
+                    )
+                    MobileSettingsRow(
+                        icon = Icons.Default.Subtitles,
+                        title = stringResource(R.string.subtitle_preload_title),
+                        subtitle = stringResource(R.string.subtitle_preload_desc),
+                        value = if (uiState.subtitlePreloadEnabled) "On" else "Off",
+                        isToggle = true,
+                        isFocused = false,
+                        onClick = { viewModel.setSubtitlePreloadEnabled(!uiState.subtitlePreloadEnabled) }
                     )
                     MobileSettingsRow(
                         icon = Icons.Default.Subtitles,
                         title = stringResource(R.string.filter_subtitles),
                         subtitle = stringResource(R.string.filter_subtitles_desc),
                         value = if (uiState.filterSubtitlesByLanguage) "On" else "Off",
+                        isToggle = true,
                         isFocused = false,
                         showDivider = false,
                         onClick = { viewModel.setFilterSubtitlesByLanguage(!uiState.filterSubtitlesByLanguage) }
@@ -4286,6 +4287,7 @@ private fun MobileSettingsRow(
     subtitle: String = "",
     value: String?,
     isFocused: Boolean = false,
+    isToggle: Boolean = (value == "On" || value == "Off"),
     showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
@@ -4328,7 +4330,7 @@ private fun MobileSettingsRow(
             val safeValue = value.orEmpty()
             if (safeValue.isNotEmpty()) {
                 Spacer(modifier = Modifier.width(16.dp))
-                if (safeValue == "On" || safeValue == "Off") {
+                if (isToggle && (safeValue == "On" || safeValue == "Off")) {
                     val isChecked = safeValue == "On"
                     Box(
                         modifier = Modifier
@@ -9697,57 +9699,62 @@ private fun UiModeWarningDialog(
 }
 
 val TMDB_LANGUAGES = listOf(
-    "en-US" to "English",
-    "nl-NL" to "Dutch (Nederlands)",
-    "fr-FR" to "French (Francais)",
-    "de-DE" to "German (Deutsch)",
-    "es-ES" to "Spanish (Espanol)",
-    "pt-PT" to "Portuguese (Portugues)",
-    "pt-BR" to "Portuguese - Brazil",
-    "it-IT" to "Italian (Italiano)",
-    "ru-RU" to "Russian",
-    "ja-JP" to "Japanese",
-    "ko-KR" to "Korean",
+    "af-ZA" to "Afrikaans",
+    "sq-AL" to "Albanian (Shqip)",
+    "ar-SA" to "Arabic",
+    "eu-ES" to "Basque (Euskara)",
+    "bn-BD" to "Bengali",
+    "bg-BG" to "Bulgarian",
+    "ca-ES" to "Catalan",
     "zh-CN" to "Chinese (Simplified)",
     "zh-TW" to "Chinese (Traditional)",
-    "ar-SA" to "Arabic",
-    "hi-IN" to "Hindi",
-    "tr-TR" to "Turkish (Turkce)",
-    "pl-PL" to "Polish (Polski)",
-    "sv-SE" to "Swedish (Svenska)",
-    "da-DK" to "Danish (Dansk)",
-    "no-NO" to "Norwegian (Norsk)",
-    "fi-FI" to "Finnish (Suomi)",
-    "el-GR" to "Greek",
-    "cs-CZ" to "Czech (Cesky)",
-    "hu-HU" to "Hungarian (Magyar)",
-    "ro-RO" to "Romanian (Romana)",
-    "th-TH" to "Thai",
-    "vi-VN" to "Vietnamese",
-    "id-ID" to "Indonesian",
-    "ms-MY" to "Malay",
-    "tl-PH" to "Filipino/Tagalog",
-    "uk-UA" to "Ukrainian",
-    "bg-BG" to "Bulgarian",
     "hr-HR" to "Croatian (Hrvatski)",
+    "cs-CZ" to "Czech (Cesky)",
+    "da-DK" to "Danish (Dansk)",
+    "nl-NL" to "Dutch (Nederlands)",
+    "en-US" to "English",
+    "et-EE" to "Estonian",
+    "tl-PH" to "Filipino/Tagalog",
+    "fi-FI" to "Finnish (Suomi)",
+    "fr-FR" to "French (Francais)",
+    "gl-ES" to "Galician (Galego)",
+    "de-DE" to "German (Deutsch)",
+    "el-GR" to "Greek",
+    "gu-IN" to "Gujarati",
+    "he-IL" to "Hebrew",
+    "hi-IN" to "Hindi",
+    "hu-HU" to "Hungarian (Magyar)",
+    "id-ID" to "Indonesian",
+    "it-IT" to "Italian (Italiano)",
+    "ja-JP" to "Japanese",
+    "kn-IN" to "Kannada",
+    "ko-KR" to "Korean",
+    "lv-LV" to "Latvian",
+    "lt-LT" to "Lithuanian",
+    "ms-MY" to "Malay",
+    "ml-IN" to "Malayalam",
+    "mr-IN" to "Marathi",
+    "no-NO" to "Norwegian (Norsk)",
+    "fa-IR" to "Persian (Farsi)",
+    "pl-PL" to "Polish (Polski)",
+    "pt-PT" to "Portuguese (Portugues)",
+    "pt-BR" to "Portuguese - Brazil",
+    "pa-IN" to "Punjabi",
+    "ro-RO" to "Romanian (Romana)",
+    "ru-RU" to "Russian",
     "sr-RS" to "Serbian (Srpski)",
     "sk-SK" to "Slovak (Slovensky)",
     "sl-SI" to "Slovenian (Slovenscina)",
-    "he-IL" to "Hebrew",
-    "fa-IR" to "Persian (Farsi)",
-    "bn-BD" to "Bengali",
+    "es-ES" to "Spanish (Espanol)",
+    "sw-KE" to "Swahili",
+    "sv-SE" to "Swedish (Svenska)",
     "ta-IN" to "Tamil",
     "te-IN" to "Telugu",
+    "th-TH" to "Thai",
+    "tr-TR" to "Turkish (Turkce)",
+    "uk-UA" to "Ukrainian",
     "ur-PK" to "Urdu",
-    "ca-ES" to "Catalan",
-    "eu-ES" to "Basque (Euskara)",
-    "gl-ES" to "Galician (Galego)",
-    "lt-LT" to "Lithuanian",
-    "lv-LV" to "Latvian",
-    "et-EE" to "Estonian",
-    "af-ZA" to "Afrikaans",
-    "sw-KE" to "Swahili",
-    "sq-AL" to "Albanian (Shqip)"
+    "vi-VN" to "Vietnamese"
 )
 
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)

@@ -85,19 +85,31 @@ object Constants {
  */
 object LanguageMap {
     private val ISO_LANG_MAP = mapOf(
+        "ar" to "Arabic", "ara" to "Arabic",
+        "bn" to "Bengali", "ben" to "Bengali",
+        "zh" to "Chinese", "chi" to "Chinese", "zho" to "Chinese",
+        "nl" to "Dutch", "nld" to "Dutch", "dut" to "Dutch",
         "en" to "English", "eng" to "English",
         "fr" to "French", "fre" to "French", "fra" to "French",
-        "es" to "Spanish", "spa" to "Spanish",
         "de" to "German", "ger" to "German", "deu" to "German",
+        "gu" to "Gujarati", "guj" to "Gujarati",
+        "hi" to "Hindi", "hin" to "Hindi",
         "it" to "Italian", "ita" to "Italian",
-        "pt" to "Portuguese", "por" to "Portuguese",
-        "nl" to "Dutch", "nld" to "Dutch", "dut" to "Dutch",
-        "ru" to "Russian", "rus" to "Russian",
-        "zh" to "Chinese", "chi" to "Chinese", "zho" to "Chinese",
         "ja" to "Japanese", "jpn" to "Japanese",
+        "kn" to "Kannada", "kan" to "Kannada",
         "ko" to "Korean", "kor" to "Korean",
-        "ar" to "Arabic", "ara" to "Arabic",
-        "hi" to "Hindi", "hin" to "Hindi"
+        "ml" to "Malayalam", "mal" to "Malayalam",
+        "mr" to "Marathi", "mar" to "Marathi",
+        "pl" to "Polish", "pol" to "Polish",
+        "pt" to "Portuguese", "por" to "Portuguese",
+        "pa" to "Punjabi", "pan" to "Punjabi",
+        "ru" to "Russian", "rus" to "Russian",
+        "es" to "Spanish", "spa" to "Spanish",
+        "sv" to "Swedish", "swe" to "Swedish",
+        "ta" to "Tamil", "tam" to "Tamil",
+        "te" to "Telugu", "tel" to "Telugu",
+        "th" to "Thai", "tha" to "Thai",
+        "tr" to "Turkish", "tur" to "Turkish"
     )
 
     fun getLanguageName(code: String): String {

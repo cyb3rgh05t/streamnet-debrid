@@ -101,6 +101,7 @@ export function LiveTvScreen() {
       const keyed = items[0] ? groupKey(items[0]) : group;
       return orderMap.get(keyed) ?? orderMap.get(group) ?? Number.MAX_SAFE_INTEGER;
     };
+    const sortMode = settings.iptvSortOrder ?? "provider";
     const groupRows = Object.entries(groups)
       .map(([group, items]) => ({
         id: `group:${group}`,
@@ -111,13 +112,19 @@ export function LiveTvScreen() {
         rank: groupRank(group, items)
       }))
       .filter((group) => !group.hidden)
-      .sort((a, b) => Number(b.favorite) - Number(a.favorite) || a.rank - b.rank || b.count - a.count || a.label.localeCompare(b.label));
+      .sort((a, b) => {
+        if (Number(b.favorite) !== Number(a.favorite)) return Number(b.favorite) - Number(a.favorite);
+        if (a.rank !== b.rank) return a.rank - b.rank;
+        if (sortMode === "name") return a.label.localeCompare(b.label);
+        if (sortMode === "number") return b.count - a.count || a.label.localeCompare(b.label);
+        return 0;
+      });
     return [
       { id: "all", label: "All Channels", count: channels.length, favorite: false, hidden: false },
       { id: "favorites", label: "Favorites", count: favoriteChannels.length, favorite: true, hidden: false },
       ...groupRows
     ];
-  }, [channels.length, favoriteChannels.length, favoriteGroups, groups, hiddenGroups, iptvSnapshot.groupOrder]);
+  }, [channels.length, favoriteChannels.length, favoriteGroups, groups, hiddenGroups, iptvSnapshot.groupOrder, settings.iptvSortOrder]);
 
   const visibleChannels = useMemo(() => {
     const base = activeCategory === "favorites"
@@ -126,14 +133,27 @@ export function LiveTvScreen() {
         ? groups[activeCategory.slice(6)] ?? []
         : channels;
     const needle = query.trim().toLowerCase();
-    return needle
+    const filtered = needle
       ? base.filter((channel) =>
           channel.name.toLowerCase().includes(needle) ||
           channel.group.toLowerCase().includes(needle) ||
           channel.tvgId?.toLowerCase().includes(needle)
         )
       : base;
-  }, [activeCategory, channels, favoriteChannels, groups, query]);
+    const sortMode = settings.iptvSortOrder ?? "provider";
+    if (sortMode === "number") {
+      return [...filtered].sort((a, b) => {
+        const numA = a.number ? parseInt(a.number, 10) : Number.MAX_SAFE_INTEGER;
+        const numB = b.number ? parseInt(b.number, 10) : Number.MAX_SAFE_INTEGER;
+        if (numA !== numB) return numA - numB;
+        return a.name.localeCompare(b.name);
+      });
+    }
+    if (sortMode === "name") {
+      return [...filtered].sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return filtered;
+  }, [activeCategory, channels, favoriteChannels, groups, query, settings.iptvSortOrder]);
 
   useEffect(() => {
     setVisibleCount(CHANNEL_PAGE_SIZE);

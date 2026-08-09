@@ -2083,11 +2083,13 @@ fun LiveTvScreen(
         resetRetry: Boolean,
         initialPositionMs: Long = 0L,
         drmInfo: com.arflix.tv.data.model.DrmInfo? = null,
+        forcePrepare: Boolean = false,
     ) {
         val mergedHeaders = (baseRequestHeaders + headers).safePlaybackHeaders()
         iptvDataSourceFactory.setDefaultRequestProperties(mergedHeaders)
 
-        if (stream == lastPreparedStreamUrl &&
+        if (!forcePrepare &&
+            stream == lastPreparedStreamUrl &&
             isHls == lastPreparedIsHls &&
             headers == lastPreparedHeaders &&
             (playingCatchupProgram == null || catchupUrlAnchorOffsetMs == lastPreparedCatchupOffsetMs)
@@ -2215,24 +2217,28 @@ fun LiveTvScreen(
         } else {
             val currentNow = currentNowNext?.now
             val ch = playingChannel
-            if (ch != null && currentNow != null && ch.source.catchupDays > 0) {
-                System.err.println("[IPTV-Catchup] auto-switch catchup program=${currentNow.title} targetMs=$targetMs")
+            val currentElapsed = if (currentNow != null && currentNow.startUtcMillis > 0L) {
+                (System.currentTimeMillis() - currentNow.startUtcMillis).coerceAtLeast(0L)
+            } else {
+                playerPositionMs
+            }
+            val boundedTarget = targetMs.coerceIn(0L, currentElapsed)
+            if (boundedTarget >= currentElapsed) {
+                hudPokeSignal++
+                return
+            }
+            if (ch != null && currentNow != null && ch.supportsCatchupHistory()) {
+                System.err.println("[IPTV-Catchup] auto-switch catchup program=${currentNow.title} targetMs=$boundedTarget")
                 playingCatchupProgram = currentNow
-                catchupPlaybackOffsetMs = targetMs.coerceAtLeast(0L)
-                playerPositionMs = targetMs.coerceAtLeast(0L)
+                catchupPlaybackOffsetMs = boundedTarget
+                playerPositionMs = boundedTarget
                 lastPreparedStreamUrl = null
                 playerIsBuffering = true
                 hudPokeSignal++
             } else {
                 val currentExo = exoPlayer.currentPosition
                 val maxExo = exoPlayer.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 60_000L
-                val currentNow = currentNowNext?.now
-                val currentElapsed = if (currentNow != null && currentNow.startUtcMillis > 0L) {
-                    (System.currentTimeMillis() - currentNow.startUtcMillis).coerceAtLeast(0L)
-                } else {
-                    playerPositionMs
-                }
-                val delta = targetMs - currentElapsed
+                val delta = boundedTarget - currentElapsed
                 val newExo = (currentExo + delta).coerceIn(0L, maxExo)
                 exoPlayer.seekTo(newExo)
                 hudPokeSignal++
@@ -2292,33 +2298,12 @@ fun LiveTvScreen(
             )
             return@LaunchedEffect
         }
-        val isHls = target.isHls
         val headers = sourceChannel?.requestHeaders.orEmpty()
-
-        val isCatchup = playingCatchupProgram != null
-        val seekTargetMs = if (isCatchup) catchupPlaybackOffsetMs else 0L
-
-        val (isStreamHls, initialSeekMs) = if (isCatchup && target.url != rawStream) {
-            val candidateCount = sourceChannel?.let {
-                viewModel.iptvRepository.getCatchupUrlCandidates(it, streamProgram ?: playingCatchupProgram!!).size
-            } ?: 0
-            val isMultiCandidateFormat = candidateCount > 1
-            if (isMultiCandidateFormat) {
-                val candidateOffsetMs = sourceChannel?.catchupInSegmentSeekOffset(catchupPlaybackOffsetMs)
-                    ?: (catchupPlaybackOffsetMs % 60_000L)
-                Pair(isHls, candidateOffsetMs)
-            } else {
-                val candidateOffsetMs = sourceChannel?.catchupInSegmentSeekOffset(catchupPlaybackOffsetMs)
-                    ?: seekTargetMs
-                Pair(isHls, candidateOffsetMs)
-            }
-        } else {
-            Pair(isHls, seekTargetMs)
-        }
+        val initialSeekMs = if (playingCatchupProgram != null) catchupInSegmentSeekMs else 0L
 
         prepareStream(
             stream = target.url,
-            isHls = isStreamHls,
+            isHls = target.isHls,
             headers = headers,
             resetRetry = true,
             initialPositionMs = initialSeekMs,
@@ -2444,6 +2429,7 @@ fun LiveTvScreen(
                         resetRetry = false,
                         initialPositionMs = retryChannel?.catchupInSegmentSeekOffset(catchupPlaybackOffsetMs) ?: 0L,
                         drmInfo = retryChannel?.drmInfo,
+                        forcePrepare = true,
                     )
                 }
             }
@@ -2771,6 +2757,33 @@ fun LiveTvScreen(
                             false
                         } else {
                             val firstPress = ev.nativeKeyEvent.repeatCount == 0
+                            if (firstPress && playingCatchupProgram != null) {
+                                when (ev.nativeKeyEvent.keyCode) {
+                                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
+                                    AndroidKeyEvent.KEYCODE_SPACE -> {
+                                        toggleCatchupPlayback()
+                                        return@onPreviewKeyEvent true
+                                    }
+                                    AndroidKeyEvent.KEYCODE_MEDIA_PLAY -> {
+                                        exoPlayer.play()
+                                        hudPokeSignal++
+                                        return@onPreviewKeyEvent true
+                                    }
+                                    AndroidKeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                                        exoPlayer.pause()
+                                        hudPokeSignal++
+                                        return@onPreviewKeyEvent true
+                                    }
+                                    AndroidKeyEvent.KEYCODE_MEDIA_REWIND -> {
+                                        seekCatchupBy(-CatchupSeekStepMs)
+                                        return@onPreviewKeyEvent true
+                                    }
+                                    AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                                        seekCatchupBy(CatchupSeekStepMs)
+                                        return@onPreviewKeyEvent true
+                                    }
+                                }
+                            }
                             if (firstPress) {
                                 digitForTvKeyCode(ev.nativeKeyEvent.keyCode)?.let { digit ->
                                     hudPokeSignal++
@@ -2784,13 +2797,29 @@ fun LiveTvScreen(
                                 }
                             }
                             when (ev.key) {
-                                Key.Back, Key.Escape -> { exitFullScreenPlayback(); true }
+                                Key.Back, Key.Escape -> {
+                                    if (firstPress) {
+                                        if (playingCatchupProgram != null) {
+                                            returnCatchupToLive()
+                                        } else {
+                                            exitFullScreenPlayback()
+                                        }
+                                    }
+                                    true
+                                }
                                 else -> false
                             }
                         }
                     }
                     .then(
-                        if (isFullScreen && !fullscreenGuideOpen && !quickZapOpen) {
+                        if (isTouchDevice) {
+                            Modifier.clickable(
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                indication = null,
+                            ) {
+                                hudPokeSignal++
+                            }
+                        } else if (isFullScreen && !fullscreenGuideOpen && !quickZapOpen) {
                             Modifier.onPreviewKeyEvent { ev ->
                                 if (ev.type == KeyEventType.KeyDown) {
                                     hudPokeSignal++
@@ -2895,7 +2924,18 @@ fun LiveTvScreen(
                             if (playingCatchupProgram != null) {
                                 seekCatchupBy(-playerPositionMs)
                             } else {
-                                playingChannel?.let { selectChannel(it) }
+                                val preparedStream = lastPreparedStreamUrl
+                                if (preparedStream != null) {
+                                    prepareStream(
+                                        stream = preparedStream,
+                                        isHls = lastPreparedIsHls,
+                                        headers = lastPreparedHeaders,
+                                        resetRetry = true,
+                                        drmInfo = playingChannel?.source?.drmInfo,
+                                        forcePrepare = true,
+                                    )
+                                }
+                                hudPokeSignal++
                             }
                         },
                         onGoLiveClick = { returnCatchupToLive() },

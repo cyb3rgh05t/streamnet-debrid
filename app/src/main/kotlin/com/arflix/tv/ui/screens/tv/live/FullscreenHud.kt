@@ -251,9 +251,9 @@ fun FullscreenHud(
             val next = nowNext?.next
 
             // Elapsed time passed on current show
-            var frozenElapsedMs by remember { mutableStateOf<Long?>(null) }
+            var frozenElapsedMs by remember(channel?.id, now?.startUtcMillis) { mutableStateOf<Long?>(null) }
 
-            val currentElapsedShowMs = if (isCatchupMode && playbackPositionMs > 0L) {
+            val currentElapsedShowMs = if (isCatchupMode) {
                 playbackPositionMs
             } else if (now != null && now.startUtcMillis > 0L) {
                 (clockMillis - now.startUtcMillis).coerceAtLeast(0L)
@@ -439,10 +439,10 @@ fun FullscreenHud(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Previous catchup program / channel (|<)
+                        // Previous channel (|<)
                         HudIconButton(
                             icon = Icons.Filled.SkipPrevious,
-                            contentDescription = "Previous Program",
+                            contentDescription = "Previous Channel",
                             onClick = { onPreviousCatchupClick?.invoke() },
                         )
 
@@ -472,10 +472,10 @@ fun FullscreenHud(
                             onClick = { onFastForwardClick?.invoke() },
                         )
 
-                        // Next catchup program / channel (>|)
+                        // Next channel (>|)
                         HudIconButton(
                             icon = Icons.Filled.SkipNext,
-                            contentDescription = "Next Program",
+                            contentDescription = "Next Channel",
                             onClick = { onNextCatchupClick?.invoke() },
                         )
                     }
