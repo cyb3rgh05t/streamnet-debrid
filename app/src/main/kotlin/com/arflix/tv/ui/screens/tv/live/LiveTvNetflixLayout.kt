@@ -31,6 +31,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
@@ -65,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
@@ -73,7 +73,10 @@ import coil.compose.AsyncImage
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
+import com.arflix.tv.ui.components.LoadingIndicator
 import kotlinx.coroutines.delay
+import java.text.DateFormat
+import java.util.Date
 
 // Netflix-style Live TV layout for TV mode only. Touch layout stays in LiveTvScreen.
 
@@ -82,7 +85,7 @@ private val CategoryRowHeight = 48.dp
 private val ChannelCardWidth = 220.dp
 private val HeroCornerRadius = 18.dp
 private val CardCornerRadius = 14.dp
-private const val HeroUpcomingMax = 4
+private const val HeroUpcomingMax = 2
 
 private data class NetflixCategoryItem(val id: String, val label: String, val count: Int)
 
@@ -99,6 +102,8 @@ internal fun LiveTvNetflixLayout(
     favoriteSet: Set<String>,
     exoPlayer: ExoPlayer,
     guideClockMillis: Long,
+    playlistLastRefreshedAtMillis: Long?,
+    isPlaylistRefreshing: Boolean,
     variantCountFor: (EnrichedChannel) -> Int,
     isFullScreen: Boolean,
     lookupBackdrop: suspend (String) -> String? = { null },
@@ -108,6 +113,7 @@ internal fun LiveTvNetflixLayout(
     onChannelFocused: (EnrichedChannel) -> Unit,
     onChannelSelected: (EnrichedChannel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
+    onRefreshPlaylist: () -> Unit,
     onOpenVariants: (EnrichedChannel) -> Unit,
     onMoveUpFromCategory: () -> Unit,
     onMoveDownToChannels: () -> Unit,
@@ -120,7 +126,6 @@ internal fun LiveTvNetflixLayout(
     var railEntrySignal by remember { mutableIntStateOf(0) }
     var railFocusPending by remember { mutableStateOf(false) }
     val heroFocusRequester = remember { FocusRequester() }
-    var heroVideoAspectRatio by remember { mutableStateOf(16f / 9f) }
     var previewChannelId by remember { mutableStateOf(focusedChannelId ?: playingChannelId) }
     LaunchedEffect(channels, focusedChannelId, playingChannelId) {
         if (channels.none { it.id == previewChannelId }) {
@@ -156,10 +161,9 @@ internal fun LiveTvNetflixLayout(
                 onClick = onOpenFullscreen,
                 onMoveUp = onMoveUpFromCategory,
                 onMoveDown = { runCatching { categoryFocusRequester.requestFocus() } },
-                onVideoAspectRatioChanged = { heroVideoAspectRatio = it },
                 modifier = Modifier
                     .fillMaxHeight()
-                    .aspectRatio(heroVideoAspectRatio, matchHeightConstraintsFirst = true),
+                    .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
             )
             HeroInfoPanel(
                 channel = previewChannel,
@@ -167,6 +171,9 @@ internal fun LiveTvNetflixLayout(
                 nowNext = previewNowNext,
                 isFavorite = previewChannel?.id?.let { it in favoriteSet } == true,
                 backdropUrl = previewBackdropUrl,
+                playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
+                isPlaylistRefreshing = isPlaylistRefreshing,
+                onRefreshPlaylist = onRefreshPlaylist,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
@@ -232,7 +239,6 @@ private fun HeroVideoCard(
     onClick: () -> Unit,
     onMoveUp: () -> Unit,
     onMoveDown: () -> Unit,
-    onVideoAspectRatioChanged: (Float) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
@@ -248,16 +254,7 @@ private fun HeroVideoCard(
     }
 
     DisposableEffect(exoPlayer) {
-        val listener = object : Player.Listener {
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                val w = videoSize.width; val h = videoSize.height
-                if (w > 0 && h > 0)
-                    onVideoAspectRatioChanged(w.toFloat() * videoSize.pixelWidthHeightRatio / h)
-            }
-        }
-        exoPlayer.addListener(listener)
         onDispose {
-            exoPlayer.removeListener(listener)
             textureViewRef.value?.let { tv -> runCatching { exoPlayer.clearVideoTextureView(tv) } }
         }
     }
@@ -286,10 +283,19 @@ private fun HeroVideoCard(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        if (channel != null) {
-            Box(modifier = Modifier.fillMaxSize().background(
-                Brush.radialGradient(colors = listOf(channel.brandBg, LiveColors.Bg))
-            ))
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(LiveColors.Panel, LiveColors.PanelDeep),
+                    )
+                ),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (channel != null) {
+                ChannelLogo(channel = channel, size = 72.dp, showBackground = false)
+            }
         }
         AndroidView(
             factory = { ctx ->
@@ -321,6 +327,9 @@ private fun HeroInfoPanel(
     nowNext: IptvNowNext?,
     isFavorite: Boolean,
     backdropUrl: String?,
+    playlistLastRefreshedAtMillis: Long?,
+    isPlaylistRefreshing: Boolean,
+    onRefreshPlaylist: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -342,14 +351,21 @@ private fun HeroInfoPanel(
             ))
         }
         Column(
-            modifier = Modifier.fillMaxSize().padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 11.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (channel != null) {
-                    ChannelLogo(channel = channel, size = 48.dp, showBackground = false)
+                    ChannelLogo(
+                        channel = channel,
+                        size = 64.dp,
+                        showBackground = false,
+                        imagePadding = 2.dp,
+                    )
                 } else {
-                    Spacer(Modifier.size(48.dp))
+                    Spacer(Modifier.size(64.dp))
                 }
                 val group = channel?.source?.group?.takeIf { it.isNotBlank() }
                 Column(modifier = Modifier.weight(1f)) {
@@ -374,12 +390,17 @@ private fun HeroInfoPanel(
                     Icon(imageVector = Icons.Filled.Star, contentDescription = null,
                         tint = LiveColors.Accent, modifier = Modifier.size(13.dp))
                 }
+                PlaylistRefreshControl(
+                    lastRefreshedAtMillis = playlistLastRefreshedAtMillis,
+                    isRefreshing = isPlaylistRefreshing,
+                    onRefresh = onRefreshPlaylist,
+                )
             }
 
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LiveColors.Divider))
 
             val nowProgram = nowNext?.now
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(text = stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
                 Text(
                     text = nowProgram?.title ?: stringResource(R.string.live_placeholder_guide_pending),
@@ -414,7 +435,7 @@ private fun HeroInfoPanel(
 
             val upcoming = remember(nowNext) { collectUpcoming(nowNext).take(HeroUpcomingMax) }
             if (upcoming.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     Text(text = stringResource(R.string.live_label_upcoming), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
                     upcoming.forEach { program ->
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -429,6 +450,65 @@ private fun HeroInfoPanel(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun PlaylistRefreshControl(
+    lastRefreshedAtMillis: Long?,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val formattedTimestamp = remember(lastRefreshedAtMillis) {
+        lastRefreshedAtMillis?.let { timestamp ->
+            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
+        }
+    }
+    Row(
+        modifier = Modifier
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (focused) LiveColors.PanelRaised else LiveColors.Panel.copy(alpha = 0.72f))
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) LiveColors.FocusRing else LiveColors.Divider,
+                shape = RoundedCornerShape(6.dp),
+            )
+            .onFocusChanged { focused = it.hasFocus }
+            .focusable(enabled = !isRefreshing)
+            .onKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.DirectionCenter || event.key == Key.Enter) &&
+                    !isRefreshing
+                ) {
+                    onRefresh()
+                    true
+                } else {
+                    false
+                }
+            }
+            .clickable(enabled = !isRefreshing, onClick = onRefresh)
+            .padding(horizontal = 8.dp, vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = formattedTimestamp?.let { stringResource(R.string.live_playlist_updated, it) }
+                ?: stringResource(R.string.live_playlist_not_updated),
+            style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+            maxLines = 1,
+        )
+        if (isRefreshing) {
+            LoadingIndicator(size = 14.dp, color = LiveColors.Accent, strokeWidth = 2.dp)
+        } else {
+            Icon(
+                imageVector = Icons.Filled.Refresh,
+                contentDescription = stringResource(R.string.live_refresh_playlist),
+                tint = if (focused) LiveColors.Accent else LiveColors.FgDim,
+                modifier = Modifier.size(14.dp),
+            )
         }
     }
 }
@@ -677,6 +757,7 @@ private fun NetflixChannelCard(
             (it.endUtcMillis - it.startUtcMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
     } ?: 0f
     val minsLeft = now?.let { ((it.endUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L) }
+    val backgroundLogoUrl = remember(channel.logo) { safeChannelLogoUrl(channel.logo) }
 
     // Async TMDB backdrop for the current program; cached by TvViewModel.
     val cardBackdropUrl by produceState<String?>(initialValue = null, key1 = now?.title) {
@@ -685,10 +766,13 @@ private fun NetflixChannelCard(
         value = runCatching { lookupBackdrop(title) }.getOrNull()
     }
 
-    Column(
+    val shape = RoundedCornerShape(8.dp)
+
+    Box(
         modifier = modifier
             .width(ChannelCardWidth)
-            .clip(RoundedCornerShape(CardCornerRadius))
+            .aspectRatio(16f / 9f)
+            .clip(shape)
             .background(when {
                 focused -> LiveColors.PanelRaised
                 isPlaying -> LiveColors.FocusBg
@@ -701,7 +785,7 @@ private fun NetflixChannelCard(
                     isPlaying -> LiveColors.Accent.copy(alpha = 0.55f)
                     else -> Color.Transparent
                 },
-                shape = RoundedCornerShape(CardCornerRadius),
+                shape = shape,
             )
             .onFocusChanged { focused = it.hasFocus; if (it.hasFocus) onFocused() }
             .focusable()
@@ -723,94 +807,140 @@ private fun NetflixChannelCard(
                 }
                 false
             }
-            .combinedClickable(onClick = onClick, onLongClick = onLongPress)
-            ,
+            .combinedClickable(onClick = onClick, onLongClick = onLongPress),
     ) {
-        // — Logo / backdrop area
         Box(
-            modifier = Modifier.fillMaxWidth().height(80.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Box(modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(colors = listOf(
-                    channel.brandBg.copy(alpha = if (cardBackdropUrl.isNullOrBlank()) 0.65f else 0.45f),
-                    Color.Transparent,
-                ))
-            ))
-            if (!cardBackdropUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = cardBackdropUrl, contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.5f },
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.linearGradient(
+                        listOf(
+                            channel.brandBg.copy(alpha = 0.72f),
+                            LiveColors.PanelDeep,
+                        )
+                    )
                 )
-                Box(modifier = Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(colors = listOf(
-                        Color.Transparent, LiveColors.PanelDeep.copy(alpha = 0.75f)
-                    ))
-                ))
-            }
-            ChannelLogo(channel = channel, size = 52.dp, showBackground = false)
-            Row(
-                modifier = Modifier.align(Alignment.TopStart).padding(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                if (isPlaying) {
-                    Box(modifier = Modifier.size(6.dp).clip(RoundedCornerShape(999.dp)).background(LiveColors.LiveRed))
-                    Text(text = "LIVE", style = LiveType.Badge.copy(color = LiveColors.LiveRed))
-                }
-            }
-            if (isFavorite) {
-                Icon(imageVector = Icons.Filled.Star, contentDescription = null,
-                    tint = LiveColors.Accent,
-                    modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(12.dp))
-            }
+        )
+        if (!cardBackdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = cardBackdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.52f },
+            )
+        }
+        if (cardBackdropUrl.isNullOrBlank() && !backgroundLogoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backgroundLogoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = 0.26f
+                        scaleX = 1.16f
+                        scaleY = 1.16f
+                    },
+            )
+        }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = if (cardBackdropUrl.isNullOrBlank()) 0.22f else 0.12f))
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        0f to Color.Transparent,
+                        0.52f to LiveColors.PanelDeep.copy(alpha = 0.52f),
+                        1f to LiveColors.PanelDeep.copy(alpha = 0.98f),
+                    )
+                )
+        )
+        ChannelLogo(
+            channel = channel,
+            size = 64.dp,
+            showBackground = false,
+            imagePadding = 1.dp,
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 5.dp),
+        )
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(6.dp)
+                .background(LiveColors.LiveRed, RoundedCornerShape(3.dp))
+                .padding(horizontal = 5.dp, vertical = 1.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.live_badge_live),
+                style = LiveType.Badge.copy(color = Color.White, fontSize = 7.sp),
+            )
+        }
+        if (isFavorite) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = LiveColors.Accent,
+                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(12.dp),
+            )
         }
 
-        // — Info section
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(3.dp),
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = "CH ${channel.number}",
-                    style = LiveType.NumberMono.copy(color = LiveColors.Accent, fontSize = 9.sp))
-                Text("·", style = LiveType.TimeMono.copy(color = LiveColors.FgMute))
-                Text(text = channel.name,
-                    style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 10.sp),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f))
+                Text(
+                    text = "${stringResource(R.string.live_badge_ch)} ${channel.number}",
+                    style = LiveType.NumberMono.copy(color = LiveColors.Accent, fontSize = 7.sp),
+                )
+                Text(
+                    text = channel.name,
+                    style = LiveType.ChannelName.copy(color = Color.White.copy(alpha = 0.78f), fontSize = 8.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LiveColors.Divider))
-            Text(text = now?.title ?: "—",
-                style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 9.sp),
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(
+                text = now?.title ?: stringResource(R.string.live_status_guide_pending),
+                style = LiveType.ProgramTitle.copy(color = Color.White, fontSize = 9.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             if (now != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    Text(text = formatClock(now.startUtcMillis),
-                        style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp))
+                    Text(
+                        text = formatClock(now.startUtcMillis),
+                        style = LiveType.TimeMono.copy(color = Color.White.copy(alpha = 0.58f), fontSize = 7.sp),
+                    )
                     LinearProgressIndicator(
                         progress = { progress },
-                        color = if (isPlaying) LiveColors.Accent else LiveColors.FgMute.copy(alpha = 0.5f),
-                        trackColor = LiveColors.Panel,
-                        modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(999.dp)),
+                        color = LiveColors.Accent,
+                        trackColor = Color.White.copy(alpha = 0.12f),
+                        modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(99.dp)),
                     )
                     if (minsLeft != null && minsLeft > 0L) {
-                        Text(text = "${minsLeft}m",
-                            style = LiveType.TimeMono.copy(
-                                color = if (isPlaying) LiveColors.Accent else LiveColors.FgMute,
-                                fontSize = 8.sp))
+                        Text(
+                            text = stringResource(R.string.live_label_minutes_left, minsLeft),
+                            style = LiveType.TimeMono.copy(color = LiveColors.Accent, fontSize = 7.sp),
+                        )
                     }
                 }
             }
             val nextTitle = nowNext?.next?.title
             if (!nextTitle.isNullOrBlank()) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(text = "▸", style = LiveType.Badge.copy(color = LiveColors.FgMute, fontSize = 7.sp))
-                    Text(text = nextTitle,
-                        style = LiveType.CellTitle.copy(color = LiveColors.FgMute, fontSize = 8.sp),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                Text(
+                    text = "${stringResource(R.string.live_badge_next)}  $nextTitle",
+                    style = LiveType.CellTitle.copy(color = Color.White.copy(alpha = 0.55f), fontSize = 7.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
         }
     }

@@ -5,6 +5,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import com.arflix.tv.data.model.IptvProgram
+import com.arflix.tv.data.model.IptvNowNext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
@@ -45,6 +46,40 @@ class IptvRepositoryOptimizationTest {
         val merged = mergeIptvProgramsPreferRichFresh(listOf(existing), listOf(fresh))
 
         assertEquals("Cached synopsis", merged.single().description)
+    }
+
+    @Test
+    fun mergeIptvGuidePreferRichFresh_keepsCurrentDescriptionWhenShortEpgOmitsIt() {
+        val cachedProgram = IptvProgram(
+            title = "Example programme",
+            description = "Detailed XMLTV synopsis",
+            startUtcMillis = 1_000L,
+            endUtcMillis = 2_000L,
+        )
+        val shortEpgProgram = cachedProgram.copy(description = null)
+
+        val merged = mergeIptvGuidePreferRichFresh(
+            existing = IptvNowNext(now = cachedProgram),
+            fresh = IptvNowNext(now = shortEpgProgram),
+        )
+
+        assertEquals("Detailed XMLTV synopsis", merged.now?.description)
+    }
+
+    @Test
+    fun needsRichCurrentEpg_requiresCurrentProgrammeDescription() {
+        val current = IptvProgram(
+            title = "Example programme",
+            description = null,
+            startUtcMillis = 1_000L,
+            endUtcMillis = 2_000L,
+        )
+
+        assertEquals(true, needsRichCurrentEpg(IptvNowNext(now = current)))
+        assertEquals(
+            false,
+            needsRichCurrentEpg(IptvNowNext(now = current.copy(description = "Synopsis"))),
+        )
     }
 
     // Helper to instantiate private class BackslashEscapeSanitizingInputStream using reflection

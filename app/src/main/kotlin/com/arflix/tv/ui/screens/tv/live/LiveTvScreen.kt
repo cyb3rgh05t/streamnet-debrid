@@ -1018,6 +1018,7 @@ fun LiveTvScreen(
     }
     val filteredChannels = filteredChannelsCollapsedState.value
     val filteredChannelIndexById = filteredChannelIndexState.value
+    val indexedGuideNowNextState = remember { mutableStateOf<Map<String, IptvNowNext>>(emptyMap()) }
     val selectedCategoryTotalCount = remember(visibleEnrichedState.value.tree, selectedCategoryId, filteredChannels.size) {
         visibleEnrichedState.value.tree.countForCategory(selectedCategoryId)
             ?.takeIf { it > 0 }
@@ -1026,7 +1027,10 @@ fun LiveTvScreen(
     val visibleChannelsById = visibleEnrichedState.value.index.byId
     fun guideForChannel(channel: EnrichedChannel?): IptvNowNext? {
         if (channel == null) return null
-        return state.snapshot.nowNext[channel.id]
+        return mergeGuideSlices(
+            indexedGuideNowNextState.value[channel.id],
+            state.snapshot.nowNext[channel.id],
+        )
     }
     // Playing channel — default to the one we were navigated to, else the first
     // channel of the first non-empty category.
@@ -1103,7 +1107,12 @@ fun LiveTvScreen(
     val catchupInSegmentSeekMs = remember(playingChannel?.source, catchupPlaybackOffsetMs) {
         playingChannel?.source?.catchupInSegmentSeekOffset(catchupPlaybackOffsetMs) ?: 0L
     }
-    val currentNowNext = remember(playingChannel, playingCatchupProgram, state.snapshot.nowNext) {
+    val currentNowNext = remember(
+        playingChannel,
+        playingCatchupProgram,
+        state.snapshot.nowNext,
+        indexedGuideNowNextState.value,
+    ) {
         val live = guideForChannel(playingChannel)
         val catchup = playingCatchupProgram
         if (catchup != null) {
@@ -1135,7 +1144,13 @@ fun LiveTvScreen(
             ?.let { id -> visibleChannelsById[id] ?: filteredChannels.firstOrNull { it.id == id } }
             ?: playingChannel
     }
-    val previewNowNext = remember(previewInfoChannel, playingChannel, playingCatchupProgram, state.snapshot.nowNext) {
+    val previewNowNext = remember(
+        previewInfoChannel,
+        playingChannel,
+        playingCatchupProgram,
+        state.snapshot.nowNext,
+        indexedGuideNowNextState.value,
+    ) {
         val live = guideForChannel(previewInfoChannel)
         val catchup = playingCatchupProgram
         if (catchup != null && previewInfoChannel?.id == playingChannel?.id) {
@@ -1244,7 +1259,6 @@ fun LiveTvScreen(
             guideChannels.forEachIndexed { index, channel -> put(channel.id, index) }
         }
     }
-    val indexedGuideNowNextState = remember { mutableStateOf<Map<String, IptvNowNext>>(emptyMap()) }
     LaunchedEffect(guideChannels, guideClockMillis) {
         val ids = guideChannels
             .asSequence()
@@ -2694,6 +2708,9 @@ fun LiveTvScreen(
                     favoriteSet = favSet,
                     exoPlayer = exoPlayer,
                     guideClockMillis = guideClockMillis,
+                    playlistLastRefreshedAtMillis = state.snapshot.loadedAt.toEpochMilli()
+                        .takeIf { state.snapshot.channels.isNotEmpty() },
+                    isPlaylistRefreshing = state.isRefreshingPlaylist,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
                     lookupBackdrop = { title ->
@@ -2712,6 +2729,7 @@ fun LiveTvScreen(
                     },
                     onChannelSelected = { ch -> selectChannel(ch) },
                     onFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
+                    onRefreshPlaylist = viewModel::refreshPlaylist,
                     onOpenVariants = { ch -> openVariantPicker(ch) },
                     onMoveUpFromCategory = {
                         topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile)

@@ -95,7 +95,7 @@ class WatchlistViewModel @Inject constructor(
             watchlistRepository.watchlistItems.collect { items ->
                 if (traktSyncInFlight) return@collect
                 val current = _uiState.value
-                if (items.isNotEmpty() || (!current.isLoading && current.isEmpty)) {
+                if (items.isNotEmpty() || !current.isLoading) {
                     val orderedItems = items.watchlistDisplayOrder()
                     _uiState.value = orderedItems.toSplitState(isLoading = false)
                     fetchLogos(orderedItems)
@@ -286,7 +286,10 @@ class WatchlistViewModel @Inject constructor(
                     toastMessage = context.getString(R.string.watchlist_toast_removed),
                     toastType = ToastType.SUCCESS
                 )
-                runCatching { cloudSyncRepository.pushToCloud() }
+                val cloudPushResult: Result<Unit> = runCatching {
+                    cloudSyncRepository.pushLocalSnapshotToCloud()
+                }.getOrElse { Result.failure(it) }
+                cloudPushResult
                     .onFailure { error ->
                         AppLogger.recordException(
                             throwable = error,

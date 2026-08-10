@@ -1401,13 +1401,42 @@ private fun IptvHeroSection(
     )
 
     Column(
-        modifier = modifier.width(440.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp),
+        modifier = modifier.width(360.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        Box(
+            modifier = Modifier.height(72.dp),
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            if (!programLogoUrl.isNullOrBlank()) {
+                AsyncImage(
+                    model = programLogoUrl,
+                    contentDescription = item.liveProgramTitle,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier.width(320.dp).height(72.dp),
+                )
+            } else {
+                Text(
+                    text = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                    style = ArflixTypography.heroTitle.copy(
+                        fontSize = 40.sp,
+                        lineHeight = 44.sp,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 0.sp,
+                        shadow = textShadow,
+                    ),
+                    color = Color.White,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (item.image.isNotBlank()) {
                 AsyncImage(
@@ -1415,30 +1444,36 @@ private fun IptvHeroSection(
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(86.dp).height(38.dp),
-                )
-            }
-
-            if (!programLogoUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = programLogoUrl,
-                    contentDescription = item.liveProgramTitle,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(260.dp).height(54.dp),
+                    modifier = Modifier.width(74.dp).height(30.dp),
                 )
             } else {
                 Text(
-                    text = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title,
-                    style = ArflixTypography.heroTitle.copy(
-                        fontSize = 24.sp,
-                        lineHeight = 28.sp,
+                    text = item.title,
+                    style = ArflixTypography.caption.copy(
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.sp,
                         shadow = textShadow,
                     ),
                     color = Color.White,
-                    maxLines = 2,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            item.subtitle.takeIf { it.isNotBlank() }?.let { category ->
+                Text(
+                    text = "|",
+                    style = ArflixTypography.caption.copy(fontSize = 13.sp, shadow = textShadow),
+                    color = Color.White.copy(alpha = 0.5f),
+                )
+                Text(
+                    text = category,
+                    style = ArflixTypography.caption.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        shadow = textShadow,
+                    ),
+                    color = Color.White.copy(alpha = 0.82f),
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
@@ -1446,36 +1481,41 @@ private fun IptvHeroSection(
         }
 
         if (hasSchedule) {
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(
-                    text = "${formatIptvCardClock(startMs!!)} - ${formatIptvCardClock(endMs!!)}",
-                    style = ArflixTypography.caption.copy(fontSize = 12.sp, shadow = textShadow),
-                    color = Color.White.copy(alpha = 0.82f),
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        text = "${formatIptvCardClock(startMs!!)} - ${formatIptvCardClock(endMs!!)}",
+                        style = ArflixTypography.caption.copy(fontSize = 12.sp, shadow = textShadow),
+                        color = Color.White.copy(alpha = 0.82f),
+                    )
+                    minutesLeft?.let {
+                        Text(
+                            text = "$it min",
+                            style = ArflixTypography.caption.copy(
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                shadow = textShadow,
+                            ),
+                            color = accent,
+                        )
+                    }
+                }
                 LinearProgressIndicator(
                     progress = { progress },
                     color = accent,
                     trackColor = Color.White.copy(alpha = 0.18f),
                     modifier = Modifier
-                        .width(180.dp)
+                        .fillMaxWidth()
                         .height(3.dp)
                         .clip(RoundedCornerShape(99.dp)),
                 )
-                minutesLeft?.let {
-                    Text(
-                        text = "$it min",
-                        style = ArflixTypography.caption.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            shadow = textShadow,
-                        ),
-                        color = accent,
-                    )
-                }
             }
         }
 
@@ -1499,7 +1539,7 @@ private fun IptvHeroSection(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
-                    text = stringResource(R.string.next).uppercase(),
+                    text = stringResource(R.string.live_badge_next),
                     style = ArflixTypography.caption.copy(
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Black,
@@ -4071,6 +4111,24 @@ private fun IptvHomeCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().alpha(0.62f),
                     )
+                } else if (item.image.isNotBlank()) {
+                    AsyncImage(
+                        model = item.image,
+                        contentDescription = null,
+                        contentScale = ContentScale.FillBounds,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                alpha = 0.26f
+                                scaleX = 1.16f
+                                scaleY = 1.16f
+                            },
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Color.Black.copy(alpha = 0.22f)),
+                    )
                 }
                 Box(
                     Modifier.fillMaxSize().background(
@@ -4089,7 +4147,7 @@ private fun IptvHomeCard(
                         onSuccess = { success ->
                             logoGradient = iptvLogoGradient(success.result.drawable, item.title)
                         },
-                        modifier = Modifier.size(42.dp).align(Alignment.TopCenter).padding(top = 8.dp),
+                        modifier = Modifier.size(58.dp).align(Alignment.TopCenter).padding(top = 7.dp),
                     )
                 }
                 Box(
@@ -4097,7 +4155,7 @@ private fun IptvHomeCard(
                         .background(AccentRed, RoundedCornerShape(3.dp))
                         .padding(horizontal = 5.dp, vertical = 1.dp)
                 ) {
-                    Text("LIVE", style = ArflixTypography.caption.copy(fontSize = 7.sp, fontWeight = FontWeight.Black), color = Color.White)
+                    Text(stringResource(R.string.live_badge_live), style = ArflixTypography.caption.copy(fontSize = 7.sp, fontWeight = FontWeight.Black), color = Color.White)
                 }
             }
             Column(
@@ -4106,11 +4164,11 @@ private fun IptvHomeCard(
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     item.liveChannelNumber?.takeIf { it.isNotBlank() }?.let {
-                        Text("CH $it", style = ArflixTypography.caption.copy(fontSize = 7.sp, fontWeight = FontWeight.Bold), color = accent)
+                        Text("${stringResource(R.string.live_badge_ch)} $it", style = ArflixTypography.caption.copy(fontSize = 7.sp, fontWeight = FontWeight.Bold), color = accent)
                     }
                     Text(item.title, style = ArflixTypography.caption.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.78f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Text(item.liveProgramTitle ?: "Guide pending", style = ArflixTypography.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.liveProgramTitle ?: stringResource(R.string.live_status_guide_pending), style = ArflixTypography.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (start != null && end != null) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         Text(formatIptvCardClock(start), style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.58f))
@@ -4121,12 +4179,12 @@ private fun IptvHomeCard(
                             modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(99.dp)),
                         )
                         if (minsLeft != null && minsLeft > 0) {
-                            Text("${minsLeft}m", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = accent)
+                            Text(stringResource(R.string.live_label_minutes_left, minsLeft), style = ArflixTypography.caption.copy(fontSize = 7.sp), color = accent)
                         }
                     }
                 }
                 item.liveNextProgramTitle?.takeIf { it.isNotBlank() }?.let {
-                    Text("Next  $it", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text("${stringResource(R.string.live_badge_next)}  $it", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

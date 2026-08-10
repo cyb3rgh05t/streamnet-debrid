@@ -44,6 +44,7 @@ fun ChannelLogo(
     size: Dp,
     modifier: Modifier = Modifier,
     showBackground: Boolean = true,
+    imagePadding: Dp? = null,
 ) {
     val initials = initialsFor(channel.name)
     val variant = (channel.name.firstOrNull()?.code ?: 0) % 3
@@ -127,7 +128,7 @@ fun ChannelLogo(
                 onError = { showFallback = true },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding((size.value / 7f).coerceIn(4f, 8f).dp),
+                    .padding(imagePadding ?: (size.value / 7f).coerceIn(4f, 8f).dp),
             )
         }
     }
@@ -144,7 +145,7 @@ internal fun initialsFor(name: String): String {
     }
 }
 
-private fun safeChannelLogoUrl(raw: String?): String? {
+internal fun safeChannelLogoUrl(raw: String?): String? {
     val trimmed = raw?.trim().orEmpty()
     if (trimmed.isBlank()) return null
     val normalized = when {

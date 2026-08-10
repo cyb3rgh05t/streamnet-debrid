@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -176,7 +179,9 @@ fun FullscreenHud(
         visible = visible,
         enter = fadeIn(tween(200)),
         exit = fadeOut(tween(200)),
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             // Full screen gradient overlay (dark at top and bottom)
@@ -269,8 +274,22 @@ fun FullscreenHud(
             }
 
             // --- Bottom Sheet Layout (Full-Width) ---
+            val guidePrograms = remember(nowNext) {
+                buildList {
+                    nowNext?.now?.let(::add)
+                    nowNext?.next?.let(::add)
+                    nowNext?.later?.let(::add)
+                    addAll(nowNext?.upcoming.orEmpty())
+                }.distinctBy { Triple(it.startUtcMillis, it.endUtcMillis, it.title) }
+            }
             val now = nowNext?.now
-            val next = nowNext?.next
+                ?.takeIf { isCatchupMode || it.isLive(clockMillis) }
+                ?: guidePrograms.firstOrNull { it.isLive(clockMillis) }
+            val nextBoundary = now?.endUtcMillis ?: clockMillis
+            val next = guidePrograms
+                .asSequence()
+                .filter { it.startUtcMillis >= nextBoundary }
+                .minByOrNull { it.startUtcMillis }
 
             // Elapsed time passed on current show
             var frozenElapsedMs by remember(channel?.id, now?.startUtcMillis) { mutableStateOf<Long?>(null) }
@@ -351,7 +370,7 @@ fun FullscreenHud(
                             overflow = TextOverflow.Ellipsis,
                         )
 
-                        // Time window + remaining duration + channel number & name
+                        // Current programme time window and remaining duration
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -365,12 +384,17 @@ fun FullscreenHud(
                                         fontSize = 14.sp,
                                     ),
                                 )
+                            }
+
+                            now?.title?.takeIf { it.isNotBlank() }?.let { programmeTitle ->
                                 Text(
-                                    text = "—",
-                                    style = LiveType.TimeMono.copy(
-                                        color = Color.White.copy(alpha = 0.5f),
+                                    text = programmeTitle,
+                                    style = LiveType.CellTitle.copy(
+                                        color = Color.White.copy(alpha = 0.78f),
                                         fontSize = 14.sp,
                                     ),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
                                 )
                             }
 
@@ -379,24 +403,13 @@ fun FullscreenHud(
                                 Text(
                                     text = remaining,
                                     style = LiveType.TimeMono.copy(
-                                        color = Color.White.copy(alpha = 0.75f),
+                                        color = LiveColors.Accent,
                                         fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
                                     ),
                                 )
                             }
 
-                            if (channel != null) {
-                                Text(
-                                    text = "${channel.number}  ${channel.name}",
-                                    style = LiveType.ChannelName.copy(
-                                        color = Color.White,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                    ),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
                         }
 
                         // Next Program Preview
@@ -405,6 +418,14 @@ fun FullscreenHud(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                             ) {
+                                Text(
+                                    text = stringResource(R.string.live_badge_next),
+                                    style = LiveType.SectionTag.copy(
+                                        color = LiveColors.Accent,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                )
                                 Text(
                                     text = "${formatClock(next.startUtcMillis, clockFormat)} — ${formatClock(next.endUtcMillis, clockFormat)}",
                                     style = LiveType.TimeMono.copy(

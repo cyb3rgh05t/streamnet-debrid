@@ -361,7 +361,7 @@ internal class IptvEpgIndex(context: Context) : SQLiteOpenHelper(
         // bloated it with up to 336 programmes/channel; loading 360 such channels into
         // memory churned the heap and crashed the Live TV page. Recreating it clears
         // that, and the reduced caps below keep per-channel memory bounded.
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
         const val MAX_SQL_ARGS = 900
         const val MAX_DESCRIPTION_CHARS = 200
         // ±48h of guide needs only ~24-48 programmes each way. Keeping 96+240 held far

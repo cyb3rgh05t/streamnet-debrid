@@ -14,6 +14,7 @@ import com.arflix.tv.data.repository.IptvPlaybackUrlResolver
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvTvSessionState
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.mergeIptvGuidePreferRichFresh
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,6 +51,7 @@ private const val RichCatchupRecentTarget = 6
 private const val CatchupHistoryWindowMs = 48L * 60L * 60_000L
 private const val RichCatchupRefreshThrottleMs = 45_000L
 private const val CurrentChannelEpgRefreshThrottleMs = 12_000L
+private const val VisibleEpgRetryDelayMs = 60_000L
 private const val PeriodicIptvNetworkRefreshIntervalMs = 4L * 60L * 60_000L
 private const val PeriodicIptvRefreshCheckIntervalMs = 60_000L
 private const val LargeListCompleteGuideCoverageTarget = 0.75f
@@ -58,6 +60,7 @@ private const val LargeListCompleteEpgBackfillStartupDelayMs = 180_000L
 
 data class TvUiState(
     val isLoading: Boolean = false,
+    val isRefreshingPlaylist: Boolean = false,
     val error: String? = null,
     val loadingMessage: String? = null,
     val loadingPercent: Int = 0,
@@ -113,6 +116,8 @@ class TvViewModel @Inject constructor(
     private val visibleEpgQueueLock = Any()
     private val pendingVisibleEpgChannelIds = LinkedHashSet<String>()
     private var pendingVisibleEpgSelectedChannelId: String? = null
+    private var visibleEpgRetryJob: Job? = null
+    private val pendingVisibleEpgRetryIds = LinkedHashSet<String>()
     private var tvSessionSaveJob: Job? = null
     private var startupGuideWarmupKey: String? = null
     private var fullEpgWarmupJob: Job? = null
@@ -335,6 +340,9 @@ class TvViewModel @Inject constructor(
         if (forceEpg) {
             completeEpgBackfillJob?.cancel()
         }
+        if (force) {
+            _uiState.value = _uiState.value.copy(isRefreshingPlaylist = true)
+        }
 
         refreshJob = viewModelScope.launch {
             val hasExistingChannels = _uiState.value.snapshot.channels.isNotEmpty()
@@ -510,12 +518,17 @@ class TvViewModel @Inject constructor(
         }.also { job ->
             job.invokeOnCompletion {
                 refreshJob = null
+                _uiState.value = _uiState.value.copy(isRefreshingPlaylist = false)
                 if (pendingForcedReload) {
                     pendingForcedReload = false
                     refresh(force = true, showLoading = false, forceEpg = false)
                 }
             }
         }
+    }
+
+    fun refreshPlaylist() {
+        refresh(force = true, showLoading = false, forceEpg = true)
     }
 
     private fun warmXtreamVodCache() {
@@ -739,14 +752,7 @@ class TvViewModel @Inject constructor(
         existing: com.arflix.tv.data.model.IptvNowNext?,
         fresh: com.arflix.tv.data.model.IptvNowNext
     ): com.arflix.tv.data.model.IptvNowNext {
-        if (existing == null) return fresh
-        return com.arflix.tv.data.model.IptvNowNext(
-            now = fresh.now ?: existing.now,
-            next = fresh.next ?: existing.next,
-            later = fresh.later ?: existing.later,
-            upcoming = if (fresh.upcoming.isNotEmpty()) fresh.upcoming else existing.upcoming,
-            recent = if (fresh.recent.isNotEmpty()) fresh.recent else existing.recent,
-        )
+        return mergeIptvGuidePreferRichFresh(existing, fresh)
     }
 
     // Every TvUiState emission re-executes the (very large, interpreter-only)
@@ -1485,6 +1491,18 @@ class TvViewModel @Inject constructor(
                         mergeNowNext(refreshed)
                     }
                 }
+                val deferredVisibleIds = missingIds
+                    .asSequence()
+                    .filterNot { it in firstPaintIds }
+                    .filterNot { hasUsefulVisibleGuideData(_uiState.value.snapshot.nowNext[it]) }
+                    .toList()
+                if (deferredVisibleIds.isNotEmpty()) {
+                    System.err.println(
+                        "[EPG-StartupCache] queueing remaining visible=${deferredVisibleIds.size} " +
+                            "after immediate=${firstPaintIds.size}"
+                    )
+                    enqueueVisibleEpgRefresh(deferredVisibleIds, selectedChannelId = null)
+                }
                 val delayedFavoritePass = orderedIds
                     .asSequence()
                     .filter { favoriteIds.contains(it) }
@@ -1675,11 +1693,14 @@ class TvViewModel @Inject constructor(
         visibleEpgRefreshJob = viewModelScope.launch {
             delay(120L)
             var pass = 0
+            val unresolvedForRetry = LinkedHashSet<String>()
             while (true) {
+                val largeList = isActiveLargeIptvList()
                 val drain = drainVisibleEpgBatch(
-                    maxChannels = when (pass) {
-                        0 -> 18
-                        1 -> 32
+                    maxChannels = when {
+                        pass == 0 -> 18
+                        largeList -> LargeListFocusedNetworkEpgLimit
+                        pass == 1 -> 32
                         else -> 48
                     }
                 )
@@ -1801,6 +1822,10 @@ class TvViewModel @Inject constructor(
                     hasUsefulVisibleGuideData(_uiState.value.snapshot.nowNext[id])
                 }
                 if (unresolvedIds.isNotEmpty()) {
+                    unresolvedIds
+                        .asSequence()
+                        .take(48 - unresolvedForRetry.size)
+                        .forEach(unresolvedForRetry::add)
                     val current = _uiState.value
                     val hasGuideSource = current.hasPotentialGuideSource && hasNetworkEpgSource(current.config)
                     val fullGuideRecentlyCompleted = lastCompleteEpgBackfillCompletedAt > 0L &&
@@ -1823,10 +1848,39 @@ class TvViewModel @Inject constructor(
                 pass += 1
                 delay(60L)
             }
+            scheduleVisibleEpgRetry(unresolvedForRetry)
         }.also { job ->
             job.invokeOnCompletion {
                 if (visibleEpgRefreshJob === job) {
                     visibleEpgRefreshJob = null
+                }
+            }
+        }
+    }
+
+    private fun scheduleVisibleEpgRetry(channelIds: Collection<String>) {
+        if (channelIds.isEmpty()) return
+        synchronized(visibleEpgQueueLock) {
+            channelIds
+                .asSequence()
+                .filter { it.isNotBlank() }
+                .take(48 - pendingVisibleEpgRetryIds.size)
+                .forEach(pendingVisibleEpgRetryIds::add)
+        }
+        if (visibleEpgRetryJob?.isActive == true) return
+        visibleEpgRetryJob = viewModelScope.launch {
+            delay(VisibleEpgRetryDelayMs)
+            val retryIds = synchronized(visibleEpgQueueLock) {
+                pendingVisibleEpgRetryIds.toList().also { pendingVisibleEpgRetryIds.clear() }
+            }.filterNot { id -> hasUsefulVisibleGuideData(_uiState.value.snapshot.nowNext[id]) }
+            if (retryIds.isNotEmpty()) {
+                System.err.println("[EPG-Retry] retrying ${retryIds.size} unresolved visible channels")
+                enqueueVisibleEpgRefresh(retryIds, selectedChannelId = null)
+            }
+        }.also { job ->
+            job.invokeOnCompletion {
+                if (visibleEpgRetryJob === job) {
+                    visibleEpgRetryJob = null
                 }
             }
         }

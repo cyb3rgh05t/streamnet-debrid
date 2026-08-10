@@ -28,6 +28,7 @@ import com.arflix.tv.data.repository.providerScopedStreamIdentity
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
+import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.settingsDataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1068,7 +1069,19 @@ class DetailsViewModel @Inject constructor(
                     }
                     watchlistRepository.removeFromWatchlist(currentMediaType, currentMediaId)
                 }
-                runCatching { cloudSyncRepository.pushToCloud() }
+                val cloudPushResult: Result<Unit> = runCatching {
+                    cloudSyncRepository.pushLocalSnapshotToCloud()
+                }.getOrElse { Result.failure(it) }
+                cloudPushResult.onFailure { error ->
+                    AppLogger.recordException(
+                        throwable = error,
+                        context = mapOf(
+                            "error_area" to "Watchlist",
+                            "watchlist_phase" to "details_toggle_cloud_push",
+                            "media_type" to currentMediaType.name.lowercase()
+                        )
+                    )
+                }
 
                 _uiState.value = _uiState.value.copy(
                     isInWatchlist = newInWatchlist,

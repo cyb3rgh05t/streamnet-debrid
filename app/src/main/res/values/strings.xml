@@ -807,6 +807,9 @@
     <string name="live_label_duration_min">·  %1$dmin</string>
     <string name="live_label_minutes_left">%1$d min left</string>
     <string name="live_label_upcoming">UPCOMING</string>
+    <string name="live_playlist_updated">Playlist: %1$s</string>
+    <string name="live_playlist_not_updated">Playlist not refreshed yet</string>
+    <string name="live_refresh_playlist">Refresh playlist</string>
     <string name="live_label_quality_variants">%1$s %2$dx</string>
     <string name="live_label_all_channels">All Channels</string>
     <string name="live_label_search_channels">Search channels</string>

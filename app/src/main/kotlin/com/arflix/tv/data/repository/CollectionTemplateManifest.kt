@@ -293,7 +293,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "MGM+",
             group = CollectionGroupKind.SERVICE,
-            coverImageUrl = "${UPLOADED_COVER_BASE}886dd8ac-2c7f-4ad6-9fe9-dab115ca7c00.jpg",
+            coverImageUrl = "https://www.mgmplus.com/_next/static/media/og-image.1p-ndvvwq3kwr.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,

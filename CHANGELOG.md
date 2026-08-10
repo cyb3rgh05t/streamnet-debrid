@@ -15,6 +15,15 @@ All notable changes to this project are documented in this file.
 - Enforced explicit-only Search focus in the category sidebar so Search only takes focus when intentionally opened.
 - Persisted last used Live TV category and channel during navigation so app restarts restore the previous context more reliably.
 - Updated mini-player side EPG info to follow the currently focused channel while scrolling the channel list up/down.
+- Improved Xtream EPG mapping, description retention, visible-channel retries, and authenticated XMLTV fallback so Home and Live TV show consistent rich guide data.
+- Made manual playlist refresh publish channel changes immediately and force a complete EPG refresh while preserving existing data during transient failures.
+- Refined the TV-mode Live TV hero and channel cards with larger sender logos, TMDB-aware logo backdrops, compact upcoming-program rows, and clearer refresh status.
+
+### Home and watchlist
+
+- Matched Home IPTV cards to the Live TV artwork treatment and restored MGM+ service artwork with a valid landscape source.
+- Fixed removing the final watchlist item leaving a stale card visible until navigating away.
+- Synchronized watchlist additions and removals from Home, Details, and Watchlist as authoritative local cloud snapshots, with retryable failure reporting.
 
 ### Localization
 

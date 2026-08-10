@@ -17,7 +17,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,10 +41,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -58,6 +55,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.arflix.tv.ui.components.AppBottomBar
+import com.arflix.tv.ui.components.LoadingIndicator
+import com.arflix.tv.ui.skin.resolveAccentColor
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -471,6 +470,7 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 fun ArvioLoadingScreen() {
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
     val reveal = remember { Animatable(0f) }
+    val accentColor = resolveAccentColor(fallback = Color(0xFFE5A209))
 
     LaunchedEffect(Unit) {
         reveal.animateTo(
@@ -478,16 +478,6 @@ fun ArvioLoadingScreen() {
             animationSpec = tween(durationMillis = 920, easing = FastOutSlowInEasing)
         )
     }
-
-    val sweep by infiniteTransition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1550, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "sweep"
-    )
 
     val logoAlpha by infiniteTransition.animateFloat(
         initialValue = 0.96f,
@@ -505,52 +495,34 @@ fun ArvioLoadingScreen() {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRect(color = Color.Black)
-
-            val progress = reveal.value
-            val logoCenterY = center.y - 8.dp.toPx()
-            val baselineY = logoCenterY + 138.dp.toPx()
-
-            val halfWidth = 180.dp.toPx() * progress
-            val lineStartX = center.x - halfWidth
-            val lineEndX = center.x + halfWidth
-            drawLine(
-                color = Color(0xFFE5A209).copy(alpha = 0.36f * progress),
-                start = Offset(lineStartX, baselineY),
-                end = Offset(lineEndX, baselineY),
-                strokeWidth = 1.6.dp.toPx(),
-                cap = StrokeCap.Round
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+                contentDescription = "StreamNet TV",
+                modifier = Modifier
+                    .fillMaxWidth(0.52f)
+                    .widthIn(max = 320.dp)
+                    .graphicsLayer {
+                        alpha = reveal.value * logoAlpha
+                        val scale = 0.88f + (0.12f * reveal.value)
+                        scaleX = scale
+                        scaleY = scale
+                        translationY = (1f - reveal.value) * 18.dp.toPx()
+                    },
+                contentScale = ContentScale.Fit,
             )
-
-            val sweepHalfWidth = 34.dp.toPx()
-            val sweepTravel = (halfWidth - sweepHalfWidth).coerceAtLeast(0f)
-            val sweepX = center.x + (sweep * sweepTravel)
-            drawLine(
-                color = Color(0xFFE5A209).copy(alpha = 0.9f * progress),
-                start = Offset(sweepX - sweepHalfWidth, baselineY),
-                end = Offset(sweepX + sweepHalfWidth, baselineY),
-                strokeWidth = 1.2.dp.toPx(),
-                cap = StrokeCap.Round
+            Spacer(modifier = Modifier.height(42.dp))
+            LoadingIndicator(
+                size = 42.dp,
+                color = accentColor,
+                strokeWidth = 3.dp,
             )
         }
-
-        Image(
-            painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
-            contentDescription = "StreamNet TV",
-            modifier = Modifier
-                .padding(horizontal = 24.dp)
-                .fillMaxWidth(0.52f)
-                .widthIn(max = 320.dp)
-                .graphicsLayer {
-                    alpha = reveal.value * logoAlpha
-                    val scale = 0.88f + (0.12f * reveal.value)
-                    scaleX = scale
-                    scaleY = scale
-                    translationY = (1f - reveal.value) * 18.dp.toPx()
-                },
-            contentScale = ContentScale.Fit,
-        )
     }
 }
 

@@ -243,6 +243,9 @@
     <string name="live_label_duration_min">·  %1$d Min.</string>
     <string name="live_label_minutes_left">Noch %1$d Min.</string>
     <string name="live_label_upcoming">DANACH</string>
+    <string name="live_playlist_updated">Playlist: %1$s</string>
+    <string name="live_playlist_not_updated">Playlist noch nicht aktualisiert</string>
+    <string name="live_refresh_playlist">Playlist aktualisieren</string>
     <string name="live_label_quality_variants">%1$s %2$dx</string>
     <string name="live_label_all_channels">Alle Sender</string>
     <string name="live_label_search_channels">Sender suchen</string>

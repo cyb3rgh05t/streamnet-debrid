@@ -33,6 +33,7 @@ import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.SportsRepository
 import com.arflix.tv.data.repository.StreamRepository
 import com.arflix.tv.data.repository.IptvRepository
+import com.arflix.tv.data.repository.needsRichCurrentEpg
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.CloudSyncStatus
 import com.arflix.tv.data.repository.CollectionTemplateManifest
@@ -923,7 +924,10 @@ class HomeViewModel @Inject constructor(
             ?: categories.firstOrNull()?.items?.firstOrNull()
     }
 
-    private fun refreshTvCatalogEpg(networkFetch: Boolean = false) {
+    private fun refreshTvCatalogEpg(
+        networkFetch: Boolean = false,
+        requestedChannelIds: Set<String>? = null,
+    ) {
         activeEpgRefreshJob?.cancel()
         activeEpgRefreshJob = viewModelScope.launch(Dispatchers.IO) {
             try {
@@ -931,10 +935,11 @@ class HomeViewModel @Inject constructor(
                 val tvCategoryIds = setOf(FAVORITE_TV_CATEGORY_ID, RECENT_TV_CATEGORY_ID)
                 val tvCategories = categories
                     .filter { it.id in tvCategoryIds }
-                val channelIds = tvCategories
-                    .flatMap { it.items }
-                    .mapNotNull(::getIptvChannelId)
-                    .toSet()
+                val channelIds = requestedChannelIds?.filterTo(LinkedHashSet()) { it.isNotBlank() }
+                    ?: tvCategories
+                        .flatMap { it.items }
+                        .mapNotNull(::getIptvChannelId)
+                        .toSet()
                 if (channelIds.isEmpty()) return@launch
 
                 // Optionally do network refresh first
@@ -953,12 +958,12 @@ class HomeViewModel @Inject constructor(
                                 .mapNotNull(::getIptvChannelId)
                                 .filter { channelId ->
                                     val guide = snapshot?.nowNext?.get(channelId)
-                                    guide?.now == null && guide?.next == null && guide?.later == null
+                                    needsRichCurrentEpg(guide)
                                 }
                                 .forEach(::add)
                         }
-                        val requestedIds = prioritizedMissingIds.ifEmpty { channelIds }
-                        runCatching { iptvRepository.refreshEpgForChannels(requestedIds) }
+                        val networkIds = prioritizedMissingIds.ifEmpty { channelIds }
+                        runCatching { iptvRepository.refreshEpgForChannels(networkIds) }
                     }
                 }
 
@@ -1012,8 +1017,7 @@ class HomeViewModel @Inject constructor(
         epgRefreshJob?.cancel()
         activeEpgRefreshJob?.cancel()
         epgRefreshJob = viewModelScope.launch {
-            // Initial delay — let home data + IPTV warmup finish first
-            delay(if (isLowRamDevice) 10_000L else 5_000L)
+            delay(if (isLowRamDevice) 20_000L else 10_000L)
             var tickCount = 0L
             while (true) {
                 tickCount++
@@ -1759,7 +1763,7 @@ class HomeViewModel @Inject constructor(
             }
         }
         viewModelScope.launch(Dispatchers.IO) {
-            delay(if (isLowRamDevice) 8 * 60_000L else 6 * 60_000L)
+            delay(if (isLowRamDevice) 6_000L else 3_000L)
             // Warm IPTV channels + EPG in background after startup settles.
             // First load from disk cache (fast), then do targeted network EPG refresh
             // for favorite channels so home screen shows current program info.
@@ -1769,16 +1773,21 @@ class HomeViewModel @Inject constructor(
                 // Phase 2: Refresh EPG for favorite channels (lightweight network call)
                 val snap = iptvRepository.getMemoryCachedSnapshot()
                 if (snap != null) {
-                    val favIds = snap.favoriteChannels.toHashSet()
-                    val favChannelIds = snap.channels
-                        .filter { favIds.contains(it.id) }
-                        .map { it.id }
-                        .toSet()
-                    if (favChannelIds.isNotEmpty()) {
+                    val startupChannelIds = buildSet {
+                        addAll(snap.favoriteChannels.filter { it.isNotBlank() })
+                        addAll(iptvRepository.observeTvSessionState().first().recentChannelIds.filter { it.isNotBlank() })
+                    }
+                    if (startupChannelIds.isNotEmpty()) {
                         val epgAgeMs = iptvRepository.cachedEpgAgeMs()
-                        val shouldNetworkRefresh =
-                            epgAgeMs == Long.MAX_VALUE || epgAgeMs >= EPG_STARTUP_NETWORK_STALE_MS
-                        refreshTvCatalogEpg(networkFetch = shouldNetworkRefresh)
+                        val shouldNetworkRefresh = epgAgeMs == Long.MAX_VALUE ||
+                            epgAgeMs >= EPG_STARTUP_NETWORK_STALE_MS ||
+                            startupChannelIds.any { channelId ->
+                                needsRichCurrentEpg(snap.nowNext[channelId])
+                            }
+                        refreshTvCatalogEpg(
+                            networkFetch = shouldNetworkRefresh,
+                            requestedChannelIds = startupChannelIds,
+                        )
                     }
                 }
                     } catch (e: Exception) {
@@ -1787,7 +1796,7 @@ class HomeViewModel @Inject constructor(
         }
         // Periodically refresh EPG data for IPTV rows after Home settles.
         viewModelScope.launch {
-            delay(if (isLowRamDevice) 8 * 60_000L else 6 * 60_000L)
+            delay(if (isLowRamDevice) 20_000L else 10_000L)
             startEpgRefreshTimer()
         }
         viewModelScope.launch {
@@ -4361,7 +4370,10 @@ class HomeViewModel @Inject constructor(
                     }
                     watchlistRepository.addToWatchlist(item.mediaType, item.id, item)
                 }
-                runCatching { cloudSyncRepository.pushToCloud() }
+                val cloudPushResult: Result<Unit> = runCatching {
+                    cloudSyncRepository.pushLocalSnapshotToCloud()
+                }.getOrElse { Result.failure(it) }
+                cloudPushResult
                     .onFailure { error ->
                         AppLogger.recordException(
                             throwable = error,
