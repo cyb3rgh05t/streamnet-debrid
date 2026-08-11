@@ -1,6 +1,8 @@
 package com.arflix.tv.data.repository
 
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -58,5 +60,60 @@ class HomeServerMatcherTest {
         )
 
         assertTrue(HomeServerMatcher.isAcceptable(score))
+    }
+
+    @Test
+    fun `strong ids reuse the same source cache entry across details and player`() {
+        val detailsIdentity = HomeServerSourceCacheKey.contentIdentity(
+            title = "Dune: Part Two",
+            year = 2024,
+            imdbId = "TT15239678",
+            tmdbId = 693134,
+            tvdbId = null
+        )
+        val playerIdentity = HomeServerSourceCacheKey.contentIdentity(
+            title = "",
+            year = null,
+            imdbId = "tt15239678",
+            tmdbId = 693134,
+            tvdbId = 12345
+        )
+
+        assertEquals(detailsIdentity, playerIdentity)
+        assertEquals("imdb:tt15239678", detailsIdentity)
+    }
+
+    @Test
+    fun `tmdb id reuses cache when optional metadata arrives later`() {
+        val prefetched = HomeServerSourceCacheKey.contentIdentity("The Pitt", 2025, null, 250307, null)
+        val playback = HomeServerSourceCacheKey.contentIdentity("", null, null, 250307, 45177)
+
+        assertEquals(prefetched, playback)
+    }
+
+    @Test
+    fun `title fallback keeps remakes separate`() {
+        val original = HomeServerSourceCacheKey.contentIdentity("Road House", 1989, null, null, null)
+        val remake = HomeServerSourceCacheKey.contentIdentity("Road House", 2024, null, null, null)
+
+        assertNotEquals(original, remake)
+    }
+
+    @Test
+    fun `matching title versions are retained while unrelated titles are rejected`() {
+        assertTrue(
+            HomeServerMatcher.isLikelySameVersion(
+                requestedTitle = "Blade Runner 2049",
+                requestedYear = 2017,
+                candidate = HomeServerCandidateInfo("Blade Runner 2049", 2017, emptyMap())
+            )
+        )
+        assertFalse(
+            HomeServerMatcher.isLikelySameVersion(
+                requestedTitle = "Blade Runner 2049",
+                requestedYear = 2017,
+                candidate = HomeServerCandidateInfo("Blade Runner", 1982, emptyMap())
+            )
+        )
     }
 }

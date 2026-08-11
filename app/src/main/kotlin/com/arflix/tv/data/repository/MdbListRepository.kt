@@ -71,6 +71,21 @@ class MdbListRepository @Inject constructor(
 
     suspend fun isConnected(): Boolean = key() != null
 
+    /**
+     * Fetches the MDBList username for the currently connected API key.
+     * Returns null gracefully if not connected or if the request fails.
+     */
+    suspend fun fetchUsername(): String? = withContext(Dispatchers.IO) {
+        try {
+            val k = key() ?: return@withContext null
+            api.getUser(k).username
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ===== Watchlist =====
 
     suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int): Boolean =

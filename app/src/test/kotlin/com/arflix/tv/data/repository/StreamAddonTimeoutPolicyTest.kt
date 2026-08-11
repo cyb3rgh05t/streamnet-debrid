@@ -9,6 +9,17 @@ import org.junit.Test
 
 class StreamAddonTimeoutPolicyTest {
     @Test
+    fun `penguplay configured instances use the slow aggregator timeout`() {
+        val addon = addon(
+            id = "com.penguplay.configured",
+            name = "PenguPlay",
+            manifestId = "com.penguplay"
+        )
+
+        assertTrue(usesSlowAggregatorTimeout(addon))
+    }
+
+    @Test
     fun `hdhub configured instances use the slow aggregator timeout`() {
         val addon = addon(
             id = "com.stremio.HdHub_configured",

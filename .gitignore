@@ -16,9 +16,6 @@ gen/
 out/
 release/
 
-# Repository-local automation not used by this distribution
-.github/workflows/
-
 # Gradle files
 .gradle/
 build/

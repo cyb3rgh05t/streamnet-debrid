@@ -304,7 +304,7 @@ class MainActivity : ComponentActivity() {
                 }
             }.collectAsStateWithLifecycle(initialValue = "de-DE")
             LaunchedEffect(appLanguage) {
-                mediaRepository.get().contentLanguage = if (appLanguage == "en-US") null else appLanguage
+                mediaRepository.get().contentLanguage = appLanguage
             }
             val currentConfiguration = LocalConfiguration.current
             val autoDeviceType = remember(

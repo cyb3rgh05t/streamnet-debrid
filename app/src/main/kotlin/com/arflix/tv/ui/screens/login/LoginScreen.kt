@@ -1,5 +1,7 @@
 package com.arflix.tv.ui.screens.login
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -21,6 +23,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +66,9 @@ fun LoginScreen(
     val passwordFocusRequester = remember { FocusRequester() }
     val buttonFocusRequester = remember { FocusRequester() }
     val toggleFocusRequester = remember { FocusRequester() }
+    val privacyFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val context = LocalContext.current
 
     // Handle successful login
     LaunchedEffect(uiState.loginReady) {
@@ -105,6 +110,10 @@ fun LoginScreen(
                                     true
                                 }
                                 "button" -> {
+                                    if (isSignUpMode) privacyFocusRequester.requestFocus() else toggleFocusRequester.requestFocus()
+                                    true
+                                }
+                                "privacy" -> {
                                     toggleFocusRequester.requestFocus()
                                     true
                                 }
@@ -122,6 +131,10 @@ fun LoginScreen(
                                     true
                                 }
                                 "toggle" -> {
+                                    if (isSignUpMode) privacyFocusRequester.requestFocus() else buttonFocusRequester.requestFocus()
+                                    true
+                                }
+                                "privacy" -> {
                                     buttonFocusRequester.requestFocus()
                                     true
                                 }
@@ -397,6 +410,32 @@ fun LoginScreen(
                         .focusRequester(buttonFocusRequester)
                         .onFocusChanged { if (it.isFocused) focusedField = "button" }
                 )
+
+                if (isSignUpMode) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = stringResource(R.string.login_privacy_notice),
+                        fontSize = 12.sp,
+                        color = Color.White.copy(alpha = 0.62f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    GradientButton(
+                        onClick = {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://arvio.tv/privacy"))
+                            )
+                        },
+                        text = stringResource(R.string.login_read_privacy_policy),
+                        isPrimary = false,
+                        isFocused = focusedField == "privacy",
+                        enabled = !uiState.isLoading,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .focusRequester(privacyFocusRequester)
+                            .onFocusChanged { if (it.isFocused) focusedField = "privacy" }
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Bookmark, CalendarDays, Clapperboard, Copy, Download, ExternalLink, Filter, MapPin, Play, Search, Star, Trash2, UserCircle, X } from "lucide-react";
+import { BadgeCheck, Bookmark, CalendarDays, Check, Clapperboard, Copy, Download, ExternalLink, EyeOff, Filter, MapPin, Play, Search, Star, Trash2, UserCircle, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { MediaCard } from "@/components/media/MediaCard";
@@ -37,7 +37,7 @@ function needsDetailsHydration(item: MediaItem) {
 }
 
 function DetailsView({ item }: { item: MediaItem }) {
-  const { streams, selectedEpisode, activeProfile, addons: installedAddons, loadEpisodeStreams, openDetails, playStream, playTrailer, setToast, settings, watchlist, refreshData, busy, isWatched, markWatchedLocally } = useApp();
+  const { streams, selectedEpisode, activeProfile, addons: installedAddons, loadEpisodeStreams, openDetails, playStream, playTrailer, setToast, settings, watchlist, refreshData, busy, isWatched, markWatchedLocally, openContextMenu, toggleWatched } = useApp();
   const [detailsItem, setDetailsItem] = useState<MediaItem>(item);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [reviews, setReviews] = useState<ReviewInfo[]>([]);
@@ -891,6 +891,7 @@ function SeasonEpisodes({ item, loadingDetails, selectedEpisode, isWatched, onPl
   isWatched: (item: MediaItem, seasonNumber?: number | null, episodeNumber?: number | null) => boolean;
   onPlayEpisode: (season: number, episode: number) => void;
 }) {
+  const { openContextMenu, setToast, toggleWatched } = useApp();
   const seasons = item.seasons ?? [];
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [episodes, setEpisodes] = useState<EpisodeInfo[]>([]);
@@ -913,6 +914,77 @@ function SeasonEpisodes({ item, loadingDetails, selectedEpisode, isWatched, onPl
     return () => { active = false; };
   }, [item.id, season, retryNonce]);
 
+  const updateSeasonWatched = async (seasonNum: number, watched: boolean) => {
+    try {
+      const targetEpisodes = await getSeasonEpisodes(item.id, seasonNum);
+      for (const ep of targetEpisodes) {
+        if (isWatched(item, seasonNum, ep.episodeNumber) !== watched) {
+          await toggleWatched(item, seasonNum, ep.episodeNumber);
+        }
+      }
+      setToast(`Season ${seasonNum} marked as ${watched ? "watched" : "unwatched"}.`);
+    } catch {
+      setToast(`Could not update Season ${seasonNum}. Please try again.`);
+    }
+  };
+
+  const handleSeasonContextMenu = (e: React.MouseEvent, seasonNum: number, seasonName: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openContextMenu({
+      title: seasonName || `Season ${seasonNum}`,
+      subtitle: item.title,
+      position: { x: e.clientX, y: e.clientY },
+      actions: [
+        {
+          id: "mark_season_watched",
+          label: "Mark Season Watched",
+          icon: <Check size={18} />,
+          action: async () => {
+            await updateSeasonWatched(seasonNum, true);
+          }
+        },
+        {
+          id: "mark_season_unwatched",
+          label: "Mark Season Unwatched",
+          icon: <EyeOff size={18} />,
+          action: async () => {
+            await updateSeasonWatched(seasonNum, false);
+          }
+        }
+      ]
+    });
+  };
+
+  const handleEpisodeContextMenu = (e: React.MouseEvent, ep: EpisodeInfo) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const watched = isWatched(item, season, ep.episodeNumber);
+    openContextMenu({
+      title: ep.name || `Episode ${ep.episodeNumber}`,
+      subtitle: `${item.title} - S${season} E${ep.episodeNumber}`,
+      position: { x: e.clientX, y: e.clientY },
+      actions: [
+        {
+          id: "play_episode",
+          label: "Play Episode",
+          icon: <Play size={18} fill="currentColor" />,
+          action: () => {
+            onPlayEpisode(season, ep.episodeNumber);
+          }
+        },
+        {
+          id: "toggle_episode_watched",
+          label: watched ? "Mark as Unwatched" : "Mark as Watched",
+          icon: watched ? <EyeOff size={18} /> : <Check size={18} />,
+          action: () => {
+            void toggleWatched(item, season, ep.episodeNumber);
+          }
+        }
+      ]
+    });
+  };
+
   return (
     <section className="detail-section episodes-section detail-wide">
       <h3>Episodes</h3>
@@ -923,6 +995,7 @@ function SeasonEpisodes({ item, loadingDetails, selectedEpisode, isWatched, onPl
             key={s.id}
             className={`season-tab ${s.seasonNumber === season ? "is-active" : ""}`}
             onClick={() => setSeason(s.seasonNumber)}
+            onContextMenu={(e) => handleSeasonContextMenu(e, s.seasonNumber, s.name || `Season ${s.seasonNumber}`)}
           >
             {s.name || `Season ${s.seasonNumber}`}
           </button>
@@ -947,6 +1020,7 @@ function SeasonEpisodes({ item, loadingDetails, selectedEpisode, isWatched, onPl
               key={episode.id}
               className={`episode-row ${active ? "is-active" : ""} ${watched ? "is-watched" : ""}`}
               onClick={() => onPlayEpisode(season, episode.episodeNumber)}
+              onContextMenu={(e) => handleEpisodeContextMenu(e, episode)}
             >
               <div className="episode-still">
                 {episode.still ? <img src={episode.still} alt="" /> : <Clapperboard size={24} />}

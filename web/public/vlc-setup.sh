@@ -34,9 +34,12 @@ done
 if [[ "$URL" =~ ^(https?)[:/]+(.*) ]]; then
   URL="${BASH_REMATCH[1]}://${BASH_REMATCH[2]}"
 fi
-if [ -n "$URL" ]; then
-  exec vlc "$URL"
+# Accept one absolute HTTP(S) media URL only. The explicit option terminator
+# also prevents a crafted protocol link from being interpreted as VLC flags.
+if [[ ! "$URL" =~ ^https?://[^/?#[:space:]]+([/?#]|$) ]] || [[ "$URL" =~ [[:space:][:cntrl:]] ]]; then
+  exit 2
 fi
+exec vlc -- "$URL"
 EOF
 
 chmod +x "$SCRIPT_PATH"

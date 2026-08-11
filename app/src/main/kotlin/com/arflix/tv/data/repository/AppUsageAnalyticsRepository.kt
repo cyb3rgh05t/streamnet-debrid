@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.arflix.tv.BuildConfig
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
+import com.arflix.tv.util.DiagnosticsManager
 import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.util.settingsDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -34,6 +35,7 @@ class AppUsageAnalyticsRepository @Inject constructor(
     private val jsonMediaType = "application/json; charset=utf-8".toMediaType()
 
     suspend fun recordAppOpen() = withContext(Dispatchers.IO) {
+        if (!DiagnosticsManager.isReportingEnabled(context)) return@withContext
         if (!Constants.USE_NETLIFY_CLOUD_SYNC &&
             (Constants.SUPABASE_URL.isBlank() || Constants.SUPABASE_ANON_KEY.isBlank())
         ) return@withContext

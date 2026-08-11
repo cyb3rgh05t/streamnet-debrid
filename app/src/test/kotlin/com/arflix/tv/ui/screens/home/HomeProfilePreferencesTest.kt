@@ -66,5 +66,31 @@ class HomeProfilePreferencesTest {
         assertThat(settings.showBudget).isTrue()
         assertThat(settings.clockFormat).isEqualTo("24h")
         assertThat(settings.smoothScrolling).isFalse()
+        assertThat(settings.contentLanguage).isEqualTo("en-US")
+    }
+
+    @Test
+    fun `missing profile language uses last app language`() {
+        val settings = readHomeProfilePreferences(
+            mutablePreferencesOf(
+                stringPreferencesKey("last_app_language") to "ar-SA"
+            ),
+            "primary"
+        )
+
+        assertThat(settings.contentLanguage).isEqualTo("ar-SA")
+    }
+
+    @Test
+    fun `profile language overrides last app language`() {
+        val settings = readHomeProfilePreferences(
+            mutablePreferencesOf(
+                stringPreferencesKey("last_app_language") to "ar-SA",
+                stringPreferencesKey("profile_primary_content_language") to "iw-IL"
+            ),
+            "primary"
+        )
+
+        assertThat(settings.contentLanguage).isEqualTo("iw-IL")
     }
 }

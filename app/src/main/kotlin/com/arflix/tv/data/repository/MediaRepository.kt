@@ -101,11 +101,11 @@ class MediaRepository @Inject constructor(
     private val apiKey = Constants.TMDB_API_KEY
     private val gson = Gson()
 
-    /** TMDB content language (e.g. "en-US", "fr-FR", "nl-NL"). Null = TMDB default (English). */
+    /** TMDB content language (e.g. "en-US", "fr-FR", "nl-NL"). */
     @Volatile
-    var contentLanguage: String? = null
+    var contentLanguage: String = "en-US"
         set(value) {
-            field = value?.replace("iw", "he")?.replace('_', '-')
+            field = value.ifBlank { "en-US" }.replace("iw", "he").replace('_', '-')
         }
 
     // === IN-MEMORY CACHE FOR PERFORMANCE ===
@@ -117,6 +117,18 @@ class MediaRepository @Inject constructor(
         private set
     @Volatile private var homeCategoriesFetchedAt = 0L
     private val HOME_CATEGORIES_CACHE_MS = 120_000L // 2 minutes
+
+    fun clearMediaCache() {
+        cachedHomeCategories = emptyList()
+        homeCategoriesFetchedAt = 0L
+        synchronized(detailsCache) { detailsCache.clear() }
+        synchronized(fullDetailsCacheKeys) { fullDetailsCacheKeys.clear() }
+        synchronized(castCache) { castCache.clear() }
+        synchronized(similarCache) { similarCache.clear() }
+        synchronized(logoCache) { logoCache.clear() }
+        synchronized(reviewsCache) { reviewsCache.clear() }
+        synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
+    }
 
     private val detailsCache = mutableMapOf<String, CacheEntry<MediaItem>>()
     private val fullDetailsCacheKeys = mutableSetOf<String>()
@@ -3047,7 +3059,10 @@ class MediaRepository @Inject constructor(
             val videos = tmdbApi.getVideos(type, mediaId, apiKey, language = contentLanguage)
             var results = videos.results
             // If language-specific request returned no YouTube videos, fall back to English
-            if (results.none { it.site == "YouTube" } && !contentLanguage.isNullOrBlank()) {
+            if (
+                results.none { it.site == "YouTube" } &&
+                !contentLanguage.equals("en-US", ignoreCase = true)
+            ) {
                 results = tmdbApi.getVideos(type, mediaId, apiKey, language = null).results
             }
             val trailer = results.find { it.type == "Trailer" && it.site == "YouTube" && it.official }
@@ -3645,7 +3660,11 @@ private fun TmdbMediaItem.toMediaItem(defaultType: MediaType): MediaItem {
 
     return MediaItem(
         id = id,
-        title = title ?: name ?: "Unknown",
+        title = title?.takeIf { it.isNotBlank() }
+            ?: name?.takeIf { it.isNotBlank() }
+            ?: originalTitle?.takeIf { it.isNotBlank() }
+            ?: originalName?.takeIf { it.isNotBlank() }
+            ?: "Unknown",
         subtitle = if (type == MediaType.MOVIE) "Movie" else "TV Series",
         overview = overview ?: "",
         year = year,
@@ -3672,7 +3691,9 @@ private fun TmdbMovieDetails.toMediaItem(): MediaItem {
 
     return MediaItem(
         id = id,
-        title = title,
+        title = title.takeIf { it.isNotBlank() }
+            ?: originalTitle?.takeIf { it.isNotBlank() }
+            ?: "Unknown",
         subtitle = "Movie",
         overview = overview ?: "",
         year = year,
@@ -3707,7 +3728,9 @@ private fun TmdbTvDetails.toMediaItem(): MediaItem {
 
     return MediaItem(
         id = id,
-        title = name,
+        title = name.takeIf { it.isNotBlank() }
+            ?: originalName?.takeIf { it.isNotBlank() }
+            ?: "Unknown",
         subtitle = "TV Series",
         overview = overview ?: "",
         year = year,

@@ -76,8 +76,8 @@ export function externalPlayerUrl(player: ExternalPlayer, stream: StreamSource, 
     return androidIntentUrl(targetUrl, filename, sub, "org.videolan.vlc");
   }
 
-  // Desktop with the one-time vlc:// handler installed: our handler runs
-  // `vlc.exe --open <url>`, stripping the vlc:// prefix. Just prepend the scheme.
+  // Desktop with the one-time vlc:// handler installed: our handler validates
+  // the nested HTTP(S) URL and passes it to VLC as one media argument.
   if (player === "vlc" && isDesktop()) {
     return `vlc://${targetUrl}`;
   }
@@ -194,23 +194,30 @@ export function isDesktop() {
 
 // One-time setup scripts that register the vlc:// handler so desktop "Open in VLC"
 // launches VLC directly instead of downloading a .m3u. Hosted by ARVIO.
-export const VLC_SETUP_URL = "/vlc-setup.bat";
-export const VLC_SETUP_SH_URL = "/vlc-setup.sh";
+// Bump this query and readiness key whenever the installed protocol handler
+// changes. Browsers must not keep using or re-download an obsolete handler.
+const VLC_SETUP_VERSION = "2";
+export const VLC_SETUP_URL = `/vlc-setup.bat?v=${VLC_SETUP_VERSION}`;
+export const VLC_SETUP_SH_URL = `/vlc-setup.sh?v=${VLC_SETUP_VERSION}`;
 
 // Whether the user has run the one-time desktop vlc:// setup. We can't detect
 // protocol registration from the browser, so we remember that they installed
 // it and use the direct vlc:// launch; otherwise we fall back to the .m3u.
-const VLC_PROTOCOL_KEY = "arvio.web.vlcProtocolReady";
+const VLC_PROTOCOL_KEY = `arvio.web.vlcProtocolReady.v${VLC_SETUP_VERSION}`;
+const LEGACY_VLC_PROTOCOL_KEY = "arvio.web.vlcProtocolReady";
 
 export function vlcProtocolReady(): boolean {
   if (typeof localStorage === "undefined") return false;
-  return localStorage.getItem(VLC_PROTOCOL_KEY) === "1";
+  const ready = localStorage.getItem(VLC_PROTOCOL_KEY) === "1";
+  if (!ready) localStorage.removeItem(LEGACY_VLC_PROTOCOL_KEY);
+  return ready;
 }
 
 export function setVlcProtocolReady(ready: boolean) {
   if (typeof localStorage === "undefined") return;
   if (ready) localStorage.setItem(VLC_PROTOCOL_KEY, "1");
   else localStorage.removeItem(VLC_PROTOCOL_KEY);
+  localStorage.removeItem(LEGACY_VLC_PROTOCOL_KEY);
 }
 
 // How VLC is launched on this platform:

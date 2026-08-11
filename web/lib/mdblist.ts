@@ -183,6 +183,10 @@ export class MdbListClient {
     await this.request("sync/watched/remove", { method: "POST", body: JSON.stringify(this.watchedBody(item)) });
   }
 
+  async dismissFromContinueWatching(_item: MdbMediaRef) {
+    // MDBList does not expose paused-playback dismissal. Keep watched history intact.
+  }
+
   private watchedBody(item: MdbMediaRef) {
     if (item.mediaType === "tv") {
       const ids = { tmdb: item.tmdbId };

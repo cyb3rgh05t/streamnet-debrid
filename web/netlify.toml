@@ -44,9 +44,11 @@
   [headers.values]
     Content-Type = "application/octet-stream"
     Content-Disposition = "attachment; filename=\"vlc-setup.bat\""
+    Cache-Control = "no-store, must-revalidate"
 
 [[headers]]
   for = "/vlc-setup.sh"
   [headers.values]
     Content-Type = "application/x-sh"
     Content-Disposition = "attachment; filename=\"vlc-setup.sh\""
+    Cache-Control = "no-store, must-revalidate"

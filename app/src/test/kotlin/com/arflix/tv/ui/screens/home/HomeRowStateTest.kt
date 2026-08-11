@@ -2,6 +2,7 @@ package com.arflix.tv.ui.screens.home
 
 import com.arflix.tv.data.model.Category
 import com.arflix.tv.data.model.MediaItem
+import com.arflix.tv.data.model.MediaType
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -93,4 +94,86 @@ class HomeRowStateTest {
         assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(placeholder)))).isFalse()
         assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(MediaItem(2, "Channel"))))).isTrue()
     }
+
+    fun `poster keys do not change when unrelated items are inserted`() {
+        val original = listOf(mediaItem(1), mediaItem(2), mediaItem(3))
+        val updated = listOf(mediaItem(99)) + original
+
+        val originalKeys = stableHomeRowItemKeys("trending", original)
+        val updatedKeys = stableHomeRowItemKeys("trending", updated)
+
+        assertThat(updatedKeys.drop(1)).containsExactlyElementsIn(originalKeys).inOrder()
+    }
+
+    @Test
+    fun `duplicate poster keys remain unique and deterministic`() {
+        val duplicates = listOf(mediaItem(7), mediaItem(7), mediaItem(7))
+
+        val keys = stableHomeRowItemKeys("trending", duplicates)
+
+        assertThat(keys).containsExactly(
+            "MOVIE-7",
+            "MOVIE-7#duplicate1",
+            "MOVIE-7#duplicate2"
+        ).inOrder()
+    }
+
+    @Test
+    fun `focused poster follows its identity when catalog is reordered`() {
+        val reorderedKeys = stableHomeRowItemKeys(
+            "trending",
+            listOf(mediaItem(3), mediaItem(1), mediaItem(2))
+        )
+
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = reorderedKeys,
+            preferredItemKey = "MOVIE-2",
+            fallbackIndex = 1,
+            hasMore = false
+        )
+
+        assertThat(resolvedIndex).isEqualTo(2)
+    }
+
+    @Test
+    fun `empty refreshing catalog preserves pending poster index`() {
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = emptyList(),
+            preferredItemKey = "MOVIE-20",
+            fallbackIndex = 19,
+            hasMore = true
+        )
+
+        assertThat(resolvedIndex).isEqualTo(19)
+    }
+
+    @Test
+    fun `partial paged catalog preserves pending poster index`() {
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = stableHomeRowItemKeys("trending", List(10) { mediaItem(it + 1) }),
+            preferredItemKey = "MOVIE-20",
+            fallbackIndex = 19,
+            hasMore = true
+        )
+
+        assertThat(resolvedIndex).isEqualTo(19)
+    }
+
+    @Test
+    fun `completed shorter catalog clamps poster index`() {
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = stableHomeRowItemKeys("trending", List(10) { mediaItem(it + 1) }),
+            preferredItemKey = "MOVIE-20",
+            fallbackIndex = 19,
+            hasMore = false
+        )
+
+        assertThat(resolvedIndex).isEqualTo(9)
+    }
+
+    private fun mediaItem(id: Int) = MediaItem(
+        id = id,
+        title = "Title $id",
+        mediaType = MediaType.MOVIE
+    )
 }

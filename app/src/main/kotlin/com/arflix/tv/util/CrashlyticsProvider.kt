@@ -54,6 +54,16 @@ data object CrashlyticsProvider : AppLogger.CrashContextProvider {
         }
     }
 
+    fun disable() {
+        isInitialized = false
+        runCatching {
+            FirebaseCrashlytics.getInstance().apply {
+                setCrashlyticsCollectionEnabled(false)
+                deleteUnsentReports()
+            }
+        }
+    }
+
     override fun setCustomKey(key: String, value: String) {
         if (!isInitialized) return
         try {

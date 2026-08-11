@@ -624,7 +624,7 @@
   }
 
   * { box-sizing: border-box; }
-  html, body { margin: 0; padding: 0; }
+  html, body { margin: 0; padding: 0; width: 100%; max-width: 100vw; overflow-x: hidden; }
   html { background: var(--bg); scroll-behavior: smooth; }
   
   html.theme-transitioning,
@@ -791,6 +791,7 @@
   .brand {
     display: flex; align-items: center; gap: 10px;
     justify-self: start;
+    flex-shrink: 0;
     font-weight: 700; letter-spacing: 0.02em;
     font-size: 15px;
   }
@@ -810,29 +811,33 @@
     filter: drop-shadow(0 0 14px rgba(13, 240, 194, 0.16));
   }
   .nav-links {
+    margin: 0;
     justify-self: center;
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 5px;
+    padding: 4px;
     border: 1px solid var(--line-soft);
     border-radius: 999px;
     background:
       linear-gradient(180deg, color-mix(in oklch, var(--ink) 4%, transparent), transparent),
       color-mix(in oklch, var(--bg) 84%, transparent);
     box-shadow: 0 16px 44px -32px oklch(0 0 0 / 0.9);
-    font-size: 13px;
+    font-size: 13.5px;
     color: var(--ink-2);
     font-weight: 650;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .nav-links a {
     position: relative;
     display: inline-flex;
     align-items: center;
-    min-height: 34px;
-    padding: 8px 12px;
+    min-height: 38px;
+    padding: 9px;
     border-radius: 999px;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: color .3s ease, background .3s ease, box-shadow .3s ease, transform .3s ease;
   }
   .nav-links a::after {
@@ -871,8 +876,9 @@
     justify-self: end;
     display: inline-flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
     margin-left: 0;
+    flex-shrink: 0;
   }
   .theme-toggle {
     background: transparent;
@@ -905,6 +911,7 @@
     font-size: 13px;
     font-weight: 700;
     white-space: nowrap;
+    flex-shrink: 0;
     transition: transform .2s ease, border-color .2s ease, background .2s ease;
   }
   .nav-web::before {
@@ -925,6 +932,8 @@
     padding: 10px 18px; border-radius: 999px;
     background: var(--ink); color: var(--bg);
     font-size: 13px; font-weight: 600;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: transform .2s ease, box-shadow .2s;
   }
   .nav-cta:hover { transform: translateY(-1px); box-shadow: 0 10px 30px -10px oklch(0 0 0 / 0.5); }
@@ -1971,16 +1980,28 @@
   }
 
   /* ============ RESPONSIVE ============ */
+  @media (max-width: 1400px) {
+    .nav-web { display: none !important; }
+  }
+
+  @media (max-width: 1000px) {
+    .nav-links { display: none; }
+    .nav-inner {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .nav-actions { margin-left: auto; }
+  }
+
   @media (max-width: 900px) {
     .wrap { padding: 0 20px; }
-    .nav-links { display: none; }
     .nav-inner {
       display: flex;
       justify-content: space-between;
       gap: 10px;
     }
     .nav-actions { margin-left: auto; gap: 8px; }
-    .nav-web { min-height: 40px; padding: 10px 14px; }
     .hero { padding: 48px 0 20px; }
     .hero-meta { grid-template-columns: repeat(2, 1fr); }
     .section { padding: 80px 0; }
@@ -1996,10 +2017,32 @@
     .download { padding: 100px 0; }
   }
 
+  @media (max-width: 768px) {
+    .nav-web { display: none !important; }
+  }
+
   @media (max-width: 640px) {
-    .nav-inner { padding: 12px 20px; }
-    .nav-web { padding: 10px 12px; font-size: 12px; }
-    .nav-cta { padding: 10px 13px; font-size: 12px; }
+    .nav-inner { padding: 12px 16px; }
+    .brand { gap: 6px; }
+    .brand-mark { width: 26px; height: 22px; }
+    .brand-wordmark { display: block !important; width: 95px; height: 22px; }
+    .nav-cta { padding: 8px 12px; font-size: 12px; }
+  }
+
+  @media (max-width: 420px) {
+    .wrap { padding: 0 12px; }
+    .nav-inner { padding: 10px 12px; gap: 6px; }
+    .brand { gap: 4px; }
+    .brand-mark { width: 24px; height: 20px; }
+    .brand-wordmark { display: block !important; width: 80px; height: 20px; }
+    .nav-cta { padding: 7px 10px; font-size: 11.5px; }
+  }
+
+  @media (max-width: 340px) {
+    .brand-wordmark { display: none !important; }
+  }
+
+  @media (max-width: 640px) {
     .compare { padding: 72px 0; }
     .compare-table {
       display: grid;
@@ -2212,11 +2255,16 @@
   @media (max-width: 900px) {
     .hero-content-split { flex-direction: column; text-align: center; gap: 60px; }
     .hero-left { max-width: 100%; }
-    .hero-right { min-height: 400px; }
+    .hero-right { min-height: 340px; width: 100%; max-width: 100vw; overflow: hidden; }
     .hero-h1 { margin-left: auto; margin-right: auto; }
     .hero-sub { margin-left: auto; margin-right: auto; }
     .hero-ctas { justify-content: center; }
-    .cinematic-showcase { width: 288px; height: 162px; --r: 210px; }
+    .cinematic-showcase { width: 288px; height: 162px; --r: 210px; transform: scale(0.85) rotateX(6deg) rotateY(-10deg); }
+  }
+
+  @media (max-width: 480px) {
+    .hero-right { min-height: 260px; }
+    .cinematic-showcase { transform: scale(0.65) rotateX(4deg) rotateY(-6deg); }
   }
 </style>
 </head>
@@ -2939,7 +2987,15 @@
           <span>Is ARVIO free? Are there ads?</span>
           <span class="faq-q-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
         </summary>
-        <div class="faq-a">The Android/TV app: free, open source. No ads, no analytics, no upsells — nothing in the app is gated. The one optional paid thing is <a href="https://web.arvio.tv">ARVIO Web</a>, the browser version, at $2.99/month — because web streaming runs on real servers and bandwidth. The app never needs it.</div>
+        <div class="faq-a">The Android/TV app is free and open source, with no ads, marketing analytics, or gated app features. Release builds can send limited crash diagnostics and one pseudonymous daily app-open event to help maintain reliability. This can be disabled per device in Settings. The one optional paid service is <a href="https://web.arvio.tv">ARVIO Web</a>, the browser version, at $2.99/month because browser streaming uses hosted servers and bandwidth. The Android app never requires it.</div>
+      </details>
+
+      <details class="faq-item reveal">
+        <summary class="faq-q">
+          <span>What data does ARVIO collect, and can I opt out?</span>
+          <span class="faq-q-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
+        </summary>
+        <div class="faq-a">An ARVIO Cloud account is optional. If you create one, ARVIO stores your email, a password hash, and the profiles and settings you choose to sync. Release builds can also send limited crash diagnostics and a pseudonymous app-open event at most once per day. Screenshots, view hierarchy, network breadcrumbs, and user-interaction breadcrumbs are disabled, and app diagnostic logs are sanitized. Crash transport can still involve an IP address, so reports are not described as anonymous. You can turn diagnostics and usage reporting off in Settings without affecting playback or cloud sync. Read the complete <a href="/privacy">Privacy Policy</a> or delete cloud data at <a href="https://auth.arvio.tv/delete">auth.arvio.tv/delete</a>.</div>
       </details>
 
       <details class="faq-item reveal">
@@ -3047,7 +3103,7 @@
       <div class="foot-col">
         <h4>Legal</h4>
         <a href="https://github.com/ProdigyV21/ARVIO/blob/main/LICENSE">License</a>
-        <a href="https://github.com/ProdigyV21/ARVIO/blob/main/PRIVACY.md">Privacy</a>
+        <a href="/privacy">Privacy</a>
         <a href="https://github.com/ProdigyV21/ARVIO/tree/main/LICENSES">Third-party</a>
       </div>
     </div>

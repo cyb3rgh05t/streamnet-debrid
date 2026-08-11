@@ -242,6 +242,41 @@ export class TraktClient {
     });
   }
 
+  async dismissFromContinueWatching(item: TraktMediaRef) {
+    if (!this.token) return;
+    await this.refreshIfNeeded();
+
+    const playbackRows = await this.playback();
+    const matchingPlaybackIds = playbackRows.flatMap((raw) => {
+      const row = raw as {
+        id?: number;
+        movie?: { ids?: { tmdb?: number } };
+        show?: { ids?: { tmdb?: number } };
+        episode?: { season?: number; number?: number };
+      };
+      const sameTitle = item.mediaType === "movie"
+        ? row.movie?.ids?.tmdb === item.tmdbId
+        : row.show?.ids?.tmdb === item.tmdbId;
+      const sameEpisode = item.mediaType !== "tv" ||
+        ((item.season == null || row.episode?.season === item.season) &&
+          (item.episode == null || row.episode?.number === item.episode));
+      return sameTitle && sameEpisode && typeof row.id === "number" ? [row.id] : [];
+    });
+
+    await Promise.all(matchingPlaybackIds.map((id) => this.trakt(`/sync/playback/${id}`, {
+      method: "DELETE",
+      headers: { "x-user-token": this.token!.access_token }
+    })));
+
+    if (item.mediaType === "tv") {
+      await this.trakt("/users/hidden/progress_watched", {
+        method: "POST",
+        headers: { "x-user-token": this.token.access_token },
+        body: JSON.stringify({ shows: [{ ids: { tmdb: item.tmdbId } }] })
+      });
+    }
+  }
+
   async removeFromWatchlist(item: TraktMediaRef) {
     if (!this.token) return;
     await this.refreshIfNeeded();

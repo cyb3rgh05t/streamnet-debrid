@@ -1050,7 +1050,7 @@ class HomeViewModel @Inject constructor(
         val profileId = profileManager.getProfileIdSync()
             .ifBlank { "default" }
             .replace(HomeVMRegexes.ALPHANUMERIC_REGEX, "_")
-        val language = (mediaRepository.contentLanguage ?: "en-US")
+        val language = mediaRepository.contentLanguage
             .replace(HomeVMRegexes.ALPHANUMERIC_REGEX, "_")
         return java.io.File(context.cacheDir, "home_categories_cache_${profileId}_$language.json")
     }
@@ -1090,7 +1090,20 @@ class HomeViewModel @Inject constructor(
                 .getParameterized(MutableList::class.java, Category::class.java)
                 .type
             val parsed: List<Category> = gson.fromJson(json, type) ?: emptyList()
-            parsed.filter { it.items.isNotEmpty() }
+            var hadBlankTitles = false
+            val sanitized = parsed.map { cat ->
+                val cleanItems = cat.items.filter { item ->
+                    val isValid = item.title.isNotBlank() && item.title != "Unknown"
+                    if (!isValid) hadBlankTitles = true
+                    isValid
+                }
+                cat.copy(items = cleanItems)
+            }.filter { it.items.isNotEmpty() }
+
+            if (hadBlankTitles) {
+                file.delete()
+            }
+            sanitized
         }.getOrDefault(emptyList())
     }
     // IO concurrency for network requests (logo fetches, catalog loads, etc.)
@@ -1133,6 +1146,7 @@ class HomeViewModel @Inject constructor(
     private var watchedBadgesJob: Job? = null
     private var loadHomeRequestId: Long = 0L
     private var activeRuntimeProfileId: String? = null
+    private var observedContentLanguage: String? = null
     private val HERO_DEBOUNCE_MS = 80L // Short debounce; focus idle is handled in HomeScreen
     private val startupCreatedAtMs = SystemClock.elapsedRealtime()
     private val startupSettleMs = if (isLowRamDevice) 5_000L else 4_000L
@@ -1484,6 +1498,21 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private fun invalidateContentLanguageCaches() {
+        heroUpdateJob?.cancel()
+        heroDetailsJob?.cancel()
+        prefetchJob?.cancel()
+        heroDetailsCache.clear()
+        heroDetailsFetchInFlight.clear()
+        lastResolvedBaseCategories = emptyList()
+        mediaRepository.clearMediaCache()
+        _uiState.value = _uiState.value.copy(
+            heroOverviewOverride = null,
+            heroTrailerKey = null,
+            isHeroTransitioning = false
+        )
+    }
+
     init {
         viewModelScope.launch {
             iptvRepository.dataRefreshEvents.collect {
@@ -1524,6 +1553,11 @@ class HomeViewModel @Inject constructor(
                 ).collect { preferences ->
                     val previousState = _uiState.value
                     val autoplayJustEnabled = !previousState.trailerAutoPlay && preferences.trailerAutoPlay
+                    mediaRepository.contentLanguage = preferences.contentLanguage
+                    val normalizedLanguage = mediaRepository.contentLanguage
+                    val langChanged = observedContentLanguage?.let { it != normalizedLanguage } ?: false
+                    observedContentLanguage = normalizedLanguage
+
                     _uiState.value = previousState.copy(
                         trailerAutoPlay = preferences.trailerAutoPlay,
                         trailerSoundEnabled = preferences.trailerSoundEnabled,
@@ -1534,7 +1568,10 @@ class HomeViewModel @Inject constructor(
                         smoothScrolling = preferences.smoothScrolling
                     )
 
-                    if (autoplayJustEnabled) {
+                    if (langChanged) {
+                        invalidateContentLanguageCaches()
+                        loadHomeData()
+                    } else if (autoplayJustEnabled) {
                         _uiState.value.heroItem?.let(::hydrateHeroDetailsIfNeeded)
                     }
                 }

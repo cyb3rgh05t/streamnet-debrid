@@ -14,7 +14,8 @@ internal data class HomeProfilePreferences(
     val trailerInCards: Boolean,
     val showBudget: Boolean,
     val clockFormat: String,
-    val smoothScrolling: Boolean
+    val smoothScrolling: Boolean,
+    val contentLanguage: String
 )
 
 internal fun readHomeProfilePreferences(
@@ -22,6 +23,8 @@ internal fun readHomeProfilePreferences(
     profileId: String
 ): HomeProfilePreferences {
     val prefix = "profile_${profileId}_"
+    val fallbackLanguage = preferences[stringPreferencesKey("last_app_language")] ?: "en-US"
+    val contentLang = preferences[stringPreferencesKey("${prefix}content_language")] ?: fallbackLanguage
     return HomeProfilePreferences(
         trailerAutoPlay = preferences[booleanPreferencesKey("${prefix}trailer_auto_play")] ?: false,
         trailerSoundEnabled = preferences[booleanPreferencesKey("${prefix}trailer_sound_enabled")] ?: false,
@@ -30,7 +33,8 @@ internal fun readHomeProfilePreferences(
         trailerInCards = preferences[booleanPreferencesKey("${prefix}trailer_in_cards")] ?: true,
         showBudget = preferences[booleanPreferencesKey("${prefix}show_budget_on_home")] ?: true,
         clockFormat = preferences[stringPreferencesKey("${prefix}clock_format")] ?: "24h",
-        smoothScrolling = preferences[booleanPreferencesKey("${prefix}smooth_scrolling")] ?: false
+        smoothScrolling = preferences[booleanPreferencesKey("${prefix}smooth_scrolling")] ?: false,
+        contentLanguage = contentLang
     )
 }
 

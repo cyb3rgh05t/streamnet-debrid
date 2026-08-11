@@ -438,6 +438,16 @@ interface TraktApi {
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 100
     ): List<TraktPublicListItem>
+
+    // ========== User Profile ==========
+
+    @GET("users/me")
+    @retrofit2.http.Headers("Content-Type: application/json")
+    suspend fun getMe(
+        @Header("Authorization") auth: String,
+        @Header("trakt-api-key") clientId: String,
+        @Header("trakt-api-version") version: String = "2"
+    ): TraktUserProfile
 }
 
 // ========== Request Bodies ==========
@@ -924,4 +934,11 @@ data class TraktBulkSeasonItem(
 data class TraktBulkEpisodeItem(
     val number: Int,
     @SerializedName("watched_at") val watchedAt: String? = null
+)
+
+// ========== User Profile ==========
+
+data class TraktUserProfile(
+    val username: String? = null,
+    val name: String? = null
 )

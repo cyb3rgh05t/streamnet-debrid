@@ -14,6 +14,8 @@ import { SettingsScreen } from "@/components/settings/SettingsScreen";
 import { WatchlistScreen } from "@/components/watchlist/WatchlistScreen";
 import { BackHandler } from "./BackHandler";
 import { ExternalPlaybackPrompt } from "./ExternalPlaybackPrompt";
+import { MediaContextMenu } from "./MediaContextMenu";
+import { NoAddonsPrompt } from "./NoAddonsPrompt";
 import { EntitlementGate } from "./Paywall";
 import { Toast } from "./Toast";
 import { TopNav } from "./TopNav";
@@ -101,6 +103,8 @@ export function AppShell() {
 
       <PlayerOverlay />
       <ExternalPlaybackPrompt />
+      <MediaContextMenu />
+      <NoAddonsPrompt />
       <BackHandler />
       <Toast />
     </main>

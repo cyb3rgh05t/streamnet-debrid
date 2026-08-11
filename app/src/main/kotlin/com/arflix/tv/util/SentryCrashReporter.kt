@@ -81,6 +81,11 @@ data object SentryCrashReporter : AppLogger.CrashContextProvider {
         }
     }
 
+    fun disable() {
+        isInitialized = false
+        runCatching { Sentry.close() }
+    }
+
     override fun setCustomKey(key: String, value: String) {
         if (!isInitialized) return
         Sentry.setTag(key, value)

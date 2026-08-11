@@ -491,6 +491,22 @@ class TraktRepository @Inject constructor(
         return "Bearer $token"
     }
 
+    /**
+     * Fetches the Trakt username for the currently authenticated profile.
+     * Returns null gracefully if not authenticated or if the request fails — a
+     * failed username fetch must never break the auth or sync flow.
+     */
+    suspend fun fetchUsername(): String? = withContext(Dispatchers.IO) {
+        try {
+            val auth = getAuthHeader() ?: return@withContext null
+            traktApi.getMe(auth = auth, clientId = clientId).username
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private suspend fun hasStoredTraktTokenForCurrentProfile(): Boolean {
         ensureProfileCacheScope()
         val prefs = context.traktDataStore.data.first()

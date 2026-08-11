@@ -18,6 +18,12 @@ import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -171,6 +177,33 @@ internal object HomeServerMatcher {
     }
 
     fun isAcceptable(score: Int): Boolean = score >= 150 || score >= 900
+
+    fun isLikelySameVersion(
+        requestedTitle: String,
+        requestedYear: Int?,
+        candidate: HomeServerCandidateInfo
+    ): Boolean {
+        val requestedNormalized = normalizeTitle(requestedTitle)
+        val candidateNormalized = normalizeTitle(candidate.title)
+        if (requestedNormalized.isBlank() || requestedNormalized != candidateNormalized) return false
+        val candidateYear = candidate.productionYear ?: return true
+        return requestedYear == null || abs(requestedYear - candidateYear) <= 1
+    }
+}
+
+internal object HomeServerSourceCacheKey {
+    fun contentIdentity(
+        title: String,
+        year: Int?,
+        imdbId: String?,
+        tmdbId: Int?,
+        tvdbId: Int?
+    ): String {
+        imdbId?.trim()?.lowercase(Locale.US)?.takeIf { it.isNotBlank() }?.let { return "imdb:$it" }
+        tmdbId?.takeIf { it > 0 }?.let { return "tmdb:$it" }
+        tvdbId?.takeIf { it > 0 }?.let { return "tvdb:$it" }
+        return "title:${HomeServerMatcher.normalizeTitle(title)}:${year?.toString().orEmpty()}"
+    }
 }
 
 @Singleton
@@ -187,6 +220,7 @@ class HomeServerRepository @Inject constructor(
         private const val HOME_SERVER_SECRET_ALIAS = "arvio_home_server_credentials_v1"
         private const val SOURCE_CACHE_MAX_ENTRIES = 128
         private const val SOURCE_CACHE_TTL_MS = 30L * 60L * 1000L
+        private const val EMPTY_SOURCE_CACHE_TTL_MS = 30L * 1000L
 
         fun catalogServerKey(connection: HomeServerConnection): String {
             return connection.serverId.ifBlank { connection.connectionId }.ifBlank {
@@ -246,11 +280,13 @@ class HomeServerRepository @Inject constructor(
     }
 
     private val sourceCacheLock = Any()
+    private val sourceRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sourceCache = object : LinkedHashMap<String, CachedHomeServerSources>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedHomeServerSources>?): Boolean {
             return size > SOURCE_CACHE_MAX_ENTRIES
         }
     }
+    private val sourceRequests = mutableMapOf<String, Deferred<List<StreamSource>>>()
 
     val connections: Flow<List<HomeServerConnection>> = combine(
         profileManager.activeProfileId,
@@ -576,22 +612,24 @@ class HomeServerRepository @Inject constructor(
             season = null,
             episode = null
         )
-        getCachedSources(cacheKey)?.let { return@withContext it }
-
-        val sources = connections
-            .flatMap { connection ->
-                runCatching {
-                    val items = if (connection.serverKind == HomeServerKind.PLEX) {
-                        findMovieMatches(connection, imdbId, title, year, tmdbId)
-                    } else {
-                        listOfNotNull(findBestMovie(connection, imdbId, title, year, tmdbId))
+        resolveSourcesCached(cacheKey) {
+            coroutineScope {
+                connections.map { connection ->
+                    async {
+                        runCatching {
+                            val items = findMovieMatches(connection, imdbId, title, year, tmdbId)
+                            coroutineScope {
+                                items.map { item -> async { buildStreamSources(connection, item) } }
+                                    .awaitAll()
+                                    .flatten()
+                            }
+                        }.getOrDefault(emptyList())
                     }
-                    items.flatMap { item -> buildStreamSources(connection, item) }
-                }.getOrDefault(emptyList())
+                }.awaitAll()
+                    .flatten()
+                    .distinctBy { "${it.addonId}|${it.source}|${it.url}" }
             }
-            .distinctBy { "${it.addonId}|${it.source}|${it.url}" }
-        putCachedSources(cacheKey, sources)
-        sources
+        }
     }
 
     suspend fun resolveEpisodeSources(
@@ -615,30 +653,39 @@ class HomeServerRepository @Inject constructor(
             season = season,
             episode = episode
         )
-        getCachedSources(cacheKey)?.let { return@withContext it }
-
-        val sources = connections
-            .flatMap { connection ->
-                runCatching {
+        resolveSourcesCached(cacheKey) {
+            coroutineScope {
+                connections.map { connection ->
+                    async {
+                        runCatching {
                     val series = findBestSeries(connection, imdbId, title, null, tmdbId, tvdbId)
                         ?: return@runCatching emptyList()
-                    val episodeItems = if (connection.serverKind == HomeServerKind.PLEX) {
-                        findEpisodes(connection, series.id, season, episode)
-                            .ifEmpty {
-                                listOfNotNull(findEpisodeBySearch(connection, title, season, episode, imdbId, tmdbId, tvdbId))
+                            val episodeItems = findEpisodes(connection, series.id, season, episode)
+                                .ifEmpty {
+                                    listOfNotNull(
+                                        findEpisodeBySearch(
+                                            connection,
+                                            title,
+                                            season,
+                                            episode,
+                                            imdbId,
+                                            tmdbId,
+                                            tvdbId
+                                        )
+                                    )
+                                }
+                            coroutineScope {
+                                episodeItems.map { item -> async { buildStreamSources(connection, item) } }
+                                    .awaitAll()
+                                    .flatten()
                             }
-                    } else {
-                        listOfNotNull(
-                            findEpisode(connection, series.id, season, episode)
-                                ?: findEpisodeBySearch(connection, title, season, episode, imdbId, tmdbId, tvdbId)
-                        )
+                        }.getOrDefault(emptyList())
                     }
-                    episodeItems.flatMap { episodeItem -> buildStreamSources(connection, episodeItem) }
-                }.getOrDefault(emptyList())
+                }.awaitAll()
+                    .flatten()
+                    .distinctBy { "${it.addonId}|${it.source}|${it.url}" }
             }
-            .distinctBy { "${it.addonId}|${it.source}|${it.url}" }
-        putCachedSources(cacheKey, sources)
-        sources
+        }
     }
 
     private suspend fun saveConnection(connection: HomeServerConnection) {
@@ -798,38 +845,56 @@ class HomeServerRepository @Inject constructor(
         return listOf(
             type,
             connectionSignature,
-            imdbId?.trim().orEmpty().lowercase(Locale.US),
-            tmdbId?.toString().orEmpty(),
-            tvdbId?.toString().orEmpty(),
-            HomeServerMatcher.normalizeTitle(title),
-            year?.toString().orEmpty(),
+            HomeServerSourceCacheKey.contentIdentity(title, year, imdbId, tmdbId, tvdbId),
             season?.toString().orEmpty(),
             episode?.toString().orEmpty()
         ).joinToString("|")
     }
 
-    private fun getCachedSources(key: String): List<StreamSource>? = synchronized(sourceCacheLock) {
-        val cached = sourceCache[key] ?: return@synchronized null
-        val isFresh = System.currentTimeMillis() - cached.createdAtMs < SOURCE_CACHE_TTL_MS
+    private fun getCachedSourcesLocked(key: String): List<StreamSource>? {
+        val cached = sourceCache[key] ?: return null
+        val ttl = if (cached.sources.isEmpty()) EMPTY_SOURCE_CACHE_TTL_MS else SOURCE_CACHE_TTL_MS
+        val isFresh = System.currentTimeMillis() - cached.createdAtMs < ttl
         if (isFresh) {
-            cached.sources
+            return cached.sources
         } else {
             sourceCache.remove(key)
-            null
+            return null
         }
     }
 
+    private suspend fun resolveSourcesCached(
+        key: String,
+        loader: suspend () -> List<StreamSource>
+    ): List<StreamSource> {
+        val request = synchronized(sourceCacheLock) {
+            getCachedSourcesLocked(key)?.let { return it }
+            sourceRequests[key] ?: sourceRequestScope.async {
+                loader().also { putCachedSources(key, it) }
+            }.also { created ->
+                sourceRequests[key] = created
+                created.invokeOnCompletion {
+                    synchronized(sourceCacheLock) {
+                        if (sourceRequests[key] === created) sourceRequests.remove(key)
+                    }
+                }
+            }
+        }
+        return request.await()
+    }
+
     private fun putCachedSources(key: String, sources: List<StreamSource>) {
-        if (sources.isEmpty()) return
         synchronized(sourceCacheLock) {
             sourceCache[key] = CachedHomeServerSources(sources, System.currentTimeMillis())
         }
     }
 
     private fun clearSourceCache() {
-        synchronized(sourceCacheLock) {
+        val requests = synchronized(sourceCacheLock) {
             sourceCache.clear()
+            sourceRequests.values.toList().also { sourceRequests.clear() }
         }
+        requests.forEach { it.cancel() }
     }
 
     private fun normalizeServerUrl(rawUrl: String): String {
@@ -1566,17 +1631,7 @@ class HomeServerRepository @Inject constructor(
         )
     }
 
-    private fun findBestMovie(
-        connection: HomeServerConnection,
-        imdbId: String?,
-        title: String,
-        year: Int?,
-        tmdbId: Int?
-    ): HomeServerItem? {
-        return findMovieMatches(connection, imdbId, title, year, tmdbId).firstOrNull()
-    }
-
-    private fun findMovieMatches(
+    private suspend fun findMovieMatches(
         connection: HomeServerConnection,
         imdbId: String?,
         title: String,
@@ -1584,12 +1639,18 @@ class HomeServerRepository @Inject constructor(
         tmdbId: Int?
     ): List<HomeServerItem> {
         val candidates = linkedMapOf<String, HomeServerItem>()
-        providerQueries(imdbId, tmdbId, null).forEach { providerId ->
-            queryItems(
-                connection,
-                itemTypes = "Movie",
-                query = mapOf("AnyProviderIdEquals" to providerId, "Limit" to "10")
-            ).forEach { candidates[it.id] = it }
+        coroutineScope {
+            providerQueries(imdbId, tmdbId, null).map { providerId ->
+                async {
+                    runCatching {
+                        queryItems(
+                            connection,
+                            itemTypes = "Movie",
+                            query = mapOf("AnyProviderIdEquals" to providerId, "Limit" to "10")
+                        )
+                    }.getOrDefault(emptyList())
+                }
+            }.awaitAll().flatten().forEach { candidates[it.id] = it }
         }
         val bestById = bestCandidate(candidates.values, title, year, imdbId, tmdbId, null)
         val bestByIdScore = bestById?.let {
@@ -1619,26 +1680,14 @@ class HomeServerRepository @Inject constructor(
         val bestScore = scored.maxOfOrNull { (_, score) -> score } ?: return emptyList()
         return scored
             .filter { (item, score) ->
-                score == bestScore || isLikelySameMovieVersion(item, title, year)
+                score == bestScore || HomeServerMatcher.isLikelySameVersion(title, year, item.info())
             }
             .sortedByDescending { (_, score) -> score }
             .map { (item, _) -> item }
             .distinctBy { it.id }
     }
 
-    private fun isLikelySameMovieVersion(
-        item: HomeServerItem,
-        title: String,
-        year: Int?
-    ): Boolean {
-        val requestedTitle = HomeServerMatcher.normalizeTitle(title)
-        val candidateTitle = HomeServerMatcher.normalizeTitle(item.name)
-        if (requestedTitle.isBlank() || requestedTitle != candidateTitle) return false
-        val candidateYear = item.productionYear ?: return true
-        return year == null || abs(year - candidateYear) <= 1
-    }
-
-    private fun findBestSeries(
+    private suspend fun findBestSeries(
         connection: HomeServerConnection,
         imdbId: String?,
         title: String,
@@ -1647,12 +1696,18 @@ class HomeServerRepository @Inject constructor(
         tvdbId: Int?
     ): HomeServerItem? {
         val candidates = linkedMapOf<String, HomeServerItem>()
-        providerQueries(imdbId, tmdbId, tvdbId).forEach { providerId ->
-            queryItems(
-                connection,
-                itemTypes = "Series",
-                query = mapOf("AnyProviderIdEquals" to providerId, "Limit" to "10")
-            ).forEach { candidates[it.id] = it }
+        coroutineScope {
+            providerQueries(imdbId, tmdbId, tvdbId).map { providerId ->
+                async {
+                    runCatching {
+                        queryItems(
+                            connection,
+                            itemTypes = "Series",
+                            query = mapOf("AnyProviderIdEquals" to providerId, "Limit" to "10")
+                        )
+                    }.getOrDefault(emptyList())
+                }
+            }.awaitAll().flatten().forEach { candidates[it.id] = it }
         }
         val bestById = bestCandidate(candidates.values, title, year, imdbId, tmdbId, tvdbId)
         if (bestById != null && HomeServerMatcher.score(title, year, imdbId, tmdbId, tvdbId, bestById.info()) >= 900) {
@@ -1742,9 +1797,11 @@ class HomeServerRepository @Inject constructor(
             ),
             connection
         ).items()
-        return listOfNotNull(
-            byShowEndpoint.firstOrNull { it.parentIndexNumber == season && it.indexNumber == episode }
-                ?: queryItems(
+        val directMatches = byShowEndpoint
+            .filter { it.parentIndexNumber == season && it.indexNumber == episode }
+            .distinctBy { it.id }
+        if (directMatches.isNotEmpty()) return directMatches
+        return queryItems(
                     connection,
                     itemTypes = "Episode",
                     query = mapOf(
@@ -1753,8 +1810,9 @@ class HomeServerRepository @Inject constructor(
                         "IndexNumber" to episode.toString(),
                         "Limit" to "10"
                     )
-                ).firstOrNull { it.parentIndexNumber == season && it.indexNumber == episode }
-        )
+                )
+            .filter { it.parentIndexNumber == season && it.indexNumber == episode }
+            .distinctBy { it.id }
     }
 
     private fun findEpisodeBySearch(

@@ -1,83 +1,99 @@
 # Privacy Policy
 
-**Last updated: May 11, 2026**
+**Last updated: August 10, 2026**
 
-## Overview
+## 1. Scope And Controller
 
-ARVIO ("the App") is an Android media hub for TV, phone, and tablet form factors. ARVIO does not host, sell, or distribute movies, series, live TV channels, playlists, streams, or other third-party media. This policy explains what app data is stored locally, what can be synced when you sign in, and which third-party services may receive data when you use optional features.
+This policy explains how the ARVIO project processes personal data in the Android app, ARVIO Cloud account portal, and ARVIO Web. ARVIO is an open-source media hub and does not host, sell, or distribute movies, series, live TV channels, playlists, or third-party streams.
 
-## Data We Collect Or Store
+The ARVIO project owner is the data controller for ARVIO Cloud, the account portal, first-party usage measurements, and first-party website services. Third-party services that you connect may act as separate controllers under their own privacy policies.
 
-### Local App Data
+For privacy requests, use the secure account deletion page at [auth.arvio.tv/delete](https://auth.arvio.tv/delete) or contact the project through [GitHub](https://github.com/ProdigyV21/ARVIO). Do not put passwords, tokens, identity documents, or other sensitive data in a public GitHub issue.
 
-ARVIO stores app data on your device so the app can remember your setup and playback state. This may include:
+## 2. Data Stored Only On Your Device
 
-- Profiles, profile names, profile PIN settings, and avatar choices
-- App language, interface, subtitle, audio, playback, catalog, addon, and IPTV settings
-- IPTV playlist configuration, category order/visibility, favorites, recently watched channels, and EPG-related state
-- Watch history, watch progress, watchlist, and continue-watching state
-- Home server connection details that you add, such as server label, server URL, server type, username, access token, library identifiers, and source-matching metadata
+ARVIO can store profiles, preferences, playback progress, watch history, watchlist entries, addon configuration, IPTV configuration, home-server configuration, caches, and authorization tokens locally on your device. This local data is not received by ARVIO unless you enable a cloud feature, send a diagnostic report, or connect a third-party service that needs it.
 
-### ARVIO Cloud Sync
+You can remove local data by using the relevant in-app controls, clearing Android app data, or uninstalling the app.
 
-If you sign in to ARVIO Cloud, selected app data is synced with Supabase so your profiles and settings can follow you across devices. Synced data may include the local app data listed above, plus your cloud account identifier/email and custom profile avatar images uploaded from your device.
+## 3. ARVIO Cloud Account And Sync
 
-ARVIO Cloud sync is optional. If you do not sign in, this data stays on your device unless you connect another third-party service yourself.
+Creating an ARVIO Cloud account processes:
 
-### Trakt
+- Your email address, account identifier, password hash, authentication sessions, and password-reset records
+- Profiles, settings, catalog order, addon configuration, IPTV configuration, watchlist, watch history, playback progress, and other data you choose to sync
+- Security and operational information such as timestamps, request metadata, and IP address in infrastructure logs
 
-If you connect Trakt.tv, ARVIO can read and update Trakt watch history, progress, watchlist, and related authorization tokens for the active profile.
+ARVIO stores a one-way password hash, not your plain-text password. ARVIO Cloud is optional; the Android app can be used without an ARVIO Cloud account.
 
-### Crash Diagnostics
+The legal basis for account authentication and requested cloud sync is performance of the service you request (GDPR Article 6(1)(b)). Security, abuse prevention, reliability, and limited operational logging are based on ARVIO's legitimate interests in operating and protecting the service (Article 6(1)(f)).
 
-Release builds may send crash stack traces, app version, device model, Android version, and limited app state to Sentry or Firebase Crashlytics. ARVIO does not intentionally send stream URLs, account tokens, screenshots, or view hierarchy data in crash reports.
+## 4. Diagnostics And Usage Measurement
 
-## How We Use Data
+Release builds can send limited diagnostics and usage information when **Share diagnostics and usage** is enabled in Settings. This is a device-local choice and is not cloud-synced.
 
-We use app data to:
+### Crash diagnostics
 
-- Sync profiles, settings, catalog configuration, watch history, watchlist, and continue-watching state between your devices when ARVIO Cloud is enabled
-- Restore your subtitle, audio, playback, IPTV, and catalog preferences
-- Match your selected movie or episode with user-configured sources and home servers
-- Diagnose crashes and stability issues
+ARVIO can send crash stack traces, exception details, app version and build, device model, Android version, and limited diagnostic breadcrumbs to Sentry. A build configured for Firebase may use Firebase Crashlytics as a fallback. ARVIO disables default PII collection, screenshots, view hierarchy, network breadcrumbs, and user-interaction breadcrumbs. App-provided diagnostic logs are sanitized to remove URLs, email addresses, tokens, and IP addresses. Exception text and infrastructure transport can still contain personal data such as an IP address, so ARVIO does not describe crash reports as anonymous.
 
-We do not sell your personal information.
+### App-open measurement
 
-## Third-Party Services
+At most once per 24 hours, ARVIO can send an `app_open` event containing a random install identifier, app version, Android API level, device type, distribution type, and account/profile identifiers when signed in. The backend converts direct identifiers into keyed pseudonymous values before storing the event. This measurement is used only to estimate daily and weekly active use and release adoption; it is not used for advertising or user profiling.
 
-The App may use these services depending on the features you enable:
+These activities are based on ARVIO's legitimate interests in finding crashes, measuring release health, and maintaining a reliable service (Article 6(1)(f)). You can object at any time by turning **Share diagnostics and usage** off in Settings. Turning it off does not affect playback, accounts, or cloud sync.
 
-| Service | Purpose | Privacy Policy |
-|---------|---------|----------------|
-| Supabase / ARVIO Cloud | Authentication, cloud sync, device login, profile avatar storage, and API proxy functions | [supabase.com/privacy](https://supabase.com/privacy) |
-| Google Sign-In | Optional sign-in provider | [policies.google.com/privacy](https://policies.google.com/privacy) |
-| TMDB | Movie/TV metadata and images | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy) |
-| Trakt.tv | Optional watch history, progress, and watchlist sync | [trakt.tv/privacy](https://trakt.tv/privacy) |
-| Sentry | Crash reporting and diagnostics, when enabled | [sentry.io/privacy](https://sentry.io/privacy/) |
-| Firebase Crashlytics | Crash reporting and diagnostics, when enabled | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
-| User-configured services | Addons, IPTV providers, home servers, and URLs that you add yourself | Governed by the provider you configure |
+## 5. Optional Third-Party Services
 
-## Security And Network Notes
+Data is also sent to services you deliberately use or connect:
 
-ARVIO uses HTTPS for ARVIO Cloud and supported third-party APIs. The app may also allow HTTP URLs for local home servers or IPTV providers because many private home-network servers do not use HTTPS. HTTP connections are not encrypted, so use HTTPS where possible and only add services you trust.
+| Service | Purpose | Privacy policy |
+| --- | --- | --- |
+| Netlify infrastructure | ARVIO websites, account functions, cloud sync, and storage | [netlify.com/privacy](https://www.netlify.com/privacy/) |
+| Resend | Account verification and password-reset email delivery | [resend.com/legal/privacy-policy](https://resend.com/legal/privacy-policy) |
+| Sentry | Crash reporting and diagnostics when enabled | [sentry.io/privacy](https://sentry.io/privacy/) |
+| Firebase Crashlytics | Crash-reporting fallback in configured builds | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
+| TMDB | Movie and TV metadata and images | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy) |
+| Trakt.tv | Optional watch history, progress, ratings, and watchlist sync | [trakt.tv/privacy](https://trakt.tv/privacy) |
+| Ko-fi | Optional ARVIO Web membership verification | [ko-fi.com/privacy](https://ko-fi.com/privacy) |
+| User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add | Governed by the provider you configure |
 
-## Data Retention And Deletion
+ARVIO sends only the data needed for the requested integration. Third-party services may process data outside the European Economic Area under their own transfer mechanisms and terms.
 
-Local data remains on your device until you remove it in the app, clear Android app data, or uninstall the app.
+## 6. Retention
 
-ARVIO Cloud data remains in Supabase until you delete it or request deletion. You can request cloud account and synced data deletion at [auth.arvio.tv/delete](https://auth.arvio.tv/delete). You can also disconnect Trakt in app settings or revoke ARVIO access from your Trakt account.
+- Local data remains until you remove it, clear app data, or uninstall ARVIO.
+- ARVIO Cloud account and sync data remains while the account is active and is deleted when account deletion completes, except for a minimal record required to prove or secure the deletion.
+- Stored first-party app-open events are retained for up to 31 days.
+- Password-reset and device-pairing codes expire after a short operational period.
+- Crash diagnostics follow the configured Sentry or Firebase retention period and are kept only as long as needed to investigate app stability.
+- Infrastructure security logs follow the hosting provider's operational retention schedule.
 
-## Children's Privacy
+ARVIO may keep data longer where required by law, to resolve a dispute, or to prevent abuse, and will keep only what is necessary for that purpose.
 
-The App is not directed at children under 13. We do not knowingly collect data from children.
+## 7. Security
 
-## Changes To This Policy
+ARVIO uses HTTPS for first-party cloud services and supported APIs, hashes account passwords with a salted memory-hard password function, limits crash-report contents, and scopes cloud data to authenticated accounts. No system is risk-free.
 
-We may update this policy occasionally. Changes will be posted here with an updated date.
+ARVIO also permits user-configured HTTP URLs for local servers and IPTV providers because some private-network services do not support HTTPS. HTTP traffic is not encrypted. Prefer HTTPS and only add services you trust.
 
-## Contact
+## 8. Your Rights
 
-For privacy questions, open an issue on GitHub or use the account deletion page above.
+Depending on where you live, you may have the right to access, correct, export, restrict, object to, or delete your personal data, and to complain to your local data-protection authority. You can:
+
+- Disable diagnostics and usage reporting in app Settings
+- Disconnect Trakt and other optional services in app Settings
+- Revoke ARVIO from the relevant third-party account
+- Delete your ARVIO Cloud account and synced data at [auth.arvio.tv/delete](https://auth.arvio.tv/delete)
+
+ARVIO may need to verify that a request concerns your account before acting on it.
+
+## 9. Children's Privacy
+
+ARVIO is not directed at children who cannot legally manage their own online account in their country. ARVIO does not knowingly create cloud accounts for such children without authorization from a parent or guardian.
+
+## 10. Changes
+
+This policy may change when ARVIO's services or legal obligations change. Material changes will be published with a new date, and an in-app or account notice will be used when appropriate.
 
 ---
 

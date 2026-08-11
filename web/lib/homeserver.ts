@@ -430,6 +430,73 @@ interface MatchTarget {
   tmdbId?: number;
 }
 
+const SOURCE_CACHE_TTL_MS = 30 * 60 * 1000;
+const EMPTY_SOURCE_CACHE_TTL_MS = 30 * 1000;
+const SOURCE_CACHE_MAX_ENTRIES = 128;
+const sourceCache = new Map<string, { expiresAt: number; sources: StreamSource[] }>();
+const sourceRequests = new Map<string, Promise<StreamSource[]>>();
+
+function sourceContentIdentity(target: MatchTarget): string {
+  const imdb = target.imdbId?.trim().toLowerCase();
+  if (imdb) return `imdb:${imdb}`;
+  if (target.tmdbId && target.tmdbId > 0) return `tmdb:${target.tmdbId}`;
+  return `title:${normalizeTitle(target.title)}:${target.year ?? ""}`;
+}
+
+function sourceServerSignature(servers: HomeServerConfig[]): string {
+  return servers.map((server) => [
+    server.id,
+    server.type,
+    trimUrl(server.url),
+    server.userId ?? "",
+    server.lastConnectedAt ?? 0,
+    `${server.token?.length ?? 0}:${hashId(server.token ?? "")}`,
+    (server.collections ?? []).filter((collection) => collection.enabled !== false).map((collection) => collection.id).join(",")
+  ].join(":"))
+    .join("|");
+}
+
+function homeServerSourceCacheKey(
+  type: "movie" | "episode",
+  servers: HomeServerConfig[],
+  target: MatchTarget,
+  season?: number,
+  episode?: number
+): string {
+  return [type, sourceServerSignature(servers), sourceContentIdentity(target), season ?? "", episode ?? ""].join("|");
+}
+
+async function resolveCachedHomeServerSources(
+  key: string,
+  loader: () => Promise<StreamSource[]>
+): Promise<StreamSource[]> {
+  const cached = sourceCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.sources;
+  if (cached) sourceCache.delete(key);
+
+  const inFlight = sourceRequests.get(key);
+  if (inFlight) return inFlight;
+
+  let request: Promise<StreamSource[]>;
+  request = loader()
+    .then((sources) => {
+      if (sourceCache.size >= SOURCE_CACHE_MAX_ENTRIES) {
+        const oldestKey = sourceCache.keys().next().value as string | undefined;
+        if (oldestKey) sourceCache.delete(oldestKey);
+      }
+      sourceCache.set(key, {
+        sources,
+        expiresAt: Date.now() + (sources.length ? SOURCE_CACHE_TTL_MS : EMPTY_SOURCE_CACHE_TTL_MS)
+      });
+      return sources;
+    })
+    .finally(() => {
+      if (sourceRequests.get(key) === request) sourceRequests.delete(key);
+    });
+  sourceRequests.set(key, request);
+  return request;
+}
+
 interface Candidate {
   title: string;
   year?: number;
@@ -462,6 +529,12 @@ function scoreCandidate(target: MatchTarget, c: Candidate): number {
 
 function isAcceptable(score: number): boolean {
   return score >= 150 || score >= 900;
+}
+
+function isLikelySameVersion(target: MatchTarget, candidate: Candidate): boolean {
+  if (!normalizeTitle(target.title) || normalizeTitle(target.title) !== normalizeTitle(candidate.title)) return false;
+  if (target.year == null || candidate.year == null) return true;
+  return Math.abs(target.year - candidate.year) <= 1;
 }
 
 function formatBytes(bytes: number): string {
@@ -498,12 +571,12 @@ interface JellyfinFullItem {
   }>;
 }
 
-async function jellyfinFindItem(
+async function jellyfinFindItems(
   server: HomeServerConfig,
   session: { token: string; userId: string },
   target: MatchTarget,
   itemTypes: string
-): Promise<JellyfinFullItem | null> {
+): Promise<JellyfinFullItem[]> {
   const base = trimUrl(server.url);
   const { token, userId } = session;
   const params = new URLSearchParams({
@@ -518,21 +591,29 @@ async function jellyfinFindItem(
     `${base}/Users/${userId}/Items?${params.toString()}`
   ).catch(() => null);
   const items = res?.Items ?? [];
-  if (!items.length) return null;
-  let best: JellyfinFullItem | null = null;
-  let bestScore = -Infinity;
-  for (const item of items) {
-    const score = scoreCandidate(target, {
+  const scored = items.map((item) => {
+    const candidate = {
       title: item.Name,
       year: item.ProductionYear,
       providerIds: item.ProviderIds ?? {}
-    });
-    if (score > bestScore) {
-      bestScore = score;
-      best = item;
-    }
-  }
-  return best && isAcceptable(bestScore) ? best : null;
+    };
+    return { item, candidate, score: scoreCandidate(target, candidate) };
+  }).filter(({ score }) => isAcceptable(score));
+  const bestScore = Math.max(...scored.map(({ score }) => score), -Infinity);
+  return scored
+    .filter(({ candidate, score }) => score === bestScore || isLikelySameVersion(target, candidate))
+    .sort((a, b) => b.score - a.score)
+    .filter(({ item }, index, all) => all.findIndex((entry) => entry.item.Id === item.Id) === index)
+    .map(({ item }) => item);
+}
+
+async function jellyfinFindItem(
+  server: HomeServerConfig,
+  session: { token: string; userId: string },
+  target: MatchTarget,
+  itemTypes: string
+): Promise<JellyfinFullItem | null> {
+  return (await jellyfinFindItems(server, session, target, itemTypes))[0] ?? null;
 }
 
 async function jellyfinItemSources(
@@ -602,39 +683,55 @@ function plexProviderIds(meta: PlexMetadata): Record<string, string> {
   return ids;
 }
 
+async function plexFindMetadataMatches(
+  server: HomeServerConfig,
+  target: MatchTarget,
+  plexTypes: number[]
+): Promise<PlexMetadata[]> {
+  const base = trimUrl(server.url);
+  const token = server.token ?? "";
+  const headers = { Accept: "application/json", "X-Plex-Token": token };
+  const responses = await Promise.all(plexTypes.map(async (plexType) => {
+    const res = await proxiedGet<{ MediaContainer?: { Metadata?: PlexMetadata[] } }>(
+      `${base}/library/all?title=${encodeURIComponent(target.title)}&type=${plexType}&includeGuids=1&X-Plex-Token=${encodeURIComponent(token)}`,
+      headers
+    ).catch(() => null);
+    return res?.MediaContainer?.Metadata ?? [];
+  }));
+  const scored = responses.flat().map((meta) => {
+    const candidate = { title: meta.title, year: meta.year, providerIds: plexProviderIds(meta) };
+    return { meta, candidate, score: scoreCandidate(target, candidate) };
+  }).filter(({ score }) => isAcceptable(score));
+  const bestScore = Math.max(...scored.map(({ score }) => score), -Infinity);
+  return scored
+    .filter(({ candidate, score }) => score === bestScore || isLikelySameVersion(target, candidate))
+    .sort((a, b) => b.score - a.score)
+    .filter(({ meta }, index, all) => all.findIndex((entry) => entry.meta.ratingKey === meta.ratingKey) === index)
+    .map(({ meta }) => meta);
+}
+
 async function plexFindMetadata(
   server: HomeServerConfig,
   target: MatchTarget,
   plexTypes: number[]
 ): Promise<PlexMetadata | null> {
-  const base = trimUrl(server.url);
-  const token = server.token ?? "";
-  const headers = { Accept: "application/json", "X-Plex-Token": token };
-  let best: PlexMetadata | null = null;
-  let bestScore = -Infinity;
-  for (const plexType of plexTypes) {
-    const res = await proxiedGet<{ MediaContainer?: { Metadata?: PlexMetadata[] } }>(
-      `${base}/library/all?title=${encodeURIComponent(target.title)}&type=${plexType}&includeGuids=1&X-Plex-Token=${encodeURIComponent(token)}`,
-      headers
-    ).catch(() => null);
-    for (const meta of res?.MediaContainer?.Metadata ?? []) {
-      const score = scoreCandidate(target, { title: meta.title, year: meta.year, providerIds: plexProviderIds(meta) });
-      if (score > bestScore) {
-        bestScore = score;
-        best = meta;
-      }
-    }
-  }
-  return best && isAcceptable(bestScore) ? best : null;
+  return (await plexFindMetadataMatches(server, target, plexTypes))[0] ?? null;
 }
 
 async function plexMetadataSources(server: HomeServerConfig, meta: PlexMetadata): Promise<StreamSource[]> {
   const base = trimUrl(server.url);
   const token = server.token ?? "";
+  const headers = { Accept: "application/json", "X-Plex-Token": token };
+  // Search responses can contain only one Media entry. Always hydrate the full
+  // item so every Plex version/part is represented in the source selector.
+  const hydrated = (await proxiedGet<{ MediaContainer?: { Metadata?: PlexMetadata[] } }>(
+    `${base}/library/metadata/${meta.ratingKey}?includeGuids=1&includeMedia=1&X-Plex-Token=${encodeURIComponent(token)}`,
+    headers
+  ).catch(() => null))?.MediaContainer?.Metadata?.[0] ?? meta;
   const label = server.name || "Home Server";
   const out: StreamSource[] = [];
   const seen = new Set<string>();
-  for (const media of meta.Media ?? []) {
+  for (const media of hydrated.Media ?? []) {
     for (const part of media.Part ?? []) {
       if (!part.key) continue;
       const url = `${base}${part.key}?X-Plex-Token=${encodeURIComponent(token)}`;
@@ -652,8 +749,8 @@ async function plexMetadataSources(server: HomeServerConfig, meta: PlexMetadata)
         size: formatBytes(part.size ?? 0),
         sizeBytes: part.size && part.size > 0 ? part.size : null,
         url,
-        behaviorHints: { cached: true, filename: meta.title, videoSize: part.size && part.size > 0 ? part.size : null },
-        description: `${meta.title} · ${label}`
+        behaviorHints: { cached: true, filename: hydrated.title, videoSize: part.size && part.size > 0 ? part.size : null },
+        description: `${hydrated.title} · ${label}`
       });
     }
   }
@@ -670,21 +767,24 @@ export async function resolveHomeServerMovieSources(
 ): Promise<StreamSource[]> {
   const active = usableServers(servers);
   if (!active.length) return [];
-  const perServer = await Promise.all(active.map(async (server) => {
-    try {
-      if (server.type === "plex") {
-        const meta = await plexFindMetadata(server, target, [1]); // 1 = movie
-        return meta ? plexMetadataSources(server, meta) : [];
+  const cacheKey = homeServerSourceCacheKey("movie", active, target);
+  return resolveCachedHomeServerSources(cacheKey, async () => {
+    const perServer = await Promise.all(active.map(async (server) => {
+      try {
+        if (server.type === "plex") {
+          const matches = await plexFindMetadataMatches(server, target, [1]); // 1 = movie
+          return (await Promise.all(matches.map((meta) => plexMetadataSources(server, meta)))).flat();
+        }
+        const session = await ensureSession(server);
+        if (!session) return [];
+        const items = await jellyfinFindItems(server, session, target, "Movie");
+        return (await Promise.all(items.map((item) => jellyfinItemSources(server, session, item)))).flat();
+      } catch {
+        return [];
       }
-      const session = await ensureSession(server);
-      if (!session) return [];
-      const item = await jellyfinFindItem(server, session, target, "Movie");
-      return item ? jellyfinItemSources(server, session, item) : [];
-    } catch {
-      return [];
-    }
-  }));
-  return dedupeSources(perServer.flat());
+    }));
+    return dedupeSources(perServer.flat());
+  });
 }
 
 export async function resolveHomeServerEpisodeSources(
@@ -695,28 +795,33 @@ export async function resolveHomeServerEpisodeSources(
 ): Promise<StreamSource[]> {
   const active = usableServers(servers);
   if (!active.length) return [];
-  const perServer = await Promise.all(active.map(async (server) => {
-    try {
-      if (server.type === "plex") {
-        return plexEpisodeSources(server, target, season, episode);
+  const cacheKey = homeServerSourceCacheKey("episode", active, target, season, episode);
+  return resolveCachedHomeServerSources(cacheKey, async () => {
+    const perServer = await Promise.all(active.map(async (server) => {
+      try {
+        if (server.type === "plex") {
+          return plexEpisodeSources(server, target, season, episode);
+        }
+        const session = await ensureSession(server);
+        if (!session) return [];
+        const series = await jellyfinFindItem(server, session, target, "Series");
+        if (!series) return [];
+        const base = trimUrl(server.url);
+        const { token, userId } = session;
+        // Keep separately stored episode versions instead of selecting the first one.
+        const epRes = await proxiedGet<{ Items?: Array<JellyfinFullItem & { IndexNumber?: number; ParentIndexNumber?: number }> }>(
+          `${base}/Shows/${series.Id}/Episodes?userId=${userId}&Fields=MediaSources,Path&api_key=${token}`
+        ).catch(() => null);
+        const episodes = (epRes?.Items ?? []).filter((item) =>
+          item.ParentIndexNumber === season && item.IndexNumber === episode
+        );
+        return (await Promise.all(episodes.map((item) => jellyfinItemSources(server, session, item)))).flat();
+      } catch {
+        return [];
       }
-      const session = await ensureSession(server);
-      if (!session) return [];
-      const series = await jellyfinFindItem(server, session, target, "Series");
-      if (!series) return [];
-      const base = trimUrl(server.url);
-      const { token, userId } = session;
-      // Jellyfin episode lookup by series + season/episode indices.
-      const epRes = await proxiedGet<{ Items?: Array<JellyfinFullItem & { IndexNumber?: number; ParentIndexNumber?: number }> }>(
-        `${base}/Shows/${series.Id}/Episodes?userId=${userId}&Fields=MediaSources,Path&api_key=${token}`
-      ).catch(() => null);
-      const ep = (epRes?.Items ?? []).find((e) => e.ParentIndexNumber === season && e.IndexNumber === episode);
-      return ep ? jellyfinItemSources(server, session, ep) : [];
-    } catch {
-      return [];
-    }
-  }));
-  return dedupeSources(perServer.flat());
+    }));
+    return dedupeSources(perServer.flat());
+  });
 }
 
 async function plexEpisodeSources(
@@ -735,8 +840,10 @@ async function plexEpisodeSources(
     `${base}/library/metadata/${series.ratingKey}/allLeaves?X-Plex-Token=${encodeURIComponent(token)}`,
     headers
   ).catch(() => null);
-  const ep = (res?.MediaContainer?.Metadata ?? []).find((m) => m.parentIndex === season && m.index === episode);
-  return ep ? plexMetadataSources(server, ep) : [];
+  const episodes = (res?.MediaContainer?.Metadata ?? []).filter(
+    (item) => item.parentIndex === season && item.index === episode
+  );
+  return (await Promise.all(episodes.map((item) => plexMetadataSources(server, item)))).flat();
 }
 
 function dedupeSources(sources: StreamSource[]): StreamSource[] {

@@ -7,6 +7,14 @@ import org.junit.Test
 class IptvProviderOrderTest {
 
     @Test
+    fun iptvSortOrderRejectsUnknownCloudValues() {
+        assertThat(normalizeIptvSortOrder(" NUMBER ")).isEqualTo("number")
+        assertThat(normalizeIptvSortOrder("name")).isEqualTo("name")
+        assertThat(normalizeIptvSortOrder("unexpected")).isEqualTo("provider")
+        assertThat(normalizeIptvSortOrder(null)).isEqualTo("provider")
+    }
+
+    @Test
     fun xtreamCategoryEndpointDefinesGroupOrder() {
         val categorizedChannels = listOf(
             "sports" to apiChannel(301, "Sports One", "Sports"),

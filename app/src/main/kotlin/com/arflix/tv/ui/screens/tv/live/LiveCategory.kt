@@ -314,6 +314,26 @@ data class LiveCategory(
     val isGroup: Boolean get() = children.isNotEmpty()
 }
 
+internal fun sortChannelsByConfiguredOrder(
+    channels: List<EnrichedChannel>,
+    sortOrder: String,
+): List<EnrichedChannel> = when (sortOrder) {
+    "number" -> channels.sortedWith { first, second ->
+        val firstNumber = first.source.providerChannelNumber?.trim()?.toBigDecimalOrNull()
+        val secondNumber = second.source.providerChannelNumber?.trim()?.toBigDecimalOrNull()
+        when {
+            firstNumber != null && secondNumber != null -> firstNumber.compareTo(secondNumber)
+            firstNumber != null -> -1
+            secondNumber != null -> 1
+            else -> 0
+        }
+    }
+    "name" -> channels.sortedWith { first, second ->
+        first.name.compareTo(second.name, ignoreCase = true)
+    }
+    else -> channels
+}
+
 enum class CategoryIcon { Favorite, Recent, All, Grid, Sport, Movie, News, Kids, Docs, Music, Lock, Country, SubEntry }
 
 /**

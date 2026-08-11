@@ -259,6 +259,9 @@ private class HomeFocusState(
     // every Down press resets to item 0 which is jarring.
     // Catalog IDs remain stable while background loads insert or reorder rows.
     val rowItemIndicesByCategoryId = mutableMapOf<String, Int>()
+    // Keep the exact focused title as well as its index. Catalog refreshes can
+    // insert or reorder items, so the numeric index alone is not a stable anchor.
+    val rowItemKeysByCategoryId = mutableMapOf<String, String>()
 
     companion object {
         // `userHasNavigated` is saved as the 4th element (0/1). Without it,
@@ -300,8 +303,8 @@ private fun localizedCategoryTitle(category: Category): String = when (category.
     "collection_row_franchise" -> stringResource(R.string.franchises)
     "collection_row_network"   -> stringResource(R.string.networks)
     "collection_row_featured"  -> stringResource(R.string.featured)
-    "top10_movies_today"       -> if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "10 הסרטים הנצפים היום" else stringResource(R.string.home_top10_movies_today)
-    "top10_shows_today"        -> if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) "10 הסדרות הנצפות היום" else stringResource(R.string.home_top10_shows_today)
+    "top10_movies_today"       -> stringResource(R.string.home_top10_movies_today)
+    "top10_shows_today"        -> stringResource(R.string.home_top10_shows_today)
     else                       -> category.title
 }
 
@@ -343,6 +346,20 @@ private fun homeRowItemKey(item: MediaItem): String {
     return "${item.mediaType.name}-${item.id}$episodeSuffix"
 }
 
+internal fun stableHomeRowItemKeys(categoryId: String, items: List<MediaItem>): List<String> {
+    val occurrences = HashMap<String, Int>()
+    return items.map { item ->
+        val baseKey = if (item.isPlaceholder) {
+            "placeholder_${categoryId}_${item.id}"
+        } else {
+            homeRowItemKey(item)
+        }
+        val occurrence = occurrences[baseKey] ?: 0
+        occurrences[baseKey] = occurrence + 1
+        if (occurrence == 0) baseKey else "$baseKey#duplicate$occurrence"
+    }
+}
+
 internal fun stableHomeRowKey(layout: String, categoryId: String): String =
     "${layout}_home_row_$categoryId"
 
@@ -371,6 +388,23 @@ internal fun resolveHomeCategoryIndex(
     } else {
         fallbackIndex.coerceIn(0, categoryIds.lastIndex)
     }
+}
+
+internal fun resolveHomeItemIndex(
+    itemKeys: List<String>,
+    preferredItemKey: String?,
+    fallbackIndex: Int,
+    hasMore: Boolean
+): Int {
+    val preferredIndex = preferredItemKey?.let(itemKeys::indexOf) ?: -1
+    if (preferredIndex >= 0) return preferredIndex
+
+    val safeFallback = fallbackIndex.coerceAtLeast(0)
+    if (itemKeys.isEmpty() || safeFallback <= itemKeys.lastIndex) return safeFallback
+
+    // A paged row can temporarily contain fewer items while it is refreshing.
+    // Preserve the intended index until the page arrives instead of snapping left.
+    return if (hasMore) safeFallback else itemKeys.lastIndex
 }
 
 @androidx.compose.runtime.Immutable
@@ -455,14 +489,16 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
 
 private suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeScrollDelta(
     deltaPx: Float,
-    durationMillis: Int
+    durationMillis: Int,
+    isRtl: Boolean = false
 ) {
-    if (abs(deltaPx) <= 1f) return
+    val targetDelta = if (isRtl) -deltaPx else deltaPx
+    if (abs(targetDelta) <= 1f) return
     scroll(scrollPriority = MutatePriority.PreventUserInput) {
         var previousValue = 0f
         animate(
             initialValue = 0f,
-            targetValue = deltaPx,
+            targetValue = targetDelta,
             animationSpec = spring(
                 dampingRatio = 0.85f,
                 stiffness = 200f
@@ -2015,28 +2051,27 @@ private fun HomeHeroLayer(
         val buttonsBottomPadding = contentRowTopPadding - 10.dp
         val heroBottomPadding = buttonsBottomPadding + if (configuration.screenHeightDp < 720) 34.dp else 34.dp
 
-        androidx.compose.runtime.CompositionLocalProvider(
-            androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = AppTopBarContentTopInset)
+                .zIndex(3f)
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = AppTopBarContentTopInset)
-                    .zIndex(3f)
-            ) {
-                heroItem?.let { item ->
-                    if (!item.status.orEmpty().startsWith("collection:")) {
-                        HeroSection(
-                            item = item,
-                            logoUrl = heroLogoUrl,
-                            overviewOverride = heroOverviewOverride,
-                            showBudget = showBudget,
-                            modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .padding(start = contentStartPadding, end = 400.dp)
-                                .offset(y = -heroBottomPadding)
-                        )
-                    }
+            heroItem?.let { item ->
+                if (!item.status.orEmpty().startsWith("collection:")) {
+                    HeroSection(
+                        item = item,
+                        logoUrl = heroLogoUrl,
+                        overviewOverride = heroOverviewOverride,
+                        showBudget = showBudget,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = contentStartPadding,
+                                end = 400.dp
+                            )
+                            .offset(y = -heroBottomPadding)
+                    )
                 }
             }
         }
@@ -2534,25 +2569,41 @@ private fun HomeInputLayer(
             fallbackIndex = focusState.currentRowIndex
         )
         preferredCategoryId = categories.getOrNull(focusState.currentRowIndex)?.id
-
-        // Clamp item index if it's beyond the current row's bounds.
-        // Do NOT reset to 0 or jump rows — that's what caused the trip.
-        val currentRowItems = categories.getOrNull(focusState.currentRowIndex)?.items.orEmpty()
-        if (currentRowItems.isNotEmpty() && focusState.currentItemIndex > currentRowItems.lastIndex) {
-            focusState.currentItemIndex = currentRowItems.lastIndex
-        }
     }
 
     val focusedCategory = categories.getOrNull(focusState.currentRowIndex)
-    val focusedRowItemCount = focusedCategory?.items?.size ?: 0
-    LaunchedEffect(focusState.currentRowIndex, focusedRowItemCount) {
-        if (focusedRowItemCount <= 0) {
-            if (focusState.currentItemIndex != 0) focusState.currentItemIndex = 0
-            return@LaunchedEffect
+    val focusedCategoryId = focusedCategory?.id
+    val focusedItemKeys = remember(focusedCategoryId, focusedCategory?.items) {
+        if (focusedCategory == null) emptyList() else {
+            stableHomeRowItemKeys(focusedCategory.id, focusedCategory.items)
         }
-        val maxItemIndex = focusedRowItemCount - 1
-        if (focusState.currentItemIndex > maxItemIndex) {
-            focusState.currentItemIndex = maxItemIndex
+    }
+    val focusedRowHasMore = focusedCategoryId?.let { categoryHasMoreMap[it] == true } == true
+
+    // Restore the same title when a row is reordered or refreshed. Empty and
+    // partial paged results keep the pending index instead of resetting to zero.
+    LaunchedEffect(focusedCategoryId, focusedItemKeys, focusedRowHasMore) {
+        val categoryId = focusedCategoryId ?: return@LaunchedEffect
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = focusedItemKeys,
+            preferredItemKey = focusState.rowItemKeysByCategoryId[categoryId],
+            fallbackIndex = focusState.currentItemIndex,
+            hasMore = focusedRowHasMore
+        )
+        if (focusState.currentItemIndex != resolvedIndex) {
+            focusState.currentItemIndex = resolvedIndex
+        }
+        focusState.rowItemIndicesByCategoryId[categoryId] = resolvedIndex
+    }
+
+    // User navigation updates the stable identity anchor. This effect is not
+    // keyed on the item list, so a background reorder cannot overwrite it first.
+    LaunchedEffect(focusedCategoryId, focusState.currentItemIndex) {
+        val categoryId = focusedCategoryId ?: return@LaunchedEffect
+        val itemIndex = focusState.currentItemIndex
+        focusState.rowItemIndicesByCategoryId[categoryId] = itemIndex
+        focusedItemKeys.getOrNull(itemIndex)?.let { itemKey ->
+            focusState.rowItemKeysByCategoryId[categoryId] = itemKey
         }
     }
 
@@ -3080,6 +3131,9 @@ private fun MobileHomeRowsLayer(
                         category.items
                     }
                 }
+                val itemKeys = remember(category.id, itemsToRender) {
+                    stableHomeRowItemKeys(category.id, itemsToRender)
+                }
 
                 // Horizontal card row with touch scrolling
                 LazyRow(
@@ -3095,13 +3149,7 @@ private fun MobileHomeRowsLayer(
                 ) {
                     itemsIndexed(
                         itemsToRender,
-                        key = { index, item ->
-                            if (item.isPlaceholder) "placeholder_${category.id}_${item.id}"
-                            else {
-                                val episodeSuffix = if (item.nextEpisode != null) "_S${item.nextEpisode.seasonNumber}E${item.nextEpisode.episodeNumber}" else ""
-                                "${item.mediaType.name}-${item.id}${episodeSuffix}_$index"
-                            }
-                        },
+                        key = { index, _ -> itemKeys[index] },
                         contentType = { _, item -> if (item.isPlaceholder) "placeholder_card" else "${item.mediaType.name}_mobile_card" }
                     ) { index, item ->
                         if (item.isPlaceholder) {
@@ -3681,6 +3729,10 @@ private fun ContentRow(
             category.items
         }
     }
+    val itemKeys = remember(category.id, itemsToRender) {
+        stableHomeRowItemKeys(category.id, itemsToRender)
+    }
+    val isRtlLayout = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
     val totalItems = itemsToRender.size
     val maxFirstIndex = remember(totalItems) {
         (totalItems - 1).coerceAtLeast(0)
@@ -3748,7 +3800,7 @@ private fun ContentRow(
     // Use smooth scroll (animated) for D-pad moves to avoid abrupt jumps.
     var lastScrollIndex by remember { mutableIntStateOf(-1) }
     var lastScrollOffset by remember { mutableIntStateOf(-1) }
-    LaunchedEffect(isCurrentRow, totalItems) {
+    LaunchedEffect(isCurrentRow, category.id) {
         lastScrollIndex = -1
         lastScrollOffset = -1
     }
@@ -3798,7 +3850,8 @@ private fun ContentRow(
                         isFastScrolling -> 115
                         jumpDistance >= 3 -> 180
                         else -> 150
-                    }
+                    },
+                    isRtl = isRtlLayout
                 )
                 if (
                     !isFastScrolling && (
@@ -3863,10 +3916,7 @@ private fun ContentRow(
             ) {
                 itemsIndexed(
                     itemsToRender,
-                    key = { index, item ->
-                        if (item.isPlaceholder) "placeholder_${category.id}_${item.id}"
-                        else "${homeRowItemKey(item)}_$index"
-                    },
+                    key = { index, _ -> itemKeys[index] },
                     contentType = { index, item ->
                         when {
                             item.isPlaceholder -> "placeholder_card"

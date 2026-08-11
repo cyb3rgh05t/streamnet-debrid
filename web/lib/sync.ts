@@ -23,6 +23,7 @@ export interface SyncClient {
   removeFromWatchlist(item: SyncMediaRef): Promise<void>;
   addToHistory(item: SyncMediaRef): Promise<void>;
   removeFromHistory(item: SyncMediaRef): Promise<void>;
+  dismissFromContinueWatching(item: SyncMediaRef): Promise<void>;
   scrobble(action: "start" | "pause" | "stop", item: SyncMediaRef & { progress: number }): Promise<void>;
 }
 

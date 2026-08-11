@@ -102,6 +102,23 @@ internal fun buildEpisodeIdCandidates(
     return ordered.distinctBy { "${it.contentId}|${it.preferAnimePath}" }
 }
 
+internal fun buildTmdbEpisodeIdCandidate(
+    tmdbId: Int?,
+    season: Int,
+    episode: Int,
+    supportsTmdbIds: Boolean
+): String? {
+    if (tmdbId == null || !supportsTmdbIds) return null
+    return "tmdb:$tmdbId:$season:$episode"
+}
+
+internal fun buildEpisodeAddonLookupIds(imdbId: String, tmdbId: Int?): List<String> {
+    return buildList {
+        add(imdbId)
+        if (tmdbId != null) add("tmdb:$tmdbId")
+    }.distinct()
+}
+
 internal fun buildNativeAnimeRetryCandidates(
     seriesId: String,
     animeQuery: String?,
@@ -188,7 +205,8 @@ internal fun usesSlowAggregatorTimeout(addon: Addon): Boolean {
         haystack.contains("aio-streams") ||
         haystack.contains("comet") ||
         haystack.contains("mediafusion") ||
-        haystack.contains("hdhub")
+        haystack.contains("hdhub") ||
+        haystack.contains("pengu")
 }
 
 // --- HubCloud/HubDrive URL classification (pure, unit-tested) --------------------
@@ -1561,7 +1579,9 @@ class StreamRepository @Inject constructor(
         genreIds: List<Int>,
         originalLanguage: String?
     ): List<Addon> {
-        val seriesAddons = getStreamAddons(addons, "series", imdbId)
+        val seriesAddons = buildEpisodeAddonLookupIds(imdbId, tmdbId)
+            .flatMap { id -> getStreamAddons(addons, "series", id) }
+            .distinctBy { it.id }
         val hasNativeAnimeAddon = addons.any(::shouldPreferNativeAnimeIds)
         val shouldIncludeAnimeAddons = isAnime ||
             shouldTryNativeAnimeFallback(
@@ -1593,7 +1613,7 @@ class StreamRepository @Inject constructor(
     private val ADDON_EXTENDED_TIMEOUT_MS = 30_000L
     private val ADDON_EXTENDED_EPISODE_TIMEOUT_MS = 45_000L
     private val ADDON_EXTENDED_SINGLE_STREAM_REQUEST_TIMEOUT_MS = 35_000L
-    // Aggregators (AIOStreams/Comet/MediaFusion/HdHub) can take well over the default timeout
+    // Aggregators (AIOStreams/Comet/MediaFusion/HdHub/PenguPlay) can take well over the default timeout
     // on a cold request. Progressive fetch keeps them from blocking faster addon results.
     private val ADDON_AGGREGATOR_TIMEOUT_MS = 20_000L
     private val ADDON_AGGREGATOR_EPISODE_TIMEOUT_MS = 25_000L
@@ -1983,9 +2003,12 @@ class StreamRepository @Inject constructor(
                     return emptyList()
                 }
 
-                val tmdbEpisodeId = if (resolveAsAnime && tmdbId != null && addonSupportsIdFamily(addon, "tmdb")) {
-                    "tmdb:$tmdbId:$season:$episode"
-                } else null
+                val tmdbEpisodeId = buildTmdbEpisodeIdCandidate(
+                    tmdbId = tmdbId,
+                    season = season,
+                    episode = episode,
+                    supportsTmdbIds = addonSupportsIdFamily(addon, "tmdb")
+                )
 
                 var addonStreams = emptyList<StreamSource>()
                 val attemptedEpisodeCandidateKeys = linkedSetOf<String>()

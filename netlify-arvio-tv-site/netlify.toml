@@ -2,6 +2,12 @@
   publish = "."
 
 [[redirects]]
+  from = "/privacy"
+  to = "https://github.com/ProdigyV21/ARVIO/blob/main/PRIVACY.md"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/app"
   to = "https://web.arvio.tv"
   status = 302

@@ -212,13 +212,20 @@ internal fun needsRichCurrentEpg(item: IptvNowNext?): Boolean {
     return current.description.isNullOrBlank()
 }
 
+internal fun normalizeIptvSortOrder(value: String?): String = when (value?.trim()?.lowercase()) {
+    "number" -> "number"
+    "name" -> "name"
+    else -> "provider"
+}
+
 data class IptvConfig(
     val m3uUrl: String = "",
     val epgUrl: String = "",
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val stalkerPortalUrl: String = "",
     val stalkerMacAddress: String = "",
-    val showSpecialCategories: Boolean = true
+    val showSpecialCategories: Boolean = true,
+    val sortOrder: String = "provider"
 )
 
 data class IptvPlaylistEntry(
@@ -243,6 +250,7 @@ data class IptvCloudProfileState(
     val hiddenGroups: List<String> = emptyList(),
     val groupOrder: List<String> = emptyList(),
     val groupOrderSchema: Int = 0,
+    val sortOrder: String = "provider",
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
     val showSpecialCategories: Boolean = true,
@@ -535,7 +543,8 @@ class IptvRepository @Inject constructor(
                 playlists = playlists,
                 stalkerPortalUrl = decryptConfigValue(prefs[stalkerPortalUrlKey()].orEmpty()),
                 stalkerMacAddress = prefs[stalkerMacAddressKey()].orEmpty(),
-                showSpecialCategories = prefs[showSpecialCategoriesKey()] ?: true
+                showSpecialCategories = prefs[showSpecialCategoriesKey()] ?: true,
+                sortOrder = normalizeIptvSortOrder(prefs[sortOrderKey()])
             )
         }
 
@@ -703,6 +712,14 @@ class IptvRepository @Inject constructor(
             prefs[showSpecialCategoriesKey()] = showSpecialCategories
         }
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv special categories visibility")
+    }
+
+    suspend fun saveSortOrder(sortOrder: String) {
+        val normalizedSortOrder = normalizeIptvSortOrder(sortOrder)
+        context.settingsDataStore.edit { prefs ->
+            prefs[sortOrderKey()] = normalizedSortOrder
+        }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv sort order")
     }
 
     /**
@@ -2970,6 +2987,10 @@ class IptvRepository @Inject constructor(
     private fun showSpecialCategoriesKey(): Preferences.Key<Boolean> = booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_show_special_categories")
     private fun showSpecialCategoriesKeyFor(profileId: String): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileId}_iptv_show_special_categories")
+
+    private fun sortOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_sort_order")
+    private fun sortOrderKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_sort_order")
     private fun epgUrlKeyFor(profileId: String): Preferences.Key<String> =
         profileManager.profileStringKeyFor(profileId, "iptv_epg_url")
     private fun favoriteGroupsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_favorite_groups")
@@ -3171,6 +3192,7 @@ class IptvRepository @Inject constructor(
                 }.getOrDefault(emptyList())
             } else emptyList(),
             groupOrderSchema = IPTV_GROUP_ORDER_SCHEMA,
+            sortOrder = normalizeIptvSortOrder(prefs[sortOrderKeyFor(safeProfileId)]),
             playlists = playlists,
             tvSession = decodeTvSessionState(tvSessionRaw),
             showSpecialCategories = prefs[showSpecialCategoriesKeyFor(safeProfileId)] ?: true,
@@ -3214,6 +3236,7 @@ class IptvRepository @Inject constructor(
             if (normalizedGroupOrder.isEmpty()) prefs.remove(groupOrderKeyFor(safeProfileId))
             else prefs[groupOrderKeyFor(safeProfileId)] = gson.toJson(normalizedGroupOrder)
             prefs[groupOrderSchemaKeyFor(safeProfileId)] = IPTV_GROUP_ORDER_SCHEMA.toString()
+            prefs[sortOrderKeyFor(safeProfileId)] = normalizeIptvSortOrder(state.sortOrder)
             if (effectivePlaylists.isEmpty()) prefs.remove(playlistsKeyFor(safeProfileId))
             else prefs[playlistsKeyFor(safeProfileId)] = gson.toJson(effectivePlaylists)
             if (state.tvSession != IptvTvSessionState()) {

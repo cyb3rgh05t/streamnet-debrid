@@ -64,6 +64,8 @@ class TelegramRepository @Inject constructor(
             File(context.filesDir, "tdlib").deleteRecursively()
             File(context.filesDir, "tdlib_files").deleteRecursively()
         } else {
+            // Purge leftover video stream files from previous session on launch
+            clearCache()
             client.initialize()
         }
     }

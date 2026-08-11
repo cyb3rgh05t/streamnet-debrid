@@ -442,6 +442,22 @@
     <string name="mdblist_connect_title">Connect MDBList</string>
     <string name="mdblist_disconnect_confirm_title">Disconnect MDBList?</string>
     <string name="mdblist_disconnect_confirm_desc">Your watch history and lists will no longer sync.</string>
+    <!-- Tracking Integrations sub-page -->
+    <string name="settings_tracking_integrations">Tracking Integrations</string>
+    <string name="settings_connected_as">Connected as %1$s</string>
+    <string name="settings_tracking_movies">Movies synced</string>
+    <string name="settings_tracking_episodes">Episodes synced</string>
+    <string name="settings_tracking_provider">Active provider</string>
+    <string name="settings_tracking_last_sync">Last sync</string>
+    <string name="settings_coming_soon">Coming Soon</string>
+    <string name="settings_connecting">Connecting…</string>
+    <string name="settings_trakt_tagline">Scrobble history, ratings &amp; watchlists</string>
+    <string name="settings_mdblist_tagline">Ratings, lists &amp; watch tracking</string>
+    <string name="settings_simkl_tagline">Full scrobble &amp; anime tracking</string>
+    <string name="settings_tracking_section_stats">SYNC STATS</string>
+    <string name="settings_tracking_section_services">SERVICES</string>
+    <string name="settings_tracking_none">None</string>
+
     <string name="settings_fact_app_language">App language</string>
     <string name="settings_fact_default">Default</string>
     <string name="settings_fact_secondary">Secondary</string>
@@ -562,6 +578,12 @@
     <string name="settings_badge_delete">DELETE</string>
     <string name="settings_n_selected">%1$d selected</string>
     <string name="settings_section_playlists">PLAYLISTS</string>
+    <string name="settings_section_options">OPTIONS</string>
+    <string name="settings_iptv_channel_order">Channel order</string>
+    <string name="settings_iptv_channel_order_description">Choose how channels are ordered within each group</string>
+    <string name="settings_iptv_order_provider">Provider order</string>
+    <string name="settings_iptv_order_number">Channel number</string>
+    <string name="settings_iptv_order_name">Alphabetical (A-Z)</string>
     <string name="settings_add_tv_lists_hint">Add up to 3 M3U / Xtream TV lists</string>
     <string name="settings_create_another_tv">Create another TV list</string>
     <string name="settings_badge_full_short">Full</string>
@@ -640,6 +662,12 @@
     <string name="settings_badge_checking">CHECKING</string>
     <string name="settings_badge_update">UPDATE</string>
     <string name="settings_badge_check">CHECK</string>
+    <string name="settings_diagnostics_sharing">Share diagnostics and usage</string>
+    <string name="settings_diagnostics_sharing_desc">Send limited crash diagnostics and one pseudonymous app-open event per day. Screenshots and view hierarchy are disabled.</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="settings_privacy_policy_desc">Read what ARVIO processes, why it is needed, retention, providers, and your rights</string>
+    <string name="settings_account_data_deletion">Delete cloud account and data</string>
+    <string name="settings_account_data_deletion_desc">Open the secure ARVIO Cloud account deletion page</string>
     <string name="settings_privacy_data_deletion">Privacy and data deletion</string>
     <string name="settings_privacy_data_deletion_desc">Open privacy and StreamNet TV Cloud account deletion instructions</string>
     <string name="settings_go_to">Go to: %1$s</string>
@@ -747,6 +775,8 @@
     <string name="login_sign_up">Sign Up</string>
     <string name="login_have_account">Already have an account? Sign In</string>
     <string name="login_no_account">Don\'t have an account? Sign Up</string>
+    <string name="login_privacy_notice">Creating an account stores your email and the cloud data you choose to sync.</string>
+    <string name="login_read_privacy_policy">Read Privacy Policy</string>
     <string name="collection_empty">Nothing to show here yet.</string>
 
     <!-- Extracted from code: Details, Home, Search and Player -->

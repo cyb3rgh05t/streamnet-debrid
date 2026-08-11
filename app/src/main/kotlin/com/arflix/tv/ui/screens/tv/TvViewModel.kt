@@ -304,7 +304,8 @@ class TvViewModel @Inject constructor(
                     favoriteGroups = favoriteGroups,
                     favoriteChannels = favoriteChannels,
                     hiddenGroups = hiddenGroups,
-                    groupOrder = groupOrder
+                    groupOrder = groupOrder,
+                    sortOrder = config.sortOrder
                 )
                 setUiState(
                     _uiState.value.copy(

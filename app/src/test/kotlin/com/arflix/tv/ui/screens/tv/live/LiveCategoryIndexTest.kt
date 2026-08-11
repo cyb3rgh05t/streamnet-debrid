@@ -163,6 +163,33 @@ class LiveCategoryIndexTest {
     }
 
     @Test
+    fun channelNumberSortUsesProviderNumbersAndKeepsTiesStable() {
+        val channels = listOf(
+            channel("list:20", "Twenty", "General").copy(providerChannelNumber = "20"),
+            channel("list:none", "No number", "General"),
+            channel("list:3a", "Three A", "General").copy(providerChannelNumber = "3"),
+            channel("list:invalid", "Invalid number", "General").copy(providerChannelNumber = "HD"),
+            channel("list:3b", "Three B", "General").copy(providerChannelNumber = "3.0"),
+        ).mapIndexed { index, channel -> channel.enrich(index + 100) }
+
+        val result = sortChannelsByConfiguredOrder(channels, "number")
+
+        assertThat(result.map { it.id })
+            .containsExactly("list:3a", "list:3b", "list:20", "list:none", "list:invalid")
+            .inOrder()
+    }
+
+    @Test
+    fun providerSortKeepsTheOriginalChannelList() {
+        val channels = listOf(
+            channel("list:z", "Zulu", "General"),
+            channel("list:a", "Alpha", "General"),
+        ).mapIndexed { index, channel -> channel.enrich(index + 1) }
+
+        assertThat(sortChannelsByConfiguredOrder(channels, "provider")).isSameInstanceAs(channels)
+    }
+
+    @Test
     fun configSignatureChangesWhenPlaylistOrderChanges() {
         val first = IptvPlaylistEntry("first", "First", "https://example.test/first.m3u")
         val second = IptvPlaylistEntry("second", "Second", "https://example.test/second.m3u")

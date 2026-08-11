@@ -44,6 +44,13 @@ test("deletion page uses authenticated self-service flow without storing credent
   assert.doesNotMatch(html, /How to request deletion/);
 });
 
+test("account creation presents the privacy notice before signup", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  assert.match(html, /Creating an account stores your email and the cloud data/i);
+  assert.match(html, /https:\/\/arvio\.tv\/privacy/);
+  assert.doesNotMatch(html, /fonts\.googleapis\.com/);
+});
+
 test("deletion endpoints reject missing app auth, bad user auth, and missing receipts", async () => {
   const missingAppAuth = await backend.handleAccountDeleteStart({
     httpMethod: "POST",
