@@ -70,10 +70,12 @@ import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.cancelAndJoin
 import java.text.SimpleDateFormat
+import java.text.Normalizer
 import java.util.Collections
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
+import kotlin.math.abs
 
 internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
     channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -131,6 +133,7 @@ data class HomeUiState(
     // App Updates
     val updateStatus: com.arflix.tv.updater.UpdateStatus = com.arflix.tv.updater.UpdateStatus.Idle,
     val showAppUpdateDialog: Boolean = false,
+    val showUnknownSourcesDialog: Boolean = false,
     val hasUpdateBadge: Boolean = false,
     val categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     val smoothScrolling: Boolean = false
@@ -196,9 +199,9 @@ class HomeViewModel @Inject constructor(
     // IPTV favorite channels — maps MediaItem.id (Int hash) to channel data
     private val iptvChannelMap = mutableMapOf<Int, com.arflix.tv.data.model.IptvChannel>()
     private val programBackdropCache = ConcurrentHashMap<String, String>()
-    private val programBackdropMisses = Collections.synchronizedSet(mutableSetOf<String>())
+    private val programBackdropMisses = ConcurrentHashMap<String, Long>()
     private val programLogoCache = ConcurrentHashMap<String, String>()
-    private val programLogoMisses = Collections.synchronizedSet(mutableSetOf<String>())
+    private val programLogoMisses = ConcurrentHashMap<String, Long>()
     private val _sportsHomeRows = MutableStateFlow(sportsRepository.defaultHomeRows())
     val sportsHomeRows: StateFlow<List<Category>> = combine(
         _sportsHomeRows,
@@ -756,51 +759,228 @@ class HomeViewModel @Inject constructor(
     fun getIptvStreamUrl(itemId: Int): String? = iptvChannelMap[itemId]?.streamUrl
 
     suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
-        val cleaned = rawTitle
-            .replace(Regex("""\([^)]*\)"""), " ")
-            .replace(Regex("""\[[^]]*]"""), " ")
-            .replace(Regex("""(?i)\b(live|hd|uhd|4k|ep\.?\s*\d+|s\d+e\d+)\b"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
-        if (cleaned.length < 3) return null
-        val key = cleaned.lowercase(Locale.US)
+        val query = parseIptvProgramQuery(rawTitle) ?: return null
+        val key = query.cacheKey
         programBackdropCache[key]?.let { return it }
-        if (key in programBackdropMisses) return null
+        if (hasActiveMiss(programBackdropMisses, key)) return null
+
         return runCatching {
-            mediaRepository.search(cleaned)
-                .firstOrNull { !it.backdrop.isNullOrBlank() }
-                ?.backdrop
-                ?.also { programBackdropCache[key] = it }
-                ?: run { programBackdropMisses.add(key); null }
+            val bestMatch = searchIptvProgramCandidates(query)
+                .firstOrNull { candidate ->
+                    !candidate.item.backdrop.isNullOrBlank() && isAcceptableIptvCandidate(query, candidate)
+                }
+
+            bestMatch?.item?.backdrop
+                ?.also { backdrop ->
+                    programBackdropCache[key] = backdrop
+                    programBackdropMisses.remove(key)
+                }
+                ?: run {
+                    registerMiss(programBackdropMisses, key)
+                    null
+                }
         }.getOrElse {
-            programBackdropMisses.add(key)
+            registerMiss(programBackdropMisses, key)
             null
         }
     }
 
     suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
-        val cleaned = rawTitle
-            .replace(Regex("""\([^)]*\)"""), " ")
-            .replace(Regex("""\[[^]]*]"""), " ")
-            .replace(Regex("""(?i)\b(live|hd|uhd|4k|ep\.?\s*\d+|s\d+e\d+)\b"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
-        if (cleaned.length < 3) return null
-        val key = cleaned.lowercase(Locale.US)
+        val query = parseIptvProgramQuery(rawTitle) ?: return null
+        val key = query.cacheKey
         programLogoCache[key]?.let { return it }
-        if (key in programLogoMisses) return null
+        if (hasActiveMiss(programLogoMisses, key)) return null
+
         return runCatching {
-            val results = mediaRepository.search(cleaned)
-            val match = results.firstOrNull { result ->
-                result.title.equals(cleaned, ignoreCase = true)
-            } ?: results.firstOrNull()
-            match?.let { mediaRepository.getLogoUrl(it.mediaType, it.id) }
-                ?.also { programLogoCache[key] = it }
-                ?: run { programLogoMisses.add(key); null }
+            val candidates = searchIptvProgramCandidates(query)
+                .filter { candidate -> isAcceptableIptvCandidate(query, candidate) }
+
+            for (candidate in candidates.take(IPTV_LOGO_CANDIDATE_LIMIT)) {
+                val logoUrl = mediaRepository.getLogoUrl(candidate.item.mediaType, candidate.item.id)
+                if (!logoUrl.isNullOrBlank()) {
+                    programLogoCache[key] = logoUrl
+                    programLogoMisses.remove(key)
+                    return@runCatching logoUrl
+                }
+            }
+
+            registerMiss(programLogoMisses, key)
+            null
         }.getOrElse {
-            programLogoMisses.add(key)
+            registerMiss(programLogoMisses, key)
             null
         }
+    }
+
+    private data class IptvProgramQuery(
+        val cleanedTitle: String,
+        val normalizedTitle: String,
+        val releaseYear: Int?,
+        val preferTvType: Boolean
+    ) {
+        val cacheKey: String = buildString {
+            append(normalizedTitle)
+            releaseYear?.let {
+                append(":")
+                append(it)
+            }
+        }
+    }
+
+    private data class IptvScoredCandidate(
+        val item: MediaItem,
+        val score: Int,
+        val exactTitle: Boolean,
+        val titleOverlap: Double
+    )
+
+    private fun parseIptvProgramQuery(rawTitle: String): IptvProgramQuery? {
+        val releaseYear = IPTV_YEAR_REGEX.find(rawTitle)?.value?.toIntOrNull()
+        val preferTv = IPTV_SEASON_EPISODE_REGEX.containsMatchIn(rawTitle)
+        val cleaned = rawTitle
+            .replace(IPTV_PAREN_CONTENT_REGEX, " ")
+            .replace(IPTV_BRACKET_CONTENT_REGEX, " ")
+            .replace(IPTV_NOISE_TOKEN_REGEX, " ")
+            .replace(IPTV_YEAR_REGEX, " ")
+            .replace(IPTV_MULTI_SPACE_REGEX, " ")
+            .trim()
+        if (cleaned.length < 3) return null
+        val normalizedTitle = normalizeIptvTitle(cleaned)
+        if (normalizedTitle.length < 3) return null
+        return IptvProgramQuery(
+            cleanedTitle = cleaned,
+            normalizedTitle = normalizedTitle,
+            releaseYear = releaseYear,
+            preferTvType = preferTv
+        )
+    }
+
+    private fun normalizeIptvTitle(value: String): String {
+        val ascii = Normalizer.normalize(value, Normalizer.Form.NFD)
+            .replace(IPTV_DIACRITICS_REGEX, "")
+        return ascii
+            .lowercase(Locale.US)
+            .replace("&", " and ")
+            .replace(IPTV_NON_ALNUM_REGEX, " ")
+            .replace(IPTV_ARTICLES_REGEX, " ")
+            .replace(IPTV_MULTI_SPACE_REGEX, " ")
+            .trim()
+    }
+
+    private fun titleTokenOverlap(left: String, right: String): Double {
+        val leftTokens = left.split(' ').filter { it.length > 1 }.toSet()
+        val rightTokens = right.split(' ').filter { it.length > 1 }.toSet()
+        if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
+        val common = leftTokens.intersect(rightTokens).size.toDouble()
+        return common / maxOf(leftTokens.size, rightTokens.size).toDouble()
+    }
+
+    private fun scoreIptvCandidate(query: IptvProgramQuery, item: MediaItem): IptvScoredCandidate {
+        val normalizedCandidateTitle = normalizeIptvTitle(item.title)
+        val exactTitle = normalizedCandidateTitle == query.normalizedTitle
+        val overlap = titleTokenOverlap(query.normalizedTitle, normalizedCandidateTitle)
+
+        var score = 0
+        if (query.preferTvType) {
+            score += if (item.mediaType == MediaType.TV) 70 else -180
+        }
+
+        when {
+            exactTitle -> score += 220
+            query.normalizedTitle in normalizedCandidateTitle || normalizedCandidateTitle in query.normalizedTitle -> score += 120
+            overlap >= 0.8 -> score += 95
+            overlap >= 0.6 -> score += 65
+            overlap >= 0.4 -> score += 25
+            else -> score -= 80
+        }
+
+        val candidateYear = item.releaseDate?.take(4)?.toIntOrNull() ?: item.year.toIntOrNull()
+        if (query.releaseYear != null) {
+            if (candidateYear == null) {
+                score -= 20
+            } else {
+                val yearDelta = abs(query.releaseYear - candidateYear)
+                when {
+                    yearDelta == 0 -> score += 140
+                    yearDelta == 1 -> score += 70
+                    yearDelta == 2 -> score += 20
+                    else -> score -= 220
+                }
+            }
+        }
+
+        score += ((item.popularity / 5f).toInt()).coerceIn(0, 40)
+
+        return IptvScoredCandidate(
+            item = item,
+            score = score,
+            exactTitle = exactTitle,
+            titleOverlap = overlap
+        )
+    }
+
+    private fun isAcceptableIptvCandidate(query: IptvProgramQuery, candidate: IptvScoredCandidate): Boolean {
+        if (query.releaseYear != null) {
+            return candidate.score >= IPTV_MIN_SCORE_WITH_YEAR
+        }
+        if (candidate.exactTitle) {
+            return candidate.score >= IPTV_MIN_SCORE_EXACT_TITLE
+        }
+        return candidate.score >= IPTV_MIN_SCORE_FUZZY_TITLE && candidate.titleOverlap >= 0.6
+    }
+
+    private suspend fun searchIptvProgramCandidates(query: IptvProgramQuery): List<IptvScoredCandidate> {
+        val searchQueries = buildList {
+            add(query.cleanedTitle)
+            query.releaseYear?.let { year -> add("${query.cleanedTitle} $year") }
+        }.distinct()
+
+        val languageOverrides = mutableListOf<String?>()
+        languageOverrides += null
+        val contentLanguage = mediaRepository.contentLanguage
+        if (!contentLanguage.startsWith("en", ignoreCase = true)) {
+            languageOverrides += "en-US"
+        }
+
+        val bestByKey = LinkedHashMap<String, IptvScoredCandidate>()
+        for (searchQuery in searchQueries) {
+            for (languageOverride in languageOverrides) {
+                val results = runCatching {
+                    if (languageOverride == null) {
+                        mediaRepository.search(searchQuery)
+                    } else {
+                        mediaRepository.search(searchQuery, languageOverride = languageOverride)
+                    }
+                }.getOrDefault(emptyList())
+
+                for (item in results) {
+                    val candidate = scoreIptvCandidate(query, item)
+                    val candidateKey = "${item.mediaType.name}:${item.id}"
+                    val current = bestByKey[candidateKey]
+                    if (current == null || candidate.score > current.score) {
+                        bestByKey[candidateKey] = candidate
+                    }
+                }
+            }
+        }
+
+        return bestByKey.values
+            .sortedByDescending { it.score }
+            .take(IPTV_SEARCH_CANDIDATE_LIMIT)
+    }
+
+    private fun hasActiveMiss(missCache: ConcurrentHashMap<String, Long>, key: String): Boolean {
+        val expiresAt = missCache[key] ?: return false
+        val now = SystemClock.elapsedRealtime()
+        if (expiresAt <= now) {
+            missCache.remove(key, expiresAt)
+            return false
+        }
+        return true
+    }
+
+    private fun registerMiss(missCache: ConcurrentHashMap<String, Long>, key: String) {
+        missCache[key] = SystemClock.elapsedRealtime() + IPTV_PROGRAM_MISS_TTL_MS
     }
 
     private fun iptvChannelToMediaItem(
@@ -1062,7 +1242,7 @@ class HomeViewModel @Inject constructor(
         val language = com.arflix.tv.util.normalizeAppLanguage(
             prefs[profileManager.profileStringKeyFor(profileId, "content_language")] ?: fallbackLanguage
         )
-        mediaRepository.contentLanguage = if (language == "en-US") null else language
+        mediaRepository.contentLanguage = language
         return language
     }
 
@@ -1117,6 +1297,21 @@ class HomeViewModel @Inject constructor(
     private val WATCHED_BADGES_REFRESH_MS = 90_000L
     private var lastWatchedBadgesRefreshMs: Long = 0L
     private val HOME_PLACEHOLDER_ITEM_COUNT = 8
+    private val IPTV_PROGRAM_MISS_TTL_MS = 10 * 60_000L
+    private val IPTV_SEARCH_CANDIDATE_LIMIT = 12
+    private val IPTV_LOGO_CANDIDATE_LIMIT = 5
+    private val IPTV_MIN_SCORE_WITH_YEAR = 180
+    private val IPTV_MIN_SCORE_EXACT_TITLE = 150
+    private val IPTV_MIN_SCORE_FUZZY_TITLE = 230
+    private val IPTV_PAREN_CONTENT_REGEX = Regex("""\([^)]*\)""")
+    private val IPTV_BRACKET_CONTENT_REGEX = Regex("""\[[^]]*]""")
+    private val IPTV_NOISE_TOKEN_REGEX = Regex("""(?i)\b(live|hd|uhd|fhd|4k|hdr|dolby|vision|ep\.?\s*\d+|episode\s*\d+|staffel\s*\d+|folge\s*\d+|part\s*\d+)\b""")
+    private val IPTV_SEASON_EPISODE_REGEX = Regex("""(?i)\b(s\d{1,2}\s*e\d{1,2}|season\s*\d+|staffel\s*\d+)\b""")
+    private val IPTV_YEAR_REGEX = Regex("""\b(19|20)\d{2}\b""")
+    private val IPTV_DIACRITICS_REGEX = Regex("""\p{InCombiningDiacriticalMarks}+""")
+    private val IPTV_NON_ALNUM_REGEX = Regex("""[^a-z0-9\s]""")
+    private val IPTV_ARTICLES_REGEX = Regex("""\b(the|a|an|der|die|das|ein|eine)\b""")
+    private val IPTV_MULTI_SPACE_REGEX = Regex("""\s+""")
 
     // EPG refresh intervals for IPTV rows
     /** Local re-derive: shift now/next from cached programs when a program ends. */
@@ -4766,12 +4961,16 @@ class HomeViewModel @Inject constructor(
         } ?: return
 
         if (!appUpdateRepository.supportsSelfUpdate()) return
+        if (!com.arflix.tv.updater.ApkInstaller.canRequestPackageInstalls(context)) {
+            _uiState.value = _uiState.value.copy(showUnknownSourcesDialog = true, showAppUpdateDialog = false)
+            return
+        }
 
         downloadJob = viewModelScope.launch {
             updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.Downloading(0f, update))
 
-            val safeName = update.assetName.replace(HomeVMRegexes.FILE_NAME_REGEX, "_")
-            val dest = java.io.File(java.io.File(context.cacheDir, "updates"), safeName)
+            val dest = com.arflix.tv.updater.ApkInstaller.buildUpdateDestinationFile(context, update.assetName)
+            com.arflix.tv.updater.ApkInstaller.cleanupDownloadedUpdates(context, keepPath = dest.absolutePath)
 
             val result = kotlinx.coroutines.withContext(Dispatchers.IO) {
                 apkDownloader.download(update.assetUrl, dest) { downloaded, total ->
@@ -4800,6 +4999,7 @@ class HomeViewModel @Inject constructor(
         downloadJob = null
         val currentStatus = updateStatusManager.status.value
         if (currentStatus is com.arflix.tv.updater.UpdateStatus.Downloading) {
+            com.arflix.tv.updater.ApkInstaller.cleanupDownloadedUpdates(context)
             updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.UpdateAvailable(currentStatus.update))
         }
     }
@@ -4818,8 +5018,8 @@ class HomeViewModel @Inject constructor(
         }
 
         if (!com.arflix.tv.updater.ApkInstaller.canRequestPackageInstalls(context)) {
-            // If we can't request package installs, we should let the user know, but for now
-            // launchInstall handles falling back to Intent.ACTION_VIEW
+            _uiState.value = _uiState.value.copy(showUnknownSourcesDialog = true, showAppUpdateDialog = false)
+            return
         }
 
         val conflictMsg = com.arflix.tv.updater.ApkInstaller.checkSignatureConflict(context, apkFile)
@@ -4838,8 +5038,14 @@ class HomeViewModel @Inject constructor(
     }
 
     fun dismissAppUpdateDialog() {
-        _uiState.value = _uiState.value.copy(showAppUpdateDialog = false)
+        _uiState.value = _uiState.value.copy(showAppUpdateDialog = false, showUnknownSourcesDialog = false)
         // We do not reset updateStatusManager here, so the badge remains active
+    }
+
+    fun openUnknownSourcesSettings() {
+        com.arflix.tv.updater.ApkInstaller.buildUnknownSourcesSettingsIntent(context)?.let { intent ->
+            context.startActivity(intent)
+        }
     }
 
     fun ignoreAppUpdate() {

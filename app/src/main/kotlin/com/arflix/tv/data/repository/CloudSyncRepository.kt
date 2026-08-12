@@ -812,6 +812,12 @@ class CloudSyncRepository @Inject constructor(
             }
         }
         root.put("watchlistByProfile", JSONObject(gson.toJson(watchlistByProfile)))
+        val watchlistUpdatedAtByProfile = buildMap<String, Long> {
+            profiles.forEach { profile ->
+                put(profile.id, watchlistRepository.exportWatchlistUpdatedAtForProfile(profile.id))
+            }
+        }
+        root.put("watchlistUpdatedAtByProfile", JSONObject(gson.toJson(watchlistUpdatedAtByProfile)))
 
         // Backward compatibility fields (legacy single-profile clients)
         root.put("addons", JSONArray(gson.toJson(sharedAddons)))
@@ -960,10 +966,15 @@ class CloudSyncRepository @Inject constructor(
         // Field-level merge against the already-loaded remote: keep local fields we changed more
         // recently, but never overwrite a cloud field with an older local value. This is what stops
         // a stale device from reverting a peer's setting (even via the pull's pre-push).
-        val effectivePayload = if (existingRemotePayload != null) {
+        val settingsMergedPayload = if (existingRemotePayload != null) {
             mergeSettingsByTimestamp(baseStr = groupOrderMerged, otherStr = existingRemotePayload).json
         } else {
             groupOrderMerged
+        }
+        val effectivePayload = if (existingRemotePayload != null) {
+            mergeWatchlistByTimestamp(localPayload = settingsMergedPayload, remotePayload = existingRemotePayload)
+        } else {
+            settingsMergedPayload
         }
 
         val payloadHash = runCatching {
@@ -1034,6 +1045,44 @@ class CloudSyncRepository @Inject constructor(
                 }
             }
             local.toString()
+        }.getOrDefault(localPayload)
+    }
+
+    private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {
+        return runCatching {
+            val localRoot = JSONObject(localPayload)
+            val remoteRoot = JSONObject(remotePayload)
+
+            val localLists = localRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
+            val remoteLists = remoteRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
+            val localTs = localRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
+            val remoteTs = remoteRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
+
+            val mergedLists = JSONObject()
+            val mergedTs = JSONObject()
+            val profileIds = LinkedHashSet<String>().apply {
+                localLists.keys().forEachRemaining { add(it) }
+                remoteLists.keys().forEachRemaining { add(it) }
+                localTs.keys().forEachRemaining { add(it) }
+                remoteTs.keys().forEachRemaining { add(it) }
+            }
+
+            profileIds.forEach { profileId ->
+                val localUpdatedAt = localTs.optLong(profileId, 0L)
+                val remoteUpdatedAt = remoteTs.optLong(profileId, 0L)
+                val useRemote = remoteUpdatedAt >= localUpdatedAt
+                val chosenArray = if (useRemote) {
+                    remoteLists.optJSONArray(profileId) ?: localLists.optJSONArray(profileId) ?: JSONArray()
+                } else {
+                    localLists.optJSONArray(profileId) ?: remoteLists.optJSONArray(profileId) ?: JSONArray()
+                }
+                mergedLists.put(profileId, chosenArray)
+                mergedTs.put(profileId, max(localUpdatedAt, remoteUpdatedAt))
+            }
+
+            localRoot.put("watchlistByProfile", mergedLists)
+            localRoot.put("watchlistUpdatedAtByProfile", mergedTs)
+            localRoot.toString()
         }.getOrDefault(localPayload)
     }
 
@@ -1666,12 +1715,20 @@ class CloudSyncRepository @Inject constructor(
             root.optJSONObject("watchlistByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, LocalWatchlistItem::class.java).type).type
                 val map: Map<String, List<LocalWatchlistItem>> = gson.fromJson(json, type) ?: emptyMap()
+                val watchlistUpdatedAt = root.optJSONObject("watchlistUpdatedAtByProfile")
                 map.forEach { (profileId, items) ->
                     // Restore the cloud mirror for every profile, including Trakt profiles.
                     // Trakt remains the source of truth after a successful live sync, but
                     // skipping this cache made fresh installs show an empty watchlist while
                     // auth/network refresh was still settling or failed.
-                    watchlistRepository.importWatchlistForProfile(profileId, items)
+                    val cloudUpdatedAt = watchlistUpdatedAt
+                        ?.optLong(profileId, 0L)
+                        ?.takeIf { it > 0L }
+                    watchlistRepository.importWatchlistForProfile(
+                        profileId = profileId,
+                        cloudItems = items,
+                        cloudUpdatedAtMs = cloudUpdatedAt
+                    )
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_watchlist")) }

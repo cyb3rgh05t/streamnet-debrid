@@ -13,19 +13,24 @@
     />
     <style>
       :root {
-        --bg-1: #0e0e0e;
-        --bg-2: #141414;
-        --card: rgba(31, 31, 31, 0.8);
-        --line: rgba(255, 255, 255, 0.07);
-        --line-strong: rgba(255, 255, 255, 0.14);
-        --text: #f0f0f0;
-        --muted: #888888;
+        --bg-1: #0f0d0b;
+        --bg-2: #171311;
+        --bg-3: #221b16;
+        --card: #1c1713;
+        --panel: #15110e;
+        --field: #120f0c;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-strong: rgba(229, 162, 9, 0.26);
+        --text: #f4efe7;
+        --muted: #b4a798;
+        --muted-strong: #d6cabb;
         --accent-1: #e5a209;
         --accent-2: #ce8017;
-        --field: rgba(255, 255, 255, 0.05);
-        --field-focus: rgba(255, 255, 255, 0.09);
+        --accent-soft: rgba(229, 162, 9, 0.12);
+        --field-focus: #1d1712;
         --ok: #6ee7a3;
         --danger: #ff8a76;
+        --shadow: rgba(0, 0, 0, 0.42);
       }
 
       * {
@@ -46,212 +51,278 @@
           system-ui,
           sans-serif;
         color: var(--text);
-        background: linear-gradient(
-          160deg,
-          var(--bg-1),
-          var(--bg-2) 60%,
-          #0a0806
-        );
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(229, 162, 9, 0.06),
+            transparent 22%
+          ),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2) 62%, var(--bg-3));
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         letter-spacing: -0.01em;
-        display: grid;
-        place-items: center;
-        padding: 24px;
-        position: relative;
-        overflow-x: hidden;
+        padding: 28px;
         min-height: 100vh;
       }
 
-      /* Animated nebula clouds — three drifting layers */
-      .nebula {
-        position: fixed;
-        inset: -20%;
-        pointer-events: none;
-        z-index: 0;
-        filter: blur(60px);
-        will-change: transform, opacity;
-      }
-      .nebula.one {
-        background:
-          radial-gradient(
-            40% 45% at 15% 25%,
-            rgba(229, 162, 9, 0.18),
-            transparent 65%
-          ),
-          radial-gradient(
-            30% 35% at 80% 70%,
-            rgba(206, 128, 23, 0.12),
-            transparent 65%
-          );
-        animation: drift-a 28s ease-in-out infinite alternate;
-      }
-      .nebula.two {
-        background:
-          radial-gradient(
-            35% 40% at 85% 20%,
-            rgba(239, 175, 20, 0.1),
-            transparent 60%
-          ),
-          radial-gradient(
-            28% 32% at 20% 85%,
-            rgba(229, 162, 9, 0.08),
-            transparent 65%
-          );
-        animation: drift-b 36s ease-in-out infinite alternate;
-        mix-blend-mode: screen;
-        opacity: 0.9;
-      }
-      .nebula.three {
-        background:
-          radial-gradient(
-            25% 30% at 50% 50%,
-            rgba(206, 128, 23, 0.06),
-            transparent 70%
-          ),
-          radial-gradient(
-            40% 40% at 10% 55%,
-            rgba(229, 162, 9, 0.07),
-            transparent 65%
-          );
-        animation: drift-c 44s linear infinite;
-        mix-blend-mode: screen;
-        opacity: 0.7;
-      }
-      @keyframes drift-a {
-        0% {
-          transform: translate3d(-4%, -2%, 0) rotate(0deg) scale(1);
-        }
-        50% {
-          transform: translate3d(3%, 4%, 0) rotate(8deg) scale(1.1);
-        }
-        100% {
-          transform: translate3d(5%, -3%, 0) rotate(-6deg) scale(1.05);
-        }
-      }
-      @keyframes drift-b {
-        0% {
-          transform: translate3d(3%, 2%, 0) rotate(0deg) scale(1.05);
-        }
-        50% {
-          transform: translate3d(-4%, -3%, 0) rotate(-10deg) scale(1.15);
-        }
-        100% {
-          transform: translate3d(-2%, 4%, 0) rotate(7deg) scale(1);
-        }
-      }
-      @keyframes drift-c {
-        from {
-          transform: rotate(0deg) scale(1.1);
-        }
-        to {
-          transform: rotate(360deg) scale(1.1);
-        }
+      .page {
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+        min-height: calc(100vh - 56px);
+        display: grid;
+        align-content: center;
+        gap: 12px;
       }
 
-      /* Star canvas — full viewport, above nebulas */
-      #stars {
-        position: fixed;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        pointer-events: none;
-        z-index: 1;
+      .topbar {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .lang-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px;
+      }
+
+      .lang-btn {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        min-height: 34px;
+        min-width: 54px;
+        border-radius: 999px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 0 12px;
+        transition:
+          color 0.2s ease,
+          background 0.2s ease;
+      }
+
+      .lang-btn[aria-pressed="true"] {
+        color: #17120f;
+        background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      }
+
+      .lang-btn:hover {
+        color: var(--text);
       }
 
       .shell {
-        position: relative;
-        z-index: 3;
         width: 100%;
-        max-width: 460px;
-        border-radius: 20px;
-        background: var(--card);
-        backdrop-filter: blur(22px) saturate(140%);
-        -webkit-backdrop-filter: blur(22px) saturate(140%);
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 440px);
+        border-radius: 28px;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.01),
+            rgba(255, 255, 255, 0.01)
+          ),
+          var(--card);
         border: 1px solid var(--line);
         box-shadow:
-          0 1px 0 rgba(229, 162, 9, 0.08) inset,
-          0 30px 80px -20px rgba(0, 0, 0, 0.85),
-          0 8px 30px -8px rgba(0, 0, 0, 0.6),
-          0 0 0 1px rgba(229, 162, 9, 0.06);
+          0 28px 70px -34px rgba(0, 0, 0, 0.86),
+          0 8px 18px -12px var(--shadow);
         overflow: hidden;
-        animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        min-height: 700px;
       }
 
-      @keyframes rise {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
+      .info {
+        position: relative;
+        padding: 40px 40px 34px;
+        background:
+          linear-gradient(180deg, rgba(229, 162, 9, 0.06), transparent 26%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02), transparent 40%);
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
       }
 
-      .head {
-        padding: 28px 28px 22px;
-        border-bottom: 1px solid var(--line);
-        text-align: center;
+      .kicker {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-1);
       }
 
       .brand {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        margin-bottom: 18px;
-      }
-      .brand-mark {
-        width: 44px;
-        height: 32px;
-        display: block;
-        object-fit: contain;
-        filter: drop-shadow(0 0 12px rgba(229, 162, 9, 0.35));
+        gap: 12px;
       }
       .brand-logo {
-        width: 260px;
+        width: min(290px, 100%);
         height: auto;
         display: block;
-        filter: drop-shadow(0 0 12px rgba(229, 162, 9, 0.28));
       }
-      .brand-word {
-        font-weight: 800;
-        letter-spacing: 0.18em;
-        font-size: 12px;
-        color: rgba(245, 239, 229, 0.82);
+
+      .hero-copy {
+        max-width: 520px;
       }
 
       .title {
         margin: 0;
-        font-size: 26px;
-        line-height: 1.15;
+        font-size: clamp(34px, 4vw, 48px);
+        line-height: 1.02;
         font-weight: 800;
-        letter-spacing: -0.025em;
+        letter-spacing: -0.04em;
         color: #fbf6ec;
       }
 
       .subtitle {
-        margin: 8px 0 0;
+        margin: 14px 0 0;
         color: var(--muted);
-        font-size: 14px;
-        line-height: 1.5;
+        font-size: 15px;
+        line-height: 1.65;
       }
 
-      .body {
-        padding: 22px 28px 26px;
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .summary-card,
+      .pairing-card,
+      .help-card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 18px;
+      }
+
+      .summary-card {
+        padding: 16px 16px 14px;
+      }
+
+      .summary-card strong {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 6px;
+        color: var(--muted-strong);
+      }
+
+      .summary-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .pairing-card {
+        padding: 22px;
+      }
+
+      .section-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .section-copy {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .pairing-steps {
+        margin: 16px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+
+      .pairing-steps li {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .step-index {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        background: var(--accent-soft);
+        color: var(--accent-1);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .step-copy {
+        color: var(--muted-strong);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .pairing-card[data-mode="default"] .pairing-state,
+      .pairing-card[data-mode="pairing"] .pairing-default {
+        display: none;
+      }
+
+      .help-card {
+        padding: 18px 22px;
+      }
+
+      .help-list {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .auth-panel {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        padding: 24px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          transparent 22%
+        );
+      }
+
+      .auth-card {
+        width: 100%;
+        background: #17120f;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .head {
+        padding: 28px 28px 20px;
+        border-bottom: 1px solid var(--line);
       }
 
       .pair {
         display: none;
-        margin-bottom: 16px;
-        padding: 12px 14px;
+        margin-top: 14px;
+        padding: 14px 15px;
         border-radius: 12px;
-        border: 1px solid rgba(212, 165, 116, 0.35);
-        background: linear-gradient(
-          135deg,
-          rgba(212, 165, 116, 0.14),
-          rgba(124, 92, 255, 0.12)
-        );
+        border: 1px solid var(--line-strong);
+        background: rgba(229, 162, 9, 0.08);
         color: var(--text);
         font-size: 13px;
         align-items: center;
@@ -265,13 +336,17 @@
       .pair b {
         font-family: ui-monospace, "SF Mono", Menlo, monospace;
         letter-spacing: 0.12em;
-        font-size: 14px;
+        font-size: 15px;
         color: #fbf6ec;
       }
 
+      .body {
+        padding: 20px 28px 26px;
+      }
+
       .status {
-        min-height: 18px;
-        margin: 2px 0 8px;
+        min-height: 19px;
+        margin: 4px 0 10px;
         font-size: 13px;
         color: var(--muted);
         transition: color 0.2s ease;
@@ -308,15 +383,15 @@
           box-shadow 0.18s ease;
       }
       .input::placeholder {
-        color: #6e6557;
+        color: #7e7164;
       }
       .input:hover {
         border-color: var(--line-strong);
       }
       .input:focus {
-        border-color: rgba(124, 92, 255, 0.6);
+        border-color: rgba(229, 162, 9, 0.58);
         background: var(--field-focus);
-        box-shadow: 0 0 0 4px rgba(124, 92, 255, 0.15);
+        box-shadow: inset 0 0 0 1px rgba(229, 162, 9, 0.16);
       }
 
       .actions {
@@ -357,30 +432,13 @@
       }
 
       .btn.primary {
-        position: relative;
         background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
-        background-size: 200% 200%;
         color: #0d0e12;
         border: 0;
-        box-shadow:
-          0 12px 30px -10px rgba(229, 162, 9, 0.55),
-          0 4px 14px -4px rgba(255, 107, 53, 0.45);
-        animation: shift 8s ease-in-out infinite;
+        box-shadow: none;
       }
       .btn.primary:hover {
-        box-shadow:
-          0 16px 36px -10px rgba(229, 162, 9, 0.7),
-          0 6px 18px -4px rgba(255, 107, 53, 0.6);
-      }
-
-      @keyframes shift {
-        0%,
-        100% {
-          background-position: 0% 50%;
-        }
-        50% {
-          background-position: 100% 50%;
-        }
+        background: linear-gradient(135deg, #efaf14, #d88419);
       }
 
       .small {
@@ -442,261 +500,310 @@
         color: var(--text);
       }
 
+      .mode-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        color: var(--muted-strong);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .mode-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent-1);
+      }
+
       @media (max-width: 480px) {
+        body {
+          padding: 14px;
+        }
+        .page {
+          gap: 10px;
+          min-height: auto;
+        }
+        .shell {
+          border-radius: 18px;
+        }
+        .topbar {
+          justify-content: stretch;
+        }
+        .lang-switch {
+          width: 100%;
+          justify-content: center;
+        }
         .head {
-          padding: 24px 22px 18px;
+          padding: 20px 16px 16px;
         }
         .body {
-          padding: 18px 22px 22px;
+          padding: 16px;
+        }
+        .info {
+          padding: 20px 16px 18px;
+          gap: 18px;
+        }
+        .pairing-card,
+        .help-card {
+          padding: 14px;
+          border-radius: 14px;
+        }
+        .summary-card {
+          padding: 12px;
+          border-radius: 14px;
+        }
+        .pair {
+          padding: 12px;
+        }
+        .pair b {
+          font-size: 13px;
+          letter-spacing: 0.08em;
+          word-break: break-all;
         }
         .title {
-          font-size: 22px;
+          font-size: 30px;
+        }
+        .subtitle,
+        .section-copy,
+        .step-copy,
+        .help-list {
+          font-size: 13px;
+          line-height: 1.55;
+        }
+        .btn {
+          min-height: 46px;
         }
       }
 
-      @media (prefers-reduced-motion: reduce) {
-        .btn.primary,
+      @media (max-width: 980px) {
+        .page {
+          align-content: start;
+        }
+
         .shell {
-          animation: none !important;
+          grid-template-columns: 1fr;
+          min-height: auto;
+        }
+
+        .auth-panel {
+          order: 1;
+          padding: 16px;
+        }
+
+        .info {
+          order: 2;
+          padding: 26px 20px 22px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .summary {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          border-radius: 20px;
+        }
+        .auth-panel {
+          padding: 12px;
         }
       }
     </style>
   </head>
   <body>
-    <div class="nebula one" aria-hidden="true"></div>
-    <div class="nebula two" aria-hidden="true"></div>
-    <div class="nebula three" aria-hidden="true"></div>
-    <canvas id="stars" aria-hidden="true"></canvas>
-
-    <main class="shell">
-      <header class="head">
-        <div class="brand">
-          <img
-            class="brand-logo"
-            src="/assets/streamnet-logo.svg"
-            alt="StreamNet TV"
-          />
-        </div>
-        <h1 class="title">Account Access</h1>
-        <p class="subtitle" id="subtitle">Sign in to your account.</p>
-      </header>
-
-      <section class="body">
-        <div class="pair" id="pairBox">
-          <span class="pair-label">Pairing code</span>
-          <b id="pairCode"></b>
-        </div>
-        <div class="status" id="status"></div>
-
-        <label class="label" for="email">Email</label>
-        <input
-          class="input"
-          id="email"
-          type="email"
-          autocomplete="email"
-          placeholder="you@example.com"
-        />
-
-        <label class="label" for="password">Password</label>
-        <input
-          class="input"
-          id="password"
-          type="password"
-          autocomplete="current-password"
-          placeholder="Your password"
-        />
-        <div class="linkrow">
-          <button class="linkbtn" id="forgot" type="button">
-            Forgot password?
+    <div class="page">
+      <div class="topbar">
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button
+            class="lang-btn"
+            id="langEn"
+            type="button"
+            aria-pressed="true"
+          >
+            EN
+          </button>
+          <button
+            class="lang-btn"
+            id="langDe"
+            type="button"
+            aria-pressed="false"
+          >
+            DE
           </button>
         </div>
+      </div>
 
-        <div class="actions">
-          <button class="btn primary" id="signin">Sign In</button>
-          <button class="btn" id="signup">Create Account</button>
-          <button class="btn" id="savepass" style="display: none">
-            Save New Password
-          </button>
-        </div>
+      <main class="shell">
+        <section class="info">
+          <div class="brand">
+            <img
+              class="brand-logo"
+              src="/assets/streamnet-logo.svg"
+              alt="StreamNet TV"
+            />
+          </div>
 
-        <p class="small">
-          If you opened this from a TV QR code, signing in will automatically
-          pair that TV.
-        </p>
-        <div class="foot">StreamNet TV · Cloud Auth</div>
-        <a class="privacy-link" href="/delete-account">Delete account</a>
-      </section>
-    </main>
+          <div class="hero-copy">
+            <div class="kicker" data-i18n="hero.kicker"></div>
+            <h1 class="title" data-i18n="hero.title"></h1>
+            <p class="subtitle" id="subtitle"></p>
+          </div>
 
-    <!-- Starfield + shooting-stars -->
-    <script>
-      (function () {
-        const reduce =
-          window.matchMedia &&
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        const canvas = document.getElementById("stars");
-        const ctx = canvas.getContext("2d");
-        let w = 0,
-          h = 0,
-          dpr = 1;
-        let stars = [];
-        let shootingStars = [];
-        let lastShoot = 0;
-        let nextShootDelay = 900 + Math.random() * 1800;
+          <div class="summary">
+            <div class="summary-card">
+              <strong data-i18n="summary.profiles.title"></strong>
+              <span data-i18n="summary.profiles.copy"></span>
+            </div>
+            <div class="summary-card">
+              <strong data-i18n="summary.playback.title"></strong>
+              <span data-i18n="summary.playback.copy"></span>
+            </div>
+            <div class="summary-card">
+              <strong data-i18n="summary.pairing.title"></strong>
+              <span data-i18n="summary.pairing.copy"></span>
+            </div>
+          </div>
 
-        function resize() {
-          dpr = Math.min(window.devicePixelRatio || 1, 2);
-          w = window.innerWidth;
-          h = window.innerHeight;
-          canvas.width = w * dpr;
-          canvas.height = h * dpr;
-          canvas.style.width = w + "px";
-          canvas.style.height = h + "px";
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          seedStars();
-        }
+          <section class="pairing-card" id="pairingInfo" data-mode="default">
+            <div class="pairing-default">
+              <h2 class="section-title" data-i18n="pairing.defaultTitle"></h2>
+              <p class="section-copy" data-i18n="pairing.defaultCopy"></p>
+            </div>
+            <div class="pairing-state">
+              <div class="mode-tag">
+                <span class="mode-dot"></span>
+                <span data-i18n="pairing.activeTag"></span>
+              </div>
+              <h2
+                class="section-title"
+                style="margin-top: 14px"
+                data-i18n="pairing.stateTitle"
+              ></h2>
+              <p class="section-copy" data-i18n="pairing.stateCopy"></p>
+              <ol class="pairing-steps">
+                <li>
+                  <span class="step-index">1</span>
+                  <span class="step-copy" data-i18n="pairing.steps.one"></span>
+                </li>
+                <li>
+                  <span class="step-index">2</span>
+                  <span class="step-copy" data-i18n="pairing.steps.two"></span>
+                </li>
+                <li>
+                  <span class="step-index">3</span>
+                  <span
+                    class="step-copy"
+                    data-i18n="pairing.steps.three"
+                  ></span>
+                </li>
+              </ol>
+            </div>
+          </section>
 
-        function seedStars() {
-          const density = 0.00022; // stars per px²
-          const count = Math.max(
-            120,
-            Math.min(420, Math.floor(w * h * density)),
-          );
-          stars = new Array(count).fill(0).map(() => {
-            // 3 parallax layers — back is dim/slow, front is bright/fast
-            const layerR = Math.random();
-            let depth, sizeMul, alphaMul, speed;
-            if (layerR < 0.55) {
-              depth = 0;
-              sizeMul = 0.7;
-              alphaMul = 0.7;
-              speed = 0.12;
-            } else if (layerR < 0.88) {
-              depth = 1;
-              sizeMul = 1.0;
-              alphaMul = 0.9;
-              speed = 0.3;
-            } else {
-              depth = 2;
-              sizeMul = 1.5;
-              alphaMul = 1.1;
-              speed = 0.65;
-            }
+          <section class="help-card">
+            <h2 class="section-title" data-i18n="help.title"></h2>
+            <ul class="help-list">
+              <li data-i18n="help.items.one"></li>
+              <li data-i18n="help.items.two"></li>
+              <li data-i18n="help.items.three"></li>
+            </ul>
+          </section>
+        </section>
 
-            // Mostly horizontal flow with slight vertical wobble — feels like a slow drift
-            const angle = Math.PI + (Math.random() - 0.5) * 0.6; // mostly leftward
-            return {
-              x: Math.random() * w,
-              y: Math.random() * h,
-              r: (Math.random() * 1.0 + 0.3) * sizeMul,
-              baseA: (0.35 + Math.random() * 0.55) * alphaMul,
-              twinkleSpeed: 0.5 + Math.random() * 2.0,
-              twinklePhase: Math.random() * Math.PI * 2,
-              vx: Math.cos(angle) * speed,
-              vy: Math.sin(angle) * speed,
-              depth,
-              tint:
-                Math.random() < 0.2
-                  ? Math.random() < 0.5
-                    ? "229,162,9"
-                    : "255,107,53"
-                  : "200,220,255",
-            };
-          });
-        }
+        <section class="auth-panel">
+          <div class="auth-card">
+            <header class="head">
+              <div class="kicker" data-i18n="auth.kicker"></div>
+              <h2
+                class="section-title"
+                style="font-size: 28px; margin: 10px 0 0"
+              >
+                <span data-i18n="auth.title"></span>
+              </h2>
+              <div class="pair" id="pairBox">
+                <span class="pair-label" data-i18n="auth.pairCode"></span>
+                <b id="pairCode"></b>
+              </div>
+            </header>
 
-        function spawnShootingStar() {
-          // Diagonal: top-right to bottom-left, with some variety
-          const fromTop = Math.random() < 0.7;
-          const startX = fromTop ? Math.random() * w * 0.9 + w * 0.05 : w + 20;
-          const startY = fromTop ? -20 : Math.random() * h * 0.4;
-          const angle = Math.PI / 4 + (Math.random() * 0.25 - 0.125); // ~45° down-left
-          const speed = 9 + Math.random() * 6;
-          shootingStars.push({
-            x: startX,
-            y: startY,
-            vx: -Math.cos(angle) * speed,
-            vy: Math.sin(angle) * speed,
-            life: 0,
-            maxLife: 70 + Math.random() * 40,
-            length: 120 + Math.random() * 120,
-          });
-        }
+            <section class="body">
+              <div class="status" id="status"></div>
 
-        function tick(ts) {
-          ctx.clearRect(0, 0, w, h);
+              <label
+                class="label"
+                for="email"
+                id="emailLabel"
+                data-i18n="labels.email"
+              ></label>
+              <input
+                class="input"
+                id="email"
+                type="email"
+                autocomplete="email"
+                data-i18n-placeholder="placeholders.email"
+              />
 
-          // Twinkling stars
-          const t = ts / 1000;
-          for (let i = 0; i < stars.length; i++) {
-            const s = stars[i];
-            s.x += s.vx;
-            s.y += s.vy;
-            if (s.x < -2) s.x = w + 2;
-            else if (s.x > w + 2) s.x = -2;
-            if (s.y < -2) s.y = h + 2;
-            else if (s.y > h + 2) s.y = -2;
+              <label
+                class="label"
+                for="password"
+                id="passwordLabel"
+                data-i18n="labels.password"
+              ></label>
+              <input
+                class="input"
+                id="password"
+                type="password"
+                autocomplete="current-password"
+                data-i18n-placeholder="placeholders.password"
+              />
+              <div class="linkrow">
+                <button
+                  class="linkbtn"
+                  id="forgot"
+                  type="button"
+                  data-i18n="actions.forgot"
+                ></button>
+              </div>
 
-            const a =
-              s.baseA *
-              (0.55 + 0.45 * Math.sin(t * s.twinkleSpeed + s.twinklePhase));
-            ctx.beginPath();
-            ctx.fillStyle = `rgba(${s.tint}, ${a})`;
-            ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-            ctx.fill();
-          }
+              <div class="actions">
+                <button
+                  class="btn primary"
+                  id="signin"
+                  data-i18n="actions.signIn"
+                ></button>
+                <button
+                  class="btn"
+                  id="signup"
+                  data-i18n="actions.signUp"
+                ></button>
+                <button
+                  class="btn"
+                  id="savepass"
+                  style="display: none"
+                  data-i18n="actions.savePassword"
+                ></button>
+              </div>
 
-          // Shooting stars
-          if (!reduce) {
-            if (ts - lastShoot > nextShootDelay) {
-              spawnShootingStar();
-              // Sometimes a quick double for visual interest
-              if (Math.random() < 0.25)
-                setTimeout(spawnShootingStar, 220 + Math.random() * 320);
-              lastShoot = ts;
-              nextShootDelay = 1100 + Math.random() * 2600;
-            }
-            for (let i = shootingStars.length - 1; i >= 0; i--) {
-              const s = shootingStars[i];
-              s.x += s.vx;
-              s.y += s.vy;
-              s.life++;
-
-              const fade = Math.max(0, 1 - s.life / s.maxLife);
-              const tx = s.x - s.vx * (s.length / Math.hypot(s.vx, s.vy));
-              const ty = s.y - s.vy * (s.length / Math.hypot(s.vx, s.vy));
-
-              const grad = ctx.createLinearGradient(s.x, s.y, tx, ty);
-              grad.addColorStop(0, `rgba(255,255,255,${0.95 * fade})`);
-              grad.addColorStop(0.4, `rgba(229,162,9,${0.55 * fade})`);
-              grad.addColorStop(1, "rgba(229,162,9,0)");
-              ctx.strokeStyle = grad;
-              ctx.lineWidth = 1.6;
-              ctx.beginPath();
-              ctx.moveTo(s.x, s.y);
-              ctx.lineTo(tx, ty);
-              ctx.stroke();
-
-              // Bright head
-              ctx.beginPath();
-              ctx.fillStyle = `rgba(255,245,230,${fade})`;
-              ctx.arc(s.x, s.y, 1.6, 0, Math.PI * 2);
-              ctx.fill();
-
-              if (s.life > s.maxLife || s.x < -50 || s.y > h + 50) {
-                shootingStars.splice(i, 1);
-              }
-            }
-          }
-
-          requestAnimationFrame(tick);
-        }
-
-        window.addEventListener("resize", resize, { passive: true });
-        resize();
-        requestAnimationFrame(tick);
-      })();
-    </script>
+              <p class="small" id="helperText"></p>
+              <div class="foot" data-i18n="auth.foot"></div>
+              <a
+                class="privacy-link"
+                href="/delete-account"
+                data-i18n="auth.deleteAccount"
+              ></a>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
 
     <script type="module">
       const APP_ANON_KEY =
@@ -710,12 +817,18 @@
       const subtitleEl = document.getElementById("subtitle");
       const pairBox = document.getElementById("pairBox");
       const pairCodeEl = document.getElementById("pairCode");
+      const pairingInfoEl = document.getElementById("pairingInfo");
+      const helperTextEl = document.getElementById("helperText");
+      const emailLabelEl = document.getElementById("emailLabel");
+      const passwordLabelEl = document.getElementById("passwordLabel");
       const emailEl = document.getElementById("email");
       const passEl = document.getElementById("password");
       const signInBtn = document.getElementById("signin");
       const signUpBtn = document.getElementById("signup");
       const savePassBtn = document.getElementById("savepass");
       const forgotBtn = document.getElementById("forgot");
+      const langEnBtn = document.getElementById("langEn");
+      const langDeBtn = document.getElementById("langDe");
       const hashParams = new URLSearchParams(
         (window.location.hash || "").replace(/^#/, ""),
       );
@@ -725,6 +838,330 @@
       const isRecoveryMode =
         queryMode === "recovery" || hashType === "recovery";
       const isPasswordSetupMode = queryMode === "set-password" && !!setupToken;
+
+      const I18N = {
+        en: {
+          meta: { title: "StreamNet TV - Cloud Account" },
+          hero: {
+            kicker: "Cloud Account",
+            title: "Sign in once. Sync everything.",
+            subtitleDefault:
+              "Connect your StreamNet TV account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and web.",
+            subtitlePairing:
+              "Sign in here to approve the pairing request from your StreamNet TV device and restore your cloud account there.",
+            subtitleRecovery:
+              "Set a new password to regain access to your StreamNet TV Cloud account.",
+          },
+          summary: {
+            profiles: {
+              title: "Profiles",
+              copy: "Keep account profiles and personalized app behavior aligned across devices.",
+            },
+            playback: {
+              title: "Playback",
+              copy: "Bring watch progress, continue watching and linked services with you.",
+            },
+            pairing: {
+              title: "TV Pairing",
+              copy: "Sign in from your phone or browser and link the TV in the same step.",
+            },
+          },
+          pairing: {
+            defaultTitle: "What this page does",
+            defaultCopy:
+              "Use this page to sign in to your StreamNet TV Cloud account, create a new one, or reset your password. If you opened it from a TV QR code, the TV will be linked automatically after a successful sign-in.",
+            activeTag: "Pairing active",
+            stateTitle: "How TV pairing works",
+            stateCopy:
+              "This session was opened from a StreamNet TV device. After you sign in or create your account, the browser will confirm the pairing code and the TV can restore your cloud data.",
+            steps: {
+              one: "Use the same email address and password you want to use on your StreamNet TV account.",
+              two: "After sign-in, this browser will approve the pairing request for the TV that showed the QR code.",
+              three:
+                "Keep the TV screen open for a moment so it can finish cloud restore after approval.",
+            },
+          },
+          help: {
+            title: "Before you continue",
+            items: {
+              one: "Use your real email address so password recovery works later.",
+              two: "If you are pairing a TV, do not close the TV pairing screen until it confirms completion.",
+              three:
+                "If the pairing code expires, return to the TV and start a new cloud pairing session.",
+            },
+          },
+          auth: {
+            kicker: "Secure Access",
+            title: "Account access",
+            pairCode: "Pairing code",
+            foot: "StreamNet TV · Cloud Auth",
+            deleteAccount: "Delete account",
+            helperDefault:
+              "Sign in with your StreamNet TV Cloud account to continue.",
+            helperPairing:
+              "After sign-in, this browser will confirm the TV pairing code automatically.",
+            helperRecovery:
+              "Choose a new password with at least 6 characters, then return to sign in.",
+          },
+          labels: {
+            email: "Email",
+            password: "Password",
+            newPassword: "New password",
+          },
+          placeholders: {
+            email: "you@example.com",
+            password: "Your password",
+            newPassword: "New password (min 6 characters)",
+          },
+          actions: {
+            signIn: "Sign In",
+            signUp: "Create Account",
+            savePassword: "Save New Password",
+            forgot: "Forgot password?",
+          },
+          status: {
+            signingIn: "Signing in...",
+            tvPairedRedirecting: "TV paired. Redirecting...",
+            signedInRedirecting: "Signed in. Redirecting...",
+            creatingAccount: "Creating account...",
+            creatingAccountAndPairing: "Creating account and pairing TV...",
+            createdAndPairedRedirecting:
+              "Account created and TV paired. Redirecting...",
+            createdRedirecting: "Account created. Redirecting...",
+            createdCheckEmail:
+              "Account created. Check your email, then sign in.",
+            sendingReset: "Sending new password email...",
+            resetSent:
+              "New password email sent to {email}. Check your inbox and spam folder.",
+            savingPassword: "Saving new password...",
+            passwordUpdated: "Password updated. Redirecting to sign in...",
+          },
+          errors: {
+            emailRequired: "Email is required.",
+            emailInvalid: "Enter a valid email address.",
+            emailReal: "Use a real email address.",
+            passwordRequired: "Password is required.",
+            passwordMin: "Password must be at least 6 characters.",
+            waitCooldown:
+              "Please wait {seconds}s before requesting another email.",
+            tvPairingFailed: "TV pairing failed",
+            accountCreationPairingFailed:
+              "Account creation or TV pairing failed",
+            accountCreationFailed: "Account creation failed",
+            accountCreatedIncomplete:
+              "Account created but sign-in response was incomplete.",
+            signInFailed: "Sign in failed",
+            setupHintMailSent:
+              " We sent you an email to create your new StreamNet TV Cloud password.",
+            setupHintMailFailed:
+              " Password setup email could not be sent: {setupError}",
+            setupHintUseForgot:
+              " Use Forgot password to create your new StreamNet TV Cloud password.",
+            passwordResetFailed: "Password reset failed",
+            accountNotFound:
+              "No StreamNet TV account was found for this email.",
+            resetMailNotSent:
+              "Account found, but the password email could not be sent. Please try again in a minute.",
+            passwordSetupFailed: "Password setup failed",
+            passwordLinkInvalid:
+              "This password link is no longer valid. Request a new reset email.",
+          },
+        },
+        de: {
+          meta: { title: "StreamNet TV - Cloud Konto" },
+          hero: {
+            kicker: "Cloud Konto",
+            title: "Einmal anmelden. Alles synchron.",
+            subtitleDefault:
+              "Verbinde dein StreamNet TV Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Web zusammen bleiben.",
+            subtitlePairing:
+              "Melde dich hier an, um die Kopplungsanfrage deines StreamNet TV Geraets zu bestaetigen und dein Cloud Konto dort wiederherzustellen.",
+            subtitleRecovery:
+              "Lege ein neues Passwort fest, um wieder Zugriff auf dein StreamNet TV Cloud Konto zu erhalten.",
+          },
+          summary: {
+            profiles: {
+              title: "Profile",
+              copy: "Halte Kontoprofile und personalisiertes App-Verhalten auf allen Geraeten synchron.",
+            },
+            playback: {
+              title: "Wiedergabe",
+              copy: "Nimm Fortschritt, Weiterschauen und verbundene Dienste ueberall mit.",
+            },
+            pairing: {
+              title: "TV Kopplung",
+              copy: "Melde dich per Handy oder Browser an und verbinde den TV im gleichen Schritt.",
+            },
+          },
+          pairing: {
+            defaultTitle: "Was diese Seite macht",
+            defaultCopy:
+              "Nutze diese Seite, um dich in dein StreamNet TV Cloud Konto einzuloggen, ein neues Konto zu erstellen oder dein Passwort zurueckzusetzen. Wenn du von einem TV-QR-Code kommst, wird der TV nach erfolgreicher Anmeldung automatisch verknuepft.",
+            activeTag: "Kopplung aktiv",
+            stateTitle: "So funktioniert die TV-Kopplung",
+            stateCopy:
+              "Diese Sitzung wurde von einem StreamNet TV Geraet gestartet. Nach Anmeldung oder Kontoerstellung bestaetigt der Browser den Kopplungscode und der TV kann deine Cloud-Daten wiederherstellen.",
+            steps: {
+              one: "Verwende dieselbe E-Mail-Adresse und dasselbe Passwort, die du fuer dein StreamNet TV Konto nutzen moechtest.",
+              two: "Nach der Anmeldung bestaetigt dieser Browser die Kopplungsanfrage fuer den TV, der den QR-Code angezeigt hat.",
+              three:
+                "Lass den TV-Bildschirm noch kurz offen, damit die Cloud-Wiederherstellung nach der Freigabe abgeschlossen wird.",
+            },
+          },
+          help: {
+            title: "Bevor du weitermachst",
+            items: {
+              one: "Verwende deine echte E-Mail-Adresse, damit die Passwortwiederherstellung spaeter funktioniert.",
+              two: "Wenn du einen TV koppelst, schliesse den Kopplungsbildschirm am TV nicht, bis die Bestaetigung angezeigt wird.",
+              three:
+                "Wenn der Kopplungscode ablaeuft, gehe zum TV zurueck und starte eine neue Cloud-Kopplung.",
+            },
+          },
+          auth: {
+            kicker: "Sicherer Zugriff",
+            title: "Kontozugriff",
+            pairCode: "Kopplungscode",
+            foot: "StreamNet TV · Cloud Auth",
+            deleteAccount: "Konto loeschen",
+            helperDefault:
+              "Melde dich mit deinem StreamNet TV Cloud Konto an, um fortzufahren.",
+            helperPairing:
+              "Nach der Anmeldung bestaetigt dieser Browser den TV-Kopplungscode automatisch.",
+            helperRecovery:
+              "Waehle ein neues Passwort mit mindestens 6 Zeichen und kehre dann zur Anmeldung zurueck.",
+          },
+          labels: {
+            email: "E-Mail",
+            password: "Passwort",
+            newPassword: "Neues Passwort",
+          },
+          placeholders: {
+            email: "du@beispiel.de",
+            password: "Dein Passwort",
+            newPassword: "Neues Passwort (mind. 6 Zeichen)",
+          },
+          actions: {
+            signIn: "Anmelden",
+            signUp: "Konto erstellen",
+            savePassword: "Neues Passwort speichern",
+            forgot: "Passwort vergessen?",
+          },
+          status: {
+            signingIn: "Anmeldung laeuft...",
+            tvPairedRedirecting: "TV gekoppelt. Weiterleitung...",
+            signedInRedirecting: "Angemeldet. Weiterleitung...",
+            creatingAccount: "Konto wird erstellt...",
+            creatingAccountAndPairing:
+              "Konto wird erstellt und TV wird gekoppelt...",
+            createdAndPairedRedirecting:
+              "Konto erstellt und TV gekoppelt. Weiterleitung...",
+            createdRedirecting: "Konto erstellt. Weiterleitung...",
+            createdCheckEmail:
+              "Konto erstellt. Pruefe deine E-Mail und melde dich dann an.",
+            sendingReset: "E-Mail fuer neues Passwort wird gesendet...",
+            resetSent:
+              "E-Mail fuer neues Passwort an {email} gesendet. Bitte pruefe Posteingang und Spam.",
+            savingPassword: "Neues Passwort wird gespeichert...",
+            passwordUpdated:
+              "Passwort aktualisiert. Weiterleitung zur Anmeldung...",
+          },
+          errors: {
+            emailRequired: "E-Mail ist erforderlich.",
+            emailInvalid: "Gib eine gueltige E-Mail-Adresse ein.",
+            emailReal: "Verwende eine echte E-Mail-Adresse.",
+            passwordRequired: "Passwort ist erforderlich.",
+            passwordMin: "Passwort muss mindestens 6 Zeichen haben.",
+            waitCooldown:
+              "Bitte warte {seconds}s, bevor du eine weitere E-Mail anforderst.",
+            tvPairingFailed: "TV-Kopplung fehlgeschlagen",
+            accountCreationPairingFailed:
+              "Kontoerstellung oder TV-Kopplung fehlgeschlagen",
+            accountCreationFailed: "Kontoerstellung fehlgeschlagen",
+            accountCreatedIncomplete:
+              "Konto erstellt, aber die Anmeldeantwort war unvollstaendig.",
+            signInFailed: "Anmeldung fehlgeschlagen",
+            setupHintMailSent:
+              " Wir haben dir eine E-Mail geschickt, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+            setupHintMailFailed:
+              " E-Mail fuer Passwort-Setup konnte nicht gesendet werden: {setupError}",
+            setupHintUseForgot:
+              " Nutze Passwort vergessen, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+            passwordResetFailed: "Passwort-Reset fehlgeschlagen",
+            accountNotFound:
+              "Fuer diese E-Mail wurde kein StreamNet TV Konto gefunden.",
+            resetMailNotSent:
+              "Konto gefunden, aber die Passwort-E-Mail konnte nicht gesendet werden. Bitte versuche es in einer Minute erneut.",
+            passwordSetupFailed: "Passwort-Setup fehlgeschlagen",
+            passwordLinkInvalid:
+              "Dieser Passwort-Link ist nicht mehr gueltig. Fordere eine neue Reset-E-Mail an.",
+          },
+        },
+      };
+
+      const storedLang = window.localStorage.getItem("arvio:lang");
+      let currentLang = storedLang
+        ? storedLang === "de"
+          ? "de"
+          : "en"
+        : (navigator.language || "en").toLowerCase().startsWith("de")
+          ? "de"
+          : "en";
+
+      function readKey(bundle, keyPath) {
+        return keyPath.split(".").reduce((acc, part) => acc?.[part], bundle);
+      }
+
+      function t(keyPath, vars = {}) {
+        const selected = I18N[currentLang] || I18N.en;
+        const fallback = I18N.en;
+        const raw =
+          readKey(selected, keyPath) || readKey(fallback, keyPath) || keyPath;
+        return String(raw).replace(/\{(\w+)\}/g, (_, name) =>
+          vars[name] == null ? `{${name}}` : String(vars[name]),
+        );
+      }
+
+      function renderStaticI18n() {
+        document.documentElement.lang = currentLang;
+        document.title = t("meta.title");
+        langEnBtn.setAttribute("aria-pressed", String(currentLang === "en"));
+        langDeBtn.setAttribute("aria-pressed", String(currentLang === "de"));
+
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const keyPath = el.getAttribute("data-i18n");
+          if (keyPath) el.textContent = t(keyPath);
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+          const keyPath = el.getAttribute("data-i18n-placeholder");
+          if (keyPath) el.setAttribute("placeholder", t(keyPath));
+        });
+      }
+
+      function renderModeCopy() {
+        if (isRecoveryMode || isPasswordSetupMode) {
+          subtitleEl.textContent = t("hero.subtitleRecovery");
+          helperTextEl.textContent = t("auth.helperRecovery");
+          passwordLabelEl.textContent = t("labels.newPassword");
+          passEl.placeholder = t("placeholders.newPassword");
+          return;
+        }
+
+        subtitleEl.textContent = pairCode
+          ? t("hero.subtitlePairing")
+          : t("hero.subtitleDefault");
+        helperTextEl.textContent = pairCode
+          ? t("auth.helperPairing")
+          : t("auth.helperDefault");
+        passwordLabelEl.textContent = t("labels.password");
+        passEl.placeholder = t("placeholders.password");
+      }
+
+      function setLanguage(lang) {
+        currentLang = lang === "de" ? "de" : "en";
+        window.localStorage.setItem("arvio:lang", currentLang);
+        renderStaticI18n();
+        renderModeCopy();
+      }
 
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
@@ -803,21 +1240,21 @@
 
       function validateEmail(value, rejectDisposable = true) {
         const email = normalizeEmail(value);
-        if (!email) return "Email is required.";
+        if (!email) return t("errors.emailRequired");
         if (email.length > 254 || !EMAIL_RE.test(email))
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
         if ((email.match(/@/g) || []).length !== 1)
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
 
         const [localPart, domain = ""] = email.split("@");
-        if (!localPart || !domain) return "Use a real email address.";
+        if (!localPart || !domain) return t("errors.emailReal");
         if (
           localPart.length > 64 ||
           localPart.startsWith(".") ||
           localPart.endsWith(".") ||
           localPart.includes("..")
         ) {
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
         }
 
         const domainLabels = domain.split(".");
@@ -825,17 +1262,17 @@
           domainLabels.length < 2 ||
           domainLabels.some((part) => !part || part.length > 63)
         ) {
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
         }
         if (
           domainLabels.some(
             (part) => part.startsWith("-") || part.endsWith("-"),
           )
         ) {
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
         }
         if (/^\d+$/.test(domainLabels[domainLabels.length - 1])) {
-          return "Enter a valid email address.";
+          return t("errors.emailInvalid");
         }
 
         const blockedDomain =
@@ -844,9 +1281,8 @@
             domain.includes(fragment),
           );
         if (rejectDisposable && BLOCKED_SIGNUP_LOCAL_PARTS.has(localPart))
-          return "Use a real email address.";
-        if (rejectDisposable && blockedDomain)
-          return "Use a real email address.";
+          return t("errors.emailReal");
+        if (rejectDisposable && blockedDomain) return t("errors.emailReal");
         if (
           rejectDisposable &&
           (domain.endsWith(".example") ||
@@ -855,7 +1291,7 @@
             domain.endsWith(".local") ||
             domain.endsWith(".test"))
         ) {
-          return "Use a real email address.";
+          return t("errors.emailReal");
         }
         return "";
       }
@@ -876,7 +1312,7 @@
         const remaining = EMAIL_SEND_COOLDOWN_MS - (Date.now() - last);
         if (remaining > 0) {
           throw new Error(
-            `Please wait ${Math.ceil(remaining / 1000)}s before requesting another email.`,
+            t("errors.waitCooldown", { seconds: Math.ceil(remaining / 1000) }),
           );
         }
       }
@@ -887,24 +1323,27 @@
       }
 
       function applyRecoveryModeUi() {
-        subtitleEl.textContent = "Set a new password for your account.";
         pairBox.style.display = "none";
         signInBtn.style.display = "none";
         signUpBtn.style.display = "none";
         forgotBtn.style.display = "none";
         savePassBtn.style.display = "block";
         emailEl.style.display = "none";
-        document.querySelector('label[for="email"]').style.display = "none";
-        passEl.placeholder = "New password (min 6 characters)";
+        emailLabelEl.style.display = "none";
         passEl.autocomplete = "new-password";
       }
 
       if (pairCode) {
-        subtitleEl.textContent = "Sign in to pair your TV device.";
         pairBox.style.display = "flex";
         pairCodeEl.textContent = pairCode;
+        pairingInfoEl.dataset.mode = "pairing";
       }
       if (isRecoveryMode || isPasswordSetupMode) applyRecoveryModeUi();
+
+      langEnBtn.onclick = () => setLanguage("en");
+      langDeBtn.onclick = () => setLanguage("de");
+      renderStaticI18n();
+      renderModeCopy();
 
       async function approveTvViaServer(email, password) {
         if (!pairCode) return;
@@ -924,7 +1363,8 @@
           }),
         });
         const json = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(json.error || "TV pairing failed");
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.tvPairingFailed"));
       }
 
       async function signUpAndPairViaServer(email, password) {
@@ -948,7 +1388,7 @@
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok)
           throw new Error(
-            json.error || "Account creation or TV pairing failed",
+            json.error || t("errors.accountCreationPairingFailed"),
           );
         markEmailSent("signup", normalizedEmail);
       }
@@ -969,11 +1409,10 @@
           }),
         });
         const json = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(json.error || "Account creation failed");
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.accountCreationFailed"));
         if (!json.access_token || !json.refresh_token) {
-          throw new Error(
-            "Account created but sign-in response was incomplete.",
-          );
+          throw new Error(t("errors.accountCreatedIncomplete"));
         }
         markEmailSent("signup", normalizedEmail);
         return normalizedEmail;
@@ -982,7 +1421,7 @@
       async function signInEmail() {
         const email = requireValidEmail(emailEl.value, false);
         const password = passEl.value;
-        if (!password) throw new Error("Password is required.");
+        if (!password) throw new Error(t("errors.passwordRequired"));
         const resp = await fetch(`${FUNCTION_BASE}/auth-login`, {
           method: "POST",
           headers: {
@@ -997,16 +1436,16 @@
           let setupHint = "";
           if (json.code === "password_setup_required") {
             if (json.email_sent) {
-              setupHint =
-                " We sent you an email to create your new StreamNet TV Cloud password.";
+              setupHint = t("errors.setupHintMailSent");
             } else if (json.setup_error) {
-              setupHint = ` Password setup email could not be sent: ${json.setup_error}`;
+              setupHint = t("errors.setupHintMailFailed", {
+                setupError: json.setup_error,
+              });
             } else {
-              setupHint =
-                " Use Forgot password to create your new StreamNet TV Cloud password.";
+              setupHint = t("errors.setupHintUseForgot");
             }
           }
-          throw new Error((json.error || "Sign in failed") + setupHint);
+          throw new Error((json.error || t("errors.signInFailed")) + setupHint);
         }
         return { email, password };
       }
@@ -1014,9 +1453,8 @@
       async function signUpEmail() {
         const email = requireValidEmail(emailEl.value);
         const password = passEl.value;
-        if (!password) throw new Error("Password is required.");
-        if (password.length < 6)
-          throw new Error("Password must be at least 6 characters.");
+        if (!password) throw new Error(t("errors.passwordRequired"));
+        if (password.length < 6) throw new Error(t("errors.passwordMin"));
         await createAccountViaServer(email, password);
       }
 
@@ -1035,14 +1473,13 @@
           }),
         });
         const json = await resp.json().catch(() => ({}));
-        if (!resp.ok) throw new Error(json.error || "Password reset failed");
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.passwordResetFailed"));
         if (!json.account_exists) {
-          throw new Error("No StreamNet TV account was found for this email.");
+          throw new Error(t("errors.accountNotFound"));
         }
         if (!json.email_sent) {
-          throw new Error(
-            "Account found, but the password email could not be sent. Please try again in a minute.",
-          );
+          throw new Error(t("errors.resetMailNotSent"));
         }
         markEmailSent("reset", email);
         return { ...json, email };
@@ -1051,7 +1488,7 @@
       async function saveNewPassword() {
         const password = passEl.value;
         if (!password || password.length < 6)
-          throw new Error("Password must be at least 6 characters.");
+          throw new Error(t("errors.passwordMin"));
         if (setupToken) {
           const resp = await fetch(`${FUNCTION_BASE}/auth-password-complete`, {
             method: "POST",
@@ -1059,26 +1496,25 @@
             body: JSON.stringify({ token: setupToken, password }),
           });
           const json = await resp.json().catch(() => ({}));
-          if (!resp.ok) throw new Error(json.error || "Password setup failed");
+          if (!resp.ok)
+            throw new Error(json.error || t("errors.passwordSetupFailed"));
           return;
         }
-        throw new Error(
-          "This password link is no longer valid. Request a new reset email.",
-        );
+        throw new Error(t("errors.passwordLinkInvalid"));
       }
 
       signInBtn.onclick = async () => {
         try {
           setBusy(true);
-          setStatus("Signing in...");
+          setStatus(t("status.signingIn"));
           const creds = await signInEmail();
           if (pairCode) {
             await approveTvViaServer(creds.email, creds.password);
           }
           setStatus(
             pairCode
-              ? "TV paired. Redirecting..."
-              : "Signed in. Redirecting...",
+              ? t("status.tvPairedRedirecting")
+              : t("status.signedInRedirecting"),
             "ok",
           );
           setTimeout(() => {
@@ -1096,29 +1532,28 @@
           setBusy(true);
           const email = requireValidEmail(emailEl.value);
           const password = passEl.value;
-          if (!password) throw new Error("Password is required.");
-          if (password.length < 6)
-            throw new Error("Password must be at least 6 characters.");
+          if (!password) throw new Error(t("errors.passwordRequired"));
+          if (password.length < 6) throw new Error(t("errors.passwordMin"));
 
           if (pairCode) {
-            setStatus("Creating account and pairing TV...");
+            setStatus(t("status.creatingAccountAndPairing"));
             await signUpAndPairViaServer(email, password);
-            setStatus("Account created and TV paired. Redirecting...", "ok");
+            setStatus(t("status.createdAndPairedRedirecting"), "ok");
             setTimeout(() => {
               window.location.href = "https://streamnet-sync.netlify.app";
             }, 1200);
             return;
           }
 
-          setStatus("Creating account...");
+          setStatus(t("status.creatingAccount"));
           await signUpEmail();
           if (pairCode) {
             await approveTvViaServer(email, password);
           }
           setStatus(
             pairCode
-              ? "Account created and TV paired. Redirecting..."
-              : "Account created. Redirecting...",
+              ? t("status.createdAndPairedRedirecting")
+              : t("status.createdRedirecting"),
             "ok",
           );
           setTimeout(() => {
@@ -1130,7 +1565,7 @@
             msg.toLowerCase().includes("email") &&
             msg.toLowerCase().includes("confirm")
           ) {
-            setStatus("Account created. Check your email, then sign in.", "ok");
+            setStatus(t("status.createdCheckEmail"), "ok");
           } else {
             setStatus(msg, "error");
           }
@@ -1142,12 +1577,9 @@
       forgotBtn.onclick = async () => {
         try {
           setBusy(true);
-          setStatus("Sending new password email...");
+          setStatus(t("status.sendingReset"));
           const result = await sendPasswordReset();
-          setStatus(
-            `New password email sent to ${result.email}. Check your inbox and spam folder.`,
-            "ok",
-          );
+          setStatus(t("status.resetSent", { email: result.email }), "ok");
         } catch (err) {
           setStatus(err.message || String(err), "error");
         } finally {
@@ -1158,9 +1590,9 @@
       savePassBtn.onclick = async () => {
         try {
           setBusy(true);
-          setStatus("Saving new password...");
+          setStatus(t("status.savingPassword"));
           await saveNewPassword();
-          setStatus("Password updated. Redirecting to sign in...", "ok");
+          setStatus(t("status.passwordUpdated"), "ok");
           setTimeout(() => {
             window.location.href = "https://streamnet-sync.netlify.app";
           }, 1200);

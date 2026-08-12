@@ -350,6 +350,8 @@
     <string name="settings_pair_scan_qr_link_tv">Scan this QR code to sign in and link this TV.</string>
     <string name="settings_pair_code">Code: %1$s</string>
     <string name="settings_waiting_for_approval">Waiting for approval...</string>
+    <string name="settings_cloud_pair_starting">Starting cloud sign-in...</string>
+    <string name="settings_cloud_pair_loading_data">Loading cloud data...</string>
     <string name="settings_use_email_password">Use Email &amp; Password</string>
     <string name="settings_use_email_password_short">Use Email/Password</string>
     <string name="settings_connect_trakt">Connect Trakt.tv</string>

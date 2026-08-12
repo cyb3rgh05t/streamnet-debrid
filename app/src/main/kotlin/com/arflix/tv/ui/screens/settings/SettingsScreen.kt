@@ -1042,7 +1042,7 @@ fun SettingsScreen(
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
                                                     viewModel.clearIptvConfig()
                                                 }
-                                                contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
+                                                contentFocusIndex == uiState.iptvPlaylists.size + 4 -> {
                                                     viewModel.setIptvShowSpecialCategories(!uiState.iptvShowSpecialCategories)
                                                 }
                                             }
@@ -1551,7 +1551,7 @@ fun SettingsScreen(
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
-                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
+                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                             sortOrder = uiState.iptvSortOrder,
                             onSortOrderChange = { viewModel.setIptvSortOrder(it) }
                         )
@@ -1599,6 +1599,8 @@ fun SettingsScreen(
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
+                            sortOrder = uiState.iptvSortOrder,
+                            onSortOrderChange = { viewModel.setIptvSortOrder(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
                         )
                         "home_server" -> HomeServerSettings(
@@ -2217,6 +2219,7 @@ fun SettingsScreen(
                 verificationUrl = uiState.cloudVerificationUrl.orEmpty(),
                 userCode = uiState.cloudUserCode.orEmpty(),
                 isWorking = uiState.isCloudAuthWorking,
+                statusMessage = uiState.cloudAuthStatusMessage,
                 onDismiss = { viewModel.cancelCloudAuth() },
                 onUseEmailPassword = { viewModel.openCloudEmailPasswordDialog() }
             )
@@ -3040,6 +3043,7 @@ private fun CloudPairModal(
     verificationUrl: String,
     userCode: String,
     isWorking: Boolean,
+    statusMessage: String?,
     onDismiss: () -> Unit,
     onUseEmailPassword: () -> Unit,
 ) {
@@ -3190,13 +3194,13 @@ private fun CloudPairModal(
                     }
                 }
 
-                if (isWorking) {
+                if (isWorking || !statusMessage.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         LoadingIndicator(size = 20.dp)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = stringResource(R.string.settings_waiting_for_approval),
+                            text = statusMessage ?: stringResource(R.string.settings_waiting_for_approval),
                             style = ArflixTypography.body,
                             color = TextSecondary
                         )
@@ -4281,7 +4285,7 @@ private fun MobileSettingsSubPage(
                         onNavigate("IPTV_CATEGORIES")
                     },
                     showSpecialCategories = uiState.iptvShowSpecialCategories,
-                    onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
+                    onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                     sortOrder = uiState.iptvSortOrder,
                     onSortOrderChange = { viewModel.setIptvSortOrder(it) }
                 )

@@ -125,10 +125,10 @@ class CloudSyncCoordinator @Inject constructor(
 
     private fun debounceMsFor(scope: CloudSyncScope): Long {
         return when (scope) {
-            CloudSyncScope.LOCAL_HISTORY -> 2_000L
-            CloudSyncScope.IPTV -> 750L
-            CloudSyncScope.PLUGINS -> 1_000L
-            else -> 500L
+            CloudSyncScope.LOCAL_HISTORY -> 1_000L
+            CloudSyncScope.IPTV -> 400L
+            CloudSyncScope.PLUGINS -> 600L
+            else -> 200L
         }
     }
 }

@@ -16,6 +16,29 @@ import java.io.File
 import java.io.FileInputStream
 
 object ApkInstaller {
+    fun updatesDirectory(context: Context): File = File(context.cacheDir, "updates")
+
+    fun buildUpdateDestinationFile(context: Context, assetName: String): File {
+        val safeName = assetName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
+        return File(updatesDirectory(context), safeName)
+    }
+
+    fun cleanupDownloadedUpdates(context: Context, keepPath: String? = null) {
+        val keep = keepPath?.let(::File)?.absolutePath
+        val dir = updatesDirectory(context)
+        val files = dir.listFiles() ?: return
+        files.forEach { file ->
+            if (keep != null && file.absolutePath == keep) return@forEach
+            runCatching { if (file.isFile) file.delete() else file.deleteRecursively() }
+        }
+    }
+
+    fun launchApp(context: Context) {
+        val launchIntent = context.packageManager.getLaunchIntentForPackage(context.packageName) ?: return
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        runCatching { context.startActivity(launchIntent) }
+    }
+
     fun canRequestPackageInstalls(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             context.packageManager.canRequestPackageInstalls()
@@ -101,6 +124,8 @@ object ApkInstaller {
     }
 
     fun launchInstall(context: Context, apkFile: File) {
+        cleanupDownloadedUpdates(context, keepPath = apkFile.absolutePath)
+
         // Try session-based installer first (smoother UX on Android 5+)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             try {

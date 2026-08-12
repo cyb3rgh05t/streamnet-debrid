@@ -2830,8 +2830,40 @@ fun LiveTvScreen(
                                     hudPokeSignal++
                                     return@onPreviewKeyEvent handleChannelNumberDigit(digit)
                                 }
+                                // Up/Down: channel switch (always, regardless of HUD state)
+                                if (ev.key == Key.DirectionUp || ev.key == Key.DirectionDown) {
+                                    val channels = visibleChannels
+                                    val idx = channels.indexOfFirst { it.id == playingChannelId }
+                                    if (idx >= 0) {
+                                        val next = if (ev.key == Key.DirectionDown) {
+                                            channels.getOrNull(idx + 1) ?: channels.firstOrNull()
+                                        } else {
+                                            channels.getOrNull(idx - 1) ?: channels.lastOrNull()
+                                        }
+                                        if (next != null && next.id != playingChannelId) {
+                                            playingChannelId = next.id
+                                            focusedChannelId = next.id
+                                            epgPrefetchAnchorId = next.id
+                                            rememberedChannelByCategory[selectedCategoryId] = next.id
+                                            playingCatchupProgram = null
+                                            catchupPlaybackOffsetMs = 0L
+                                        }
+                                    }
+                                    hudPokeSignal++
+                                    return@onPreviewKeyEvent true
+                                }
+                                // Left: open QuickZap / EPG guide
+                                if (ev.key == Key.DirectionLeft) {
+                                    hudPokeSignal++
+                                    if (playingCatchupProgram != null) {
+                                        // In catchup, Left falls through to HUD seek
+                                    } else {
+                                        quickZapOpen = true
+                                        return@onPreviewKeyEvent true
+                                    }
+                                }
                                 if (!isHudVisible) {
-                                    if (ev.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight, Key.DirectionCenter, Key.Enter)) {
+                                    if (ev.key in listOf(Key.DirectionRight, Key.DirectionCenter, Key.Enter)) {
                                         hudPokeSignal++
                                         return@onPreviewKeyEvent true
                                     }

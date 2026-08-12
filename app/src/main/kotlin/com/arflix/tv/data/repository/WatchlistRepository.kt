@@ -58,6 +58,9 @@ class WatchlistRepository @Inject constructor(
     // Profile-scoped DataStore key
     private fun watchlistKey() = profileManager.profileStringKey("local_watchlist_v1")
     private fun watchlistKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "local_watchlist_v1")
+    private fun watchlistUpdatedAtKey() = profileManager.profileStringKey("local_watchlist_updated_at_v1")
+    private fun watchlistUpdatedAtKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "local_watchlist_updated_at_v1")
 
     // In-memory cache for quick lookups
     private val keyCache = mutableSetOf<String>()
@@ -363,53 +366,39 @@ class WatchlistRepository @Inject constructor(
         }
     }
 
-    suspend fun importWatchlistForProfile(profileId: String, cloudItems: List<LocalWatchlistItem>) {
+    suspend fun exportWatchlistUpdatedAtForProfile(profileId: String): Long {
+        val safeProfileId = profileId.trim().ifBlank { "default" }
+        return runCatching {
+            context.traktDataStore.data.first()[watchlistUpdatedAtKeyFor(safeProfileId)]
+                ?.toLongOrNull()
+                ?: 0L
+        }.getOrDefault(0L)
+    }
+
+    suspend fun importWatchlistForProfile(
+        profileId: String,
+        cloudItems: List<LocalWatchlistItem>,
+        cloudUpdatedAtMs: Long? = null
+    ) {
         val safeProfileId = profileId.trim().ifBlank { "default" }
 
-        // Union merge local and cloud items to prevent offline additions from being wiped
-        val localJson = try {
-            context.traktDataStore.data.first()[watchlistKeyFor(safeProfileId)]
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Throwable) {
-            AppLogger.recordException(
-                throwable = e,
-                context = mapOf(
-                    "error_area" to "WatchlistRepository",
-                    "watchlist_phase" to "import_read_local",
-                    "profile_id" to safeProfileId
-                )
-            )
-            // Abort the import to prevent overwriting/wiping local-only entries when read fails
+        val localUpdatedAt = runCatching {
+            context.traktDataStore.data.first()[watchlistUpdatedAtKeyFor(safeProfileId)]
+                ?.toLongOrNull()
+                ?: 0L
+        }.getOrDefault(0L)
+        val cloudUpdatedAt = cloudUpdatedAtMs ?: 0L
+
+        // If local is newer than cloud, keep local state to avoid stale remote pull rollbacks.
+        if (cloudUpdatedAtMs != null && localUpdatedAt > cloudUpdatedAt) {
             return
         }
 
-        val type = TypeToken.getParameterized(MutableList::class.java, LocalWatchlistItem::class.java).type
-        val localItems: List<LocalWatchlistItem> = if (localJson != null) {
-            try {
-                gson.fromJson<List<LocalWatchlistItem>>(localJson, type) ?: emptyList()
-            } catch (e: com.google.gson.JsonSyntaxException) {
-                emptyList()
-            }
-        } else {
-            emptyList()
-        }
-
-        val combinedMap = mutableMapOf<String, LocalWatchlistItem>()
-        cloudItems.forEach { item ->
-            combinedMap["${item.mediaType}:${item.tmdbId}"] = item
-        }
-        localItems.forEach { item ->
-            val key = "${item.mediaType}:${item.tmdbId}"
-            val existing = combinedMap[key]
-            if (existing == null || item.addedAt > existing.addedAt) {
-                combinedMap[key] = item
-            }
-        }
-
-        val mergedList = combinedMap.values.sortedWith(compareBy<LocalWatchlistItem> { it.sourceOrder }.thenByDescending { it.addedAt })
+        val replacedList = cloudItems
+            .distinctBy { "${it.mediaType}:${it.tmdbId}" }
+            .sortedWith(compareBy<LocalWatchlistItem> { it.sourceOrder }.thenByDescending { it.addedAt })
         val json = try {
-            gson.toJson(mergedList)
+            gson.toJson(replacedList)
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Throwable) {
@@ -428,6 +417,11 @@ class WatchlistRepository @Inject constructor(
         try {
             context.traktDataStore.edit { prefs ->
                 prefs[watchlistKeyFor(safeProfileId)] = json
+                val effectiveUpdatedAt = when {
+                    cloudUpdatedAtMs != null && cloudUpdatedAt > 0L -> cloudUpdatedAt
+                    else -> System.currentTimeMillis()
+                }
+                prefs[watchlistUpdatedAtKeyFor(safeProfileId)] = effectiveUpdatedAt.toString()
             }
             invalidationBus.markDirty(CloudSyncScope.WATCHLIST, safeProfileId, "import watchlist")
             if (profileManager.getProfileIdSync() == safeProfileId) {
@@ -479,8 +473,10 @@ class WatchlistRepository @Inject constructor(
      */
     private suspend fun saveWatchlist(items: List<LocalWatchlistItem>) {
         val json = gson.toJson(items)
+        val now = System.currentTimeMillis()
         context.traktDataStore.edit { prefs ->
             prefs[watchlistKey()] = json
+            prefs[watchlistUpdatedAtKey()] = now.toString()
         }
         invalidationBus.markDirty(CloudSyncScope.WATCHLIST, profileManager.getProfileIdSync(), "save watchlist")
     }

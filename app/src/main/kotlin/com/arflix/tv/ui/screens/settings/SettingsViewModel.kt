@@ -127,6 +127,7 @@ data class SettingsUiState(
     val showCloudPairDialog: Boolean = false,
     val cloudUserCode: String? = null,
     val cloudVerificationUrl: String? = null,
+    val cloudAuthStatusMessage: String? = null,
     val showCloudEmailPasswordDialog: Boolean = false,
     val isCloudAuthWorking: Boolean = false,
     val isForceCloudSyncing: Boolean = false,
@@ -157,7 +158,6 @@ data class SettingsUiState(
     val iptvStalkerMac: String = "",
     val iptvShowSpecialCategories: Boolean = true,
     val iptvSortOrder: String = "provider",
-    val iptvShowSpecialCategories: Boolean = true,
     val iptvChannelCount: Int = 0,
     val isIptvLoading: Boolean = false,
     val iptvError: String? = null,
@@ -2426,20 +2426,27 @@ class SettingsViewModel @Inject constructor(
     fun startCloudAuth() {
         if (_uiState.value.isLoggedIn || _uiState.value.isCloudAuthWorking) return
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
+            _uiState.value = _uiState.value.copy(
+                isCloudAuthWorking = true,
+                showCloudPairDialog = true,
+                cloudAuthStatusMessage = context.getString(R.string.settings_cloud_pair_starting)
+            )
             ensureCloudAuthSession(startPolling = true)
                 .onSuccess {
                     _uiState.value = _uiState.value.copy(
-                        isCloudAuthWorking = false,
+                        isCloudAuthWorking = true,
                         showCloudPairDialog = true,
                         cloudUserCode = cloudUserCode,
-                        cloudVerificationUrl = cloudVerificationUrl
+                        cloudVerificationUrl = cloudVerificationUrl,
+                        cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval)
                     )
                 }
                 .onFailure { error ->
                     clearCloudAuthSession()
                     _uiState.value = _uiState.value.copy(
                         isCloudAuthWorking = false,
+                        showCloudPairDialog = false,
+                        cloudAuthStatusMessage = null,
                         toastMessage = error.message ?: context.getString(R.string.cloud_login_failed_start),
                         toastType = ToastType.ERROR
                     )
@@ -2453,6 +2460,7 @@ class SettingsViewModel @Inject constructor(
             showCloudPairDialog = false,
             cloudUserCode = null,
             cloudVerificationUrl = null,
+            cloudAuthStatusMessage = null,
             showCloudEmailPasswordDialog = false,
             isCloudAuthWorking = false
         )
@@ -2464,6 +2472,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = false,
+                cloudAuthStatusMessage = null,
                 isCloudAuthWorking = true
             )
             ensureCloudAuthSession(startPolling = false)
@@ -2471,6 +2480,7 @@ class SettingsViewModel @Inject constructor(
                     _uiState.value = _uiState.value.copy(
                         showCloudPairDialog = false,
                         showCloudEmailPasswordDialog = true,
+                        cloudAuthStatusMessage = null,
                         isCloudAuthWorking = false
                     )
                 }
@@ -2478,6 +2488,7 @@ class SettingsViewModel @Inject constructor(
                     clearCloudAuthSession()
                     _uiState.value = _uiState.value.copy(
                         showCloudEmailPasswordDialog = false,
+                        cloudAuthStatusMessage = null,
                         isCloudAuthWorking = false,
                         toastMessage = error.message ?: context.getString(R.string.cloud_signin_failed_start),
                         toastType = ToastType.ERROR
@@ -2520,6 +2531,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     toastMessage = sessionReady.exceptionOrNull()?.message ?: context.getString(R.string.cloud_signin_could_not_start),
                     toastType = ToastType.ERROR,
+                    cloudAuthStatusMessage = null,
                     isCloudAuthWorking = false
                 )
                 return@launch
@@ -2531,6 +2543,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     toastMessage = "Cloud sign-in session was unavailable. Try again.",
                     toastType = ToastType.ERROR,
+                    cloudAuthStatusMessage = null,
                     isCloudAuthWorking = false
                 )
                 return@launch
@@ -2546,6 +2559,8 @@ class SettingsViewModel @Inject constructor(
                     toastMessage = "Waiting for approval...",
                     toastType = ToastType.INFO,
                     showCloudEmailPasswordDialog = false,
+                    showCloudPairDialog = true,
+                    cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval),
                     isCloudAuthWorking = true
                 )
                 startCloudPolling()
@@ -2553,6 +2568,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     toastMessage = error.message ?: context.getString(R.string.tv_link_failed),
                     toastType = ToastType.ERROR,
+                    cloudAuthStatusMessage = null,
                     isCloudAuthWorking = false
                 )
             }
@@ -2563,7 +2579,13 @@ class SettingsViewModel @Inject constructor(
         val deviceCode = cloudDeviceCode ?: return
         cloudPollingJob?.cancel()
         cloudPollingJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
+            _uiState.value = _uiState.value.copy(
+                isCloudAuthWorking = true,
+                showCloudPairDialog = true,
+                cloudUserCode = cloudUserCode,
+                cloudVerificationUrl = cloudVerificationUrl,
+                cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval)
+            )
 
             val now = System.currentTimeMillis()
             val intervalMs = cloudPollIntervalMs.coerceIn(500L, 3_000L)
@@ -2583,11 +2605,18 @@ class SettingsViewModel @Inject constructor(
                         if (access.isNullOrBlank() || refresh.isNullOrBlank()) {
                             _uiState.value = _uiState.value.copy(
                                 isCloudAuthWorking = false,
+                                cloudAuthStatusMessage = null,
                                 toastMessage = status.message ?: context.getString(R.string.tv_link_approved_no_tokens),
                                 toastType = ToastType.ERROR
                             )
                             return@launch
                         }
+
+                        _uiState.value = _uiState.value.copy(
+                            isCloudAuthWorking = true,
+                            showCloudPairDialog = true,
+                            cloudAuthStatusMessage = context.getString(R.string.settings_cloud_pair_loading_data)
+                        )
 
                         val tokenImport = authRepository.signInWithSessionTokens(access, refresh)
                         if (tokenImport.isSuccess) {
@@ -2620,6 +2649,7 @@ class SettingsViewModel @Inject constructor(
                                 showCloudEmailPasswordDialog = false,
                                 cloudUserCode = null,
                                 cloudVerificationUrl = null,
+                                cloudAuthStatusMessage = null,
                                 shouldSwitchProfile = true,
                                 toastMessage = when (restoreResult) {
                                     CloudRestoreResult.RESTORED -> "Signed in and restored from cloud"
@@ -2635,6 +2665,7 @@ class SettingsViewModel @Inject constructor(
                         } else {
                             _uiState.value = _uiState.value.copy(
                                 isCloudAuthWorking = false,
+                                cloudAuthStatusMessage = null,
                                 toastMessage = tokenImport.exceptionOrNull()?.message ?: context.getString(R.string.cloud_failed_import_tokens),
                                 toastType = ToastType.ERROR
                             )
@@ -2648,6 +2679,7 @@ class SettingsViewModel @Inject constructor(
                             showCloudEmailPasswordDialog = false,
                             cloudUserCode = null,
                             cloudVerificationUrl = null,
+                            cloudAuthStatusMessage = null,
                             toastMessage = status.message ?: context.getString(R.string.cloud_signin_expired),
                             toastType = ToastType.ERROR
                         )
@@ -2657,6 +2689,7 @@ class SettingsViewModel @Inject constructor(
                     TvDeviceAuthStatusType.ERROR -> {
                         _uiState.value = _uiState.value.copy(
                             isCloudAuthWorking = false,
+                            cloudAuthStatusMessage = null,
                             toastMessage = status.message ?: context.getString(R.string.cloud_signin_failed),
                             toastType = ToastType.ERROR
                         )
@@ -2669,6 +2702,7 @@ class SettingsViewModel @Inject constructor(
 
             _uiState.value = _uiState.value.copy(
                 isCloudAuthWorking = false,
+                cloudAuthStatusMessage = null,
                 toastMessage = "Sign-in did not complete. Try again.",
                 toastType = ToastType.ERROR
             )
@@ -2807,10 +2841,23 @@ class SettingsViewModel @Inject constructor(
                     preferredServerUrl = serverUrl,
                     displayName = plexHomeServerDisplayName.orEmpty()
                 )
-                val connection = connectionResult.getOrElse { error ->
-                    lastFailure = error.message
-                    null
+                if (connectionResult.isFailure) {
+                    val error = connectionResult.exceptionOrNull()
+                    val message = error?.message
+                        ?: context.getString(R.string.homeserver_server_connection_failed)
+                    plexHomeServerUrl = null
+                    plexHomeServerDisplayName = null
+                    _uiState.value = _uiState.value.copy(
+                        isHomeServerConnecting = false,
+                        plexHomeServerAuth = null,
+                        isPlexHomeServerPolling = false,
+                        homeServerError = message,
+                        toastMessage = message,
+                        toastType = ToastType.ERROR
+                    )
+                    return@launch
                 }
+                val connection = connectionResult.getOrNull()
                 if (connection == null) {
                     continue
                 }
@@ -3185,12 +3232,16 @@ class SettingsViewModel @Inject constructor(
         } ?: return
 
         if (!appUpdateRepository.supportsSelfUpdate()) return
+        if (!ApkInstaller.canRequestPackageInstalls(context)) {
+            _uiState.value = _uiState.value.copy(showUnknownSourcesDialog = true, showAppUpdateDialog = false)
+            return
+        }
 
         downloadJob = viewModelScope.launch {
             updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.Downloading(0f, update))
 
-            val safeName = update.assetName.replace(Regex("[^a-zA-Z0-9._-]"), "_")
-            val dest = File(File(context.cacheDir, "updates"), safeName)
+            val dest = ApkInstaller.buildUpdateDestinationFile(context, update.assetName)
+            ApkInstaller.cleanupDownloadedUpdates(context, keepPath = dest.absolutePath)
 
             val result = withContext(Dispatchers.IO) {
                 apkDownloader.download(update.assetUrl, dest) { downloaded, total ->
@@ -3218,6 +3269,7 @@ class SettingsViewModel @Inject constructor(
         downloadJob = null
         val currentStatus = updateStatusManager.status.value
         if (currentStatus is com.arflix.tv.updater.UpdateStatus.Downloading) {
+            ApkInstaller.cleanupDownloadedUpdates(context)
             updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.UpdateAvailable(currentStatus.update))
         }
     }

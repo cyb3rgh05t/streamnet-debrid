@@ -593,8 +593,8 @@ private fun HudSeekBar(
                                 true
                             } else false
                         }
-                        AndroidKeyEvent.KEYCODE_DPAD_UP -> {
-                            if (onOpenQuickZap != null) {
+                        AndroidKeyEvent.KEYCODE_DPAD_LEFT -> {
+                            if (onOpenQuickZap != null && onSeekToPosition == null) {
                                 onOpenQuickZap()
                                 true
                             } else false

@@ -505,11 +505,21 @@ class HomeServerRepository @Inject constructor(
                     if (token.isNullOrBlank()) {
                         null
                     } else {
+                        val normalizedPreferredUrl = preferredServerUrl.ifBlank { session.serverUrl }
                         connectPlexAccount(
                             accountToken = token,
-                            preferredServerUrl = preferredServerUrl.ifBlank { session.serverUrl },
+                            preferredServerUrl = normalizedPreferredUrl,
                             displayName = displayName
-                        ).getOrThrow()
+                        ).recoverCatching {
+                            if (normalizedPreferredUrl.isBlank()) throw it
+                            // If the manually entered URL is stale/unreachable, retry once
+                            // against Plex-discovered resources so auth can still complete.
+                            connectPlexAccount(
+                                accountToken = token,
+                                preferredServerUrl = "",
+                                displayName = displayName
+                            ).getOrThrow()
+                        }.getOrThrow()
                     }
                 }
                 HomeServerKind.JELLYFIN -> pollJellyfinQuickConnect(session, displayName)

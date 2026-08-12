@@ -475,6 +475,8 @@
     <string name="settings_pair_scan_qr_link_tv">QR-Code scannen, um dich anzumelden und diesen TV zu verknüpfen.</string>
     <string name="settings_pair_code">Code: %1$s</string>
     <string name="settings_waiting_for_approval">Warten auf Bestätigung...</string>
+        <string name="settings_cloud_pair_starting">Cloud-Anmeldung wird gestartet...</string>
+        <string name="settings_cloud_pair_loading_data">Cloud-Daten werden geladen...</string>
     <string name="settings_use_email_password">E-Mail und Passwort verwenden</string>
     <string name="settings_use_email_password_short">E-Mail/Passwort verwenden</string>
     <string name="settings_connect_trakt">Trakt.tv verbinden</string>

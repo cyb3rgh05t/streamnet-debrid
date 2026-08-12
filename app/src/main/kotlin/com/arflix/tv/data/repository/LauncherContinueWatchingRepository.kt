@@ -187,14 +187,18 @@ class LauncherContinueWatchingRepository @Inject constructor(
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun insertPreviewProgram(channelId: Long, item: ContinueWatchingItem, index: Int) {
+        val posterUri = item.launcherPosterArtUri()
+        val thumbnailUri = item.launcherBackdropUri()
         val program = PreviewProgram.Builder()
             .setChannelId(channelId)
             .setType(item.toPreviewType())
             .setTitle(item.title.ifBlank { context.getString(R.string.continue_watching) })
             .setDescription(item.buildSubtitle())
             .setInternalProviderId(item.previewProgramId())
-            .setPosterArtUri(item.posterPath?.takeIf { it.isNotBlank() }?.let(Uri::parse))
-            .setThumbnailUri(item.backdropPath?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .setPosterArtUri(posterUri)
+            .setThumbnailUri(thumbnailUri)
+            .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
+            .setThumbnailAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
             .setIntentUri(buildLaunchIntent(item).toUri(Intent.URI_INTENT_SCHEME).let(Uri::parse))
             .setWeight((Constants.MAX_CONTINUE_WATCHING - index).coerceAtLeast(1))
             .build()
@@ -204,14 +208,18 @@ class LauncherContinueWatchingRepository @Inject constructor(
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun insertWatchNextProgram(item: ContinueWatchingItem, index: Int) {
+        val posterUri = item.launcherPosterArtUri()
+        val thumbnailUri = item.launcherBackdropUri()
         val builder = WatchNextProgram.Builder()
             .setType(item.toPreviewType())
             .setTitle(item.title.ifBlank { context.getString(R.string.continue_watching) })
             .setDescription(item.buildSubtitle())
             .setInternalProviderId(item.watchNextProgramId())
             .setIntentUri(buildLaunchIntent(item).toUri(Intent.URI_INTENT_SCHEME).let(Uri::parse))
-            .setPosterArtUri(item.posterPath?.takeIf { it.isNotBlank() }?.let(Uri::parse))
-            .setThumbnailUri(item.backdropPath?.takeIf { it.isNotBlank() }?.let(Uri::parse))
+            .setPosterArtUri(posterUri)
+            .setThumbnailUri(thumbnailUri)
+            .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
+            .setThumbnailAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
             .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
             .setLastEngagementTimeUtcMillis(System.currentTimeMillis() - index)
 
@@ -344,6 +352,60 @@ class LauncherContinueWatchingRepository @Inject constructor(
 
     private fun ContinueWatchingItem.watchNextProgramId(): String {
         return "$WATCH_NEXT_PROGRAM_PREFIX:${mediaType.name}:${id}:${season ?: -1}:${episode ?: -1}"
+    }
+
+    private fun ContinueWatchingItem.launcherPosterArtUri(): Uri? {
+        return launcherBackdropUri()
+            ?: posterPath.normalizeLauncherTmdbImageUrl(preferBackdrop = false)
+                ?.let(Uri::parse)
+    }
+
+    private fun ContinueWatchingItem.launcherBackdropUri(): Uri? {
+        return backdropPath.normalizeLauncherTmdbImageUrl(preferBackdrop = true)
+            ?.let(Uri::parse)
+            ?: posterPath.normalizeLauncherTmdbImageUrl(preferBackdrop = false)
+                ?.let(Uri::parse)
+    }
+
+    private fun String?.normalizeLauncherTmdbImageUrl(preferBackdrop: Boolean): String? {
+        val value = this?.trim().orEmpty()
+        if (value.isBlank()) return null
+
+        return when {
+            value.startsWith(Constants.BACKDROP_BASE) || value.startsWith(Constants.BACKDROP_BASE_LARGE) -> {
+                if (preferBackdrop) {
+                    value.substringAfter("/t/p/", missingDelimiterValue = value)
+                        .takeIf { it != value }
+                        ?.substringAfter('/', missingDelimiterValue = "")
+                        ?.takeIf { it.isNotBlank() }
+                        ?.let { path -> "${Constants.BACKDROP_BASE_LARGE}/$path" }
+                        ?: value
+                } else {
+                    value
+                }
+            }
+            value.startsWith(Constants.IMAGE_BASE) || value.startsWith(Constants.IMAGE_BASE_LARGE) -> {
+                value.substringAfter("/t/p/", missingDelimiterValue = value)
+                    .takeIf { it != value }
+                    ?.substringAfter('/', missingDelimiterValue = "")
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let { path ->
+                        val base = if (preferBackdrop) Constants.BACKDROP_BASE_LARGE else Constants.IMAGE_BASE_LARGE
+                        "$base/$path"
+                    }
+                    ?: value
+            }
+            value.startsWith("https://image.tmdb.org/t/p/") -> {
+                val path = value.substringAfter("/t/p/").substringAfter('/', missingDelimiterValue = "")
+                if (path.isBlank()) {
+                    value
+                } else {
+                    val base = if (preferBackdrop) Constants.BACKDROP_BASE_LARGE else Constants.IMAGE_BASE_LARGE
+                    "$base/$path"
+                }
+            }
+            else -> value
+        }
     }
 
     private fun ContinueWatchingItem.buildSubtitle(): String {

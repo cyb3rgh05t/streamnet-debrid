@@ -64,6 +64,41 @@
         margin: 0 auto;
       }
 
+      .topbar-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .lang-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: #151515;
+        padding: 4px;
+      }
+
+      .lang-btn {
+        min-width: 52px;
+        min-height: 32px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+
+      .lang-btn[aria-pressed="true"] {
+        background: var(--accent);
+        color: #141414;
+      }
+
       .brand {
         width: 160px;
         height: auto;
@@ -339,6 +374,28 @@
         .actions {
           flex-direction: column-reverse;
         }
+        .lang-switch {
+          width: 112px;
+          justify-content: center;
+        }
+      }
+
+      @media (max-width: 420px) {
+        .topbar-inner,
+        .page {
+          width: min(100% - 16px, 760px);
+        }
+        .brand {
+          width: 134px;
+        }
+        .stage {
+          padding: 18px 14px;
+        }
+        .warning,
+        .data-list li,
+        .account-line {
+          font-size: 13px;
+        }
       }
 
       @media (prefers-reduced-motion: reduce) {
@@ -356,34 +413,52 @@
           src="/assets/streamnet-logo.svg"
           alt="StreamNet TV"
         />
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button
+            class="lang-btn"
+            id="lang-en"
+            type="button"
+            aria-pressed="true"
+          >
+            EN
+          </button>
+          <button
+            class="lang-btn"
+            id="lang-de"
+            type="button"
+            aria-pressed="false"
+          >
+            DE
+          </button>
+        </div>
       </div>
     </header>
 
     <main class="page">
-      <p class="eyebrow">Account privacy</p>
-      <h1>Permanently delete your StreamNet TV account</h1>
-      <p class="intro">
+      <p class="eyebrow" id="eyebrow">Account privacy</p>
+      <h1 id="page-title">Permanently delete your StreamNet TV account</h1>
+      <p class="intro" id="intro-copy">
         Verify the account, review what will be removed, and confirm deletion.
         The process signs out every device and permanently removes your cloud
         data.
       </p>
 
       <section class="panel" aria-labelledby="stage-title">
-        <div class="steps" aria-label="Deletion progress">
-          <div class="step active" data-step="1">1. Verify</div>
-          <div class="step" data-step="2">2. Confirm</div>
-          <div class="step" data-step="3">3. Delete</div>
+        <div class="steps" aria-label="Deletion progress" id="steps-label">
+          <div class="step active" data-step="1" id="step-1">1. Verify</div>
+          <div class="step" data-step="2" id="step-2">2. Confirm</div>
+          <div class="step" data-step="3" id="step-3">3. Delete</div>
         </div>
 
         <form class="stage" id="login-stage">
           <h2 id="stage-title">Verify your account</h2>
-          <p class="stage-copy">
+          <p class="stage-copy" id="stage-copy-login">
             Sign in again so no one else can delete your account from an
             unattended device.
           </p>
 
           <div class="field">
-            <label for="email">Email address</label>
+            <label for="email" id="label-email">Email address</label>
             <input
               id="email"
               name="email"
@@ -394,7 +469,7 @@
             />
           </div>
           <div class="field">
-            <label for="password">Password</label>
+            <label for="password" id="label-password">Password</label>
             <input
               id="password"
               name="password"
@@ -410,7 +485,7 @@
             type="submit"
             style="width: 100%; margin-top: 24px"
           >
-            Continue
+            <span id="verify-button-text">Continue</span>
           </button>
           <p
             class="message"
@@ -418,37 +493,48 @@
             role="alert"
             aria-live="polite"
           ></p>
-          <p class="privacy-note">
+          <p class="privacy-note" id="privacy-note">
             Your password is used only for this verification and is never stored
             on this page.
           </p>
         </form>
 
         <form class="stage" id="confirm-stage" hidden>
-          <h2>Review permanent deletion</h2>
+          <h2 id="confirm-title">Review permanent deletion</h2>
           <p class="account-line">
-            Signed in as <strong id="verified-email"></strong>
+            <span id="signed-in-as">Signed in as</span>
+            <strong id="verified-email"></strong>
           </p>
-          <div class="warning">
+          <div class="warning" id="warning-copy">
             This cannot be undone. Local data on devices is not a backup and may
             be cleared when the account signs out.
           </div>
           <ul class="data-list">
-            <li>Account credentials and every active cloud session</li>
-            <li>
-              Profiles, settings, addons, catalogs, IPTV configuration, and home
-              server configuration
+            <li id="delete-item-1">
+              Account credentials and every active cloud session
             </li>
             <li>
-              Watch history, progress, watchlists, favorites, and synced
-              third-party tokens
+              <span id="delete-item-2">
+                Profiles, settings, addons, catalogs, IPTV configuration, and
+                home server configuration
+              </span>
             </li>
             <li>
-              Cloud snapshots, sync history, and pending TV pairing sessions
+              <span id="delete-item-3">
+                Watch history, progress, watchlists, favorites, and synced
+                third-party tokens
+              </span>
+            </li>
+            <li>
+              <span id="delete-item-4">
+                Cloud snapshots, sync history, and pending TV pairing sessions
+              </span>
             </li>
           </ul>
           <div class="field">
-            <label for="confirmation">Type DELETE to confirm</label>
+            <label for="confirmation" id="label-confirm"
+              >Type DELETE to confirm</label
+            >
             <input
               id="confirmation"
               name="confirmation"
@@ -458,14 +544,16 @@
               placeholder="DELETE"
               required
             />
-            <p class="confirm-help">The confirmation is case-sensitive.</p>
+            <p class="confirm-help" id="confirm-help">
+              The confirmation is case-sensitive.
+            </p>
           </div>
           <div class="actions">
             <button class="secondary" id="cancel-button" type="button">
-              Cancel
+              <span id="cancel-button-text">Cancel</span>
             </button>
             <button class="danger" id="delete-button" type="submit" disabled>
-              Delete permanently
+              <span id="delete-button-text">Delete permanently</span>
             </button>
           </div>
           <p
@@ -479,15 +567,15 @@
         <section class="stage" id="progress-stage" hidden aria-live="polite">
           <div class="status-box" id="working-state">
             <div class="spinner" aria-hidden="true"></div>
-            <h2>Deleting your account</h2>
-            <p class="stage-copy">
+            <h2 id="working-title">Deleting your account</h2>
+            <p class="stage-copy" id="working-copy">
               Revoking sessions and removing cloud data. Keep this page open.
             </p>
           </div>
           <div class="status-box" id="success-state" hidden>
             <div class="success-mark" aria-hidden="true">&#10003;</div>
-            <h2>Account deleted</h2>
-            <p class="stage-copy">
+            <h2 id="success-title">Account deleted</h2>
+            <p class="stage-copy" id="success-copy">
               Your StreamNet TV account and cloud data have been removed. A
               confirmation email has been sent when delivery is available.
             </p>
@@ -513,6 +601,181 @@
       const confirmation = document.getElementById("confirmation");
       const workingState = document.getElementById("working-state");
       const successState = document.getElementById("success-state");
+      const langEnButton = document.getElementById("lang-en");
+      const langDeButton = document.getElementById("lang-de");
+
+      const I18N = {
+        en: {
+          title: "Delete StreamNet TV account",
+          eyebrow: "Account privacy",
+          pageTitle: "Permanently delete your StreamNet TV account",
+          intro:
+            "Verify the account, review what will be removed, and confirm deletion. The process signs out every device and permanently removes your cloud data.",
+          stepsLabel: "Deletion progress",
+          step1: "1. Verify",
+          step2: "2. Confirm",
+          step3: "3. Delete",
+          stageTitle: "Verify your account",
+          stageCopyLogin:
+            "Sign in again so no one else can delete your account from an unattended device.",
+          labelEmail: "Email address",
+          labelPassword: "Password",
+          verifyButtonText: "Continue",
+          privacyNote:
+            "Your password is used only for this verification and is never stored on this page.",
+          confirmTitle: "Review permanent deletion",
+          signedInAs: "Signed in as",
+          warningCopy:
+            "This cannot be undone. Local data on devices is not a backup and may be cleared when the account signs out.",
+          deleteItem1: "Account credentials and every active cloud session",
+          deleteItem2:
+            "Profiles, settings, addons, catalogs, IPTV configuration, and home server configuration",
+          deleteItem3:
+            "Watch history, progress, watchlists, favorites, and synced third-party tokens",
+          deleteItem4:
+            "Cloud snapshots, sync history, and pending TV pairing sessions",
+          labelConfirm: "Type DELETE to confirm",
+          confirmHelp: "The confirmation is case-sensitive.",
+          cancelButtonText: "Cancel",
+          deleteButtonText: "Delete permanently",
+          workingTitle: "Deleting your account",
+          workingCopy:
+            "Revoking sessions and removing cloud data. Keep this page open.",
+          successTitle: "Account deleted",
+          successCopy:
+            "Your StreamNet TV account and cloud data have been removed. A confirmation email has been sent when delivery is available.",
+          messages: {
+            incompleteSignin: "Sign-in response was incomplete",
+            passwordSetupSent:
+              "A password setup email was sent. Create your new StreamNet TV Cloud password, then return here.",
+            passwordSetupRequired:
+              "A new StreamNet TV Cloud password is required.",
+            deletionFailed: "Deletion could not finish.",
+            supportHint: "Contact support with the time of this request.",
+            waitingService: "Waiting for the deletion service to respond...",
+            stillProcessing:
+              "Deletion is still processing. Contact support if you do not receive confirmation shortly.",
+          },
+        },
+        de: {
+          title: "StreamNet TV Konto loeschen",
+          eyebrow: "Kontodatenschutz",
+          pageTitle: "Dein StreamNet TV Konto dauerhaft loeschen",
+          intro:
+            "Konto verifizieren, geloeschte Daten pruefen und die Loeschung bestaetigen. Der Vorgang meldet alle Geraete ab und entfernt deine Cloud-Daten dauerhaft.",
+          stepsLabel: "Loeschfortschritt",
+          step1: "1. Pruefen",
+          step2: "2. Bestaetigen",
+          step3: "3. Loeschen",
+          stageTitle: "Konto verifizieren",
+          stageCopyLogin:
+            "Melde dich erneut an, damit niemand dein Konto auf einem unbeaufsichtigten Geraet loeschen kann.",
+          labelEmail: "E-Mail-Adresse",
+          labelPassword: "Passwort",
+          verifyButtonText: "Weiter",
+          privacyNote:
+            "Dein Passwort wird nur fuer diese Verifizierung genutzt und auf dieser Seite nie gespeichert.",
+          confirmTitle: "Dauerhafte Loeschung pruefen",
+          signedInAs: "Angemeldet als",
+          warningCopy:
+            "Dies kann nicht rueckgaengig gemacht werden. Lokale Daten auf Geraeten sind kein Backup und koennen beim Abmelden des Kontos entfernt werden.",
+          deleteItem1: "Kontodaten und jede aktive Cloud-Sitzung",
+          deleteItem2:
+            "Profile, Einstellungen, Addons, Kataloge, IPTV-Konfiguration und Home-Server-Konfiguration",
+          deleteItem3:
+            "Watch-Historie, Fortschritt, Watchlists, Favoriten und synchronisierte Drittanbieter-Tokens",
+          deleteItem4:
+            "Cloud-Snapshots, Sync-Verlauf und offene TV-Kopplungssitzungen",
+          labelConfirm: "Zum Bestaetigen DELETE eingeben",
+          confirmHelp: "Die Bestaetigung ist gross/klein-schreibungssensitiv.",
+          cancelButtonText: "Abbrechen",
+          deleteButtonText: "Dauerhaft loeschen",
+          workingTitle: "Konto wird geloescht",
+          workingCopy:
+            "Sitzungen werden widerrufen und Cloud-Daten entfernt. Bitte lasse diese Seite offen.",
+          successTitle: "Konto geloescht",
+          successCopy:
+            "Dein StreamNet TV Konto und deine Cloud-Daten wurden entfernt. Eine Bestaetigungs-E-Mail wurde gesendet, sobald die Zustellung verfuegbar ist.",
+          messages: {
+            incompleteSignin: "Die Anmeldeantwort war unvollstaendig",
+            passwordSetupSent:
+              "Eine E-Mail zum Passwort-Setup wurde gesendet. Erstelle dein neues StreamNet TV Cloud Passwort und kehre dann hierher zurueck.",
+            passwordSetupRequired:
+              "Ein neues StreamNet TV Cloud Passwort ist erforderlich.",
+            deletionFailed: "Die Loeschung konnte nicht abgeschlossen werden.",
+            supportHint:
+              "Kontaktiere den Support mit der Uhrzeit dieser Anfrage.",
+            waitingService: "Warte auf Rueckmeldung des Loeschdienstes...",
+            stillProcessing:
+              "Die Loeschung wird noch verarbeitet. Kontaktiere den Support, falls du in Kuerze keine Bestaetigung erhaeltst.",
+          },
+        },
+      };
+
+      const preferredLang = (navigator.language || "en")
+        .toLowerCase()
+        .startsWith("de")
+        ? "de"
+        : "en";
+      let currentLang = preferredLang;
+
+      function t(key) {
+        return (
+          key
+            .split(".")
+            .reduce((acc, part) => acc?.[part], I18N[currentLang]) ??
+          key.split(".").reduce((acc, part) => acc?.[part], I18N.en) ??
+          key
+        );
+      }
+
+      function setText(id, key) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = t(key);
+      }
+
+      function applyLanguage(lang) {
+        currentLang = lang === "de" ? "de" : "en";
+        document.documentElement.lang = currentLang;
+        document.title = t("title");
+        langEnButton.setAttribute("aria-pressed", String(currentLang === "en"));
+        langDeButton.setAttribute("aria-pressed", String(currentLang === "de"));
+
+        setText("eyebrow", "eyebrow");
+        setText("page-title", "pageTitle");
+        setText("intro-copy", "intro");
+        document
+          .getElementById("steps-label")
+          ?.setAttribute("aria-label", t("stepsLabel"));
+        setText("step-1", "step1");
+        setText("step-2", "step2");
+        setText("step-3", "step3");
+        setText("stage-title", "stageTitle");
+        setText("stage-copy-login", "stageCopyLogin");
+        setText("label-email", "labelEmail");
+        setText("label-password", "labelPassword");
+        setText("verify-button-text", "verifyButtonText");
+        setText("privacy-note", "privacyNote");
+        setText("confirm-title", "confirmTitle");
+        setText("signed-in-as", "signedInAs");
+        setText("warning-copy", "warningCopy");
+        setText("delete-item-1", "deleteItem1");
+        setText("delete-item-2", "deleteItem2");
+        setText("delete-item-3", "deleteItem3");
+        setText("delete-item-4", "deleteItem4");
+        setText("label-confirm", "labelConfirm");
+        setText("confirm-help", "confirmHelp");
+        setText("cancel-button-text", "cancelButtonText");
+        setText("delete-button-text", "deleteButtonText");
+        setText("working-title", "workingTitle");
+        setText("working-copy", "workingCopy");
+        setText("success-title", "successTitle");
+        setText("success-copy", "successCopy");
+      }
+
+      langEnButton.addEventListener("click", () => applyLanguage("en"));
+      langDeButton.addEventListener("click", () => applyLanguage("de"));
+      applyLanguage(currentLang);
 
       let accessToken = "";
       let jobId = "";
@@ -571,7 +834,7 @@
             APP_ANON_KEY,
           );
           if (!session.access_token || !session.user?.email)
-            throw new Error("Sign-in response was incomplete");
+            throw new Error(t("messages.incompleteSignin"));
           accessToken = session.access_token;
           document.getElementById("password").value = "";
           document.getElementById("verified-email").textContent =
@@ -581,9 +844,8 @@
         } catch (error) {
           if (error.code === "password_setup_required") {
             loginMessage.textContent = error.details?.email_sent
-              ? "A password setup email was sent. Create your new StreamNet TV Cloud password, then return here."
-              : error.message ||
-                "A new StreamNet TV Cloud password is required.";
+              ? t("messages.passwordSetupSent")
+              : error.message || t("messages.passwordSetupRequired");
           } else {
             loginMessage.textContent = error.message;
           }
@@ -646,18 +908,16 @@
               return;
             }
             if (status.status === "failed") {
-              progressMessage.textContent = `${status.error || "Deletion could not finish."} Contact support with the time of this request.`;
+              progressMessage.textContent = `${status.error || t("messages.deletionFailed")} ${t("messages.supportHint")}`;
               return;
             }
           } catch (error) {
             if (attempt > 4)
-              progressMessage.textContent =
-                "Waiting for the deletion service to respond...";
+              progressMessage.textContent = t("messages.waitingService");
           }
           await new Promise((resolve) => setTimeout(resolve, 1500));
         }
-        progressMessage.textContent =
-          "Deletion is still processing. Contact support if you do not receive confirmation shortly.";
+        progressMessage.textContent = t("messages.stillProcessing");
       }
     </script>
   </body>

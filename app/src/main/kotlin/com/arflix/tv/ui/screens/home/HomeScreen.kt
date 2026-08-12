@@ -28,6 +28,7 @@ import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.res.painterResource
 import com.arflix.tv.R
 import androidx.compose.foundation.rememberScrollState
@@ -665,14 +666,42 @@ fun HomeScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     var suppressSelectUntilMs by remember { mutableLongStateOf(0L) }
 
+    val rawDisplayCategoriesBase = if (uiState.categories.isNotEmpty()) {
+        uiState.categories
+    } else {
+        preloadedCategories
+    }
+    val sportsHomeRows by viewModel.sportsHomeRows.collectAsStateWithLifecycle()
+    val rawDisplayCategories = remember(rawDisplayCategoriesBase, sportsHomeRows) {
+        viewModel.withSportsHomeRows(rawDisplayCategoriesBase, sportsHomeRows)
+    }
+    val displayCategories = remember(rawDisplayCategories) {
+        deduplicateHomeCategories(rawDisplayCategories).filter(::shouldDisplayHomeCategory)
+    }
+
+    // Use rememberSaveable to persist focus position across navigation (back from details page)
+    val focusState = rememberSaveable(saver = HomeFocusState.Saver) { HomeFocusState() }
+
     LaunchedEffect(Unit) {
         // Prevent stale select key events from previous screen from reopening details.
         suppressSelectUntilMs = SystemClock.elapsedRealtime() + 150L
+        viewModel.refreshIptvHomeCatalogs()
+        viewModel.refreshContinueWatchingOnly(force = true)
     }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
+                val continueWatchingRow = displayCategories.indexOfFirst {
+                    it.id == "continue_watching" && it.items.any { item -> !item.isPlaceholder }
+                }
+                if (continueWatchingRow >= 0 && !focusState.isSidebarFocused) {
+                    focusState.currentRowIndex = continueWatchingRow
+                    focusState.currentItemIndex = 0
+                    focusState.lastNavEventTime = SystemClock.elapsedRealtime()
+                    focusState.userHasNavigated = true
+                    focusState.rowItemIndicesByCategoryId["continue_watching"] = 0
+                }
                 viewModel.refreshContinueWatchingOnly(force = true)
                 viewModel.refreshIptvHomeCatalogs()
                 // Pull the full cloud state (addons, catalogs, settings) on resume.
@@ -688,19 +717,6 @@ fun HomeScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
-    }
-
-    val rawDisplayCategoriesBase = if (uiState.categories.isNotEmpty()) {
-        uiState.categories
-    } else {
-        preloadedCategories
-    }
-    val sportsHomeRows by viewModel.sportsHomeRows.collectAsStateWithLifecycle()
-    val rawDisplayCategories = remember(rawDisplayCategoriesBase, sportsHomeRows) {
-        viewModel.withSportsHomeRows(rawDisplayCategoriesBase, sportsHomeRows)
-    }
-    val displayCategories = remember(rawDisplayCategories) {
-        deduplicateHomeCategories(rawDisplayCategories).filter(::shouldDisplayHomeCategory)
     }
     val displayHeroItem = uiState.heroItem ?: preloadedHeroItem
         ?: if (uiState.categories.isEmpty()) {
@@ -742,8 +758,6 @@ fun HomeScreen(
     }
     val contentStartPadding = if (isMobile) 16.dp else 36.dp
 
-    // Use rememberSaveable to persist focus position across navigation (back from details page)
-    val focusState = rememberSaveable(saver = HomeFocusState.Saver) { HomeFocusState() }
     val fastScrollThresholdMs = 650L
     val heroVideoIdleThresholdMs = 6_000L
     val startupEffectsDelayMs = if (isMobile) 0L else 900L
@@ -1031,7 +1045,15 @@ fun HomeScreen(
             .fillMaxSize()
             .background(appBackgroundDark())
       ) {
-        val iptvHeroBackdrop by produceState<String?>(null, displayHeroItem?.liveProgramTitle) {
+        val iptvHeroBackdrop by produceState<String?>(
+            null,
+            displayHeroItem?.id,
+            displayHeroItem?.image,
+            displayHeroItem?.backdrop,
+            displayHeroItem?.liveProgramTitle,
+            displayHeroItem?.liveProgramStartMs,
+            displayHeroItem?.liveProgramEndMs,
+        ) {
             val title = displayHeroItem
                 ?.takeIf(viewModel::isIptvItem)
                 ?.liveProgramTitle
@@ -1039,7 +1061,15 @@ fun HomeScreen(
                 ?: return@produceState
             value = viewModel.lookupIptvProgramBackdrop(title)
         }
-        val iptvHeroProgramLogo by produceState<String?>(null, displayHeroItem?.liveProgramTitle) {
+        val iptvHeroProgramLogo by produceState<String?>(
+            null,
+            displayHeroItem?.id,
+            displayHeroItem?.image,
+            displayHeroItem?.backdrop,
+            displayHeroItem?.liveProgramTitle,
+            displayHeroItem?.liveProgramStartMs,
+            displayHeroItem?.liveProgramEndMs,
+        ) {
             val title = displayHeroItem
                 ?.takeIf(viewModel::isIptvItem)
                 ?.liveProgramTitle
@@ -1403,7 +1433,55 @@ fun HomeScreen(
                 onIgnore = { viewModel.ignoreAppUpdate() }
             )
         }
+
+        if (uiState.showUnknownSourcesDialog) {
+            com.arflix.tv.ui.components.UnknownSourcesModal(
+                onDismiss = { viewModel.dismissAppUpdateDialog() },
+                onOpenSettings = { viewModel.openUnknownSourcesSettings() }
+            )
+        }
     }
+}
+
+@Composable
+private fun HomeHeroMarqueeTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    style: TextStyle = ArflixTypography.heroTitle,
+    color: Color = Color.White,
+    maxLines: Int = 1,
+) {
+    val marqueeText = text.ifBlank { " " }
+    val scrollState = rememberScrollState()
+    val shouldScroll = remember(marqueeText) { marqueeText.length > 20 }
+
+    LaunchedEffect(marqueeText, shouldScroll) {
+        if (!shouldScroll) {
+            scrollState.scrollTo(0)
+            return@LaunchedEffect
+        }
+        while (true) {
+            val maxScroll = scrollState.maxValue
+            if (maxScroll <= 0) {
+                delay(250L)
+                continue
+            }
+            scrollState.animateScrollTo(maxScroll)
+            delay(1_200L)
+            scrollState.animateScrollTo(0)
+            delay(700L)
+        }
+    }
+
+    Text(
+        text = marqueeText,
+        style = style,
+        color = color,
+        maxLines = maxLines,
+        overflow = TextOverflow.Ellipsis,
+        modifier = modifier
+            .horizontalScroll(scrollState, enabled = shouldScroll, reverseScrolling = false)
+    )
 }
 
 @Composable
@@ -1440,11 +1518,12 @@ private fun IptvHeroSection(
         modifier = modifier.width(360.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
+        val hasProgramLogo = !programLogoUrl.isNullOrBlank()
         Box(
-            modifier = Modifier.height(72.dp),
+            modifier = Modifier.height(if (hasProgramLogo) 72.dp else 98.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
-            if (!programLogoUrl.isNullOrBlank()) {
+            if (hasProgramLogo) {
                 AsyncImage(
                     model = programLogoUrl,
                     contentDescription = item.liveProgramTitle,
@@ -1453,18 +1532,21 @@ private fun IptvHeroSection(
                     modifier = Modifier.width(320.dp).height(72.dp),
                 )
             } else {
-                Text(
-                    text = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                val fallbackTitle = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title
+                HomeHeroMarqueeTitle(
+                    text = fallbackTitle,
                     style = ArflixTypography.heroTitle.copy(
-                        fontSize = 40.sp,
-                        lineHeight = 44.sp,
+                        fontSize = 38.sp,
+                        lineHeight = 40.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.sp,
                         shadow = textShadow,
                     ),
                     color = Color.White,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp)
                 )
             }
         }
@@ -1690,17 +1772,21 @@ private fun HeroSection(
                                 .width(320.dp)
                         )
                     } else {
-                        // Fallback to title text
-                        Text(
-                            text = currentItem.title.uppercase(),
+                        // Fallback to title text with a single-line marquee for long names.
+                        val fallbackTitle = currentItem.title.uppercase()
+                        HomeHeroMarqueeTitle(
+                            text = fallbackTitle,
                             style = ArflixTypography.heroTitle.copy(
-                                fontSize = 40.sp,
+                                fontSize = 38.sp,
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 2.sp,
                                 shadow = textShadow
                             ),
                             color = TextPrimary,
-                            maxLines = 2
+                            maxLines = 1,
+                            modifier = Modifier
+                                .width(heroTextWidth)
+                                .height(72.dp)
                         )
                     }
                 }
@@ -4114,9 +4200,16 @@ private fun IptvHomeCard(
             value = System.currentTimeMillis()
         }
     }
-    val backdropUrl by produceState<String?>(null, item.liveProgramTitle) {
+    val backdropUrl by produceState<String?>(
+        null,
+        item.id,
+        item.image,
+        item.backdrop,
+        item.liveProgramTitle,
+        item.liveProgramStartMs,
+        item.liveProgramEndMs,
+    ) {
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
-        delay(200L)
         value = lookupBackdrop(title)
     }
     val start = item.liveProgramStartMs

@@ -3088,8 +3088,9 @@ class MediaRepository @Inject constructor(
     /**
      * Search media
      */
-    suspend fun search(query: String): List<MediaItem> {
-        val results = tmdbApi.searchMulti(apiKey, query, language = contentLanguage)
+    suspend fun search(query: String, languageOverride: String? = null): List<MediaItem> {
+        val language = languageOverride ?: contentLanguage
+        val results = tmdbApi.searchMulti(apiKey, query, language = language)
         val items = results.results
             .filter { it.mediaType == "movie" || it.mediaType == "tv" }
             .map {
