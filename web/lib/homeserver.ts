@@ -227,6 +227,8 @@ interface JellyfinItem {
   ImageTags?: { Primary?: string };
   BackdropImageTags?: string[];
   PrimaryImageTag?: string;
+  ProviderIds?: { Tmdb?: string; Imdb?: string; Tvdb?: string };
+  DateCreated?: string;
 }
 
 interface PlexSection {
@@ -245,15 +247,18 @@ interface PlexItem {
   thumb?: string;
   art?: string;
   Media?: Array<{ Part?: Array<{ key?: string }> }>;
+  Guid?: Array<{ id?: string }>;
+  addedAt?: number;
 }
 
 const NON_VIDEO_COLLECTION_TYPES = new Set(["music", "photos", "homevideos", "books", "podcasts", "audiobooks"]);
+const BROWSABLE_LIBRARY_TYPES = new Set(["movies", "tvshows", "mixed"]);
 function isVideoCollectionType(type?: string | null): boolean {
   if (!type) return true;
   return !NON_VIDEO_COLLECTION_TYPES.has(type.toLowerCase().trim());
 }
 
-function mapItem(base: string, token: string, item: JellyfinItem): MediaItem {
+function mapItem(base: string, token: string, item: JellyfinItem, server?: HomeServerConfig): MediaItem {
   const mediaType: MediaType = item.Type === "Series" ? "tv" : "movie";
   // Leave these empty when the server has no artwork rather than pointing at an
   // image route that will 404: MediaCard renders a placeholder for empty values
@@ -267,8 +272,9 @@ function mapItem(base: string, token: string, item: JellyfinItem): MediaItem {
   const backdrop = backdropTag
     ? directUrl(`${base}/Items/${item.Id}/Images/Backdrop/0?maxWidth=1280&tag=${backdropTag}&api_key=${token}`)
     : null;
+  const tmdbId = Number(item.ProviderIds?.Tmdb) || null;
   return {
-    id: hashId(item.Id),
+    id: tmdbId ?? -hashId(`${server?.id ?? base}:${item.Id}`),
     title: item.Name,
     overview: item.Overview ?? "",
     year: item.ProductionYear ? String(item.ProductionYear) : "",
@@ -277,6 +283,13 @@ function mapItem(base: string, token: string, item: JellyfinItem): MediaItem {
     image,
     backdrop,
     isHomeServer: true,
+    tmdbId,
+    imdbId: item.ProviderIds?.Imdb ?? null,
+    tvdbId: Number(item.ProviderIds?.Tvdb) || null,
+    activityAt: item.DateCreated ? Date.parse(item.DateCreated) || 0 : 0,
+    homeServerItemId: item.Id,
+    homeServerId: server?.id ?? null,
+    homeServerType: server?.type ?? null,
     // Movies stream directly; series would need episode browsing (future).
     homeServerUrl: mediaType === "movie" ? directUrl(`${base}/Videos/${item.Id}/stream?static=true&api_key=${token}`) : null
   };
@@ -291,10 +304,15 @@ function plexStreamUrl(base: string, token: string, item: PlexItem) {
   return part ? directUrl(`${base}${part}?X-Plex-Token=${encodeURIComponent(token)}`) : null;
 }
 
-function mapPlexItem(base: string, token: string, item: PlexItem): MediaItem {
+function mapPlexItem(base: string, token: string, item: PlexItem, server?: HomeServerConfig): MediaItem {
   const mediaType: MediaType = item.type === "show" ? "tv" : "movie";
+  const providerIds = Object.fromEntries((item.Guid ?? []).map((entry) => {
+    const value = entry.id ?? "";
+    return [value.split("://")[0]?.toLowerCase(), value.split("://")[1]?.split("?")[0]];
+  }).filter(([provider, id]) => Boolean(provider && id)));
+  const tmdbId = Number(providerIds.tmdb) || null;
   return {
-    id: hashId(`plex:${item.ratingKey}`),
+    id: tmdbId ?? -hashId(`${server?.id ?? base}:${item.ratingKey}`),
     title: item.title,
     overview: item.summary ?? "",
     year: item.year ? String(item.year) : "",
@@ -303,6 +321,13 @@ function mapPlexItem(base: string, token: string, item: PlexItem): MediaItem {
     image: plexImage(base, token, item.thumb),
     backdrop: item.art ? plexImage(base, token, item.art) : null,
     isHomeServer: true,
+    tmdbId,
+    imdbId: providerIds.imdb ?? null,
+    tvdbId: Number(providerIds.tvdb) || null,
+    activityAt: item.addedAt ? item.addedAt * 1000 : 0,
+    homeServerItemId: item.ratingKey,
+    homeServerId: server?.id ?? null,
+    homeServerType: server?.type ?? "plex",
     homeServerUrl: mediaType === "movie" ? plexStreamUrl(base, token, item) : null
   };
 }
@@ -326,7 +351,7 @@ async function loadPlexRows(server: HomeServerConfig): Promise<Category[]> {
     ).catch(() => null);
     const mapped = (payload?.MediaContainer?.Metadata ?? [])
       .slice(0, 24)
-      .map((item) => mapPlexItem(base, token, item))
+      .map((item) => mapPlexItem(base, token, item, server))
       .filter((item) => Boolean(item && item.title));
     return mapped.length ? { id: `hs_${server.id}_${library.key}`, title: `${server.name} - ${library.title}`, items: mapped } : null;
   }));
@@ -354,7 +379,7 @@ export async function loadHomeServerRows(servers: HomeServerConfig[]): Promise<C
         const items = await proxiedGet<{ Items?: JellyfinItem[] }>(
           `${base}/Users/${userId}/Items?ParentId=${library.Id}&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending&Limit=24&Fields=Overview,PrimaryImageAspectRatio,BasicSyncInfo,ImageTags,BackdropImageTags,ProductionYear,CommunityRating&api_key=${token}`
         ).catch(() => ({ Items: [] as JellyfinItem[] }));
-        const mapped = (items.Items ?? []).map((item) => mapItem(base, token, item)).filter((m) => Boolean(m && m.title));
+        const mapped = (items.Items ?? []).map((item) => mapItem(base, token, item, server)).filter((m) => Boolean(m && m.title));
         return mapped.length ? { id: `hs_${server.id}_${library.Id}`, title: `${server.name} · ${library.Name}`, items: mapped } : null;
       }));
       return rows.filter((row): row is Category => Boolean(row));
@@ -863,6 +888,37 @@ export interface HomeServerLibraryOption {
   // to loadHomeServerLibraryItems.
   value: string;
   label: string;
+  serverId: string;
+  serverName: string;
+  serverType: HomeServerConfig["type"];
+  libraryId: string;
+  libraryName: string;
+  mediaType: "movie" | "tv" | "mixed";
+}
+
+function isBrowsableLibraryType(type?: string | null): boolean {
+  return !type || BROWSABLE_LIBRARY_TYPES.has(type.toLowerCase().trim());
+}
+
+export type HomeServerLibrarySort = "added" | "title" | "rating";
+export interface HomeServerLibraryPage {
+  items: MediaItem[];
+  hasMore: boolean;
+  total: number;
+}
+
+function libraryValue(serverId: string, libraryId: string): string {
+  return `hslib:${encodeURIComponent(serverId)}:${encodeURIComponent(libraryId)}`;
+}
+
+function parseLibraryValue(value: string): { serverId: string; libraryId: string } | null {
+  const match = value.match(/^hslib:([^:]+):(.+)$/);
+  if (!match) return null;
+  try {
+    return { serverId: decodeURIComponent(match[1]), libraryId: decodeURIComponent(match[2]) };
+  } catch {
+    return { serverId: match[1], libraryId: match[2] };
+  }
 }
 
 // List each enabled server's movie/show libraries as selectable options.
@@ -881,7 +937,16 @@ export async function listHomeServerLibraries(
         );
         return (res?.MediaContainer?.Directory ?? [])
           .filter((s) => s.type === "movie" || s.type === "show")
-          .map((s) => ({ value: `hslib:${server.id}:${s.key}`, label: `${server.name} · ${s.title}` }));
+          .map((s) => ({
+            value: libraryValue(server.id, s.key),
+            label: `${server.name} · ${s.title}`,
+            serverId: server.id,
+            serverName: server.name,
+            serverType: server.type,
+            libraryId: s.key,
+            libraryName: s.title,
+            mediaType: s.type === "movie" ? "movie" as const : "tv" as const
+          }));
       }
       const session = await ensureSession(server);
       if (!session) return [];
@@ -890,8 +955,17 @@ export async function listHomeServerLibraries(
         `${base}/Users/${session.userId}/Views?api_key=${session.token}`
       );
       return (views.Items ?? [])
-        .filter((v) => isVideoCollectionType(v.CollectionType))
-        .map((v) => ({ value: `hslib:${server.id}:${v.Id}`, label: `${server.name} · ${v.Name}` }));
+        .filter((v) => isBrowsableLibraryType(v.CollectionType))
+        .map((v) => ({
+          value: libraryValue(server.id, v.Id),
+          label: `${server.name} · ${v.Name}`,
+          serverId: server.id,
+          serverName: server.name,
+          serverType: server.type,
+          libraryId: v.Id,
+          libraryName: v.Name,
+          mediaType: v.CollectionType === "movies" ? "movie" as const : v.CollectionType === "tvshows" ? "tv" as const : "mixed" as const
+        }));
     } catch {
       return [];
     }
@@ -905,31 +979,70 @@ export async function loadHomeServerLibraryItems(
   source: string,
   limit = 60
 ): Promise<MediaItem[]> {
-  const match = source.match(/^hslib:([^:]+):(.+)$/);
-  if (!match) return [];
-  const [, serverId, libraryKey] = match;
+  return (await loadHomeServerLibraryPage(servers, source, { limit })).items;
+}
+
+export async function loadHomeServerLibraryPage(
+  servers: HomeServerConfig[],
+  source: string,
+  options: { offset?: number; limit?: number; sort?: HomeServerLibrarySort; filter?: "all" | "movie" | "tv"; search?: string; throwOnError?: boolean } = {}
+): Promise<HomeServerLibraryPage> {
+  const parsed = parseLibraryValue(source);
+  if (!parsed) return { items: [], hasMore: false, total: 0 };
+  const { serverId, libraryId: libraryKey } = parsed;
+  const offset = Math.max(0, options.offset ?? 0);
+  const limit = Math.min(100, Math.max(1, options.limit ?? 60));
+  const sort = options.sort ?? "added";
+  const filter = options.filter ?? "all";
+  const search = options.search?.trim() ?? "";
   const server = servers.find((s) => s.id === serverId && s.enabled && s.url);
-  if (!server) return [];
+  if (!server) return { items: [], hasMore: false, total: 0 };
   try {
     if (server.type === "plex") {
       const base = trimUrl(server.url);
       const token = server.token ?? "";
-      const res = await proxiedGet<{ MediaContainer?: { Metadata?: PlexItem[] } }>(
-        `${base}/library/sections/${libraryKey}/all?X-Plex-Token=${encodeURIComponent(token)}&sort=addedAt:desc&X-Plex-Container-Start=0&X-Plex-Container-Size=${limit}`,
+      const params = new URLSearchParams({
+        "X-Plex-Token": token,
+        sort: sort === "title" ? "titleSort:asc" : sort === "rating" ? "rating:desc" : "addedAt:desc",
+        "X-Plex-Container-Start": String(offset),
+        "X-Plex-Container-Size": String(limit),
+        includeGuids: "1"
+      });
+      if (filter !== "all") params.set("type", filter === "movie" ? "1" : "2");
+      if (search) params.set("title", search);
+      const res = await proxiedGet<{ MediaContainer?: { Metadata?: PlexItem[]; totalSize?: number; size?: number } }>(
+        `${base}/library/sections/${libraryKey}/all?${params.toString()}`,
         { Accept: "application/json", "X-Plex-Token": token }
       );
-      return (res?.MediaContainer?.Metadata ?? [])
-        .map((item) => mapPlexItem(base, token, item))
+      const items = (res?.MediaContainer?.Metadata ?? [])
+        .map((item) => mapPlexItem(base, token, item, server))
         .filter((m) => Boolean(m && m.title));
+      const total = res?.MediaContainer?.totalSize ?? res?.MediaContainer?.size ?? items.length;
+      return { items, total, hasMore: offset + items.length < total };
     }
     const session = await ensureSession(server);
-    if (!session) return [];
+    if (!session) return { items: [], hasMore: false, total: 0 };
     const base = trimUrl(server.url);
-    const items = await proxiedGet<{ Items?: JellyfinItem[] }>(
-      `${base}/Users/${session.userId}/Items?ParentId=${libraryKey}&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending&Limit=${limit}&Fields=Overview,PrimaryImageAspectRatio,BasicSyncInfo,ImageTags,BackdropImageTags,ProductionYear,CommunityRating&api_key=${session.token}`
+    const params = new URLSearchParams({
+      ParentId: libraryKey,
+      Recursive: "true",
+      IncludeItemTypes: filter === "movie" ? "Movie" : filter === "tv" ? "Series" : "Movie,Series",
+      SortBy: sort === "title" ? "SortName" : sort === "rating" ? "CommunityRating" : "DateCreated",
+      SortOrder: sort === "title" ? "Ascending" : "Descending",
+      StartIndex: String(offset),
+      Limit: String(limit),
+      Fields: "Overview,PrimaryImageAspectRatio,BasicSyncInfo,ImageTags,BackdropImageTags,ProductionYear,CommunityRating,ProviderIds,DateCreated",
+      api_key: session.token
+    });
+    if (search) params.set("SearchTerm", search);
+    const payload = await proxiedGet<{ Items?: JellyfinItem[]; TotalRecordCount?: number }>(
+      `${base}/Users/${session.userId}/Items?${params.toString()}`
     );
-    return (items.Items ?? []).map((item) => mapItem(base, session.token, item)).filter((m) => Boolean(m && m.title));
-  } catch {
-    return [];
+    const items = (payload.Items ?? []).map((item) => mapItem(base, session.token, item, server)).filter((m) => Boolean(m && m.title));
+    const total = payload.TotalRecordCount ?? items.length;
+    return { items, total, hasMore: offset + items.length < total };
+  } catch (error) {
+    if (options.throwOnError) throw error;
+    return { items: [], hasMore: false, total: 0 };
   }
 }

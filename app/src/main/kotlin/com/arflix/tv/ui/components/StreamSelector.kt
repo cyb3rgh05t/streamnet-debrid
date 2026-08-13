@@ -394,7 +394,16 @@ fun StreamSelector(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = (0.95f * (1f - backMotion.eased * 0.5f)).coerceIn(0f, 0.95f)))
+                .background(
+                    if (isMobile) {
+                        Color.Black.copy(
+                            alpha = (0.95f * (1f - backMotion.eased * 0.5f))
+                                .coerceIn(0f, 0.95f)
+                        )
+                    } else {
+                        Color.Black
+                    }
+                )
         ) {
             Box(
                 modifier = Modifier

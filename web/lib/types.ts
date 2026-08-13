@@ -45,6 +45,10 @@ export interface MediaItem {
   // Home server (Plex/Jellyfin/Emby) direct playback
   isHomeServer?: boolean;
   homeServerUrl?: string | null;
+  homeServerItemId?: string | null;
+  homeServerId?: string | null;
+  homeServerType?: "plex" | "jellyfin" | "emby" | null;
+  tmdbId?: number | null;
   // External metadata IDs & classification
   isAnime?: boolean;
   anilistId?: number | null;

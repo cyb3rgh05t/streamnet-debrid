@@ -61,6 +61,12 @@ data class MediaItem(
     val liveProgramEndMs: Long? = null,
     val liveProgramDescription: String? = null,
     val liveNextProgramTitle: String? = null,
+    // Native home-server identity. The TMDB id remains `id` when available;
+    // unmatched server items use a stable negative id and still render/open.
+    val isHomeServer: Boolean = false,
+    val homeServerItemId: String? = null,
+    val homeServerSourceRef: String? = null,
+    val homeServerProvider: String? = null,
 ) : Serializable
 
 enum class MediaType {

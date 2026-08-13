@@ -1251,7 +1251,7 @@ export function AppProvider({
   // surfaces home-server media in the same source list as addons.
   const appendHomeServerSources = useCallback((item: MediaItem, season?: number, episode?: number) => {
     const servers = settingsRef.current.homeServers;
-    if (!servers?.length || item.isHomeServer) return;
+    if (!servers?.length) return;
     void (async () => {
       try {
         const { resolveHomeServerMovieSources, resolveHomeServerEpisodeSources } = await import("./homeserver");
@@ -1259,7 +1259,7 @@ export function AppProvider({
           title: item.title,
           year: item.year ? Number(item.year) || undefined : undefined,
           imdbId: item.imdbId ?? undefined,
-          tmdbId: item.id > 0 ? item.id : undefined
+          tmdbId: item.tmdbId ?? (item.id > 0 && !item.isHomeServer ? item.id : undefined)
         };
         const sources = season && episode
           ? await resolveHomeServerEpisodeSources(servers, target, season, episode)
@@ -1303,7 +1303,7 @@ export function AppProvider({
   const openDetails = useCallback(async (item: MediaItem) => {
     setSelectedEpisode(null);
     // Home-server items carry their own metadata + a direct stream URL — no TMDB.
-    if (item.isHomeServer) {
+    if (item.isHomeServer && !item.tmdbId) {
       setSelected(item);
       setStreams(item.homeServerUrl
         ? [{ source: item.title, addonName: "Home Server", quality: "Direct", size: "", url: item.homeServerUrl }]
@@ -1314,9 +1314,20 @@ export function AppProvider({
     setBusy("Opening details");
     setStreams([]);
     const priorityConfig = getPriorityConfig(settingsRef.current);
-    const detailed = await getDetails(item, priorityConfig).catch(() => item);
+    const detailsTarget = item.isHomeServer && item.tmdbId ? { ...item, id: item.tmdbId } : item;
+    const detailed = await getDetails(detailsTarget, priorityConfig).catch(() => item);
     const withResumeEpisode = {
       ...detailed,
+      ...(item.isHomeServer ? {
+        isHomeServer: true,
+        homeServerUrl: item.homeServerUrl,
+        homeServerItemId: item.homeServerItemId,
+        homeServerId: item.homeServerId,
+        homeServerType: item.homeServerType,
+        tmdbId: item.tmdbId,
+        image: detailed.image || item.image,
+        backdrop: detailed.backdrop || item.backdrop
+      } : {}),
       seasonNumber: item.seasonNumber ?? detailed.seasonNumber ?? null,
       episodeNumber: item.episodeNumber ?? detailed.episodeNumber ?? null,
       episodeTitle: item.episodeTitle ?? detailed.episodeTitle ?? null

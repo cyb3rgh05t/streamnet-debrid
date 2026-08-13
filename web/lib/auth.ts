@@ -40,6 +40,7 @@ function sessionFromResponse(response: SupabaseAuthResponse, fallbackEmail: stri
 
 export class AuthClient {
   session = loadStored<AuthSession | null>(SESSION_KEY, null);
+  private refreshInFlight: Promise<void> | null = null;
 
   get isAuthenticated() {
     return Boolean(this.session?.accessToken);
@@ -117,20 +118,33 @@ export class AuthClient {
   }
 
   async refresh() {
-    if (!this.session) throw new Error("Sign in required");
-    if (this.isNetlifySession) {
-      const response = await this.netlifyAuth<SupabaseAuthResponse>("auth-refresh", { refresh_token: this.session.refreshToken });
-      this.session = sessionFromResponse(response, this.session.email, "netlify");
+    if (this.refreshInFlight) return this.refreshInFlight;
+    const sourceSession = this.session;
+    if (!sourceSession) throw new Error("Sign in required");
+
+    const refresh = (async () => {
+      const payload = sourceSession.accessToken ? decodeJwtPayload(sourceSession.accessToken) : {};
+      const isNetlify = sourceSession.provider === "netlify" || payload.iss === "arvio-netlify";
+      const response = isNetlify
+        ? await this.netlifyAuth<SupabaseAuthResponse>("auth-refresh", { refresh_token: sourceSession.refreshToken })
+        : await jsonRequest<SupabaseAuthResponse>(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+            method: "POST",
+            headers: { apikey: config.supabaseAnonKey },
+            body: JSON.stringify({ refresh_token: sourceSession.refreshToken })
+          });
+
+      // A sign-out while refresh was in flight must not silently restore the session.
+      if (!this.session || this.session.refreshToken !== sourceSession.refreshToken) return;
+      this.session = sessionFromResponse(response, sourceSession.email, isNetlify ? "netlify" : "supabase");
       saveStored(SESSION_KEY, this.session);
-      return;
+    })();
+
+    this.refreshInFlight = refresh;
+    try {
+      await refresh;
+    } finally {
+      if (this.refreshInFlight === refresh) this.refreshInFlight = null;
     }
-    const response = await jsonRequest<SupabaseAuthResponse>(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-      method: "POST",
-      headers: { apikey: config.supabaseAnonKey },
-      body: JSON.stringify({ refresh_token: this.session.refreshToken })
-    });
-    this.session = sessionFromResponse(response, this.session.email, "supabase");
-    saveStored(SESSION_KEY, this.session);
   }
 
   async supabase<T>(path: string, init: RequestInit = {}) {

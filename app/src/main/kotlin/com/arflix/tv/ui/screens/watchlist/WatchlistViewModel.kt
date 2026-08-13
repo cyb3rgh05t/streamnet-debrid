@@ -9,6 +9,10 @@ import com.arflix.tv.data.model.MediaType.MOVIE
 import com.arflix.tv.data.model.MediaType.TV
 import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.HomeServerCatalogCandidate
+import com.arflix.tv.data.repository.HomeServerKind
+import com.arflix.tv.data.repository.HomeServerLibrarySort
+import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.util.AppLogger
@@ -18,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
@@ -37,6 +43,21 @@ data class WatchlistUiState(
     val allItems: List<MediaItem> get() = movies + series
 }
 
+data class HomeLibraryUiState(
+    val providers: List<HomeServerKind> = emptyList(),
+    val libraries: List<HomeServerCatalogCandidate> = emptyList(),
+    val selectedProvider: HomeServerKind? = null,
+    val selectedSourceRef: String? = null,
+    val items: List<MediaItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = false,
+    val sort: HomeServerLibrarySort = HomeServerLibrarySort.RECENTLY_ADDED,
+    val mediaType: com.arflix.tv.data.model.MediaType? = null,
+    val searchQuery: String = "",
+    val error: String? = null
+)
+
 @HiltViewModel
 class WatchlistViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -44,13 +65,20 @@ class WatchlistViewModel @Inject constructor(
     private val cloudSyncRepository: CloudSyncRepository,
     private val traktRepository: TraktRepository,
     private val remoteSyncManager: com.arflix.tv.data.repository.sync.RemoteSyncManager,
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    private val homeServerRepository: HomeServerRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(WatchlistUiState())
     val uiState: StateFlow<WatchlistUiState> = _uiState.asStateFlow()
 
     private val _logoUrls = MutableStateFlow<Map<String, String>>(emptyMap())
     val logoUrls: StateFlow<Map<String, String>> = _logoUrls.asStateFlow()
+    private val _libraryState = MutableStateFlow(HomeLibraryUiState())
+    val libraryState: StateFlow<HomeLibraryUiState> = _libraryState.asStateFlow()
+    private val libraryCache = linkedMapOf<String, Pair<List<MediaItem>, Boolean>>()
+    private var libraryLoadJob: Job? = null
+    private var librarySearchJob: Job? = null
+    private var libraryRequestId = 0
     private var traktSyncInFlight = false
     private var initialLoadComplete = false
     private var enrichmentInFlight = false
@@ -87,6 +115,7 @@ class WatchlistViewModel @Inject constructor(
 
     init {
         observeWatchlistChanges()
+        observeHomeServers()
         loadWatchlistInstant()
     }
 
@@ -107,13 +136,193 @@ class WatchlistViewModel @Inject constructor(
     private fun fetchLogos(items: List<MediaItem>) {
         viewModelScope.launch {
             val currentLogos = _logoUrls.value.toMutableMap()
-            for (item in items) {
+            for (item in items.filterNot { it.isHomeServer }) {
                 val key = "${item.mediaType}_${item.id}"
                 if (key in currentLogos) continue
                 val url = runCatching { mediaRepository.getLogoUrl(item.mediaType, item.id) }.getOrNull()
                 if (url != null) {
                     currentLogos[key] = url
                     _logoUrls.value = currentLogos.toMap()
+                }
+            }
+        }
+    }
+
+    private fun observeHomeServers() {
+        viewModelScope.launch {
+            homeServerRepository.connections.collect { connections ->
+                val providers = connections
+                    .filter { it.isUsable }
+                    .map { it.serverKind }
+                    .distinct()
+                    .sortedBy { kind ->
+                        when (kind) {
+                            HomeServerKind.PLEX -> 0
+                            HomeServerKind.JELLYFIN -> 1
+                            HomeServerKind.EMBY -> 2
+                            HomeServerKind.UNKNOWN -> 3
+                        }
+                    }
+                val candidates = runCatching { homeServerRepository.getCatalogCandidates() }
+                    .getOrDefault(emptyList())
+                    .filter { candidate ->
+                        candidate.serverKind in providers &&
+                            candidate.collectionType.lowercase() in BROWSABLE_LIBRARY_TYPES
+                    }
+                val current = _libraryState.value
+                val selectedProvider = current.selectedProvider?.takeIf { it in providers }
+                val selectedSource = current.selectedSourceRef?.takeIf { source ->
+                    candidates.any { it.sourceRef == source && it.serverKind == selectedProvider }
+                }
+                _libraryState.value = current.copy(
+                    providers = providers,
+                    libraries = candidates,
+                    selectedProvider = selectedProvider,
+                    selectedSourceRef = selectedSource,
+                    items = if (selectedProvider == null) emptyList() else current.items
+                )
+            }
+        }
+    }
+
+    fun selectLibraryProvider(provider: HomeServerKind?) {
+        val current = _libraryState.value
+        if (current.selectedProvider == provider) return
+        libraryLoadJob?.cancel()
+        if (provider == null) {
+            _libraryState.value = current.copy(
+                selectedProvider = null,
+                selectedSourceRef = null,
+                items = emptyList(),
+                isLoading = false,
+                isLoadingMore = false,
+                error = null
+            )
+            return
+        }
+        val firstLibrary = current.libraries.firstOrNull { it.serverKind == provider }
+        _libraryState.value = current.copy(
+            selectedProvider = provider,
+            selectedSourceRef = firstLibrary?.sourceRef,
+            items = emptyList(),
+            error = null
+        )
+        if (firstLibrary != null) loadLibraryFirstPage()
+    }
+
+    fun selectLibrary(sourceRef: String) {
+        if (_libraryState.value.selectedSourceRef == sourceRef) return
+        _libraryState.value = _libraryState.value.copy(selectedSourceRef = sourceRef, items = emptyList(), error = null)
+        loadLibraryFirstPage()
+    }
+
+    fun setLibrarySort(sort: HomeServerLibrarySort) {
+        if (_libraryState.value.sort == sort) return
+        _libraryState.value = _libraryState.value.copy(sort = sort, items = emptyList())
+        loadLibraryFirstPage()
+    }
+
+    fun setLibraryMediaType(mediaType: com.arflix.tv.data.model.MediaType?) {
+        if (_libraryState.value.mediaType == mediaType) return
+        _libraryState.value = _libraryState.value.copy(mediaType = mediaType, items = emptyList())
+        loadLibraryFirstPage()
+    }
+
+    fun setLibrarySearch(query: String) {
+        if (_libraryState.value.searchQuery == query) return
+        libraryRequestId++
+        libraryLoadJob?.cancel()
+        _libraryState.value = _libraryState.value.copy(searchQuery = query)
+        librarySearchJob?.cancel()
+        librarySearchJob = viewModelScope.launch {
+            delay(300)
+            _libraryState.value = _libraryState.value.copy(items = emptyList())
+            loadLibraryFirstPage()
+        }
+    }
+
+    fun refreshLibrary() = loadLibraryFirstPage(force = true)
+
+    private fun libraryCacheKey(state: HomeLibraryUiState): String = listOf(
+        state.selectedSourceRef.orEmpty(),
+        state.sort.name,
+        state.mediaType?.name.orEmpty(),
+        state.searchQuery.trim().lowercase()
+    ).joinToString("|")
+
+    private fun loadLibraryFirstPage(force: Boolean = false) {
+        val snapshot = _libraryState.value
+        val sourceRef = snapshot.selectedSourceRef ?: return
+        val cacheKey = libraryCacheKey(snapshot)
+        val cached = libraryCache[cacheKey]
+        if (cached != null && !force) {
+            _libraryState.value = snapshot.copy(items = cached.first, hasMore = cached.second, isLoading = false, error = null)
+        } else {
+            _libraryState.value = snapshot.copy(items = emptyList(), isLoading = true, isLoadingMore = false, error = null)
+        }
+        val requestId = ++libraryRequestId
+        libraryLoadJob?.cancel()
+        libraryLoadJob = viewModelScope.launch {
+            runCatching {
+                mediaRepository.loadHomeServerLibraryPage(
+                    sourceRef = sourceRef,
+                    offset = 0,
+                    limit = LIBRARY_PAGE_SIZE,
+                    sort = snapshot.sort,
+                    mediaType = snapshot.mediaType,
+                    searchQuery = snapshot.searchQuery
+                )
+            }.onSuccess { page ->
+                if (requestId != libraryRequestId) return@onSuccess
+                libraryCache[cacheKey] = page.items to page.hasMore
+                while (libraryCache.size > 12) libraryCache.remove(libraryCache.keys.first())
+                _libraryState.value = _libraryState.value.copy(
+                    items = page.items,
+                    hasMore = page.hasMore,
+                    isLoading = false,
+                    isLoadingMore = false,
+                    error = null
+                )
+            }.onFailure { error ->
+                if (requestId != libraryRequestId) return@onFailure
+                _libraryState.value = _libraryState.value.copy(
+                    isLoading = false,
+                    isLoadingMore = false,
+                    error = if (cached == null) error.message ?: context.getString(R.string.homeserver_connection_failed) else null
+                )
+            }
+        }
+    }
+
+    fun loadMoreLibrary() {
+        val snapshot = _libraryState.value
+        val sourceRef = snapshot.selectedSourceRef ?: return
+        if (!snapshot.hasMore || snapshot.isLoading || snapshot.isLoadingMore) return
+        val requestId = libraryRequestId
+        val cacheKey = libraryCacheKey(snapshot)
+        _libraryState.value = snapshot.copy(isLoadingMore = true)
+        viewModelScope.launch {
+            runCatching {
+                mediaRepository.loadHomeServerLibraryPage(
+                    sourceRef = sourceRef,
+                    offset = snapshot.items.size,
+                    limit = LIBRARY_PAGE_SIZE,
+                    sort = snapshot.sort,
+                    mediaType = snapshot.mediaType,
+                    searchQuery = snapshot.searchQuery
+                )
+            }.onSuccess { page ->
+                if (requestId != libraryRequestId) return@onSuccess
+                val current = _libraryState.value
+                val existing = current.items.mapTo(HashSet()) { "${it.mediaType}:${it.id}:${it.homeServerItemId}" }
+                val fresh = page.items.filter { "${it.mediaType}:${it.id}:${it.homeServerItemId}" !in existing }
+                val merged = current.items + fresh
+                val next = current.copy(items = merged, hasMore = page.hasMore, isLoadingMore = false)
+                _libraryState.value = next
+                libraryCache[cacheKey] = merged to page.hasMore
+            }.onFailure {
+                if (requestId == libraryRequestId) {
+                    _libraryState.value = _libraryState.value.copy(isLoadingMore = false)
                 }
             }
         }
@@ -404,5 +613,19 @@ class WatchlistViewModel @Inject constructor(
 
     fun dismissToast() {
         _uiState.value = _uiState.value.copy(toastMessage = null)
+    }
+
+    companion object {
+        private const val LIBRARY_PAGE_SIZE = 60
+        private val BROWSABLE_LIBRARY_TYPES = setOf(
+            "",
+            "movie",
+            "movies",
+            "show",
+            "shows",
+            "series",
+            "tvshows",
+            "mixed"
+        )
     }
 }

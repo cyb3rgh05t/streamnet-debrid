@@ -1,7 +1,7 @@
 "use client";
 
 import { BadgeCheck, ExternalLink, Loader2, LogOut, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { config } from "@/lib/config";
 import { HttpError } from "@/lib/http";
 import {
@@ -22,20 +22,26 @@ const SHOW_TRIAL = true;
 // enabled. Fails OPEN on backend errors (a paying user is never locked out by a
 // hiccup) and CLOSED on a confirmed non-entitled state.
 export function EntitlementGate({ children }: { children: React.ReactNode }) {
-  const { signOut } = useApp();
-  const [state, setState] = useState<EntitlementState | null>(() => cachedEntitlement());
+  const { auth, signOut, goToLogin } = useApp();
+  const accountId = auth?.userId ?? null;
+  const [state, setState] = useState<EntitlementState | null>(() => cachedEntitlement(authClient));
   const [status, setStatus] = useState<"loading" | "ready" | "error">(state ? "ready" : "loading");
-  const checked = useRef(false);
 
   useEffect(() => {
-    if (!config.paywallEnabled || checked.current) return;
-    checked.current = true;
+    if (!config.paywallEnabled) return;
+    const cached = cachedEntitlement(authClient);
+    setState(cached);
+    if (!accountId) {
+      setStatus("ready");
+      return;
+    }
+    setStatus(cached ? "ready" : "loading");
     let active = true;
     void fetchEntitlement(authClient)
       .then((next) => { if (active) { setState(next); setStatus("ready"); } })
       .catch(() => { if (active) setStatus("error"); });
     return () => { active = false; };
-  }, []);
+  }, [accountId]);
 
   // Paywall off, or entitled → app. On a backend error with no cached "not
   // entitled", fail open so we never lock out a paying user over a hiccup.
@@ -53,7 +59,9 @@ export function EntitlementGate({ children }: { children: React.ReactNode }) {
   return (
     <PaywallScreen
       state={state}
+      isSignedIn={Boolean(auth)}
       onEntitled={(next) => setState(next)}
+      onConnect={goToLogin}
       onSignOut={signOut}
     />
   );
@@ -61,11 +69,15 @@ export function EntitlementGate({ children }: { children: React.ReactNode }) {
 
 function PaywallScreen({
   state,
+  isSignedIn,
   onEntitled,
+  onConnect,
   onSignOut
 }: {
   state: EntitlementState | null;
+  isSignedIn: boolean;
   onEntitled: (next: EntitlementState) => void;
+  onConnect: () => void;
   onSignOut: () => void;
 }) {
   const [busy, setBusy] = useState<"trial" | "link" | null>(null);
@@ -75,6 +87,10 @@ function PaywallScreen({
   const trialAvailable = state?.trialAvailable ?? true;
 
   const beginTrial = useCallback(async () => {
+    if (!isSignedIn) {
+      onConnect();
+      return;
+    }
     setBusy("trial"); setError(null);
     try {
       const next = await startTrial(authClient);
@@ -86,13 +102,15 @@ function PaywallScreen({
       // the backend hiccuped — say which, and give the dead-session case a way
       // out (the generic message left users stuck with no next step).
       const status = err instanceof HttpError ? err.status : null;
-      if (status === 401) setError("Your session has expired — sign out below and sign back in, then try again.");
-      else if (status === 409) setError("Your free trial has already been used.");
+      if (status === 401) {
+        onConnect();
+        return;
+      } else if (status === 409) setError("Your free trial has already been used.");
       else setError("Could not start the trial — please try again in a moment.");
     } finally {
       setBusy(null);
     }
-  }, [onEntitled]);
+  }, [isSignedIn, onConnect, onEntitled]);
 
   const link = useCallback(async () => {
     if (!kofiEmail.trim()) return;
@@ -142,7 +160,7 @@ function PaywallScreen({
         {SHOW_TRIAL && trialAvailable && !expired && (
           <button type="button" className="paywall-trial" onClick={() => void beginTrial()} disabled={busy !== null}>
             {busy === "trial" ? <Loader2 className="paywall-spinner" size={16} /> : <Sparkles size={16} />}
-            Start 24-hour free trial
+            {isSignedIn ? "Start 24-hour free trial" : "Connect to Cloud for free trial"}
           </button>
         )}
 
@@ -166,9 +184,11 @@ function PaywallScreen({
 
         {error && <p className="paywall-error">{error}</p>}
 
-        <button type="button" className="paywall-signout" onClick={onSignOut}>
-          <LogOut size={15} /> Sign out
-        </button>
+        {isSignedIn && (
+          <button type="button" className="paywall-signout" onClick={onSignOut}>
+            <LogOut size={15} /> Sign out
+          </button>
+        )}
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 package com.arflix.tv.data.repository
 
+import com.arflix.tv.BuildConfig
 import com.arflix.tv.data.api.StremioMetaPreview
 import com.arflix.tv.data.api.StremioStream
 import com.arflix.tv.data.api.StreamApi
@@ -44,7 +45,7 @@ class SportsRepository @Inject constructor(
         private const val CATEGORY_ARTWORK_TIMEOUT_MS = 1_500L
 
         private fun drawable(name: String): String =
-            "android.resource://com.arvio.tv/drawable/$name"
+            "android.resource://${BuildConfig.APPLICATION_ID}/drawable/$name"
     }
     data class SportsPlayback(
         val mediaId: Int,

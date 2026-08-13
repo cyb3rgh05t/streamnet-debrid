@@ -76,6 +76,12 @@ data class PersonMediaSearchResult(
     val items: List<MediaItem>
 )
 
+internal object HomeServerLibraryIdentity {
+    fun stableNativeId(sourceRef: String, itemId: String): Int {
+        return -("$sourceRef:$itemId".hashCode() and Int.MAX_VALUE).coerceAtLeast(1)
+    }
+}
+
 /**
  * Repository for media data from TMDB
  * Cross-references with Trakt for watched status
@@ -1872,6 +1878,54 @@ class MediaRepository @Inject constructor(
         )
     }
 
+    /**
+     * Native-first home-server browsing. Unlike home-screen catalog hydration,
+     * this does not wait for one TMDB details request per card. Provider artwork
+     * and metadata render immediately while a real TMDB id is retained whenever
+     * the server supplies one.
+     */
+    suspend fun loadHomeServerLibraryPage(
+        sourceRef: String,
+        offset: Int,
+        limit: Int,
+        sort: HomeServerLibrarySort = HomeServerLibrarySort.RECENTLY_ADDED,
+        mediaType: MediaType? = null,
+        searchQuery: String = ""
+    ): CategoryPageResult {
+        val page = homeServerRepository.loadCatalogItems(
+            sourceRef = sourceRef,
+            offset = offset,
+            limit = limit,
+            sort = sort,
+            mediaType = mediaType,
+            searchQuery = searchQuery,
+            propagateErrors = true
+        )
+        val items = page.items.map { serverItem ->
+            val tmdbId = serverItem.providerIds["tmdb"]?.toIntOrNull()?.takeIf { it > 0 }
+            val stableNativeId = HomeServerLibraryIdentity.stableNativeId(serverItem.sourceRef, serverItem.id)
+            MediaItem(
+                id = tmdbId ?: stableNativeId,
+                title = serverItem.title,
+                subtitle = serverItem.providerName,
+                overview = serverItem.overview,
+                year = serverItem.year?.toString().orEmpty(),
+                rating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
+                tmdbRating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
+                mediaType = serverItem.mediaType,
+                image = serverItem.imageUrl,
+                backdrop = serverItem.backdropUrl,
+                addedAt = serverItem.addedAt,
+                isHomeServer = true,
+                homeServerItemId = serverItem.id,
+                homeServerSourceRef = serverItem.sourceRef,
+                homeServerProvider = serverItem.providerName
+            )
+        }
+        cacheItems(items)
+        return CategoryPageResult(items = items, hasMore = page.hasMore)
+    }
+
     private suspend fun resolveHomeServerCatalogItem(item: HomeServerCatalogItem): MediaItem? {
         val providers = item.providerIds.mapKeys { it.key.lowercase(Locale.US) }
         providers["tmdb"]?.toIntOrNull()?.let { tmdbId ->
@@ -2781,6 +2835,7 @@ class MediaRepository @Inject constructor(
     suspend fun getMovieDetails(movieId: Int): MediaItem {
         val cacheKey = "movie_$movieId"
         getFromCache(detailsCache, cacheKey)?.let { cached ->
+            if (movieId < 0 && cached.isHomeServer) return cached
             if (cacheKey in fullDetailsCacheKeys) {
                 if (cached.imdbRating.isNotBlank()) return cached
                 val imdbRating = getImdbRating(MediaType.MOVIE, movieId)
@@ -2810,6 +2865,7 @@ class MediaRepository @Inject constructor(
     suspend fun getTvDetails(tvId: Int): MediaItem {
         val cacheKey = "tv_$tvId"
         getFromCache(detailsCache, cacheKey)?.let { cached ->
+            if (tvId < 0 && cached.isHomeServer) return cached
             if (cacheKey in fullDetailsCacheKeys) {
                 if (cached.imdbRating.isNotBlank()) return cached
                 val imdbRating = getImdbRating(MediaType.TV, tvId)
@@ -3515,7 +3571,7 @@ class MediaRepository @Inject constructor(
             "apple tv+" -> R.drawable.apple_tv_plus_logo
             else -> null
         } ?: return null
-        return "android.resource://com.arvio.tv/$resId"
+        return "android.resource://${context.packageName}/$resId"
     }
 
     private fun normalizeWatchRegion(region: String?): String {

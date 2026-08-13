@@ -116,4 +116,21 @@ class HomeServerMatcherTest {
             )
         )
     }
+
+    @Test
+    fun `native library ids remain stable across reloads`() {
+        val first = HomeServerLibraryIdentity.stableNativeId("server-a:movies", "item-42")
+        val second = HomeServerLibraryIdentity.stableNativeId("server-a:movies", "item-42")
+
+        assertEquals(first, second)
+        assertTrue(first < 0)
+    }
+
+    @Test
+    fun `same native item key on different servers does not collide`() {
+        val first = HomeServerLibraryIdentity.stableNativeId("server-a:movies", "item-42")
+        val second = HomeServerLibraryIdentity.stableNativeId("server-b:movies", "item-42")
+
+        assertNotEquals(first, second)
+    }
 }

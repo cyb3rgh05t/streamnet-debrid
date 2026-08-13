@@ -21,7 +21,7 @@ export interface EntitlementState {
   updatedAt?: string | null;
 }
 
-const CACHE_KEY = "arvio.web.entitlement.v1";
+const CACHE_KEY_PREFIX = "arvio.web.entitlement.v2";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 async function backendRequest<T>(auth: AuthClient, path: string, init: RequestInit = {}): Promise<T> {
@@ -35,17 +35,24 @@ async function backendRequest<T>(auth: AuthClient, path: string, init: RequestIn
   });
 }
 
-function readCache(): { at: number; state: EntitlementState } | null {
-  return loadStored<{ at: number; state: EntitlementState } | null>(CACHE_KEY, null);
+function accountCacheKey(auth: AuthClient): string | null {
+  const accountId = auth.session?.userId?.trim();
+  return accountId ? `${CACHE_KEY_PREFIX}:${accountId}` : null;
 }
 
-export function cachedEntitlement(): EntitlementState | null {
-  const cached = readCache();
+function readCache(auth: AuthClient): { at: number; state: EntitlementState } | null {
+  const key = accountCacheKey(auth);
+  return key ? loadStored<{ at: number; state: EntitlementState } | null>(key, null) : null;
+}
+
+export function cachedEntitlement(auth: AuthClient): EntitlementState | null {
+  const cached = readCache(auth);
   return cached && Date.now() - cached.at < CACHE_TTL_MS ? cached.state : null;
 }
 
-function cache(state: EntitlementState) {
-  saveStored(CACHE_KEY, { at: Date.now(), state });
+function cache(auth: AuthClient, state: EntitlementState) {
+  const key = accountCacheKey(auth);
+  if (key) saveStored(key, { at: Date.now(), state });
 }
 
 /** Fetch the live entitlement for the signed-in account. */
@@ -59,19 +66,20 @@ export async function fetchEntitlement(auth: AuthClient): Promise<EntitlementSta
   // state but the live read says none/expired, retry once before locking the
   // user out — never boot a paying user to the paywall over propagation lag.
   if (!state.entitled) {
-    const cached = cachedEntitlement();
+    const cached = cachedEntitlement(auth);
     if (cached?.entitled) {
       await new Promise((r) => setTimeout(r, 2500));
       const retry = await backendRequest<EntitlementState>(auth, "entitlement-status", { method: "GET" }).catch(() => null);
       if (retry?.entitled) state = retry;
     }
   }
-  cache(state);
+  cache(auth, state);
   return state;
 }
 
 /** Start the one-time 24h trial for the signed-in account. */
 export async function startTrial(auth: AuthClient): Promise<EntitlementState> {
+  if (!auth.session) throw new HttpError(401, "Sign in required");
   const attempt = () => backendRequest<EntitlementState>(auth, "entitlement-status", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -86,13 +94,17 @@ export async function startTrial(auth: AuthClient): Promise<EntitlementState> {
     // before surfacing an error — this was the main source of "could not
     // start the trial" reports.
     if (error instanceof HttpError && error.status === 401) {
-      await auth.refresh();
+      try {
+        await auth.refresh();
+      } catch {
+        throw new HttpError(401, "Session expired");
+      }
       state = await attempt();
     } else {
       throw error;
     }
   }
-  cache(state);
+  cache(auth, state);
   return state;
 }
 
@@ -103,7 +115,7 @@ export async function linkKofiEmail(auth: AuthClient, kofiEmail: string): Promis
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ kofiEmail })
   });
-  cache(state);
+  cache(auth, state);
   return state;
 }
 
