@@ -53,6 +53,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
@@ -64,6 +65,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -2586,6 +2589,36 @@ fun LiveTvScreen(
                 }
             )
     ) {
+        if (!isFullScreen) {
+            androidx.compose.foundation.Image(
+                painter = painterResource(R.drawable.live_tv_theatre_fanart),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.52f },
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            colors = listOf(
+                                LiveColors.Bg.copy(alpha = 0.72f),
+                                LiveColors.Bg.copy(alpha = 0.42f),
+                                LiveColors.Bg.copy(alpha = 0.66f),
+                            ),
+                        ),
+                    )
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                LiveColors.Bg.copy(alpha = 0.38f),
+                                Color.Transparent,
+                                LiveColors.Bg.copy(alpha = 0.58f),
+                            ),
+                        ),
+                    ),
+            )
+        }
         // Content area starts below the translucent top bar so it doesn't get
         // overwritten.
         if (isFullScreen) {

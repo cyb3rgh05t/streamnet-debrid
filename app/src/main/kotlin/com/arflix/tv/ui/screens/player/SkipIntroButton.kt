@@ -84,11 +84,16 @@ fun SkipIntroButton(
 
     val isVisible = shouldShow && (!autoHidden || controlsVisible)
 
-    // When visible while controls are hidden, take focus so Enter skips immediately.
-    LaunchedEffect(isVisible) {
+    // AnimatedVisibility attaches the focus target after its enter transition starts.
+    // Keep retrying until this button actually owns focus instead of accepting a
+    // request that succeeds while the player/HUD still owns the focus chain.
+    LaunchedEffect(isVisible, controlsVisible) {
         if (isVisible && !controlsVisible) {
-            delay(160)
-            runCatching { focusRequester.requestFocus() }
+            repeat(20) {
+                delay(100)
+                runCatching { focusRequester.requestFocus() }
+                if (isFocused) return@LaunchedEffect
+            }
         }
     }
 

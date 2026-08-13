@@ -109,7 +109,12 @@ fun NextEpisodeOverlay(
 
     LaunchedEffect(isVisible) {
         if (isVisible) {
-            runCatching { overlayFocusRequester.requestFocus() }
+            repeat(8) {
+                delay(80)
+                if (runCatching { overlayFocusRequester.requestFocus() }.isSuccess) {
+                    return@LaunchedEffect
+                }
+            }
         }
     }
 

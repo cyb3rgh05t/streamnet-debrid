@@ -60,7 +60,7 @@ val AppTopBarContentTopInset = 98.dp
 val MobileContentTopInset = 16.dp
 val AppTopBarHorizontalPadding = 28.dp
 
-// Navigation items that appear CENTERED in the top bar (Search, Home, Watchlist, TV).
+// Navigation items that appear CENTERED in the top bar.
 // Settings is NOT in this list — it's rendered as a standalone gear icon on the right.
 private val NAV_ITEMS = SidebarItem.entries.filter { it != SidebarItem.SETTINGS }
 

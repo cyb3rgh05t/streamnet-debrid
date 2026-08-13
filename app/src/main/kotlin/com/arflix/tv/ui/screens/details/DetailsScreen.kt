@@ -3768,13 +3768,20 @@ private fun EpisodeCard(
                     .background(
                         brush = Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.18f),
-                                Color.Transparent,
-                                Color.Black.copy(alpha = 0.28f),
+                                Color.Black.copy(alpha = 0.38f),
+                                Color.Black.copy(alpha = 0.12f),
+                                Color.Black.copy(alpha = 0.48f),
                                 Color.Black.copy(alpha = 0.86f)
                             )
                         )
                     )
+            )
+
+            // Keep episode titles and synopsis readable over bright stills.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.14f))
             )
 
             if (isSpoilerBlurred && Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
@@ -3888,7 +3895,7 @@ private fun EpisodeCard(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     ),
-                    color = Color.White,
+                    color = resolveAccentColor(fallback = Color.White),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )

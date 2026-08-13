@@ -5796,25 +5796,7 @@ private fun isLikelyHlsPlaybackUrl(url: String, stream: StreamSource?): Boolean 
         return true
     }
 
-    val uri = runCatching { Uri.parse(url) }.getOrNull() ?: return false
-    val host = uri.host.orEmpty().lowercase()
-    val path = uri.path.orEmpty().lowercase()
-    val streamText = buildString {
-        append(stream?.addonId.orEmpty())
-        append(' ')
-        append(stream?.addonName.orEmpty())
-        append(' ')
-        append(stream?.source.orEmpty())
-        append(' ')
-        append(stream?.quality.orEmpty())
-    }.lowercase()
-
-    // Sports live TV addons such as Highfly proxy the real .m3u8 behind
-    // /playlist/<token>, so extension sniffing would otherwise choose the
-    // progressive parser and fail with an unsupported container error.
-    val looksLikeSportsPlaylist = path.startsWith("/playlist/") &&
-        (host.contains("highfly") || streamText.contains("highfly") || streamText.contains("sports"))
-    return looksLikeSportsPlaylist
+    return false
 }
 
 private fun isLikelyHeavyStream(stream: StreamSource?): Boolean {

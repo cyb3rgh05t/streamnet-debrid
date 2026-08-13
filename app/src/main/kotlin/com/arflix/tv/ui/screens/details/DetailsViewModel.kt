@@ -13,7 +13,6 @@ import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.PersonDetails
 import com.arflix.tv.data.model.Review
-import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.data.model.Subtitle
 import com.arflix.tv.data.api.TmdbApi
@@ -182,7 +181,7 @@ private fun isSupplementalStream(stream: StreamSource): Boolean =
 private fun Addon.isVodStreamingAddon(): Boolean =
     isEnabled &&
         type != AddonType.SUBTITLE &&
-        !SportsAddonCapabilities.isSportsOnlyLiveTvAddon(this)
+        true
 
 @HiltViewModel
 class DetailsViewModel @Inject constructor(

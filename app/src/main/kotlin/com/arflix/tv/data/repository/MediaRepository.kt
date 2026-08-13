@@ -32,7 +32,6 @@ import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.PersonDetails
 import com.arflix.tv.data.model.Review
-import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.util.CatalogUrlParser
 import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -605,8 +604,6 @@ class MediaRepository @Inject constructor(
                 CatalogConfig("trending_movies", "Trending in Movies", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-movies"),
                 CatalogConfig("trending_tv", "Trending in Shows", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trakt-s-trending-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trakt-s-trending-shows"),
                 CatalogConfig("trending_anime", "Trending in Anime", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-anime-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-anime-shows"),
-                CatalogConfig(SportsAddonCapabilities.SPORTS_CATEGORY_ROW_ID, "Sports", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
-                CatalogConfig(SportsAddonCapabilities.POPULAR_LIVE_TV_ROW_ID, "Popular Live Sports", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
                 CatalogConfig("top10_movies_today", "Top 10 Movies Today", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/top-10-movies-of-the-day", sourceRef = "mdblist:https://mdblist.com/lists/snoak/top-10-movies-of-the-day"),
                 CatalogConfig("top10_shows_today", "Top 10 Shows Today", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/top-10-shows-of-the-day", sourceRef = "mdblist:https://mdblist.com/lists/snoak/top-10-shows-of-the-day"),
                 CatalogConfig("just_added", "Just Added", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-movies-digital-release", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-movies-digital-release"),
@@ -2870,6 +2867,84 @@ class MediaRepository @Inject constructor(
             .map { it.toMediaItem(MediaType.MOVIE) }
     }
 
+    /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
+    suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
+        val cleanedTitle = rawTitle
+            .replace(Regex("""\([^)]*\)|\[[^]]*]"""), " ")
+            .replace(Regex("""(?i)\b(live|hd|uhd|4k|s\d+e\d+|episode\s*\d+)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        if (cleanedTitle.length < 3) return null
+
+        val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
+        val languageOverrides = buildList<String?> {
+            add(null)
+            if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
+        }
+        val candidates = languageOverrides.flatMap { languageOverride ->
+            runCatching { search(cleanedTitle, languageOverride = languageOverride) }
+                .getOrDefault(emptyList<MediaItem>())
+        }.distinctBy { "${it.mediaType.name}:${it.id}" }
+
+        return candidates
+            .filter { !it.backdrop.isNullOrBlank() }
+            .maxByOrNull { item ->
+                val candidateTitle = normalizeIptvArtworkTitle(item.title)
+                when {
+                    candidateTitle == normalizedTitle -> 1_000.0
+                    candidateTitle.contains(normalizedTitle) || normalizedTitle.contains(candidateTitle) -> 700.0
+                    else -> artworkTitleOverlap(normalizedTitle, candidateTitle) * 100.0
+                } + (item.popularity / 100f)
+            }
+            ?.backdrop
+    }
+
+    suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
+        val cleanedTitle = rawTitle
+            .replace(Regex("""\([^)]*\)|\[[^]]*]"""), " ")
+            .replace(Regex("""(?i)\b(live|hd|uhd|4k|s\d+e\d+|episode\s*\d+)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+        if (cleanedTitle.length < 3) return null
+
+        val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
+        val candidates = buildList<String?> {
+            add(null)
+            if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
+        }.flatMap { languageOverride ->
+            runCatching { search(cleanedTitle, languageOverride = languageOverride) }
+                .getOrDefault(emptyList<MediaItem>())
+        }.distinctBy { "${it.mediaType.name}:${it.id}" }
+            .sortedByDescending { item ->
+                val candidateTitle = normalizeIptvArtworkTitle(item.title)
+                when {
+                    candidateTitle == normalizedTitle -> 1_000.0
+                    candidateTitle.contains(normalizedTitle) || normalizedTitle.contains(candidateTitle) -> 700.0
+                    else -> artworkTitleOverlap(normalizedTitle, candidateTitle) * 100.0
+                } + (item.popularity / 100f)
+            }
+
+        for (candidate in candidates.take(8)) {
+            getLogoUrl(candidate.mediaType, candidate.id)?.takeIf { it.isNotBlank() }?.let { return it }
+        }
+        return null
+    }
+
+    private fun normalizeIptvArtworkTitle(value: String): String =
+        value.lowercase(Locale.US)
+            .replace(Regex("""[^a-z0-9\s]"""), " ")
+            .replace(Regex("""\b(the|a|an|der|die|das)\b"""), " ")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+
+    private fun artworkTitleOverlap(left: String, right: String): Double {
+        val leftTokens = left.split(' ').filter { it.length > 1 }.toSet()
+        val rightTokens = right.split(' ').filter { it.length > 1 }.toSet()
+        if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
+        return leftTokens.intersect(rightTokens).size.toDouble() /
+            maxOf(leftTokens.size, rightTokens.size).toDouble()
+    }
+
     /**
      * Get season episodes with Trakt watched status
      */
@@ -2917,6 +2992,25 @@ class MediaRepository @Inject constructor(
         }
 
         val season = tmdbApi.getTvSeason(tvId, seasonNumber, apiKey, language = contentLanguage)
+        val needsArtworkFallback = season.episodes.any { it.stillPath.isNullOrBlank() }
+        val englishSeason = if (needsArtworkFallback && contentLanguage != "en-US") {
+            runCatching {
+                tmdbApi.getTvSeason(tvId, seasonNumber, apiKey, language = "en-US")
+            }.getOrNull()
+        } else {
+            null
+        }
+        val englishStillPaths = englishSeason?.episodes
+            ?.associateBy { it.episodeNumber }
+            .orEmpty()
+        val englishSeriesBackdrop = if (needsArtworkFallback) {
+            runCatching {
+                tmdbApi.getTvDetails(tvId, apiKey, language = "en-US").backdropPath
+            }.getOrNull()
+                ?.let { "${Constants.BACKDROP_BASE_LARGE}$it" }
+        } else {
+            null
+        }
         val episodeImdbRatings = getSeasonEpisodeImdbRatings(
             tvId = tvId,
             seasonNumber = seasonNumber,
@@ -2926,6 +3020,9 @@ class MediaRepository @Inject constructor(
         val episodes = season.episodes.map { episode ->
             val episodeKey = "show_tmdb:$tvId:$seasonNumber:${episode.episodeNumber}"
             episode.toEpisode().copy(
+                stillPath = episode.stillPath?.let { "${Constants.IMAGE_BASE}$it" }
+                    ?: englishStillPaths[episode.episodeNumber]?.stillPath?.let { "${Constants.IMAGE_BASE}$it" }
+                    ?: englishSeriesBackdrop,
                 imdbRating = episodeImdbRatings[seasonNumber to episode.episodeNumber].orEmpty(),
                 isWatched = episodeKey in watchedEpisodes
             )

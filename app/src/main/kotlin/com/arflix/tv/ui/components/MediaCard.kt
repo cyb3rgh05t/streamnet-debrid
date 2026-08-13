@@ -136,8 +136,7 @@ fun MediaCard(
     val collectionFocusUrl = if (isCollectionTile) {
         item.backdrop?.takeIf { it.isNotBlank() && it != item.image }
     } else null
-    val isSportsCollectionTile = item.status?.startsWith("collection:sports_collection:") == true
-    val showCollectionTitleOverlay = isCollectionTile && showTitle && !isSportsCollectionTile
+    val showCollectionTitleOverlay = isCollectionTile && showTitle
     val isGenreCollectionTile = item.collectionGroup == CollectionGroupKind.GENRE
     val rawImageUrl = if (visualFocused && enableFocusedImageSwap) {
         explicitFocusUrl ?: collectionFocusUrl ?: baseImageUrl

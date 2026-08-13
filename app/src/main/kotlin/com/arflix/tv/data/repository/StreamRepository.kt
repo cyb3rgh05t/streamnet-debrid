@@ -19,7 +19,6 @@ import com.arflix.tv.data.model.AddonType
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.QualityFilterConfig
 import com.arflix.tv.data.model.RuntimeKind
-import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.telegram.TelegramSourceResolver
 import com.arflix.tv.data.model.ProxyHeaders as ModelProxyHeaders
 import com.arflix.tv.data.model.StreamBehaviorHints as ModelStreamBehaviorHints
@@ -1439,9 +1438,6 @@ class StreamRepository @Inject constructor(
                     // Skip subtitle addons
                     if (addon.type == AddonType.SUBTITLE) return@filter false
 
-                    // Sports-only addons are queried by the sports home rows. Hybrid addons
-                    // can expose sports catalogs and regular movie/series streams together.
-                    if (SportsAddonCapabilities.isSportsOnlyLiveTvAddon(addon)) return@filter false
 
                     // Must have a URL to fetch from
                     if (addon.url.isNullOrBlank()) return@filter false
@@ -1479,7 +1475,6 @@ class StreamRepository @Inject constructor(
 
         // Apply id-prefix filtering per-call (varies by id, cheap string ops).
         return baseCandidates.filter { addon ->
-            if (SportsAddonCapabilities.isSportsOnlyLiveTvAddon(addon)) return@filter false
             if (addon.type == AddonType.CUSTOM) return@filter true
             val manifest = addon.manifest
             if (manifest != null && manifest.resources.isNotEmpty()) {

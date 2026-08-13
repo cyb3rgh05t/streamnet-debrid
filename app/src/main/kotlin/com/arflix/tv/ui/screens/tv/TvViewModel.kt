@@ -530,6 +530,7 @@ class TvViewModel @Inject constructor(
     }
 
     fun refreshPlaylist() {
+        programBackdropNegativeCache.clear()
         refresh(force = true, showLoading = false, forceEpg = true)
     }
 
@@ -2031,9 +2032,7 @@ class TvViewModel @Inject constructor(
         programBackdropCache[key]?.let { return it }
         if (key in programBackdropNegativeCache) return null
         return runCatching {
-            val results = mediaRepository.search(cleaned)
-            val best = results.firstOrNull { !it.backdrop.isNullOrBlank() }
-            val backdrop = best?.backdrop
+            val backdrop = mediaRepository.lookupIptvProgramBackdrop(rawTitle)
             if (backdrop.isNullOrBlank()) {
                 programBackdropNegativeCache.add(key)
                 null

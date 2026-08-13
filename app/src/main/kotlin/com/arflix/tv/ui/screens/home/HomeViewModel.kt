@@ -3571,6 +3571,11 @@ class HomeViewModel @Inject constructor(
             .filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99
             }
+            .sortedWith(
+                compareByDescending<ContinueWatchingItem> { it.updatedAtMs }
+                    .thenByDescending { it.resumePositionSeconds }
+                    .thenByDescending { it.progress }
+            )
             .take(Constants.MAX_CONTINUE_WATCHING)
     }
 
