@@ -272,7 +272,10 @@ class WatchlistViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
-                if (remoteConnected && !remoteSyncManager.removeFromWatchlist(item.mediaType, item.id)) {
+                val isAnime = item.mediaType == TV &&
+                    item.originalLanguage.equals("ja", ignoreCase = true) &&
+                    item.genreIds.contains(16)
+                if (remoteConnected && !remoteSyncManager.removeFromWatchlist(item.mediaType, item.id, isAnime)) {
                     throw IllegalStateException(context.getString(R.string.watchlist_failed_remove_trakt))
                 }
 

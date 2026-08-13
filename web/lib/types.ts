@@ -45,6 +45,10 @@ export interface MediaItem {
   // Home server (Plex/Jellyfin/Emby) direct playback
   isHomeServer?: boolean;
   homeServerUrl?: string | null;
+  // External metadata IDs & classification
+  isAnime?: boolean;
+  anilistId?: number | null;
+  tvdbId?: number | null;
 }
 
 export interface NextEpisode {
@@ -467,5 +471,12 @@ export interface AppSettings {
   favoriteGroupIds: string[];
   hiddenGroupIds: string[];
   groupOrder: string[];
+  // Metadata & API Keys
+  customTmdbApiKey: string;
+  customTvdbApiKey: string;
+  customTvdbUserPin: string;
+  metadataMovieProviders: string[];
+  metadataTvProviders: string[];
+  metadataAnimeProviders: string[];
   iptvSortOrder?: "provider" | "number" | "name";
 }

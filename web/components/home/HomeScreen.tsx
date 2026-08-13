@@ -142,7 +142,9 @@ export function HomeScreen() {
   ].filter(Boolean);
 
   return (
-    <div className="screen">
+    // has-hero mirrors the CSS :has(.hero) padding rule for TV browsers whose
+    // engines predate :has() support (Tizen/webOS).
+    <div className={displayHero ? "screen has-hero" : "screen"}>
       {displayHero && (
         <section className="hero" style={{ backgroundImage: displayHero.backdrop ? `url(${displayHero.backdrop})` : undefined }}>
           <div className="hero-copy" key={displayHero.id}>

@@ -126,7 +126,7 @@ private data class AccountSyncPayloadCandidate(
 private class AccountSyncPayloadRejectedException(message: String) : Exception(message)
 
 private fun parseJsonObject(payload: String): com.google.gson.JsonObject? {
-    return runCatching { JsonParser().parse(payload).asJsonObject }.getOrNull()
+    return try { JsonParser().parse(payload).asJsonObject } catch (e: com.google.gson.JsonSyntaxException) { null } catch (e: IllegalStateException) { null }
 }
 
 internal fun accountSyncPayloadProfileCount(payload: String): Int? {
@@ -225,7 +225,7 @@ private fun accountSyncPayloadsMatch(expected: String, actual: String?): Boolean
 
 private fun safePostgrestError(body: String): String {
     if (body.isBlank()) return "empty response"
-    val parsed = runCatching { JSONObject(body) }.getOrNull()
+    val parsed = try { JSONObject(body) } catch (e: org.json.JSONException) { null }
     return parsed?.optString("message")?.takeIf { it.isNotBlank() }
         ?: parsed?.optString("error")?.takeIf { it.isNotBlank() }
         ?: body.take(180)
@@ -679,7 +679,7 @@ class AuthRepository @Inject constructor(
 
             okHttpClient.newCall(request).execute().use { response ->
                 val body = response.body?.string().orEmpty()
-                val json = runCatching { JSONObject(body) }.getOrNull()
+                val json = try { JSONObject(body) } catch (e: org.json.JSONException) { null }
                 if (!response.isSuccessful) {
                     val message = cloudAuthErrorMessage(json, defaultError)
                     throw IllegalStateException(message)
@@ -1708,7 +1708,7 @@ class AuthRepository @Inject constructor(
 
     private suspend fun saveAccountSyncPayloadToNetlify(payload: String): Result<Unit> {
         return try {
-            val payloadValue = runCatching { JSONObject(payload) }.getOrNull() ?: payload
+            val payloadValue = try { JSONObject(payload) } catch (e: org.json.JSONException) { null } ?: payload
             val body = JSONObject()
                 .put("payload", payloadValue)
                 .toString()
@@ -1716,9 +1716,9 @@ class AuthRepository @Inject constructor(
                 url = Constants.NETLIFY_ACCOUNT_SYNC_PUSH_URL,
                 body = body
             )
-            val responseJson = runCatching { JSONObject(responseBody) }.getOrNull()
-            if (responseJson?.optBoolean("accepted", true) == false) {
-                val reason = responseJson.optString("reason", "existing_snapshot_is_richer")
+            val responseJson = try { JSONObject(responseBody) } catch (e: org.json.JSONException) { null }
+            if (responseJson == null || !responseJson.optBoolean("accepted", false)) {
+                val reason = responseJson?.optString("reason", "invalid_response") ?: "invalid_response"
                 throw AccountSyncPayloadRejectedException("Cloud sync upload rejected: $reason")
             }
             Result.success(Unit)
@@ -1752,7 +1752,7 @@ class AuthRepository @Inject constructor(
                             "Cloud sync upload failed (${response.code}): ${safePostgrestError(responseBody)}"
                         )
                     }
-                    val rpcJson = runCatching { JSONObject(responseBody) }.getOrNull()
+                    val rpcJson = try { JSONObject(responseBody) } catch (e: org.json.JSONException) { null }
                     if (rpcJson?.optBoolean("accepted", true) == false) {
                         val reason = rpcJson.optString("reason", "existing_snapshot_is_richer")
                         throw AccountSyncPayloadRejectedException("Cloud sync upload rejected: $reason")
@@ -2110,7 +2110,13 @@ class AuthRepository @Inject constructor(
 
     private fun parseInstantMillis(value: String?): Long {
         if (value.isNullOrBlank()) return 0L
-        return runCatching { Instant.parse(value).toEpochMilliseconds() }.getOrDefault(0L)
+        return try {
+            Instant.parse(value).toEpochMilliseconds()
+        } catch (e: IllegalArgumentException) {
+            0L
+        } catch (e: java.time.format.DateTimeParseException) {
+            0L
+        }
     }
 
     private fun encodeProfileAccountSyncPayload(existingAddons: String?, payload: String): String {
@@ -2139,7 +2145,7 @@ class AuthRepository @Inject constructor(
             val root = if (existingPayload.isBlank()) {
                 JSONObject()
             } else {
-                runCatching { JSONObject(existingPayload) }.getOrElse { JSONObject() }
+                try { JSONObject(existingPayload) } catch (e: org.json.JSONException) { JSONObject()  }
             }
 
             root.put("version", root.optInt("version", 1))

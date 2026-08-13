@@ -5,6 +5,7 @@ import { jsonRequest } from "./http";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
 import { tmdbImageUrl } from "./mediaImages";
 import type { TraktToken } from "./trakt";
+import type { SimklToken } from "./simkl";
 import type { AppSettings, InstalledAddon, IptvPlaylistEntry, MediaItem, Profile, QualityFilterConfig, WatchHistoryEntry } from "./types";
 
 export interface CloudPayload {
@@ -662,6 +663,9 @@ export async function pullCloudPayload(auth: AuthClient, profileId?: string | nu
   const hiddenCatalogIds = scopedValue<string[]>(root, "hiddenPreinstalledByProfile", profileId);
   const profileAddons = scopedValue<InstalledAddon[]>(root, "addonsByProfile", profileId);
   const legacySettings = objectRecord<unknown>(root.settings) as Partial<AppSettings>;
+  delete legacySettings.customTmdbApiKey;
+  delete legacySettings.customTvdbApiKey;
+  delete legacySettings.customTvdbUserPin;
   const legacyCatalogs = arrayValue(root.catalogs) as AppSettings["catalogs"];
   const legacyHiddenCatalogIds = arrayValue<string>(root.hiddenPreinstalledCatalogs);
   // Canonical, timestamp-managed GLOBAL settings live at the top level of the payload (written by
@@ -751,7 +755,8 @@ export async function saveCloudSettings(
     // exclusively through saveCloudAddons (merge-protected). A stale session's
     // partial in-memory addon list must never leak into the shared payload.
     void addons;
-    root.settings = settings;
+    const { customTmdbApiKey: _k1, customTvdbApiKey: _k2, customTvdbUserPin: _k3, ...sanitizedSettings } = settings;
+    root.settings = sanitizedSettings;
 
     // ── Genuine global settings that Android merges by per-field timestamp. Only write + bump the
     //    timestamp when the web actually changed the field vs its baseline; otherwise leave the
@@ -898,6 +903,50 @@ export async function saveCloudTraktToken(auth: AuthClient, token: TraktToken, p
     };
     root.traktTokens = tokens;
     root.traktLinked = true;
+  });
+}
+
+export async function pullCloudSimklToken(auth: AuthClient, profileId?: string | null): Promise<SimklToken | null> {
+  if (!profileId) return null;
+  const root = await pullRawPayload(auth);
+  const directTokens = objectRecord<{ access_token?: string; accessToken?: string }>(root.simklTokens);
+  const selections = objectRecord<{ provider?: string; simklAccessToken?: string }>(root.mdbListSyncByProfile);
+  const direct = directTokens[profileId];
+  const selection = selections[profileId];
+  const accessToken = direct?.access_token ?? direct?.accessToken ?? selection?.simklAccessToken;
+  return accessToken ? { access_token: accessToken } : null;
+}
+
+export async function saveCloudSimklToken(
+  auth: AuthClient,
+  token: SimklToken | null,
+  profileId?: string | null
+) {
+  if (!profileId) return;
+  await mutateCloudPayload(auth, (root) => {
+    const directTokens = objectRecord<unknown>(root.simklTokens) ?? {};
+    const selections = objectRecord<Record<string, unknown>>(root.mdbListSyncByProfile) ?? {};
+    const currentSelection = selections[profileId] ?? {};
+    if (token?.access_token) {
+      directTokens[profileId] = {
+        access_token: token.access_token,
+        accessToken: token.access_token
+      };
+      selections[profileId] = {
+        ...currentSelection,
+        provider: "SIMKL",
+        simklAccessToken: token.access_token
+      };
+    } else {
+      delete directTokens[profileId];
+      const { simklAccessToken: _removed, ...remaining } = currentSelection;
+      selections[profileId] = {
+        ...remaining,
+        provider: String(currentSelection.provider ?? "").toLowerCase() === "simkl" ? "NONE" : currentSelection.provider
+      };
+    }
+    root.simklTokens = directTokens;
+    root.mdbListSyncByProfile = selections;
   });
 }
 

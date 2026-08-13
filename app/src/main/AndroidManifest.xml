@@ -20,7 +20,7 @@
         android:name=".ArflixApplication"
         android:allowBackup="false"
         android:banner="@drawable/app_banner"
-        android:enableOnBackInvokedCallback="false"
+        android:enableOnBackInvokedCallback="true"
         android:extractNativeLibs="false"
         android:hardwareAccelerated="true"
         android:largeHeap="true"

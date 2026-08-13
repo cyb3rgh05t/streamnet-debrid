@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.plugin
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -121,6 +122,10 @@ fun PluginScreen(
             }
             onEnterTriggerHandled()
         }
+    }
+
+    BackHandler {
+        onBackPressed()
     }
 
     if (isMobile) {

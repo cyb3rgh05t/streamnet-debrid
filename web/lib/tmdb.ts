@@ -1,5 +1,8 @@
 import { config } from "./config";
 import { apiProxiedUrl, jsonRequest, proxiedUrl } from "./http";
+import { fetchAniZipMappingByTmdbId } from "./metadata/anizip";
+import { MetadataDispatcher } from "./metadata/dispatcher";
+import type { MetadataLookupIds, MetadataMediaType, MetadataProviderId, ProviderPriorityConfig } from "./metadata/types";
 import { tmdbImageUrl } from "./mediaImages";
 import { loadStored, saveStored } from "./storage";
 import type { CatalogConfig, Category, CollectionSourceConfig, EpisodeInfo, HomeServerConfig, InstalledAddon, MediaItem, MediaType, PersonDetails, ReviewInfo } from "./types";
@@ -92,8 +95,22 @@ export function genreNamesFromIds(ids?: number[]): string[] {
   return (ids ?? []).map((id) => TMDB_GENRES[id]).filter(Boolean);
 }
 
+export function isAnime(item: TmdbItem | Partial<MediaItem>): boolean {
+  if ("isAnime" in item && typeof item.isAnime === "boolean") return item.isAnime;
+  const genreIds = ("genre_ids" in item ? item.genre_ids : "genreIds" in item ? item.genreIds : []) ?? [];
+  const genres = ("genres" in item ? item.genres : []) ?? [];
+  const hasAnimation = genreIds.includes(16) || (genres as any[]).some((g: any) =>
+    typeof g === "string" ? g.toLowerCase() === "animation" : g.id === 16 || g.name === "Animation"
+  );
+  const origLang = ("original_language" in item ? item.original_language : "originalLanguage" in item ? item.originalLanguage : "") ?? "";
+  return hasAnimation && (origLang === "ja" || origLang === "jp");
+}
+
 export function mapTmdbItem(item: TmdbItem, fallbackType: MediaType): MediaItem {
-  const mediaType: MediaType = item.media_type === "tv" || fallbackType === "tv" ? "tv" : "movie";
+  const mediaType: MediaType = item.media_type === "tv" || fallbackType === "tv"
+    ? "tv"
+    : "movie";
+  const animeFlag = isAnime(item);
   const date = mediaType === "movie" ? item.release_date : item.first_air_date;
   const runtime = item.runtime ?? item.episode_run_time?.[0];
   return {
@@ -105,6 +122,7 @@ export function mapTmdbItem(item: TmdbItem, fallbackType: MediaType): MediaItem 
     rating: item.vote_average ? item.vote_average.toFixed(1) : "",
     duration: runtime ? `${runtime}m` : "",
     mediaType,
+    isAnime: animeFlag,
     image: tmdbImageUrl(config.imageBase, item.poster_path),
     backdrop: tmdbImageUrl(config.backdropBase, item.backdrop_path) || null,
     genreIds: item.genre_ids ?? []
@@ -119,7 +137,7 @@ export function mapTmdbItem(item: TmdbItem, fallbackType: MediaType): MediaItem 
 let tmdbCooldownUntil = 0;
 const TMDB_COOLDOWN_MS = 30_000;
 
-async function tmdb<T>(path: string, params: Record<string, string | number | undefined> = {}) {
+export async function tmdb<T>(path: string, params: Record<string, string | number | undefined> = {}, customKey?: string) {
   const url = new URL(`/api/tmdb/${path.replace(/^\/+/, "")}`, window.location.origin);
   // Never surface adult titles anywhere in the app (discover/search/trending).
   url.searchParams.set("include_adult", "false");
@@ -129,6 +147,10 @@ async function tmdb<T>(path: string, params: Record<string, string | number | un
   if (Date.now() < tmdbCooldownUntil) {
     throw new Error("Rate limited — TMDB requests are pausing briefly.");
   }
+  const headers: Record<string, string> = {};
+  if (customKey?.trim()) {
+    headers["X-TMDB-API-Key"] = customKey.trim();
+  }
   // Timeout + one retry. Callers swallow failures and render partial UI (a
   // details page without seasons/cast, "No episodes found"), so a single
   // dropped request during the startup burst must not be terminal — and a
@@ -137,6 +159,7 @@ async function tmdb<T>(path: string, params: Record<string, string | number | un
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
       return await jsonRequest<T>(url.toString(), {
+        headers: Object.keys(headers).length > 0 ? headers : undefined,
         signal: typeof AbortSignal.timeout === "function" ? AbortSignal.timeout(12_000) : undefined
       });
     } catch (error) {
@@ -237,7 +260,7 @@ export async function loadCatalog(
   }
 
   if (catalog.sourceType === "trakt" && catalog.sourceUrl) {
-    const refs = await loadTraktPublicList(catalog.sourceUrl);
+    const refs = await loadTraktPublicList(catalog.sourceUrl) as Array<{ type: MediaType; id: number }>;
     const details = await hydrateRefs(refs, language);
     return {
       id: catalog.id,
@@ -323,7 +346,7 @@ async function loadCollectionSource(
   if (kind === "CURATED_IDS") {
     const refs = (source.curatedRefs ?? [])
       .map(parseCuratedRef)
-      .filter((ref): ref is { type: MediaType; id: number } => Boolean(ref));
+      .filter(<T>(ref: T | null): ref is NonNullable<T> => Boolean(ref));
     const items = await Promise.all(refs.map((ref) => getBasicItem(ref.type, ref.id, language).catch(() => null)));
     return items.filter((item): item is MediaItem => Boolean(item));
   }
@@ -510,7 +533,7 @@ async function loadMdblist(catalog: CatalogConfig, language: string) {
         : [];
   const ids = rawItems
     .map((item) => extractMdblistIdentity(item as MdblistItem, catalog.mediaType))
-    .filter((item): item is { id: number; type: MediaType } => Boolean(item?.id));
+    .filter(<T>(item: T | null | undefined): item is NonNullable<T> => Boolean((item as any)?.id));
   return hydrateRefs(ids, language);
 }
 
@@ -600,7 +623,7 @@ async function loadTraktPublicList(sourceUrl: string) {
       const id = type === "tv" ? item.show?.ids?.tmdb : item.movie?.ids?.tmdb;
       return id ? { type, id } : null;
     })
-    .filter((item): item is { type: MediaType; id: number } => Boolean(item));
+    .filter(<T>(item: T | null): item is NonNullable<T> => Boolean(item));
 }
 
 function parseTraktUrl(sourceUrl: string): { type: "user"; user: string; slug: string } | { type: "list"; slug: string } | null {
@@ -835,14 +858,76 @@ const seriesEpisodeRatingsCache = new Map<string, Map<string, string>>();
 const SEASON_EPISODE_CACHE_KEY = "arvio.web.seasonEpisodes.v1";
 const SEASON_EPISODE_CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 
-export async function getSeasonEpisodes(tvId: number, seasonNumber: number, language = "en-US"): Promise<EpisodeInfo[]> {
+export interface SeasonMetadataContext {
+  tvdbId?: number | null;
+  anilistId?: number | null;
+  isAnime?: boolean;
+}
+
+function providersBeforeTmdb(type: MetadataMediaType, configOverride?: ProviderPriorityConfig): ProviderPriorityConfig | null {
+  const priority = MetadataDispatcher.getPriorityList(type, configOverride);
+  const tmdbIndex = priority.indexOf("tmdb");
+  const providers = priority.slice(0, tmdbIndex >= 0 ? tmdbIndex : priority.length);
+  if (providers.length === 0) return null;
+
+  const movieProviders: MetadataProviderId[] = configOverride?.movieProviders ?? ["tmdb"];
+  const tvProviders: MetadataProviderId[] = configOverride?.tvProviders ?? ["tvdb", "tmdb"];
+  const animeProviders: MetadataProviderId[] = configOverride?.animeProviders ?? ["anilist", "tvdb", "tmdb"];
+  return {
+    ...configOverride,
+    movieProviders: type === "movie" ? providers : movieProviders,
+    tvProviders: type === "tv" ? providers : tvProviders,
+    animeProviders: type === "anime" ? providers : animeProviders
+  };
+}
+
+export async function getSeasonEpisodes(
+  tvId: number,
+  seasonNumber: number,
+  language = "en-US",
+  priorityConfig?: ProviderPriorityConfig,
+  metadataContext?: SeasonMetadataContext
+): Promise<EpisodeInfo[]> {
+  const metadataType: MetadataMediaType = metadataContext?.isAnime ? "anime" : "tv";
+  const externalConfig = providersBeforeTmdb(metadataType, priorityConfig);
+  const lookup: MetadataLookupIds = {
+    tmdb: tvId,
+    tvdb: metadataContext?.tvdbId,
+    anilist: metadataContext?.anilistId
+  };
+  // TMDB numbering remains canonical for playback. TVDB metadata can enrich a
+  // matching normal-TV episode, but must never replace the list or its numbers.
+  // Anime numbering differs frequently between providers, so it is deliberately
+  // excluded until a verified per-episode ID mapping exists.
+  const externalEpisodesPromise = externalConfig && metadataType === "tv"
+    ? MetadataDispatcher.getEpisodes(lookup, metadataType, seasonNumber, externalConfig).catch(() => [])
+    : Promise.resolve([] as EpisodeInfo[]);
+  const enrichEpisodes = async (episodes: EpisodeInfo[]) => {
+    const externalEpisodes = await externalEpisodesPromise;
+    if (externalEpisodes.length === 0) return episodes;
+    const externalByNumber = new Map(
+      externalEpisodes.map((episode) => [`${episode.seasonNumber}:${episode.episodeNumber}`, episode])
+    );
+    return episodes.map((episode) => {
+      const external = externalByNumber.get(`${episode.seasonNumber}:${episode.episodeNumber}`);
+      if (!external) return episode;
+      return {
+        ...episode,
+        name: external.name || episode.name,
+        overview: external.overview || episode.overview,
+        still: external.still || episode.still,
+        airDate: external.airDate || episode.airDate,
+        runtime: external.runtime || episode.runtime
+      };
+    });
+  };
   const key = `${tvId}:${seasonNumber}:${language}`;
   const memo = seasonCache.get(key);
-  if (memo?.length) return memo;
+  if (memo?.length) return enrichEpisodes(memo);
   const cached = readSeasonEpisodesCache(key);
   if (cached) {
     seasonCache.set(key, cached);
-    return cached;
+    return enrichEpisodes(cached);
   }
   try {
     // IMDb episode ratings (external_ids + cinemeta) run in parallel but are
@@ -850,7 +935,8 @@ export async function getSeasonEpisodes(tvId: number, seasonNumber: number, lang
     // list (the cinemeta proxy call has no timeout and can hang for a long time).
     const season = await tmdb<{ episodes?: Array<{ id: number; episode_number: number; name?: string; overview?: string; still_path?: string | null; vote_average?: number; air_date?: string; runtime?: number }> }>(
       `tv/${tvId}/season/${seasonNumber}`,
-      { language }
+      { language },
+      priorityConfig?.customTmdbApiKey
     );
     // Real IMDb ratings need the episode numbers first (the imdb id lives on the
     // per-episode endpoint), so this starts after the season lands and still
@@ -887,7 +973,7 @@ export async function getSeasonEpisodes(tvId: number, seasonNumber: number, lang
       // session then refetches with ratings instead of pinning them missing.
       if (!ratingsTimedOut) writeSeasonEpisodesCache(key, episodes);
     }
-    return episodes;
+    return enrichEpisodes(episodes);
   } catch {
     return [];
   }
@@ -1078,14 +1164,14 @@ export async function getBasicItem(mediaType: MediaType, id: number, language = 
 const detailsPayloadCache = new Map<string, { at: number; payload: TmdbItem }>();
 const DETAILS_CACHE_TTL_MS = 10 * 60 * 1000;
 
-async function fetchDetailsPayload(item: MediaItem) {
+async function fetchDetailsPayload(item: MediaItem, customApiKey?: string) {
   const key = `${item.mediaType}-${item.id}`;
   const cached = detailsPayloadCache.get(key);
   if (cached && Date.now() - cached.at < DETAILS_CACHE_TTL_MS) return cached.payload;
   const payload = await tmdb<TmdbItem>(`${item.mediaType}/${item.id}`, {
     language: "en-US",
     append_to_response: "credits,videos,similar,recommendations,external_ids,watch/providers"
-  });
+  }, customApiKey);
   detailsPayloadCache.set(key, { at: Date.now(), payload });
   if (detailsPayloadCache.size > 60) {
     const oldest = [...detailsPayloadCache.entries()].sort((a, b) => a[1].at - b[1].at)[0];
@@ -1131,10 +1217,30 @@ export async function getTitlesForSearch(
   }
 }
 
-export async function getDetails(item: MediaItem) {
+export async function getDetails(item: MediaItem, priorityConfig?: ProviderPriorityConfig) {
   try {
-    const details = await fetchDetailsPayload(item);
+    const details = await fetchDetailsPayload(item, priorityConfig?.customTmdbApiKey);
     const mapped = mapTmdbItem({ ...details, media_type: item.mediaType }, item.mediaType);
+    const anime = item.isAnime || isAnime(item) || isAnime(details);
+    const aniZipMapping = anime
+      ? await fetchAniZipMappingByTmdbId(item.id).catch(() => null)
+      : null;
+    const anilistId = item.anilistId ?? aniZipMapping?.anilistId ?? null;
+    const tvdbId = details.external_ids?.tvdb_id ?? item.tvdbId ?? aniZipMapping?.tvdbId ?? null;
+    const imdbId = details.external_ids?.imdb_id ?? item.imdbId ?? null;
+
+    let resolvedMeta: MediaItem | null = null;
+    const metadataType: MetadataMediaType = anime ? "anime" : item.mediaType;
+    const externalConfig = providersBeforeTmdb(metadataType, priorityConfig);
+    if (externalConfig) {
+      const lookup: MetadataLookupIds = {
+        tmdb: item.id,
+        tvdb: tvdbId,
+        anilist: anilistId
+      };
+      resolvedMeta = await MetadataDispatcher.getDetails(lookup, metadataType, externalConfig).catch(() => null);
+    }
+
     const trailer = details.videos?.results?.find((video) => video.site === "YouTube" && video.type === "Trailer" && video.official)
       ?? details.videos?.results?.find((video) => video.site === "YouTube" && video.type === "Trailer")
       ?? details.videos?.results?.find((video) => video.site === "YouTube");
@@ -1145,10 +1251,21 @@ export async function getDetails(item: MediaItem) {
     return {
       ...item,
       ...mapped,
-      rating: mapped.rating || item.rating,
-      imdbId: details.external_ids?.imdb_id ?? item.imdbId ?? null,
+      id: item.id, // Preserve canonical TMDB ID
+      anilistId: resolvedMeta?.anilistId ?? anilistId,
+      tvdbId: tvdbId ?? resolvedMeta?.tvdbId ?? item.tvdbId ?? null,
+      ...(resolvedMeta ? {
+        title: resolvedMeta.title || mapped.title,
+        overview: resolvedMeta.overview || mapped.overview,
+        rating: resolvedMeta.rating || mapped.rating,
+        badge: resolvedMeta.badge || mapped.badge,
+        image: resolvedMeta.image || mapped.image,
+        backdrop: resolvedMeta.backdrop || mapped.backdrop
+      } : {}),
+      rating: resolvedMeta?.rating || mapped.rating || item.rating,
+      imdbId,
       genres: (details.genres ?? []).map((genre) => genre.name).filter(Boolean),
-      status: details.status ?? null,
+      status: resolvedMeta?.status || (details.status ?? null),
       budget: details.budget ?? null,
       revenue: details.revenue ?? null,
       originalLanguage: details.original_language ?? null,

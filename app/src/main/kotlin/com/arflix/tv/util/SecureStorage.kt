@@ -21,6 +21,8 @@ object SecureStorage {
     private const val IV_LENGTH = 12
     private const val PREFIX = "enc:v1:"
 
+    fun isEncrypted(value: String?): Boolean = value?.startsWith(PREFIX) == true
+
     fun encrypt(plainText: String, alias: String): String {
         if (plainText.isBlank()) return plainText
         if (plainText.startsWith(PREFIX)) return plainText

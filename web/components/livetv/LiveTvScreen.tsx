@@ -611,7 +611,9 @@ function GuideRow({ channel, guide, selected, windowStart, windowEnd, totalWidth
   }, [guide, windowStart, windowEnd]);
 
   return (
-    <div ref={rowRef} className={`livetv-guide-row ${selected ? "is-selected" : ""}`} onMouseEnter={onFocus} role="row">
+    // onFocus mirrors ChannelRow: React's bubbling focus from the inner
+    // channel button keeps the details pane in sync for D-pad/remote users.
+    <div ref={rowRef} className={`livetv-guide-row ${selected ? "is-selected" : ""}`} onMouseEnter={onFocus} onFocus={onFocus} role="row">
       <button type="button" className="livetv-guide-channel" onClick={onPlay} title={channel.name}>
         <span className="livetv-row-logo">{channel.logo ? <img src={channel.logo} alt="" loading="lazy" /> : <Tv size={16} />}</span>
         <strong>{channel.name}</strong>

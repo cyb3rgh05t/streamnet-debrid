@@ -296,6 +296,10 @@ class IptvRepository @Inject constructor(
     private var cachedGroupedChannels: Map<String, List<IptvChannel>> = emptyMap()
     @Volatile var cachedStalkerApi: com.arflix.tv.data.api.StalkerApi? = null
 
+    /** (store key, channel count) — see [pagedChannelStoreCount]. */
+    @Volatile
+    private var cachedPagedChannelStoreCount: Pair<String, Int>? = null
+
     @Volatile
     private var groupOrderLocallyDirty = false
 
@@ -1352,9 +1356,12 @@ class IptvRepository @Inject constructor(
             if (pattern in setOf("Y", "m", "d", "H", "M", "S")) {
                 return@replace match.value
             }
-            try { Result.success(dateTime.format(IptvRepoDateRegexes.formatterFor(pattern))) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e
- Result.failure<String>(e) }
-                .getOrDefault(match.value)
+            try {
+                dateTime.format(IptvRepoDateRegexes.formatterFor(pattern))
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                match.value
+            }
         }
     }
 
@@ -2391,8 +2398,34 @@ class IptvRepository @Inject constructor(
     fun pagedChannelWindow(playlistId: String?, groupTitle: String?, offset: Int, limit: Int): List<IptvChannel> =
         runCatching { channelStore.windowForPlaylistGroup(currentEpgIndexKey, playlistId, groupTitle, offset, limit) }.getOrDefault(emptyList())
 
-    fun pagedChannelStoreCount(): Int =
-        runCatching { channelStore.count(currentEpgIndexKey) }.getOrDefault(0)
+    /**
+     * Number of channels in the paged store.
+     *
+     * Cached per store key. The uncached version ran a `COUNT(*)` over a 90MB
+     * SQLite database, and callers ask this on the main thread on every focus
+     * change (via TvViewModel.isActiveLargeIptvList). Under sustained d-pad
+     * navigation those queries queued on the connection pool until the main
+     * thread blocked past the ANR threshold and Android killed the app —
+     * captured on device: "Waited 10010ms for KeyEvent", main thread parked in
+     * SQLiteConnectionPool.waitForConnection under IptvChannelStore.count.
+     *
+     * The count only changes when the store is rewritten, so [invalidatePagedChannelStoreCount]
+     * clears it there.
+     */
+    fun pagedChannelStoreCount(): Int {
+        val key = currentEpgIndexKey
+        cachedPagedChannelStoreCount?.let { (cachedKey, cachedCount) ->
+            if (cachedKey == key) return cachedCount
+        }
+        val count = runCatching { channelStore.count(key) }.getOrDefault(0)
+        cachedPagedChannelStoreCount = key to count
+        return count
+    }
+
+    /** Drop the cached channel count after the paged store changes. */
+    fun invalidatePagedChannelStoreCount() {
+        cachedPagedChannelStoreCount = null
+    }
 
     fun pagedChannelGroupCounts(): List<Pair<String, Int>> =
         runCatching { channelStore.groupCounts(currentEpgIndexKey) }.getOrDefault(emptyList())
@@ -2960,6 +2993,7 @@ class IptvRepository @Inject constructor(
 
     private fun deletePersistedSourceCaches(sourceKey: String) {
         runCatching { channelStore.deleteSource(sourceKey) }
+        invalidatePagedChannelStoreCount()
         runCatching { epgIndex.deleteSource(sourceKey) }
         runCatching { cacheFile().delete() }
         runCatching { channelCacheFile().delete() }
@@ -7926,6 +7960,7 @@ class IptvRepository @Inject constructor(
                     System.err.println("[IPTV-Paged] Keeping full channel store ($existingCount); skip partial write ${channels.size}")
                 } else {
                     channelStore.replaceAll(key, channels, loadedAtMs)
+                    invalidatePagedChannelStoreCount()
                 }
             }
 
@@ -8035,6 +8070,7 @@ class IptvRepository @Inject constructor(
             if (count in PARTIAL_PAGED_CACHE_REPAIR_COUNTS && hasAnyConfiguredSource(config)) {
                 System.err.println("[IPTV-Paged] Repairing partial channel store count=$count; forcing playlist cache reload")
                 runCatching { channelStore.deleteSource(key) }
+                invalidatePagedChannelStoreCount()
                 return@runCatching
             }
             if (count > 0) {

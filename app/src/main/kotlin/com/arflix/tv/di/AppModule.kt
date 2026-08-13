@@ -91,6 +91,64 @@ object AppModule {
     @Provides
     @Singleton
     @JvmStatic
+    fun provideSimklApi(okHttpClient: OkHttpClient): com.arflix.tv.data.api.SimklApi {
+        var lastPostTimestampMs = 0L
+        val postLock = Any()
+
+        val simklClient = okHttpClient.newBuilder()
+            .addInterceptor { chain ->
+                val original = chain.request()
+
+                // Enforce 1 POST request per second per Simkl API policy
+                if (original.method.equals("POST", ignoreCase = true)) {
+                    synchronized(postLock) {
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        val elapsed = now - lastPostTimestampMs
+                        if (elapsed < 1000L) {
+                            val sleepTime = 1000L - elapsed
+                            try {
+                                Thread.sleep(sleepTime)
+                            } catch (_: InterruptedException) {}
+                        }
+                        lastPostTimestampMs = android.os.SystemClock.elapsedRealtime()
+                    }
+                }
+
+                val originalUrl = original.url
+                val urlBuilder = originalUrl.newBuilder()
+                if (originalUrl.queryParameter("client_id") == null) {
+                    urlBuilder.addQueryParameter("client_id", Constants.SIMKL_CLIENT_ID)
+                }
+                if (originalUrl.queryParameter("app-name") == null) {
+                    urlBuilder.addQueryParameter("app-name", "ARVIO")
+                }
+                if (originalUrl.queryParameter("app-version") == null) {
+                    urlBuilder.addQueryParameter("app-version", com.arflix.tv.BuildConfig.VERSION_NAME)
+                }
+
+                val requestBuilder = original.newBuilder()
+                    .url(urlBuilder.build())
+                    .header("User-Agent", "ARVIO/${com.arflix.tv.BuildConfig.VERSION_NAME} (Android TV)")
+
+                if (original.header("simkl-api-key") == null) {
+                    requestBuilder.header("simkl-api-key", Constants.SIMKL_CLIENT_ID)
+                }
+
+                chain.proceed(requestBuilder.build())
+            }
+            .build()
+
+        return Retrofit.Builder()
+            .baseUrl(Constants.SIMKL_BASE_URL)
+            .client(simklClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(com.arflix.tv.data.api.SimklApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
     fun provideSupabaseApi(okHttpClient: OkHttpClient): SupabaseApi {
         // Supabase API client without disk cache to prevent OkHttp from returning
         // cached responses for POST/upsert operations (which silently drops writes)

@@ -24,9 +24,9 @@ interface RemoteSyncProvider {
 
     // ===== Watchlist (remote is source of truth while connected) =====
 
-    suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int): Boolean
+    suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean = false): Boolean
 
-    suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int): Boolean
+    suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean = false): Boolean
 
     /** Pull the remote watchlist. Returns null when the fetch could not run. */
     suspend fun getWatchlist(): RemoteWatchlistResult?
@@ -38,7 +38,18 @@ interface RemoteSyncProvider {
         tmdbId: Int,
         progress: Float,
         season: Int? = null,
-        episode: Int? = null
+        episode: Int? = null,
+        isAnime: Boolean = false
+    )
+
+    /** Periodic progress heartbeat. Providers with strict write locks may ignore it. */
+    suspend fun scrobbleProgress(
+        mediaType: MediaType,
+        tmdbId: Int,
+        progress: Float,
+        season: Int? = null,
+        episode: Int? = null,
+        isAnime: Boolean = false
     )
 
     suspend fun scrobblePause(
@@ -46,7 +57,8 @@ interface RemoteSyncProvider {
         tmdbId: Int,
         progress: Float,
         season: Int? = null,
-        episode: Int? = null
+        episode: Int? = null,
+        isAnime: Boolean = false
     )
 
     suspend fun scrobbleStop(
@@ -54,7 +66,8 @@ interface RemoteSyncProvider {
         tmdbId: Int,
         progress: Float,
         season: Int? = null,
-        episode: Int? = null
+        episode: Int? = null,
+        isAnime: Boolean = false
     )
 
     // ===== Watched reads =====

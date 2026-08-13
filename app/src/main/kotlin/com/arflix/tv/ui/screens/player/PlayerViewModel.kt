@@ -231,6 +231,11 @@ class PlayerViewModel @Inject constructor(
     private var userPickedSubtitle: Boolean = false
     private var playbackSessionStartTime: Long = 0L
 
+    private fun isCurrentAnime(): Boolean =
+        currentMediaType == MediaType.TV &&
+            currentOriginalLanguage.equals("ja", ignoreCase = true) &&
+            currentGenreIds.contains(16)
+
     // AI subtitle settings (read once per video load)
     private var aiSubtitleEnabled = false
     private var aiSubtitleAutoSelect = false
@@ -3088,7 +3093,7 @@ class PlayerViewModel @Inject constructor(
 
     /** Whitespace/tag-insensitive form for comparing renderer cue text against parsed file text. */
     private fun normalizeCueTextForCompare(text: String): String =
-        text.replace(Regex("<[^>]*>"), " ").replace(Regex("\\s+"), " ").trim()
+        text.replace(PlayerViewModelRegexes.HTML_TAG_REGEX, " ").replace(PlayerViewModelRegexes.MULTI_SPACE_REGEX, " ").trim()
 
     /**
      * A scored candidate. [offsetMs] is 0 for a normal (as-authored) match, or the uniform delay
@@ -3938,7 +3943,8 @@ class PlayerViewModel @Inject constructor(
                         tmdbId = currentMediaId,
                         progress = progressPercent.toFloat(),
                         season = currentSeason,
-                        episode = currentEpisode
+                        episode = currentEpisode,
+                        isAnime = isCurrentAnime()
                     )
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -3953,7 +3959,8 @@ class PlayerViewModel @Inject constructor(
                         tmdbId = currentMediaId,
                         progress = progressPercent.toFloat(),
                         season = currentSeason,
-                        episode = currentEpisode
+                        episode = currentEpisode,
+                        isAnime = isCurrentAnime()
                     )
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -3962,14 +3969,15 @@ class PlayerViewModel @Inject constructor(
                 }
                 lastScrobbleTime = currentTime
             } else if (!isLiveStreamOrSports && isPlaying && currentTime - lastScrobbleTime >= SCROBBLE_UPDATE_INTERVAL_MS) {
-                // Periodic scrobble update while playing (use scrobbleStart, not pause)
+                // Periodic heartbeat. SIMKL intentionally ignores this because it enforces a strict write lock.
                 try {
-                    remoteSyncManager.scrobbleStart(
+                    remoteSyncManager.scrobbleProgress(
                         mediaType = currentMediaType,
                         tmdbId = currentMediaId,
                         progress = progressPercent.toFloat(),
                         season = currentSeason,
-                        episode = currentEpisode
+                        episode = currentEpisode,
+                        isAnime = isCurrentAnime()
                     )
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -4064,7 +4072,8 @@ class PlayerViewModel @Inject constructor(
                         tmdbId = currentMediaId,
                         progress = progressPercent.toFloat(),
                         season = currentSeason,
-                        episode = currentEpisode
+                        episode = currentEpisode,
+                        isAnime = isCurrentAnime()
                     )
                 } catch (e: Exception) {
                     if (e is kotlinx.coroutines.CancellationException) throw e
@@ -4576,4 +4585,10 @@ class PlayerViewModel @Inject constructor(
             "offcloud.com",
         )
     }
+}
+
+
+private object PlayerViewModelRegexes {
+    val HTML_TAG_REGEX = Regex("<[^>]*>")
+    val MULTI_SPACE_REGEX = Regex("\\s+")
 }

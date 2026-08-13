@@ -193,7 +193,12 @@ class WatchHistoryRepository @Inject constructor(
                 }
             }
             cachedContinueWatchingByProfile[profileId] = cachedContinueWatching
-            runCatching { realtimeSyncManagerProvider.get().markLocalWatchHistoryWrite() }
+            try {
+                realtimeSyncManagerProvider.get().markLocalWatchHistoryWrite()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.arflix.tv.util.AppLogger.e("WatchHistoryRepository", "Failed to mark local write", e)
+            }
             return
         }
 
@@ -206,14 +211,18 @@ class WatchHistoryRepository @Inject constructor(
             }
             saved = true
         } catch (e: HttpException) {
-            runCatching {
+            try {
                 val fallback = entry.copy(stream_key = null, stream_addon_id = null, stream_title = null)
                 executeSupabaseCall("save watch progress fallback") { auth ->
                     supabaseApi.upsertWatchHistory(auth = auth, item = fallback.toRecord())
                 }
                 saved = true
+            } catch (fallbackEx: Exception) {
+                if (fallbackEx is kotlinx.coroutines.CancellationException) throw fallbackEx
+                AppLogger.e("WatchHistoryRepository", "Fallback error in watch history operation", fallbackEx)
             }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.e("WatchHistoryRepository", "Error in watch history operation", e)
         }
 
@@ -240,7 +249,12 @@ class WatchHistoryRepository @Inject constructor(
                 }
             }
             cachedContinueWatchingByProfile[profileId] = cachedContinueWatching
-            runCatching { realtimeSyncManagerProvider.get().markLocalWatchHistoryWrite() }
+            try {
+                realtimeSyncManagerProvider.get().markLocalWatchHistoryWrite()
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                com.arflix.tv.util.AppLogger.e("WatchHistoryRepository", "Failed to mark local write", e)
+            }
         }
     }
 

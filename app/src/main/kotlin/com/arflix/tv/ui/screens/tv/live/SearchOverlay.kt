@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.tv.live
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -158,6 +159,10 @@ fun SearchOverlay(
                 .take(200)
                 .toList()
         }
+    }
+
+    BackHandler {
+        onDismiss()
     }
 
     Box(

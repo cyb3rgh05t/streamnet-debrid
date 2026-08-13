@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.tv.live
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -132,6 +133,15 @@ fun QuickZapOverlay(
             originalCategoryId = selectedCategoryId
             categoryListFocused = false
             runCatching { focusRequester.requestFocus() }
+        }
+    }
+
+    BackHandler(enabled = visible) {
+        if (categoryListFocused) {
+            onCategorySelected(originalCategoryId)
+            categoryListFocused = false
+        } else {
+            onDismiss()
         }
     }
 

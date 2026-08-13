@@ -2054,7 +2054,7 @@ class MediaRepository @Inject constructor(
         val body = withContext(Dispatchers.IO) {
             fetchUrl("https://mdblist.com/lists/$slug/json")
         } ?: return emptyList()
-        val array = runCatching { JSONArray(body) }.getOrNull() ?: return emptyList()
+        val array = try { org.json.JSONArray(body) } catch (e: org.json.JSONException) { null } ?: return emptyList()
         val refs = mutableListOf<Pair<MediaType, Int>>()
         for (i in 0 until array.length()) {
             val obj = array.optJSONObject(i) ?: continue

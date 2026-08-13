@@ -39,6 +39,7 @@ import {
   hasNetlifyBackendConfig,
   hasSupabaseConfig,
   hasTraktConfig,
+  hasSimklConfig,
   getAuthPortalUrl,
 } from "@/lib/config";
 import {
@@ -108,7 +109,9 @@ const SECTIONS = [
   { id: "telegram", label: "Telegram", icon: Send },
   { id: "catalogs", label: "Catalogs", icon: ListVideo },
   { id: "addons", label: "Addons", icon: Sparkles },
+  { id: "metadata", label: "Metadata & Keys", icon: Sparkles },
 ] as const;
+
 
 type SectionId = (typeof SECTIONS)[number]["id"];
 
@@ -590,14 +593,17 @@ function SectionBody({ section }: { section: SectionId }) {
       return (
         <Panel title="Playback">
           <Row
-            label="Play in"
-            hint="VLC/Infuse open the source directly; ARVIO still syncs Trakt when you return"
+            label="Play Live TV in"
+            // Movies and series always open in an external player now, so this
+            // choice only routes Live TV. Saying otherwise here would be the
+            // same broken promise we removed from the source list.
+            hint="Movies and series always open in an external player like VLC. This picks where Live TV channels play; ARVIO still syncs Trakt when you return"
           >
             <Select
               value={settings.defaultPlayer}
               onChange={(v) => set({ defaultPlayer: v })}
               options={[
-                ["browser", "ARVIO player"],
+                ["browser", "ARVIO player (browser)"],
                 ["vlc", "VLC"],
                 ["infuse", "Infuse"],
               ]}
@@ -1121,10 +1127,76 @@ function SectionBody({ section }: { section: SectionId }) {
       return <AddonsSection />;
     case "vlc":
       return <VlcSection />;
+    case "metadata":
+      return <MetadataSection settings={settings} set={set} />;
     default:
       return null;
   }
 }
+
+function MetadataSection({ settings, set }: { settings: AppSettings; set: (patch: Partial<AppSettings>) => void }) {
+  const animeChain = (settings.metadataAnimeProviders || ["anilist", "tvdb", "tmdb"]).join(" → ").toUpperCase();
+  const tvChain = (settings.metadataTvProviders || ["tvdb", "tmdb"]).join(" → ").toUpperCase();
+  const movieChain = (settings.metadataMovieProviders || ["tmdb"]).join(" → ").toUpperCase();
+  const tvdbActive = Boolean(settings.customTvdbApiKey?.trim());
+
+  return (
+    <div className="settings-section">
+      <Panel title="Custom API Keys (Bring Your Own Key)">
+        <Row label="TMDB API Key" hint="Custom v3 API key for TMDB requests">
+          <input
+            type="password"
+            autoComplete="off"
+            className="settings-input"
+            placeholder="System Default Key"
+            value={settings.customTmdbApiKey || ""}
+            onChange={(e) => set({ customTmdbApiKey: e.target.value })}
+          />
+        </Row>
+
+        <Row
+          label="TVDB v4 API Key"
+          hint={tvdbActive ? "Active — TVDB enabled for metadata fallback" : "TVDB is disabled until a custom API key is provided"}
+        >
+          <input
+            type="password"
+            autoComplete="off"
+            className="settings-input"
+            placeholder="Enter Custom TVDB Key to Enable"
+            value={settings.customTvdbApiKey || ""}
+            onChange={(e) => set({ customTvdbApiKey: e.target.value })}
+          />
+        </Row>
+
+        <Row label="TVDB User PIN" hint="Required if using subscriber user key">
+          <input
+            type="password"
+            autoComplete="off"
+            className="settings-input"
+            placeholder="Optional User PIN"
+            value={settings.customTvdbUserPin || ""}
+            onChange={(e) => set({ customTvdbUserPin: e.target.value })}
+          />
+        </Row>
+      </Panel>
+
+      <Panel title="Metadata Provider Priorities">
+        <Row label="Anime Metadata Priority" hint={`Active chain: ${animeChain}`}>
+          <span className="accent-badge">{animeChain}</span>
+        </Row>
+
+        <Row label="TV Shows Metadata Priority" hint={`Active chain: ${tvChain}`}>
+          <span className="accent-badge">{tvChain}</span>
+        </Row>
+
+        <Row label="Movies Metadata Priority" hint={`Active chain: ${movieChain}`}>
+          <span className="accent-badge">{movieChain}</span>
+        </Row>
+      </Panel>
+    </div>
+  );
+}
+
 
 function safeArray<T>(value: T[] | null | undefined): T[] {
   return Array.isArray(value) ? value : [];
@@ -1152,17 +1224,24 @@ function AccountsSection() {
     auth,
     traktConnected,
     mdblistConnected,
+    simklConnected,
     deviceCode,
+    simklDeviceCode,
     signOut,
     beginTrakt,
     pollTrakt,
     disconnectTrakt,
     connectMdblist,
     disconnectMdblist,
+    beginSimkl,
+    pollSimkl,
+    disconnectSimkl,
     refreshData,
   } = useApp();
   const [traktError, setTraktError] = useState<string | null>(null);
   const [traktBusy, setTraktBusy] = useState<"start" | "poll" | null>(null);
+  const [simklError, setSimklError] = useState<string | null>(null);
+  const [simklBusy, setSimklBusy] = useState<"start" | "poll" | null>(null);
   const [mdblistKey, setMdblistKey] = useState("");
   const [mdblistError, setMdblistError] = useState<string | null>(null);
   const [mdblistBusy, setMdblistBusy] = useState(false);
@@ -1203,6 +1282,38 @@ function AccountsSection() {
       );
     } finally {
       setTraktBusy(null);
+    }
+  };
+
+  const startSimklLink = async () => {
+    setSimklBusy("start");
+    setSimklError(null);
+    try {
+      await beginSimkl();
+    } catch (error) {
+      setSimklError(
+        error instanceof Error
+          ? error.message
+          : "Could not start Simkl device link.",
+      );
+    } finally {
+      setSimklBusy(null);
+    }
+  };
+
+  const approveSimklLink = async () => {
+    setSimklBusy("poll");
+    setSimklError(null);
+    try {
+      await pollSimkl();
+    } catch (error) {
+      setSimklError(
+        error instanceof Error
+          ? error.message
+          : "Simkl has not approved this device yet.",
+      );
+    } finally {
+      setSimklBusy(null);
     }
   };
 
@@ -1259,6 +1370,20 @@ function AccountsSection() {
                   ? "Not linked"
                   : "Missing config"}
             </strong>
+          </div>
+          <div>
+            <span>Simkl</span>
+            <strong>
+              {simklConnected
+                ? "Connected"
+                : hasSimklConfig()
+                  ? "Not linked"
+                  : "Missing config"}
+            </strong>
+          </div>
+          <div>
+            <span>MDBList</span>
+            <strong>{mdblistConnected ? "Connected" : "Not linked"}</strong>
           </div>
           <div>
             <span>Sync</span>
@@ -1320,6 +1445,54 @@ function AccountsSection() {
                   onClick={() => void approveTraktLink()}
                 >
                   {traktBusy === "poll" ? "Checking..." : "I approved it"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </Panel>
+
+      <Panel title="Simkl">
+        {!hasSimklConfig() && (
+          <p className="empty">Simkl client configuration is missing.</p>
+        )}
+        {simklError && <p className="login-error">{simklError}</p>}
+        {simklConnected ? (
+          <button type="button" className="secondary" onClick={disconnectSimkl}>
+            Disconnect Simkl
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="primary"
+              disabled={simklBusy === "start" || !hasSimklConfig()}
+              onClick={() => void startSimklLink()}
+            >
+              {simklBusy === "start" ? "Starting..." : "Start device link"}
+            </button>
+            {simklDeviceCode && (
+              <div className="device-code">
+                <span>{simklDeviceCode.user_code}</span>
+                <p>
+                  Open{" "}
+                  <a
+                    href={simklDeviceCode.verification_url || "https://simkl.com/pin"}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ color: "var(--accent)", textDecoration: "underline" }}
+                  >
+                    {simklDeviceCode.verification_url || "https://simkl.com/pin"}
+                  </a>{" "}
+                  and enter the code above
+                </p>
+                <button
+                  type="button"
+                  className="secondary"
+                  disabled={simklBusy === "poll"}
+                  onClick={() => void approveSimklLink()}
+                >
+                  {simklBusy === "poll" ? "Checking..." : "I approved it"}
                 </button>
               </div>
             )}

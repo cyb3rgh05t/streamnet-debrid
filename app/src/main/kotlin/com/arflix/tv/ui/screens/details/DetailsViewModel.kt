@@ -1008,7 +1008,10 @@ class DetailsViewModel @Inject constructor(
                                 duration = 0L,
                                 position = 0L
                             )
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            if (e is kotlinx.coroutines.CancellationException) throw e
+                            com.arflix.tv.util.AppLogger.w("DetailsViewModel", "Failed to mark episode watched/save progress: ${e.message}")
+                        }
                     } else {
                         traktRepository.markEpisodeUnwatched(
                             currentMediaId,
@@ -1056,15 +1059,18 @@ class DetailsViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
+                val isAnime = currentItem.mediaType == MediaType.TV &&
+                    currentItem.originalLanguage.equals("ja", ignoreCase = true) &&
+                    currentItem.genreIds.contains(16)
                 val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
                 if (newInWatchlist) {
-                    if (remoteConnected && !remoteSyncManager.addToWatchlist(currentMediaType, currentMediaId)) {
+                    if (remoteConnected && !remoteSyncManager.addToWatchlist(currentMediaType, currentMediaId, isAnime)) {
                         throw IllegalStateException(context.getString(R.string.details_failed_trakt_watchlist_add))
                     }
                     // Pass the full MediaItem so it appears instantly in watchlist
                     watchlistRepository.addToWatchlist(currentMediaType, currentMediaId, currentItem)
                 } else {
-                    if (remoteConnected && !remoteSyncManager.removeFromWatchlist(currentMediaType, currentMediaId)) {
+                    if (remoteConnected && !remoteSyncManager.removeFromWatchlist(currentMediaType, currentMediaId, isAnime)) {
                         throw IllegalStateException(context.getString(R.string.details_failed_trakt_watchlist_remove))
                     }
                     watchlistRepository.removeFromWatchlist(currentMediaType, currentMediaId)
@@ -1089,6 +1095,8 @@ class DetailsViewModel @Inject constructor(
                     toastType = ToastType.SUCCESS
                 )
             } catch (e: Exception) {
+                Log.e("DetailsViewModel", "Error updating watchlist: ${e.message}", e)
+                AppLogger.e("DetailsViewModel", "Error updating watchlist: ${e.message}", e)
                 _uiState.value = _uiState.value.copy(
                     toastMessage = context.getString(R.string.details_failed_update_watchlist),
                     toastType = ToastType.ERROR

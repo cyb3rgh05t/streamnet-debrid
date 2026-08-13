@@ -11,7 +11,7 @@ export function RailsView({ title, eyebrow, categories, onOpen, posterMode = fal
   posterMode?: boolean;
 }) {
   return (
-    <div className="screen">
+    <div className="screen has-section-heading">
       <section className="section-heading">
         <p className="eyebrow">{eyebrow ?? "Browse"}</p>
         <h2>{title}</h2>

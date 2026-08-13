@@ -1,5 +1,11 @@
 package com.arflix.tv.ui.components
 
+import com.arflix.tv.ui.motion.*
+
+import androidx.activity.compose.PredictiveBackHandler
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.mutableFloatStateOf
+import kotlinx.coroutines.CancellationException
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -225,6 +231,8 @@ fun StreamSelector(
     onClose: () -> Unit = {}
 ) {
     val isRtlLayoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
+    val backMotion = rememberArvioPredictiveBack(enabled = isVisible, onCommit = onClose)
+
     var focusedIndex by remember { mutableIntStateOf(0) }
     var focusedTabIndex by remember { mutableIntStateOf(0) }
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -381,15 +389,20 @@ fun StreamSelector(
     AnimatedVisibility(
         visible = isVisible,
         enter = fadeIn(tween(200)) + slideInVertically(tween(300)) { it / 4 },
-        exit = fadeOut(tween(150)) + slideOutVertically(tween(200)) { it / 4 }
+        exit = fadeOut(tween(220, easing = androidx.compose.animation.core.FastOutSlowInEasing)) + slideOutVertically(tween(250, easing = androidx.compose.animation.core.FastOutSlowInEasing)) { it / 4 }
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .focusRequester(focusRequester)
-                .focusable()
-                .background(Color.Black.copy(alpha = 0.95f))
-                .onKeyEvent { event ->
+                .background(Color.Black.copy(alpha = (0.95f * (1f - backMotion.eased * 0.5f)).coerceIn(0f, 0.95f)))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .arvioBackModal(backMotion)
+                    .onKeyEvent { event ->
                     if (event.type == KeyEventType.KeyDown) {
                         val isRtl = isRtlLayoutDirection
                         val actualKey = event.key
@@ -402,7 +415,7 @@ fun StreamSelector(
                         } else actualKey
 
                         when (logicalKey) {
-                            Key.Back, Key.Escape -> {
+                            Key.Escape -> {
                                 onClose()
                                 true
                             }
@@ -693,6 +706,7 @@ fun StreamSelector(
             }
         }
     }
+}
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -1365,7 +1379,7 @@ private fun presentSource(stream: StreamSource): SourcePresentation {
         upstreamLabel = stream.description.orEmpty().lines()
             .firstOrNull { it.trimStart().startsWith("🔌") }
             // Keep "Torrentio | ThePirateBay", drop the emoji decorations.
-            ?.replace(Regex("""[^\p{L}\p{N} .+|\-]"""), "")
+            ?.replace(StreamSelectorRegexes.CLEAN_TITLE_REGEX, "")
             ?.trim()
             ?.takeIf { it.isNotBlank() },
     )
@@ -1475,7 +1489,7 @@ private fun rowSubtitle(presentation: SourcePresentation): String {
         presentation.editionLabel?.let(::add)
         presentation.bitrateLabel?.let(::add)
     }
-        .distinctBy { it.lowercase().replace(Regex("[^\\p{L}\\p{N}]+"), "") }
+        .distinctBy { it.lowercase().replace(StreamSelectorRegexes.DISTINCT_TITLE_REGEX, "") }
         .joinToString(" · ")
 }
 
@@ -2661,4 +2675,10 @@ private fun qualityScore(quality: String): Int {
         quality.contains("480p", ignoreCase = true) -> 1
         else -> 0
     }
+}
+
+
+private object StreamSelectorRegexes {
+    val CLEAN_TITLE_REGEX = Regex("""[^\p{L}\p{N} .+|\-]""")
+    val DISTINCT_TITLE_REGEX = Regex("[^\\p{L}\\p{N}]+")
 }

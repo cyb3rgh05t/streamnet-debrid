@@ -3487,14 +3487,14 @@ class HomeViewModel @Inject constructor(
         }
         // MDBList profiles have no Trakt token but still source CW from a remote provider —
         // route them through the same getContinueWatching() path (it branches to MDBList).
-        val isMdbListActive = try {
-            traktRepository.isMdbListActive()
+        val isAlternativeRemoteActive = try {
+            traktRepository.isAlternativeRemoteActive()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             false
         }
-        val useRemoteSync = isTraktAuthenticated || isMdbListActive
+        val useRemoteSync = isTraktAuthenticated || isAlternativeRemoteActive
         // Debug: write CW state to a file we can pull via adb
         val items: List<ContinueWatchingItem> = if (useRemoteSync) {
             // When connected to Trakt, use ONLY Trakt as the source of truth for
@@ -3821,14 +3821,14 @@ class HomeViewModel @Inject constructor(
         } catch (e: Exception) {
             false
         }
-        val isMdbListActive = try {
-            traktRepository.isMdbListActive()
+        val isAlternativeRemoteActive = try {
+            traktRepository.isAlternativeRemoteActive()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             false
         }
-        val useRemoteSync = isTraktAuthenticated || isMdbListActive
+        val useRemoteSync = isTraktAuthenticated || isAlternativeRemoteActive
         val items = if (useRemoteSync) {
             val traktItems = if (forceFresh) {
                 try {
@@ -3927,14 +3927,14 @@ class HomeViewModel @Inject constructor(
         } catch (e: Exception) {
             false
         }
-        val isMdbListActive = try {
-            traktRepository.isMdbListActive()
+        val isAlternativeRemoteActive = try {
+            traktRepository.isAlternativeRemoteActive()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             false
         }
-        val useRemoteSync = isTraktAuthenticated || isMdbListActive
+        val useRemoteSync = isTraktAuthenticated || isAlternativeRemoteActive
         val items = if (useRemoteSync) {
             try {
                 traktRepository.preloadContinueWatchingCache()
@@ -4591,13 +4591,16 @@ class HomeViewModel @Inject constructor(
                 } catch (e: Exception) {
                     false
                 }
+                val isAnime = item.mediaType == MediaType.TV &&
+                    item.originalLanguage.equals("ja", ignoreCase = true) &&
+                    item.genreIds.contains(16)
                 if (isInWatchlist) {
-                    if (remoteConnected && !remoteSyncManager.removeFromWatchlist(item.mediaType, item.id)) {
+                    if (remoteConnected && !remoteSyncManager.removeFromWatchlist(item.mediaType, item.id, isAnime)) {
                         throw IllegalStateException("Failed to remove from remote watchlist")
                     }
                     watchlistRepository.removeFromWatchlist(item.mediaType, item.id)
                 } else {
-                    if (remoteConnected && !remoteSyncManager.addToWatchlist(item.mediaType, item.id)) {
+                    if (remoteConnected && !remoteSyncManager.addToWatchlist(item.mediaType, item.id, isAnime)) {
                         throw IllegalStateException("Failed to add to remote watchlist")
                     }
                     watchlistRepository.addToWatchlist(item.mediaType, item.id, item)

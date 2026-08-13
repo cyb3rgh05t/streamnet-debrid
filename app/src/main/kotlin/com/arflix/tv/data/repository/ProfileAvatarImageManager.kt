@@ -71,11 +71,19 @@ class ProfileAvatarImageManager @Inject constructor(
                 ?: loadInlineAvatarFromCloud(profile.id)
 
             if (!resolvedInlineBase64.isNullOrBlank()) {
-                runCatching {
+                try {
                     val bytes = Base64.decode(resolvedInlineBase64, Base64.NO_WRAP)
                     file.writeBytes(bytes)
                     ProfileAvatarFiles.cleanupProfile(context, profile.id, keepVersion = profile.avatarImageVersion)
-                }.onSuccess { return@withContext }
+                    return@withContext
+                } catch (e: IllegalArgumentException) {
+                    com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Base64 decode error: ${e.message}")
+                } catch (e: java.io.IOException) {
+                    com.arflix.tv.util.AppLogger.e("ProfileAvatar", "IO error writing avatar: ${e.message}")
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Unexpected error restoring avatar: ${e.message}")
+                }
             }
 
             val storagePath = profile.avatarImageStoragePath?.trim().orEmpty()
@@ -152,7 +160,7 @@ class ProfileAvatarImageManager @Inject constructor(
 
     private suspend fun uploadAvatar(profileId: String, version: Long, file: File): Result<String> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 if (Constants.USE_NETLIFY_CLOUD_SYNC) {
                     error("Remote avatar storage is handled by account sync")
                 }
@@ -173,13 +181,19 @@ class ProfileAvatarImageManager @Inject constructor(
                 httpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) error(context.getString(R.string.avatar_upload_failed, response.code))
                 }
-                path
+                Result.success(path)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: java.io.IOException) {
+                Result.failure(e)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
         }
 
     private suspend fun downloadAvatar(storagePath: String, destination: File): Result<Unit> =
         withContext(Dispatchers.IO) {
-            runCatching {
+            try {
                 if (Constants.USE_NETLIFY_CLOUD_SYNC) {
                     error("Remote avatar storage is handled by account sync")
                 }
@@ -196,6 +210,13 @@ class ProfileAvatarImageManager @Inject constructor(
                     val bytes = response.body?.bytes() ?: error(context.getString(R.string.avatar_response_empty))
                     destination.writeBytes(bytes)
                 }
+                Result.success(Unit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: java.io.IOException) {
+                Result.failure(e)
+            } catch (e: Exception) {
+                Result.failure(e)
             }
         }
 
@@ -203,12 +224,19 @@ class ProfileAvatarImageManager @Inject constructor(
         return authRepository.loadAccountSyncPayload().getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?.let { payload ->
-                runCatching {
+                try {
                     JSONObject(payload)
                         .optJSONObject("profileAvatarImagesById")
                         ?.optString(profileId)
                         ?.takeIf { it.isNotBlank() }
-                }.getOrNull()
+                } catch (e: org.json.JSONException) {
+                    com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Error parsing inline avatar JSON: ${e.message}")
+                    null
+                } catch (e: Exception) {
+                    if (e is kotlinx.coroutines.CancellationException) throw e
+                    com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Unexpected error parsing inline avatar: ${e.message}")
+                    null
+                }
             }
     }
 

@@ -2,6 +2,7 @@
 
 package com.arflix.tv.ui.screens.home
 
+import androidx.activity.compose.BackHandler
 import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedContent
@@ -692,16 +693,6 @@ fun HomeScreen(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                val continueWatchingRow = displayCategories.indexOfFirst {
-                    it.id == "continue_watching" && it.items.any { item -> !item.isPlaceholder }
-                }
-                if (continueWatchingRow >= 0 && !focusState.isSidebarFocused) {
-                    focusState.currentRowIndex = continueWatchingRow
-                    focusState.currentItemIndex = 0
-                    focusState.lastNavEventTime = SystemClock.elapsedRealtime()
-                    focusState.userHasNavigated = true
-                    focusState.rowItemIndicesByCategoryId["continue_watching"] = 0
-                }
                 viewModel.refreshContinueWatchingOnly(force = true)
                 viewModel.refreshIptvHomeCatalogs()
                 // Pull the full cloud state (addons, catalogs, settings) on resume.
@@ -2655,6 +2646,19 @@ private fun HomeInputLayer(
             fallbackIndex = focusState.currentRowIndex
         )
         preferredCategoryId = categories.getOrNull(focusState.currentRowIndex)?.id
+    }
+
+    BackHandler {
+        selectPressedInHome = false
+        selectDownAtMs = 0L
+        if (focusState.isSidebarFocused) {
+            onExitApp()
+        } else {
+            categories.getOrNull(focusState.currentRowIndex)?.id?.let { categoryId ->
+                focusState.rowItemIndicesByCategoryId[categoryId] = focusState.currentItemIndex
+            }
+            focusState.isSidebarFocused = true
+        }
     }
 
     val focusedCategory = categories.getOrNull(focusState.currentRowIndex)

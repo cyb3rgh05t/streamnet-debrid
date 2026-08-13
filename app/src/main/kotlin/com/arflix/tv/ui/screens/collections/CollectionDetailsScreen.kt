@@ -591,6 +591,10 @@ fun CollectionDetailsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    BackHandler {
+        onBack()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()

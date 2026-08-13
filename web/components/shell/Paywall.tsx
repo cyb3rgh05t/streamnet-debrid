@@ -120,9 +120,9 @@ function PaywallScreen({
 
         <h1>{expired ? "Your ARVIO Web membership has ended" : "ARVIO Web is a members feature"}</h1>
         <p className="paywall-sub">
-          Streaming, live TV and downloads in the browser are part of ARVIO Web membership.
-          The Android app stays completely free — this unlocks ARVIO on iPhone, iPad, smart-TV
-          browsers and any desktop.
+          Live TV in the browser, one-click playback in VLC and downloads are part of
+          ARVIO Web membership. The Android app stays completely free — this unlocks
+          ARVIO on iPhone, iPad, smart-TV browsers and any desktop.
         </p>
 
         <div className="paywall-price">

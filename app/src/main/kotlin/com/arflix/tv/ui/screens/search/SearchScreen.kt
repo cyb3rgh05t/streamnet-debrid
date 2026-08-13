@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.search
 
+import androidx.activity.compose.BackHandler
 import android.os.SystemClock
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -296,6 +297,37 @@ fun SearchScreen(
     }
 
     val showFilters = uiState.query.isEmpty()
+
+    BackHandler {
+        if (isSearchEditing) {
+            isSearchEditing = false
+            keyboardController?.hide()
+            runCatching { searchFocusRequester.requestFocus() }
+        } else {
+            when (focusZone) {
+                FocusZone.RESULTS -> {
+                    if (showFilters && quickFilters.isNotEmpty()) {
+                        focusZone = FocusZone.FILTERS
+                        focusedFilterIndex = focusedFilterIndex.coerceIn(0, (quickFilters.size - 1).coerceAtLeast(0))
+                        try { filtersFocusRequester.requestFocus() } catch (_: Exception) {}
+                    } else {
+                        focusZone = FocusZone.SEARCH_INPUT
+                        searchFocusRequester.requestFocus()
+                    }
+                }
+                FocusZone.FILTERS -> {
+                    focusZone = FocusZone.SEARCH_INPUT
+                    searchFocusRequester.requestFocus()
+                }
+                FocusZone.SEARCH_INPUT -> {
+                    focusZone = FocusZone.SIDEBAR
+                }
+                FocusZone.SIDEBAR -> {
+                    onBack()
+                }
+            }
+        }
+    }
 
     // D-pad handler: manages zone transitions. FILTERS zone lets native focus handle Left/Right.
     val dpadModifier = if (!isTouchDevice) {

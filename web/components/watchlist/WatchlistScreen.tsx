@@ -15,7 +15,7 @@ const BUILTIN_SOURCES = [
 ] as const;
 
 export function WatchlistScreen() {
-  const { watchlist, traktConnected, openDetails, settings, loadTraktLists, loadTraktListItems } = useApp();
+  const { watchlist, traktConnected, simklConnected, mdblistConnected, openDetails, settings, loadTraktLists, loadTraktListItems } = useApp();
   const [sort, setSort] = useState<WatchlistSort>("added");
   const [filter, setFilter] = useState<WatchlistFilter>("all");
   const [source, setSource] = useState("watchlist");
@@ -84,10 +84,18 @@ export function WatchlistScreen() {
   }, [activeList, sort, filter]);
 
   return (
-    <div className={`screen ${posterMode ? "poster-results" : ""}`}>
+    <div className={`screen has-section-heading ${posterMode ? "poster-results" : ""}`}>
       <section className="section-heading watchlist-heading">
         <div>
-          <p className="eyebrow">{traktConnected ? "Synced with your Trakt account" : "Connect Trakt in Settings to sync"}</p>
+          <p className="eyebrow">
+            {traktConnected
+              ? "Synced with your Trakt account"
+              : simklConnected
+                ? "Synced with your Simkl account"
+                : mdblistConnected
+                  ? "Synced with your MDBList account"
+                  : "Connect Trakt, Simkl, or MDBList in Settings to sync"}
+          </p>
           <h2>Watchlist</h2>
         </div>
         <div className="watchlist-toolbar">

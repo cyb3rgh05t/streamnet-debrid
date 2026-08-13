@@ -74,7 +74,7 @@ internal class IptvPlaybackUrlResolver(
         headers: Map<String, String>,
         useHead: Boolean,
     ): ProbeResult? {
-        return runCatching {
+        return try {
             val request = Request.Builder()
                 .url(url)
                 .apply {
@@ -117,7 +117,11 @@ internal class IptvPlaybackUrlResolver(
                         contentType.isDirectMediaContentType(),
                 )
             }
-        }.getOrNull()
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
     }
 }
 
@@ -130,7 +134,7 @@ internal fun shouldResolveIptvPlaybackRedirect(url: String): Boolean {
     }
     if (looksLikeHlsPlaybackUrl(trimmed)) return false
 
-    val uri = runCatching { URI(trimmed) }.getOrNull() ?: return false
+    val uri = try { URI(trimmed) } catch (e: Exception) { null } ?: return false
     val path = uri.path.orEmpty().trimEnd('/').lowercase(Locale.US)
     val lastSegment = path.substringAfterLast('/')
     if (lastSegment.isBlank() || lastSegment.contains('.')) return false

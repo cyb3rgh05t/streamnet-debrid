@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -127,6 +128,10 @@ fun AppUpdateModal(
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
+    }
+
+    BackHandler {
+        onDismiss()
     }
 
     Dialog(

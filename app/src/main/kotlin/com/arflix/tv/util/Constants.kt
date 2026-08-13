@@ -16,10 +16,11 @@ object Constants {
     val NETLIFY_BACKEND_URL: String
         get() = BuildConfig.NETLIFY_BACKEND_URL.trim().trimEnd('/')
     val USE_NETLIFY_CLOUD_SYNC: Boolean
-        get() = BuildConfig.ENABLE_NETLIFY_CLOUD_SYNC && NETLIFY_BACKEND_URL.startsWith("https://")
+        get() = BuildConfig.ENABLE_NETLIFY_CLOUD_SYNC && (NETLIFY_BACKEND_URL.startsWith("https://") || NETLIFY_BACKEND_URL.startsWith("http://"))
 
     // Edge Function proxy URLs used by backend/proxy-capable flows.
     val TMDB_PROXY_URL: String get() = "$NETLIFY_BACKEND_URL/tmdb-proxy"
+    val SIMKL_PROXY_URL: String get() = "$NETLIFY_BACKEND_URL/simkl-proxy"
     val TV_AUTH_START_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-start"
     val TV_AUTH_STATUS_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-status"
     val TV_AUTH_POLL_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-poll"
@@ -37,6 +38,7 @@ object Constants {
     // API base URLs.
     const val TMDB_BASE_URL = "https://api.themoviedb.org/3/"
     const val TRAKT_API_URL = "https://api.trakt.tv/"
+    const val SIMKL_BASE_URL = "https://api.simkl.com/"
     // MDBList is an optional per-profile alternative to Trakt. Auth is a static
     // API key passed as an `?apikey=` query parameter (no OAuth), so no client
     // secret needs to ship in the APK.
@@ -53,6 +55,7 @@ object Constants {
     val TRAKT_CLIENT_ID: String get() = usableSecret(BuildConfig.TRAKT_CLIENT_ID)
     val TRAKT_CLIENT_SECRET: String
         get() = usableSecret(BuildConfig.TRAKT_CLIENT_SECRET)
+    val SIMKL_CLIENT_ID: String get() = usableSecret(BuildConfig.SIMKL_CLIENT_ID)
 
     // Image URLs - tuned for TV quality with smooth scrolling/perf.
     const val IMAGE_BASE = "https://image.tmdb.org/t/p/w780"

@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.settings.telegram
 
+import androidx.activity.compose.BackHandler
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -591,6 +592,10 @@ private fun DisconnectConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+
+    BackHandler {
+        onDismiss()
+    }
 
     Box(
         modifier = Modifier

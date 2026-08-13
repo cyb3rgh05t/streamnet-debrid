@@ -759,7 +759,7 @@ class HomeServerRepository @Inject constructor(
 
     private fun parseConnections(json: String?): List<HomeServerConnection> {
         if (json.isNullOrBlank()) return emptyList()
-        return runCatching {
+        return try {
             val root = JsonParser().parse(json)
             val connections = when {
                 root.isJsonObject && root.asJsonObject.has("connections") -> {
@@ -776,7 +776,11 @@ class HomeServerRepository @Inject constructor(
                 .map { it.sanitized().decryptedForUse() }
                 .filter { it.serverUrl.isNotBlank() || it.accessToken.isNotBlank() }
                 .distinctBy { connectionIdentity(it) }
-        }.getOrDefault(emptyList())
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+            com.arflix.tv.util.AppLogger.recordException(e)
+            emptyList()
+        }
     }
 
     private fun HomeServerConnection.encryptedForStorage(): HomeServerConnection {
@@ -2597,7 +2601,7 @@ private object HomeServerXmlRegexCache {
         }
     }
 }
-private object HomeServerRegexes {
+internal object HomeServerRegexes {
     val DIACRITICS_REGEX = Regex("\\p{Mn}+")
     val NON_ALPHA_NUM_REGEX = Regex("[^a-z0-9]+")
     val ARTICLES_REGEX = Regex("\\b(the|a|an)\\b")

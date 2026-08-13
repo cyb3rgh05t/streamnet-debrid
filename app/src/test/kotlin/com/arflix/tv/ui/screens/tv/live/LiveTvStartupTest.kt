@@ -157,4 +157,48 @@ class LiveTvStartupTest {
         assertThat(twelveHour).containsMatch("(?i)\\b(am|pm)\\b")
         assertThat(twentyFourHour).doesNotContainMatch("(?i)\\b(am|pm)\\b")
     }
+
+    // ── Keeping search out of the way while the playlist loads ─────────────
+
+    @Test
+    fun searchCannotTakeFocusBeforeThereAreCategories() {
+        // Not focusing search explicitly was not enough: it is the first
+        // focusable row, so Compose handed it the selector anyway, and "down"
+        // had no category to move to — the selector sat there, frozen, until
+        // the whole playlist had parsed.
+        assertThat(LiveTvStartup.searchIsReachable(0)).isFalse()
+    }
+
+    @Test
+    fun searchBecomesReachableOnceCategoriesExist() {
+        assertThat(LiveTvStartup.searchIsReachable(1)).isTrue()
+        assertThat(LiveTvStartup.searchIsReachable(42)).isTrue()
+    }
+
+    // ── Where the selector lands on entry ──────────────────────────────────
+
+    @Test
+    fun openingLiveTvLandsOnTheCategoryList() {
+        // The real cause of the reported bug: the screen deliberately focused
+        // the search row on entry. Because "down" from search selects the first
+        // category — absent until the playlist parses — the selector was stuck
+        // in the search box for the whole load.
+        val entry = LiveTvStartup.entryFocus(isTouchDevice = false, hasChannels = true)
+
+        assertThat(entry).isEqualTo(LiveTvStartup.EntryFocus.CATEGORY_LIST)
+    }
+
+    @Test
+    fun nothingIsFocusedBeforeChannelsExist() {
+        val entry = LiveTvStartup.entryFocus(isTouchDevice = false, hasChannels = false)
+
+        assertThat(entry).isEqualTo(LiveTvStartup.EntryFocus.NONE)
+    }
+
+    @Test
+    fun touchDevicesGetNoEntryFocus() {
+        val entry = LiveTvStartup.entryFocus(isTouchDevice = true, hasChannels = true)
+
+        assertThat(entry).isEqualTo(LiveTvStartup.EntryFocus.NONE)
+    }
 }

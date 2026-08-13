@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -72,6 +73,10 @@ fun AudioTrackSelector(
     onClose: () -> Unit
 ) {
     var focusedIndex by remember(isVisible) { mutableIntStateOf(0) }
+
+    BackHandler(enabled = isVisible) {
+        onClose()
+    }
 
     AnimatedVisibility(
         visible = isVisible,

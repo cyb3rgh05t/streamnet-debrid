@@ -88,4 +88,44 @@ class CrashReportFilterTest {
         assertThat(CrashReportFilter.shouldReportHandledException(throwable)).isTrue()
         assertThat(CrashReportFilter.shouldSendSentryEvent(throwable, SentryLevel.ERROR)).isTrue()
     }
+
+    @Test
+    fun `drops non fatal message only events`() {
+        assertThat(CrashReportFilter.shouldSendSentryEvent(null, SentryLevel.ERROR)).isFalse()
+    }
+
+    @Test
+    fun `keeps genuine crashes regardless of expected provider failure`() {
+        val throwable = UnknownHostException("Unable to resolve host provider.example")
+
+        assertThat(
+            CrashReportFilter.shouldSendSentryEvent(
+                throwable = throwable,
+                level = SentryLevel.ERROR,
+                isCrashed = true
+            )
+        ).isTrue()
+    }
+
+    @Test
+    fun `handled fingerprints ignore changing messages at the same app callsite`() {
+        val frame = StackTraceElement("com.arflix.tv.data.Repository", "load", "Repository.kt", 42)
+        val first = IllegalStateException("provider response 1").apply { stackTrace = arrayOf(frame) }
+        val second = IllegalStateException("provider response 2").apply { stackTrace = arrayOf(frame) }
+
+        assertThat(CrashReportFilter.handledEventFingerprint(first))
+            .isEqualTo(CrashReportFilter.handledEventFingerprint(second))
+    }
+
+    @Test
+    fun `handled installation sampling is deterministic and respects boundaries`() {
+        val seed = "installation-a"
+        val fingerprint = "failure-a"
+
+        val first = CrashReportFilter.isSelectedForHandledSample(seed, fingerprint, 50)
+        val second = CrashReportFilter.isSelectedForHandledSample(seed, fingerprint, 50)
+        assertThat(second).isEqualTo(first)
+        assertThat(CrashReportFilter.isSelectedForHandledSample(seed, fingerprint, 0)).isFalse()
+        assertThat(CrashReportFilter.isSelectedForHandledSample(seed, fingerprint, 1_000)).isTrue()
+    }
 }

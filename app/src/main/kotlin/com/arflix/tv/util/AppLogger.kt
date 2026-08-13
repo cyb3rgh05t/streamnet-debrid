@@ -66,15 +66,9 @@ object AppLogger {
      */
     fun w(tag: String, message: String, throwable: Throwable? = null) {
         breadcrumb(tag, message, severity = "warning")
-        throwable?.let {
-            recordException(
-                throwable = it,
-                context = mapOf(
-                    "error_area" to safeTag(tag),
-                    "error_severity" to "warning"
-                )
-            )
-        }
+        // Warnings are recoverable by definition. Keep them as crash context,
+        // but do not spend a full error event on them.
+        throwable?.let { breadcrumb(tag, it::class.java.simpleName, severity = "warning_type") }
     }
 
     /**

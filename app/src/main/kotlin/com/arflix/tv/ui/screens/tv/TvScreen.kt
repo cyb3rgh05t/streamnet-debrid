@@ -332,13 +332,18 @@ fun TvScreen(
         }
     }
 
-    BackHandler(enabled = isMobile && isFullScreen) {
-        if (showFullscreenOverlay) {
-            showFullscreenOverlay = false
-        } else {
-            // Always return to EPG guide first, regardless of how we got here
-            isFullScreen = false
-            showFullscreenOverlay = false
+    BackHandler(enabled = showGroupContextMenu || isFullScreen || !isMobile) {
+        when {
+            showGroupContextMenu -> showGroupContextMenu = false
+            isFullScreen && showFullscreenOverlay -> showFullscreenOverlay = false
+            isFullScreen -> {
+                // Always return to EPG guide first, regardless of how we got here.
+                isFullScreen = false
+                showFullscreenOverlay = false
+            }
+            focusZone == TvFocusZone.GUIDE -> focusZone = TvFocusZone.GROUPS
+            focusZone == TvFocusZone.GROUPS -> focusZone = TvFocusZone.SIDEBAR
+            else -> onBack()
         }
     }
 

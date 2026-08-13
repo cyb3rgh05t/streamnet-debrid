@@ -1,5 +1,8 @@
 package com.arflix.tv.ui.components
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import com.arflix.tv.R
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.BackgroundElevated
 import com.arflix.tv.ui.theme.Pink
@@ -137,9 +141,9 @@ fun SettingsRow(
                 if (subtitle.isNotEmpty()) {
                     Text(
                         text = subtitle,
-                        style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                        style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                         color = TextSecondary,
-                        maxLines = 1,
+                        maxLines = 3,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -212,9 +216,9 @@ fun SettingsToggleRow(
             if (subtitle.isNotEmpty()) {
                 Text(
                     text = subtitle,
-                    style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                    style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                     color = TextSecondary,
-                    maxLines = 1,
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -272,42 +276,50 @@ fun MobileSettingsCategory(
 fun MobileSettingsRow(
     icon: ImageVector? = null,
     @DrawableRes iconRes: Int? = null,
+    iconTint: Color = TextSecondary,
     title: String,
     subtitle: String = "",
     value: String?,
+    enabled: Boolean = true,
     isFocused: Boolean = false,
     isToggle: Boolean = (value == "On" || value == "Off"),
+    isExternalLink: Boolean = false,
+    actionIcon: ImageVector? = null,
     showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
-    Column {
+    val alpha = if (enabled) 1f else 0.4f
+    Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onClick() }
+                .clickable(enabled = enabled) { onClick() }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 when {
                     iconRes != null -> Icon(
                         painter = painterResource(id = iconRes),
                         contentDescription = null,
-                        tint = TextSecondary,
+                        tint = iconTint,
                         modifier = Modifier.size(24.dp)
                     )
                     icon != null -> Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = TextSecondary,
+                        tint = iconTint,
                         modifier = Modifier.size(24.dp)
                     )
                 }
                 if (iconRes != null || icon != null) {
                     Spacer(modifier = Modifier.width(16.dp))
                 }
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
                         style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
@@ -318,16 +330,17 @@ fun MobileSettingsRow(
                     if (subtitle.isNotEmpty()) {
                         Text(
                             text = subtitle,
-                            style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                            style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                             color = TextSecondary,
-                            maxLines = 2,
+                            maxLines = 4,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
             }
             val safeValue = value.orEmpty()
-            if (safeValue.isNotEmpty()) {
+            val isOpenLabel = safeValue.equals("Open", ignoreCase = true) || safeValue == stringResource(R.string.settings_open)
+            if (safeValue.isNotEmpty() || isExternalLink || actionIcon != null) {
                 Spacer(modifier = Modifier.width(16.dp))
                 if (isToggle && (safeValue == "On" || safeValue == "Off")) {
                     val isChecked = safeValue == "On"
@@ -351,6 +364,13 @@ fun MobileSettingsRow(
                                 )
                         )
                     }
+                } else if (isExternalLink || actionIcon != null) {
+                    Icon(
+                        imageVector = actionIcon ?: Icons.AutoMirrored.Filled.OpenInNew,
+                        contentDescription = null,
+                        tint = TextSecondary,
+                        modifier = Modifier.size(18.dp)
+                    )
                 } else {
                     Text(
                         text = localizeSettingValue(safeValue),

@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { avatarCategories, avatarGradient, avatarSrc, colorToCss, profileColors } from "@/lib/profiles";
 import type { Profile } from "@/lib/types";
 
@@ -16,9 +16,23 @@ export function ProfileDialog({ mode, initial, onConfirm, onDelete, onClose }: {
   const [avatarColor, setAvatarColor] = useState(initial?.avatarColor ?? profileColors[0]);
   const [avatarId, setAvatarId] = useState(initial?.avatarId ?? 0);
 
+  // Escape / remote Back / gamepad B closes the dialog like every other
+  // modal. When the event targets the name input, tvNav already turned that
+  // press into a blur — the next one closes.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const target = event.target;
+      if (target instanceof HTMLElement && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="modal-scrim" onClick={onClose}>
-      <div className="profile-dialog" onClick={(event) => event.stopPropagation()}>
+      <div className="profile-dialog" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
         <div className="profile-dialog-head">
           <h2>{mode === "add" ? "Add Profile" : "Edit Profile"}</h2>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Close"><X size={20} /></button>

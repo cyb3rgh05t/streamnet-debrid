@@ -59,6 +59,47 @@ object LiveTvStartup {
      */
     fun shouldFocusSearch(focusSearchSignal: Int): Boolean = focusSearchSignal > 0
 
+    /**
+     * Whether the channel-search row may take D-pad focus.
+     *
+     * Search is the first focusable row in the sidebar, so while the playlist
+     * is still loading Compose parks the selector there by default — and
+     * "down" from search selects the first category, which does not exist yet,
+     * so every key press is swallowed and the selector looks frozen. Keeping
+     * search out of the focus order until there is a category to move to sends
+     * that initial focus straight to the category list instead.
+     */
+    fun searchIsReachable(categoryCount: Int): Boolean = categoryCount > 0
+
+    /**
+     * Where the selector lands when Live TV opens.
+     *
+     * This used to be the search row on purpose ("Default IPTV entry is the
+     * playlist/category rail, focused on Search"), which is exactly what users
+     * reported as broken: the selector opened inside the search box, and since
+     * "down" from search selects the first category — which does not exist
+     * until the playlist has parsed — it stayed stuck there through the entire
+     * load. The categories are the useful landing spot; search is one press up.
+     */
+    enum class EntryFocus { CATEGORY_LIST, NONE }
+
+    fun entryFocus(isTouchDevice: Boolean, hasChannels: Boolean): EntryFocus = when {
+        isTouchDevice -> EntryFocus.NONE
+        !hasChannels -> EntryFocus.NONE
+        else -> EntryFocus.CATEGORY_LIST
+    }
+
+    /**
+     * How long the sidebar keeps re-claiming the selector after Live TV opens.
+     *
+     * The mini player attaches its video surface shortly after the screen
+     * appears; that takes the platform focus, and Compose then falls back to
+     * the first focusable row — the search box. Roughly two seconds of retries
+     * covers stream start-up on a slow TV without fighting the user afterwards.
+     */
+    const val INITIAL_FOCUS_ATTEMPTS: Int = 25
+    const val INITIAL_FOCUS_RETRY_MS: Long = 80L
+
     /** Ids of the channels currently available, for [resumeChannelId]. */
     fun channelIds(channels: List<IptvChannel>): Set<String> =
         channels.mapTo(LinkedHashSet(channels.size)) { it.id }

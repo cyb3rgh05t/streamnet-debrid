@@ -33,6 +33,13 @@ import { attachPlayback } from "@/lib/player";
 import { resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
 import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
 import { playbackPlan, streamPlayability } from "@/lib/streamCompatibility";
+import {
+  bufferedAhead,
+  bufferedEndAt,
+  classifyMediaError,
+  isStalled,
+  nextStallAction,
+} from "@/lib/playerRecovery";
 import { authClient, useApp } from "@/lib/store";
 import { syncClient } from "@/lib/sync";
 import { SubtitleTranslator, subtitleLanguageName } from "@/lib/subtitleAi";
@@ -40,6 +47,18 @@ import { getLogoUrl } from "@/lib/tmdb";
 import type { AppSettings, InstalledAddon, MediaItem, StreamSource } from "@/lib/types";
 
 type PlayerPanel = "sources" | "subtitles" | "audio" | "settings" | null;
+
+/** How often the stall watchdog samples playback progress. */
+const STALL_POLL_MS = 1_000;
+
+/**
+ * Seconds of no forward progress before the remux path is declared dead.
+ *
+ * Generous because a remux legitimately spends time downloading and
+ * repackaging before the first frame — but bounded, because it used to hang
+ * indefinitely with no error and no timeout.
+ */
+const REMUX_STUCK_TICKS = 25;
 
 function youTubeId(url: string): string | null {
   const match = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([\w-]{11})/);
@@ -290,6 +309,16 @@ function VideoPlayer({
   const [current, setCurrent] = useState(0);
   const [duration, setDuration] = useState(0);
   const [buffered, setBuffered] = useState(0);
+  // Position being dragged to. While this is set the scrubber shows it instead
+  // of `current`, and the seek is deferred to pointer release: React's onChange
+  // is the DOM `input` event, so seeking there fired a real seek on every step
+  // of a drag — each one restarting the buffer on a remote stream.
+  const [scrubTo, setScrubTo] = useState<number | null>(null);
+  // Time under the cursor, for the hover tooltip.
+  const [hoverTime, setHoverTime] = useState<number | null>(null);
+  const [hoverPct, setHoverPct] = useState(0);
+  /** Seconds buffered ahead of the playhead, for the buffering readout. */
+  const [bufferAheadSec, setBufferAheadSec] = useState(0);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [buffering, setBuffering] = useState(true);
@@ -309,7 +338,10 @@ function VideoPlayer({
     remuxAudioIndexRef.current = index;
     setRemuxAudioIndex(index);
     // Picking a track on a direct-played source switches into the remux path,
-    // which is what actually lets us choose the audio stream.
+    // which is what actually lets us choose the audio stream. Keep the
+    // position: changing language should not send you back to the start.
+    const playhead = videoRef.current?.currentTime ?? 0;
+    if (playhead > 5) resumeAtRef.current = playhead;
     if (!stream.remux) {
       onSelectStream(stream, { forceRemux: true });
       return;
@@ -484,16 +516,31 @@ function VideoPlayer({
     if (!booted || liveTv) return undefined;
     const video = videoRef.current;
     if (!video) return undefined;
-    let stalls: number[] = [];
-    let switched = false;
-    const onWaiting = () => {
-      if (switched || video.currentTime < 8) return;
-      const now = Date.now();
-      stalls = [...stalls.filter((t) => now - t < 90_000), now];
-      if (stalls.length < 3) return;
+    // Mid-playback stall recovery. Previously this only reacted after three
+    // stalls in 90s AND only if a strictly smaller source existed — so a single
+    // source, an equal-sized source, or a source with unknown size (all common)
+    // meant the video buffered forever with no message and no way to continue.
+    // Now every stall is recovered: nudge the decoder, then re-attach the
+    // source, then fall down the ladder, preferring a lighter source if one
+    // exists because a stall usually means the connection can't keep up.
+    let lastProgressTime = video.currentTime;
+    let stalledSinceMs = 0;
+    let nudged = false;
+    let reloaded = false;
+    let escalated = false;
+    let announced = false;
+
+    const resetStall = () => {
+      stalledSinceMs = 0;
+      nudged = false;
+      reloaded = false;
+      announced = false;
+    };
+
+    const lighterSource = () => {
       const current = currentStreamRef.current;
       const currentSize = streamSizeBytes(current);
-      const lighter = sourceListRef.current.find((candidate) => {
+      return sourceListRef.current.find((candidate) => {
         if (!candidate.url || candidate.url === current.url || candidate.url === current.originalUrl) return false;
         if (isUncachedDebridStream(candidate)) return false;
         const mode = streamPlayability(candidate).mode;
@@ -501,13 +548,76 @@ function VideoPlayer({
         const size = streamSizeBytes(candidate);
         return size > 0 && (!currentSize || size < currentSize * 0.55);
       });
-      if (!lighter) return;
-      switched = true;
-      onToast("Your connection can't keep up with this version — switching to a lighter one.");
-      onSelectStream(lighter, { forceBrowser: true });
     };
-    video.addEventListener("waiting", onWaiting);
-    return () => video.removeEventListener("waiting", onWaiting);
+
+    const tick = window.setInterval(() => {
+      if (escalated) return;
+      const stalledNow = isStalled({
+        paused: video.paused,
+        seeking: video.seeking,
+        ended: video.ended,
+        currentTime: video.currentTime,
+        lastProgressTime,
+      });
+      if (!stalledNow) {
+        lastProgressTime = video.currentTime;
+        resetStall();
+        return;
+      }
+      stalledSinceMs += STALL_POLL_MS;
+      const action = nextStallAction({
+        stalledForMs: stalledSinceMs,
+        currentTime: video.currentTime,
+        nudged,
+        reloaded,
+      });
+      if (action.kind === "wait") return;
+      if (!announced) {
+        announced = true;
+        onToast("Playback stalled — trying to recover…");
+      }
+      if (action.kind === "nudge") {
+        nudged = true;
+        try { video.currentTime = action.seekTo; } catch { /* seek can throw while unbuffered */ }
+        void video.play().catch(() => undefined);
+        return;
+      }
+      if (action.kind === "reload") {
+        reloaded = true;
+        const resumeAt = action.resumeAt;
+        // Re-attaching drops a dead socket and re-requests the byte range; the
+        // resume seek has to wait until the fresh element can accept it.
+        const onLoaded = () => {
+          video.removeEventListener("loadedmetadata", onLoaded);
+          try { video.currentTime = resumeAt; } catch { /* ignore */ }
+          void video.play().catch(() => undefined);
+        };
+        video.addEventListener("loadedmetadata", onLoaded);
+        video.load();
+        return;
+      }
+      // escalate
+      escalated = true;
+      const lighter = lighterSource();
+      if (lighter) {
+        onToast("Your connection can't keep up with this version — switching to a lighter one.");
+        onSelectStream(lighter, { forceBrowser: true });
+        return;
+      }
+      // Nothing lighter: surface the failure instead of buffering silently so
+      // the source list (and the external-player options) are reachable.
+      setBuffering(false);
+      setError(true);
+      setShowControls(true);
+      onToast("This source stopped responding. Pick another source to continue.");
+    }, STALL_POLL_MS);
+
+    const onSeeked = () => { lastProgressTime = video.currentTime; resetStall(); };
+    video.addEventListener("seeked", onSeeked);
+    return () => {
+      window.clearInterval(tick);
+      video.removeEventListener("seeked", onSeeked);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, stream.url, liveTv]);
 
@@ -526,7 +636,10 @@ function VideoPlayer({
   const sourceList = useMemo(() => {
     const playable = streams.filter((candidate) => Boolean(candidate.url));
     const base = playable.length ? playable : [stream];
-    return [...base].sort((a, b) => sourcePickerScore(b) - sourcePickerScore(a));
+    // Always the browser ordering here: this list is the in-player picker and
+    // the auto-hop fallback, so every candidate has to decode in this browser
+    // no matter what the user's default player is elsewhere.
+    return [...base].sort((a, b) => sourcePickerScore(b, "browser") - sourcePickerScore(a, "browser"));
   }, [streams, stream]);
 
   // When a source is truly dead (URL ladder + remux exhausted), hop to the next
@@ -537,6 +650,10 @@ function VideoPlayer({
   const failedSourceUrlsRef = useRef(new Set<string>());
   const failedAddonStrikesRef = useRef(new Map<string, number>());
   const autoSourceHopsRef = useRef(0);
+  // Where to resume when the player re-attaches for the SAME title: a source
+  // hop, a remux escalation or a stall reload. Without this every switch
+  // restarted at 0, which is punishing 40 minutes into a film.
+  const resumeAtRef = useRef(0);
   const sourceListRef = useRef(sourceList);
   sourceListRef.current = sourceList;
   const currentStreamRef = useRef(stream);
@@ -549,6 +666,10 @@ function VideoPlayer({
   }, [item?.id, selectedEpisode?.season, selectedEpisode?.episode]);
   const tryNextSource = useCallback(() => {
     if (liveTv || autoSourceHopsRef.current >= 6) return false;
+    // Carry the watched position across the switch — the replacement source is
+    // the same title, so restarting at 0 loses the user's place.
+    const playhead = videoRef.current?.currentTime ?? 0;
+    if (playhead > 5) resumeAtRef.current = playhead;
     const current = currentStreamRef.current;
     if (current.url) failedSourceUrlsRef.current.add(current.url);
     if (current.originalUrl) failedSourceUrlsRef.current.add(current.originalUrl);
@@ -565,8 +686,11 @@ function VideoPlayer({
         const key = candidate.addonId || candidate.addonName || "";
         if (key && (failedAddonStrikesRef.current.get(key) ?? 0) >= 2) return false;
       }
+      // Transcode counts too: a debrid source whose codecs this browser cannot
+      // decode still plays once the provider transcodes it, so excluding it
+      // threw away working fallbacks and dead-ended on the error screen.
       const mode = streamPlayability(candidate).mode;
-      return mode === "direct" || mode === "remux";
+      return mode === "direct" || mode === "remux" || mode === "transcode";
     });
     const next = pick(true) ?? pick(false);
     if (!next) return false;
@@ -615,27 +739,54 @@ function VideoPlayer({
           setRemuxAudioIndex(startIndex);
           await prepared.start(video, startIndex);
           if (cancelled) return;
+          // Restore the position carried in from a source hop or an audio-track
+          // switch, which routes through this same remux path.
+          const resumeAt = resumeAtRef.current;
+          if (resumeAt > 5) {
+            const seekWhenReady = () => {
+              const target = video.duration > 0 ? Math.min(resumeAt, video.duration - 5) : resumeAt;
+              if (target > 0) { try { video.currentTime = target; } catch { /* ignore */ } }
+            };
+            if (video.readyState >= 1) seekWhenReady();
+            else video.addEventListener("loadedmetadata", seekWhenReady, { once: true });
+            resumeAtRef.current = 0;
+          }
           void video.play().catch(() => undefined);
           // The remux pipeline can die silently (conversion abort, CDN cutting
           // the range stream) — every internal error is swallowed and the UI
           // would spin forever. Watchdog: if no actual frames arrived shortly
           // after start resolved, declare the remux dead and move down the
           // ladder (next source, then the error screen with its VLC handoff).
-          remuxWatchdog = window.setTimeout(() => {
-            if (cancelled || video.readyState >= 2) return;
+          // Poll rather than fire once: a single timeout that lands while the
+          // element happens to report readyState>=2 gives up its only chance,
+          // and the remux then hangs with no error and no timeout at all —
+          // observed on device sitting at readyState 0 for 40s+ before the tab
+          // froze. Require real forward progress, not just a ready flag.
+          let lastSeen = -1;
+          let stuckTicks = 0;
+          remuxWatchdog = window.setInterval(() => {
+            if (cancelled) return;
+            const advancing = video.currentTime > lastSeen + 0.05;
+            lastSeen = Math.max(lastSeen, video.currentTime);
+            if (advancing && video.readyState >= 2) { stuckTicks = 0; return; }
+            stuckTicks += 1;
+            if (stuckTicks < REMUX_STUCK_TICKS) return;
+            window.clearInterval(remuxWatchdog);
             handle?.destroy();
             handle = null;
+            onToast("This version could not be repackaged for the browser — trying another source.");
             if (tryNextSource()) return;
             setBuffering(false);
             setError(true);
-          }, 15000);
+            setShowControls(true);
+          }, 1000);
         } catch {
           if (!cancelled && !tryNextSource()) { setBuffering(false); setError(true); }
         }
       })();
       return () => {
         cancelled = true;
-        window.clearTimeout(remuxWatchdog);
+        window.clearInterval(remuxWatchdog);
         handle?.destroy();
         video.removeAttribute("src");
         video.load();
@@ -650,6 +801,14 @@ function VideoPlayer({
     let handlingError = false;
     let cancelled = false;
     let detach: (() => void) | undefined;
+    // Set once this source has actually rendered frames. Everything below is
+    // STARTUP logic — "can this URL be opened at all?" — and must stand down
+    // afterwards. Without this, an error five seconds into a working stream ran
+    // the startup ladder and declared the source unplayable, which is why a
+    // source that was visibly playing would suddenly say it can't play in the
+    // browser and hop to the next one. Once playback has proven itself, a later
+    // fault is a stall/interruption and belongs to the recovery watchdog.
+    let hasPlayed = false;
     // Playback ladder: direct first (free for CORS-friendly providers), then the
     // Cloudflare resolver media proxy for live TV (fixes CORS/ORB without Netlify
     // bandwidth), then the legacy Netlify fallbacks.
@@ -693,7 +852,10 @@ function VideoPlayer({
       stallTimer = window.setTimeout(() => {
         if (cancelled) return;
         if (video.readyState < 1) handlePlaybackError();
-      }, liveTv ? 10000 : 13000);
+        // A cold debrid link has to be fetched and cached by the provider
+        // before the first byte arrives, which regularly exceeds the VOD
+        // budget — condemning sources that were about to work.
+      }, liveTv ? 10000 : (parseDebridStream(stream.originalUrl ?? stream.url) ? 25000 : 13000));
     };
     // Backstop for MSE sources (hls.js / remux): those attach a blob: src and
     // can fire loadedmetadata — which clears the stall timer — while never
@@ -704,7 +866,8 @@ function VideoPlayer({
       if (cancelled) return;
       if (video.readyState >= 2) return;
       handlePlaybackError();
-    }, liveTv ? 15000 : 20000);
+      // Same reasoning as the stall timer: debrid needs a longer leash.
+    }, liveTv ? 15000 : (parseDebridStream(stream.originalUrl ?? stream.url) ? 38000 : 20000));
     const requestPlayback = () => {
       if (cancelled || !video.paused) return;
       setError(false);
@@ -722,6 +885,21 @@ function VideoPlayer({
     let refreshedLink = false;
     const handlePlaybackError = () => {
       if (cancelled || handlingError) return;
+      // A source that already played is not a startup failure. Walking the
+      // ladder here would re-attach a different URL (or hop to another source)
+      // mid-film; the stall watchdog recovers in place instead, keeping the
+      // user's position and the source they chose. A decode fault is the one
+      // exception — those bytes will never play here, so say so plainly rather
+      // than letting the watchdog retry something that cannot work.
+      if (hasPlayed) {
+        if (classifyMediaError(video.error?.code) === "fatal") {
+          setBuffering(false);
+          setError(true);
+          setShowControls(true);
+          onToast("This source stopped decoding partway through. Try another source or open it in VLC.");
+        }
+        return;
+      }
       handlingError = true;
       // A debrid CDN link is presigned and short-lived. When one expires the
       // CDN rejects it (TorBox: "Invalid Presigned Token", HTTP 400) and every
@@ -777,6 +955,8 @@ function VideoPlayer({
       if (!liveTv && !stream.remux && playbackPlan(stream).route === "here" && playbackPlan(stream).method === "remux") {
         cancelled = true;
         detach?.();
+        const playhead = video.currentTime;
+        if (playhead > 5) resumeAtRef.current = playhead;
         onSelectStream(stream, { forceRemux: true });
         return;
       }
@@ -792,7 +972,19 @@ function VideoPlayer({
     };
     detach = attachPlayback(video, uniqueAttempts[0], { onError: handlePlaybackError, live: liveTv });
     armStallTimer();
-    const onReadyToStart = () => { window.clearTimeout(stallTimer); if (video.playbackRate !== playbackRate) video.playbackRate = playbackRate; requestPlayback(); };
+    const onReadyToStart = () => {
+      window.clearTimeout(stallTimer);
+      if (video.playbackRate !== playbackRate) video.playbackRate = playbackRate;
+      // Restore the position carried over from a source hop / remux switch.
+      // Guarded so it only fires once and never seeks past the end.
+      const resumeAt = resumeAtRef.current;
+      if (resumeAt > 5 && video.currentTime < 1) {
+        const target = video.duration > 0 ? Math.min(resumeAt, video.duration - 5) : resumeAt;
+        if (target > 0) { try { video.currentTime = target; } catch { /* not seekable yet */ } }
+        resumeAtRef.current = 0;
+      }
+      requestPlayback();
+    };
     const startTimer = window.setTimeout(requestPlayback, 0);
     video.addEventListener("loadedmetadata", onReadyToStart, { once: true });
     video.addEventListener("canplay", onReadyToStart, { once: true });
@@ -801,12 +993,29 @@ function VideoPlayer({
     }, 6500);
     const onErr = () => handlePlaybackError();
     video.addEventListener("error", onErr);
+    // The moment real frames arrive this source has proven it plays here, so
+    // retire the startup watchdogs and the ladder. Anything that goes wrong
+    // from now on is handled by the stall watchdog, which recovers in place.
+    const onFirstPlaying = () => {
+      if (video.readyState < 3) return;
+      hasPlayed = true;
+      window.clearTimeout(stallTimer);
+      window.clearTimeout(playableWatchdog);
+      video.removeEventListener("playing", onFirstPlaying);
+      video.removeEventListener("timeupdate", onFirstPlaying);
+    };
+    video.addEventListener("playing", onFirstPlaying);
+    // `playing` can be missed when a source starts already-buffered; a moving
+    // clock is the same proof.
+    video.addEventListener("timeupdate", onFirstPlaying);
     return () => {
       cancelled = true;
       window.clearTimeout(startTimer);
       window.clearTimeout(slowTimer);
       window.clearTimeout(stallTimer);
       window.clearTimeout(playableWatchdog);
+      video.removeEventListener("playing", onFirstPlaying);
+      video.removeEventListener("timeupdate", onFirstPlaying);
       video.removeEventListener("loadedmetadata", onReadyToStart);
       video.removeEventListener("canplay", onReadyToStart);
       video.removeEventListener("error", onErr);
@@ -817,14 +1026,26 @@ function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return undefined;
-    const onTime = () => setCurrent(video.currentTime);
+    const onTime = () => {
+      setCurrent(video.currentTime);
+      // Keep the buffer bar tied to the range under the playhead; `progress`
+      // alone only fires while bytes are arriving, so it goes stale on a seek.
+      setBuffered(bufferedEndAt(video.buffered, video.currentTime));
+      setBufferAheadSec(bufferedAhead(video.buffered, video.currentTime));
+    };
     const onDur = () => setDuration(video.duration || 0);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
     const onPlaying = () => setBuffering(false);
+    // Use the range holding the playhead, not the last range: after seeking
+    // backwards the last range is somewhere ahead, and the buffer bar claimed
+    // far more was loaded than really was.
+    // `progress` keeps firing while stalled (bytes still arriving even though
+    // the clock is frozen), which is exactly when the readout matters.
     const onProgress = () => {
-      if (video.buffered.length) setBuffered(video.buffered.end(video.buffered.length - 1));
+      setBuffered(bufferedEndAt(video.buffered, video.currentTime));
+      setBufferAheadSec(bufferedAhead(video.buffered, video.currentTime));
     };
     const onVol = () => { setVolume(video.volume); setMuted(video.muted); };
     video.addEventListener("timeupdate", onTime);
@@ -877,9 +1098,32 @@ function VideoPlayer({
       streamAddonId: stream.addonId,
       title: item.title
     }, addons);
-    if (!isLiveStream) {
-      void syncClient().scrobble("start", { mediaType: item.mediaType, tmdbId: item.id, season, episode, progress: item.progress ?? 0 }).catch(() => undefined);
-    }
+    const isAnime = item.mediaType === "tv" && item.originalLanguage === "ja" && Boolean(item.genreIds?.includes(16));
+    const scrobble = (action: "start" | "pause" | "stop", progress: number) => {
+      if (isLiveStream) return;
+      void syncClient().scrobble(action, {
+        mediaType: item.mediaType,
+        tmdbId: item.id,
+        season,
+        episode,
+        isAnime,
+        progress
+      }).catch(() => undefined);
+    };
+    const playbackProgress = () => Number.isFinite(video.duration) && video.duration > 0
+      ? Math.min(100, Math.max(0, (video.currentTime / video.duration) * 100))
+      : item.progress ?? 0;
+    let scrobbleActive = false;
+    const onPlaying = () => {
+      if (scrobbleActive) return;
+      scrobbleActive = true;
+      scrobble("start", playbackProgress());
+    };
+    const onPaused = () => {
+      if (!scrobbleActive || video.ended) return;
+      scrobbleActive = false;
+      scrobble("pause", playbackProgress());
+    };
     const save = () => {
       if (!authClient.session || !Number.isFinite(video.duration) || video.duration <= 0) return;
       const now = Date.now();
@@ -905,18 +1149,22 @@ function VideoPlayer({
       }, activeProfileId, addons).catch(() => undefined);
     };
     const onEnded = () => {
-      if (!isLiveStream) {
-        void syncClient().scrobble("stop", { mediaType: item.mediaType, tmdbId: item.id, season, episode, progress: 100 }).catch(() => undefined);
-      }
+      scrobbleActive = false;
+      scrobble("stop", 100);
       if (settings.autoPlayNext && canAdvance) void onAdvance();
     };
     video.addEventListener("timeupdate", save);
     video.addEventListener("pause", save);
+    video.addEventListener("playing", onPlaying);
+    video.addEventListener("pause", onPaused);
     video.addEventListener("ended", onEnded);
+    if (!video.paused && video.readyState >= 2) onPlaying();
     return () => {
       save();
       video.removeEventListener("timeupdate", save);
       video.removeEventListener("pause", save);
+      video.removeEventListener("playing", onPlaying);
+      video.removeEventListener("pause", onPaused);
       video.removeEventListener("ended", onEnded);
     };
   }, [item, stream, selectedEpisode, settings.autoPlayNext, activeProfileId, addons, canAdvance, onAdvance]);
@@ -937,14 +1185,26 @@ function VideoPlayer({
       setBuffering(true);
       const attempt = video.play();
       void attempt?.catch(() => {
-        setBuffering(false);
-        if (video.error) setError(true);
-        setShowControls(true);
+        if (video.error) {
+          setBuffering(false);
+          setError(true);
+          setShowControls(true);
+          return;
+        }
+        // No media error means autoplay policy: the page has no user
+        // activation yet (controller-only session). Muted playback is exempt.
+        video.muted = true;
+        void video.play().then(() => {
+          onToast("Started muted — press M or the speaker button to unmute.");
+        }).catch(() => {
+          setBuffering(false);
+          setShowControls(true);
+        });
       });
     }
     else video.pause();
     flashControls();
-  }, [flashControls]);
+  }, [flashControls, onToast]);
 
   const seekBy = useCallback((delta: number) => {
     const video = videoRef.current;
@@ -959,9 +1219,15 @@ function VideoPlayer({
   const toggleFullscreen = useCallback(() => {
     const el = containerRef.current;
     if (!el) return;
-    if (!document.fullscreenElement) void el.requestFullscreen?.().catch(() => undefined);
+    if (!document.fullscreenElement) {
+      void el.requestFullscreen?.().catch(() => {
+        // Fullscreen demands a real click/tap (transient activation), which
+        // controller input can never mint — say so instead of doing nothing.
+        onToast("Fullscreen needs a real click or tap first — or press F11.");
+      });
+    }
     else void document.exitFullscreen?.().catch(() => undefined);
-  }, []);
+  }, [onToast]);
 
   const openPanel = useCallback((panel: Exclude<PlayerPanel, null>) => {
     setActivePanel((currentPanel) => {
@@ -1085,7 +1351,10 @@ function VideoPlayer({
           break;
         case "Escape":
           if (activePanel) setActivePanel(null);
-          else if (!document.fullscreenElement) onClose();
+          // A synthetic Escape (gamepad B) can't trigger the browser's own
+          // exit-fullscreen default — do it ourselves, then close next press.
+          else if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
+          else onClose();
           break;
         default:
           break;
@@ -1114,17 +1383,31 @@ function VideoPlayer({
     if (!video || activeSubtitle < 0) return undefined;
     const track = video.textTracks?.[activeSubtitle];
     if (!track) return undefined;
+    // Subtitle sync offset. The Settings slider wrote subtitleOffsetMs but
+    // nothing ever read it, so the control did nothing at all. Shift each cue
+    // by the stored delta, remembering the original times so repeated changes
+    // (and switching back to 0) stay accurate instead of compounding.
+    const shiftSec = (settings.subtitleOffsetMs ?? 0) / 1000;
+    const originals = new WeakMap<VTTCue, { start: number; end: number }>();
     const applyLine = () => {
       for (const cue of Array.from(track.cues ?? []) as VTTCue[]) {
         cue.snapToLines = false;
         cue.line = subtitleLinePercent;
+        if (!originals.has(cue)) originals.set(cue, { start: cue.startTime, end: cue.endTime });
+        const base = originals.get(cue)!;
+        const start = Math.max(0, base.start + shiftSec);
+        const end = Math.max(start + 0.05, base.end + shiftSec);
+        if (cue.startTime !== start) cue.startTime = start;
+        if (cue.endTime !== end) cue.endTime = end;
       }
     };
     applyLine();
     track.addEventListener("cuechange", applyLine);
     return () => track.removeEventListener("cuechange", applyLine);
-  }, [activeSubtitle, subtitleLinePercent, stream.url]);
-  const pct = duration > 0 ? (current / duration) * 100 : 0;
+  }, [activeSubtitle, subtitleLinePercent, settings.subtitleOffsetMs, stream.url]);
+  // While scrubbing the bar follows the drag, not the (not yet moved) playhead.
+  const scrubDisplayTime = scrubTo ?? current;
+  const pct = duration > 0 ? (scrubDisplayTime / duration) * 100 : 0;
   const bufPct = duration > 0 ? (buffered / duration) * 100 : 0;
 
   return (
@@ -1154,7 +1437,14 @@ function VideoPlayer({
             : <h2 className="player-boot-title">{title}</h2>}
         </div>
       )}
-      {buffering && !error && booted && <div className="player-spinner"><Loader2 size={56} /></div>}
+      {buffering && !error && booted && (
+        <div className="player-spinner">
+          <Loader2 size={56} />
+          {/* Show how much is actually buffered ahead: a bare spinner cannot
+              distinguish "downloading fine" from "wedged and going nowhere". */}
+          {bufferAheadSec > 0 && <span className="player-buffer-health">{Math.round(bufferAheadSec)}s buffered</span>}
+        </div>
+      )}
       {error && (
         <div className="player-error">
           <p>{liveTv ? "This channel could not be played right now." : "This source could not be played in the browser."}</p>
@@ -1413,19 +1703,53 @@ function VideoPlayer({
 
       <div className="player-controls">
         {!liveTv && (
-          <input
-            className="scrubber"
-            type="range"
-            min={0}
-            max={duration || 0}
-            step={0.1}
-            value={current}
-            style={{ ["--pct" as string]: `${pct}%`, ["--buf" as string]: `${bufPct}%` }}
-            onChange={(e) => {
-              const v = videoRef.current;
-              if (v) v.currentTime = Number(e.target.value);
+          <div
+            className="scrubber-track"
+            onPointerMove={(e) => {
+              if (!duration) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              setHoverTime(ratio * duration);
+              setHoverPct(ratio * 100);
             }}
-          />
+            onPointerLeave={() => setHoverTime(null)}
+          >
+            {hoverTime !== null && (
+              <span
+                className="scrubber-hover-time"
+                // Clamp so the readout stays inside the bar at both ends
+                // instead of hanging off the edge near 0:00 and the finish.
+                style={{ left: `${Math.min(96, Math.max(4, hoverPct))}%` }}
+              >
+                {fmt(hoverTime)}
+              </span>
+            )}
+            <input
+              className="scrubber"
+              type="range"
+              min={0}
+              max={duration || 0}
+              // 1s keeps keyboard arrows useful; 0.1 made a 2h film 72,000 steps.
+              step={1}
+              value={scrubDisplayTime}
+              aria-label="Seek"
+              aria-valuetext={fmt(scrubDisplayTime)}
+              style={{ ["--pct" as string]: `${pct}%`, ["--buf" as string]: `${bufPct}%` }}
+              onChange={(e) => setScrubTo(Number(e.target.value))}
+              onPointerUp={() => {
+                const v = videoRef.current;
+                if (v && scrubTo !== null) v.currentTime = scrubTo;
+                setScrubTo(null);
+              }}
+              onKeyUp={() => {
+                // Keyboard seeking has no pointer release to commit on.
+                const v = videoRef.current;
+                if (v && scrubTo !== null) v.currentTime = scrubTo;
+                setScrubTo(null);
+              }}
+              onBlur={() => setScrubTo(null)}
+            />
+          </div>
         )}
         <div className="player-controls-row">
           <div className="player-controls-left">
@@ -1465,7 +1789,16 @@ function VideoPlayer({
             </div>
             {liveTv
               ? <span className="player-time player-live-indicator"><span className="live-dot" /> LIVE</span>
-              : <span className="player-time">{fmt(current)} <em>/</em> {fmt(duration)}</span>}
+              : (
+                <span className="player-time">
+                  {fmt(scrubDisplayTime)} <em>/</em> {fmt(duration)}
+                  {duration > 0 && (
+                    // "How much is left" is the question people actually ask;
+                    // the elapsed/total pair alone makes you do the subtraction.
+                    <span className="player-time-remaining">-{fmt(Math.max(0, duration - scrubDisplayTime))}</span>
+                  )}
+                </span>
+              )}
           </div>
           <div className="player-controls-right">
             <div className="player-badges">

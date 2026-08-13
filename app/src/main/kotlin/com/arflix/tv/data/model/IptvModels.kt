@@ -1,5 +1,6 @@
 package com.arflix.tv.data.model
 
+import androidx.compose.runtime.Immutable
 import java.time.Instant
 
 /**
@@ -12,6 +13,7 @@ import java.time.Instant
  * @property licenseData Optional PSSH override (base64). Most MPD manifests declare
  *   PSSH inline or in the init segment; ExoPlayer handles both automatically.
  */
+@Immutable
 data class DrmInfo(
     val scheme: String,
     val licenseUrl: String? = null,
@@ -21,6 +23,7 @@ data class DrmInfo(
 /**
  * IPTV channel parsed from an M3U playlist.
  */
+@Immutable
 data class IptvChannel(
     val id: String,
     val name: String,
@@ -46,6 +49,7 @@ data class IptvChannel(
 /**
  * Compact now/next program slice for a channel.
  */
+@Immutable
 data class IptvNowNext(
     val now: IptvProgram? = null,
     val next: IptvProgram? = null,
@@ -57,6 +61,7 @@ data class IptvNowNext(
 /**
  * EPG program row.
  */
+@Immutable
 data class IptvProgram(
     val title: String,
     val description: String? = null,
@@ -71,6 +76,7 @@ data class IptvProgram(
 /**
  * Loaded IPTV snapshot used by UI.
  */
+@Immutable
 data class IptvSnapshot(
     val channels: List<IptvChannel> = emptyList(),
     val grouped: Map<String, List<IptvChannel>> = emptyMap(),

@@ -8,6 +8,14 @@ export type BrowserMediaCapabilities = {
   h264: boolean;
   hevc: boolean;
   hevc10: boolean;
+  /**
+   * True only when the browser advertises a Dolby Vision decoder.
+   *
+   * Without one, a DV title decodes its HEVC layer but renders black while the
+   * audio and subtitles play — the exact symptom users report. Desktop Chrome,
+   * Edge and Firefox all report false here; some TV and mobile builds do not.
+   */
+  dolbyVision: boolean;
   av1: boolean;
   vp9: boolean;
   aac: boolean;
@@ -23,6 +31,7 @@ const NO_CAPABILITIES: BrowserMediaCapabilities = {
   h264: true,
   hevc: false,
   hevc10: false,
+  dolbyVision: false,
   av1: false,
   vp9: false,
   aac: true,
@@ -61,6 +70,12 @@ export function getMediaCapabilities(): BrowserMediaCapabilities {
     h264: supports('video/mp4; codecs="avc1.640028"'),
     hevc: supports('video/mp4; codecs="hvc1.1.6.L120.90"') || supports('video/mp4; codecs="hev1.1.6.L120.90"'),
     hevc10: supports('video/mp4; codecs="hvc1.2.4.L153.B0"') || supports('video/mp4; codecs="hev1.2.4.L153.B0"'),
+    // Profile 5 (single layer) and profile 8.1 (HDR10-compatible base) cover
+    // the two shapes a browser could plausibly render.
+    dolbyVision: supports('video/mp4; codecs="dvhe.05.06"')
+      || supports('video/mp4; codecs="dvh1.05.06"')
+      || supports('video/mp4; codecs="dvhe.08.06"')
+      || supports('video/mp4; codecs="dvh1.08.06"'),
     av1: supports('video/mp4; codecs="av01.0.08M.08"'),
     vp9: supports('video/mp4; codecs="vp09.00.50.08"') || supports('video/webm; codecs="vp9"'),
     aac: supports('audio/mp4; codecs="mp4a.40.2"'),

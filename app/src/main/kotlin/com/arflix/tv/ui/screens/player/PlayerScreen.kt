@@ -2490,6 +2490,10 @@ fun PlayerScreen(
         cancelNextEpisodePrompt()
     }
 
+    BackHandler(enabled = uiState.error != null) {
+        onBack()
+    }
+
     BackHandler(
         enabled = !showSubtitleMenu && !showSourceMenu && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
     ) {

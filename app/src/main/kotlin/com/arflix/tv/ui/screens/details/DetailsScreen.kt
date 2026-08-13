@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.details
 
+import androidx.activity.compose.BackHandler
 import android.content.Context
 import android.graphics.Bitmap
 import android.content.Intent
@@ -537,6 +538,14 @@ fun DetailsScreen(
             if (item != null) {
                 onNavigateToDetails(item.mediaType, item.id)
             }
+        }
+    }
+
+    BackHandler(enabled = !showStreamSelector && !showEpisodeContextMenu && !showSeasonContextMenu && !uiState.showPersonModal) {
+        if (showTrailerPlayer) {
+            showTrailerPlayer = false
+        } else {
+            onBack()
         }
     }
 

@@ -38,8 +38,11 @@ export function AppShell() {
 
   // D-pad / keyboard spatial navigation for TV browsers (Tizen, webOS) and
   // desktop keyboards: arrows move focus, Enter activates, TV Back → Escape.
+  // The gamepad layer (HTPC mode: Xbox Ally, Steam Deck, any pad) feeds the
+  // same engine, so a controller drives the whole app like Plex HTPC.
   useEffect(() => {
     void import("@/lib/tvNav").then((mod) => mod.installTvNav()).catch(() => undefined);
+    void import("@/lib/gamepadNav").then((mod) => mod.installGamepadNav()).catch(() => undefined);
   }, []);
 
   // Warm the lazy player libraries during idle time so the first Play press

@@ -8,7 +8,9 @@ export function SearchScreen() {
   const { query, setQuery, results, openDetails, settings } = useApp();
   const posterMode = settings.cardLayoutMode === "poster";
   return (
-    <div className={`screen ${posterMode ? "poster-results" : ""}`}>
+    // has-search-hero mirrors the CSS :has(.search-hero) rules for TV
+    // browsers whose engines predate :has() support (Tizen/webOS).
+    <div className={`screen has-search-hero ${posterMode ? "poster-results" : ""}`}>
       <section className="search-hero">
         <span className="search-icon-shell"><Search size={28} /></span>
         <input

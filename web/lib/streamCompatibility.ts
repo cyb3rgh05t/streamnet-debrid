@@ -36,21 +36,19 @@ function videoBlockReason(text: string): string | null {
   // black picture with working sound.
   const dolbyVision = /dolby[.\s_-]?vision/.test(text) || /\bdovi\b/.test(text) || /\bdv\b/.test(text);
   if ((hevc || dolbyVision) && !caps.hevc10 && !caps.hevc) return "This device has no HEVC decoder";
-  // Dolby Vision profile 5 has NO HDR10 base layer: browsers decode it but
-  // render a black/green picture while the audio plays fine. Profiles 7 and 8
-  // do carry an HDR10 base, so they display correctly.
+  // Dolby Vision renders black — with the audio and subtitles playing normally
+  // — on any browser without a DV decoder. That is the reported symptom, and
+  // it is not limited to profile 5: this used to assume profiles 7/8 were safe
+  // because they carry an HDR10 base layer, and treated an "hdr" or "remux"
+  // marker in the name as proof of one. Browsers do not reliably fall back to
+  // that base layer, so "…HDR10+ | Dolby Vision P7…" was badged "Plays here"
+  // and then played black. Measured in Chrome: dvhe.05 and dvhe.08 are both
+  // unsupported.
   //
-  // Profile is rarely stated, so infer it: an explicit p5 marker means blocked,
-  // an explicit p7/p8 marker (or an HDR10/HDR marker, or a REMUX, which is
-  // profile 7) means it has a base layer. Bare "DV" with nothing else is
-  // profile 5 in practice — that is the case that shows a black picture.
-  const dvProfile5 = /\b(dv|dovi)[.\s_-]?p?0?5\b/.test(text) || /profile[.\s_-]?5/.test(text);
-  const dvHasBaseLayer = /\b(dv|dovi)[.\s_-]?p?0?[78]\b/.test(text)
-    || /profile[.\s_-]?[78]/.test(text)
-    || text.includes("hdr")
-    || /\bremux\b/.test(text);
-  if (dolbyVision && (dvProfile5 || !dvHasBaseLayer)) {
-    return "Dolby Vision profile 5 shows a black picture in browsers";
+  // Trust the decoder, not the filename: DV only plays here if the browser
+  // actually advertises it.
+  if (dolbyVision && !caps.dolbyVision) {
+    return "Dolby Vision shows a black picture in this browser";
   }
   if (text.includes("av1") && !caps.av1) return "This device has no AV1 decoder";
   return null;
@@ -88,6 +86,30 @@ function directBlockReason(stream: CompatStream): string | null {
 /** Does the device have the decoder this stream's video needs? */
 export function videoDecodableForDevice(stream: CompatStream): boolean {
   return videoBlockReason(streamText(stream)) === null;
+}
+
+/**
+ * Will this browser end up with audio it can decode?
+ *
+ * The counterpart to [videoDecodableForDevice], and the signal ranking was
+ * missing: undecodable video was sunk hard while undecodable audio scored
+ * normally, so DDP/Atmos releases — nearly every modern streaming rip — ranked
+ * top and then failed. A blocked track is only survivable when the file
+ * plausibly carries another one (disc remux, MULTi/dual-audio) for the remux to
+ * switch to.
+ */
+export function audioDecodableForDevice(stream: CompatStream): boolean {
+  const text = streamText(stream);
+  if (audioBlockReason(text) === null) return true;
+  const caps = getMediaCapabilities();
+  const decodableCompanion = new RegExp(
+    caps.ac3 || caps.eac3
+      ? "(aac|ac-?3|eac-?3|ddp|dd\\+|opus|flac)"
+      : "(aac|opus|flac)"
+  ).test(text);
+  if (decodableCompanion) return true;
+  return /\bremux\b|\bmulti\b|dual[.\s_-]?audio|\bmulti-?audio\b|\bdual\b/.test(text)
+    && !(/truehd|dts/.test(text));
 }
 
 function videoDecodableForRemux(text: string) {
@@ -182,16 +204,42 @@ export function playbackPlan(stream: CompatStream): PlaybackPlan {
     // browser can decode. Lossless-only audio (TrueHD/DTS with no AC-3/AAC
     // companion) is the common failure, and AC-3 itself is unsupported here.
     //
-    // Be conservative: the release name lists the HEADLINE track, not every
-    // track, and most TrueHD/DTS releases also ship an AAC or AC-3 companion
-    // the remux can pick. Only route away from the browser when the name says
-    // lossless AND nothing suggests a companion — a full disc REMUX practically
-    // always carries one, so those keep their Play button and let the remux's
-    // own track probe decide. Guessing wrong here removes a button that would
-    // have worked, which is worse than a rare failed attempt.
-    const mentionsCompanion = /(aac|ac-?3|eac-?3|ddp|dd\+|opus|flac)/.test(text) || /\bremux\b/.test(text);
-    const losslessOnly = /truehd|dts/.test(text) && !mentionsCompanion;
-    if (losslessOnly && !caps.ac3 && !caps.eac3) {
+    // The release name lists the HEADLINE track, so a companion mention (AAC,
+    // Opus, FLAC…) is real evidence the remux has something to pick.
+    //
+    // "Remux" is NOT such evidence, though it used to count as one. A disc
+    // remux carries the disc's own tracks — typically TrueHD/DTS-HD and often
+    // nothing else this browser can decode. Treating the word as a promise of a
+    // safe companion is what put an 80GB "BluRay.Remux.DV.P7.HDR.MULTi.
+    // TrueHD.Atmos" at the top of the list badged "Plays here": measured in
+    // Chrome, TrueHD, Atmos, E-AC-3 and AC-3 are all unsupported, so pressing
+    // Play sat at readyState 0 with no picture, no error and no timeout.
+    //
+    // AC-3/E-AC-3 only count as a companion when this browser can actually
+    // decode them — naming a codec it cannot play is not a fallback.
+    const decodableCompanion = new RegExp(
+      caps.ac3 || caps.eac3
+        ? "(aac|ac-?3|eac-?3|ddp|dd\\+|opus|flac)"
+        : "(aac|opus|flac)"
+    ).test(text);
+    // A remux can only rescue blocked audio if the file actually carries a
+    // second track. Disc remuxes and dual-audio releases usually do; a WEB-DL
+    // carries exactly one. That distinction is why almost every
+    // "…MAX.WEB-DL.DDP5.1.Atmos…" episode was badged "Plays here" and then
+    // failed: E-AC-3 is undecodable in this browser and there was no other
+    // track to switch to.
+    const likelyMultiTrack = /\bremux\b|\bmulti\b|dual[.\s_-]?audio|\bmulti-?audio\b|\bdual\b/.test(text);
+    const audioBlocked = audioBlockReason(text) !== null;
+    if (audioBlocked && !decodableCompanion && !likelyMultiTrack) {
+      return {
+        route: "vlc",
+        method: "remux",
+        label: "Needs VLC",
+        detail: "This browser can't decode its only audio track",
+      };
+    }
+    const losslessOnly = /truehd|dts/.test(text) && !decodableCompanion;
+    if (losslessOnly) {
       return { route: "vlc", method: "remux", label: "Needs VLC", detail: "Only lossless audio this browser can't decode" };
     }
     return { route: "here", method: "remux", label: "Plays here", detail: reason };

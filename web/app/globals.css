@@ -251,12 +251,29 @@ button {
 
 /* Screens that already supply their own top offset must not stack this one:
    .section-heading carries clamp(112px, 14.3vh, 154px) of its own padding
-   (Watchlist/Browse/Addons), a hero fills the space itself, and .livetv-shell
-   sets its own. Without these exclusions those pages rendered ~232px of empty
-   space above the first heading instead of ~112px. */
+   (Watchlist/Browse/Addons) and a hero fills the space itself.
+
+   .livetv-shell is deliberately NOT in this list. It sets its own full padding
+   (clamp(84px, 9vh, 104px) top — the Live TV overhaul block), and that
+   single-class rule already beats the .screen base by source order. Forcing
+   padding-top: 0 from here out-specified it (two classes vs one) and pushed
+   the whole TV page underneath the fixed top bar.
+
+   The .has-hero / .has-section-heading classes are set by the components and
+   duplicate the :has() conditions: TV browsers (Tizen/webOS ship Chromium
+   69-94; :has() needs 105+) would otherwise ignore these rules entirely and
+   render double top padding on every screen.
+
+   The class fallbacks MUST live in their own rule: one selector an engine
+   can't parse (like :has() below Chromium 105) invalidates the entire
+   comma-separated list, fallbacks included. */
 .screen:has(.hero),
-.screen:has(> .section-heading:first-child),
-.screen.livetv-shell {
+.screen:has(> .section-heading:first-child) {
+  padding-top: 0;
+}
+
+.screen.has-hero,
+.screen.has-section-heading {
   padding-top: 0;
 }
 
@@ -3071,8 +3088,24 @@ a.login-submit {
   gap: 14px;
 }
 .player-spacer { flex: 1; }
-.player-time { font-size: 14px; color: rgba(255, 255, 255, 0.86); white-space: nowrap; }
+.player-time {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.86);
+  white-space: nowrap;
+  /* Digits must not reflow the row as the clock ticks. */
+  font-variant-numeric: tabular-nums;
+}
 .player-time em { color: var(--soft); font-style: normal; margin: 0 2px; }
+.player-time-remaining { margin-left: 10px; color: rgba(255, 255, 255, 0.55); }
+.player-buffer-health {
+  display: block;
+  margin-top: 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
 .player-quality {
   font-size: 12px;
   font-weight: 700;
@@ -3103,6 +3136,34 @@ a.login-submit {
     rgba(255, 255, 255, 0.16) var(--buf, var(--pct, 0%)), rgba(255, 255, 255, 0.16) 100%);
 }
 .scrubber { width: 100%; height: 6px; }
+
+/* Wrapper gives the thin bar a taller pointer target and anchors the hover
+   time readout. Padding (not height) so the bar keeps its slim look. */
+.scrubber-track {
+  position: relative;
+  width: 100%;
+  padding: 9px 0;
+  display: flex;
+  align-items: center;
+}
+.scrubber-hover-time {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  /* Clamp so the readout never hangs off either end of the bar. */
+  transform: translateX(-50%);
+  margin-inline: 0;
+  padding: 4px 9px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 3;
+}
 .scrubber::-webkit-slider-thumb,
 .volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -3981,10 +4042,20 @@ select:focus {
   transform: translateY(-1px);
 }
 
-.player-top,
-.player-controls,
+/* The side panel sits over the video as a solid surface, so it blurs. The top
+   and bottom bars do NOT: they are transparent strips, and blurring there
+   frosted a visible band of the picture along both edges.
+   A soft gradient scrim keeps the controls readable over bright scenes
+   without touching the image the way a backdrop blur does. */
 .player-side-panel {
   backdrop-filter: blur(18px);
+}
+
+.player-top {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+}
+.player-controls {
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0.72), rgba(0, 0, 0, 0.34) 55%, rgba(0, 0, 0, 0));
 }
 
 .toast {
@@ -5702,7 +5773,7 @@ button,
 
   .livetv-shell,
   .settings-shell,
-  .screen:has(.search-hero) {
+  .screen.has-search-hero {
     min-height: auto !important;
   }
 
@@ -9511,8 +9582,16 @@ button,
   }
 }
 
-/* Final search layout pass - keep search clear of the fixed top navigation */
-.screen:has(.search-hero) {
+/* Final search layout pass - keep search clear of the fixed top navigation.
+   .has-search-hero is set by SearchScreen so :has()-less TV engines (Tizen/
+   webOS) match too; 100vh first as their fallback for dvh (Chromium 108+). */
+.screen.has-search-hero {
+  min-height: 100vh;
+  padding-top: 0;
+}
+
+.screen:has(.search-hero),
+.screen.has-search-hero {
   min-height: 100dvh;
   padding-top: 0;
 }
@@ -9572,13 +9651,13 @@ button,
     0 24px 70px rgba(0, 0, 0, 0.44);
 }
 
-.screen:has(.search-hero) .grid-results {
+.screen.has-search-hero .grid-results {
   padding: 0 clamp(22px, 4.2vw, 78px) 96px;
   grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr));
   align-items: start;
 }
 
-.screen:has(.search-hero).poster-results .grid-results {
+.screen.has-search-hero.poster-results .grid-results {
   grid-template-columns: repeat(auto-fill, minmax(150px, 210px));
 }
 
@@ -9607,8 +9686,8 @@ button,
     font-size: 16px;
   }
 
-  .screen:has(.search-hero) .grid-results,
-  .screen:has(.search-hero).poster-results .grid-results {
+  .screen.has-search-hero .grid-results,
+  .screen.has-search-hero.poster-results .grid-results {
     grid-template-columns: 1fr;
     padding: 0 var(--phone-gutter) 24px !important;
   }
@@ -10494,7 +10573,7 @@ button,
   grid-template-columns: repeat(auto-fill, minmax(min(232px, 100%), 1fr));
 }
 
-.screen:has(.search-hero) .grid-results {
+.screen.has-search-hero .grid-results {
   grid-template-columns: repeat(auto-fill, minmax(min(232px, 100%), 1fr));
 }
 
@@ -10626,17 +10705,23 @@ button,
 .player-controls .scrubber {
   -webkit-appearance: none;
   appearance: none;
-  height: 3px !important;
+  /* 3px was too thin to see the played/buffered split at a glance and too
+     fiddly to aim at; 6px reads clearly and still looks slim. */
+  height: 6px !important;
   border-radius: 999px;
   background: linear-gradient(90deg,
-    #fff 0, #fff var(--pct, 0%),
-    rgba(255, 255, 255, 0.45) var(--pct, 0%), rgba(255, 255, 255, 0.45) var(--buf, var(--pct, 0%)),
-    rgba(255, 255, 255, 0.18) var(--buf, var(--pct, 0%)), rgba(255, 255, 255, 0.18) 100%);
+    var(--accent, #e50914) 0, var(--accent, #e50914) var(--pct, 0%),
+    rgba(255, 255, 255, 0.42) var(--pct, 0%), rgba(255, 255, 255, 0.42) var(--buf, var(--pct, 0%)),
+    rgba(255, 255, 255, 0.16) var(--buf, var(--pct, 0%)), rgba(255, 255, 255, 0.16) 100%);
   transition: height 0.12s ease;
   margin-bottom: 4px;
 }
 
-.player-controls .scrubber:hover { height: 5px !important; }
+/* Hovering anywhere in the (much taller) track wrapper grows the bar and
+   reveals the thumb — the 3px bar itself is an awkward pointer target. */
+.player-controls .scrubber:hover,
+.scrubber-track:hover .scrubber,
+.scrubber-track:focus-within .scrubber { height: 9px !important; }
 
 /* iOS renders the native track unless it is explicitly zeroed out. */
 .player-controls .scrubber::-webkit-slider-runnable-track {
@@ -10646,25 +10731,38 @@ button,
   border: 0;
 }
 
+/* The thumb used to be invisible until hover, so at a glance there was no
+   handle to grab and no marker for the exact play position. Keep it visible
+   and grow it on hover/drag instead. */
 .player-controls .scrubber::-webkit-slider-thumb {
   -webkit-appearance: none;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   margin-top: 0;
   border: 0;
   border-radius: 999px;
   background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
-  opacity: 0;
-  transition: opacity 0.12s ease;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6);
+  opacity: 1;
+  transition: transform 0.12s ease;
 }
 
 .player-controls .scrubber:hover::-webkit-slider-thumb,
-.player-controls .scrubber:active::-webkit-slider-thumb { opacity: 1; }
+.player-controls .scrubber:active::-webkit-slider-thumb,
+.scrubber-track:hover .scrubber::-webkit-slider-thumb,
+.scrubber-track:focus-within .scrubber::-webkit-slider-thumb { transform: scale(1.35); }
 .player-controls .scrubber::-moz-range-track { background: transparent; height: 100%; border: 0; }
-.player-controls .scrubber::-moz-range-thumb { width: 12px; height: 12px; border: 0; background: #fff; opacity: 0; }
+.player-controls .scrubber::-moz-range-thumb {
+  width: 13px; height: 13px; border: 0; border-radius: 999px; background: #fff;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.6); opacity: 1;
+}
 .player-controls .scrubber:hover::-moz-range-thumb,
-.player-controls .scrubber:active::-moz-range-thumb { opacity: 1; }
+.player-controls .scrubber:active::-moz-range-thumb { transform: scale(1.35); }
+/* Keyboard focus needs a visible ring — the thumb alone is not an indicator. */
+.player-controls .scrubber:focus-visible {
+  outline: 2px solid var(--accent, #e50914);
+  outline-offset: 4px;
+}
 
 .player-controls-row {
   display: flex;
@@ -10804,7 +10902,10 @@ button,
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: clamp(84px, 9vh, 104px) clamp(16px, 2.6vw, 40px) 24px;
+  /* Top clearance must cover the fixed top bar's centered controls, whose
+     bottom edge reaches (clamp(96px,13vh,154px) + 58px)/2 ≈ 106px on large
+     screens — 104px left a 2px sliver of clickable nav over the heading. */
+  padding: clamp(84px, 9vh, 108px) clamp(16px, 2.6vw, 40px) 24px;
   min-height: 100vh;
 }
 
@@ -10996,7 +11097,10 @@ button,
   overflow-y: auto;
   max-height: calc(100vh - 200px);
   position: sticky;
-  top: 96px;
+  /* Must clear the fixed bar's clickable controls at every size: their bottom
+     edge reaches ~106px on large screens, and 96px tucked the stuck list
+     underneath them. */
+  top: 108px;
   padding-right: 4px;
   scrollbar-width: thin;
 }
@@ -11210,9 +11314,11 @@ button,
   border: 1px solid rgba(255, 255, 255, 0.07);
   background: rgba(255, 255, 255, 0.03);
   position: sticky;
-  top: 96px;
+  /* Same clearance as .livetv-cats — 96px sat under the bar's controls on
+     large screens. max-height follows so the stuck panel still fits. */
+  top: 108px;
   align-self: start;
-  max-height: calc(100vh - 130px);
+  max-height: calc(100vh - 142px);
   overflow-y: auto;
   scrollbar-width: thin;
 }
@@ -11287,7 +11393,12 @@ button,
 
 /* Mobile: single column, categories become horizontal chips */
 @media (max-width: 760px) {
-  .livetv-shell { padding: 76px 12px 90px; gap: 10px; }
+  /* 681-760px still shows the DESKTOP fixed bar (the mobile header only
+     exists at <=680px), and that bar is clamp(96px, 13vh, 154px) tall — a flat
+     76px put the Live TV heading under its click-intercepting controls on any
+     tallish tablet. Clear the bar here; at <=680px the 16px !important rule in
+     the mobile-header block takes over anyway. */
+  .livetv-shell { padding: clamp(96px, 13vh, 112px) 12px 90px; gap: 10px; }
   .livetv-columns { display: flex; flex-direction: column; gap: 10px; }
   .livetv-cats {
     flex-direction: row;
@@ -11959,6 +12070,41 @@ html { background: #000; }
 :where(button, a[href], [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--accent, #fff);
   outline-offset: 2px;
+}
+
+/* Gamepad-driven focus is set by script after UNTRUSTED key events, so the
+   browser's :focus-visible heuristic may never engage — kbd-nav mode (set by
+   tvNav/gamepadNav on key navigation, cleared on pointer use) guarantees the
+   ring. Hover-equivalent styling rides the same class: hoverParity.ts clones
+   every :hover rule as a html.kbd-nav …:focus-within twin at runtime.
+   :where() around the prefix keeps specificity at (0,1,0) so bespoke
+   `outline: none` suppressions (cards/rows with their own focus skin) still
+   win — same invariant as the :focus-visible rule above. */
+:where(html.kbd-nav) :where(button, a[href], [role="button"], [tabindex]):focus {
+  outline: 2px solid var(--accent, #fff);
+  outline-offset: 2px;
+}
+
+/* ============ TV browsers (Tizen / webOS) ============ */
+/* `is-tv` is set on <html> by tvNav when the UA is a smart-TV shell. Plain
+   `:focus` (not :focus-visible) on purpose: TV engines predate :focus-visible,
+   and on a couch every focus IS keyboard focus — the ring must always show. */
+.is-tv *:focus {
+  outline: 3px solid #fff !important;
+  outline-offset: 3px;
+}
+
+/* TV SoCs render backdrop blur at single-digit framerates. These surfaces all
+   carry near-opaque backgrounds of their own, so dropping the blur costs
+   almost nothing visually and buys back the frame budget. */
+.is-tv .player-side-panel,
+.is-tv .toast,
+.is-tv .chips span,
+.is-tv .hero-meta > span,
+.is-tv .login-proof span,
+.is-tv .player-quality {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 
 /* ============================================================

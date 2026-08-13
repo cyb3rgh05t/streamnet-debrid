@@ -8,6 +8,7 @@ import java.net.PortUnreachableException
 import java.net.SocketException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
+import java.security.MessageDigest
 import java.util.concurrent.CancellationException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
@@ -95,9 +96,18 @@ object CrashReportFilter {
     }
 
     fun shouldSendSentryEvent(throwable: Throwable?, level: SentryLevel?): Boolean {
-        if (throwable == null) return true
+        return shouldSendSentryEvent(throwable, level, isCrashed = false)
+    }
+
+    fun shouldSendSentryEvent(
+        throwable: Throwable?,
+        level: SentryLevel?,
+        isCrashed: Boolean
+    ): Boolean {
+        if (isCrashed || level == SentryLevel.FATAL) return true
+        // Non-fatal message-only events are not actionable and can be extremely noisy.
+        if (throwable == null) return false
         if (isAlwaysIgnored(throwable)) return false
-        if (level == SentryLevel.FATAL) return true
         return shouldReportHandledException(throwable)
     }
 
@@ -108,7 +118,43 @@ object CrashReportFilter {
         val count = handledExceptionCounts
             .getOrPut(handledExceptionSignature(throwable, context)) { AtomicInteger(0) }
             .incrementAndGet()
-        return count <= 3 || count == 10 || count == 50 || count == 100
+        return count == 1
+    }
+
+    fun handledEventFingerprint(throwable: Throwable): String {
+        val root = rootCause(throwable)
+        val appFrame = throwable.causeSequence()
+            .flatMap { it.stackTrace.asSequence() }
+            .firstOrNull { it.className.startsWith("com.arflix.tv.") }
+            ?: root.stackTrace.firstOrNull()
+        val raw = buildString {
+            append(root::class.java.name)
+            append('|')
+            append(appFrame?.className.orEmpty())
+            append('.')
+            append(appFrame?.methodName.orEmpty())
+        }
+        return MessageDigest.getInstance("SHA-256")
+            .digest(raw.toByteArray())
+            .take(12)
+            .joinToString("") { "%02x".format(it) }
+    }
+
+    fun isSelectedForHandledSample(
+        installationSeed: String,
+        fingerprint: String,
+        samplePermille: Int
+    ): Boolean {
+        if (samplePermille <= 0) return false
+        if (samplePermille >= 1_000) return true
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest("$installationSeed|$fingerprint".toByteArray())
+        val bucket = (((digest[0].toInt() and 0xff) shl 8) or (digest[1].toInt() and 0xff)) % 1_000
+        return bucket < samplePermille
+    }
+
+    fun isAnr(throwable: Throwable): Boolean {
+        return containsClassName(throwable, setOf("ApplicationNotResponding"))
     }
 
     fun dropReasonForHandledException(throwable: Throwable): String? {
@@ -191,6 +237,15 @@ object CrashReportFilter {
             current = current.cause
         }
         return false
+    }
+
+    private fun Throwable.causeSequence(): Sequence<Throwable> = sequence {
+        var current: Throwable? = this@causeSequence
+        val seen = mutableSetOf<Throwable>()
+        while (current != null && seen.add(current)) {
+            yield(current)
+            current = current.cause
+        }
     }
 
     private val URL_PATTERN = Regex("\\b(?:https?|wss?|ftp|file|content)://[^\\s\"'<>]+", RegexOption.IGNORE_CASE)

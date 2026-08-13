@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -125,6 +126,11 @@ fun TextInputModal(
         } else {
             hideKeyboard()
         }
+    }
+
+    BackHandler(enabled = isVisible) {
+        hideKeyboard()
+        onCancel()
     }
 
     AnimatedVisibility(

@@ -38,7 +38,7 @@ export function AddonsScreen() {
     }
   };
   return (
-    <div className="screen">
+    <div className="screen has-section-heading">
       <section className="section-heading">
         <p className="eyebrow">Sources</p>
         <h2>Addons</h2>

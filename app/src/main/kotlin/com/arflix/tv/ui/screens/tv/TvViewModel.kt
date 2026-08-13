@@ -9,6 +9,7 @@ import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.data.model.IptvSnapshot
 import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.IptvConfig
+import com.arflix.tv.ui.screens.tv.live.LiveTvGuideSources
 import com.arflix.tv.data.repository.IptvPlaybackTarget
 import com.arflix.tv.data.repository.IptvPlaybackUrlResolver
 import com.arflix.tv.data.repository.IptvRepository
@@ -766,6 +767,15 @@ class TvViewModel @Inject constructor(
     private fun shouldEmitEpgSpinnerState(): Boolean =
         !isActiveLargeIptvList()
 
+    /**
+     * Whether the active playlist counts as "large" (paged store, reduced
+     * per-focus work).
+     *
+     * Called from several per-focus paths, so it must not touch the database:
+     * [IptvRepository.pagedChannelStoreCount] caches the count precisely because
+     * this used to run a `COUNT(*)` over a 90MB SQLite file on the main thread,
+     * which ANR'd the app under sustained d-pad navigation.
+     */
     private fun isActiveLargeIptvList(): Boolean {
         val snapshotCount = _uiState.value.snapshot.channels.size
         if (isLargeIptvList(snapshotCount)) return true
@@ -1078,7 +1088,15 @@ class TvViewModel @Inject constructor(
             deferCompleteEpgBackfill(priorityChannelIds)
             return
         }
-        if (largeList) {
+        // A large list is only dangerous for the Xtream path, which fans out into
+        // one HTTP call per channel. An XMLTV source is a single file parsed with
+        // SAX, keeping only now/next/recent per channel, so it stays bounded no
+        // matter how many programmes the file holds — and it is the ONLY way a
+        // plain-M3U playlist can ever get a guide, because refreshEpgForChannels
+        // (the "loads on demand" fallback) skips every channel without Xtream
+        // credentials. Blocking it here left large M3U playlists with no EPG at
+        // all: verified on device, the guide stayed empty indefinitely.
+        if (largeList && !LiveTvGuideSources.hasXmltvSource(state.config)) {
             setEpgBackfillInProgress(false)
             System.err.println("[EPG-Complete] Skipping on-device full guide backfill for large playlist; visible guide loads on demand")
             return
@@ -1923,8 +1941,10 @@ class TvViewModel @Inject constructor(
         moveGroupUp(null, groupName)
     }
 
+    // Reordering reads the visible group list (which can hit the paged channel
+    // store) and then writes the new order, so it runs off the main thread.
     fun moveGroupUp(playlistId: String?, groupName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val targetPlaylistId = playlistId?.trim().orEmpty()
             if (targetPlaylistId.isNotBlank()) {
                 iptvRepository.moveGroupUp(targetPlaylistId, groupName, currentVisiblePlaylistGroups(targetPlaylistId))
@@ -1944,7 +1964,7 @@ class TvViewModel @Inject constructor(
     }
 
     fun moveGroupToTop(playlistId: String?, groupName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val targetPlaylistId = playlistId?.trim().orEmpty()
             if (targetPlaylistId.isNotBlank()) {
                 iptvRepository.moveGroupToTop(targetPlaylistId, groupName, currentVisiblePlaylistGroups(targetPlaylistId))
@@ -1964,7 +1984,7 @@ class TvViewModel @Inject constructor(
     }
 
     fun moveGroupDown(playlistId: String?, groupName: String) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val targetPlaylistId = playlistId?.trim().orEmpty()
             if (targetPlaylistId.isNotBlank()) {
                 iptvRepository.moveGroupDown(targetPlaylistId, groupName, currentVisiblePlaylistGroups(targetPlaylistId))

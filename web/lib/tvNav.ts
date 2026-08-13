@@ -13,7 +13,9 @@
 // The engine stands down while the video player overlay is open (it owns the
 // arrow keys for seek/volume) and whenever a text field has focus.
 
-const FOCUS_SELECTOR = [
+import { enterKbdNav } from "./hoverParity";
+
+export const FOCUS_SELECTOR = [
   "button:not([disabled])",
   "a[href]",
   "input:not([disabled])",
@@ -22,6 +24,20 @@ const FOCUS_SELECTOR = [
   '[role="button"]:not([aria-disabled="true"])',
   '[tabindex]:not([tabindex="-1"])'
 ].join(",");
+
+/**
+ * Are we in a TV browser (Samsung Tizen, LG webOS, other smart-TV shells)?
+ *
+ * Used to flip an `is-tv` class on <html> that CSS keys off for an
+ * always-visible focus ring and for dropping GPU-expensive effects, and to
+ * switch focus scrolling from smooth to instant — TV SoCs janks through
+ * animated scrolls, and old TV engines are exactly where smoothness matters
+ * least.
+ */
+export function isTvBrowser(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return /\b(tizen|web0s|webos|smart-?tv|netcast|hbbtv)\b/i.test(navigator.userAgent);
+}
 
 type Direction = "up" | "down" | "left" | "right";
 
@@ -51,7 +67,7 @@ function isTextTarget(target: EventTarget | null): boolean {
   );
 }
 
-function playerIsOpen(): boolean {
+export function playerIsOpen(): boolean {
   return document.querySelector(".player-overlay") !== null;
 }
 
@@ -155,7 +171,7 @@ function moveFocus(direction: Direction): boolean {
 
 function focusElement(el: HTMLElement) {
   el.focus({ preventScroll: true });
-  el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  el.scrollIntoView({ block: "nearest", inline: "nearest", behavior: isTvBrowser() ? "auto" : "smooth" });
 }
 
 function synthesizeEscape() {
@@ -169,9 +185,21 @@ function appVideo(): HTMLVideoElement | null {
 }
 
 function onKeyDown(event: KeyboardEvent) {
+  // --- Escape frees a focused text field. ---
+  // Without this, remotes and controllers have no way OUT of an input: the
+  // guard below swallows their arrows and nothing else listens. TV Back runs
+  // through here too (synthesizeEscape re-dispatches onto the field), so the
+  // first Back blurs and the next one closes layers.
+  if (event.key === "Escape" && isTextTarget(event.target)) {
+    (event.target as HTMLElement).blur();
+    return;
+  }
+
   // --- TV Back (Tizen/webOS/remotes): translate into Escape everywhere. ---
-  if (TV_BACK_CODES.has(event.keyCode) || event.key === "GoBack" || event.key === "BrowserBack") {
+  // "XF86Back" is what some older Tizen builds report as event.key.
+  if (TV_BACK_CODES.has(event.keyCode) || event.key === "GoBack" || event.key === "BrowserBack" || event.key === "XF86Back") {
     event.preventDefault(); // keep the TV browser from exiting the app
+    enterKbdNav();
     synthesizeEscape();
     return;
   }
@@ -212,11 +240,20 @@ function onKeyDown(event: KeyboardEvent) {
     }
   }
 
+  // Tab is keyboard navigation too: without this, Tab users get focus skins
+  // but none of the hover-parity reveals (play overlays etc.) arrow users see.
+  if (event.key === "Tab" && event.isTrusted) enterKbdNav();
+
   // --- Spatial navigation with the arrows. ---
   const direction = ARROW_TO_DIRECTION[event.key];
   if (!direction) return;
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
-  if (isTextTarget(event.target)) return;
+  // Trusted arrows in a text field belong to the caret / select value. The
+  // gamepad's synthetic arrows have no default action at all, so for them
+  // spatial navigation is the only way OUT of a field — let them through.
+  if (event.isTrusted && isTextTarget(event.target)) return;
+  // Key-driven navigation: light up hover-equivalent focus styling.
+  enterKbdNav();
   if (playerIsOpen()) return; // the player owns arrows (seek/volume)
   if (moveFocus(direction)) event.preventDefault(); // stop page scroll on a handled move
 }
@@ -227,4 +264,8 @@ export function installTvNav() {
   if (installed || typeof window === "undefined") return;
   installed = true;
   window.addEventListener("keydown", onKeyDown);
+  // CSS keys off this for the always-visible focus ring and for skipping
+  // effects TV GPUs struggle with (backdrop blur). Done here rather than in a
+  // component so it exists before first paint settles.
+  if (isTvBrowser()) document.documentElement.classList.add("is-tv");
 }

@@ -20,10 +20,10 @@ class TraktRemoteProvider @Inject constructor(
 
     override suspend fun isConnected(): Boolean = traktRepository.hasTrakt()
 
-    override suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int): Boolean =
+    override suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean): Boolean =
         traktRepository.addToWatchlist(mediaType, tmdbId)
 
-    override suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int): Boolean =
+    override suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean): Boolean =
         traktRepository.removeFromWatchlist(mediaType, tmdbId)
 
     override suspend fun getWatchlist(): RemoteWatchlistResult {
@@ -40,7 +40,8 @@ class TraktRemoteProvider @Inject constructor(
         tmdbId: Int,
         progress: Float,
         season: Int?,
-        episode: Int?
+        episode: Int?,
+        isAnime: Boolean
     ) {
         traktRepository.scrobbleStart(mediaType, tmdbId, progress, season, episode)
     }
@@ -50,10 +51,22 @@ class TraktRemoteProvider @Inject constructor(
         tmdbId: Int,
         progress: Float,
         season: Int?,
-        episode: Int?
+        episode: Int?,
+        isAnime: Boolean
     ) {
         // Player uses the immediate (non-debounced) pause; preserve that.
         traktRepository.scrobblePauseImmediate(mediaType, tmdbId, progress, season, episode)
+    }
+
+    override suspend fun scrobbleProgress(
+        mediaType: MediaType,
+        tmdbId: Int,
+        progress: Float,
+        season: Int?,
+        episode: Int?,
+        isAnime: Boolean
+    ) {
+        traktRepository.scrobbleStart(mediaType, tmdbId, progress, season, episode)
     }
 
     override suspend fun scrobbleStop(
@@ -61,7 +74,8 @@ class TraktRemoteProvider @Inject constructor(
         tmdbId: Int,
         progress: Float,
         season: Int?,
-        episode: Int?
+        episode: Int?,
+        isAnime: Boolean
     ) {
         traktRepository.scrobbleStop(mediaType, tmdbId, progress, season, episode)
     }

@@ -20,24 +20,28 @@ class MdbListRemoteProvider @Inject constructor(
 
     override suspend fun isConnected(): Boolean = repository.isConnected()
 
-    override suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int): Boolean =
+    override suspend fun addToWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean): Boolean =
         repository.addToWatchlist(mediaType, tmdbId)
 
-    override suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int): Boolean =
+    override suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int, isAnime: Boolean): Boolean =
         repository.removeFromWatchlist(mediaType, tmdbId)
 
     override suspend fun getWatchlist(): RemoteWatchlistResult = repository.getWatchlist()
 
     override suspend fun scrobbleStart(
-        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?
+        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?, isAnime: Boolean
     ) = repository.scrobble("start", mediaType, tmdbId, progress, season, episode)
 
     override suspend fun scrobblePause(
-        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?
+        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?, isAnime: Boolean
     ) = repository.scrobble("pause", mediaType, tmdbId, progress, season, episode)
 
+    override suspend fun scrobbleProgress(
+        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?, isAnime: Boolean
+    ) = repository.scrobble("start", mediaType, tmdbId, progress, season, episode)
+
     override suspend fun scrobbleStop(
-        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?
+        mediaType: MediaType, tmdbId: Int, progress: Float, season: Int?, episode: Int?, isAnime: Boolean
     ) = repository.scrobble("stop", mediaType, tmdbId, progress, season, episode)
 
     override suspend fun getWatchedMovies(): Set<Int> = repository.getWatchedMovies()

@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.tv.live
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -279,6 +280,15 @@ fun EpgGrid(
         channelListState.scrollToItem(idx)
         runCatching { selectedChannelFocusRequester.requestFocus() }
         handledSelectedFocusSignal = focusSelectedChannelSignal
+    }
+
+    BackHandler {
+        if (focusMode == EpgGridFocusMode.Epg) {
+            onExitEpg(selectedChannel)
+            runCatching { selectedChannelFocusRequester.requestFocus() }
+        } else {
+            onMoveLeftFromChannels()
+        }
     }
 
     var handledEpgFocusSignal by remember { mutableIntStateOf(0) }
