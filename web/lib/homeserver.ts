@@ -399,7 +399,13 @@ export function clearHomeServerSessions() {
 // so users adding a server directly (no Android app) get confirmation.
 export async function testHomeServerConnection(
   server: HomeServerConfig
-): Promise<{ ok: boolean; serverName?: string; libraryCount?: number; error?: string }> {
+): Promise<{
+  ok: boolean;
+  serverName?: string;
+  libraryCount?: number;
+  connection?: HomeServerConfig;
+  error?: string;
+}> {
   const base = trimUrl(server.url);
   if (!base) return { ok: false, error: "Missing server URL" };
   try {
@@ -411,19 +417,61 @@ export async function testHomeServerConnection(
         { Accept: "application/json", "X-Plex-Token": token }
       );
       const libs = sections?.MediaContainer?.Directory ?? [];
-      return { ok: true, serverName: sections?.MediaContainer?.friendlyName, libraryCount: libs.length };
+      const serverName = sections?.MediaContainer?.friendlyName;
+      return {
+        ok: true,
+        serverName,
+        libraryCount: libs.length,
+        connection: {
+          ...server,
+          name: server.name || serverName || "Plex",
+          url: base,
+          password: undefined,
+          collections: libs.map((library) => ({
+            id: library.key,
+            name: library.title,
+            type: library.type,
+            enabled: true
+          })),
+          lastConnectedAt: Date.now()
+        }
+      };
     }
     // Reset any cached (possibly stale) session so the test really re-auths.
     sessionCache.delete(server.id);
     const session = await ensureSession(server);
     if (!session) return { ok: false, error: "Authentication failed — check token or username/password" };
-    const views = await proxiedGet<{ Items?: unknown[] }>(
+    const views = await proxiedGet<{ Items?: Array<{ Id: string; Name: string; CollectionType?: string }> }>(
       `${base}/Users/${session.userId}/Views?api_key=${session.token}`
     ).catch(() => null);
-    const info = await proxiedGet<{ ServerName?: string }>(
+    const info = await proxiedGet<{ Id?: string; ServerName?: string }>(
       `${base}/System/Info?api_key=${session.token}`
     ).catch(() => null);
-    return { ok: true, serverName: info?.ServerName, libraryCount: (views?.Items ?? []).length };
+    const libraries = (views?.Items ?? [])
+      .filter((view) => isBrowsableLibraryType(view.CollectionType))
+      .map((view) => ({
+        id: view.Id,
+        name: view.Name,
+        type: view.CollectionType ?? "mixed",
+        enabled: true
+      }));
+    return {
+      ok: true,
+      serverName: info?.ServerName,
+      libraryCount: libraries.length,
+      connection: {
+        ...server,
+        name: server.name || info?.ServerName || (server.type === "emby" ? "Emby" : "Jellyfin"),
+        url: base,
+        token: session.token,
+        userId: session.userId,
+        userName: server.username,
+        password: undefined,
+        serverId: info?.Id,
+        collections: libraries,
+        lastConnectedAt: Date.now()
+      }
+    };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : "Connection failed" };
   }
@@ -911,6 +959,13 @@ function libraryValue(serverId: string, libraryId: string): string {
   return `hslib:${encodeURIComponent(serverId)}:${encodeURIComponent(libraryId)}`;
 }
 
+export function homeServerLibraryMediaFilter(mediaType: HomeServerLibraryOption["mediaType"] | string | undefined): "movie" | "tv" | "all" {
+  const normalized = mediaType?.trim().toLowerCase();
+  if (["movie", "movies", "film", "films"].includes(normalized ?? "")) return "movie";
+  if (["tv", "show", "shows", "series", "tvshow", "tvshows"].includes(normalized ?? "")) return "tv";
+  return "all";
+}
+
 function parseLibraryValue(value: string): { serverId: string; libraryId: string } | null {
   const match = value.match(/^hslib:([^:]+):(.+)$/);
   if (!match) return null;
@@ -985,7 +1040,15 @@ export async function loadHomeServerLibraryItems(
 export async function loadHomeServerLibraryPage(
   servers: HomeServerConfig[],
   source: string,
-  options: { offset?: number; limit?: number; sort?: HomeServerLibrarySort; filter?: "all" | "movie" | "tv"; search?: string; throwOnError?: boolean } = {}
+  options: {
+    offset?: number;
+    limit?: number;
+    sort?: HomeServerLibrarySort;
+    filter?: "all" | "movie" | "tv";
+    libraryMediaType?: HomeServerLibraryOption["mediaType"];
+    search?: string;
+    throwOnError?: boolean;
+  } = {}
 ): Promise<HomeServerLibraryPage> {
   const parsed = parseLibraryValue(source);
   if (!parsed) return { items: [], hasMore: false, total: 0 };
@@ -997,6 +1060,7 @@ export async function loadHomeServerLibraryPage(
   const search = options.search?.trim() ?? "";
   const server = servers.find((s) => s.id === serverId && s.enabled && s.url);
   if (!server) return { items: [], hasMore: false, total: 0 };
+  const effectiveFilter = filter === "all" ? homeServerLibraryMediaFilter(options.libraryMediaType) : filter;
   try {
     if (server.type === "plex") {
       const base = trimUrl(server.url);
@@ -1008,7 +1072,7 @@ export async function loadHomeServerLibraryPage(
         "X-Plex-Container-Size": String(limit),
         includeGuids: "1"
       });
-      if (filter !== "all") params.set("type", filter === "movie" ? "1" : "2");
+      if (effectiveFilter !== "all") params.set("type", effectiveFilter === "movie" ? "1" : "2");
       if (search) params.set("title", search);
       const res = await proxiedGet<{ MediaContainer?: { Metadata?: PlexItem[]; totalSize?: number; size?: number } }>(
         `${base}/library/sections/${libraryKey}/all?${params.toString()}`,
@@ -1026,7 +1090,7 @@ export async function loadHomeServerLibraryPage(
     const params = new URLSearchParams({
       ParentId: libraryKey,
       Recursive: "true",
-      IncludeItemTypes: filter === "movie" ? "Movie" : filter === "tv" ? "Series" : "Movie,Series",
+      IncludeItemTypes: effectiveFilter === "movie" ? "Movie" : effectiveFilter === "tv" ? "Series" : "Movie,Series",
       SortBy: sort === "title" ? "SortName" : sort === "rating" ? "CommunityRating" : "DateCreated",
       SortOrder: sort === "title" ? "Ascending" : "Descending",
       StartIndex: String(offset),

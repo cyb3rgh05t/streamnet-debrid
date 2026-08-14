@@ -680,6 +680,43 @@ type TmdbImages = {
   logos?: Array<{ file_path: string; iso_639_1: string | null; vote_average?: number; width?: number }>;
 };
 
+type TmdbExternalFind = {
+  movie_results?: TmdbItem[];
+  tv_results?: TmdbItem[];
+};
+
+const externalTmdbIdCache = new Map<string, Promise<number | null>>();
+
+/** Resolve a server-native item to TMDB once, so every card overlay can share it. */
+export function resolveTmdbId(item: {
+  mediaType: MediaType;
+  id?: number | null;
+  tmdbId?: number | null;
+  imdbId?: string | null;
+}): Promise<number | null> {
+  const directId = item.tmdbId && item.tmdbId > 0
+    ? item.tmdbId
+    : item.id && item.id > 0
+      ? item.id
+      : null;
+  if (directId) return Promise.resolve(directId);
+
+  const imdbId = item.imdbId?.trim().toLowerCase();
+  if (!imdbId || !/^tt\d+$/.test(imdbId)) return Promise.resolve(null);
+  const cacheKey = `${item.mediaType}:${imdbId}`;
+  const cached = externalTmdbIdCache.get(cacheKey);
+  if (cached) return cached;
+
+  const request = tmdb<TmdbExternalFind>(`find/${imdbId}`, { external_source: "imdb_id" })
+    .then((payload) => {
+      const results = item.mediaType === "tv" ? payload.tv_results : payload.movie_results;
+      return results?.[0]?.id ?? null;
+    })
+    .catch(() => null);
+  externalTmdbIdCache.set(cacheKey, request);
+  return request;
+}
+
 type CinemetaSeries = {
   meta?: {
     videos?: Array<{ season?: number; episode?: number; number?: number; rating?: string | number | null }>;

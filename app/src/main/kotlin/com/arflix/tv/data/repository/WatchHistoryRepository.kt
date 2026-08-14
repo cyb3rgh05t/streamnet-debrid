@@ -435,18 +435,20 @@ class WatchHistoryRepository @Inject constructor(
         season: Int?,
         episode: Int?
     ) {
+        val profileId = currentProfileId()
+        fun keepEntry(entry: WatchHistoryEntry): Boolean = !(
+            entry.show_tmdb_id == tmdbId &&
+                (season == null || entry.season == season) &&
+                (episode == null || entry.episode == episode)
+            )
+        cachedWatchHistory = cachedWatchHistory.filter(::keepEntry)
+        cachedContinueWatching = cachedContinueWatching.filter(::keepEntry)
+        cachedWatchHistoryByProfile[profileId] =
+            cachedWatchHistoryByProfile[profileId].orEmpty().filter(::keepEntry)
+        cachedContinueWatchingByProfile[profileId] =
+            cachedContinueWatchingByProfile[profileId].orEmpty().filter(::keepEntry)
+
         if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            val profileId = currentProfileId()
-            cachedWatchHistoryByProfile[profileId] = cachedWatchHistoryByProfile[profileId].orEmpty().filterNot { entry ->
-                entry.show_tmdb_id == tmdbId &&
-                    (season == null || entry.season == season) &&
-                    (episode == null || entry.episode == episode)
-            }
-            cachedContinueWatchingByProfile[profileId] = cachedContinueWatchingByProfile[profileId].orEmpty().filterNot { entry ->
-                entry.show_tmdb_id == tmdbId &&
-                    (season == null || entry.season == season) &&
-                    (episode == null || entry.episode == episode)
-            }
             return
         }
         val userId = authRepositoryProvider.get().getCurrentUserId() ?: return

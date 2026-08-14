@@ -26,6 +26,8 @@ import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.TraktSyncService
 import com.arflix.tv.data.repository.ContinueWatchingItem
+import com.arflix.tv.data.repository.ContinueWatchingUpdate
+import com.arflix.tv.data.repository.ContinueWatchingUpdates
 import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
@@ -166,6 +168,7 @@ class HomeViewModel @Inject constructor(
     private val watchlistRepository: WatchlistRepository,
     private val cloudSyncRepository: CloudSyncRepository,
     private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
+    private val continueWatchingUpdates: ContinueWatchingUpdates,
     private val realtimeSyncManager: com.arflix.tv.data.repository.RealtimeSyncManager,
     private val profileManager: ProfileManager,
     private val appUpdateRepository: com.arflix.tv.updater.AppUpdateRepository,
@@ -1832,6 +1835,35 @@ class HomeViewModel @Inject constructor(
             }
         }
 
+        viewModelScope.launch {
+            continueWatchingUpdates.updates.collect { update ->
+                val activeProfileId = profileManager.getProfileIdSync().ifBlank { "default" }
+                if (update.profileId != activeProfileId) return@collect
+
+                val categories = when (update) {
+                    is ContinueWatchingUpdate.Upsert -> {
+                        val item = update.item.toMediaItem(context)
+                        mediaRepository.cacheItem(item)
+                        ContinueWatchingRowReducer.upsert(_uiState.value.categories, item)
+                    }
+                    is ContinueWatchingUpdate.Remove -> ContinueWatchingRowReducer.remove(
+                        categories = _uiState.value.categories,
+                        mediaType = update.mediaType,
+                        tmdbId = update.tmdbId,
+                        season = update.season,
+                        episode = update.episode
+                    )
+                }
+                val continueWatchingItems = categories
+                    .firstOrNull { it.id == "continue_watching" }
+                    ?.items
+                    .orEmpty()
+                lastContinueWatchingItems = continueWatchingItems
+                lastContinueWatchingUpdateMs = SystemClock.elapsedRealtime()
+                _uiState.value = _uiState.value.copy(categories = categories)
+            }
+        }
+
         // Reload home data when account_sync changes arrive from another device
         // (catalogs, addons, settings pushed by TV/phone). This ensures the UI
         // reflects the latest state without waiting for the next ON_RESUME.
@@ -2276,6 +2308,7 @@ class HomeViewModel @Inject constructor(
         // Don't restart if already running
         if (cwFetchJob?.isActive == true) return
         cwFetchJob = viewModelScope.launch(Dispatchers.IO) {
+            val localUpdateRevision = continueWatchingUpdates.revision
             val cached = try {
                 preloadStartupContinueWatchingItems()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -2290,7 +2323,7 @@ class HomeViewModel @Inject constructor(
                 )
                 emptyList()
             }
-            if (cached.isNotEmpty()) {
+            if (cached.isNotEmpty() && continueWatchingUpdates.revision == localUpdateRevision) {
                 publishContinueWatching(cached)
             }
 
@@ -2312,7 +2345,7 @@ class HomeViewModel @Inject constructor(
                 )
                 emptyList()
             }
-            if (instant.isNotEmpty()) {
+            if (instant.isNotEmpty() && continueWatchingUpdates.revision == localUpdateRevision) {
                 publishContinueWatching(instant)
             }
 
@@ -2333,7 +2366,11 @@ class HomeViewModel @Inject constructor(
                 )
                 emptyList()
             }
-            if (fresh.isNotEmpty() && fresh != instant) {
+            if (
+                fresh.isNotEmpty() &&
+                fresh != instant &&
+                continueWatchingUpdates.revision == localUpdateRevision
+            ) {
                 publishContinueWatching(fresh)
             }
             val traktConnected = try {
@@ -2952,8 +2989,10 @@ class HomeViewModel @Inject constructor(
                     if (requestId != loadHomeRequestId) return@cw
                     delay(if (isLowRamDevice) 2_200L else 1_200L)
                     if (requestId != loadHomeRequestId) return@cw
+                    val localUpdateRevision = continueWatchingUpdates.revision
                     val freshContinueWatching = resolveContinueWatchingItemsStable(forceFresh = true)
                     if (requestId != loadHomeRequestId) return@cw
+                    if (continueWatchingUpdates.revision != localUpdateRevision) return@cw
 
                     if (freshContinueWatching.isNotEmpty()) {
                         val mergedContinueWatching = mergeContinueWatchingResumeData(freshContinueWatching)
@@ -3647,7 +3686,9 @@ class HomeViewModel @Inject constructor(
                     return@launch
                 }
 
+                val localUpdateRevision = continueWatchingUpdates.revision
                 val resolvedContinueWatching = resolveContinueWatchingItemsStable(forceFresh = force)
+                if (continueWatchingUpdates.revision != localUpdateRevision) return@launch
 
                 if (resolvedContinueWatching.isNotEmpty()) {
                     val mergedContinueWatching = mergeContinueWatchingResumeData(resolvedContinueWatching)
@@ -4661,6 +4702,7 @@ class HomeViewModel @Inject constructor(
                         )
                     } else {
                         traktRepository.markMovieWatched(item.id)
+                        watchHistoryRepository.removeFromHistory(item.id, null, null)
                         _uiState.value = _uiState.value.copy(
                             toastMessage = context.getString(R.string.details_marked_watched),
                             toastType = ToastType.SUCCESS
@@ -4761,6 +4803,7 @@ class HomeViewModel @Inject constructor(
                 if (item.mediaType == MediaType.MOVIE) {
                     if (!item.isWatched) {
                         traktRepository.markMovieWatched(item.id)
+                        watchHistoryRepository.removeFromHistory(item.id, null, null)
                         _uiState.value = _uiState.value.copy(
                             toastMessage = context.getString(R.string.details_marked_watched),
                             toastType = ToastType.SUCCESS
@@ -4821,7 +4864,7 @@ class HomeViewModel @Inject constructor(
                                 season = followingSeason,
                                 episode = followingEpisode,
                                 episodeTitle = null,
-                                progress = 1,
+                                progress = 3,
                                 positionSeconds = 0L,
                                 durationSeconds = 1L,
                                 year = item.year
@@ -4883,7 +4926,7 @@ class HomeViewModel @Inject constructor(
 
                 watchHistoryRepository.removeFromHistory(item.id, season, episode)
                 traktRepository.deletePlaybackForContent(item.id, item.mediaType)
-                traktRepository.removeFromContinueWatchingCache(item.id, null, null)
+                traktRepository.removeFromContinueWatchingCache(item.id, null, null, item.mediaType)
                 traktRepository.dismissContinueWatching(item)
                 runCatching { cloudSyncRepository.pushToCloud() }
 

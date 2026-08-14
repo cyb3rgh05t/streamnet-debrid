@@ -131,6 +131,7 @@ class MediaRepository @Inject constructor(
         synchronized(castCache) { castCache.clear() }
         synchronized(similarCache) { similarCache.clear() }
         synchronized(logoCache) { logoCache.clear() }
+        homeServerLogoRefCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
     }
@@ -139,7 +140,7 @@ class MediaRepository @Inject constructor(
     private val fullDetailsCacheKeys = mutableSetOf<String>()
     private val castCache = mutableMapOf<String, CacheEntry<List<CastMember>>>()
     private val similarCache = mutableMapOf<String, CacheEntry<List<MediaItem>>>()
-    private val logoCache = mutableMapOf<String, CacheEntry<String?>>()
+    private val logoCache = ConcurrentHashMap<String, CacheEntry<String?>>()
     private val reviewsCache = mutableMapOf<String, CacheEntry<List<Review>>>()
     private val watchProvidersCache = mutableMapOf<String, CacheEntry<StreamingServicesResult?>>()
     private val seasonEpisodesCache = mutableMapOf<String, CacheEntry<List<Episode>>>()
@@ -150,6 +151,7 @@ class MediaRepository @Inject constructor(
     private val imdbIdCache = ConcurrentHashMap<String, String>()
     private val addonImdbToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
+    private val homeServerLogoRefCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val collectionRefsCache = ConcurrentHashMap<String, CacheEntry<List<Pair<MediaType, Int>>>>()
 
     private fun <T> getFromCache(cache: Map<String, CacheEntry<T>>, key: String): T? {
@@ -1919,7 +1921,8 @@ class MediaRepository @Inject constructor(
                 isHomeServer = true,
                 homeServerItemId = serverItem.id,
                 homeServerSourceRef = serverItem.sourceRef,
-                homeServerProvider = serverItem.providerName
+                homeServerProvider = serverItem.providerName,
+                homeServerImdbId = serverItem.providerIds["imdb"]
             )
         }
         cacheItems(items)
@@ -3153,8 +3156,11 @@ class MediaRepository @Inject constructor(
      */
     suspend fun getLogoUrl(mediaType: MediaType, mediaId: Int): String? {
         val cacheKey = "${mediaType}_logo_$mediaId"
-        if (logoCache.containsKey(cacheKey)) {
-            getFromCache(logoCache, cacheKey)?.let { return it }
+        logoCache[cacheKey]?.let { cached ->
+            if (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS) {
+                return cached.data
+            }
+            logoCache.remove(cacheKey)
         }
 
         val type = if (mediaType == MediaType.TV) "tv" else "movie"
@@ -3189,6 +3195,87 @@ class MediaRepository @Inject constructor(
 
             null
         }
+    }
+
+    suspend fun getLogoUrl(item: MediaItem): String? {
+        item.id.takeIf { it > 0 }?.let { return getLogoUrl(item.mediaType, it) }
+        if (!item.isHomeServer) return null
+
+        val resolved = resolveHomeServerLogoRef(item) ?: return null
+        return getLogoUrl(resolved.first, resolved.second)
+    }
+
+    private suspend fun resolveHomeServerLogoRef(item: MediaItem): Pair<MediaType, Int>? {
+        val cacheKey = listOf(
+            item.mediaType.name,
+            item.homeServerImdbId.orEmpty(),
+            HomeServerMatcher.normalizeTitle(item.title),
+            item.year
+        ).joinToString("|")
+        homeServerLogoRefCache[cacheKey]?.let { cached ->
+            if (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS) return cached.data
+            homeServerLogoRefCache.remove(cacheKey)
+        }
+
+        val resolvedByImdb = item.homeServerImdbId
+            ?.takeIf { it.startsWith("tt", ignoreCase = true) }
+            ?.let { resolveImdbToTmdbRef(it, item.mediaType) }
+        val resolved = resolvedByImdb ?: resolveHomeServerLogoRefByTitle(item)
+        homeServerLogoRefCache[cacheKey] = CacheEntry(resolved, System.currentTimeMillis())
+        return resolved
+    }
+
+    private suspend fun resolveHomeServerLogoRefByTitle(item: MediaItem): Pair<MediaType, Int>? {
+        val title = item.title.trim()
+        if (title.isBlank()) return null
+        val year = item.year.take(4).toIntOrNull()
+        val response = runCatching {
+            when (item.mediaType) {
+                MediaType.MOVIE -> tmdbApi.searchMovies(
+                    apiKey = apiKey,
+                    query = title,
+                    language = contentLanguage,
+                    primaryReleaseYear = year,
+                    year = year
+                )
+                MediaType.TV -> tmdbApi.searchTv(
+                    apiKey = apiKey,
+                    query = title,
+                    language = contentLanguage,
+                    firstAirDateYear = year
+                )
+            }
+        }.getOrNull() ?: return null
+
+        val requestedTitle = HomeServerMatcher.normalizeTitle(title)
+        val match = response.results
+            .map { candidate ->
+                val candidateTitle = candidate.title ?: candidate.name ?: candidate.originalTitle
+                    ?: candidate.originalName.orEmpty()
+                val normalizedTitle = HomeServerMatcher.normalizeTitle(candidateTitle)
+                val candidateYear = (candidate.releaseDate ?: candidate.firstAirDate)
+                    .orEmpty()
+                    .take(4)
+                    .toIntOrNull()
+                val titleScore = when {
+                    requestedTitle == normalizedTitle -> 100
+                    requestedTitle.isNotBlank() &&
+                        (requestedTitle in normalizedTitle || normalizedTitle in requestedTitle) -> 45
+                    else -> 0
+                }
+                val yearScore = when {
+                    year == null || candidateYear == null -> 0
+                    year == candidateYear -> 30
+                    kotlin.math.abs(year - candidateYear) <= 1 -> 12
+                    else -> -40
+                }
+                candidate to (titleScore + yearScore + candidate.popularity.toInt().coerceAtMost(30))
+            }
+            .maxByOrNull { it.second }
+            ?.takeIf { it.second >= 55 }
+            ?.first
+            ?: return null
+        return item.mediaType to match.id
     }
 
     /** Instant synchronous peek into the in-memory logo cache. */

@@ -67,6 +67,7 @@ data class MediaItem(
     val homeServerItemId: String? = null,
     val homeServerSourceRef: String? = null,
     val homeServerProvider: String? = null,
+    val homeServerImdbId: String? = null,
 ) : Serializable
 
 enum class MediaType {

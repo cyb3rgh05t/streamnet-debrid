@@ -5,7 +5,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { getImdbRating } from "@/lib/imdbRatings";
 import { IMDB_LOGO, serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
-import { getCardMeta, getCardProviders, getLogoUrl, prefetchDetails } from "@/lib/tmdb";
+import { getCardMeta, getCardProviders, getLogoUrl, prefetchDetails, resolveTmdbId } from "@/lib/tmdb";
 import type { MediaItem } from "@/lib/types";
 
 function formatReleaseDate(raw?: string | null): string {
@@ -64,6 +64,18 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
   const backdrop = item.backdrop || fallbackArt?.backdrop || "";
   const artwork = effectivePosterMode ? (image || backdrop) : (backdrop || image);
   const year = item.releaseDate?.slice(0, 4) || item.year || (item.mediaType === "tv" ? "Series" : "Movie");
+  const directMetadataId = item.tmdbId && item.tmdbId > 0 ? item.tmdbId : item.id > 0 ? item.id : null;
+  const [metadataId, setMetadataId] = useState<number | null>(directMetadataId);
+
+  useEffect(() => {
+    let active = true;
+    setMetadataId(directMetadataId);
+    if (directMetadataId || !item.isHomeServer) return () => { active = false; };
+    void resolveTmdbId(item).then((id) => {
+      if (active) setMetadataId(id);
+    });
+    return () => { active = false; };
+  }, [directMetadataId, item.homeServerId, item.homeServerItemId, item.imdbId, item.isHomeServer, item.mediaType]);
 
   useEffect(() => {
     setImgLoaded(false);
@@ -127,27 +139,27 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
   // Rails load lazily, so a card only mounts when its row is near the viewport —
   // fetch the title-treatment logo on mount (getLogoUrl is cached + persisted).
   useEffect(() => {
-    if (item.id <= 0 || item.isHomeServer) return undefined;
+    if (!metadataId) return undefined;
     let active = true;
-    void getLogoUrl({ mediaType: item.mediaType, id: item.id }).then((url) => {
+    void getLogoUrl({ mediaType: item.mediaType, id: metadataId }).then((url) => {
       if (active) setLogo(url);
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [item.id, item.mediaType]);
+  }, [item.mediaType, metadataId]);
 
   // Streaming-service clearlogos, shown top-left inside the artwork (cached).
   const [serviceBadges, setServiceBadges] = useState<string[]>([]);
   useEffect(() => {
     setServiceBadges([]);
-    if (item.id <= 0 || item.isHomeServer) return undefined;
+    if (!metadataId) return undefined;
     let active = true;
-    void getCardProviders({ mediaType: item.mediaType, id: item.id }).then((names) => {
+    void getCardProviders({ mediaType: item.mediaType, id: metadataId }).then((names) => {
       if (!active) return;
       const logos = names.map((name) => serviceClearLogo(name)).filter((url): url is string => Boolean(url));
       setServiceBadges([...new Set(logos)].slice(0, 2));
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [item.id, item.mediaType, item.isHomeServer]);
+  }, [item.mediaType, metadataId]);
 
   // Runtime for the meta line (list responses rarely include it) and a poster/
   // backdrop back-fill for cards that arrived without artwork — both come from
@@ -162,9 +174,9 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
     setRuntime(null);
     setFallbackArt(null);
     setImdbRating(null);
-    if (item.id <= 0 || item.isHomeServer) return undefined;
+    if (!metadataId) return undefined;
     let active = true;
-    void getCardMeta({ mediaType: item.mediaType, id: item.id }).then((meta) => {
+    void getCardMeta({ mediaType: item.mediaType, id: metadataId }).then((meta) => {
       if (!active) return;
       if (meta.runtime) setRuntime(meta.runtime);
       if (missingArtwork && (meta.image || meta.backdrop)) {
@@ -177,7 +189,7 @@ function MediaCardBase({ item, onOpen, onFocus, posterMode }: {
       });
     }).catch(() => undefined);
     return () => { active = false; };
-  }, [item.id, item.mediaType, item.isHomeServer, item.imdbId, missingArtwork]);
+  }, [item.imdbId, item.mediaType, metadataId, missingArtwork]);
 
   const dateLabel = formatReleaseDate(item.releaseDate) || item.subtitle || year;
   const runtimeLabel = formatRuntime(item.duration || runtime);

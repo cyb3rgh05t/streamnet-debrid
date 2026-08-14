@@ -4116,7 +4116,10 @@ class PlayerViewModel @Inject constructor(
                 // before the next refresh cycle picks up the server-side changes.
                 runCatching {
                     traktRepository.removeFromContinueWatchingCache(
-                        currentMediaId, currentSeason, currentEpisode
+                        currentMediaId,
+                        currentSeason,
+                        currentEpisode,
+                        currentMediaType
                     )
                 }
 

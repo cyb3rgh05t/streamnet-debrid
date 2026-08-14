@@ -1,12 +1,56 @@
 package com.arflix.tv.data.repository
 
+import com.arflix.tv.data.model.MediaType
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class HomeServerMatcherTest {
+    @Test
+    fun `home server library types select the provider media filter`() {
+        assertEquals(MediaType.MOVIE, homeServerCatalogMediaType("movie"))
+        assertEquals(MediaType.MOVIE, homeServerCatalogMediaType("movies"))
+        assertEquals(MediaType.TV, homeServerCatalogMediaType("show"))
+        assertEquals(MediaType.TV, homeServerCatalogMediaType("tvshows"))
+    }
+
+    @Test
+    fun `mixed home server libraries remain unfiltered`() {
+        assertNull(homeServerCatalogMediaType("mixed"))
+        assertNull(homeServerCatalogMediaType("boxsets"))
+    }
+
+    @Test
+    fun `explicit home server media type remains supported`() {
+        assertEquals(MediaType.TV, homeServerCatalogMediaType("movies", MediaType.TV))
+    }
+
+    @Test
+    fun `library source keeps its type for every home server provider`() {
+        HomeServerKind.entries
+            .filter { it != HomeServerKind.UNKNOWN }
+            .forEach { serverKind ->
+                val connection = HomeServerConnection(
+                    connectionId = "connection-${serverKind.name}",
+                    serverKind = serverKind,
+                    serverId = "server-${serverKind.name}"
+                )
+                val collection = HomeServerCollection(id = "library-1", type = "tvshows")
+
+                val parsed = HomeServerRepository.parseCatalogSourceRef(
+                    HomeServerRepository.buildCatalogSourceRef(connection, collection)
+                )
+
+                assertEquals(
+                    Triple("server-${serverKind.name}", "library-1", "tvshows"),
+                    parsed
+                )
+            }
+    }
+
     @Test
     fun `external ids beat older title-only remakes`() {
         val correct = HomeServerCandidateInfo(

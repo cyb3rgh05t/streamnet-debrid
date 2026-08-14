@@ -75,7 +75,8 @@ class TraktRepository @Inject constructor(
     private val profileManager: ProfileManager,
     private val mdbListRepository: MdbListRepository,
     private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore,
-    private val simklSyncService: com.arflix.tv.data.repository.simkl.SimklSyncService
+    private val simklSyncService: com.arflix.tv.data.repository.simkl.SimklSyncService,
+    private val continueWatchingUpdates: ContinueWatchingUpdates
 ) {
     private val gson = Gson()
     private val watchlistHttpClient by lazy { okHttpClient }
@@ -620,7 +621,7 @@ class TraktRepository @Inject constructor(
         // OPTIMISTIC UPDATE: Update caches immediately so the UI responds instantly
         updateWatchedCache(tmdbId, null, null, true)
         persistLocalWatchedSnapshotForCurrentProfile()
-        removeFromContinueWatchingCache(tmdbId, null, null)
+        removeFromContinueWatchingCache(tmdbId, null, null, MediaType.MOVIE)
 
         // Then sync to backend in background
         try {
@@ -1336,6 +1337,7 @@ class TraktRepository @Inject constructor(
         }
         continueWatchingFetching = true
         continueWatchingFetchingProfileId = requestProfileId
+        val localUpdateRevision = continueWatchingUpdates.revision
 
         try {
         val candidates = mutableListOf<ContinueWatchingCandidate>()
@@ -1653,6 +1655,9 @@ class TraktRepository @Inject constructor(
                 severity = if (topCandidates.isEmpty() && (playbackFetched || watchedProgressFetched)) "warning" else "info"
             )
             if (topCandidates.isEmpty() && playbackFetched && watchedProgressFetched) {
+                if (continueWatchingUpdates.revision != localUpdateRevision) {
+                    return@coroutineScope cachedContinueWatching
+                }
                 cachedContinueWatching = emptyList()
                 cachedContinueWatchingProfileId = requestProfileId
                 lastContinueWatchingFetch = System.currentTimeMillis()
@@ -1677,6 +1682,9 @@ class TraktRepository @Inject constructor(
                 // Filter out items with null season/episode (already validated at candidate creation)
                 val fallbackItems = topCandidates.map { it.item }
                     .filter { it.mediaType != MediaType.TV || (it.season != null && it.episode != null) }
+                if (continueWatchingUpdates.revision != localUpdateRevision) {
+                    return@coroutineScope cachedContinueWatching
+                }
                 cachedContinueWatching = fallbackItems
                 cachedContinueWatchingProfileId = requestProfileId
                 lastContinueWatchingFetch = System.currentTimeMillis()
@@ -1684,6 +1692,9 @@ class TraktRepository @Inject constructor(
                 return@coroutineScope fallbackItems
             }
 
+        if (continueWatchingUpdates.revision != localUpdateRevision) {
+            return@coroutineScope cachedContinueWatching
+        }
         val resolvedItems = if (hydratedItems.isNotEmpty()) {
             cachedContinueWatching = hydratedItems
             cachedContinueWatchingProfileId = requestProfileId
@@ -1717,6 +1728,7 @@ class TraktRepository @Inject constructor(
         requestProfileId: String,
         forceRefresh: Boolean
     ): List<ContinueWatchingItem> {
+        val localUpdateRevision = continueWatchingUpdates.revision
         val now = System.currentTimeMillis()
         if (
             !forceRefresh &&
@@ -1824,6 +1836,10 @@ class TraktRepository @Inject constructor(
         val top = filtered.sortedByDescending { it.lastActivityAt }.take(Constants.MAX_CONTINUE_WATCHING)
         val hydrated = hydrateTopCandidates(top)
         val resolved = if (hydrated.isNotEmpty()) hydrated else top.map { it.item }
+
+        if (continueWatchingUpdates.revision != localUpdateRevision) {
+            return cachedContinueWatching
+        }
 
         cachedContinueWatching = resolved
         cachedContinueWatchingProfileId = requestProfileId
@@ -2134,10 +2150,16 @@ class TraktRepository @Inject constructor(
     /**
      * Remove an episode from Continue Watching cache when marked as watched
      */
-    suspend fun removeFromContinueWatchingCache(showTmdbId: Int, seasonNum: Int?, episodeNum: Int?) {
+    suspend fun removeFromContinueWatchingCache(
+        showTmdbId: Int,
+        seasonNum: Int?,
+        episodeNum: Int?,
+        mediaType: MediaType? = if (seasonNum != null || episodeNum != null) MediaType.TV else null
+    ) {
         ensureProfileCacheScope()
+        val profileId = currentProfileId()
         // Always remove from local CW (for non-Trakt profiles) regardless of Trakt cache state
-        removeFromLocalContinueWatching(showTmdbId, seasonNum, episodeNum)
+        removeFromLocalContinueWatching(showTmdbId, seasonNum, episodeNum, mediaType)
 
         if (cachedContinueWatching.isEmpty()) {
             cachedContinueWatching = loadContinueWatchingCache()
@@ -2147,11 +2169,23 @@ class TraktRepository @Inject constructor(
         cachedContinueWatching = cachedContinueWatching.filter { item ->
             // Keep items that don't match the watched episode
             !(item.id == showTmdbId &&
+              (mediaType == null || item.mediaType == mediaType) &&
               (seasonNum == null || item.season == seasonNum) &&
               (episodeNum == null || item.episode == episodeNum))
         }
+        cachedContinueWatchingProfileId = profileId
         // Also update persisted cache
         persistContinueWatchingCache(cachedContinueWatching)
+        preloadedProfileCache.computeIfPresent(profileId) { _, items ->
+            items.filterNot { item ->
+                item.id == showTmdbId &&
+                    (mediaType == null || item.mediaType == mediaType) &&
+                    (seasonNum == null || item.season == seasonNum) &&
+                    (episodeNum == null || item.episode == episodeNum)
+            }
+        }
+        lastContinueWatchingFetch = 0L
+        continueWatchingUpdates.remove(profileId, mediaType, showTmdbId, seasonNum, episodeNum)
     }
 
     // ========== Local Continue Watching (for profiles without Trakt) ==========
@@ -2194,7 +2228,7 @@ class TraktRepository @Inject constructor(
         if ((progress < Constants.MIN_PROGRESS_THRESHOLD && !hasMeaningfulPosition) || progress >= Constants.WATCHED_THRESHOLD) {
             // If watched (>= threshold), remove from Continue Watching
             if (progress >= Constants.WATCHED_THRESHOLD) {
-                removeFromLocalContinueWatching(tmdbId, season, episode)
+                removeFromContinueWatchingCache(tmdbId, season, episode, mediaType)
             }
             return
         }
@@ -2255,19 +2289,27 @@ class TraktRepository @Inject constructor(
         }
         if (!isTraktAuth) {
             cachedContinueWatching = trimmed
+            preloadedProfileCache[currentProfileId()] = trimmed
         }
+        continueWatchingUpdates.upsert(currentProfileId(), item)
     }
 
     /**
      * Remove item from local Continue Watching
      */
-    private suspend fun removeFromLocalContinueWatching(tmdbId: Int, season: Int?, episode: Int?) {
+    private suspend fun removeFromLocalContinueWatching(
+        tmdbId: Int,
+        season: Int?,
+        episode: Int?,
+        mediaType: MediaType?
+    ) {
         // Use raw method - no need to enrich items just to remove them
         val existingItems = loadLocalContinueWatchingRaw().toMutableList()
         val sizeBefore = existingItems.size
 
         existingItems.removeAll { item ->
             item.id == tmdbId &&
+            (mediaType == null || item.mediaType == mediaType) &&
             (season == null || item.season == season) &&
             (episode == null || item.episode == episode)
         }

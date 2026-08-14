@@ -1571,6 +1571,7 @@ function HomeServerSection() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [testing, setTesting] = useState(false);
+  const [adding, setAdding] = useState(false);
 
   const servers = safeArray(settings.homeServers);
   const update = (next: HomeServerConfig[]) =>
@@ -1611,6 +1612,37 @@ function HomeServerSection() {
       );
     } finally {
       setTesting(false);
+    }
+  };
+
+  const addConnection = async () => {
+    if (!url.trim()) {
+      setToast("Enter a Home Server URL first.");
+      return;
+    }
+    if (type === "plex" && !token.trim()) {
+      setToast("Plex needs an access token (X-Plex-Token).");
+      return;
+    }
+    setAdding(true);
+    try {
+      const { testHomeServerConnection } = await import("@/lib/homeserver");
+      const result = await testHomeServerConnection(buildDraft());
+      if (!result.ok || !result.connection) {
+        setToast(`Could not connect: ${result.error || "Connection failed"}`);
+        return;
+      }
+      update([result.connection, ...servers]);
+      setName("");
+      setUrl("");
+      setToken("");
+      setUsername("");
+      setPassword("");
+      setToast(`Connected to ${result.serverName || result.connection.name} and saved ${result.libraryCount ?? 0} libraries.`);
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Connection failed.");
+    } finally {
+      setAdding(false);
     }
   };
 
@@ -1675,21 +1707,10 @@ function HomeServerSection() {
         <button
           type="button"
           className="primary"
-          onClick={() => {
-            if (!url.trim()) {
-              setToast("Enter a Home Server URL first.");
-              return;
-            }
-            update([buildDraft(), ...servers]);
-            setName("");
-            setUrl("");
-            setToken("");
-            setUsername("");
-            setPassword("");
-            setToast("Home server saved.");
-          }}
+          disabled={adding || testing}
+          onClick={() => void addConnection()}
         >
-          <Plus size={18} /> Add
+          <Plus size={18} /> {adding ? "Connecting…" : "Add"}
         </button>
       </div>
       <div className="settings-list">

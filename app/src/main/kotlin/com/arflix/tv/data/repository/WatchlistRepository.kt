@@ -41,6 +41,26 @@ data class LocalWatchlistItem(
     val sourceOrder: Int = Int.MAX_VALUE
 )
 
+internal fun normalizeWatchlistArtworkUrl(rawValue: String?, isBackdrop: Boolean): String? {
+    val value = rawValue?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    if (
+        value.startsWith("http://", ignoreCase = true) ||
+        value.startsWith("https://", ignoreCase = true) ||
+        value.startsWith("content://", ignoreCase = true) ||
+        value.startsWith("file://", ignoreCase = true) ||
+        value.startsWith("data:", ignoreCase = true)
+    ) {
+        return value
+    }
+    if (value.startsWith("//")) return "https:$value"
+    return if (value.startsWith('/')) {
+        val base = if (isBackdrop) Constants.BACKDROP_BASE_LARGE else Constants.IMAGE_BASE
+        "$base$value"
+    } else {
+        value
+    }
+}
+
 /**
  * Profile-scoped local watchlist repository.
  * Each profile has its own separate watchlist stored in DataStore.
@@ -253,19 +273,29 @@ class WatchlistRepository @Inject constructor(
             }.awaitAll().filterNotNull()
         }
 
+        val currentRawItems = persistEnrichedArtwork(enrichedItems)
+        val enrichedByKey = enrichedItems.associateBy { cacheKey(it.mediaType, it.id) }
+        val currentItems = currentRawItems.map { raw ->
+            val type = if (raw.mediaType == "tv") MediaType.TV else MediaType.MOVIE
+            enrichedByKey[cacheKey(type, raw.tmdbId)]?.copy(
+                addedAt = raw.addedAt,
+                sourceOrder = raw.sourceOrder
+            ) ?: raw.toBasicMediaItem()
+        }
+
         // Update cache
         cacheMutex.withLock {
             itemsCache.clear()
-            itemsCache.addAll(enrichedItems)
+            itemsCache.addAll(currentItems)
             keyCache.clear()
-            enrichedItems.forEach { item ->
+            currentItems.forEach { item ->
                 keyCache.add(cacheKey(item.mediaType, item.id))
             }
-            _watchlistItems.value = enrichedItems
+            _watchlistItems.value = currentItems
             cacheLoaded = true
         }
 
-        enrichedItems
+        currentItems
     }
 
     /**
@@ -301,16 +331,18 @@ class WatchlistRepository @Inject constructor(
             ordered.add(
                 local?.copy(
                     title = item.title.ifBlank { local.title },
-                    posterPath = item.image.ifBlank { local.posterPath },
-                    backdropPath = item.backdrop ?: local.backdropPath,
+                    posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false)
+                        ?: normalizeWatchlistArtworkUrl(local.posterPath, isBackdrop = false),
+                    backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true)
+                        ?: normalizeWatchlistArtworkUrl(local.backdropPath, isBackdrop = true),
                     addedAt = traktOrderAddedAt,
                     sourceOrder = index
                 ) ?: LocalWatchlistItem(
                     tmdbId = item.id,
                     mediaType = typeStr,
                     title = item.title,
-                    posterPath = item.image,
-                    backdropPath = item.backdrop,
+                    posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false),
+                    backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true),
                     addedAt = traktOrderAddedAt,
                     sourceOrder = index
                 )
@@ -482,6 +514,61 @@ class WatchlistRepository @Inject constructor(
     }
 
     /**
+     * Artwork is cache metadata, not a user watchlist change. Persist it locally so
+     * cold starts have thumbnails without creating a cloud-sync write on every load.
+     */
+    private suspend fun persistEnrichedArtwork(enrichedItems: List<MediaItem>): List<LocalWatchlistItem> {
+        if (enrichedItems.isEmpty()) return loadWatchlistRaw()
+
+        val enrichedByKey = enrichedItems.associateBy { item ->
+            val type = if (item.mediaType == MediaType.TV) "tv" else "movie"
+            "$type:${item.id}"
+        }
+        var storedItems = emptyList<LocalWatchlistItem>()
+        val key = watchlistKey()
+
+        context.traktDataStore.edit { prefs ->
+            val currentItems = parseWatchlistItems(prefs[key])
+            val updatedItems = currentItems.map { raw ->
+                val enriched = enrichedByKey["${raw.mediaType}:${raw.tmdbId}"]
+                if (enriched == null) {
+                    raw.copy(
+                        posterPath = normalizeWatchlistArtworkUrl(raw.posterPath, isBackdrop = false),
+                        backdropPath = normalizeWatchlistArtworkUrl(raw.backdropPath, isBackdrop = true)
+                    )
+                } else {
+                    raw.copy(
+                        title = enriched.title.ifBlank { raw.title },
+                        posterPath = normalizeWatchlistArtworkUrl(enriched.image, isBackdrop = false)
+                            ?: normalizeWatchlistArtworkUrl(raw.posterPath, isBackdrop = false),
+                        backdropPath = normalizeWatchlistArtworkUrl(enriched.backdrop, isBackdrop = true)
+                            ?: normalizeWatchlistArtworkUrl(raw.backdropPath, isBackdrop = true)
+                    )
+                }
+            }
+            if (updatedItems != currentItems) {
+                prefs[key] = gson.toJson(updatedItems)
+            }
+            storedItems = updatedItems
+        }
+
+        return storedItems.sortedWith(
+            compareBy<LocalWatchlistItem> { it.sourceOrder }.thenByDescending { it.addedAt }
+        )
+    }
+
+    private fun parseWatchlistItems(json: String?): List<LocalWatchlistItem> {
+        if (json.isNullOrBlank()) return emptyList()
+        return runCatching {
+            val type = TypeToken.getParameterized(
+                MutableList::class.java,
+                LocalWatchlistItem::class.java
+            ).type
+            gson.fromJson<List<LocalWatchlistItem>>(json, type).orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    /**
      * Enrich a watchlist item with TMDB data
      */
     private suspend fun enrichWatchlistItem(item: LocalWatchlistItem): MediaItem? {
@@ -500,19 +587,7 @@ class WatchlistRepository @Inject constructor(
                 message = "enrich_failed media_type=${item.mediaType} error=${error::class.java.simpleName}",
                 severity = "warning"
             )
-            // Fallback to basic item from stored data
-            MediaItem(
-                id = item.tmdbId,
-                title = item.title,
-                subtitle = if (item.mediaType == "tv") context.getString(R.string.component_label_tv_series) else context.getString(R.string.movie),
-                overview = "",
-                year = "",
-                mediaType = if (item.mediaType == "tv") MediaType.TV else MediaType.MOVIE,
-                image = item.posterPath ?: "",
-                backdrop = item.backdropPath,
-                addedAt = item.addedAt,
-                sourceOrder = item.sourceOrder
-            )
+            item.toBasicMediaItem()
         }
     }
 
@@ -569,8 +644,8 @@ class WatchlistRepository @Inject constructor(
             overview = "",
             year = "",
             mediaType = type,
-            image = posterPath.orEmpty(),
-            backdrop = backdropPath,
+            image = normalizeWatchlistArtworkUrl(posterPath, isBackdrop = false).orEmpty(),
+            backdrop = normalizeWatchlistArtworkUrl(backdropPath, isBackdrop = true),
             addedAt = addedAt,
             sourceOrder = sourceOrder
         )

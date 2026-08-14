@@ -945,6 +945,7 @@ class DetailsViewModel @Inject constructor(
                     val newWatched = !currentItem.isWatched
                     if (newWatched) {
                         traktRepository.markMovieWatched(currentMediaId)
+                        watchHistoryRepository.removeFromHistory(currentMediaId, null, null)
                     } else {
                         traktRepository.markMovieUnwatched(currentMediaId)
                     }
@@ -1879,7 +1880,12 @@ class DetailsViewModel @Inject constructor(
                     }
                 } else {
                     runCatching {
-                        traktRepository.removeFromContinueWatchingCache(currentMediaId, null, null)
+                        traktRepository.removeFromContinueWatchingCache(
+                            currentMediaId,
+                            null,
+                            null,
+                            MediaType.TV
+                        )
                         watchHistoryRepository.removeFromHistory(currentMediaId, null, null)
                     }
                 }
