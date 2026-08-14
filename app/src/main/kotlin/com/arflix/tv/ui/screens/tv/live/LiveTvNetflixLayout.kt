@@ -145,7 +145,7 @@ internal fun LiveTvNetflixLayout(
         delay(200L)
         value = runCatching { lookupBackdrop(title) }.getOrNull()
     }
-    Column(modifier = modifier.fillMaxSize().background(LiveColors.Bg)) {
+    Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
