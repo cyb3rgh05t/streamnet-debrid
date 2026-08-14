@@ -24,7 +24,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { config } from "@/lib/config";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
-import { isLiveStreamOrSportsItem, saveProgress } from "@/lib/cloud";
+import { isLiveStreamOrSportsItem, saveProgress, saveWatchedState } from "@/lib/cloud";
 import { cachedDebridDirectUrl, invalidateDebridDirectUrl, isUncachedDebridStream, parseDebridStream, resolveDebridDirectUrl } from "@/lib/debrid";
 import type { RemuxAudioTrack } from "@/lib/remux";
 import { copyStreamUrl, externalLaunchMode, openExternalPlayer, openInAnyPlayer } from "@/lib/externalPlayers";
@@ -1151,6 +1151,14 @@ function VideoPlayer({
     const onEnded = () => {
       scrobbleActive = false;
       scrobble("stop", 100);
+      if (authClient.session && !isLiveStream) {
+        void saveWatchedState(authClient, {
+          id: item.id,
+          mediaType: item.mediaType,
+          seasonNumber: season,
+          episodeNumber: episode
+        }, true, activeProfileId).catch(() => undefined);
+      }
       if (settings.autoPlayNext && canAdvance) void onAdvance();
     };
     video.addEventListener("timeupdate", save);

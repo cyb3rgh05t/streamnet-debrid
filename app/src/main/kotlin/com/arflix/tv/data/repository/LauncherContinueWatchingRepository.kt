@@ -41,6 +41,7 @@ class LauncherContinueWatchingRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val profileManager: ProfileManager,
     private val traktRepository: TraktRepository,
+    private val remoteSyncManager: com.arflix.tv.data.repository.sync.RemoteSyncManager,
     private val watchHistoryRepository: WatchHistoryRepository,
     private val streamRepository: StreamRepository
 ) {
@@ -98,7 +99,7 @@ class LauncherContinueWatchingRepository @Inject constructor(
 
     private suspend fun loadPublisherItems(): List<ContinueWatchingItem> {
         val installedAddons = streamRepository.installedAddons.first()
-        val primaryItems = runCatching { traktRepository.getContinueWatching() }.getOrDefault(emptyList())
+        val primaryItems = runCatching { remoteSyncManager.getContinueWatching() }.getOrDefault(emptyList())
         val filteredPrimary = primaryItems.filterNot { item ->
             SportsAddonCapabilities.isLiveStreamOrSportsItem(
                 mediaType = item.mediaType,

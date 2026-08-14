@@ -334,6 +334,28 @@ class HomeViewModel @Inject constructor(
         return "${mediaType.name}:$id"
     }
 
+    private suspend fun applyContinueWatchingDismissals(
+        items: List<ContinueWatchingItem>
+    ): List<ContinueWatchingItem> {
+        val cloudFiltered = try {
+            traktRepository.filterDismissedContinueWatchingItems(items)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            items
+        }
+        return cloudFiltered.filter { item ->
+            val key = continueWatchingKey(item.mediaType, item.id)
+            val dismissedAt = dismissedContinueWatchingAt[key] ?: return@filter true
+            if (item.updatedAtMs > dismissedAt) {
+                dismissedContinueWatchingAt.remove(key)
+                true
+            } else {
+                false
+            }
+        }
+    }
+
     private fun isHardCappedTop10Catalog(categoryId: String): Boolean {
         return categoryId in HARD_CAPPED_TOP_10_CATALOG_IDS
     }
@@ -1295,7 +1317,7 @@ class HomeViewModel @Inject constructor(
     private var lastContinueWatchingItems: List<MediaItem> = emptyList()
     private var lastContinueWatchingUpdateMs: Long = 0L
     private var lastResolvedBaseCategories: List<Category> = emptyList()
-    private val dismissedContinueWatchingKeys = Collections.synchronizedSet(mutableSetOf<String>())
+    private val dismissedContinueWatchingAt = Collections.synchronizedMap(mutableMapOf<String, Long>())
     private val CONTINUE_WATCHING_REFRESH_MS = 45_000L
     private val WATCHED_BADGES_REFRESH_MS = 90_000L
     private var lastWatchedBadgesRefreshMs: Long = 0L
@@ -1530,7 +1552,7 @@ class HomeViewModel @Inject constructor(
         lastContinueWatchingItems = emptyList()
         lastContinueWatchingUpdateMs = 0L
         lastResolvedBaseCategories = emptyList()
-        dismissedContinueWatchingKeys.clear()
+        dismissedContinueWatchingAt.clear()
         categoryPaginationStates.clear()
         savedCatalogById.clear()
         collectionCatalogByMediaId.clear()
@@ -3587,21 +3609,8 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val persistedDismissedKeys = runCatching {
-            traktRepository.getDismissedContinueWatchingShowKeys()
-        }.getOrDefault(emptySet())
-
         val sanitizedItems = sanitizeContinueWatchingItems(items)
-
-        val dismissed = sanitizedItems.filter { item ->
-            val showKey = continueWatchingKey(item.mediaType, item.id)
-            dismissedContinueWatchingKeys.contains(showKey) || persistedDismissedKeys.contains(showKey)
-        }
-        return sanitizedItems
-            .filterNot { item ->
-                val showKey = continueWatchingKey(item.mediaType, item.id)
-                dismissedContinueWatchingKeys.contains(showKey) || persistedDismissedKeys.contains(showKey)
-            }
+        return applyContinueWatchingDismissals(sanitizedItems)
             // Don't filter by progress range for Trakt items — Trakt's progress API
             // is authoritative. Some "up next" items have synthetic progress = 0
             // (brand new season premiere, never started) which the old 1..99 filter
@@ -3740,7 +3749,7 @@ class HomeViewModel @Inject constructor(
                         }.getOrDefault(emptySet())
                         val safeItems = lastContinueWatchingItems.filterNot { item ->
                             val showKey = continueWatchingKey(item.mediaType, item.id)
-                            dismissedContinueWatchingKeys.contains(showKey) || persistedDismissedKeys.contains(showKey)
+                            dismissedContinueWatchingAt.containsKey(showKey) || persistedDismissedKeys.contains(showKey)
                         }
                         if (safeItems.isEmpty()) {
                             return@launch
@@ -3860,25 +3869,17 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun resolveContinueWatchingItemsStable(forceFresh: Boolean): List<ContinueWatchingItem> {
-        val isTraktAuthenticated = try {
-            traktRepository.isAuthenticated.first()
+        val useRemoteSync = try {
+            remoteSyncManager.isRemoteConnected()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             false
         }
-        val isAlternativeRemoteActive = try {
-            traktRepository.isAlternativeRemoteActive()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            false
-        }
-        val useRemoteSync = isTraktAuthenticated || isAlternativeRemoteActive
         val items = if (useRemoteSync) {
-            val traktItems = if (forceFresh) {
+            val remoteItems = if (forceFresh) {
                 try {
-                    traktRepository.getContinueWatching(forceRefresh = true)
+                    remoteSyncManager.getContinueWatching(forceRefresh = true)
                 } catch (e: kotlinx.coroutines.CancellationException) {
                     throw e
                 } catch (error: Exception) {
@@ -3886,31 +3887,26 @@ class HomeViewModel @Inject constructor(
                         throwable = error,
                         context = mapOf(
                             "error_area" to "ContinueWatching",
-                            "cw_phase" to "trakt_fresh",
+                            "cw_phase" to "remote_fresh",
                             "force_fresh" to forceFresh.toString()
                         )
                     )
                     emptyList()
                 }
             } else {
-                val cached = traktRepository.getCachedContinueWatching()
-                if (cached.isNotEmpty()) {
-                    cached
-                } else {
-                    try {
-                        traktRepository.getContinueWatching()
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (error: Exception) {
-                        AppLogger.recordException(
-                            throwable = error,
-                            context = mapOf(
-                                "error_area" to "ContinueWatching",
-                                "cw_phase" to "trakt_cached_miss"
-                            )
+                try {
+                    remoteSyncManager.getContinueWatching()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (error: Exception) {
+                    AppLogger.recordException(
+                        throwable = error,
+                        context = mapOf(
+                            "error_area" to "ContinueWatching",
+                            "cw_phase" to "remote_cached_miss"
                         )
-                        emptyList()
-                    }
+                    )
+                    emptyList()
                 }
             }
             val localItems = try {
@@ -3921,11 +3917,11 @@ class HomeViewModel @Inject constructor(
                 emptyList()
             }
             val historyItems = loadContinueWatchingFromHistoryStable()
-            if (traktItems.isEmpty() && historyItems.isNotEmpty()) {
+            if (remoteItems.isEmpty() && historyItems.isNotEmpty()) {
                 historyItems
             } else {
                 mergeTraktAndRecentLocalContinueWatching(
-                    traktItems = traktItems,
+                    traktItems = remoteItems,
                     localItems = localItems,
                     historyItems = historyItems
                 )
@@ -3945,20 +3941,8 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val persistedDismissedKeys = try {
-            traktRepository.getDismissedContinueWatchingShowKeys()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            emptySet()
-        }
-
         val repairedItems = repairContinueWatchingMetadataIfNeeded(items)
-        return sanitizeContinueWatchingItems(repairedItems)
-            .filterNot { item ->
-                val showKey = continueWatchingKey(item.mediaType, item.id)
-                dismissedContinueWatchingKeys.contains(showKey) || persistedDismissedKeys.contains(showKey)
-            }
+        return applyContinueWatchingDismissals(sanitizeContinueWatchingItems(repairedItems))
             .filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
             }
@@ -3966,24 +3950,16 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun preloadStartupContinueWatchingItems(): List<ContinueWatchingItem> {
-        val isTraktAuthenticated = try {
-            traktRepository.isAuthenticated.first()
+        val useRemoteSync = try {
+            remoteSyncManager.isRemoteConnected()
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (e: Exception) {
             false
         }
-        val isAlternativeRemoteActive = try {
-            traktRepository.isAlternativeRemoteActive()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            false
-        }
-        val useRemoteSync = isTraktAuthenticated || isAlternativeRemoteActive
         val items = if (useRemoteSync) {
             try {
-                traktRepository.preloadContinueWatchingCache()
+                remoteSyncManager.getContinueWatching(forceRefresh = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (error: Exception) {
@@ -4011,20 +3987,8 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val persistedDismissedKeys = try {
-            traktRepository.getDismissedContinueWatchingShowKeys()
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            emptySet()
-        }
-
         val repairedItems = repairContinueWatchingMetadataIfNeeded(items)
-        return sanitizeContinueWatchingItems(repairedItems)
-            .filterNot { item ->
-                val showKey = continueWatchingKey(item.mediaType, item.id)
-                dismissedContinueWatchingKeys.contains(showKey) || persistedDismissedKeys.contains(showKey)
-            }
+        return applyContinueWatchingDismissals(sanitizeContinueWatchingItems(repairedItems))
             .filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
             }
@@ -4922,10 +4886,10 @@ class HomeViewModel @Inject constructor(
             try {
                 val season = if (item.mediaType == MediaType.TV) item.nextEpisode?.seasonNumber else null
                 val episode = if (item.mediaType == MediaType.TV) item.nextEpisode?.episodeNumber else null
-                dismissedContinueWatchingKeys.add(continueWatchingKey(item.mediaType, item.id))
+                dismissedContinueWatchingAt[continueWatchingKey(item.mediaType, item.id)] = System.currentTimeMillis()
 
                 watchHistoryRepository.removeFromHistory(item.id, season, episode)
-                traktRepository.deletePlaybackForContent(item.id, item.mediaType)
+                remoteSyncManager.dismissContinueWatching(item.mediaType, item.id, season, episode)
                 traktRepository.removeFromContinueWatchingCache(item.id, null, null, item.mediaType)
                 traktRepository.dismissContinueWatching(item)
                 runCatching { cloudSyncRepository.pushToCloud() }

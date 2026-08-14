@@ -47,8 +47,8 @@ class ArvioBackMotion internal constructor() {
 /**
  * PredictiveBackHandler with real settle animations.
  *
- * Commit: animates the remaining travel to 1f *before* invoking [onCommit], so releasing
- * at 80% is never a jump cut. Cancel: animates back to 0f.
+ * Commit: invokes [onCommit] immediately while the visual state settles to 1f in the
+ * composition scope. Cancel: animates back to 0f.
  *
  * The settle is launched on [rememberCoroutineScope] because on cancel the handler's own
  * coroutine is already cancelled — suspending in the catch block would throw immediately.
@@ -69,16 +69,6 @@ fun rememberArvioPredictiveBack(
         snapshotFlow { anim.value }.collect { motion.progress = it }
     }
 
-    // Modal composables often stay in composition while hidden. Reset the completed
-    // dismiss animation so reopening them cannot inherit a scaled or faded state.
-    LaunchedEffect(enabled) {
-        if (!enabled) {
-            anim.stop()
-            anim.snapTo(0f)
-            motion.touchY = Float.NaN
-        }
-    }
-
     PredictiveBackHandler(enabled = enabled) { events ->
         try {
             events.collect { e ->
@@ -86,11 +76,16 @@ fun rememberArvioPredictiveBack(
                 motion.touchY = e.touchY
                 anim.snapTo(e.progress)
             }
-            anim.animateTo(1f, tween(commitDurationMs, easing = ArvioStandardDecelerate))
+            scope.launch {
+                anim.animateTo(1f, tween(commitDurationMs, easing = ArvioStandardDecelerate))
+                anim.snapTo(0f)
+                motion.touchY = Float.NaN
+            }
             commit()
         } catch (e: CancellationException) {
             scope.launch {
                 anim.animateTo(0f, tween(cancelDurationMs, easing = ArvioStandardDecelerate))
+                motion.touchY = Float.NaN
             }
             throw e
         }

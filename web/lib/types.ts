@@ -464,6 +464,7 @@ export interface AppSettings {
   // Catalogs / addons
   catalogs: CatalogConfig[];
   hiddenCatalogIds: string[];
+  hiddenHomeServerCatalogIds: string[];
   disabledAddonIds: string[];
   // Home servers
   homeServers: HomeServerConfig[];

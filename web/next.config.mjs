@@ -21,7 +21,13 @@ const nextConfig = {
   poweredByHeader: false,
   outputFileTracingRoot: process.cwd(),
   env: {
-    NEXT_PUBLIC_BUILD_STAMP: buildStamp
+    NEXT_PUBLIC_BUILD_STAMP: buildStamp,
+    // APP_ANON_KEY is intentionally a public client key (the same value is
+    // bundled in Android). Expose it under Next's browser-visible name so a
+    // production deploy cannot silently lose ARVIO Cloud login/sync when the
+    // Netlify site only defines the canonical server-side variable.
+    NEXT_PUBLIC_ARVIO_APP_ANON_KEY:
+      process.env.NEXT_PUBLIC_ARVIO_APP_ANON_KEY ?? process.env.APP_ANON_KEY ?? ""
   },
   images: {
     remotePatterns: [

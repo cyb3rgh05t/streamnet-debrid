@@ -31,7 +31,7 @@ function itemKey(item: MediaItem): string {
 export function WatchlistScreen() {
   const {
     watchlist, traktConnected, simklConnected, mdblistConnected, openDetails,
-    settings, loadTraktLists, loadTraktListItems
+    settings, trackingPreferences, loadTraktLists, loadTraktListItems
   } = useApp();
   const posterMode = settings.cardLayoutMode === "poster";
   const homeServers = useMemo(
@@ -205,8 +205,19 @@ export function WatchlistScreen() {
 
   const activeServerName = activeLibrary?.serverName ?? visibleLibraries[0]?.serverName ?? "Home server";
   const heading = tab === "watchlist" ? "Watchlist" : `${PROVIDER_LABELS[tab]} Library`;
+  const watchlistSyncLabel = (() => {
+    const mode = trackingPreferences.watchlistReadMode;
+    if (mode === "both" && traktConnected && simklConnected) return "Trakt + Simkl";
+    if (mode === "simkl" && simklConnected) return "Simkl";
+    if (mode === "mdblist" && mdblistConnected) return "MDBList";
+    if (mode === "trakt" && traktConnected) return "Trakt";
+    if (traktConnected) return "Trakt";
+    if (simklConnected) return "Simkl";
+    if (mdblistConnected) return "MDBList";
+    return null;
+  })();
   const eyebrow = tab === "watchlist"
-    ? traktConnected ? "Synced with Trakt" : simklConnected ? "Synced with Simkl" : mdblistConnected ? "Synced with MDBList" : "Saved across your ARVIO devices"
+    ? watchlistSyncLabel ? `Synced with ${watchlistSyncLabel}` : "Saved across your ARVIO devices"
     : loading && !items.length ? `Connecting to ${PROVIDER_LABELS[tab]}` : `${libraryPage.total.toLocaleString()} titles${activeLibrary ? ` in ${activeLibrary.libraryName}` : ""}`;
 
   return (

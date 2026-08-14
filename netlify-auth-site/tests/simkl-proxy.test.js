@@ -41,11 +41,16 @@ test("Simkl proxy only allows ARVIO's exact API surface and methods", () => {
   assert.equal(allowed("/scrobble/start", "POST"), true);
   assert.equal(allowed("/sync/all-items/anime/all", "GET"), true);
   assert.equal(allowed("/sync/history/remove", "POST"), true);
+  assert.equal(allowed("/sync/playback", "GET"), true);
+  assert.equal(allowed("/sync/playback/12345", "DELETE"), true);
 
   assert.equal(allowed("/oauth/pin-evil", "GET"), false);
   assert.equal(allowed("/search/movies", "GET"), false);
   assert.equal(allowed("/sync/all-items/anime/all", "POST"), false);
   assert.equal(allowed("/scrobble/start", "GET"), false);
+  assert.equal(allowed("/sync/playback", "DELETE"), false);
+  assert.equal(allowed("/sync/playback/12345", "GET"), false);
+  assert.equal(allowed("/sync/playback/not-an-id", "DELETE"), false);
 });
 
 test("Simkl proxy ignores caller credentials and injects server credentials", async () => {

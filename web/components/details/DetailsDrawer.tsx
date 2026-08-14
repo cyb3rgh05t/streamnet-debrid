@@ -7,7 +7,7 @@ import { MediaCard } from "@/components/media/MediaCard";
 import { RailScroller } from "@/components/media/RailScroller";
 import { config } from "@/lib/config";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
-import { saveProgress } from "@/lib/cloud";
+import { saveWatchedState } from "@/lib/cloud";
 import { copyStreamUrl, downloadStreamUrl, downloadToVlc, externalLaunchMode, isAppleMobile, isDesktop, isLinux, isWindows, openExternalPlayer, openInAnyPlayer, setVlcProtocolReady, triggerDownload, vlcProtocolReady, VLC_SETUP_SH_URL, VLC_SETUP_URL } from "@/lib/externalPlayers";
 import { fetchSubtitlesForItem } from "@/lib/addons";
 import { cachedDebridDirectUrl, isUncachedDebridStream, parseDebridStream, prefetchDebridDirectUrl, resolveDebridDirectUrl } from "@/lib/debrid";
@@ -173,20 +173,12 @@ function DetailsView({ item }: { item: MediaItem }) {
     let saved = false;
     try {
       if (authClient.session) {
-        await saveProgress(authClient, {
-          media_type: displayItem.mediaType,
-          show_tmdb_id: displayItem.id,
-          profile_id: activeProfile?.id ?? null,
-          season,
-          episode,
-          episode_title: displayItem.episodeTitle ?? null,
-          title: displayItem.title,
-          progress: alreadyWatched ? 0 : 1,
-          duration_seconds: 1,
-          position_seconds: alreadyWatched ? 0 : 1,
-          backdrop_path: displayItem.backdrop?.replace(config.backdropBase, "") ?? null,
-          poster_path: displayItem.image?.replace(config.imageBase, "") ?? null
-        }, activeProfile?.id ?? null);
+        await saveWatchedState(authClient, {
+          id: displayItem.id,
+          mediaType: displayItem.mediaType,
+          seasonNumber: season,
+          episodeNumber: episode
+        }, !alreadyWatched, activeProfile?.id ?? null);
         saved = true;
       }
       if (syncClient().isConnected) {

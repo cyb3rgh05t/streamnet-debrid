@@ -85,6 +85,7 @@ fun MediaCard(
     raiseOnFocus: Boolean = true,
     showProgress: Boolean = false,
     showTitle: Boolean = true,
+    showSubtitle: Boolean = true,
     titleMaxLines: Int = 1,
     subtitleMaxLines: Int = 1,
     isFocusedOverride: Boolean = false,
@@ -101,6 +102,7 @@ fun MediaCard(
             width = width,
             isLandscape = isLandscape,
             showTitle = showTitle,
+            showSubtitle = showSubtitle,
             modifier = modifier
         )
         return
@@ -490,36 +492,38 @@ fun MediaCard(
                 overflow = TextOverflow.Ellipsis,
             )
 
-            // Prefer release date (or year) under the title. Fall back to the
-            // explicit subtitle or media-type label only when neither is set.
-            val tvSeriesLabel = stringResource(R.string.component_label_tv_series)
-            val movieLabel = stringResource(R.string.movie)
-            val mediaLabel = stringResource(R.string.component_label_media)
-            val subtitle = remember(item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
-                val release = item.releaseDate?.takeIf { it.isNotBlank() }
-                    ?: item.year.takeIf { it.isNotBlank() }
-                release
-                    ?: item.subtitle.ifBlank {
-                        when (item.mediaType) {
-                            MediaType.TV -> tvSeriesLabel
-                            MediaType.MOVIE -> movieLabel
-                            else -> mediaLabel
+            if (showSubtitle) {
+                // Prefer release date (or year) under the title. Fall back to the
+                // explicit subtitle or media-type label only when neither is set.
+                val tvSeriesLabel = stringResource(R.string.component_label_tv_series)
+                val movieLabel = stringResource(R.string.movie)
+                val mediaLabel = stringResource(R.string.component_label_media)
+                val subtitle = remember(item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
+                    val release = item.releaseDate?.takeIf { it.isNotBlank() }
+                        ?: item.year.takeIf { it.isNotBlank() }
+                    release
+                        ?: item.subtitle.ifBlank {
+                            when (item.mediaType) {
+                                MediaType.TV -> tvSeriesLabel
+                                MediaType.MOVIE -> movieLabel
+                                else -> mediaLabel
+                            }
                         }
-                    }
+                }
+                Text(
+                    text = subtitle,
+                    style = ArvioSkin.typography.caption.copy(
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = androidx.compose.ui.graphics.Color.Black,
+                            offset = androidx.compose.ui.geometry.Offset(2f, 2f),
+                            blurRadius = 4f
+                        )
+                    ),
+                    color = ArvioSkin.colors.textMuted.copy(alpha = 0.85f),
+                    maxLines = subtitleMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                )
             }
-            Text(
-                text = subtitle,
-                style = ArvioSkin.typography.caption.copy(
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = androidx.compose.ui.graphics.Color.Black,
-                        offset = androidx.compose.ui.geometry.Offset(2f, 2f),
-                        blurRadius = 4f
-                    )
-                ),
-                color = ArvioSkin.colors.textMuted.copy(alpha = 0.85f),
-                maxLines = subtitleMaxLines,
-                overflow = TextOverflow.Ellipsis,
-            )
         }
     }
 }
@@ -534,6 +538,7 @@ private fun PlaceholderCard(
     width: Dp,
     isLandscape: Boolean,
     showTitle: Boolean = true,
+    showSubtitle: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val aspectRatio = if (isLandscape) 16f / 9f else 2f / 3f
@@ -565,15 +570,17 @@ private fun PlaceholderCard(
                     .clip(rememberArvioCardShape(ArvioSkin.radius.sm))
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            if (showSubtitle) {
+                Spacer(modifier = Modifier.height(4.dp))
 
-            // Subtitle skeleton
-            SkeletonBox(
-                modifier = Modifier
-                    .fillMaxWidth(0.5f)
-                    .height(12.dp)
-                    .clip(rememberArvioCardShape(ArvioSkin.radius.sm))
-            )
+                // Subtitle skeleton
+                SkeletonBox(
+                    modifier = Modifier
+                        .fillMaxWidth(0.5f)
+                        .height(12.dp)
+                        .clip(rememberArvioCardShape(ArvioSkin.radius.sm))
+                )
+            }
         }
     }
 }

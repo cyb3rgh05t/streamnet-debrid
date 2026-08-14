@@ -86,4 +86,15 @@ class TraktRemoteProvider @Inject constructor(
 
     override suspend fun getContinueWatching(forceRefresh: Boolean): List<ContinueWatchingItem> =
         traktRepository.getContinueWatching(forceRefresh)
+
+    override suspend fun dismissContinueWatching(
+        mediaType: MediaType,
+        tmdbId: Int,
+        season: Int?,
+        episode: Int?
+    ): Boolean = if (mediaType == MediaType.TV && season != null && episode != null) {
+        traktRepository.deletePlaybackForEpisode(tmdbId, season, episode)
+    } else {
+        traktRepository.deletePlaybackForContent(tmdbId, mediaType)
+    }
 }

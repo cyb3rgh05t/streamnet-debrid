@@ -5,7 +5,7 @@ import { getStreams, getStreamsProgressive, installAddon as installAddonManifest
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
 import { getAuthPortalUrl } from "./config";
 import { defaultCatalogs, mergeCatalogs } from "./catalogs";
-import { getContinueWatching, isLiveStreamOrSportsItem, pullCloudPayload, pullCloudProfiles, pullCloudSimklToken, pullCloudTraktToken, pullCloudWatchlist, removeContinueWatchingProgress, saveCloudAddons, saveCloudProfiles, saveCloudSettings, saveCloudSimklToken, saveCloudTraktToken, saveProgress } from "./cloud";
+import { getContinueWatching, isLiveStreamOrSportsItem, pullCloudContinueWatchingDismissals, pullCloudPayload, pullCloudProfiles, pullCloudTrackingSelection, pullCloudWatchedKeys, pullCloudWatchlist, removeContinueWatchingProgress, saveCloudAddons, saveCloudProfiles, saveCloudSettings, saveCloudTrackingSelection, saveCloudWatchlist, saveWatchedState } from "./cloud";
 import { cachedDebridDirectUrl, parseDebridStream, resolveDebridDirectUrl, resolveTranscodeStream } from "./debrid";
 import { createPendingExternalPlayback } from "./externalPlayback";
 import { externalLaunchMode, openExternalPlayer } from "./externalPlayers";
@@ -19,7 +19,14 @@ import type { MetadataProviderId, ProviderPriorityConfig } from "./metadata/type
 import { TraktClient, type TraktDeviceCode } from "./trakt";
 import { mdblistClient } from "./mdblist";
 import { simklClient, type SimklPinCode } from "./simkl";
-import { activeSyncProvider, syncClient } from "./sync";
+import {
+  activeSyncProvider,
+  defaultTrackingPreferences,
+  loadTrackingPreferences,
+  saveTrackingPreferences,
+  syncClient,
+  type TrackingPreferences
+} from "./sync";
 import type {
   AppSettings,
   AuthSession,
@@ -186,6 +193,7 @@ export const defaultSettings: AppSettings = {
   cardDensity: "comfortable",
   catalogs: defaultCatalogs,
   hiddenCatalogIds: [],
+  hiddenHomeServerCatalogIds: [],
   disabledAddonIds: [],
   homeServers: [],
   iptvPlaylists: [],
@@ -232,7 +240,7 @@ function traktWatchedKeys(movies: unknown[], shows: unknown[]) {
     const item = raw as { movie?: { ids?: { tmdb?: number } }; status?: string; last_watched_at?: string };
     const tmdb = item.movie?.ids?.tmdb;
     if (tmdb) {
-      if (item.status === undefined || item.status === "completed" || item.status === "watching" || Boolean(item.last_watched_at)) {
+      if (item.status === undefined || item.status === "completed") {
         keys.add(`movie:${tmdb}`);
       }
     }
@@ -284,6 +292,7 @@ function isMediaWatched(item: MediaItem, watchedKeys: Set<string>, seasonNumber?
 }
 
 function isPausedPlaybackItem(item: MediaItem) {
+  if (item.badge === "Up Next") return true;
   // Match the Android app: in-progress items are 3%–90% watched.
   const progress = item.progress ?? 0;
   return progress >= 3 && progress < 90;
@@ -505,6 +514,8 @@ export interface AppStore {
   traktConnected: boolean;
   mdblistConnected: boolean;
   simklConnected: boolean;
+  trackingPreferences: TrackingPreferences;
+  updateTrackingPreferences: (patch: Partial<TrackingPreferences>) => Promise<void>;
   deviceCode: TraktDeviceCode | null;
   simklDeviceCode: SimklPinCode | null;
   busy: string;
@@ -645,6 +656,11 @@ export function AppProvider({
   const [activeProfileId, setActiveProfileId] = useState<string | null>(() =>
     localProfilesMatchAccount() ? loadStored<string | null>(ACTIVE_PROFILE_KEY, null) : null
   );
+  const activeProfileIdRef = useRef(activeProfileId);
+  activeProfileIdRef.current = activeProfileId;
+  const [trackingPreferences, setTrackingPreferences] = useState<TrackingPreferences>(() =>
+    loadTrackingPreferences(activeProfileId)
+  );
   // Hydrate cached custom-avatar images synchronously so profile tiles paint the
   // real avatar on first render instead of flashing the letter fallback.
   const [avatarImages, setAvatarImagesState] = useState<Record<string, string>>(() => loadStored<Record<string, string>>(AVATAR_IMAGES_KEY, {}));
@@ -680,8 +696,25 @@ export function AppProvider({
 
   useEffect(() => {
     const effectiveCatalogs = mergeCatalogs(settings.catalogs, settings.hiddenCatalogIds);
-    setCatalogConfigs(effectiveCatalogs.filter((catalog) => catalog.enabled));
+    setCatalogConfigs(effectiveCatalogs.filter((catalog) => catalog.enabled && catalog.sourceType !== "home-server"));
   }, [settings.catalogs, settings.hiddenCatalogIds]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const effectiveCatalogs = mergeCatalogs(settings.catalogs, settings.hiddenCatalogIds);
+    void loadHomeServerRows(
+      settings.homeServers,
+      settings.hiddenHomeServerCatalogIds,
+      effectiveCatalogs
+    ).then((rows) => {
+      if (!cancelled) setHomeServerRows(rows);
+    }).catch(() => {
+      if (!cancelled) setHomeServerRows([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.catalogs, settings.hiddenCatalogIds, settings.hiddenHomeServerCatalogIds, settings.homeServers]);
 
   const deviceCodeRef = useRef(deviceCode);
   useEffect(() => {
@@ -726,7 +759,12 @@ export function AppProvider({
     refreshKeyRef.current = key;
     const existing = refreshInFlightRef.current;
     if (existing?.key === key) return existing.promise;
+    traktClient.setProfile(profileId);
+    mdblistClient.setProfile(profileId);
     simklClient.setProfile(profileId);
+    setTrackingPreferences(loadTrackingPreferences(profileId));
+    setTraktConnected(traktClient.isConnected);
+    setMdblistConnected(mdblistClient.isConnected);
     setSimklConnected(simklClient.isConnected);
     const run = (async () => {
       const currentSettings = settingsRef.current;
@@ -760,17 +798,39 @@ export function AppProvider({
       const cloud = authClient.session ? await pullCloudPayload(authClient, profileId).catch(() => null) : null;
       let effectiveSettings = currentSettings;
       if (authClient.session && profileId) {
-        const [cloudTraktToken, cloudSimklToken] = await Promise.all([
-          pullCloudTraktToken(authClient, profileId).catch(() => null),
-          pullCloudSimklToken(authClient, profileId).catch(() => null)
-        ]);
-        if (cloudTraktToken) {
-          traktClient.setToken(cloudTraktToken);
-          setTraktConnected(true);
-        }
-        if (cloudSimklToken) {
-          simklClient.setToken(cloudSimklToken);
-          setSimklConnected(true);
+        const cloudTracking = await pullCloudTrackingSelection(authClient, profileId).catch(() => null);
+        if (refreshKeyRef.current !== key) return;
+        if (cloudTracking) {
+          if (!cloudTracking.hasCloudState) {
+            const localPreferences = loadTrackingPreferences(profileId);
+            const localTracking = traktClient.token || simklClient.token || mdblistClient.key
+              ? {
+                  provider: mdblistClient.key ? "MDBLIST" as const : traktClient.token ? "TRAKT" as const : "SIMKL" as const,
+                  traktToken: traktClient.token,
+                  mdbListApiKey: mdblistClient.key,
+                  simklToken: simklClient.token,
+                  trackingPreferences: localPreferences
+                }
+              : null;
+            if (localTracking) {
+              await saveCloudTrackingSelection(authClient, profileId, localTracking).catch(() => undefined);
+              if (refreshKeyRef.current !== key) return;
+            }
+          } else {
+            traktClient.setToken(cloudTracking.traktToken);
+            simklClient.setToken(cloudTracking.simklToken);
+            mdblistClient.setKey(cloudTracking.mdbListApiKey);
+            if (cloudTracking.mdbListApiKey) {
+              traktClient.disconnect();
+              simklClient.disconnect();
+            }
+            const preferences = cloudTracking.trackingPreferences ?? defaultTrackingPreferences();
+            saveTrackingPreferences(profileId, preferences);
+            setTrackingPreferences(preferences);
+          }
+          setTraktConnected(traktClient.isConnected);
+          setSimklConnected(simklClient.isConnected);
+          setMdblistConnected(mdblistClient.isConnected);
         }
       }
       if (cloud?.settings) {
@@ -821,20 +881,20 @@ export function AppProvider({
       }
 
       const effectiveCatalogs = mergeCatalogs(effectiveSettings.catalogs, effectiveSettings.hiddenCatalogIds);
-      setCatalogConfigs(effectiveCatalogs.filter((catalog) => catalog.enabled));
-
-      void loadHomeServerRows(effectiveSettings.homeServers).then(setHomeServerRows).catch(() => setHomeServerRows([]));
+      setCatalogConfigs(effectiveCatalogs.filter((catalog) => catalog.enabled && catalog.sourceType !== "home-server"));
 
       const client = syncClient();
       const traktReady = client.isConnected;
       const currentSyncProvider = activeSyncProvider();
-      const [historyRows, traktRows, playbackRows, watchedMoviesRows, watchedShowsRows, cloudWatchlistRows, hiddenShowIds] = await Promise.all([
+      const [historyRows, traktRows, playbackRows, watchedMoviesRows, watchedShowsRows, cloudWatchlistRows, cloudWatchedKeys, cloudDismissals, hiddenShowIds] = await Promise.all([
         authClient.session ? getContinueWatching(authClient, profileId, addonState).catch(() => []) : Promise.resolve([]),
         traktReady ? client.watchlist().catch(() => []) : Promise.resolve([]),
         traktReady ? client.playback().catch(() => []) : Promise.resolve([]),
         traktReady ? client.watched("movies").catch(() => []) : Promise.resolve([]),
         traktReady ? client.watched("shows").catch(() => []) : Promise.resolve([]),
         authClient.session ? pullCloudWatchlist(authClient, profileId).catch(() => []) : Promise.resolve([]),
+        authClient.session ? pullCloudWatchedKeys(authClient, profileId).catch(() => new Set<string>()) : Promise.resolve(new Set<string>()),
+        authClient.session ? pullCloudContinueWatchingDismissals(authClient, profileId).catch(() => new Map<string, number>()) : Promise.resolve(new Map<string, number>()),
         // Only Trakt has a hidden-from-progress concept; MDBList reads return an
         // empty set so the filters below are no-ops for it.
         traktReady && currentSyncProvider === "trakt"
@@ -847,11 +907,19 @@ export function AppProvider({
       // filter them out.
       const isHiddenShow = (item: MediaItem) =>
         item.mediaType === "tv" && typeof item.traktId === "number" && hiddenShowIds.has(item.traktId);
+      const isDismissed = (item: MediaItem) => {
+        const showKey = item.mediaType === "movie" ? `movie:${item.id}` : `tv:${item.id}`;
+        const exactKey = item.mediaType === "tv" && item.seasonNumber != null && item.episodeNumber != null
+          ? `${showKey}:${item.seasonNumber}:${item.episodeNumber}`
+          : showKey;
+        const dismissedAt = Math.max(cloudDismissals.get(showKey) ?? 0, cloudDismissals.get(exactKey) ?? 0);
+        return dismissedAt > 0 && (item.activityAt ?? 0) <= dismissedAt;
+      };
       const cloudCw = historyRows.map(historyToItem);
       const traktPlaybackCw = playbackRows
         .map(traktPlaybackToMedia)
         .filter(isPausedPlaybackItem)
-        .filter((item) => !isHiddenShow(item));
+        .filter((item) => !isHiddenShow(item) && !isDismissed(item));
 
       // ── Fast paint ─────────────────────────────────────────────────────────
       // The cloud watchlist + cloud/playback CW are already available now (the
@@ -859,7 +927,9 @@ export function AppProvider({
       // ~1s, WITHOUT waiting on loadTraktUpNext (~120 per-show progress calls)
       // or the per-item TMDB hydration below. The richer Trakt up-next data
       // enriches CW a moment later.
-      const fastWatchlistSource = traktRows.length ? traktRows.map(traktItemToMedia) : cloudWatchlistRows;
+      const fastWatchlistSource = traktRows.length
+        ? dedupeMedia(traktRows.map(traktItemToMedia))
+        : cloudWatchlistRows;
       if (fastWatchlistSource.length) {
         void hydrateTraktItems(fastWatchlistSource).then((hydrated) => {
           if (hydrated.length && refreshKeyRef.current === key) {
@@ -874,7 +944,7 @@ export function AppProvider({
       // episode subtitle — which rendered that series twice until the enriched
       // pass tidied up. Trakt playback is the newer truth, so it wins.
       const fastSeen = new Set<string>();
-      const fastCw = [...traktPlaybackCw, ...cloudCw.filter((item) => !isHiddenShow(item))]
+      const fastCw = [...traktPlaybackCw, ...cloudCw.filter((item) => !isHiddenShow(item) && !isDismissed(item))]
         .filter((item) => {
           const key = `${item.mediaType}:${item.id}`;
           if (fastSeen.has(key)) return false;
@@ -913,12 +983,12 @@ export function AppProvider({
         ...traktPlaybackCw,
         ...upNextRows.filter((item) => !playbackShowKeys.has(`${item.mediaType}:${item.id}`))
       ], cloudCw);
-      const watchedKeys = traktWatchedKeys(watchedMoviesRows, watchedShowsRows);
+      const watchedKeys = new Set([...traktWatchedKeys(watchedMoviesRows, watchedShowsRows), ...cloudWatchedKeys]);
       if (refreshKeyRef.current === key) setWatchedKeys(watchedKeys);
       const cwBase = traktReady ? traktCw : cloudCw.filter(isPausedPlaybackItem);
       // Order newest-activity-first across playback + up-next (matches the app's
       // updatedAt-descending sort) so the row leads with what you last watched.
-      const cwSorted = dedupeMedia(cwBase).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
+      const cwSorted = dedupeMedia(cwBase).filter((item) => !isDismissed(item)).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
       const cw = await hydrateContinueWatchingItems(filterWatchedContinueWatching(cwSorted, watchedKeys, addonState));
       // Trakt outage guard: when Trakt is connected but every read came back
       // empty, the calls were blocked (Cloudflare challenges the CORS
@@ -951,7 +1021,9 @@ export function AppProvider({
         }
       }
       // Refresh the watchlist with the authoritative Trakt list if it differs.
-      const watchlistSource = traktRows.length ? traktRows.map(traktItemToMedia) : cloudWatchlistRows;
+      const watchlistSource = traktRows.length
+        ? dedupeMedia(traktRows.map(traktItemToMedia))
+        : cloudWatchlistRows;
       const hydratedWatchlist = await hydrateTraktItems(watchlistSource);
       if (hydratedWatchlist.length && refreshKeyRef.current === key) {
         setWatchlist(hydratedWatchlist);
@@ -1079,6 +1151,24 @@ export function AppProvider({
     if (view === "login") return;
     if (authClient.session && !cloudProfilesHydrated) return;
     void refreshData();
+  }, [cloudProfilesHydrated, refreshData, view]);
+
+  useEffect(() => {
+    if (view === "login" || (authClient.session && !cloudProfilesHydrated)) return undefined;
+    let lastRefreshAt = 0;
+    const refreshOnReturn = () => {
+      if (document.visibilityState !== "visible") return;
+      const now = Date.now();
+      if (now - lastRefreshAt < 2_000) return;
+      lastRefreshAt = now;
+      void refreshData();
+    };
+    window.addEventListener("focus", refreshOnReturn);
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    return () => {
+      window.removeEventListener("focus", refreshOnReturn);
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+    };
   }, [cloudProfilesHydrated, refreshData, view]);
 
   useEffect(() => {
@@ -1660,37 +1750,93 @@ export function AppProvider({
   }, []);
 
   const beginTrakt = useCallback(async () => {
+    traktClient.setProfile(activeProfileIdRef.current);
     setDeviceCode(await traktClient.beginDeviceLink());
   }, []);
 
   const pollTrakt = useCallback(async () => {
+    const targetProfileId = activeProfileIdRef.current;
     const code = deviceCodeRef.current;
     if (!code) return;
-    await traktClient.pollDeviceToken(code.device_code);
+    const token = await traktClient.pollDeviceToken(code.device_code);
+    if (activeProfileIdRef.current !== targetProfileId) return;
+    traktClient.setProfile(targetProfileId);
+    mdblistClient.setProfile(targetProfileId);
+    simklClient.setProfile(targetProfileId);
+    traktClient.setToken(token);
     setTraktConnected(true);
     setDeviceCode(null);
-    // Mutual exclusion: connecting Trakt drops MDBList and Simkl for this profile.
+    // MDBList is exclusive; Trakt and Simkl can be connected together.
     mdblistClient.disconnect();
     setMdblistConnected(false);
-    simklClient.disconnect();
-    setSimklConnected(false);
-    if (activeProfileId) void saveCloudSimklToken(authClient, null, activeProfileId).catch(() => undefined);
-    // Persist the token to cloud so other devices (and future sessions) see the
-    // connection — parity with the Android app's traktTokens payload.
-    if (traktClient.token && activeProfileId) {
-      void saveCloudTraktToken(authClient, traktClient.token, activeProfileId).catch(() => undefined);
+    const previousPreferences = loadTrackingPreferences(targetProfileId);
+    const mode = simklClient.isConnected ? "both" as const : "trakt" as const;
+    const nextPreferences: TrackingPreferences = {
+      watchlistReadMode: previousPreferences.watchlistReadMode === "auto" || previousPreferences.watchlistReadMode === "mdblist"
+        ? mode : previousPreferences.watchlistReadMode,
+      continueWatchingReadMode: previousPreferences.continueWatchingReadMode === "auto" || previousPreferences.continueWatchingReadMode === "mdblist"
+        ? mode : previousPreferences.continueWatchingReadMode,
+      watchedReadMode: previousPreferences.watchedReadMode === "auto" || previousPreferences.watchedReadMode === "mdblist"
+        ? mode : previousPreferences.watchedReadMode,
+      writeToTrakt: true,
+      writeToSimkl: simklClient.isConnected && previousPreferences.writeToSimkl
+    };
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, nextPreferences);
+    setTrackingPreferences(nextPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: "TRAKT",
+        traktToken: token,
+        mdbListApiKey: null,
+        simklToken: simklClient.token,
+        trackingPreferences: nextPreferences
+      }).catch(() => undefined);
     }
-    await refreshData();
-  }, [refreshData, activeProfileId]);
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
+  }, [refreshData]);
 
-  const disconnectTrakt = useCallback(() => {
+  const disconnectTrakt = useCallback(async () => {
+    const targetProfileId = activeProfileIdRef.current;
+    traktClient.setProfile(targetProfileId);
     traktClient.disconnect();
     setTraktConnected(false);
-  }, []);
+    const current = loadTrackingPreferences(targetProfileId);
+    const fallback = simklClient.isConnected ? "simkl" as const : "auto" as const;
+    const replaceTrakt = (mode: typeof current.watchlistReadMode) =>
+      mode === "trakt" || mode === "both" ? fallback : mode;
+    const nextPreferences: TrackingPreferences = {
+      watchlistReadMode: replaceTrakt(current.watchlistReadMode),
+      continueWatchingReadMode: replaceTrakt(current.continueWatchingReadMode),
+      watchedReadMode: replaceTrakt(current.watchedReadMode),
+      writeToTrakt: false,
+      writeToSimkl: simklClient.isConnected && current.writeToSimkl
+    };
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, nextPreferences);
+    setTrackingPreferences(nextPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: simklClient.isConnected ? "SIMKL" : "NONE",
+        traktToken: null,
+        mdbListApiKey: null,
+        simklToken: simklClient.token,
+        trackingPreferences: nextPreferences
+      }).catch(() => undefined);
+    }
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
+  }, [refreshData]);
 
   const connectMdblist = useCallback(async (key: string) => {
+    const targetProfileId = activeProfileIdRef.current;
     const ok = await mdblistClient.validateKey(key);
     if (!ok) throw new Error("Invalid MDBList API key");
+    if (activeProfileIdRef.current !== targetProfileId) return;
+    traktClient.setProfile(targetProfileId);
+    mdblistClient.setProfile(targetProfileId);
+    simklClient.setProfile(targetProfileId);
     mdblistClient.setKey(key);
     setMdblistConnected(true);
     // Mutual exclusion: connecting MDBList drops Trakt and Simkl for this profile.
@@ -1698,47 +1844,157 @@ export function AppProvider({
     setTraktConnected(false);
     simklClient.disconnect();
     setSimklConnected(false);
-    if (activeProfileId) void saveCloudSimklToken(authClient, null, activeProfileId).catch(() => undefined);
-    await refreshData();
-  }, [refreshData, activeProfileId]);
+    const mdbPreferences: TrackingPreferences = {
+      watchlistReadMode: "mdblist",
+      continueWatchingReadMode: "mdblist",
+      watchedReadMode: "mdblist",
+      writeToTrakt: false,
+      writeToSimkl: false
+    };
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, mdbPreferences);
+    setTrackingPreferences(mdbPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: "MDBLIST",
+        traktToken: null,
+        mdbListApiKey: key,
+        simklToken: null,
+        trackingPreferences: mdbPreferences
+      }).catch(() => undefined);
+    }
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
+  }, [refreshData]);
 
-  const disconnectMdblist = useCallback(() => {
+  const disconnectMdblist = useCallback(async () => {
+    const targetProfileId = activeProfileIdRef.current;
+    mdblistClient.setProfile(targetProfileId);
     mdblistClient.disconnect();
     setMdblistConnected(false);
-    void refreshData();
+    const emptyPreferences = defaultTrackingPreferences();
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, emptyPreferences);
+    setTrackingPreferences(emptyPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: "NONE",
+        traktToken: null,
+        mdbListApiKey: null,
+        simklToken: null,
+        trackingPreferences: emptyPreferences
+      }).catch(() => undefined);
+    }
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
   }, [refreshData]);
 
   const beginSimkl = useCallback(async () => {
-    simklClient.setProfile(activeProfileId);
+    simklClient.setProfile(activeProfileIdRef.current);
     setSimklDeviceCode(await simklClient.beginPinAuth());
-  }, [activeProfileId]);
+  }, []);
 
   const pollSimkl = useCallback(async () => {
+    const targetProfileId = activeProfileIdRef.current;
     const code = simklDeviceCodeRef.current;
     if (!code) return;
-    const ok = await simklClient.pollPinToken(code.user_code);
-    if (!ok) {
+    const token = await simklClient.pollPinToken(code.user_code);
+    if (!token) {
       throw new Error("Simkl has not approved this PIN yet. Please approve the code on Simkl.");
     }
+    if (activeProfileIdRef.current !== targetProfileId) return;
+    traktClient.setProfile(targetProfileId);
+    mdblistClient.setProfile(targetProfileId);
+    simklClient.setProfile(targetProfileId);
+    simklClient.setToken(token);
     setSimklConnected(true);
     setSimklDeviceCode(null);
-    // Mutual exclusion: connecting Simkl drops Trakt & MDBList for this profile.
-    traktClient.disconnect();
-    setTraktConnected(false);
+    // MDBList is exclusive; Simkl and Trakt can be connected together.
     mdblistClient.disconnect();
     setMdblistConnected(false);
-    if (simklClient.token && activeProfileId) {
-      await saveCloudSimklToken(authClient, simklClient.token, activeProfileId).catch(() => undefined);
+    const previousPreferences = loadTrackingPreferences(targetProfileId);
+    const mode = traktClient.isConnected ? "both" as const : "simkl" as const;
+    const nextPreferences: TrackingPreferences = {
+      watchlistReadMode: previousPreferences.watchlistReadMode === "auto" || previousPreferences.watchlistReadMode === "mdblist"
+        ? mode : previousPreferences.watchlistReadMode,
+      continueWatchingReadMode: previousPreferences.continueWatchingReadMode === "auto" || previousPreferences.continueWatchingReadMode === "mdblist"
+        ? mode : previousPreferences.continueWatchingReadMode,
+      watchedReadMode: previousPreferences.watchedReadMode === "auto" || previousPreferences.watchedReadMode === "mdblist"
+        ? mode : previousPreferences.watchedReadMode,
+      writeToTrakt: traktClient.isConnected && previousPreferences.writeToTrakt,
+      writeToSimkl: true
+    };
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, nextPreferences);
+    setTrackingPreferences(nextPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: traktClient.isConnected ? "TRAKT" : "SIMKL",
+        traktToken: traktClient.token,
+        mdbListApiKey: null,
+        simklToken: token,
+        trackingPreferences: nextPreferences
+      }).catch(() => undefined);
     }
-    await refreshData();
-  }, [refreshData, activeProfileId]);
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
+  }, [refreshData]);
 
-  const disconnectSimkl = useCallback(() => {
+  const disconnectSimkl = useCallback(async () => {
+    const targetProfileId = activeProfileIdRef.current;
+    simklClient.setProfile(targetProfileId);
     simklClient.disconnect();
     setSimklConnected(false);
-    if (activeProfileId) void saveCloudSimklToken(authClient, null, activeProfileId).catch(() => undefined);
-    void refreshData();
-  }, [refreshData, activeProfileId]);
+    const current = loadTrackingPreferences(targetProfileId);
+    const fallback = traktClient.isConnected ? "trakt" as const : "auto" as const;
+    const replaceSimkl = (mode: typeof current.watchlistReadMode) =>
+      mode === "simkl" || mode === "both" ? fallback : mode;
+    const nextPreferences: TrackingPreferences = {
+      watchlistReadMode: replaceSimkl(current.watchlistReadMode),
+      continueWatchingReadMode: replaceSimkl(current.continueWatchingReadMode),
+      watchedReadMode: replaceSimkl(current.watchedReadMode),
+      writeToTrakt: traktClient.isConnected && current.writeToTrakt,
+      writeToSimkl: false
+    };
+    if (targetProfileId) saveTrackingPreferences(targetProfileId, nextPreferences);
+    setTrackingPreferences(nextPreferences);
+    if (targetProfileId) {
+      await saveCloudTrackingSelection(authClient, targetProfileId, {
+        provider: traktClient.isConnected ? "TRAKT" : "NONE",
+        traktToken: traktClient.token,
+        mdbListApiKey: null,
+        simklToken: null,
+        trackingPreferences: nextPreferences
+      }).catch(() => undefined);
+    }
+    if (activeProfileIdRef.current === targetProfileId) {
+      await refreshData(targetProfileId);
+    }
+  }, [refreshData]);
+
+  const updateTrackingPreferences = useCallback(async (patch: Partial<TrackingPreferences>) => {
+    const profileId = activeProfileIdRef.current;
+    if (!profileId) return;
+    const next = saveTrackingPreferences(profileId, {
+      ...loadTrackingPreferences(profileId),
+      ...patch
+    });
+    setTrackingPreferences(next);
+    await saveCloudTrackingSelection(authClient, profileId, {
+      provider: mdblistClient.isConnected
+        ? "MDBLIST"
+        : traktClient.isConnected
+          ? "TRAKT"
+          : simklClient.isConnected
+            ? "SIMKL"
+            : "NONE",
+      traktToken: traktClient.token,
+      mdbListApiKey: mdblistClient.key,
+      simklToken: simklClient.token,
+      trackingPreferences: next
+    }).catch(() => undefined);
+    await refreshData(profileId);
+  }, [refreshData]);
 
   // Watchlist list-source switcher. Returns the user's custom Trakt lists to
   // populate the dropdown (built-in Watchlist/Collection are added by the UI).
@@ -1795,6 +2051,7 @@ export function AppProvider({
   }, [fetchTraktListItems]);
 
   const persistProfiles = useCallback((next: Profile[], activeId: string | null) => {
+    activeProfileIdRef.current = activeId;
     setProfiles(next);
     setActiveProfileId(activeId);
     saveStored(PROFILES_KEY, next);
@@ -1806,10 +2063,16 @@ export function AppProvider({
     const updated = profiles.map((p) => (p.id === profile.id ? { ...p, lastUsedAt: Date.now() } : p));
     const switching = profile.id !== activeProfileId;
     persistProfiles(updated, profile.id);
+    traktClient.setProfile(profile.id);
+    mdblistClient.setProfile(profile.id);
     simklClient.setProfile(profile.id);
+    setTraktConnected(traktClient.isConnected);
+    setMdblistConnected(mdblistClient.isConnected);
     setSimklConnected(simklClient.isConnected);
     setManageMode(false);
     if (switching) {
+      setDeviceCode(null);
+      setSimklDeviceCode(null);
       // Drop the previous profile's rows and seed from the new profile's cache
       // so its Continue Watching paints instantly. refreshKeyRef (updated by the
       // refreshData call below) invalidates any in-flight refresh for the old
@@ -1872,14 +2135,11 @@ export function AppProvider({
     }
     const slim = slimCacheItem(item);
     const cacheKey = watchlistCacheKeyFor(activeProfileId);
-
-    setWatchlist((prev) => {
-      const next = inWatchlist
-        ? prev.filter((entry) => !(entry.mediaType === item.mediaType && entry.id === item.id))
-        : [slim, ...prev];
-      saveCachedList(cacheKey, next, 60);
-      return next;
-    });
+    const nextWatchlist = inWatchlist
+      ? watchlist.filter((entry) => !(entry.mediaType === item.mediaType && entry.id === item.id))
+      : [slim, ...watchlist];
+    setWatchlist(nextWatchlist);
+    saveCachedList(cacheKey, nextWatchlist, 60);
 
     try {
       const ref = {
@@ -1894,6 +2154,9 @@ export function AppProvider({
         await syncClient().addToWatchlist(ref);
         setToast("Added to watchlist.");
       }
+      if (authClient.session) {
+        await saveCloudWatchlist(authClient, nextWatchlist, activeProfileId).catch(() => undefined);
+      }
     } catch (err) {
       setWatchlist((prev) => {
         const next = inWatchlist ? [slim, ...prev] : prev.filter((entry) => !(entry.mediaType === item.mediaType && entry.id === item.id));
@@ -1902,7 +2165,7 @@ export function AppProvider({
       });
       setToast(err instanceof Error ? err.message : "Failed to update watchlist.");
     }
-  }, [watchlist, activeProfileId]);
+  }, [watchlist, activeProfileId, authClient]);
 
   const toggleWatched = useCallback(async (item: MediaItem, seasonNumber?: number | null, episodeNumber?: number | null) => {
     const currentlyWatched = isWatched(item, seasonNumber, episodeNumber);
@@ -1911,20 +2174,12 @@ export function AppProvider({
 
     if (authClient.session) {
       try {
-        await saveProgress(
-          authClient,
-          {
-            media_type: item.mediaType,
-            show_tmdb_id: item.id,
-            season: seasonNumber ?? item.seasonNumber ?? null,
-            episode: episodeNumber ?? item.episodeNumber ?? null,
-            title: item.title,
-            duration_seconds: 0,
-            position_seconds: 0,
-            progress: currentlyWatched ? 0 : 1
-          },
-          activeProfileId
-        );
+        await saveWatchedState(authClient, {
+          id: item.id,
+          mediaType: item.mediaType,
+          seasonNumber: seasonNumber ?? item.seasonNumber ?? null,
+          episodeNumber: episodeNumber ?? item.episodeNumber ?? null
+        }, !currentlyWatched, activeProfileId);
       } catch {
         // Cloud sync best effort
       }
@@ -2030,6 +2285,8 @@ export function AppProvider({
     traktConnected,
     mdblistConnected,
     simklConnected,
+    trackingPreferences,
+    updateTrackingPreferences,
     deviceCode,
     simklDeviceCode,
     busy,
@@ -2070,11 +2327,11 @@ export function AppProvider({
     view, cloudLoginRequired, profiles, activeProfile, avatarImages, manageMode,
     selectProfile, createProfile, updateProfileAction, deleteProfileAction, switchProfile, goToLogin, backToProfiles,
     section, categories, catalogConfigs, loadCatalogRow, homeServerRows, continueWatching, watchlist, isWatched, hero, heroPreview, selected, streams, selectedEpisode, loadEpisodeStreams, advanceEpisode, activeStream, activeChannel,
-    addons, addonsReady, iptvSnapshot, query, results, settings, auth, traktConnected, mdblistConnected, simklConnected, deviceCode, simklDeviceCode, busy, toast,
+    addons, addonsReady, iptvSnapshot, query, results, settings, auth, traktConnected, mdblistConnected, simklConnected, trackingPreferences, deviceCode, simklDeviceCode, busy, toast,
     updateSettings, refreshData, openDetails, closeDetails, playStream, playTrailer, playChannel, playCatchup, closePlayer,
     refreshIptv, loadIptvGuide,
     installAddon, removeAddon, setAddonsState, signIn, signOut, beginTrakt, pollTrakt, disconnectTrakt,
-    connectMdblist, disconnectMdblist, beginSimkl, pollSimkl, disconnectSimkl,
+    connectMdblist, disconnectMdblist, beginSimkl, pollSimkl, disconnectSimkl, updateTrackingPreferences,
     loadTraktLists, loadTraktListItems,
     toggleWatchlist, toggleWatched, removeFromContinueWatching, activeContextMenu, openContextMenu, closeContextMenu
   ]);

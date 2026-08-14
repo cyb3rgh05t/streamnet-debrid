@@ -79,6 +79,14 @@ interface RemoteSyncProvider {
     // ===== Continue Watching (remote paused sessions) =====
 
     suspend fun getContinueWatching(forceRefresh: Boolean = false): List<ContinueWatchingItem>
+
+    /** Remove matching paused sessions without altering watch history. */
+    suspend fun dismissContinueWatching(
+        mediaType: MediaType,
+        tmdbId: Int,
+        season: Int? = null,
+        episode: Int? = null
+    ): Boolean
 }
 
 /**

@@ -1402,7 +1402,8 @@ const SIMKL_REQUEST_RULES = [
   { path: /^\/scrobble\/(?:start|pause|stop)$/, methods: new Set(["POST"]) },
   { path: /^\/sync\/activities$/, methods: new Set(["GET"]) },
   { path: /^\/sync\/all-items\/(?:movies|shows|anime|all)\/(?:watching|plantowatch|hold|completed|dropped|all)$/, methods: new Set(["GET"]) },
-  { path: /^\/sync\/playback(?:\/(?:movies|shows|anime|all))?$/, methods: new Set(["GET"]) },
+  { path: /^\/sync\/playback(?:\/(?:movies|episodes|shows|anime|all))?$/, methods: new Set(["GET"]) },
+  { path: /^\/sync\/playback\/\d+$/, methods: new Set(["DELETE"]) },
   { path: /^\/sync\/(?:history|history\/remove|add-to-list)$/, methods: new Set(["POST"]) }
 ];
 

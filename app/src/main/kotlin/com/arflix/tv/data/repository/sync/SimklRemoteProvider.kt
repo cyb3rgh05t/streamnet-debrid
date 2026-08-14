@@ -86,5 +86,12 @@ class SimklRemoteProvider @Inject constructor(
     override suspend fun getWatchedEpisodes(): Set<String> = syncService.getWatchedEpisodes()
 
     override suspend fun getContinueWatching(forceRefresh: Boolean): List<ContinueWatchingItem> =
-        emptyList()
+        syncService.getContinueWatching(forceRefresh)
+
+    override suspend fun dismissContinueWatching(
+        mediaType: MediaType,
+        tmdbId: Int,
+        season: Int?,
+        episode: Int?
+    ): Boolean = syncService.dismissContinueWatching(mediaType, tmdbId, season, episode)
 }

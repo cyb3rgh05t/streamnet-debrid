@@ -204,6 +204,7 @@ import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.BackgroundElevated
 import com.arflix.tv.ui.theme.ErrorRed
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.SuccessGreen
 import com.arflix.tv.ui.theme.TextPrimary
@@ -478,7 +479,7 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 9 // Cloud, Trakt, MDBList, Simkl, Telegram, sync, update, diagnostics, privacy, deletion
+            "accounts" -> 14 // Accounts, tracking routing, sync/update, privacy and deletion
             else -> 0
         }
     }
@@ -1198,18 +1199,42 @@ fun SettingsScreen(
                                                         viewModel.startSimklAuth()
                                                     }
                                                 }
-                                                4 -> onNavigateToTelegramSettings()
-                                                5 -> viewModel.forceCloudSyncNow()
-                                                6 -> {
+                                                4 -> viewModel.setTrackingReadMode(
+                                                    com.arflix.tv.data.repository.sync.TrackingFeature.WATCHLIST,
+                                                    nextTrackingMode(uiState.trackingWatchlistReadMode, uiState)
+                                                )
+                                                5 -> viewModel.setTrackingReadMode(
+                                                    com.arflix.tv.data.repository.sync.TrackingFeature.CONTINUE_WATCHING,
+                                                    nextTrackingMode(uiState.trackingContinueReadMode, uiState)
+                                                )
+                                                6 -> viewModel.setTrackingReadMode(
+                                                    com.arflix.tv.data.repository.sync.TrackingFeature.WATCHED,
+                                                    nextTrackingMode(uiState.trackingWatchedReadMode, uiState)
+                                                )
+                                                7 -> if (uiState.isTraktAuthenticated) {
+                                                    viewModel.setTrackingWriteTarget(
+                                                        com.arflix.tv.data.repository.sync.SyncProvider.TRAKT,
+                                                        !uiState.trackingWriteToTrakt
+                                                    )
+                                                }
+                                                8 -> if (uiState.isSimklConnected) {
+                                                    viewModel.setTrackingWriteTarget(
+                                                        com.arflix.tv.data.repository.sync.SyncProvider.SIMKL,
+                                                        !uiState.trackingWriteToSimkl
+                                                    )
+                                                }
+                                                9 -> onNavigateToTelegramSettings()
+                                                10 -> viewModel.forceCloudSyncNow()
+                                                11 -> {
                                                     if (uiState.updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) {
                                                         viewModel.installAppUpdateOrRequestPermission()
                                                     } else {
                                                         viewModel.checkForAppUpdates(force = true, showNoUpdateFeedback = true)
                                                     }
                                                 }
-                                                7 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
-                                                8 -> openExternalUrl(context, PRIVACY_POLICY_URL)
-                                                9 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
+                                                12 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
+                                                13 -> openExternalUrl(context, PRIVACY_POLICY_URL)
+                                                14 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
                                             }
                                         }
                                         "plugins" -> {
@@ -1750,6 +1775,9 @@ fun SettingsScreen(
                             onConnectSimkl = { viewModel.startSimklAuth() },
                             onCancelSimkl = { viewModel.disconnectSimkl() },
                             onDisconnectSimkl = { viewModel.disconnectSimkl() },
+                            trackingUiState = uiState,
+                            onTrackingReadMode = viewModel::setTrackingReadMode,
+                            onTrackingWriteTarget = viewModel::setTrackingWriteTarget,
                             onForceCloudSync = { viewModel.forceCloudSyncNow() },
                             onSwitchProfile = onSwitchProfile,
                             onCheckUpdates = { viewModel.checkForAppUpdates(force = true, showNoUpdateFeedback = true) },
@@ -3406,6 +3434,8 @@ private fun TraktActivationModal(
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     val resolvedTitle = title ?: stringResource(R.string.settings_connect_trakt)
     val resolvedInstruction = instruction ?: stringResource(R.string.settings_trakt_instruction, verificationUrl)
+    val accentColor = resolveAccentColor(fallback = Pink)
+    val accentContentColor = contrastingContentColor(accentColor)
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val qrContainerSize = if (isMobile) 0.dp else 172.dp
@@ -3518,7 +3548,7 @@ private fun TraktActivationModal(
                         Text(
                             text = stringResource(R.string.settings_open_auth_page),
                             style = ArflixTypography.button,
-                            color = Color.White
+                            color = accentContentColor
                         )
                     }
 
@@ -3557,7 +3587,7 @@ private fun TraktActivationModal(
                     Text(
                         text = stringResource(R.string.cancel),
                         style = ArflixTypography.button,
-                        color = Color.White
+                        color = if (isMobile && onOpenUrl != null) TextPrimary else accentContentColor
                     )
                 }
             }
@@ -3600,6 +3630,14 @@ private fun MobileSettingsLayout(
 ) {
     val backMotion = rememberArvioPredictiveBack(enabled = page != "MAIN") {
         onNavigate("MAIN")
+    }
+
+    var lastSubPage by remember { mutableStateOf(if (page != "MAIN") page else "") }
+    val displayedSubPage = if (page != "MAIN") page else lastSubPage
+    LaunchedEffect(page) {
+        if (page != "MAIN") {
+            lastSubPage = page
+        }
     }
 
     Box(
@@ -3677,14 +3715,14 @@ private fun MobileSettingsLayout(
                             .size(28.dp)
                     )
                     Text(
-                        text = mobileCategoryTitle(page),
+                        text = mobileCategoryTitle(displayedSubPage),
                         style = ArflixTypography.heroTitle.copy(fontSize = 24.sp),
                         color = TextPrimary,
                         modifier = Modifier.weight(1f)
                     )
                 }
                 MobileSettingsSubPage(
-                    page = page,
+                    page = displayedSubPage,
                     onNavigate = onNavigate,
                     uiState = uiState,
                     viewModel = viewModel,
@@ -4373,7 +4411,11 @@ private fun MobileSettingsSubPage(
                     onConnectMdbList = onConnectMdbList,
                     onDisconnectMdbList = onDisconnectMdbList,
                     onConnectSimkl = { viewModel.startSimklAuth() },
-                    onDisconnectSimkl = { viewModel.disconnectSimkl() }
+                    onDisconnectSimkl = { viewModel.disconnectSimkl() },
+                    onReadMode = { feature, mode -> viewModel.setTrackingReadMode(feature, mode) },
+                    onWriteTarget = { provider, enabled ->
+                        viewModel.setTrackingWriteTarget(provider, enabled)
+                    }
                 )
             }
             "Privacy & Data" -> {
@@ -6269,14 +6311,15 @@ private fun AiKeyQrOverlay(
                     modifier = Modifier.focusRequester(focusRequester),
                     colors = ClickableSurfaceDefaults.colors(
                         containerColor = BackgroundElevated,
-                        focusedContainerColor = Pink
+                        contentColor = TextPrimary,
+                        focusedContainerColor = Pink,
+                        focusedContentColor = contrastingContentColor(Pink)
                     ),
                     shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp))
                 ) {
                     Text(
                         text = stringResource(R.string.done),
-                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp),
-                        color = TextPrimary
+                        modifier = Modifier.padding(horizontal = 32.dp, vertical = 12.dp)
                     )
                 }
             }
@@ -8264,6 +8307,12 @@ private fun AccountsSettings(
     onConnectSimkl: () -> Unit = {},
     onCancelSimkl: () -> Unit = {},
     onDisconnectSimkl: () -> Unit = {},
+    trackingUiState: SettingsUiState,
+    onTrackingReadMode: (
+        com.arflix.tv.data.repository.sync.TrackingFeature,
+        com.arflix.tv.data.repository.sync.TrackingReadMode
+    ) -> Unit,
+    onTrackingWriteTarget: (com.arflix.tv.data.repository.sync.SyncProvider, Boolean) -> Unit,
     isForceCloudSyncing: Boolean,
     lastCloudSyncStatus: String?,
     diagnosticsSharingEnabled: Boolean,
@@ -8363,14 +8412,84 @@ private fun AccountsSettings(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        SettingsActionRow(
+            title = "Watchlist source",
+            description = "Choose which connected service supplies your watchlist.",
+            actionLabel = trackingModeLabel(trackingUiState.trackingWatchlistReadMode),
+            isFocused = focusedIndex == 4,
+            onClick = {
+                onTrackingReadMode(
+                    com.arflix.tv.data.repository.sync.TrackingFeature.WATCHLIST,
+                    nextTrackingMode(trackingUiState.trackingWatchlistReadMode, trackingUiState)
+                )
+            },
+            modifier = Modifier.settingsFocusSlot(4)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SettingsActionRow(
+            title = "Continue Watching source",
+            description = "Choose where playback progress and Up Next are loaded from.",
+            actionLabel = trackingModeLabel(trackingUiState.trackingContinueReadMode),
+            isFocused = focusedIndex == 5,
+            onClick = {
+                onTrackingReadMode(
+                    com.arflix.tv.data.repository.sync.TrackingFeature.CONTINUE_WATCHING,
+                    nextTrackingMode(trackingUiState.trackingContinueReadMode, trackingUiState)
+                )
+            },
+            modifier = Modifier.settingsFocusSlot(5)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SettingsActionRow(
+            title = "Watched history source",
+            description = "Choose which connected service supplies watched badges.",
+            actionLabel = trackingModeLabel(trackingUiState.trackingWatchedReadMode),
+            isFocused = focusedIndex == 6,
+            onClick = {
+                onTrackingReadMode(
+                    com.arflix.tv.data.repository.sync.TrackingFeature.WATCHED,
+                    nextTrackingMode(trackingUiState.trackingWatchedReadMode, trackingUiState)
+                )
+            },
+            modifier = Modifier.settingsFocusSlot(6)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SettingsToggleRow(
+            title = "Update Trakt while watching",
+            subtitle = if (isTraktAuthenticated) "Send progress and watched changes to Trakt." else "Connect Trakt to enable this.",
+            isEnabled = isTraktAuthenticated && trackingUiState.trackingWriteToTrakt,
+            isFocused = focusedIndex == 7,
+            onToggle = { enabled -> if (isTraktAuthenticated) onTrackingWriteTarget(com.arflix.tv.data.repository.sync.SyncProvider.TRAKT, enabled) },
+            modifier = Modifier.settingsFocusSlot(7)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SettingsToggleRow(
+            title = "Update Simkl while watching",
+            subtitle = if (isSimklConnected) "Send progress and watched changes to Simkl." else "Connect Simkl to enable this.",
+            isEnabled = isSimklConnected && trackingUiState.trackingWriteToSimkl,
+            isFocused = focusedIndex == 8,
+            onToggle = { enabled -> if (isSimklConnected) onTrackingWriteTarget(com.arflix.tv.data.repository.sync.SyncProvider.SIMKL, enabled) },
+            modifier = Modifier.settingsFocusSlot(8)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         // Telegram
         SettingsActionRow(
             title = "Telegram",
             description = stringResource(R.string.settings_telegram_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 4,
+            isFocused = focusedIndex == 9,
             onClick = onNavigateToTelegram,
-            modifier = Modifier.settingsFocusSlot(4)
+            modifier = Modifier.settingsFocusSlot(9)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8387,9 +8506,9 @@ private fun AccountsSettings(
                 stringResource(R.string.settings_signin_to_force_sync)
             },
             actionLabel = if (isForceCloudSyncing) stringResource(R.string.settings_badge_syncing) else stringResource(R.string.settings_badge_sync),
-            isFocused = focusedIndex == 5,
+            isFocused = focusedIndex == 10,
             onClick = { if (!isForceCloudSyncing) onForceCloudSync() },
-            modifier = Modifier.settingsFocusSlot(5)
+            modifier = Modifier.settingsFocusSlot(10)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8411,11 +8530,11 @@ private fun AccountsSettings(
                 updateStatus is com.arflix.tv.updater.UpdateStatus.UpdateAvailable -> stringResource(R.string.settings_badge_update)
                 else -> stringResource(R.string.settings_badge_check)
             },
-            isFocused = focusedIndex == 6,
+            isFocused = focusedIndex == 11,
             onClick = {
                 if (updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) onInstallUpdate() else onCheckUpdates()
             },
-            modifier = Modifier.settingsFocusSlot(6)
+            modifier = Modifier.settingsFocusSlot(11)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8424,9 +8543,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_diagnostics_sharing),
             subtitle = stringResource(R.string.settings_diagnostics_sharing_desc),
             isEnabled = diagnosticsSharingEnabled,
-            isFocused = focusedIndex == 7,
+            isFocused = focusedIndex == 12,
             onToggle = onDiagnosticsSharingToggle,
-            modifier = Modifier.settingsFocusSlot(7)
+            modifier = Modifier.settingsFocusSlot(12)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8435,9 +8554,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_privacy_policy),
             description = stringResource(R.string.settings_privacy_policy_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 8,
+            isFocused = focusedIndex == 13,
             onClick = onOpenPrivacy,
-            modifier = Modifier.settingsFocusSlot(8)
+            modifier = Modifier.settingsFocusSlot(13)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8446,9 +8565,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_account_data_deletion),
             description = stringResource(R.string.settings_account_data_deletion_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 9,
+            isFocused = focusedIndex == 14,
             onClick = onOpenDataDeletion,
-            modifier = Modifier.settingsFocusSlot(9)
+            modifier = Modifier.settingsFocusSlot(14)
         )
     }
 }
@@ -8888,7 +9007,12 @@ private fun TrackingIntegrationsPage(
     onConnectMdbList: (String) -> Unit,
     onDisconnectMdbList: () -> Unit,
     onConnectSimkl: () -> Unit = {},
-    onDisconnectSimkl: () -> Unit = {}
+    onDisconnectSimkl: () -> Unit = {},
+    onReadMode: (
+        com.arflix.tv.data.repository.sync.TrackingFeature,
+        com.arflix.tv.data.repository.sync.TrackingReadMode
+    ) -> Unit = { _, _ -> },
+    onWriteTarget: (com.arflix.tv.data.repository.sync.SyncProvider, Boolean) -> Unit = { _, _ -> }
 ) {
     var showMdbListConnect by remember { mutableStateOf(false) }
     var showMdbListDisconnectConfirm by remember { mutableStateOf(false) }
@@ -9033,6 +9157,136 @@ private fun TrackingIntegrationsPage(
                     }
                 },
                 onDisconnect = onDisconnectSimkl
+            )
+        }
+
+        if (uiState.isTraktAuthenticated || uiState.isSimklConnected || uiState.isMdbListConnected) {
+            MobileSettingsCategory(title = "DATA ROUTING") {
+                TrackingRoutingRow(
+                    title = "Watchlist source",
+                    value = trackingModeLabel(uiState.trackingWatchlistReadMode),
+                    showDivider = true,
+                    onClick = {
+                        onReadMode(
+                            com.arflix.tv.data.repository.sync.TrackingFeature.WATCHLIST,
+                            nextTrackingMode(uiState.trackingWatchlistReadMode, uiState)
+                        )
+                    }
+                )
+                TrackingRoutingRow(
+                    title = "Continue Watching source",
+                    value = trackingModeLabel(uiState.trackingContinueReadMode),
+                    showDivider = true,
+                    onClick = {
+                        onReadMode(
+                            com.arflix.tv.data.repository.sync.TrackingFeature.CONTINUE_WATCHING,
+                            nextTrackingMode(uiState.trackingContinueReadMode, uiState)
+                        )
+                    }
+                )
+                TrackingRoutingRow(
+                    title = "Watched history source",
+                    value = trackingModeLabel(uiState.trackingWatchedReadMode),
+                    showDivider = uiState.isTraktAuthenticated || uiState.isSimklConnected,
+                    onClick = {
+                        onReadMode(
+                            com.arflix.tv.data.repository.sync.TrackingFeature.WATCHED,
+                            nextTrackingMode(uiState.trackingWatchedReadMode, uiState)
+                        )
+                    }
+                )
+                if (uiState.isTraktAuthenticated) {
+                    TrackingRoutingRow(
+                        title = "Update Trakt while watching",
+                        value = if (uiState.trackingWriteToTrakt) "On" else "Off",
+                        showDivider = uiState.isSimklConnected,
+                        onClick = {
+                            onWriteTarget(
+                                com.arflix.tv.data.repository.sync.SyncProvider.TRAKT,
+                                !uiState.trackingWriteToTrakt
+                            )
+                        }
+                    )
+                }
+                if (uiState.isSimklConnected) {
+                    TrackingRoutingRow(
+                        title = "Update Simkl while watching",
+                        value = if (uiState.trackingWriteToSimkl) "On" else "Off",
+                        showDivider = false,
+                        onClick = {
+                            onWriteTarget(
+                                com.arflix.tv.data.repository.sync.SyncProvider.SIMKL,
+                                !uiState.trackingWriteToSimkl
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun trackingModeLabel(mode: com.arflix.tv.data.repository.sync.TrackingReadMode): String = when (mode) {
+    com.arflix.tv.data.repository.sync.TrackingReadMode.BOTH -> "Trakt + Simkl"
+    com.arflix.tv.data.repository.sync.TrackingReadMode.TRAKT -> "Trakt"
+    com.arflix.tv.data.repository.sync.TrackingReadMode.SIMKL -> "Simkl"
+    com.arflix.tv.data.repository.sync.TrackingReadMode.MDBLIST -> "MDBList"
+    com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO -> "Automatic"
+}
+
+private fun nextTrackingMode(
+    current: com.arflix.tv.data.repository.sync.TrackingReadMode,
+    state: SettingsUiState
+): com.arflix.tv.data.repository.sync.TrackingReadMode {
+    val choices = buildList {
+        if (state.isTraktAuthenticated && state.isSimklConnected) {
+            add(com.arflix.tv.data.repository.sync.TrackingReadMode.BOTH)
+        }
+        if (state.isTraktAuthenticated) add(com.arflix.tv.data.repository.sync.TrackingReadMode.TRAKT)
+        if (state.isSimklConnected) add(com.arflix.tv.data.repository.sync.TrackingReadMode.SIMKL)
+        if (state.isMdbListConnected) add(com.arflix.tv.data.repository.sync.TrackingReadMode.MDBLIST)
+    }.distinct()
+    if (choices.isEmpty()) return com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO
+    val index = choices.indexOf(current)
+    return choices[(index + 1).mod(choices.size)]
+}
+
+@Composable
+private fun TrackingRoutingRow(
+    title: String,
+    value: String,
+    showDivider: Boolean,
+    onClick: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 15.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = title,
+                style = ArflixTypography.cardTitle.copy(fontSize = 15.sp),
+                color = TextPrimary,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+            Text(
+                text = value,
+                style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                color = Pink
+            )
+        }
+        if (showDivider) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .padding(horizontal = 16.dp)
+                    .background(Color.White.copy(alpha = 0.05f))
             )
         }
     }

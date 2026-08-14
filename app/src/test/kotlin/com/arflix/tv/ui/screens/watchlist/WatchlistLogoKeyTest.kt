@@ -33,4 +33,19 @@ class WatchlistLogoKeyTest {
 
         assertThat(watchlistLogoKey(first)).isNotEqualTo(watchlistLogoKey(second))
     }
+
+    @Test
+    fun cardKeysKeepDifferentServerEditionsUnique() {
+        val first = MediaItem(
+            id = 42,
+            title = "Title",
+            mediaType = MediaType.MOVIE,
+            isHomeServer = true,
+            homeServerSourceRef = "plex:server",
+            homeServerItemId = "edition-4k"
+        )
+        val second = first.copy(homeServerItemId = "edition-1080p")
+
+        assertThat(watchlistItemKey(first, 0)).isNotEqualTo(watchlistItemKey(second, 1))
+    }
 }

@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Clock3, Play, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { isLiveStreamOrSportsItem, saveProgress } from "@/lib/cloud";
+import { isLiveStreamOrSportsItem, saveProgress, saveWatchedState } from "@/lib/cloud";
 import { authClient, useApp } from "@/lib/store";
 import { syncClient } from "@/lib/sync";
 import {
@@ -110,23 +110,32 @@ export function ExternalPlaybackPrompt() {
         }
       }
       if (authClient.session) {
-        await saveProgress(authClient, {
-          media_type: active.mediaType,
-          show_tmdb_id: active.tmdbId,
-          profile_id: active.profileId,
-          season: active.season,
-          episode: active.episode,
-          episode_title: active.episodeTitle,
-          title: active.title,
-          progress: Math.max(0, Math.min(1, progress / 100)),
-          duration_seconds: duration,
-          position_seconds: position,
-          backdrop_path: active.backdropPath,
-          poster_path: active.posterPath,
-          source: active.source,
-          stream_addon_id: active.streamAddonId,
-          stream_title: active.streamTitle
-        }, active.profileId, addons).catch(() => undefined);
+        if (finished) {
+          await saveWatchedState(authClient, {
+            id: active.tmdbId,
+            mediaType: active.mediaType,
+            seasonNumber: active.season,
+            episodeNumber: active.episode
+          }, true, active.profileId).catch(() => undefined);
+        } else {
+          await saveProgress(authClient, {
+            media_type: active.mediaType,
+            show_tmdb_id: active.tmdbId,
+            profile_id: active.profileId,
+            season: active.season,
+            episode: active.episode,
+            episode_title: active.episodeTitle,
+            title: active.title,
+            progress: Math.max(0, Math.min(1, progress / 100)),
+            duration_seconds: duration,
+            position_seconds: position,
+            backdrop_path: active.backdropPath,
+            poster_path: active.posterPath,
+            source: active.source,
+            stream_addon_id: active.streamAddonId,
+            stream_title: active.streamTitle
+          }, active.profileId, addons).catch(() => undefined);
+        }
       }
       setToast(finished ? "Marked watched and synced." : "Progress synced.");
       await refreshData(active.profileId);

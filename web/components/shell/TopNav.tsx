@@ -9,7 +9,7 @@ import type { NavSection } from "@/lib/types";
 const nav = [
   { id: "home", label: "Home", icon: Home },
   { id: "search", label: "Search", icon: Search },
-  { id: "watchlist", label: "Watchlist", icon: Bookmark },
+  { id: "watchlist", label: "Library", icon: Bookmark },
   { id: "tv", label: "TV", icon: Tv }
 ] satisfies Array<{ id: NavSection; label: string; icon: typeof Home }>;
 

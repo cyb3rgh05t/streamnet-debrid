@@ -250,7 +250,9 @@ fun AppNavigation(
                 onNavigateToHome = { navigateHome() },
                 onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
                 onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
-                onNavigateToSettings = { navigateTopLevel(Screen.Settings.route) },
+                onNavigateToSettings = { section ->
+                    navigateTopLevel(Screen.Settings.createRoute(initialSection = section))
+                },
                 onSwitchProfile = {
                     onSwitchProfile()
                     navController.navigate(Screen.ProfileSelection.route) {

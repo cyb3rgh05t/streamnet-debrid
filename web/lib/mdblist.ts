@@ -1,7 +1,7 @@
 import { jsonRequest } from "./http";
 import { loadStored, removeStored, saveStored } from "./storage";
 
-const MDBLIST_KEY_STORAGE = "arvio.web.mdblist.key";
+const LEGACY_MDBLIST_KEY_STORAGE = "arvio.web.mdblist.key";
 
 export interface MdbMediaRef {
   mediaType: "movie" | "tv";
@@ -20,18 +20,46 @@ export interface MdbMediaRef {
  * work unchanged regardless of the active provider.
  */
 export class MdbListClient {
-  key = loadStored<string | null>(MDBLIST_KEY_STORAGE, null);
+  key: string | null = null;
+  private profileId: string | null = null;
 
   get isConnected() {
     return Boolean(this.key);
+  }
+
+  private keyStorage(profileId: string) {
+    return `arvio.web.mdblist.key:${profileId}`;
+  }
+
+  setProfile(profileId: string | null) {
+    const normalized = profileId?.trim() || null;
+    if (normalized === this.profileId) return;
+    this.profileId = normalized;
+    this.watchedCache = null;
+    if (!normalized) {
+      this.key = null;
+      return;
+    }
+
+    let stored = loadStored<string | null>(this.keyStorage(normalized), null)?.trim() || null;
+    if (!stored) {
+      const legacy = loadStored<string | null>(LEGACY_MDBLIST_KEY_STORAGE, null)?.trim() || null;
+      if (legacy) {
+        stored = legacy;
+        saveStored(this.keyStorage(normalized), legacy);
+        removeStored(LEGACY_MDBLIST_KEY_STORAGE);
+      }
+    }
+    this.key = stored;
   }
 
   setKey(key: string | null) {
     const trimmed = key?.trim();
     this.key = trimmed ? trimmed : null;
     this.watchedCache = null; // don't serve a previous key's watched history
-    if (this.key) saveStored(MDBLIST_KEY_STORAGE, this.key);
-    else removeStored(MDBLIST_KEY_STORAGE);
+    if (!this.profileId) return;
+    if (this.key) saveStored(this.keyStorage(this.profileId), this.key);
+    else removeStored(this.keyStorage(this.profileId));
   }
 
   disconnect() {
@@ -128,19 +156,22 @@ export class MdbListClient {
     if (this.watchedCache && Date.now() - this.watchedCache.at < 30_000) {
       return this.watchedCache.data;
     }
-    const data = this.loadAllWatched();
+    const data = this.loadAllWatched(this.key);
     this.watchedCache = { at: Date.now(), data };
     return data;
   }
 
-  private async loadAllWatched() {
+  private async loadAllWatched(key: string | null) {
     const movies: MdbWatchedMovieRow[] = [];
     const episodes: MdbWatchedEpisodeRow[] = [];
+    if (!key) return { movies, episodes };
     const limit = 1000;
     // Hard page cap: never loop indefinitely on a bad has_more, even if it costs
     // a truncated tail (20k movies / 20k episodes is far beyond any real library).
     for (let page = 0; page < 20; page += 1) {
-      const resp = await this.request<MdbWatchedResponse>(`sync/watched?limit=${limit}&offset=${page * limit}`, {}).catch(() => null);
+      const resp = await this.request<MdbWatchedResponse>(`sync/watched?limit=${limit}&offset=${page * limit}`, {
+        headers: { "x-mdblist-key": key }
+      }).catch(() => null);
       if (!resp) break;
       if (resp.movies) movies.push(...resp.movies);
       if (resp.episodes) episodes.push(...resp.episodes);

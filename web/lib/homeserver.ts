@@ -1,5 +1,5 @@
 import { jsonRequest, proxiedUrl } from "./http";
-import type { Category, HomeServerCollectionConfig, HomeServerConfig, MediaItem, MediaType, StreamSource } from "./types";
+import type { CatalogConfig, Category, HomeServerCollectionConfig, HomeServerConfig, MediaItem, MediaType, StreamSource } from "./types";
 
 // ── Cloud sync shape mapping (APK parity) ───────────────────────────────────
 // The Android app persists home servers as a JSON string:
@@ -130,6 +130,95 @@ const sessionCache = new Map<string, { token: string; userId: string }>();
 
 function trimUrl(url: string) {
   return url.replace(/\/+$/, "");
+}
+
+function javaUrlEncode(value: string): string {
+  return encodeURIComponent(value)
+    .replace(/%20/g, "+")
+    .replace(/[!'()~]/g, (character) => `%${character.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
+function homeServerKey(server: HomeServerConfig): string {
+  return server.serverId?.trim() || server.id.trim() || `${webTypeToApkKind(server.type)}:${trimUrl(server.url)}`;
+}
+
+export function buildHomeServerCatalogSourceRef(
+  server: HomeServerConfig,
+  collection: Pick<HomeServerCollectionConfig, "id" | "type">
+): string {
+  return `home_server_catalog|${[
+    homeServerKey(server),
+    collection.id,
+    collection.type
+  ].map(javaUrlEncode).join("|")}`;
+}
+
+async function sha256Short(value: string): Promise<string> {
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest).slice(0, 8))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export async function homeServerCatalogIdentity(
+  server: HomeServerConfig,
+  collection: Pick<HomeServerCollectionConfig, "id" | "type">
+): Promise<{ id: string; sourceRef: string }> {
+  const sourceRef = buildHomeServerCatalogSourceRef(server, collection);
+  return { id: `home_server_${await sha256Short(sourceRef)}`, sourceRef };
+}
+
+export async function buildHomeServerCatalogConfigs(
+  servers: HomeServerConfig[],
+  savedCatalogs: CatalogConfig[] = [],
+  hiddenCatalogIds: string[] = []
+): Promise<CatalogConfig[]> {
+  const hidden = new Set(hiddenCatalogIds);
+  const savedHomeCatalogs = savedCatalogs.filter((catalog) => catalog.sourceType === "home-server");
+  const savedById = new Map(savedHomeCatalogs.map((catalog) => [catalog.id, catalog]));
+  const savedBySourceRef = new Map(
+    savedHomeCatalogs
+      .filter((catalog) => Boolean(catalog.sourceRef))
+      .map((catalog) => [catalog.sourceRef as string, catalog])
+  );
+  const generated: CatalogConfig[] = [];
+
+  for (const server of servers) {
+    for (const collection of server.collections ?? []) {
+      if (!collection.id || !isVideoCollectionType(collection.type)) continue;
+      const identity = await homeServerCatalogIdentity(server, collection);
+      const existing = savedById.get(identity.id) ?? savedBySourceRef.get(identity.sourceRef);
+      const title = existing?.name || existing?.title || `${server.name} - ${collection.name}`;
+      const normalizedType = collection.type.toLowerCase();
+      generated.push({
+        ...existing,
+        id: identity.id,
+        name: title,
+        title,
+        sourceType: "home-server",
+        sourceRef: identity.sourceRef,
+        mediaType: normalizedType.includes("movie") ? "movie" : normalizedType.includes("tv") ? "tv" : "all",
+        enabled: !hidden.has(identity.id),
+        isPreinstalled: false,
+        layout: existing?.layout ?? "landscape"
+      });
+    }
+  }
+
+  const generatedById = new Map(generated.map((catalog) => [catalog.id, catalog]));
+  const ordered = savedHomeCatalogs
+    .map((catalog) => generatedById.get(catalog.id))
+    .filter((catalog): catalog is CatalogConfig => Boolean(catalog));
+  const orderedIds = new Set(ordered.map((catalog) => catalog.id));
+  ordered.push(...generated.filter((catalog) => !orderedIds.has(catalog.id)));
+
+  // Keep a saved catalog manageable if an older cloud record has not yet
+  // populated the connection's collection metadata.
+  const generatedIds = new Set(generated.map((catalog) => catalog.id));
+  ordered.push(...savedHomeCatalogs
+    .filter((catalog) => !generatedIds.has(catalog.id))
+    .map((catalog) => ({ ...catalog, enabled: catalog.enabled !== false && !hidden.has(catalog.id) })));
+  return ordered;
 }
 
 function directUrl(url: string) {
@@ -332,7 +421,7 @@ function mapPlexItem(base: string, token: string, item: PlexItem, server?: HomeS
   };
 }
 
-async function loadPlexRows(server: HomeServerConfig): Promise<Category[]> {
+async function loadPlexRows(server: HomeServerConfig, hiddenCatalogIds: Set<string>): Promise<Category[]> {
   if (!server.token) return [];
   const base = trimUrl(server.url);
   const token = server.token;
@@ -343,8 +432,20 @@ async function loadPlexRows(server: HomeServerConfig): Promise<Category[]> {
   ).catch(() => null);
   const libraries = (sections?.MediaContainer?.Directory ?? [])
     .filter((section) => section.type === "movie" || section.type === "show")
+    .filter((section) => {
+      if (!server.collections?.length) return true;
+      return server.collections.some((collection) => collection.id === section.key && collection.enabled !== false);
+    })
     .slice(0, 6);
   const rows = await Promise.all(libraries.map(async (library) => {
+    const configured = server.collections?.find((collection) => collection.id === library.key);
+    if (server.collections?.length && !configured) return null;
+    if (configured?.enabled === false) return null;
+    const identity = await homeServerCatalogIdentity(server, {
+      id: library.key,
+      type: configured?.type || library.type
+    });
+    if (hiddenCatalogIds.has(identity.id)) return null;
     const payload = await proxiedGet<{ MediaContainer?: { Metadata?: PlexItem[] } }>(
       `${base}/library/sections/${library.key}/all?X-Plex-Token=${encodeURIComponent(token)}&sort=addedAt:desc`,
       headers
@@ -353,16 +454,21 @@ async function loadPlexRows(server: HomeServerConfig): Promise<Category[]> {
       .slice(0, 24)
       .map((item) => mapPlexItem(base, token, item, server))
       .filter((item) => Boolean(item && item.title));
-    return mapped.length ? { id: `hs_${server.id}_${library.key}`, title: `${server.name} - ${library.title}`, items: mapped } : null;
+    return mapped.length ? { id: identity.id, title: `${server.name} - ${library.title}`, items: mapped } : null;
   }));
   return rows.filter((row): row is Category => Boolean(row));
 }
 
-export async function loadHomeServerRows(servers: HomeServerConfig[]): Promise<Category[]> {
+export async function loadHomeServerRows(
+  servers: HomeServerConfig[],
+  hiddenCatalogIds: string[] = [],
+  catalogOrder: CatalogConfig[] = []
+): Promise<Category[]> {
+  const hidden = new Set(hiddenCatalogIds);
   const plexRows = await Promise.all(
     servers
       .filter((server) => server.enabled && server.url && server.type === "plex")
-      .map((server) => loadPlexRows(server).catch(() => [] as Category[]))
+      .map((server) => loadPlexRows(server, hidden).catch(() => [] as Category[]))
   );
   const active = servers.filter((server) => server.enabled && server.url && (server.type === "jellyfin" || server.type === "emby"));
   const rowsPerServer = await Promise.all(active.map(async (server) => {
@@ -374,20 +480,36 @@ export async function loadHomeServerRows(servers: HomeServerConfig[]): Promise<C
       const views = await proxiedGet<{ Items?: Array<{ Id: string; Name: string; CollectionType?: string }> }>(
         `${base}/Users/${userId}/Views?api_key=${token}`
       );
-      const libraries = (views.Items ?? []).filter((v) => isVideoCollectionType(v.CollectionType)).slice(0, 6);
+      const libraries = (views.Items ?? [])
+        .filter((view) => isVideoCollectionType(view.CollectionType))
+        .filter((view) => {
+          if (!server.collections?.length) return true;
+          return server.collections.some((collection) => collection.id === view.Id && collection.enabled !== false);
+        })
+        .slice(0, 6);
       const rows = await Promise.all(libraries.map(async (library) => {
+        const configured = server.collections?.find((collection) => collection.id === library.Id);
+        if (server.collections?.length && !configured) return null;
+        if (configured?.enabled === false) return null;
+        const identity = await homeServerCatalogIdentity(server, {
+          id: library.Id,
+          type: configured?.type || library.CollectionType || ""
+        });
+        if (hidden.has(identity.id)) return null;
         const items = await proxiedGet<{ Items?: JellyfinItem[] }>(
           `${base}/Users/${userId}/Items?ParentId=${library.Id}&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending&Limit=24&Fields=Overview,PrimaryImageAspectRatio,BasicSyncInfo,ImageTags,BackdropImageTags,ProductionYear,CommunityRating&api_key=${token}`
         ).catch(() => ({ Items: [] as JellyfinItem[] }));
         const mapped = (items.Items ?? []).map((item) => mapItem(base, token, item, server)).filter((m) => Boolean(m && m.title));
-        return mapped.length ? { id: `hs_${server.id}_${library.Id}`, title: `${server.name} · ${library.Name}`, items: mapped } : null;
+        return mapped.length ? { id: identity.id, title: `${server.name} - ${library.Name}`, items: mapped } : null;
       }));
       return rows.filter((row): row is Category => Boolean(row));
     } catch {
       return [] as Category[];
     }
   }));
-  return [...plexRows.flat(), ...rowsPerServer.flat()];
+  const order = new Map(catalogOrder.map((catalog, index) => [catalog.id, index]));
+  return [...plexRows.flat(), ...rowsPerServer.flat()]
+    .sort((left, right) => (order.get(left.id) ?? Number.MAX_SAFE_INTEGER) - (order.get(right.id) ?? Number.MAX_SAFE_INTEGER));
 }
 
 export function clearHomeServerSessions() {

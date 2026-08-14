@@ -1,0 +1,92 @@
+package com.arflix.tv.data.repository.sync
+
+import com.arflix.tv.data.model.MediaItem
+import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.repository.ContinueWatchingItem
+import io.mockk.coEvery
+import io.mockk.coVerify
+import io.mockk.mockk
+import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Before
+import org.junit.Test
+
+class RemoteSyncManagerTest {
+    private val store = mockk<SyncProviderStore>()
+    private val trakt = mockk<TraktRemoteProvider>()
+    private val mdbList = mockk<MdbListRemoteProvider>()
+    private val simkl = mockk<SimklRemoteProvider>()
+    private lateinit var manager: RemoteSyncManager
+
+    @Before
+    fun setUp() {
+        manager = RemoteSyncManager(store, trakt, mdbList, simkl)
+        coEvery { trakt.isConnected() } returns true
+        coEvery { simkl.isConnected() } returns true
+        coEvery { mdbList.isConnected() } returns false
+    }
+
+    @Test
+    fun bothWatchlistsAreMergedAndDeduplicated() = runBlocking {
+        coEvery { store.readProviders(TrackingFeature.WATCHLIST) } returns
+            setOf(SyncProvider.TRAKT, SyncProvider.SIMKL)
+        coEvery { trakt.getWatchlist() } returns RemoteWatchlistResult(
+            connected = true,
+            items = listOf(MediaItem(id = 1, title = "One", mediaType = MediaType.MOVIE)),
+            rawCount = 1
+        )
+        coEvery { simkl.getWatchlist() } returns RemoteWatchlistResult(
+            connected = true,
+            items = listOf(
+                MediaItem(id = 1, title = "One", mediaType = MediaType.MOVIE),
+                MediaItem(id = 2, title = "Two", mediaType = MediaType.TV)
+            ),
+            rawCount = 2
+        )
+
+        val result = manager.getWatchlist()
+
+        assertEquals(listOf(1, 2), result?.items?.map { it.id })
+        assertEquals(3, result?.rawCount)
+    }
+
+    @Test
+    fun writesReachBothProvidersAndOneFailureDoesNotBlockTheOther() = runBlocking {
+        coEvery { store.writeProviders() } returns setOf(SyncProvider.TRAKT, SyncProvider.SIMKL)
+        coEvery { trakt.addToWatchlist(any(), any(), any()) } throws IllegalStateException("offline")
+        coEvery { simkl.addToWatchlist(any(), any(), any()) } returns true
+
+        assertTrue(manager.addToWatchlist(MediaType.TV, 99, isAnime = true))
+        coVerify(exactly = 1) { trakt.addToWatchlist(MediaType.TV, 99, true) }
+        coVerify(exactly = 1) { simkl.addToWatchlist(MediaType.TV, 99, true) }
+    }
+
+    @Test
+    fun newestContinueWatchingEntryWinsAcrossProviders() = runBlocking {
+        coEvery { store.readProviders(TrackingFeature.CONTINUE_WATCHING) } returns
+            setOf(SyncProvider.TRAKT, SyncProvider.SIMKL)
+        coEvery { trakt.getContinueWatching(false) } returns listOf(
+            ContinueWatchingItem(7, "Show", MediaType.TV, 20, season = 1, episode = 1, updatedAtMs = 10)
+        )
+        coEvery { simkl.getContinueWatching(false) } returns listOf(
+            ContinueWatchingItem(7, "Show", MediaType.TV, 55, season = 1, episode = 1, updatedAtMs = 20)
+        )
+
+        val result = manager.getContinueWatching()
+
+        assertEquals(1, result.size)
+        assertEquals(55, result.single().progress)
+    }
+
+    @Test
+    fun dismissContinueWatchingReachesEveryWriteProvider() = runBlocking {
+        coEvery { store.writeProviders() } returns setOf(SyncProvider.TRAKT, SyncProvider.SIMKL)
+        coEvery { trakt.dismissContinueWatching(any(), any(), any(), any()) } throws IllegalStateException("offline")
+        coEvery { simkl.dismissContinueWatching(any(), any(), any(), any()) } returns true
+
+        assertTrue(manager.dismissContinueWatching(MediaType.TV, 99, 2, 4))
+        coVerify(exactly = 1) { trakt.dismissContinueWatching(MediaType.TV, 99, 2, 4) }
+        coVerify(exactly = 1) { simkl.dismissContinueWatching(MediaType.TV, 99, 2, 4) }
+    }
+}

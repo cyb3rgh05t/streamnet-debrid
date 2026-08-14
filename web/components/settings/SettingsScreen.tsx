@@ -52,6 +52,7 @@ import {
   VLC_SETUP_SH_URL,
   VLC_SETUP_URL,
 } from "@/lib/externalPlayers";
+import { buildHomeServerCatalogConfigs } from "@/lib/homeserver";
 import { defaultSettings, useApp } from "@/lib/store";
 import type {
   AppSettings,
@@ -1225,6 +1226,8 @@ function AccountsSection() {
     traktConnected,
     mdblistConnected,
     simklConnected,
+    trackingPreferences,
+    updateTrackingPreferences,
     deviceCode,
     simklDeviceCode,
     signOut,
@@ -1247,6 +1250,14 @@ function AccountsSection() {
   const [mdblistBusy, setMdblistBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
   const cloudConfigured = hasNetlifyBackendConfig() || hasSupabaseConfig();
+  const routingOptions: Array<[typeof trackingPreferences.watchlistReadMode, string]> = [];
+  if (mdblistConnected) {
+    routingOptions.push(["mdblist", "MDBList"]);
+  } else {
+    if (traktConnected && simklConnected) routingOptions.push(["both", "Trakt + Simkl"]);
+    if (traktConnected) routingOptions.push(["trakt", "Trakt"]);
+    if (simklConnected) routingOptions.push(["simkl", "Simkl"]);
+  }
 
   const redirectToAuthPortal = () => {
     const redirectUri = window.location.origin + "/";
@@ -1499,6 +1510,48 @@ function AccountsSection() {
           </>
         )}
       </Panel>
+
+      {(traktConnected || simklConnected || mdblistConnected) && (
+        <Panel title="Tracking behavior">
+          <Row label="Watchlist source" hint="Choose which connected service fills your watchlist.">
+            <Select
+              value={trackingPreferences.watchlistReadMode}
+              options={routingOptions}
+              onChange={(watchlistReadMode) => void updateTrackingPreferences({ watchlistReadMode })}
+            />
+          </Row>
+          <Row label="Continue Watching source" hint="Choose one service or merge progress from both.">
+            <Select
+              value={trackingPreferences.continueWatchingReadMode}
+              options={routingOptions}
+              onChange={(continueWatchingReadMode) => void updateTrackingPreferences({ continueWatchingReadMode })}
+            />
+          </Row>
+          <Row label="Watched history source" hint="Watched badges merge safely when both is selected.">
+            <Select
+              value={trackingPreferences.watchedReadMode}
+              options={routingOptions}
+              onChange={(watchedReadMode) => void updateTrackingPreferences({ watchedReadMode })}
+            />
+          </Row>
+          {traktConnected && (
+            <Row label="Update Trakt while watching">
+              <Toggle
+                value={trackingPreferences.writeToTrakt}
+                onChange={(writeToTrakt) => void updateTrackingPreferences({ writeToTrakt })}
+              />
+            </Row>
+          )}
+          {simklConnected && (
+            <Row label="Update Simkl while watching">
+              <Toggle
+                value={trackingPreferences.writeToSimkl}
+                onChange={(writeToSimkl) => void updateTrackingPreferences({ writeToSimkl })}
+              />
+            </Row>
+          )}
+        </Panel>
+      )}
 
       <Panel title="MDBList">
         {mdblistError && <p className="login-error">{mdblistError}</p>}
@@ -2180,17 +2233,39 @@ function TvSettingsSection() {
 
 function CatalogsSection() {
   const { settings, updateSettings, setToast } = useApp();
-  const catalogs = mergeCatalogs(
+  const standardCatalogs = mergeCatalogs(
     safeArray(settings.catalogs),
     safeArray(settings.hiddenCatalogIds),
-  );
+  ).filter((catalog) => catalog.sourceType !== "home-server");
+  const [homeServerCatalogs, setHomeServerCatalogs] = useState<CatalogConfig[]>([]);
   const [customCatalogUrl, setCustomCatalogUrl] = useState("");
+  const catalogs = [...homeServerCatalogs, ...standardCatalogs];
 
-  const updateCatalogs = (next: CatalogConfig[]) =>
+  useEffect(() => {
+    let cancelled = false;
+    void buildHomeServerCatalogConfigs(
+      safeArray(settings.homeServers),
+      safeArray(settings.catalogs),
+      safeArray(settings.hiddenHomeServerCatalogIds),
+    ).then((next) => {
+      if (!cancelled) setHomeServerCatalogs(next);
+    }).catch(() => {
+      if (!cancelled) setHomeServerCatalogs([]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [settings.catalogs, settings.hiddenHomeServerCatalogIds, settings.homeServers]);
+
+  const updateCatalogs = (next: CatalogConfig[]) => {
+    const homeServer = next.filter((catalog) => catalog.sourceType === "home-server");
+    const standard = next.filter((catalog) => catalog.sourceType !== "home-server");
     updateSettings({
       catalogs: next,
-      hiddenCatalogIds: next.filter((c) => !c.enabled).map((c) => c.id),
+      hiddenCatalogIds: standard.filter((catalog) => !catalog.enabled).map((catalog) => catalog.id),
+      hiddenHomeServerCatalogIds: homeServer.filter((catalog) => !catalog.enabled).map((catalog) => catalog.id),
     });
+  };
   const moveCatalog = (id: string, offset: number) => {
     const index = catalogs.findIndex((c) => c.id === id);
     const target = index + offset;
@@ -2236,7 +2311,7 @@ function CatalogsSection() {
         <button
           type="button"
           className="secondary text-button"
-          onClick={() => updateCatalogs(defaultCatalogs)}
+          onClick={() => updateCatalogs([...homeServerCatalogs, ...defaultCatalogs])}
         >
           <RotateCcw size={18} /> Reset
         </button>
@@ -2250,6 +2325,7 @@ function CatalogsSection() {
             <button
               type="button"
               className="icon-button"
+              aria-label={`${catalog.enabled ? "Hide" : "Show"} ${catalog.name}`}
               onClick={() =>
                 updateCatalogs(
                   catalogs.map((c) =>
@@ -2303,7 +2379,7 @@ function CatalogsSection() {
             >
               <ArrowDown size={18} />
             </button>
-            {!catalog.isPreinstalled && (
+            {!catalog.isPreinstalled && catalog.sourceType !== "home-server" && (
               <button
                 type="button"
                 className="icon-button danger"

@@ -6,6 +6,7 @@ import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
+import retrofit2.http.HTTP
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
@@ -71,8 +72,22 @@ interface SimklApi {
         @Query("date_from") dateFrom: String? = null,
         @Query("extended") extended: String = "full",
         @Query("episode_watched_at") episodeWatchedAt: String = "yes",
-        @Query("include_all_episodes") includeAllEpisodes: String = "original"
+        @Query("include_all_episodes") includeAllEpisodes: String = "yes",
+        @Query("next_watch_info") nextWatchInfo: String = "yes"
     ): SimklAllItemsResponse
+
+    @GET("sync/playback")
+    suspend fun getPlayback(
+        @Header("Authorization") auth: String,
+        @Header("simkl-api-key") clientId: String
+    ): List<SimklPlaybackItem>
+
+    @HTTP(method = "DELETE", path = "sync/playback/{id}", hasBody = false)
+    suspend fun deletePlayback(
+        @Header("Authorization") auth: String,
+        @Header("simkl-api-key") clientId: String,
+        @Path("id") id: Long
+    ): Response<ResponseBody>
 
     @POST("sync/history")
     suspend fun addToHistory(
@@ -124,12 +139,14 @@ data class SimklIds(
 data class SimklMovieRef(
     @SerializedName("title") val title: String? = null,
     @SerializedName("year") val year: Int? = null,
-    @SerializedName("ids") val ids: SimklIds
+    @SerializedName("ids") val ids: SimklIds,
+    @SerializedName("runtime") val runtime: Int? = null,
+    @SerializedName("poster") val poster: String? = null
 )
 
 data class SimklEpisodeRef(
     @SerializedName("season") val season: Int? = null,
-    @SerializedName("number") val number: Int? = null,
+    @SerializedName(value = "number", alternate = ["episode"]) val number: Int? = null,
     @SerializedName("ids") val ids: SimklIds? = null
 )
 
@@ -137,7 +154,9 @@ data class SimklShowRef(
     @SerializedName("title") val title: String? = null,
     @SerializedName("year") val year: Int? = null,
     @SerializedName("ids") val ids: SimklIds,
-    @SerializedName("seasons") val seasons: List<SimklSeasonRef>? = null
+    @SerializedName("seasons") val seasons: List<SimklSeasonRef>? = null,
+    @SerializedName("runtime") val runtime: Int? = null,
+    @SerializedName("poster") val poster: String? = null
 )
 
 data class SimklSeasonRef(
@@ -169,7 +188,10 @@ data class SimklActivityGroup(
     @SerializedName("all") val all: String? = null,
     @SerializedName("watched_at") val watchedAt: String? = null,
     @SerializedName("rated_at") val ratedAt: String? = null,
-    @SerializedName("plantowatch") val planToWatch: String? = null
+    @SerializedName("plantowatch") val planToWatch: String? = null,
+    @SerializedName("watching") val watching: String? = null,
+    @SerializedName("completed") val completed: String? = null,
+    @SerializedName("playback") val playback: String? = null
 )
 
 data class SimklAllItemsResponse(
@@ -189,7 +211,36 @@ data class SimklHistoryShowItem(
     @SerializedName("last_watched_at") val lastWatchedAt: String? = null,
     @SerializedName("status") val status: String? = null,
     @SerializedName("show") val show: SimklShowRef? = null,
-    @SerializedName("seasons") val seasons: List<SimklHistorySeasonItem>? = null
+    @SerializedName("seasons") val seasons: List<SimklHistorySeasonItem>? = null,
+    @SerializedName("next_to_watch") val nextToWatch: String? = null,
+    @SerializedName("next_to_watch_info") val nextToWatchInfo: SimklNextToWatchInfo? = null,
+    @SerializedName("watched_episodes_count") val watchedEpisodesCount: Int? = null,
+    @SerializedName("total_episodes_count") val totalEpisodesCount: Int? = null
+)
+
+data class SimklNextToWatchInfo(
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("season") val season: Int? = null,
+    @SerializedName("episode") val episode: Int? = null,
+    @SerializedName("date") val date: String? = null
+)
+
+data class SimklPlaybackItem(
+    @SerializedName("id") val id: Long? = null,
+    @SerializedName("progress") val progress: Float = 0f,
+    @SerializedName("paused_at") val pausedAt: String? = null,
+    @SerializedName("type") val type: String? = null,
+    @SerializedName("movie") val movie: SimklMovieRef? = null,
+    @SerializedName("show") val show: SimklShowRef? = null,
+    @SerializedName("anime") val anime: SimklShowRef? = null,
+    @SerializedName("episode") val episode: SimklPlaybackEpisode? = null
+)
+
+data class SimklPlaybackEpisode(
+    @SerializedName("season") val season: Int? = null,
+    @SerializedName(value = "number", alternate = ["episode"]) val number: Int? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("ids") val ids: SimklIds? = null
 )
 
 data class SimklHistorySeasonItem(

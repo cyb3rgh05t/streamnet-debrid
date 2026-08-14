@@ -43,7 +43,8 @@ class SimklAuthManager @Inject constructor(
         val response = simklApi.pollPinToken(userCode, effectiveClientId)
         if (response.result.equals("OK", ignoreCase = true) && !response.accessToken.isNullOrBlank()) {
             syncProviderStore.setSimklAccessToken(response.accessToken)
-            syncProviderStore.setProvider(SyncProvider.SIMKL)
+            syncProviderStore.setMdbListApiKey(null)
+            syncProviderStore.onProviderConnected(SyncProvider.SIMKL)
             return true
         }
         return false
@@ -63,9 +64,7 @@ class SimklAuthManager @Inject constructor(
 
     suspend fun disconnect() {
         syncProviderStore.setSimklAccessToken(null)
-        if (syncProviderStore.getProvider() == SyncProvider.SIMKL) {
-            syncProviderStore.setProvider(SyncProvider.NONE)
-        }
+        syncProviderStore.onProviderDisconnected(SyncProvider.SIMKL)
     }
 }
 

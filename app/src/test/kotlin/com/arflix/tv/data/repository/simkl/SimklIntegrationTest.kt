@@ -7,6 +7,7 @@ import com.arflix.tv.data.api.SimklActivitiesResponse
 import com.arflix.tv.data.api.SimklAllItemsResponse
 import com.arflix.tv.data.api.SimklScrobbleBody
 import com.arflix.tv.data.api.SimklScrobbleResponse
+import com.arflix.tv.data.api.TmdbApi
 import com.arflix.tv.data.repository.sync.SyncProviderStore
 import com.google.gson.Gson
 import io.mockk.coEvery
@@ -27,6 +28,7 @@ class SimklIntegrationTest {
     private lateinit var authManager: SimklAuthManager
     private lateinit var scrobbler: SimklScrobbler
     private lateinit var syncService: SimklSyncService
+    private lateinit var tmdbApi: TmdbApi
 
     @Before
     fun setUp() {
@@ -35,7 +37,8 @@ class SimklIntegrationTest {
         authManager = SimklAuthManager(simklApi, syncProviderStore)
         scrobbler = SimklScrobbler(simklApi, authManager)
         scrobbler.elapsedRealtimeMs = { 0L }
-        syncService = SimklSyncService(simklApi, authManager)
+        tmdbApi = mockk(relaxed = true)
+        syncService = SimklSyncService(simklApi, authManager, tmdbApi)
     }
 
     @Test
@@ -63,6 +66,8 @@ class SimklIntegrationTest {
         val success = authManager.pollPinAuth("SIMKL-123")
         assertTrue(success)
         coVerify { syncProviderStore.setSimklAccessToken("token_abc123") }
+        coVerify { syncProviderStore.setMdbListApiKey(null) }
+        coVerify { syncProviderStore.onProviderConnected(com.arflix.tv.data.repository.sync.SyncProvider.SIMKL) }
     }
 
     @Test
@@ -71,6 +76,7 @@ class SimklIntegrationTest {
         coEvery { syncProviderStore.getSimklAccessToken() } returns null
         assertFalse(authManager.isConnected())
         coVerify { syncProviderStore.setSimklAccessToken(null) }
+        coVerify { syncProviderStore.onProviderDisconnected(com.arflix.tv.data.repository.sync.SyncProvider.SIMKL) }
     }
 
     @Test
@@ -156,7 +162,7 @@ class SimklIntegrationTest {
     fun testInitialSyncRequestsFullEpisodeHistory() = runBlocking {
         coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
         coEvery { simklApi.getActivities(any(), any()) } returns SimklActivitiesResponse(all = "2026-08-12T10:00:00Z")
-        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
             SimklAllItemsResponse()
 
         syncService.syncIfNeeded(force = true)
@@ -170,7 +176,8 @@ class SimklIntegrationTest {
                 dateFrom = null,
                 extended = "full",
                 episodeWatchedAt = "yes",
-                includeAllEpisodes = "original"
+                includeAllEpisodes = "yes",
+                nextWatchInfo = "yes"
             )
         }
     }
@@ -179,13 +186,13 @@ class SimklIntegrationTest {
     fun testEmptyAccountSnapshotIsNotReloadedOnEveryRead() = runBlocking {
         coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
         coEvery { simklApi.getActivities(any(), any()) } returns SimklActivitiesResponse(all = null)
-        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any()) } returns
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
             SimklAllItemsResponse()
 
         syncService.syncIfNeeded()
         syncService.syncIfNeeded()
 
-        coVerify(exactly = 3) { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any()) }
+        coVerify(exactly = 3) { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
     }
 
     @Test
@@ -196,6 +203,80 @@ class SimklIntegrationTest {
         )
 
         assertEquals("2026-08-12T12:00:00Z", activities.shows?.all)
+    }
+
+    @Test
+    fun testContinueWatchingIncludesPausedPlaybackAndUpNext() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getActivities(any(), any()) } returns
+            SimklActivitiesResponse(all = "2026-08-12T12:00:00Z")
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            SimklAllItemsResponse()
+        coEvery {
+            simklApi.getAllItems(any(), any(), "shows", any(), any(), any(), any(), any(), any())
+        } returns Gson().fromJson(
+            """{"shows":[{"status":"watching","last_watched_at":"2026-08-11T20:00:00Z","show":{"title":"Up Next Show","year":2025,"runtime":45,"ids":{"tmdb":200}},"next_to_watch":"S02E04","next_to_watch_info":{"title":"The Return","season":2,"episode":4,"date":"2026-08-12T20:00:00Z"},"watched_episodes_count":12,"total_episodes_count":20}]}""",
+            SimklAllItemsResponse::class.java
+        )
+        coEvery { simklApi.getPlayback(any(), any()) } returns Gson().fromJson(
+            """[{"id":7,"progress":42.5,"paused_at":"2026-08-12T11:00:00Z","type":"movie","movie":{"title":"Paused Movie","year":2024,"runtime":120,"ids":{"tmdb":100}}}]""",
+            Array<com.arflix.tv.data.api.SimklPlaybackItem>::class.java
+        ).toList()
+
+        val items = syncService.getContinueWatching(forceRefresh = true)
+
+        assertEquals(2, items.size)
+        val movie = items.first { it.id == 100 }
+        assertEquals(42, movie.progress)
+        assertEquals(3_024L, movie.resumePositionSeconds)
+        assertFalse(syncService.getWatchedMovies().contains(100))
+        val show = items.first { it.id == 200 }
+        assertTrue(show.isUpNext)
+        assertEquals(2, show.season)
+        assertEquals(4, show.episode)
+        assertEquals("The Return", show.episodeTitle)
+        assertEquals(12, show.watchedEpisodes)
+        assertEquals(20, show.totalEpisodes)
+    }
+
+    @Test
+    fun testMyListSeparatesPlannedTitlesAndMarksPreviousEpisodesWatched() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getActivities(any(), any()) } returns
+            SimklActivitiesResponse(all = "2026-08-14T12:00:00Z")
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            SimklAllItemsResponse()
+        coEvery {
+            simklApi.getAllItems(any(), any(), "shows", any(), any(), any(), any(), any(), any())
+        } returns Gson().fromJson(
+            """{"shows":[{"status":"watching","last_watched_at":"2026-08-14T11:00:00Z","show":{"title":"Current Show","ids":{"tmdb":200}},"seasons":[{"number":1,"episodes":[{"number":1},{"number":2}]}],"next_to_watch":"S01E03"},{"status":"plantowatch","show":{"title":"Planned Show","ids":{"tmdb":300}}}]}""",
+            SimklAllItemsResponse::class.java
+        )
+        coEvery { simklApi.getPlayback(any(), any()) } returns emptyList()
+
+        val watchlist = syncService.getWatchlistItems()
+        val continueWatching = syncService.getContinueWatching()
+        val watchedEpisodes = syncService.getWatchedEpisodes()
+
+        assertEquals(listOf(300), watchlist.map { it.id })
+        assertEquals(200, continueWatching.single().id)
+        assertEquals(3, continueWatching.single().episode)
+        assertTrue("show_tmdb:200:1:1" in watchedEpisodes)
+        assertTrue("show_tmdb:200:1:2" in watchedEpisodes)
+    }
+
+    @Test
+    fun testDismissContinueWatchingDeletesMatchingPlayback() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getPlayback(any(), any()) } returns Gson().fromJson(
+            """[{"id":77,"progress":35,"type":"episode","show":{"ids":{"tmdb":200}},"episode":{"season":2,"number":4}}]""",
+            Array<com.arflix.tv.data.api.SimklPlaybackItem>::class.java
+        ).toList()
+        coEvery { simklApi.deletePlayback(any(), any(), 77L) } returns
+            retrofit2.Response.success(mockk<okhttp3.ResponseBody>())
+
+        assertTrue(syncService.dismissContinueWatching(com.arflix.tv.data.model.MediaType.TV, 200, 2, 4))
+        coVerify(exactly = 1) { simklApi.deletePlayback("Bearer token_123", any(), 77L) }
     }
 
     @Test

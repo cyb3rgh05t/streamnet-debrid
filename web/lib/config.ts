@@ -26,8 +26,12 @@ export function hasSupabaseConfig() {
   return config.supabaseUrl.startsWith("https://") && config.supabaseAnonKey.length > 40;
 }
 
+export function hasNetlifyBackendUrl() {
+  return config.netlifyBackendUrl.startsWith("https://");
+}
+
 export function hasNetlifyBackendConfig() {
-  return config.netlifyBackendUrl.startsWith("https://") && config.appAnonKey.length > 40;
+  return hasNetlifyBackendUrl() && config.appAnonKey.length > 40;
 }
 
 export function hasResolverConfig() {
@@ -35,11 +39,12 @@ export function hasResolverConfig() {
 }
 
 export function hasTraktConfig() {
-  return config.traktClientId.length > 10 && !config.traktClientId.startsWith("__");
+  return hasNetlifyBackendConfig() ||
+    (config.traktClientId.length > 10 && !config.traktClientId.startsWith("__"));
 }
 
 export function hasSimklConfig() {
-  return hasNetlifyBackendConfig() || (config.simklClientId.length > 10 && !config.simklClientId.startsWith("__"));
+  return hasNetlifyBackendUrl() || (config.simklClientId.length > 10 && !config.simklClientId.startsWith("__"));
 }
 
 export function getAuthPortalUrl(): string {

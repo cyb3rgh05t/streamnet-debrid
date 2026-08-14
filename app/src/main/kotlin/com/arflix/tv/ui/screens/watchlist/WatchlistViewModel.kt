@@ -4,29 +4,34 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arflix.tv.R
+import com.arflix.tv.data.model.CatalogConfig
+import com.arflix.tv.data.model.CatalogKind
+import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType.MOVIE
 import com.arflix.tv.data.model.MediaType.TV
+import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.CloudSyncRepository
-import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.HomeServerCatalogCandidate
 import com.arflix.tv.data.repository.HomeServerKind
 import com.arflix.tv.data.repository.HomeServerLibrarySort
 import com.arflix.tv.data.repository.HomeServerRepository
+import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.TraktRepository
+import com.arflix.tv.data.repository.WatchHistoryEntry
+import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
@@ -36,31 +41,70 @@ enum class ToastType {
     SUCCESS, ERROR, INFO
 }
 
+sealed interface WatchlistSourceItem {
+    val id: String
+    val title: String
+    val subtitle: String?
+    val displayLabel: String
+
+    data object MyWatchlist : WatchlistSourceItem {
+        override val id: String = "my_watchlist"
+        override val title: String = "My watchlist"
+        override val subtitle: String? = null
+        override val displayLabel: String = "My watchlist"
+    }
+
+    data class Catalog(
+        val config: CatalogConfig
+    ) : WatchlistSourceItem {
+        override val id: String = "catalog_${config.id}"
+        override val title: String = config.title
+        override val subtitle: String? = when {
+            config.sourceType == CatalogSourceType.TRAKT -> "Trakt"
+            config.sourceType == CatalogSourceType.MDBLIST -> "MDBList"
+            config.sourceType == CatalogSourceType.ADDON -> config.addonName ?: "Addon"
+            config.sourceUrl?.contains("simkl", ignoreCase = true) == true -> "Simkl"
+            else -> null
+        }
+        override val displayLabel: String = if (subtitle != null && !title.startsWith(subtitle, ignoreCase = true)) {
+            "$subtitle / $title"
+        } else {
+            title
+        }
+    }
+
+    data class HomeServer(
+        val candidate: HomeServerCatalogCandidate
+    ) : WatchlistSourceItem {
+        override val id: String = "server_${candidate.sourceRef}"
+        override val title: String = candidate.collectionName.ifBlank { candidate.title }
+        override val subtitle: String = candidate.serverName
+        override val displayLabel: String = if (subtitle.isNotBlank() && !title.startsWith(subtitle, ignoreCase = true)) {
+            "$subtitle / $title"
+        } else {
+            title
+        }
+    }
+}
+
 data class WatchlistUiState(
+    val sources: List<WatchlistSourceItem> = listOf(WatchlistSourceItem.MyWatchlist),
+    val selectedSourceId: String = WatchlistSourceItem.MyWatchlist.id,
     val isLoading: Boolean = true,
     val movies: List<MediaItem> = emptyList(),
     val series: List<MediaItem> = emptyList(),
     val error: String? = null,
     val toastMessage: String? = null,
-    val toastType: ToastType = ToastType.INFO
+    val toastType: ToastType = ToastType.INFO,
+    val lastFocusedSectionIndex: Int = 0,
+    val lastFocusedItemIndex: Int = 0,
+    val hasMore: Boolean = false,
+    val isLoadingMore: Boolean = false
 ) {
     val isEmpty: Boolean get() = movies.isEmpty() && series.isEmpty()
     val allItems: List<MediaItem> get() = movies + series
+    val selectedSource: WatchlistSourceItem get() = sources.firstOrNull { it.id == selectedSourceId } ?: WatchlistSourceItem.MyWatchlist
 }
-
-data class HomeLibraryUiState(
-    val providers: List<HomeServerKind> = emptyList(),
-    val libraries: List<HomeServerCatalogCandidate> = emptyList(),
-    val selectedProvider: HomeServerKind? = null,
-    val selectedSourceRef: String? = null,
-    val items: List<MediaItem> = emptyList(),
-    val isLoading: Boolean = false,
-    val isLoadingMore: Boolean = false,
-    val hasMore: Boolean = false,
-    val sort: HomeServerLibrarySort = HomeServerLibrarySort.RECENTLY_ADDED,
-    val searchQuery: String = "",
-    val error: String? = null
-)
 
 internal fun watchlistLogoKey(item: MediaItem): String {
     return if (item.id > 0) {
@@ -68,6 +112,37 @@ internal fun watchlistLogoKey(item: MediaItem): String {
     } else {
         "home:${item.homeServerSourceRef.orEmpty()}:${item.homeServerItemId.orEmpty()}:${item.mediaType.name}"
     }
+}
+
+internal fun watchlistItemKey(item: MediaItem, index: Int): String {
+    val nativeIdentity = if (item.isHomeServer || !item.homeServerItemId.isNullOrBlank()) {
+        "home:${item.homeServerSourceRef.orEmpty()}:${item.homeServerItemId.orEmpty()}"
+    } else {
+        "media:${item.mediaType.name}:${item.id}"
+    }
+    return "$nativeIdentity:$index"
+}
+
+private data class SourcePageState(
+    val hasMore: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val nextOffset: Int = 0
+)
+
+internal fun buildWatchlistSources(
+    catalogs: List<CatalogConfig>,
+    homeServerCandidates: List<HomeServerCatalogCandidate>
+): List<WatchlistSourceItem> {
+    val customCatalogs = catalogs.filter { config ->
+        !config.isPreinstalled &&
+            config.kind != CatalogKind.COLLECTION &&
+            config.kind != CatalogKind.COLLECTION_RAIL &&
+            config.sourceType != CatalogSourceType.PREINSTALLED &&
+            config.sourceType != CatalogSourceType.HOME_SERVER
+    }.map { WatchlistSourceItem.Catalog(it) }
+    val homeServers = homeServerCandidates.map { WatchlistSourceItem.HomeServer(it) }
+    return (listOf<WatchlistSourceItem>(WatchlistSourceItem.MyWatchlist) + customCatalogs + homeServers)
+        .distinctBy(WatchlistSourceItem::id)
 }
 
 @HiltViewModel
@@ -78,19 +153,22 @@ class WatchlistViewModel @Inject constructor(
     private val traktRepository: TraktRepository,
     private val remoteSyncManager: com.arflix.tv.data.repository.sync.RemoteSyncManager,
     private val mediaRepository: MediaRepository,
-    private val homeServerRepository: HomeServerRepository
+    private val homeServerRepository: HomeServerRepository,
+    private val catalogRepository: CatalogRepository,
+    private val watchHistoryRepository: WatchHistoryRepository
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(WatchlistUiState())
     val uiState: StateFlow<WatchlistUiState> = _uiState.asStateFlow()
 
     private val _logoUrls = MutableStateFlow<Map<String, String>>(emptyMap())
     val logoUrls: StateFlow<Map<String, String>> = _logoUrls.asStateFlow()
-    private val _libraryState = MutableStateFlow(HomeLibraryUiState())
-    val libraryState: StateFlow<HomeLibraryUiState> = _libraryState.asStateFlow()
-    private val libraryCache = linkedMapOf<String, Pair<List<MediaItem>, Boolean>>()
-    private var libraryLoadJob: Job? = null
-    private var librarySearchJob: Job? = null
-    private var libraryRequestId = 0
+
+    private val sourceItemsCache = linkedMapOf<String, List<MediaItem>>()
+    private val sourcePageStates = mutableMapOf<String, SourcePageState>()
+    private var currentCatalogs: List<CatalogConfig> = emptyList()
+    private var currentHomeServerCandidates: List<HomeServerCatalogCandidate> = emptyList()
+    private var sourceLoadJob: Job? = null
+    private var sourceLoadMoreJob: Job? = null
     private var traktSyncInFlight = false
     private var initialLoadComplete = false
     private var enrichmentInFlight = false
@@ -117,23 +195,9 @@ class WatchlistViewModel @Inject constructor(
         return any { item -> item.image.isBlank() && item.backdrop.isNullOrBlank() }
     }
 
-    private fun List<MediaItem>.toSplitState(
-        isLoading: Boolean = false,
-        error: String? = null,
-        toastMessage: String? = null,
-        toastType: ToastType = ToastType.INFO
-    ): WatchlistUiState = WatchlistUiState(
-        isLoading = isLoading,
-        movies = filter { it.mediaType == MOVIE },
-        series = filter { it.mediaType == TV },
-        error = error,
-        toastMessage = toastMessage,
-        toastType = toastType
-    )
-
     init {
         observeWatchlistChanges()
-        observeHomeServers()
+        observeCatalogsAndHomeServers()
         loadWatchlistInstant()
     }
 
@@ -141,14 +205,306 @@ class WatchlistViewModel @Inject constructor(
         viewModelScope.launch {
             watchlistRepository.watchlistItems.collect { items ->
                 if (traktSyncInFlight) return@collect
-                val current = _uiState.value
-                if (items.isNotEmpty() || !current.isLoading) {
-                    val orderedItems = items.watchlistDisplayOrder()
-                    _uiState.value = orderedItems.toSplitState(isLoading = false)
+                if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    val orderedItems = items.watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = orderedItems
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = orderedItems.filter { it.mediaType == MOVIE },
+                        series = orderedItems.filter { it.mediaType == TV },
+                        error = null
+                    )
                     fetchLogos(orderedItems)
                 }
             }
         }
+    }
+
+    private fun observeCatalogsAndHomeServers() {
+        viewModelScope.launch {
+            catalogRepository.observeCatalogs().collect { catalogs ->
+                updateAvailableSources(catalogs = catalogs)
+            }
+        }
+        viewModelScope.launch {
+            homeServerRepository.connections.collect { connections ->
+                val usable = connections.filter { it.isUsable }.map { it.serverKind }.distinct()
+                val candidates = runCatching { homeServerRepository.getCatalogCandidates() }
+                    .getOrDefault(emptyList())
+                    .filter { it.serverKind in usable && it.collectionType.lowercase() in BROWSABLE_LIBRARY_TYPES }
+                updateAvailableSources(homeServerCandidates = candidates)
+            }
+        }
+    }
+
+    private fun updateAvailableSources(
+        catalogs: List<CatalogConfig>? = null,
+        homeServerCandidates: List<HomeServerCatalogCandidate>? = null
+    ) {
+        if (catalogs != null) currentCatalogs = catalogs
+        if (homeServerCandidates != null) currentHomeServerCandidates = homeServerCandidates
+
+        val allSources = buildWatchlistSources(currentCatalogs, currentHomeServerCandidates)
+        val previousSources = _uiState.value.sources.associateBy { it.id }
+        val changedSourceIds = allSources.mapNotNull { source ->
+            source.id.takeIf { previousSources[source.id] != source }
+        }.toSet()
+        changedSourceIds.forEach { sourceId ->
+            sourceItemsCache.remove(sourceId)
+            sourcePageStates.remove(sourceId)
+        }
+        val currentSelectedId = _uiState.value.selectedSourceId
+        val wasValid = allSources.any { it.id == currentSelectedId }
+        val validSelectedId = if (wasValid) currentSelectedId else WatchlistSourceItem.MyWatchlist.id
+
+        _uiState.value = _uiState.value.copy(
+            sources = allSources,
+            selectedSourceId = validSelectedId
+        )
+
+        if ((!wasValid && currentSelectedId != WatchlistSourceItem.MyWatchlist.id) || validSelectedId in changedSourceIds) {
+            loadActiveSourceItems()
+        }
+    }
+
+    fun selectSource(sourceId: String) {
+        if (_uiState.value.selectedSourceId == sourceId) return
+        sourceLoadJob?.cancel()
+        sourceLoadMoreJob?.cancel()
+        val cached = sourceItemsCache[sourceId]
+        val pageState = sourcePageStates[sourceId] ?: SourcePageState()
+        _uiState.value = _uiState.value.copy(
+            selectedSourceId = sourceId,
+            isLoading = cached == null,
+            movies = cached?.filter { it.mediaType == MOVIE } ?: emptyList(),
+            series = cached?.filter { it.mediaType == TV } ?: emptyList(),
+            error = null,
+            lastFocusedSectionIndex = 0,
+            lastFocusedItemIndex = 0,
+            hasMore = pageState.hasMore,
+            isLoadingMore = false
+        )
+        loadActiveSourceItems()
+    }
+
+    fun saveFocusState(sectionIndex: Int, itemIndex: Int) {
+        _uiState.value = _uiState.value.copy(
+            lastFocusedSectionIndex = sectionIndex,
+            lastFocusedItemIndex = itemIndex
+        )
+    }
+
+    private fun loadActiveSourceItems(forceRefresh: Boolean = false) {
+        val activeSource = _uiState.value.selectedSource
+        val cacheKey = activeSource.id
+        val cached = sourceItemsCache[cacheKey]
+        if (forceRefresh) {
+            sourceLoadMoreJob?.cancel()
+            sourcePageStates[cacheKey] = sourcePageStates[cacheKey]?.copy(isLoadingMore = false)
+                ?: SourcePageState()
+        }
+
+        if (cached != null && !forceRefresh) {
+            val pageState = sourcePageStates[cacheKey] ?: SourcePageState()
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                movies = cached.filter { it.mediaType == MOVIE },
+                series = cached.filter { it.mediaType == TV },
+                error = null,
+                hasMore = pageState.hasMore,
+                isLoadingMore = false
+            )
+            fetchLogos(cached)
+            return
+        }
+
+        when (activeSource) {
+            is WatchlistSourceItem.MyWatchlist -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cached == null,
+                    error = null,
+                    hasMore = false,
+                    isLoadingMore = false
+                )
+                sourceLoadJob = viewModelScope.launch {
+                    val local = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[cacheKey] = local
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = local.filter { it.mediaType == MOVIE },
+                            series = local.filter { it.mediaType == TV },
+                            error = null
+                        )
+                        fetchLogos(local)
+                        if (local.needsArtworkEnrichment()) enrichLocalWatchlistInBackground()
+                    }
+                }
+            }
+            is WatchlistSourceItem.Catalog -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cached == null,
+                    error = null,
+                    hasMore = false,
+                    isLoadingMore = false
+                )
+                sourceLoadJob = viewModelScope.launch {
+                    runCatching {
+                        mediaRepository.loadCustomCatalog(activeSource.config, maxItems = 120)
+                    }.onSuccess { category ->
+                        val items = (category?.items ?: emptyList()).enrichWithPlaybackProgress()
+                        sourceItemsCache[cacheKey] = items
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                movies = items.filter { it.mediaType == MOVIE },
+                                series = items.filter { it.mediaType == TV },
+                                error = null
+                            )
+                            fetchLogos(items)
+                        }
+                    }.onFailure { error ->
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = error.message ?: context.getString(R.string.watchlist_error_refresh)
+                            )
+                        }
+                    }
+                }
+            }
+            is WatchlistSourceItem.HomeServer -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cached == null,
+                    error = null,
+                    isLoadingMore = false
+                )
+                sourceLoadJob = viewModelScope.launch {
+                    runCatching {
+                        mediaRepository.loadHomeServerLibraryPage(
+                            sourceRef = activeSource.candidate.sourceRef,
+                            offset = 0,
+                            limit = LIBRARY_PAGE_SIZE,
+                            sort = HomeServerLibrarySort.RECENTLY_ADDED
+                        )
+                    }.onSuccess { page ->
+                        val items = page.items.enrichWithPlaybackProgress()
+                        sourceItemsCache[cacheKey] = items
+                        sourcePageStates[cacheKey] = SourcePageState(
+                            hasMore = page.hasMore && page.items.isNotEmpty(),
+                            nextOffset = page.items.size
+                        )
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                movies = items.filter { it.mediaType == MOVIE },
+                                series = items.filter { it.mediaType == TV },
+                                error = null,
+                                hasMore = page.hasMore && page.items.isNotEmpty(),
+                                isLoadingMore = false
+                            )
+                            fetchLogos(items)
+                        }
+                    }.onFailure { error ->
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = error.message ?: context.getString(R.string.homeserver_connection_failed),
+                                isLoadingMore = false
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun loadMoreActiveSource() {
+        val activeSource = _uiState.value.selectedSource as? WatchlistSourceItem.HomeServer ?: return
+        val cacheKey = activeSource.id
+        val pageState = sourcePageStates[cacheKey] ?: return
+        val currentItems = sourceItemsCache[cacheKey].orEmpty()
+        if (!pageState.hasMore || pageState.isLoadingMore || currentItems.isEmpty()) return
+
+        sourcePageStates[cacheKey] = pageState.copy(isLoadingMore = true)
+        if (_uiState.value.selectedSourceId == cacheKey) {
+            _uiState.value = _uiState.value.copy(isLoadingMore = true)
+        }
+        sourceLoadMoreJob?.cancel()
+        sourceLoadMoreJob = viewModelScope.launch {
+            runCatching {
+                mediaRepository.loadHomeServerLibraryPage(
+                    sourceRef = activeSource.candidate.sourceRef,
+                    offset = pageState.nextOffset,
+                    limit = LIBRARY_PAGE_SIZE,
+                    sort = HomeServerLibrarySort.RECENTLY_ADDED
+                )
+            }.onSuccess { page ->
+                val existingKeys = currentItems.mapTo(HashSet()) { item ->
+                    "${item.homeServerSourceRef}:${item.homeServerItemId}:${item.mediaType}:${item.id}"
+                }
+                val freshItems = page.items.filter { item ->
+                    "${item.homeServerSourceRef}:${item.homeServerItemId}:${item.mediaType}:${item.id}" !in existingKeys
+                }.enrichWithPlaybackProgress()
+                val mergedItems = currentItems + freshItems
+                sourceItemsCache[cacheKey] = mergedItems
+                sourcePageStates[cacheKey] = SourcePageState(
+                    hasMore = page.hasMore && page.items.isNotEmpty(),
+                    nextOffset = pageState.nextOffset + page.items.size
+                )
+                if (_uiState.value.selectedSourceId == cacheKey) {
+                    _uiState.value = _uiState.value.copy(
+                        movies = mergedItems.filter { it.mediaType == MOVIE },
+                        series = mergedItems.filter { it.mediaType == TV },
+                        hasMore = page.hasMore && page.items.isNotEmpty(),
+                        isLoadingMore = false,
+                        error = null
+                    )
+                    fetchLogos(freshItems.take(LIBRARY_LOGO_INITIAL_PREFETCH))
+                }
+            }.onFailure { error ->
+                sourcePageStates[cacheKey] = pageState.copy(isLoadingMore = false)
+                if (_uiState.value.selectedSourceId == cacheKey) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoadingMore = false,
+                        toastMessage = error.message ?: context.getString(R.string.homeserver_connection_failed),
+                        toastType = ToastType.ERROR
+                    )
+                }
+            }
+        }
+    }
+
+    private suspend fun List<MediaItem>.enrichWithPlaybackProgress(): List<MediaItem> {
+        return runCatching {
+            val watchHistory = watchHistoryRepository.getWatchHistory()
+            if (watchHistory.isEmpty()) return@runCatching this
+
+            val historyByKey = mutableMapOf<String, WatchHistoryEntry>()
+            for (entry in watchHistory) {
+                val key = "${entry.media_type}:${entry.show_tmdb_id}"
+                if (!historyByKey.containsKey(key)) {
+                    historyByKey[key] = entry
+                }
+            }
+
+            map { item ->
+                val typeStr = if (item.mediaType == TV) "tv" else "movie"
+                val history = historyByKey["$typeStr:${item.id}"]
+                if (history != null) {
+                    val progressPercent = (history.progress * 100).toInt().coerceIn(0, 100)
+                    val isWatched = progressPercent >= 90 || history.progress >= 0.9f
+                    val showProgress = progressPercent in 1..89 && !isWatched
+                    item.copy(
+                        progress = progressPercent,
+                        isWatched = isWatched,
+                        showPlaybackProgress = showProgress
+                    )
+                } else {
+                    item
+                }
+            }
+        }.getOrDefault(this)
     }
 
     private fun fetchLogos(items: List<MediaItem>) {
@@ -186,184 +542,19 @@ class WatchlistViewModel @Inject constructor(
 
     fun ensureLogo(item: MediaItem) = fetchLogos(listOf(item))
 
-    private fun observeHomeServers() {
-        viewModelScope.launch {
-            homeServerRepository.connections.collect { connections ->
-                val providers = connections
-                    .filter { it.isUsable }
-                    .map { it.serverKind }
-                    .distinct()
-                    .sortedBy { kind ->
-                        when (kind) {
-                            HomeServerKind.PLEX -> 0
-                            HomeServerKind.JELLYFIN -> 1
-                            HomeServerKind.EMBY -> 2
-                            HomeServerKind.UNKNOWN -> 3
-                        }
-                    }
-                val candidates = runCatching { homeServerRepository.getCatalogCandidates() }
-                    .getOrDefault(emptyList())
-                    .filter { candidate ->
-                        candidate.serverKind in providers &&
-                            candidate.collectionType.lowercase() in BROWSABLE_LIBRARY_TYPES
-                    }
-                val current = _libraryState.value
-                val selectedProvider = current.selectedProvider?.takeIf { it in providers }
-                val selectedSource = current.selectedSourceRef?.takeIf { source ->
-                    candidates.any { it.sourceRef == source && it.serverKind == selectedProvider }
-                }
-                _libraryState.value = current.copy(
-                    providers = providers,
-                    libraries = candidates,
-                    selectedProvider = selectedProvider,
-                    selectedSourceRef = selectedSource,
-                    items = if (selectedProvider == null) emptyList() else current.items
-                )
-            }
-        }
-    }
-
-    fun selectLibraryProvider(provider: HomeServerKind?) {
-        val current = _libraryState.value
-        if (current.selectedProvider == provider) return
-        libraryLoadJob?.cancel()
-        if (provider == null) {
-            _libraryState.value = current.copy(
-                selectedProvider = null,
-                selectedSourceRef = null,
-                items = emptyList(),
-                isLoading = false,
-                isLoadingMore = false,
-                error = null
-            )
-            return
-        }
-        val firstLibrary = current.libraries.firstOrNull { it.serverKind == provider }
-        _libraryState.value = current.copy(
-            selectedProvider = provider,
-            selectedSourceRef = firstLibrary?.sourceRef,
-            error = null
-        )
-        if (firstLibrary != null) loadLibraryFirstPage()
-    }
-
-    fun selectLibrary(sourceRef: String) {
-        if (_libraryState.value.selectedSourceRef == sourceRef) return
-        _libraryState.value = _libraryState.value.copy(selectedSourceRef = sourceRef, error = null)
-        loadLibraryFirstPage()
-    }
-
-    fun setLibrarySort(sort: HomeServerLibrarySort) {
-        if (_libraryState.value.sort == sort) return
-        _libraryState.value = _libraryState.value.copy(sort = sort, error = null)
-        loadLibraryFirstPage()
-    }
-
-    fun setLibrarySearch(query: String) {
-        if (_libraryState.value.searchQuery == query) return
-        libraryRequestId++
-        libraryLoadJob?.cancel()
-        _libraryState.value = _libraryState.value.copy(searchQuery = query)
-        librarySearchJob?.cancel()
-        librarySearchJob = viewModelScope.launch {
-            delay(300)
-            loadLibraryFirstPage()
-        }
-    }
-
-    fun refreshLibrary() = loadLibraryFirstPage(force = true)
-
-    private fun libraryCacheKey(state: HomeLibraryUiState): String = listOf(
-        state.selectedSourceRef.orEmpty(),
-        state.sort.name,
-        state.searchQuery.trim().lowercase()
-    ).joinToString("|")
-
-    private fun loadLibraryFirstPage(force: Boolean = false) {
-        val snapshot = _libraryState.value
-        val sourceRef = snapshot.selectedSourceRef ?: return
-        val cacheKey = libraryCacheKey(snapshot)
-        val cached = libraryCache[cacheKey]
-        if (cached != null && !force) {
-            _libraryState.value = snapshot.copy(items = cached.first, hasMore = cached.second, isLoading = false, error = null)
-        } else {
-            _libraryState.value = snapshot.copy(isLoading = true, isLoadingMore = false, error = null)
-        }
-        val requestId = ++libraryRequestId
-        libraryLoadJob?.cancel()
-        libraryLoadJob = viewModelScope.launch {
-            runCatching {
-                mediaRepository.loadHomeServerLibraryPage(
-                    sourceRef = sourceRef,
-                    offset = 0,
-                    limit = LIBRARY_PAGE_SIZE,
-                    sort = snapshot.sort,
-                    searchQuery = snapshot.searchQuery
-                )
-            }.onSuccess { page ->
-                if (requestId != libraryRequestId) return@onSuccess
-                libraryCache[cacheKey] = page.items to page.hasMore
-                while (libraryCache.size > 12) libraryCache.remove(libraryCache.keys.first())
-                _libraryState.value = _libraryState.value.copy(
-                    items = page.items,
-                    hasMore = page.hasMore,
-                    isLoading = false,
-                    isLoadingMore = false,
-                    error = null
-                )
-                fetchLogos(page.items.take(LIBRARY_LOGO_INITIAL_PREFETCH))
-            }.onFailure { error ->
-                if (requestId != libraryRequestId) return@onFailure
-                _libraryState.value = _libraryState.value.copy(
-                    items = if (cached == null) emptyList() else _libraryState.value.items,
-                    isLoading = false,
-                    isLoadingMore = false,
-                    error = if (cached == null) error.message ?: context.getString(R.string.homeserver_connection_failed) else null
-                )
-            }
-        }
-    }
-
-    fun loadMoreLibrary() {
-        val snapshot = _libraryState.value
-        val sourceRef = snapshot.selectedSourceRef ?: return
-        if (!snapshot.hasMore || snapshot.isLoading || snapshot.isLoadingMore) return
-        val requestId = libraryRequestId
-        val cacheKey = libraryCacheKey(snapshot)
-        _libraryState.value = snapshot.copy(isLoadingMore = true)
-        viewModelScope.launch {
-            runCatching {
-                mediaRepository.loadHomeServerLibraryPage(
-                    sourceRef = sourceRef,
-                    offset = snapshot.items.size,
-                    limit = LIBRARY_PAGE_SIZE,
-                    sort = snapshot.sort,
-                    searchQuery = snapshot.searchQuery
-                )
-            }.onSuccess { page ->
-                if (requestId != libraryRequestId) return@onSuccess
-                val current = _libraryState.value
-                val existing = current.items.mapTo(HashSet()) { "${it.mediaType}:${it.id}:${it.homeServerItemId}" }
-                val fresh = page.items.filter { "${it.mediaType}:${it.id}:${it.homeServerItemId}" !in existing }
-                val merged = current.items + fresh
-                val next = current.copy(items = merged, hasMore = page.hasMore, isLoadingMore = false)
-                _libraryState.value = next
-                libraryCache[cacheKey] = merged to page.hasMore
-                fetchLogos(fresh.take(LIBRARY_LOGO_INITIAL_PREFETCH))
-            }.onFailure {
-                if (requestId == libraryRequestId) {
-                    _libraryState.value = _libraryState.value.copy(isLoadingMore = false)
-                }
-            }
-        }
-    }
-
     private fun loadWatchlistInstant() {
-        viewModelScope.launch {
-            val initialLocalItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
+        sourceLoadJob = viewModelScope.launch {
+            val initialLocalItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
             if (initialLocalItems.isNotEmpty()) {
-                _uiState.value = initialLocalItems.toSplitState(isLoading = false)
-                fetchLogos(initialLocalItems)
+                sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = initialLocalItems
+                if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = initialLocalItems.filter { it.mediaType == MOVIE },
+                        series = initialLocalItems.filter { it.mediaType == TV }
+                    )
+                    fetchLogos(initialLocalItems)
+                }
             }
 
             if (initialLocalItems.isEmpty()) {
@@ -376,42 +567,69 @@ class WatchlistViewModel @Inject constructor(
                             )
                         }
                 }
-                val cloudItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
+                val cloudItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
                 if (cloudItems.isNotEmpty()) {
-                    _uiState.value = cloudItems.toSplitState(isLoading = false)
-                    fetchLogos(cloudItems)
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = cloudItems
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = cloudItems.filter { it.mediaType == MOVIE },
+                            series = cloudItems.filter { it.mediaType == TV }
+                        )
+                        fetchLogos(cloudItems)
+                    }
                 }
             }
 
             val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
             if (!remoteConnected) {
-                val items = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
-                _uiState.value = items.toSplitState(isLoading = false)
-                if (items.isNotEmpty()) fetchLogos(items)
-                if (items.isNotEmpty()) enrichLocalWatchlistInBackground()
+                val items = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = items
+                if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = items.filter { it.mediaType == MOVIE },
+                        series = items.filter { it.mediaType == TV }
+                    )
+                    if (items.isNotEmpty()) fetchLogos(items)
+                    if (items.isNotEmpty()) enrichLocalWatchlistInBackground()
+                }
                 initialLoadComplete = true
                 return@launch
             }
 
-            val visibleItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
-            _uiState.value = visibleItems.toSplitState(isLoading = visibleItems.isEmpty())
-            if (visibleItems.isNotEmpty()) fetchLogos(visibleItems)
-            if (visibleItems.needsArtworkEnrichment()) enrichLocalWatchlistInBackground()
+            val visibleItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+            sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = visibleItems
+            if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = visibleItems.isEmpty(),
+                    movies = visibleItems.filter { it.mediaType == MOVIE },
+                    series = visibleItems.filter { it.mediaType == TV }
+                )
+                if (visibleItems.isNotEmpty()) fetchLogos(visibleItems)
+                if (visibleItems.needsArtworkEnrichment()) enrichLocalWatchlistInBackground()
+            }
             initialLoadComplete = true
 
-            // Trakt is authoritative when connected, but it must not hold the page hostage.
             val syncedFromTrakt = withTimeoutOrNull(12_000) {
                 syncTraktWatchlistSuspend()
             } ?: false
 
             if (!syncedFromTrakt) {
-                val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
+                val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
                 if (fallbackItems.isNotEmpty()) {
-                    _uiState.value = fallbackItems.toSplitState(isLoading = false)
-                    fetchLogos(fallbackItems)
-                    enrichLocalWatchlistInBackground()
-                } else {
-                    _uiState.value = WatchlistUiState(
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = fallbackItems
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = fallbackItems.filter { it.mediaType == MOVIE },
+                            series = fallbackItems.filter { it.mediaType == TV }
+                        )
+                        fetchLogos(fallbackItems)
+                        enrichLocalWatchlistInBackground()
+                    }
+                } else if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         error = context.getString(R.string.watchlist_error_load_trakt)
                     )
@@ -432,12 +650,19 @@ class WatchlistViewModel @Inject constructor(
             try {
                 do {
                     enrichmentRequested = false
-                    val enrichedItems = watchlistRepository.refreshWatchlistItems().watchlistDisplayOrder()
-                    if (enrichedItems.isNotEmpty()) {
-                        _uiState.value = enrichedItems.toSplitState(isLoading = false)
-                        fetchLogos(enrichedItems)
-                    } else if (_uiState.value.isLoading) {
-                        _uiState.value = WatchlistUiState(isLoading = false)
+                    val enrichedItems = watchlistRepository.refreshWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = enrichedItems
+                        if (enrichedItems.isNotEmpty()) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                movies = enrichedItems.filter { it.mediaType == MOVIE },
+                                series = enrichedItems.filter { it.mediaType == TV }
+                            )
+                            fetchLogos(enrichedItems)
+                        } else if (_uiState.value.isLoading) {
+                            _uiState.value = _uiState.value.copy(isLoading = false)
+                        }
                     }
                 } while (enrichmentRequested)
             } catch (error: Exception) {
@@ -446,9 +671,13 @@ class WatchlistViewModel @Inject constructor(
                     throwable = error,
                     context = watchlistDiagnosticContext("background_enrich")
                 )
-                if (_uiState.value.isLoading) {
-                    val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
-                    _uiState.value = fallbackItems.toSplitState(isLoading = false)
+                if (_uiState.value.isLoading && _uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = fallbackItems.filter { it.mediaType == MOVIE },
+                        series = fallbackItems.filter { it.mediaType == TV }
+                    )
                 }
             } finally {
                 enrichmentInFlight = false
@@ -457,6 +686,10 @@ class WatchlistViewModel @Inject constructor(
     }
 
     fun refresh() {
+        if (_uiState.value.selectedSourceId != WatchlistSourceItem.MyWatchlist.id) {
+            loadActiveSourceItems(forceRefresh = true)
+            return
+        }
         viewModelScope.launch {
             val hadItems = _uiState.value.allItems.isNotEmpty()
             _uiState.value = _uiState.value.copy(isLoading = !hadItems)
@@ -468,8 +701,13 @@ class WatchlistViewModel @Inject constructor(
                     false
                 }
                 if (!syncedFromTrakt && !remoteConnected) {
-                    val items = watchlistRepository.refreshWatchlistItems().watchlistDisplayOrder()
-                    _uiState.value = items.toSplitState(isLoading = false)
+                    val items = watchlistRepository.refreshWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = items
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = items.filter { it.mediaType == MOVIE },
+                        series = items.filter { it.mediaType == TV }
+                    )
                 } else if (!syncedFromTrakt) {
                     showLocalWatchlistOrError(context.getString(R.string.watchlist_error_load_trakt))
                 } else {
@@ -477,7 +715,6 @@ class WatchlistViewModel @Inject constructor(
                 }
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-
                 AppLogger.recordException(
                     throwable = e,
                     context = watchlistDiagnosticContext("refresh")
@@ -493,28 +730,42 @@ class WatchlistViewModel @Inject constructor(
 
     fun refreshAfterResume() {
         if (!initialLoadComplete) return
-        viewModelScope.launch {
-            val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
-            if (!remoteConnected || traktSyncInFlight) return@launch
-            val syncedFromTrakt = withTimeoutOrNull(10_000) { syncTraktWatchlistSuspend() } ?: false
-            if (!syncedFromTrakt && _uiState.value.isLoading) {
-                val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
-                _uiState.value = fallbackItems.toSplitState(isLoading = false)
+        if (_uiState.value.selectedSourceId != WatchlistSourceItem.MyWatchlist.id) {
+            loadActiveSourceItems(forceRefresh = true)
+        } else {
+            viewModelScope.launch {
+                val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
+                if (!remoteConnected || traktSyncInFlight) return@launch
+                val syncedFromTrakt = withTimeoutOrNull(10_000) { syncTraktWatchlistSuspend() } ?: false
+                if (!syncedFromTrakt && _uiState.value.isLoading) {
+                    val fallbackItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        movies = fallbackItems.filter { it.mediaType == MOVIE },
+                        series = fallbackItems.filter { it.mediaType == TV }
+                    )
+                }
             }
         }
     }
 
     private suspend fun showLocalWatchlistOrError(message: String) {
-        val cachedItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
+        val cachedItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
         if (cachedItems.isNotEmpty()) {
-            _uiState.value = cachedItems.toSplitState(isLoading = false)
+            sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = cachedItems
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                movies = cachedItems.filter { it.mediaType == MOVIE },
+                series = cachedItems.filter { it.mediaType == TV }
+            )
             fetchLogos(cachedItems)
         } else {
-            _uiState.value = WatchlistUiState(isLoading = false, error = message)
+            _uiState.value = _uiState.value.copy(isLoading = false, error = message)
         }
     }
 
     fun removeFromWatchlist(item: MediaItem) {
+        if (_uiState.value.selectedSourceId != WatchlistSourceItem.MyWatchlist.id) return
         viewModelScope.launch {
             try {
                 val remoteConnected = runCatching { remoteSyncManager.isRemoteConnected() }.getOrDefault(false)
@@ -527,18 +778,18 @@ class WatchlistViewModel @Inject constructor(
 
                 watchlistRepository.removeFromWatchlist(item.mediaType, item.id)
 
-                // Optimistic update - remove from local state immediately
                 val current = _uiState.value
+                val updatedMovies = current.movies.filter { it.id != item.id || it.mediaType != item.mediaType }
+                val updatedSeries = current.series.filter { it.id != item.id || it.mediaType != item.mediaType }
+                sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = updatedMovies + updatedSeries
+
                 _uiState.value = current.copy(
-                    movies = current.movies.filter { it.id != item.id || it.mediaType != item.mediaType },
-                    series = current.series.filter { it.id != item.id || it.mediaType != item.mediaType },
+                    movies = updatedMovies,
+                    series = updatedSeries,
                     toastMessage = context.getString(R.string.watchlist_toast_removed),
                     toastType = ToastType.SUCCESS
                 )
-                val cloudPushResult: Result<Unit> = runCatching {
-                    cloudSyncRepository.pushLocalSnapshotToCloud()
-                }.getOrElse { Result.failure(it) }
-                cloudPushResult
+                runCatching { cloudSyncRepository.pushToCloud() }
                     .onFailure { error ->
                         AppLogger.recordException(
                             throwable = error,
@@ -563,75 +814,57 @@ class WatchlistViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Pull Trakt watchlist and mirror it locally. Trakt is the source of truth
-     * for both order and IDs when connected.
-     */
     private suspend fun syncTraktWatchlistSuspend(): Boolean {
         if (traktSyncInFlight) return true
         traktSyncInFlight = true
         return try {
             val syncResult = remoteSyncManager.getWatchlist()
-            val hasTraktAuth = syncResult?.connected == true
-            if (!hasTraktAuth) {
-                AppLogger.breadcrumb(
-                    tag = "Watchlist",
-                    message = "trakt_sync_no_auth",
-                    severity = "info"
-                )
+            if (syncResult == null || !syncResult.connected) {
                 false
             } else {
-                val traktItems = syncResult?.items.orEmpty()
-                val rawCount = syncResult?.rawCount ?: 0
-                AppLogger.breadcrumb(
-                    tag = "Watchlist",
-                    message = "trakt_sync_result raw=$rawCount hydrated=${traktItems.size}",
-                    severity = "info"
-                )
+                val traktItems = syncResult.items.orEmpty()
+                val rawCount = syncResult.rawCount
                 if (traktItems.isNotEmpty()) {
                     watchlistRepository.clearWatchlistCache()
                     val orderedTraktItems = traktItems.watchlistDisplayOrder()
                     watchlistRepository.syncFromTraktOrder(orderedTraktItems)
-                    val mergedItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder()
-                    _uiState.value = mergedItems.toSplitState(isLoading = false)
-                    fetchLogos(mergedItems)
+                    val mergedItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = mergedItems
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = mergedItems.filter { it.mediaType == MOVIE },
+                            series = mergedItems.filter { it.mediaType == TV }
+                        )
+                        fetchLogos(mergedItems)
+                    }
                     runCatching { cloudSyncRepository.pushToCloud() }
-                        .onFailure { error ->
-                            AppLogger.recordException(
-                                throwable = error,
-                                context = watchlistDiagnosticContext(
-                                    phase = "trakt_sync_cloud_push",
-                                    extra = mapOf(
-                                        "raw_count" to rawCount.toString(),
-                                        "hydrated_count" to orderedTraktItems.size.toString()
-                                    )
-                                )
-                            )
-                        }
                 } else if (rawCount == 0) {
                     val cachedItems = (watchlistRepository.getCachedItems().ifEmpty {
                         watchlistRepository.getWatchlistItems()
-                    }).watchlistDisplayOrder()
-                    _uiState.value = cachedItems.toSplitState(isLoading = false)
-                    if (cachedItems.isNotEmpty()) {
-                        fetchLogos(cachedItems)
-                    } else {
-                        _uiState.value = WatchlistUiState(isLoading = false)
+                    }).watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = cachedItems
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = cachedItems.filter { it.mediaType == MOVIE },
+                            series = cachedItems.filter { it.mediaType == TV }
+                        )
+                        if (cachedItems.isNotEmpty()) {
+                            fetchLogos(cachedItems)
+                        }
                     }
                 } else {
-                    AppLogger.recordException(
-                        throwable = IllegalStateException("Trakt watchlist hydrated zero items"),
-                        context = watchlistDiagnosticContext(
-                            phase = "trakt_hydration_empty",
-                            extra = mapOf(
-                                "raw_count" to rawCount.toString(),
-                                "cached_count" to watchlistRepository.getCachedItems().size.toString()
-                            )
+                    val cachedItems = watchlistRepository.getWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = cachedItems
+                    if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = false,
+                            movies = cachedItems.filter { it.mediaType == MOVIE },
+                            series = cachedItems.filter { it.mediaType == TV }
                         )
-                    )
-                    val cachedItems = watchlistRepository.getWatchlistItems().watchlistDisplayOrder()
-                    _uiState.value = cachedItems.toSplitState(isLoading = false)
-                    fetchLogos(cachedItems)
+                        fetchLogos(cachedItems)
+                    }
                 }
                 true
             }

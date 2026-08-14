@@ -50,4 +50,14 @@ class MdbListRemoteProvider @Inject constructor(
 
     override suspend fun getContinueWatching(forceRefresh: Boolean): List<ContinueWatchingItem> =
         repository.getContinueWatching()
+
+    override suspend fun dismissContinueWatching(
+        mediaType: MediaType,
+        tmdbId: Int,
+        season: Int?,
+        episode: Int?
+    ): Boolean {
+        repository.clearPlayback(mediaType, tmdbId, season, episode)
+        return true
+    }
 }

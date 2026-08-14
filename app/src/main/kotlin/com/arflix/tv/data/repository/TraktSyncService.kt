@@ -63,6 +63,8 @@ class TraktSyncService @Inject constructor(
     /** True when the current profile mirrors watched state to MDBList, not Trakt. */
     private suspend fun usesMdbList(): Boolean =
         syncProviderStore.getProvider() == com.arflix.tv.data.repository.sync.SyncProvider.MDBLIST
+    private suspend fun writesToTrakt(): Boolean =
+        com.arflix.tv.data.repository.sync.SyncProvider.TRAKT in syncProviderStore.writeProviders()
     private val gson = Gson()
     private val clientId = Constants.TRAKT_CLIENT_ID
     private val clientSecret = Constants.TRAKT_CLIENT_SECRET
@@ -520,7 +522,7 @@ class TraktSyncService @Inject constructor(
             val userId = getUserId()
             val hasSupabase = userId != null && getSupabaseAuth() != null
             val useMdbList = usesMdbList()
-            val traktAuth = if (useMdbList) null else getAuthHeader()
+            val traktAuth = if (useMdbList || !writesToTrakt()) null else getAuthHeader()
 
             val now = Instant.now().toString()
 
@@ -618,7 +620,7 @@ class TraktSyncService @Inject constructor(
         try {
             val userId = getUserId()
             val useMdbList = usesMdbList()
-            val traktAuth = if (useMdbList) null else getAuthHeader()
+            val traktAuth = if (useMdbList || !writesToTrakt()) null else getAuthHeader()
 
             // 1. Write to Supabase first (source of truth) when available
             //    Uses RPC function (direct SQL) instead of PostgREST table endpoint
@@ -782,7 +784,7 @@ class TraktSyncService @Inject constructor(
             val userId = getUserId()
             val hasSupabase = userId != null && getSupabaseAuth() != null
             val useMdbList = usesMdbList()
-            val traktAuth = if (useMdbList) null else getAuthHeader()
+            val traktAuth = if (useMdbList || !writesToTrakt()) null else getAuthHeader()
 
             // 1. Delete from Supabase
             if (hasSupabase) {
@@ -825,7 +827,7 @@ class TraktSyncService @Inject constructor(
             val userId = getUserId()
             val hasSupabase = userId != null && getSupabaseAuth() != null
             val useMdbList = usesMdbList()
-            val traktAuth = if (useMdbList) null else getAuthHeader()
+            val traktAuth = if (useMdbList || !writesToTrakt()) null else getAuthHeader()
 
             // 1. Delete from Supabase
             if (hasSupabase) {

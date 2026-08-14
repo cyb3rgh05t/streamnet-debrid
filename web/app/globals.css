@@ -10243,6 +10243,7 @@ button,
 .watchlist-empty > button { border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; background: rgba(255, 255, 255, 0.08); color: #fff; padding: 9px 18px; font: inherit; cursor: pointer; }
 
 @media (max-width: 840px) {
+  .library-screen > .library-heading { padding-top: 20px; }
   .library-heading { grid-template-columns: 1fr; align-items: start; gap: 16px; }
   .library-provider-tabs { width: 100%; }
   .library-provider-tabs button { flex: 1 0 auto; }

@@ -4082,11 +4082,12 @@ class PlayerViewModel @Inject constructor(
                 try {
                     val safeSeason = currentSeason
                     val safeEpisode = currentEpisode
-                    if (currentMediaType == MediaType.TV && safeSeason != null && safeEpisode != null) {
-                        traktRepository.deletePlaybackForEpisode(currentMediaId, safeSeason, safeEpisode)
-                    } else if (currentMediaType == MediaType.MOVIE) {
-                        traktRepository.deletePlaybackForContent(currentMediaId, currentMediaType)
-                    }
+                    remoteSyncManager.dismissContinueWatching(
+                        currentMediaType,
+                        currentMediaId,
+                        safeSeason,
+                        safeEpisode
+                    )
                     // Clean up Supabase history for the finished episode so its stale
                     // position doesn't resurface as a Continue Watching candidate.
                     // Retry up to 2 times if the delete fails (network flakes).

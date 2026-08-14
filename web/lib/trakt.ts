@@ -2,7 +2,7 @@ import { config, hasTraktConfig } from "./config";
 import { HttpError, jsonRequest } from "./http";
 import { loadStored, removeStored, saveStored } from "./storage";
 
-const TRAKT_TOKEN_KEY = "arvio.web.trakt.token";
+const LEGACY_TRAKT_TOKEN_KEY = "arvio.web.trakt.token";
 // v2: v1 stored FULL progress payloads (every season/episode — ~740KB across a
 // library) and helped exhaust the localStorage quota; v2 entries are slimmed
 // to the four fields Continue Watching reads.
@@ -33,16 +33,47 @@ function normalizeToken(token: TraktToken | null): TraktToken | null {
 }
 
 export class TraktClient {
-  token = normalizeToken(loadStored<TraktToken | null>(TRAKT_TOKEN_KEY, null));
+  token: TraktToken | null = null;
+  private profileId: string | null = null;
+
+  get currentProfileId(): string | null {
+    return this.profileId;
+  }
 
   get isConnected() {
     return Boolean(this.token?.access_token);
   }
 
+  private tokenKey(profileId: string) {
+    return `arvio.web.trakt.token:${profileId}`;
+  }
+
+  setProfile(profileId: string | null) {
+    const normalized = profileId?.trim() || null;
+    if (normalized === this.profileId) return;
+    this.profileId = normalized;
+    if (!normalized) {
+      this.token = null;
+      return;
+    }
+
+    let stored = normalizeToken(loadStored<TraktToken | null>(this.tokenKey(normalized), null));
+    if (!stored) {
+      const legacy = normalizeToken(loadStored<TraktToken | null>(LEGACY_TRAKT_TOKEN_KEY, null));
+      if (legacy) {
+        stored = legacy;
+        saveStored(this.tokenKey(normalized), legacy);
+        removeStored(LEGACY_TRAKT_TOKEN_KEY);
+      }
+    }
+    this.token = stored;
+  }
+
   setToken(token: TraktToken | null) {
     this.token = normalizeToken(token);
-    if (this.token) saveStored(TRAKT_TOKEN_KEY, this.token);
-    else removeStored(TRAKT_TOKEN_KEY);
+    if (!this.profileId) return;
+    if (this.token) saveStored(this.tokenKey(this.profileId), this.token);
+    else removeStored(this.tokenKey(this.profileId));
   }
 
   async beginDeviceLink() {
@@ -53,14 +84,13 @@ export class TraktClient {
     });
   }
 
-  async pollDeviceToken(code: string) {
+  async pollDeviceToken(code: string): Promise<TraktToken> {
     const response = await this.exchangeDeviceToken(code);
-    this.token = {
+    return {
       access_token: response.access_token,
       refresh_token: response.refresh_token,
       expires_at: Date.now() + response.expires_in * 1000
     };
-    this.setToken(this.token);
   }
 
   private async exchangeDeviceToken(code: string) {
@@ -87,51 +117,51 @@ export class TraktClient {
   }
 
   async watchlist() {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     return this.trakt<unknown[]>("/sync/watchlist", {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   // The user's personal collection (owned/available items).
   async collection(type: "movies" | "shows") {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     return this.trakt<unknown[]>(`/sync/collection/${type}`, {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   // Custom Trakt lists owned by the user: [{ ids: { trakt, slug }, name, ... }].
   async userLists() {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     return this.trakt<unknown[]>("/users/me/lists", {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   // Items in a specific custom list (movies + shows).
   async listItems(listId: string | number) {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     return this.trakt<unknown[]>(`/users/me/lists/${listId}/items/movies,shows`, {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   async playback() {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     return this.trakt<unknown[]>("/sync/playback", {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   async watched(type: "movies" | "shows") {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     const all: unknown[] = [];
     let page = 1;
     // Trakt's July 2026 API update (trakt-api discussion #775): extended=
@@ -149,7 +179,7 @@ export class TraktClient {
       // it is also the heavy variant, hence the page ceiling.
       if (type === "shows") query.set("extended", "progress");
       const rows = await this.trakt<unknown[]>(`/sync/watched/${type}?${query.toString()}`, {
-        headers: { "x-user-token": this.token.access_token }
+        headers: { "x-user-token": token.access_token }
       });
       if (!rows.length) break;
       all.push(...rows);
@@ -164,13 +194,13 @@ export class TraktClient {
   // Trakt itself omits these from Up Next, so Continue Watching must too —
   // otherwise a dropped show reappears here forever. Returns trakt show ids.
   async hiddenProgressShowIds(): Promise<Set<number>> {
-    if (!this.token) return new Set();
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return new Set();
     const sections = ["progress_watched", "progress_watched_reset"];
     const ids = new Set<number>();
     const pages = await Promise.all(sections.map((section) =>
       this.trakt<unknown[]>(`/users/hidden/${section}?type=show&limit=100`, {
-        headers: { "x-user-token": this.token!.access_token }
+        headers: { "x-user-token": token.access_token }
       }).catch(() => [] as unknown[])
     ));
     pages.flat().forEach((raw) => {
@@ -185,9 +215,9 @@ export class TraktClient {
   // so entries stay valid for days instead of the blanket 15-minute TTL — a
   // repeat app boot then costs ~zero progress calls instead of ~120.
   async showProgress(traktShowId: number, includeSpecials = false, activityKey?: string | number) {
-    if (!this.token) return null;
-    await this.refreshIfNeeded();
-    const cached = readProgressCache(this.token.access_token, traktShowId, includeSpecials, activityKey);
+    const token = await this.refreshIfNeeded();
+    if (!token) return null;
+    const cached = readProgressCache(token.access_token, traktShowId, includeSpecials, activityKey);
     if (cached !== undefined) return cached;
     const query = new URLSearchParams({
       hidden: "false",
@@ -195,27 +225,27 @@ export class TraktClient {
       count_specials: String(includeSpecials)
     });
     const progress = await this.trakt<unknown>(`/shows/${traktShowId}/progress/watched?${query.toString()}`, {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
-    writeProgressCache(this.token.access_token, traktShowId, includeSpecials, progress, activityKey);
+    writeProgressCache(token.access_token, traktShowId, includeSpecials, progress, activityKey);
     return progress;
   }
 
   async history(type?: "movies" | "shows" | "episodes") {
-    if (!this.token) return [];
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return [];
     const path = type ? `/sync/history/${type}` : "/sync/history";
     return this.trakt<unknown[]>(path, {
-      headers: { "x-user-token": this.token.access_token }
+      headers: { "x-user-token": token.access_token }
     });
   }
 
   async addToWatchlist(item: TraktMediaRef) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
     await this.trakt("/sync/watchlist", {
       method: "POST",
-      headers: { "x-user-token": this.token.access_token },
+      headers: { "x-user-token": token.access_token },
       body: JSON.stringify(this.mediaBody(item))
     });
   }
@@ -223,30 +253,32 @@ export class TraktClient {
   // Mark watched on Trakt (registers in the user's history, same as the app's
   // "Mark watched"). A full-show ref (no season/episode) marks the whole show.
   async addToHistory(item: TraktMediaRef) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
     await this.trakt("/sync/history", {
       method: "POST",
-      headers: { "x-user-token": this.token.access_token },
+      headers: { "x-user-token": token.access_token },
       body: JSON.stringify(this.mediaBody(item))
     });
   }
 
   async removeFromHistory(item: TraktMediaRef) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
     await this.trakt("/sync/history/remove", {
       method: "POST",
-      headers: { "x-user-token": this.token.access_token },
+      headers: { "x-user-token": token.access_token },
       body: JSON.stringify(this.mediaBody(item))
     });
   }
 
   async dismissFromContinueWatching(item: TraktMediaRef) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
 
-    const playbackRows = await this.playback();
+    const playbackRows = await this.trakt<unknown[]>("/sync/playback", {
+      headers: { "x-user-token": token.access_token }
+    });
     const matchingPlaybackIds = playbackRows.flatMap((raw) => {
       const row = raw as {
         id?: number;
@@ -265,34 +297,34 @@ export class TraktClient {
 
     await Promise.all(matchingPlaybackIds.map((id) => this.trakt(`/sync/playback/${id}`, {
       method: "DELETE",
-      headers: { "x-user-token": this.token!.access_token }
+      headers: { "x-user-token": token.access_token }
     })));
 
     if (item.mediaType === "tv") {
       await this.trakt("/users/hidden/progress_watched", {
         method: "POST",
-        headers: { "x-user-token": this.token.access_token },
+        headers: { "x-user-token": token.access_token },
         body: JSON.stringify({ shows: [{ ids: { tmdb: item.tmdbId } }] })
       });
     }
   }
 
   async removeFromWatchlist(item: TraktMediaRef) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
     await this.trakt("/sync/watchlist/remove", {
       method: "POST",
-      headers: { "x-user-token": this.token.access_token },
+      headers: { "x-user-token": token.access_token },
       body: JSON.stringify(this.mediaBody(item))
     });
   }
 
   async scrobble(action: "start" | "pause" | "stop", item: TraktMediaRef & { progress: number }) {
-    if (!this.token) return;
-    await this.refreshIfNeeded();
+    const token = await this.refreshIfNeeded();
+    if (!token) return;
     await this.trakt(`/scrobble/${action}`, {
       method: "POST",
-      headers: { "x-user-token": this.token.access_token },
+      headers: { "x-user-token": token.access_token },
       body: JSON.stringify({ ...this.mediaBody(item), progress: Math.round(item.progress) })
     });
   }
@@ -302,6 +334,11 @@ export class TraktClient {
   }
 
   private async trakt<T>(path: string, init: RequestInit = {}) {
+    const requestProfileId = this.profileId;
+    const originalHeaders = new Headers(init.headers ?? {});
+    const originalAccessToken = originalHeaders.get("x-user-token")
+      ?? originalHeaders.get("Authorization")?.replace(/^Bearer\s+/i, "")
+      ?? null;
     const url = new URL(`/api/trakt/${path.replace(/^\/+/, "")}`, window.location.origin);
     const request = {
       ...init,
@@ -355,7 +392,11 @@ export class TraktClient {
       // blocks our server egress.
       const status = (error as { status?: number }).status;
       if (status !== 401 || path.replace(/^\/+/, "").startsWith("oauth/")) throw error;
-      const refreshed = await this.forceRefresh();
+      if (this.profileId !== requestProfileId) throw error;
+      const currentAccessToken = this.token?.access_token ?? null;
+      const refreshed = originalAccessToken && currentAccessToken && originalAccessToken !== currentAccessToken
+        ? currentAccessToken
+        : await this.forceRefresh();
       if (!refreshed) throw error;
       const retryHeaders = new Headers(request.headers as HeadersInit);
       if (retryHeaders.has("x-user-token")) retryHeaders.set("x-user-token", refreshed);
@@ -368,17 +409,20 @@ export class TraktClient {
 
   /** Refresh regardless of the stored expiry. Returns the new access token. */
   private async forceRefresh(): Promise<string | null> {
-    if (!this.token?.refresh_token) return null;
-    const previous = this.token.access_token;
+    const profileId = this.profileId;
+    const token = this.token;
+    if (!token?.refresh_token) return null;
+    const previous = token.access_token;
     try {
       // Reuse the normal refresh by pretending the token is already stale.
-      this.token = { ...this.token, expires_at: 0 };
-      await this.refreshIfNeeded();
+      this.token = { ...token, expires_at: 0 };
+      const refreshed = await this.refreshIfNeeded();
+      if (this.profileId !== profileId) return null;
+      const next = refreshed?.access_token ?? null;
+      return next && next !== previous ? next : null;
     } catch {
       return null;
     }
-    const next = this.token?.access_token ?? null;
-    return next && next !== previous ? next : null;
   }
 
   private canUseDirectFallback(path: string, init: RequestInit) {
@@ -423,12 +467,14 @@ export class TraktClient {
     return (await response.json()) as T;
   }
 
-  private async refreshIfNeeded() {
-    if (!this.token?.refresh_token) return;
-    if (this.token.expires_at && this.token.expires_at - Date.now() > 300000) return;
+  private async refreshIfNeeded(): Promise<TraktToken | null> {
+    const profileId = this.profileId;
+    const token = this.token;
+    if (!token?.refresh_token) return null;
+    if (token.expires_at && token.expires_at - Date.now() > 300000) return token;
     const body = {
       grant_type: "refresh_token",
-      refresh_token: this.token.refresh_token,
+      refresh_token: token.refresh_token,
       client_id: config.traktClientId,
       client_secret: config.traktClientSecret,
       redirect_uri: "urn:ietf:wg:oauth:2.0:oob"
@@ -444,19 +490,21 @@ export class TraktClient {
         body: JSON.stringify(body)
       }).catch(() => this.trakt<RefreshResponse>("/oauth/token", {
         method: "POST",
-        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.token!.refresh_token })
+        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: token.refresh_token })
       }));
     } else {
       response = await this.trakt<RefreshResponse>("/oauth/token", {
         method: "POST",
-        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: this.token.refresh_token })
+        body: JSON.stringify({ grant_type: "refresh_token", refresh_token: token.refresh_token })
       });
     }
+    if (this.profileId !== profileId || this.token?.refresh_token !== token.refresh_token) return null;
     this.setToken({
       access_token: response.access_token,
-      refresh_token: response.refresh_token ?? this.token.refresh_token,
+      refresh_token: response.refresh_token ?? token.refresh_token,
       expires_at: Date.now() + response.expires_in * 1000
     });
+    return this.token;
   }
 
   private mediaBody(item: TraktMediaRef) {
