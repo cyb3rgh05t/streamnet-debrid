@@ -1,8 +1,6 @@
 #include <jni.h>
 #include <string>
 #include <mutex>
-#include <memory>
-#include <algorithm>
 #include <android/log.h>
 
 #define LOG_TAG "DiscordBridge"
@@ -22,44 +20,6 @@ static jobject g_callbackObj = nullptr;
 static std::unique_ptr<discordpp::Client> g_discordClient = nullptr;
 #endif
 
-static std::string jstringToString(JNIEnv* env, jstring jstr) {
-    if (!jstr) return "";
-    const char* chars = env->GetStringUTFChars(jstr, nullptr);
-    if (!chars) return "";
-    std::string str(chars);
-    env->ReleaseStringUTFChars(jstr, chars);
-    return str;
-}
-
-static void notifyStatus(int status, int error, int errorDetail) {
-    if (g_jvm != nullptr && g_callbackObj != nullptr) {
-        JNIEnv* callbackEnv = nullptr;
-        jint getEnvStat = g_jvm->GetEnv(reinterpret_cast<void**>(&callbackEnv), JNI_VERSION_1_6);
-        bool attached = false;
-
-        if (getEnvStat == JNI_EDETACHED) {
-            if (g_jvm->AttachCurrentThread(&callbackEnv, nullptr) == 0) {
-                attached = true;
-            }
-        }
-
-        if (callbackEnv != nullptr) {
-            jclass clazz = callbackEnv->GetObjectClass(g_callbackObj);
-            jmethodID method = callbackEnv->GetMethodID(clazz, "onStatusChanged", "(III)V");
-            if (method != nullptr) {
-                callbackEnv->CallVoidMethod(g_callbackObj, method,
-                                            static_cast<jint>(status),
-                                            static_cast<jint>(error),
-                                            static_cast<jint>(errorDetail));
-            }
-        }
-
-        if (attached) {
-            g_jvm->DetachCurrentThread();
-        }
-    }
-}
-
 extern "C" {
 
 JNIEXPORT jint JNICALL
@@ -70,8 +30,13 @@ JNI_OnLoad(JavaVM* vm, void* reserved) {
 
 JNIEXPORT void JNICALL
 Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeInit(
-        JNIEnv* env, jobject thiz, jlong applicationId, jobject callback) {
-    LOGI("nativeInit called with application ID: %lld", static_cast<long long>(applicationId));
+        JNIEnv* env, jobject thiz, jstring clientIdStr, jobject callback) {
+    const char* clientIdChars = clientIdStr ? env->GetStringUTFChars(clientIdStr, nullptr) : nullptr;
+    std::string clientId = clientIdChars ? clientIdChars : "";
+    if (clientIdChars) {
+        env->ReleaseStringUTFChars(clientIdStr, clientIdChars);
+    }
+    LOGI("nativeInit called with client ID: %s", clientId.c_str());
 
     std::lock_guard<std::recursive_mutex> lock(g_discordMutex);
     if (g_callbackObj != nullptr) {
@@ -84,26 +49,52 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeInit(
 
 #if HAS_DISCORD_SDK
     try {
-        if (!g_discordClient) {
-            g_discordClient = std::make_unique<discordpp::Client>();
-            g_discordClient->SetApplicationId(static_cast<uint64_t>(applicationId));
-
-            g_discordClient->SetStatusChangedCallback([](discordpp::Client::Status status, discordpp::Client::Error error, int32_t errorDetail) {
-                LOGI("Discord native status changed: %d, error: %d, detail: %d",
-                     static_cast<int>(status), static_cast<int>(error), errorDetail);
-
-                int kotlinStatus = 0; // Disconnected
-                if (status == discordpp::Client::Status::Connected || status == discordpp::Client::Status::Ready) {
-                    kotlinStatus = 1; // Connected
-                } else if (status == discordpp::Client::Status::Connecting || status == discordpp::Client::Status::Reconnecting) {
-                    kotlinStatus = 2; // Connecting
-                }
-                notifyStatus(kotlinStatus, static_cast<int>(error), errorDetail);
-            });
-            LOGI("Discord Social SDK Client initialized successfully with App ID %lld.", static_cast<long long>(applicationId));
-        } else {
-            g_discordClient->SetApplicationId(static_cast<uint64_t>(applicationId));
+        // Initialize the Discord Social SDK Client
+        g_discordClient = std::make_unique<discordpp::Client>();
+        if (!clientId.empty()) {
+            g_discordClient->SetApplicationId(std::stoull(clientId));
         }
+        
+        // Wire up connection and status callbacks
+        g_discordClient->SetStatusChangedCallback([](discordpp::Client::Status status, discordpp::Client::Error error, int32_t errorDetail) {
+            LOGI("Discord native status changed: %d, error: %d, detail: %d", 
+                 static_cast<int>(status), static_cast<int>(error), errorDetail);
+            
+            if (g_jvm != nullptr && g_callbackObj != nullptr) {
+                JNIEnv* callbackEnv = nullptr;
+                jint getEnvStat = g_jvm->GetEnv(reinterpret_cast<void**>(&callbackEnv), JNI_VERSION_1_6);
+                bool attached = false;
+                
+                if (getEnvStat == JNI_EDETACHED) {
+                    if (g_jvm->AttachCurrentThread(&callbackEnv, nullptr) == 0) {
+                        attached = true;
+                    }
+                }
+                
+                if (callbackEnv != nullptr) {
+                    jclass clazz = callbackEnv->GetObjectClass(g_callbackObj);
+                    jmethodID method = callbackEnv->GetMethodID(clazz, "onStatusChanged", "(III)V");
+                    if (method != nullptr) {
+                        int kotlinStatus = 0; // Disconnected
+                        if (status == discordpp::Client::Status::Connected || status == discordpp::Client::Status::Ready) {
+                            kotlinStatus = 1; // Connected
+                        } else if (status == discordpp::Client::Status::Connecting || status == discordpp::Client::Status::Reconnecting) {
+                            kotlinStatus = 2; // Connecting
+                        }
+                        callbackEnv->CallVoidMethod(g_callbackObj, method, 
+                                                    static_cast<jint>(kotlinStatus), 
+                                                    static_cast<jint>(error), 
+                                                    static_cast<jint>(errorDetail));
+                    }
+                }
+                
+                if (attached) {
+                    g_jvm->DetachCurrentThread();
+                }
+            }
+        });
+        
+        LOGI("Discord Social SDK Client initialized successfully.");
     } catch (const std::exception& e) {
         LOGE("Failed to initialize Discord Social SDK: %s", e.what());
     }
@@ -114,20 +105,65 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeInit(
 
 JNIEXPORT void JNICALL
 Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeConnect(
-        JNIEnv* env, jobject thiz) {
-    LOGI("nativeConnect requested (unauthenticated Android RPC).");
+        JNIEnv* env, jobject thiz, jstring accessTokenStr) {
+    const char* tokenChars = accessTokenStr ? env->GetStringUTFChars(accessTokenStr, nullptr) : nullptr;
+    std::string accessToken = tokenChars ? tokenChars : "";
+    if (tokenChars) {
+        env->ReleaseStringUTFChars(accessTokenStr, tokenChars);
+    }
+    LOGI("nativeConnect requested with %s token.", accessToken.empty() ? "empty (unauthenticated)" : "provided");
 
 #if HAS_DISCORD_SDK
     std::lock_guard<std::recursive_mutex> lock(g_discordMutex);
     if (g_discordClient) {
-        LOGI("Initiating unauthenticated client connect to Discord...");
-        g_discordClient->Connect();
+        if (!accessToken.empty()) {
+            LOGI("Updating token in Discord Social SDK...");
+            g_discordClient->UpdateToken(discordpp::AuthorizationTokenType::Bearer, accessToken, [](discordpp::ClientResult result) {
+                LOGI("UpdateToken completed. Successful: %s, Message: %s", 
+                     result.Successful() ? "true" : "false", result.ToString().c_str());
+                if (result.Successful()) {
+                    std::lock_guard<std::recursive_mutex> lock(g_discordMutex);
+                    if (g_discordClient) {
+                        LOGI("Initiating client connect to Discord...");
+                        g_discordClient->Connect();
+                    }
+                } else {
+                    LOGE("Failed to update token: %s", result.ToString().c_str());
+                }
+            });
+        } else {
+            LOGI("Initiating unauthenticated direct client connect to Discord...");
+            g_discordClient->Connect();
+        }
     } else {
         LOGE("Discord Client is not initialized.");
     }
 #else
     LOGW("Discord Social SDK is not compiled in. Native connect stub callback active.");
-    notifyStatus(1, 0, 0); // Mock Connected
+    // Mock connection status change: 1 = Connected
+    if (g_jvm != nullptr && g_callbackObj != nullptr) {
+        JNIEnv* callbackEnv = nullptr;
+        jint getEnvStat = g_jvm->GetEnv(reinterpret_cast<void**>(&callbackEnv), JNI_VERSION_1_6);
+        bool attached = false;
+        
+        if (getEnvStat == JNI_EDETACHED) {
+            if (g_jvm->AttachCurrentThread(&callbackEnv, nullptr) == 0) {
+                attached = true;
+            }
+        }
+        
+        if (callbackEnv != nullptr) {
+            jclass clazz = callbackEnv->GetObjectClass(g_callbackObj);
+            jmethodID method = callbackEnv->GetMethodID(clazz, "onStatusChanged", "(III)V");
+            if (method != nullptr) {
+                callbackEnv->CallVoidMethod(g_callbackObj, method, 1, 0, 0);
+            }
+        }
+        
+        if (attached) {
+            g_jvm->DetachCurrentThread();
+        }
+    }
 #endif
 }
 
@@ -137,11 +173,22 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeUpdateActivity
         jstring detailsStr, jstring stateStr,
         jlong startTime, jlong endTime,
         jstring largeImageStr, jstring largeTextStr) {
+    
+    const char* detailsChars = detailsStr ? env->GetStringUTFChars(detailsStr, nullptr) : nullptr;
+    std::string details = detailsChars ? detailsChars : "";
+    if (detailsChars) env->ReleaseStringUTFChars(detailsStr, detailsChars);
 
-    std::string details = jstringToString(env, detailsStr);
-    std::string state = jstringToString(env, stateStr);
-    std::string largeImage = jstringToString(env, largeImageStr);
-    std::string largeText = jstringToString(env, largeTextStr);
+    const char* stateChars = stateStr ? env->GetStringUTFChars(stateStr, nullptr) : nullptr;
+    std::string state = stateChars ? stateChars : "";
+    if (stateChars) env->ReleaseStringUTFChars(stateStr, stateChars);
+
+    const char* largeImageChars = largeImageStr ? env->GetStringUTFChars(largeImageStr, nullptr) : nullptr;
+    std::string largeImage = largeImageChars ? largeImageChars : "";
+    if (largeImageChars) env->ReleaseStringUTFChars(largeImageStr, largeImageChars);
+
+    const char* largeTextChars = largeTextStr ? env->GetStringUTFChars(largeTextStr, nullptr) : nullptr;
+    std::string largeText = largeTextChars ? largeTextChars : "";
+    if (largeTextChars) env->ReleaseStringUTFChars(largeTextStr, largeTextChars);
 
     LOGI("nativeUpdateActivity: Details='%s', State='%s'", details.c_str(), state.c_str());
 
@@ -150,23 +197,13 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeUpdateActivity
     if (g_discordClient) {
         discordpp::Activity activity{};
         activity.SetType(discordpp::ActivityTypes::Watching);
-
-        // Clamp string lengths according to Discord SDK bounds:
-        // Details: 2 to 128 chars
-        if (details.length() >= 2) {
-            if (details.length() > 128) details = details.substr(0, 128);
+        if (!details.empty()) {
             activity.SetDetails(details);
-        } else if (!details.empty()) {
-            activity.SetDetails(details + " "); // Ensure min 2 chars
         }
-
-        // State: 2 to 128 chars
-        if (state.length() >= 2) {
-            if (state.length() > 128) state = state.substr(0, 128);
+        if (!state.empty() && state.length() >= 2) {
             activity.SetState(state);
         }
-
-        // Timestamps: start / end
+        
         discordpp::ActivityTimestamps timestamps{};
         bool hasTimestamps = false;
         if (startTime > 0) {
@@ -180,26 +217,18 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeUpdateActivity
         if (hasTimestamps) {
             activity.SetTimestamps(timestamps);
         }
-
-        // Assets: LargeImage (1-300 chars URL/key), LargeText (2-128 chars)
+        
         if (!largeImage.empty()) {
             discordpp::ActivityAssets assets{};
-            if (largeImage.length() > 300) {
-                largeImage = largeImage.substr(0, 300);
-            }
             assets.SetLargeImage(largeImage);
-
-            if (largeText.length() >= 2) {
-                if (largeText.length() > 128) largeText = largeText.substr(0, 128);
+            if (!largeText.empty()) {
                 assets.SetLargeText(largeText);
-            } else if (!largeText.empty()) {
-                assets.SetLargeText("ARVIO");
             }
             activity.SetAssets(assets);
         }
-
+        
         g_discordClient->UpdateRichPresence(activity, [](discordpp::ClientResult result) {
-            LOGI("UpdateRichPresence native result. Successful: %s, Message: %s",
+            LOGI("UpdateRichPresence native result. Successful: %s, Message: %s", 
                  result.Successful() ? "true" : "false", result.ToString().c_str());
         });
     } else {
@@ -239,7 +268,30 @@ Java_com_arflix_tv_ui_screens_details_discord_DiscordBridge_nativeDisconnect(
     }
 #else
     LOGW("Discord Social SDK is not compiled in. Native disconnect stub callback active.");
-    notifyStatus(0, 0, 0); // Mock Disconnected
+    // Mock connection status change: 0 = Disconnected
+    if (g_jvm != nullptr && g_callbackObj != nullptr) {
+        JNIEnv* callbackEnv = nullptr;
+        jint getEnvStat = g_jvm->GetEnv(reinterpret_cast<void**>(&callbackEnv), JNI_VERSION_1_6);
+        bool attached = false;
+        
+        if (getEnvStat == JNI_EDETACHED) {
+            if (g_jvm->AttachCurrentThread(&callbackEnv, nullptr) == 0) {
+                attached = true;
+            }
+        }
+        
+        if (callbackEnv != nullptr) {
+            jclass clazz = callbackEnv->GetObjectClass(g_callbackObj);
+            jmethodID method = callbackEnv->GetMethodID(clazz, "onStatusChanged", "(III)V");
+            if (method != nullptr) {
+                callbackEnv->CallVoidMethod(g_callbackObj, method, 0, 0, 0);
+            }
+        }
+        
+        if (attached) {
+            g_jvm->DetachCurrentThread();
+        }
+    }
 #endif
 }
 

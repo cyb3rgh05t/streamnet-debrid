@@ -18,17 +18,17 @@ object DiscordBridge {
         fun onStatusChanged(status: Int, error: Int, errorDetail: Int)
     }
 
-    fun init(applicationId: Long, callback: Callback) {
+    fun init(clientId: String, callback: Callback) {
         try {
-            nativeInit(applicationId, callback)
+            nativeInit(clientId, callback)
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "nativeInit not linked: ${e.message}")
         }
     }
 
-    fun connect() {
+    fun connect(accessToken: String) {
         try {
-            nativeConnect()
+            nativeConnect(accessToken)
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "nativeConnect not linked: ${e.message}")
         }
@@ -69,15 +69,15 @@ object DiscordBridge {
         try {
             nativeTick()
         } catch (e: UnsatisfiedLinkError) {
-            // Silence logs to prevent spamming
+            // Silence logs to prevent spamming on local builds
         }
     }
 
     @JvmStatic
-    private external fun nativeInit(applicationId: Long, callback: Callback)
+    private external fun nativeInit(clientId: String, callback: Callback)
 
     @JvmStatic
-    private external fun nativeConnect()
+    private external fun nativeConnect(accessToken: String)
 
     @JvmStatic
     private external fun nativeUpdateActivity(

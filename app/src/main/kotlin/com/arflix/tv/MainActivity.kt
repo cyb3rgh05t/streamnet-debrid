@@ -242,6 +242,13 @@ class MainActivity : ComponentActivity() {
 
         // Initialize Discord RPC Manager
         com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.init(this)
+        intent?.data?.let { uri ->
+            android.util.Log.d("MainActivity", "Received intent data URI in onCreate: $uri")
+            if (uri.scheme == "arvio" && uri.host == "discord" && uri.path == "/auth") {
+                android.util.Log.i("MainActivity", "Matching Discord auth redirect. Forwarding to DiscordRpcManager.")
+                com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.onLoginDeepLink(uri)
+            }
+        }
 
         // Set orientation based on device type
         requestedOrientation = when (initialDeviceType) {
@@ -433,6 +440,13 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
         pendingLauncherRequest = parseLauncherRequest(intent)
         pendingInstallPackUrl = parseInstallPackUrl(intent)
+        intent.data?.let { uri ->
+            android.util.Log.d("MainActivity", "Received intent data URI in onNewIntent: $uri")
+            if (uri.scheme == "arvio" && uri.host == "discord" && uri.path == "/auth") {
+                android.util.Log.i("MainActivity", "Matching Discord auth redirect. Forwarding to DiscordRpcManager.")
+                com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.onLoginDeepLink(uri)
+            }
+        }
     }
 
     override fun onResume() {
