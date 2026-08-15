@@ -1445,12 +1445,16 @@ private fun HomeHeroMarqueeTitle(
     val marqueeText = text.ifBlank { " " }
     val scrollState = rememberScrollState()
     val shouldScroll = remember(marqueeText) { marqueeText.length > 20 }
+    var marqueeActive by remember(marqueeText) { mutableStateOf(false) }
 
     LaunchedEffect(marqueeText, shouldScroll) {
         if (!shouldScroll) {
             scrollState.scrollTo(0)
+            marqueeActive = false
             return@LaunchedEffect
         }
+        delay(1_500L)
+        marqueeActive = true
         while (true) {
             val maxScroll = scrollState.maxValue
             if (maxScroll <= 0) {
@@ -1471,7 +1475,7 @@ private fun HomeHeroMarqueeTitle(
         maxLines = maxLines,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
-            .horizontalScroll(scrollState, enabled = shouldScroll, reverseScrolling = false)
+            .horizontalScroll(scrollState, enabled = shouldScroll && marqueeActive, reverseScrolling = false)
     )
 }
 
@@ -1511,7 +1515,7 @@ private fun IptvHeroSection(
     ) {
         val hasProgramLogo = !programLogoUrl.isNullOrBlank()
         Box(
-            modifier = Modifier.height(if (hasProgramLogo) 72.dp else 98.dp),
+            modifier = Modifier.height(72.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (hasProgramLogo) {
@@ -1545,7 +1549,7 @@ private fun IptvHeroSection(
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             if (item.image.isNotBlank()) {
                 AsyncImage(
@@ -1553,7 +1557,7 @@ private fun IptvHeroSection(
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(74.dp).height(30.dp),
+                    modifier = Modifier.width(60.dp).height(30.dp),
                 )
             } else {
                 Text(
@@ -3269,6 +3273,7 @@ private fun MobileHomeRowsLayer(
                                     IptvHomeCard(
                                         item = item,
                                         width = rowMobileItemWidth,
+                                        matchLandscapeFootprint = true,
                                         isFocused = false,
                                         lookupBackdrop = lookupIptvProgramBackdrop,
                                         onFocused = {},
@@ -3306,6 +3311,7 @@ private fun MobileHomeRowsLayer(
                                 IptvHomeCard(
                                     item = item,
                                     width = rowMobileItemWidth,
+                                    matchLandscapeFootprint = true,
                                     isFocused = false,
                                     lookupBackdrop = lookupIptvProgramBackdrop,
                                     onFocused = {},

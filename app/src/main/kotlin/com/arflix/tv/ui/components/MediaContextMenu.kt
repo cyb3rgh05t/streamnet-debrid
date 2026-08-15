@@ -65,6 +65,8 @@ import com.arflix.tv.util.LocalDeviceType
 import androidx.annotation.StringRes
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
+import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.contrastingContentColor
 
 /**
  * Context menu for media cards on home screen
@@ -86,6 +88,7 @@ fun MediaContextMenu(
     onDismiss: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
     var focusedIndex by remember { mutableIntStateOf(0) }
     val focusRequester = remember { FocusRequester() }
 
@@ -178,7 +181,7 @@ fun MediaContextMenu(
                         .padding(top = 110.dp)
                         .width(320.dp)
                         .background(BackgroundCard, RoundedCornerShape(14.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -257,6 +260,11 @@ fun MediaContextMenu(
                                 BackgroundElevated,
                                 RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                             )
+                            .border(
+                                1.dp,
+                                accentColor.copy(alpha = 0.45f),
+                                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                            )
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -270,7 +278,7 @@ fun MediaContextMenu(
                                 .width(36.dp)
                                 .height(4.dp)
                                 .background(
-                                    Color.White.copy(alpha = 0.2f),
+                                    accentColor.copy(alpha = 0.8f),
                                     RoundedCornerShape(2.dp)
                                 )
                         )
@@ -348,11 +356,13 @@ private fun ContextMenuItem(
     isFocused: Boolean,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(fallback = Pink)
+    val focusedContentColor = contrastingContentColor(accentColor)
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .background(
-                if (isFocused) Pink else Color.Transparent,
+                if (isFocused) accentColor else Color.Transparent,
                 RoundedCornerShape(8.dp)
             )
             .border(
@@ -369,13 +379,13 @@ private fun ContextMenuItem(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = if (isFocused) Color.Black else TextSecondary,
+                tint = if (isFocused) focusedContentColor else TextSecondary,
                 modifier = Modifier.size(22.dp)
             )
             Text(
                 text = label,
                 style = ArflixTypography.body,
-                color = if (isFocused) Color.Black else TextPrimary
+                color = if (isFocused) focusedContentColor else TextPrimary
             )
         }
     }

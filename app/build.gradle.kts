@@ -30,8 +30,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 312
-        versionName = "1.9.989"
+        versionCode = 314
+        versionName = "1.9.991"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -54,6 +54,8 @@ android {
             "APP_ANON_KEY",
             "\"${escapeBuildConfigString(localSecretValue("APP_ANON_KEY").ifBlank { localSecretValue("SUPABASE_ANON_KEY") })}\""
         )
+        buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
+        buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
 
 
         // Support both 32-bit and 64-bit devices (required for Google Play since 2019)

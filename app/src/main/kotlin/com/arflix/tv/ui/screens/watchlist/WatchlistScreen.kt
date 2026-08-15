@@ -86,6 +86,7 @@ import com.arflix.tv.ui.components.ToastType as ComponentToastType
 import com.arflix.tv.ui.components.rememberCardLayoutMode
 import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
@@ -576,7 +577,7 @@ fun WatchlistScreen(
                 }
                 if (uiState.isLoadingMore) {
                     LoadingIndicator(
-                        color = Pink,
+                        color = resolveAccentColor(fallback = Pink),
                         size = 26.dp,
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -658,6 +659,7 @@ private fun ListPill(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(999.dp)
+    val accentColor = resolveAccentColor(fallback = Pink)
     val scale by animateFloatAsState(
         targetValue = if (focused) 1.04f else 1f,
         animationSpec = tween(100),
@@ -665,13 +667,13 @@ private fun ListPill(
     )
 
     val background = when {
-        focused -> Color.White.copy(alpha = 0.28f)
-        selected -> Color.White.copy(alpha = 0.16f)
+        focused -> accentColor.copy(alpha = 0.28f)
+        selected -> accentColor.copy(alpha = 0.16f)
         else -> Color.White.copy(alpha = 0.06f)
     }
     val borderColor = when {
-        focused -> Color.White
-        selected -> Color.White.copy(alpha = 0.5f)
+        focused -> accentColor
+        selected -> accentColor.copy(alpha = 0.5f)
         else -> Color.White.copy(alpha = 0.12f)
     }
     val borderWidth = if (focused) 1.5.dp else if (selected) 1.dp else 0.5.dp
@@ -707,6 +709,7 @@ private fun ManageListsGhostButton(
     modifier: Modifier = Modifier
 ) {
     val shape = RoundedCornerShape(999.dp)
+    val accentColor = resolveAccentColor(fallback = Pink)
     val scale by animateFloatAsState(
         targetValue = if (focused) 1.04f else 1f,
         animationSpec = tween(100),
@@ -720,12 +723,12 @@ private fun ManageListsGhostButton(
                 scaleY = scale
             }
             .background(
-                color = if (focused) Color.White.copy(alpha = 0.22f) else Color.Transparent,
+                color = if (focused) accentColor.copy(alpha = 0.22f) else Color.Transparent,
                 shape = shape
             )
             .border(
                 width = if (focused) 1.5.dp else 0.8.dp,
-                color = if (focused) Color.White else Color.White.copy(alpha = 0.25f),
+                color = if (focused) accentColor else Color.White.copy(alpha = 0.25f),
                 shape = shape
             )
             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -758,6 +761,7 @@ private fun SectionHeader(
     startPadding: Dp = 36.dp,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = resolveAccentColor(fallback = Pink)
     Row(
         modifier = modifier.padding(start = startPadding, bottom = 12.dp),
         verticalAlignment = Alignment.Bottom,
@@ -782,7 +786,7 @@ private fun SectionHeader(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Medium
             ),
-            color = Color.White.copy(alpha = 0.42f),
+            color = accentColor.copy(alpha = 0.78f),
             modifier = Modifier.padding(bottom = 1.5.dp)
         )
     }
@@ -819,10 +823,13 @@ private fun SingleTypeGridView(
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             state = gridState,
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = contentStartPadding),
-            contentPadding = PaddingValues(top = 0.dp, bottom = 24.dp),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = contentStartPadding,
+                end = contentStartPadding,
+                top = 8.dp,
+                bottom = 32.dp
+            ),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
             userScrollEnabled = isMobile
@@ -901,7 +908,12 @@ private fun MultiSectionRowsView(
                     state = rowState,
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    contentPadding = PaddingValues(start = contentStartPadding, end = contentStartPadding, top = 0.dp, bottom = 0.dp)
+                    contentPadding = PaddingValues(
+                        start = contentStartPadding,
+                        end = contentStartPadding,
+                        top = 8.dp,
+                        bottom = 8.dp
+                    )
                 ) {
                     itemsIndexed(
                         items = items,
@@ -947,6 +959,7 @@ private fun EmptyStateView(
     isMobile: Boolean,
     onButtonClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(fallback = Pink)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -959,7 +972,7 @@ private fun EmptyStateView(
             Icon(
                 imageVector = Icons.Outlined.Bookmark,
                 contentDescription = null,
-                tint = Color.White.copy(alpha = 0.22f),
+                tint = accentColor.copy(alpha = 0.42f),
                 modifier = Modifier.size(68.dp)
             )
             Text(
@@ -978,12 +991,12 @@ private fun EmptyStateView(
             Box(
                 modifier = Modifier
                     .background(
-                        if (isButtonFocused) Color.White else Color.White.copy(alpha = 0.12f),
+                        if (isButtonFocused) accentColor else Color.White.copy(alpha = 0.12f),
                         RoundedCornerShape(999.dp)
                     )
                     .border(
                         1.dp,
-                        if (isButtonFocused) Color.White else Color.White.copy(alpha = 0.22f),
+                        if (isButtonFocused) accentColor else Color.White.copy(alpha = 0.22f),
                         RoundedCornerShape(999.dp)
                     )
                     .clickable(enabled = isMobile) { onButtonClick() }
@@ -1003,6 +1016,6 @@ private fun EmptyStateView(
 @Composable
 private fun CenteredLoading() {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        LoadingIndicator(color = Pink, size = 52.dp)
+        LoadingIndicator(color = resolveAccentColor(fallback = Pink), size = 52.dp)
     }
 }

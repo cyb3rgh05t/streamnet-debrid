@@ -476,7 +476,7 @@ fun SettingsScreen(
                 4 + uiState.iptvPlaylists.size // Add + rows + order + refresh + clear + special categories
             }
             "home_server" -> uiState.homeServerConnections.size + 3
-            "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
+            "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
             "accounts" -> 14 // Accounts, tracking routing, sync/update, privacy and deletion
@@ -1106,6 +1106,8 @@ fun SettingsScreen(
                                                 showCatalogInput = true
                                             } else if (contentFocusIndex == 1) {
                                                 showCatalogPackInput = true
+                                            } else if (contentFocusIndex == uiState.catalogs.size + 2) {
+                                                viewModel.restoreHiddenCatalogs()
                                             } else {
                                                 val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 2)
                                                 if (catalog != null) {
@@ -1288,6 +1290,7 @@ fun SettingsScreen(
                         viewModel.removeCatalog(catalog.id)
                     }
                 },
+                onRestoreHiddenCatalogs = viewModel::restoreHiddenCatalogs,
                 onConnectHomeServerClick = {
                     val connection = uiState.homeServerConnection
                     homeServerUrl = connection?.serverUrl.orEmpty()
@@ -1712,6 +1715,7 @@ fun SettingsScreen(
                                     viewModel.removeCatalog(catalog.id)
                                 }
                             },
+                            onRestoreHiddenCatalogs = viewModel::restoreHiddenCatalogs,
                             onUnpackCatalog = { catalog -> viewModel.unpackCatalog(catalog.id) }
                         )
                         "stremio" -> StremioAddonsSettings(
@@ -3434,7 +3438,6 @@ private fun TraktActivationModal(
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     val resolvedTitle = title ?: stringResource(R.string.settings_connect_trakt)
     val resolvedInstruction = instruction ?: stringResource(R.string.settings_trakt_instruction, verificationUrl)
-    val accentColor = resolveAccentColor(fallback = Pink)
     val accentContentColor = contrastingContentColor(accentColor)
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
@@ -3620,6 +3623,7 @@ private fun MobileSettingsLayout(
     onImportCatalogPackClick: () -> Unit,
     onRenameCatalogClick: (CatalogConfig) -> Unit,
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
+    onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
     onAddCustomAddonClick: () -> Unit,
@@ -3740,6 +3744,7 @@ private fun MobileSettingsLayout(
                     onImportCatalogPackClick = onImportCatalogPackClick,
                     onRenameCatalogClick = onRenameCatalogClick,
                     onDeleteCatalogClick = onDeleteCatalogClick,
+                    onRestoreHiddenCatalogs = onRestoreHiddenCatalogs,
                     onConnectHomeServerClick = onConnectHomeServerClick,
                     onConnectPlexHomeServerClick = onConnectPlexHomeServerClick,
                     onAddCustomAddonClick = onAddCustomAddonClick,
@@ -3938,6 +3943,7 @@ private fun MobileSettingsSubPage(
     onImportCatalogPackClick: () -> Unit,
     onRenameCatalogClick: (CatalogConfig) -> Unit,
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
+    onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
     onAddCustomAddonClick: () -> Unit,
@@ -4317,6 +4323,7 @@ private fun MobileSettingsSubPage(
                     onMoveCatalogUp = { viewModel.moveCatalogUp(it.id) },
                     onMoveCatalogDown = { viewModel.moveCatalogDown(it.id) },
                     onDeleteCatalog = onDeleteCatalogClick,
+                    onRestoreHiddenCatalogs = onRestoreHiddenCatalogs,
                     onUnpackCatalog = { viewModel.unpackCatalog(it.id) }
                 )
             }
@@ -6543,7 +6550,7 @@ private fun IptvSettings(
                     Spacer(modifier = Modifier.weight(1f))
                     if (selectedIndices.isNotEmpty()) {
                         Box(modifier = Modifier.size(36.dp).clickable { selectedIndices.sortedDescending().forEach { onDeletePlaylist(it) }; selectionMode = false; selectedIndices = emptySet() }.background(Color(0xFFDC2626), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(Icons.Default.VisibilityOff, contentDescription = "Kataloge ausblenden", tint = Color.White, modifier = Modifier.size(20.dp))
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                     }
@@ -7612,6 +7619,35 @@ private fun formatCatalogDiscoveryDate(raw: String): String {
         ?: raw.replace('T', ' ').substringBefore('.').take(16)
 }
 
+@Composable
+private fun RestoreHiddenCatalogsRow(
+    focusIndex: Int,
+    focusedIndex: Int,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .settingsFocusSlot(focusIndex)
+            .background(
+                if (focusedIndex == focusIndex) Pink.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f),
+                RoundedCornerShape(10.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(Icons.Default.Visibility, contentDescription = "Versteckte Kataloge anzeigen", tint = Pink, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "Versteckte Kataloge wiederherstellen",
+            style = ArflixTypography.button,
+            color = if (focusedIndex == focusIndex) TextPrimary else Pink
+        )
+    }
+    Spacer(modifier = Modifier.height(12.dp))
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun CatalogsSettings(
@@ -7624,7 +7660,8 @@ private fun CatalogsSettings(
     onMoveCatalogUp: (CatalogConfig) -> Unit,
     onMoveCatalogDown: (CatalogConfig) -> Unit,
     onDeleteCatalog: (CatalogConfig) -> Unit,
-    onUnpackCatalog: (CatalogConfig) -> Unit
+    onUnpackCatalog: (CatalogConfig) -> Unit,
+    onRestoreHiddenCatalogs: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
     var selectionMode by remember { mutableStateOf(false) }
@@ -7766,6 +7803,11 @@ private fun CatalogsSettings(
                     }
                 }
             }
+            RestoreHiddenCatalogsRow(
+                focusIndex = catalogs.size + 2,
+                focusedIndex = focusedIndex,
+                onClick = onRestoreHiddenCatalogs
+            )
         }
     } else {
         // TV UI
@@ -7774,7 +7816,7 @@ private fun CatalogsSettings(
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.settings_n_selected, selectedIds.size), style = ArflixTypography.sectionTitle, color = TextPrimary)
                     Spacer(modifier = Modifier.weight(1f))
-                    if (selectedIds.isNotEmpty()) { Box(modifier = Modifier.size(36.dp).clickable { selectedIds.forEach { id -> val cat = catalogs.find { it.id == id }; if (cat != null) onDeleteCatalog(cat) }; selectionMode = false; selectedIds = emptySet() }.background(Color(0xFFDC2626), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.delete), tint = Color.White, modifier = Modifier.size(20.dp)) }; Spacer(modifier = Modifier.width(12.dp)) }
+                    if (selectedIds.isNotEmpty()) { Box(modifier = Modifier.size(36.dp).clickable { selectedIds.forEach { id -> val cat = catalogs.find { it.id == id }; if (cat != null) onDeleteCatalog(cat) }; selectionMode = false; selectedIds = emptySet() }.background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.VisibilityOff, contentDescription = "Kataloge ausblenden", tint = Color.White, modifier = Modifier.size(20.dp)) }; Spacer(modifier = Modifier.width(12.dp)) }
                     Box(modifier = Modifier.size(36.dp).clickable { selectionMode = false; selectedIds = emptySet() }.background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White, modifier = Modifier.size(20.dp)) }
                 }
             }
@@ -7856,10 +7898,15 @@ private fun CatalogsSettings(
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, enabled = catalog.packId != null && catalog.isBulkDeletablePack, onClick = { onUnpackCatalog(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(icon = Icons.Default.Delete, isFocused = isRowFocused && focusedActionIndex == 5, isDestructive = true, enabled = true, onClick = { onDeleteCatalog(catalog) })
+                    CatalogActionChip(icon = Icons.Default.VisibilityOff, isFocused = isRowFocused && focusedActionIndex == 5, isDestructive = false, enabled = true, onClick = { onDeleteCatalog(catalog) })
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
+            RestoreHiddenCatalogsRow(
+                focusIndex = catalogs.size + 2,
+                focusedIndex = focusedIndex,
+                onClick = onRestoreHiddenCatalogs
+            )
         }
     }
 }

@@ -2225,6 +2225,26 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun restoreHiddenCatalogs() {
+        viewModelScope.launch {
+            runCatching {
+                catalogRepository.restoreAllHiddenCatalogsForActiveProfile()
+                catalogRepository.ensurePreinstalledDefaults(mediaRepository.getDefaultCatalogConfigs())
+                catalogRepository.syncAddonCatalogs(streamRepository.installedAddons.first())
+                syncLocalStateToCloud(silent = true)
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = "Hidden catalogs restored",
+                    toastType = ToastType.SUCCESS
+                )
+            }.onFailure { error ->
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = error.message ?: "Failed to restore hidden catalogs",
+                    toastType = ToastType.ERROR
+                )
+            }
+        }
+    }
+
     fun unpackCatalog(catalogId: String) {
         viewModelScope.launch {
             val current = catalogRepository.getCatalogs()

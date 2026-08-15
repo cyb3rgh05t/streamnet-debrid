@@ -2008,12 +2008,29 @@ class TvViewModel @Inject constructor(
                 .asSequence()
                 .filter { (id, _, _) -> id == targetPlaylistId }
                 .map { (_, group, _) -> group.trim() }
-                .filter { it.isNotBlank() && it !in hidden }
+                .filter { group ->
+                    val normalized = group.trim().ifBlank { "Ungrouped" }
+                    normalized.isNotBlank() &&
+                        com.arflix.tv.data.model.PlaylistGroupKey.build(targetPlaylistId, normalized) !in hidden
+                }
                 .distinct()
                 .toList()
         }
         val snapshot = _uiState.value.snapshot
         val hidden = snapshot.hiddenGroups.mapTo(HashSet()) { it.trim() }
+        if (targetPlaylistId.isNotBlank()) {
+            return snapshot.channels
+                .asSequence()
+                .filter { channel -> channel.id.substringBefore(':') == targetPlaylistId }
+                .map { channel -> channel.group.trim() }
+                .filter { group ->
+                    val normalized = group.trim().ifBlank { "Ungrouped" }
+                    normalized.isNotBlank() &&
+                        com.arflix.tv.data.model.PlaylistGroupKey.build(targetPlaylistId, normalized) !in hidden
+                }
+                .distinct()
+                .toList()
+        }
         return snapshot.grouped.keys
             .asSequence()
             .map { it.trim() }
@@ -2085,6 +2102,7 @@ class TvViewModel @Inject constructor(
         if (next == current) {
             if (flushImmediately) {
                 iptvRepository.saveTvSessionStateInRepositoryScope(next)
+                scheduleIptvCloudSync()
             }
             return
         }
@@ -2094,6 +2112,7 @@ class TvViewModel @Inject constructor(
         tvSessionSaveJob?.cancel()
         if (flushImmediately) {
             iptvRepository.saveTvSessionStateInRepositoryScope(next)
+            scheduleIptvCloudSync()
             return
         }
         tvSessionSaveJob = viewModelScope.launch(Dispatchers.IO) {

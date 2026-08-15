@@ -14,6 +14,15 @@ class IptvHomeCatalogTest {
     }
 
     @Test
+    fun `recent TV home rail contains only ten newest channels`() {
+        val channelIds = (1..12).map { "channel-$it" }
+
+        assertThat(recentTvHomeChannelIds(channelIds))
+            .containsExactlyElementsIn((12 downTo 3).map { "channel-$it" })
+            .inOrder()
+    }
+
+    @Test
     fun `IPTV rows merge at configured positions`() {
         val current = listOf(category("continue_watching"), category("trending_movies"))
         val fresh = mapOf(

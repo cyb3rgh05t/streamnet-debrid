@@ -8,6 +8,8 @@ import com.arflix.tv.data.api.StreamApi
 import com.arflix.tv.data.api.SupabaseApi
 import com.arflix.tv.data.api.TmdbApi
 import com.arflix.tv.data.api.TraktApi
+import com.arflix.tv.data.api.TvdbApi
+import com.arflix.tv.data.api.FanartApi
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.Constants
 import dagger.Module
@@ -62,6 +64,54 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(TmdbApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideTvdbApi(okHttpClient: OkHttpClient): TvdbApi {
+        var token: String? = null
+        val tvdbClient = okHttpClient.newBuilder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                token?.takeIf { it.isNotBlank() }?.let { request.header("Authorization", "Bearer $it") }
+                chain.proceed(request.build())
+            }
+            .build()
+        val api = Retrofit.Builder()
+            .baseUrl("https://api4.thetvdb.com/v4/")
+            .client(tvdbClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(TvdbApi::class.java)
+        return object : TvdbApi {
+            override suspend fun login(request: com.arflix.tv.data.api.TvdbLoginRequest) =
+                api.login(request).also { token = it.data?.token }
+
+            override suspend fun search(query: String, type: String) = api.search(query, type)
+            override suspend fun getSeriesArtworks(id: Int) = api.getSeriesArtworks(id)
+        }
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideFanartApi(okHttpClient: OkHttpClient): FanartApi {
+        val fanartClient = okHttpClient.newBuilder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                if (Constants.FANART_API_KEY.isNotBlank()) {
+                    request.header("api-key", Constants.FANART_API_KEY)
+                }
+                chain.proceed(request.build())
+            }
+            .build()
+        return Retrofit.Builder()
+            .baseUrl("https://webservice.fanart.tv/v3/")
+            .client(fanartClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(FanartApi::class.java)
     }
 
     @Provides

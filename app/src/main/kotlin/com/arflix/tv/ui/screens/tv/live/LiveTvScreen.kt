@@ -847,7 +847,8 @@ fun LiveTvScreen(
             selectedCategoryId = fallbackCategoryId
             return@LaunchedEffect
         }
-        if (selectedCategoryId != "all" && tree.byId(selectedCategoryId) == null) {
+        val selectedCategoryIsHidden = tree.hidden.categories.any { it.id == selectedCategoryId }
+        if (selectedCategoryId != "all" && (tree.byId(selectedCategoryId) == null || selectedCategoryIsHidden)) {
             selectedCategoryId = fallbackCategoryId
         }
     }
@@ -2505,7 +2506,13 @@ fun LiveTvScreen(
         }
     }
     BackHandler(enabled = !searchOpen && variantPickerChannel == null && !isFullScreen) {
-        onBack()
+        if (!useTouchRail && focusZone != LiveTvFocusZone.TOPBAR) {
+            topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile)
+                .coerceIn(0, maxTopBarIndex)
+            focusZone = LiveTvFocusZone.TOPBAR
+        } else {
+            onBack()
+        }
     }
 
     val channelNumberExactName = remember(channelNumberBuffer, visibleChannels) {
@@ -2589,7 +2596,7 @@ fun LiveTvScreen(
                 }
             )
     ) {
-        if (!isFullScreen) {
+        if (!isFullScreen && !isTouchDevice) {
             androidx.compose.foundation.Image(
                 painter = painterResource(R.drawable.live_tv_theatre_fanart),
                 contentDescription = null,
@@ -2745,6 +2752,7 @@ fun LiveTvScreen(
                     playlistLastRefreshedAtMillis = state.snapshot.loadedAt.toEpochMilli()
                         .takeIf { state.snapshot.channels.isNotEmpty() },
                     isPlaylistRefreshing = state.isRefreshingPlaylist,
+                    isBuffering = playerIsBuffering,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
                     lookupBackdrop = { title ->
@@ -3120,6 +3128,27 @@ fun LiveTvScreen(
             if (isFullScreen && !fullscreenGuideOpen && !quickZapOpen) {
                 delay(50L)
                 runCatching { fsFocus.requestFocus() }
+            }
+        }
+
+        // Some blocked sources stay in BUFFERING without emitting a player error.
+        // Force a native retry so the existing error path can resolve a fresh source
+        // instead of leaving the preview/fullscreen spinner stuck indefinitely.
+        LaunchedEffect(lastPreparedStreamUrl, playingChannelId, playingCatchupProgram, lastPreparedCatchupOffsetMs) {
+            val prepared = lastPreparedStreamUrl ?: return@LaunchedEffect
+            repeat(3) { attempt ->
+                delay(15_000L)
+                if (!playerIsBuffering || exoPlayer.playbackState != Player.STATE_BUFFERING || lastPreparedStreamUrl != prepared) {
+                    return@LaunchedEffect
+                }
+                playbackDiagnostic = PlaybackDiagnostic(
+                    title = context.getString(R.string.live_diag_retrying_source),
+                    detail = "Attempt ${attempt + 1}/3: ${context.getString(R.string.live_diag_preparing_source)}",
+                    severity = PlaybackDiagnosticSeverity.Warning,
+                )
+                exoPlayer.prepare()
+                exoPlayer.playWhenReady = true
+                exoPlayer.play()
             }
         }
 

@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -151,7 +152,6 @@ fun MediaCard(
 
     val context = LocalContext.current
     val density = LocalDensity.current
-    val overlayBrush: Brush? = null  // Gradient removed per user feedback
     // Performance: Removed context/density from keys - they're stable CompositionLocals
     val imageRequest = remember(rawImageUrl, width, aspectRatio) {
         if (rawImageUrl == null) return@remember null
@@ -253,56 +253,39 @@ fun MediaCard(
                         )
                     }
                 }
-                if (overlayBrush != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(overlayBrush)
-                    )
-                }
-
                 if (showCollectionTitleOverlay) {
                     Box(
                         modifier = Modifier
-                            .align(if (isGenreCollectionTile) Alignment.BottomStart else Alignment.TopStart)
+                            .align(if (isGenreCollectionTile) Alignment.Center else Alignment.TopStart)
+                            .then(if (isGenreCollectionTile) Modifier.fillMaxWidth() else Modifier)
                             .padding(
                                 start = 12.dp,
                                 end = 12.dp,
-                                top = if (isGenreCollectionTile) 12.dp else 12.dp,
-                                bottom = if (isGenreCollectionTile) 14.dp else 12.dp
+                                top = 12.dp,
+                                bottom = 12.dp
                             )
-                            .clip(RoundedCornerShape(if (isGenreCollectionTile) 12.dp else 10.dp))
+                            .clip(RoundedCornerShape(10.dp))
                             .background(
-                                Color.Black.copy(alpha = if (visualFocused) {
-                                    if (isGenreCollectionTile) 0.72f else 0.62f
-                                } else {
-                                    if (isGenreCollectionTile) 0.58f else 0.52f
-                                })
+                                Color.Black.copy(alpha = if (visualFocused) 0.62f else 0.52f)
                             )
                             .border(
-                                width = if (visualFocused) {
-                                    if (isGenreCollectionTile) 1.dp else 1.5.dp
-                                } else {
-                                    1.dp
-                                },
+                                width = if (visualFocused) 1.5.dp else 1.dp,
                                 color = Color.White.copy(alpha = if (visualFocused) 0.9f else 0.28f),
-                                shape = RoundedCornerShape(if (isGenreCollectionTile) 12.dp else 10.dp)
+                                shape = RoundedCornerShape(10.dp)
                             )
                             .padding(
-                                horizontal = if (isGenreCollectionTile) 12.dp else 10.dp,
-                                vertical = if (isGenreCollectionTile) 8.dp else 7.dp
+                                horizontal = 10.dp,
+                                vertical = 7.dp
                             )
                     ) {
                         Text(
                             text = item.title,
                             style = ArvioSkin.typography.cardTitle.copy(
-                                fontSize = when {
-                                    isGenreCollectionTile && isLandscape -> 18.sp
-                                    isLandscape -> 15.sp
-                                    else -> 14.sp
-                                }
+                                fontSize = if (isLandscape) 15.sp else 14.sp
                             ),
                             color = Color.White.copy(alpha = 0.98f),
+                            textAlign = if (isGenreCollectionTile) TextAlign.Center else TextAlign.Start,
+                            modifier = if (isGenreCollectionTile) Modifier.fillMaxWidth() else Modifier,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )

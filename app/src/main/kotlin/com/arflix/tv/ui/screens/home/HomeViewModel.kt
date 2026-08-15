@@ -82,6 +82,11 @@ import kotlin.math.abs
 internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
     channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
+private const val RECENT_TV_HOME_ITEM_LIMIT = 10
+
+internal fun recentTvHomeChannelIds(channelIds: List<String>): List<String> =
+    newestFirstChannelIds(channelIds).take(RECENT_TV_HOME_ITEM_LIMIT)
+
 internal fun mergeIptvHomeCategories(
     current: List<Category>,
     freshById: Map<String, Category>,
@@ -790,12 +795,10 @@ class HomeViewModel @Inject constructor(
         if (hasActiveMiss(programBackdropMisses, key)) return null
 
         return runCatching {
-            val bestMatch = searchIptvProgramCandidates(query)
-                .firstOrNull { candidate ->
-                    !candidate.item.backdrop.isNullOrBlank() && isAcceptableIptvCandidate(query, candidate)
-                }
-
-            bestMatch?.item?.backdrop
+            // Keep Home and Live TV on the same tolerant resolver. EPG titles often
+            // contain episode subtitles (e.g. "Blue Bloods - Crime Scene New York")
+            // while TMDB only returns the parent series title ("Blue Bloods").
+            mediaRepository.lookupIptvProgramBackdrop(rawTitle)
                 ?.also { backdrop ->
                     programBackdropCache[key] = backdrop
                     programBackdropMisses.remove(key)
@@ -817,20 +820,15 @@ class HomeViewModel @Inject constructor(
         if (hasActiveMiss(programLogoMisses, key)) return null
 
         return runCatching {
-            val candidates = searchIptvProgramCandidates(query)
-                .filter { candidate -> isAcceptableIptvCandidate(query, candidate) }
-
-            for (candidate in candidates.take(IPTV_LOGO_CANDIDATE_LIMIT)) {
-                val logoUrl = mediaRepository.getLogoUrl(candidate.item.mediaType, candidate.item.id)
-                if (!logoUrl.isNullOrBlank()) {
+            mediaRepository.lookupIptvProgramLogo(rawTitle)
+                ?.also { logoUrl ->
                     programLogoCache[key] = logoUrl
                     programLogoMisses.remove(key)
-                    return@runCatching logoUrl
                 }
-            }
-
-            registerMiss(programLogoMisses, key)
-            null
+                ?: run {
+                    registerMiss(programLogoMisses, key)
+                    null
+                }
         }.getOrElse {
             registerMiss(programLogoMisses, key)
             null
@@ -1061,7 +1059,7 @@ class HomeViewModel @Inject constructor(
             ?: iptvRepository.getCachedSnapshotOrNull()
             ?: return emptyMap()
         val favoriteIds = snapshot.favoriteChannels.toHashSet()
-        val recentIds = newestFirstChannelIds(
+        val recentIds = recentTvHomeChannelIds(
             iptvRepository.observeTvSessionState().first().recentChannelIds
         )
         val relevantIds = favoriteIds + recentIds
@@ -1359,6 +1357,7 @@ class HomeViewModel @Inject constructor(
     private var prefetchJob: Job? = null
     private var preloadCategoryPriorityJob: Job? = null
     private val preloadCategoryJobs = ConcurrentHashMap<Int, Job>()
+    private var backgroundCategoryPrefetchJob: Job? = null
     private var startupCatalogWarmupJob: Job? = null
     private var customCatalogsJob: Job? = null
     private var loadHomeJob: Job? = null
@@ -1399,15 +1398,13 @@ class HomeViewModel @Inject constructor(
     private val backdropPreloadHeight = cardBackdropHeight
     private val initialLogoPrefetchRows = 1
     private val initialLogoPrefetchItemsPerRow = if (isLowRamDevice) 1 else 2
-    // Prefetch enough backdrops to fill the first visible row on the home screen
-    // (typically 6-8 cards on a TV). Was 2, which left the majority of the first
-    // row unpreloaded on cold start, causing visible black -> image pop-in.
-    private val initialBackdropPrefetchItems = if (isLowRamDevice) 4 else 8
+    // Keep startup work small; remaining cards warm lazily as rows become visible.
+    private val initialBackdropPrefetchItems = if (isLowRamDevice) 2 else 4
     private val incrementalLogoPrefetchItems = if (isLowRamDevice) 4 else 6
     private val prioritizedLogoPrefetchItems = if (isLowRamDevice) 5 else 7
     private val incrementalBackdropPrefetchItems = if (isLowRamDevice) 4 else 7
-    private val startupWarmupCategoryCount = if (isLowRamDevice) 5 else 8
-    private val startupWarmupItemsPerRow = if (isLowRamDevice) 5 else 8
+    private val startupWarmupCategoryCount = if (isLowRamDevice) 2 else 3
+    private val startupWarmupItemsPerRow = if (isLowRamDevice) 2 else 3
     private val initialCategoryItemCap = if (isLowRamDevice) 8 else 10
     private val categoryPageSize = if (isLowRamDevice) 8 else 10
     private val initialMdblistCatalogCount = 1
@@ -1736,8 +1733,19 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             iptvRepository.dataRefreshEvents.collect {
+                programBackdropMisses.clear()
+                programLogoMisses.clear()
                 refreshIptvHomeCatalogs()
             }
+        }
+        viewModelScope.launch {
+            iptvRepository.observeTvSessionState()
+                .map { session -> session.recentChannelIds }
+                .distinctUntilChanged()
+                .drop(1)
+                .collect {
+                    refreshIptvHomeCatalogs()
+                }
         }
         viewModelScope.launch {
             streamRepository.installedAddons.collectLatest { addons ->
@@ -2979,7 +2987,8 @@ class HomeViewModel @Inject constructor(
                 // On mobile/touch devices, prefetch logos for ALL categories in the background
                 // since there's no D-pad focus to trigger incremental loading.
                 if (!isLowRamDevice && !isTvDevice) {
-                    viewModelScope.launch(networkDispatcher) {
+                    backgroundCategoryPrefetchJob?.cancel()
+                    backgroundCategoryPrefetchJob = viewModelScope.launch(networkDispatcher) {
                         delay(1_500L) // Let initial UI settle first
                         for (i in initialLogoPrefetchRows until categories.size) {
                             preloadLogosForCategory(i, prioritizeVisible = false)
@@ -4280,6 +4289,7 @@ class HomeViewModel @Inject constructor(
 
         // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
         if (_uiState.value.trailerAutoPlay &&
+            !isIptvItem(item) &&
             !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null)
         ) {
             _uiState.value = _uiState.value.copy(heroTrailerKey = null)
@@ -4287,8 +4297,11 @@ class HomeViewModel @Inject constructor(
                 try {
                     val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
                     if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
+                        android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
                         _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
                         prefetchTrailerUrl(trailerKey)
+                    } else {
+                        android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
                     }
                         } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -4321,8 +4334,11 @@ class HomeViewModel @Inject constructor(
                 try {
                     val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
                     if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
+                        android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
                         _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
                         prefetchTrailerUrl(trailerKey)
+                    } else {
+                        android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
                     }
                         } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -4346,6 +4362,7 @@ class HomeViewModel @Inject constructor(
 
         // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
         if (_uiState.value.trailerAutoPlay &&
+            !isIptvItem(item) &&
             !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null)
         ) {
             _uiState.value = _uiState.value.copy(heroTrailerKey = null)

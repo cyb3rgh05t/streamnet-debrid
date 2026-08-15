@@ -142,6 +142,18 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
         }
 
         appScope.launch {
+            // Eagerly initialize Coil's DiskLruCache on a background thread
+            // to avoid blocking the main thread later when Home cards start
+            // loading images. The DiskLruCache.initialize() call is expensive
+            // (300-400ms on first run) and heavily locks other Coil requests.
+            try {
+                imageLoader
+            } catch (e: Exception) {
+                Log.w("ArflixApplication", "Failed to initialize Coil cache", e)
+            }
+        }
+
+        appScope.launch {
             // Wait for first navigation/auth restore work to start so the
             // event can include account context without delaying app launch.
             delay(3_000L)

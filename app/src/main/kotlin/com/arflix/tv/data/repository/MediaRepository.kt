@@ -1,8 +1,12 @@
 package com.arflix.tv.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.arflix.tv.R
 import com.arflix.tv.data.api.TmdbApi
+import com.arflix.tv.data.api.FanartApi
+import com.arflix.tv.data.api.TvdbApi
+import com.arflix.tv.data.api.TvdbLoginRequest
 import com.arflix.tv.data.api.TmdbCastMember
 import com.arflix.tv.data.api.TmdbCrewMember
 import com.arflix.tv.data.api.TmdbEpisode
@@ -91,6 +95,8 @@ internal object HomeServerLibraryIdentity {
 class MediaRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val tmdbApi: TmdbApi,
+    private val tvdbApi: TvdbApi,
+    private val fanartApi: FanartApi,
     private val traktRepository: TraktRepository,
     private val traktApi: TraktApi,
     private val okHttpClient: OkHttpClient,
@@ -105,6 +111,7 @@ class MediaRepository @Inject constructor(
 
     private val apiKey = Constants.TMDB_API_KEY
     private val gson = Gson()
+    @Volatile private var tvdbToken: String? = null
 
     /** TMDB content language (e.g. "en-US", "fr-FR", "nl-NL"). */
     @Volatile
@@ -141,6 +148,7 @@ class MediaRepository @Inject constructor(
     private val castCache = mutableMapOf<String, CacheEntry<List<CastMember>>>()
     private val similarCache = mutableMapOf<String, CacheEntry<List<MediaItem>>>()
     private val logoCache = ConcurrentHashMap<String, CacheEntry<String?>>()
+    private val logoRequestSemaphore = Semaphore(3)
     private val reviewsCache = mutableMapOf<String, CacheEntry<List<Review>>>()
     private val watchProvidersCache = mutableMapOf<String, CacheEntry<StreamingServicesResult?>>()
     private val seasonEpisodesCache = mutableMapOf<String, CacheEntry<List<Episode>>>()
@@ -2934,6 +2942,7 @@ class MediaRepository @Inject constructor(
             .replace(Regex("""\s+"""), " ")
             .trim()
         if (cleanedTitle.length < 3) return null
+        if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
         val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
         val languageOverrides = buildList<String?> {
@@ -2956,6 +2965,9 @@ class MediaRepository @Inject constructor(
                 } + (item.popularity / 100f)
             }
             ?.backdrop
+            ?.also { android.util.Log.d("IptvArtwork", "TMDB backdrop hit title=$cleanedTitle") }
+            ?: lookupFanartArtwork(cleanedTitle, candidates, preferLogo = false)
+                ?.also { android.util.Log.d("IptvArtwork", "Fallback backdrop hit title=$cleanedTitle") }
     }
 
     suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
@@ -2965,6 +2977,7 @@ class MediaRepository @Inject constructor(
             .replace(Regex("""\s+"""), " ")
             .trim()
         if (cleanedTitle.length < 3) return null
+        if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
         val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
         val candidates = buildList<String?> {
@@ -2984,9 +2997,82 @@ class MediaRepository @Inject constructor(
             }
 
         for (candidate in candidates.take(8)) {
-            getLogoUrl(candidate.mediaType, candidate.id)?.takeIf { it.isNotBlank() }?.let { return it }
+            getLogoUrl(candidate.mediaType, candidate.id)?.takeIf { it.isNotBlank() }?.let {
+                android.util.Log.d("IptvArtwork", "TMDB logo hit title=$cleanedTitle candidate=${candidate.id}")
+                return it
+            }
         }
+        return lookupFanartArtwork(cleanedTitle, candidates, preferLogo = true)
+            ?.also { android.util.Log.d("IptvArtwork", "Fallback logo hit title=$cleanedTitle") }
+    }
+
+    private suspend fun lookupFanartArtwork(
+        title: String,
+        tmdbCandidates: List<MediaItem>,
+        preferLogo: Boolean,
+    ): String? {
+        if (Constants.TVDB_API_KEY.isBlank()) return null
+        val tvdbAuthenticated = ensureTvdbToken() != null
+        val tvCandidates = tmdbCandidates.filter { it.mediaType == MediaType.TV }.take(6)
+        val ids = tvCandidates.mapNotNull { candidate ->
+            runCatching { tmdbApi.getTvExternalIds(candidate.id, apiKey).tvdbId }.getOrNull()
+        }.distinct().toMutableList()
+        if (ids.isEmpty()) {
+            if (!tvdbAuthenticated) return null
+            val searchResults = runCatching {
+                tvdbApi.search(title, type = "series").data
+            }.getOrDefault(emptyList())
+            ids += searchResults.mapNotNull { it.id?.toIntOrNull() }.take(5)
+        }
+        for (tvdbId in ids.distinct()) {
+            if (Constants.FANART_API_KEY.isNotBlank()) {
+                val artwork = runCatching { fanartApi.getTvArtwork(tvdbId) }.getOrNull()
+                val images = if (preferLogo) {
+                    artwork?.clearLogos.orEmpty() + artwork?.hdTvLogos.orEmpty()
+                } else {
+                    artwork?.backgrounds.orEmpty() + artwork?.thumbnails.orEmpty() + artwork?.banners.orEmpty()
+                }
+                images.asSequence()
+                    .filter { image -> !image.url.isNullOrBlank() }
+                    .sortedWith(
+                        compareByDescending<com.arflix.tv.data.api.FanartImage> { it.lang.equals("en", true) }
+                            .thenByDescending { it.likes ?: 0 }
+                    )
+                    .firstOrNull()
+                    ?.url
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        android.util.Log.d("IptvArtwork", "Fanart.tv hit tvdbId=$tvdbId logo=$preferLogo")
+                        return it
+                    }
+            }
+            val tvdbArtwork = if (tvdbAuthenticated) {
+                runCatching { tvdbApi.getSeriesArtworks(tvdbId) }.getOrNull()
+            } else {
+                null
+            }
+            tvdbArtwork?.data
+                ?.asSequence()
+                ?.filter { image -> !image.image.isNullOrBlank() }
+                ?.sortedByDescending { it.score ?: 0 }
+                ?.firstOrNull()
+                ?.image
+                ?.takeIf { it.isNotBlank() }
+                ?.let {
+                    android.util.Log.d("IptvArtwork", "TVDB artwork hit tvdbId=$tvdbId logo=$preferLogo")
+                    return it
+                }
+        }
+            android.util.Log.d("IptvArtwork", "No artwork source hit title=$title logo=$preferLogo")
         return null
+    }
+
+    private suspend fun ensureTvdbToken(): String? {
+        tvdbToken?.takeIf { it.isNotBlank() }?.let { return it }
+        return runCatching {
+            tvdbApi.login(TvdbLoginRequest(Constants.TVDB_API_KEY)).data?.token
+                ?.also { tvdbToken = it }
+        }.getOrNull()
     }
 
     private fun normalizeIptvArtworkTitle(value: String): String =
@@ -3002,6 +3088,18 @@ class MediaRepository @Inject constructor(
         if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
         return leftTokens.intersect(rightTokens).size.toDouble() /
             maxOf(leftTokens.size, rightTokens.size).toDouble()
+    }
+
+    private fun String.isArtworkPlaceholderTitle(): Boolean {
+        val normalized = lowercase(Locale.US).replace(Regex("""\s+"""), " ").trim()
+        return normalized in setOf(
+            "tv guide nicht verfügbar",
+            "tv guide nicht verfugbar",
+            "tv guide pending",
+            "guide pending",
+            "no programme information",
+            "no program information",
+        )
     }
 
     /**
@@ -3164,36 +3262,38 @@ class MediaRepository @Inject constructor(
         }
 
         val type = if (mediaType == MediaType.TV) "tv" else "movie"
-        return try {
-            // Request English + language-agnostic logos explicitly so logo availability
-            // is stable even when app locale is non-English.
-            val images = tmdbApi.getImages(
-                mediaType = type,
-                id = mediaId,
-                apiKey = apiKey,
-                includeImageLanguage = "en,null"
-            )
-            // Quality ranking for clearlogos: prefer PNG over SVG (the app has
-            // no SVG decoder), English over other locales, and among the
-            // survivors pick the highest community-rated logo (vote_average
-            // breaks ties, width acts as a secondary for untouched images).
-            val logo = images.logos
-                .asSequence()
-                .filter { !it.filePath.isNullOrBlank() }
-                .filterNot { it.filePath!!.endsWith(".svg", ignoreCase = true) }
-                .sortedWith(
-                    compareByDescending<TmdbImage> { it.iso6391 == "en" }
-                        .thenByDescending { it.voteAverage }
-                        .thenByDescending { it.width }
+        return logoRequestSemaphore.withPermit {
+            try {
+                // Request English + language-agnostic logos explicitly so logo availability
+                // is stable even when app locale is non-English.
+                val images = tmdbApi.getImages(
+                    mediaType = type,
+                    id = mediaId,
+                    apiKey = apiKey,
+                    includeImageLanguage = "en,null"
                 )
-                .firstOrNull()
-            val url = logo?.filePath?.let { "${Constants.LOGO_BASE}$it" }
-            logoCache[cacheKey] = CacheEntry(url, System.currentTimeMillis())
-            url
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
+                // Quality ranking for clearlogos: prefer PNG over SVG (the app has
+                // no SVG decoder), English over other locales, and among the
+                // survivors pick the highest community-rated logo (vote_average
+                // breaks ties, width acts as a secondary for untouched images).
+                val logo = images.logos
+                    .asSequence()
+                    .filter { !it.filePath.isNullOrBlank() }
+                    .filterNot { it.filePath!!.endsWith(".svg", ignoreCase = true) }
+                    .sortedWith(
+                        compareByDescending<TmdbImage> { it.iso6391 == "en" }
+                            .thenByDescending { it.voteAverage }
+                            .thenByDescending { it.width }
+                    )
+                    .firstOrNull()
+                val url = logo?.filePath?.let { "${Constants.LOGO_BASE}$it" }
+                logoCache[cacheKey] = CacheEntry(url, System.currentTimeMillis())
+                url
+            } catch (e: Exception) {
+                if (e is kotlinx.coroutines.CancellationException) throw e
 
-            null
+                null
+            }
         }
     }
 
@@ -3309,10 +3409,16 @@ class MediaRepository @Inject constructor(
                 ?: results.find { it.type == "Trailer" && it.site == "YouTube" }
                 ?: results.find { it.type == "Teaser" && it.site == "YouTube" }
                 ?: results.find { it.site == "YouTube" }
+            Log.d(
+                "TrailerDebug",
+                "TMDB videos type=$type id=$mediaId language=$contentLanguage results=${results.size} " +
+                    "selected=${trailer?.key.orEmpty()} title=${trailer?.name.orEmpty()}"
+            )
             trailer?.key
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
+            Log.w("TrailerDebug", "TMDB video lookup failed type=$type id=$mediaId: ${e.message}")
             null
         }
     }

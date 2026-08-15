@@ -607,6 +607,7 @@ fun CollectionDetailsScreen(
             onNearEnd = { viewModel.loadMoreIfNeeded(activeTab) },
             isLoading = isTabLoading,
             isLoadingMore = isTabLoadingMore,
+            loadingAccent = collectionAccentColor(uiState.catalog?.collectionGroup),
             emptyMessage = when (uiState.error) {
                 null -> stringResource(R.string.collection_empty)
                 COLLECTION_LOAD_FAILED_ERROR -> stringResource(R.string.collection_failed_load)
@@ -788,6 +789,7 @@ private fun CollectionItemsGrid(
     onNearEnd: () -> Unit,
     isLoading: Boolean,
     isLoadingMore: Boolean,
+    loadingAccent: Color,
     emptyMessage: String,
     topContentPadding: androidx.compose.ui.unit.Dp
 ) {
@@ -922,7 +924,7 @@ private fun CollectionItemsGrid(
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.material3.CircularProgressIndicator(
-                        color = Color(0xFF4F7FB0),
+                        color = loadingAccent,
                         strokeWidth = 2.dp,
                         modifier = Modifier.size(20.dp)
                     )

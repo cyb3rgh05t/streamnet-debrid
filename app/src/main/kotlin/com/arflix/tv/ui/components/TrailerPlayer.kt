@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.components
 
 import android.view.LayoutInflater
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -81,10 +82,15 @@ fun TrailerPlayer(
             try {
                 val source = extractor.extractPlaybackSource("https://www.youtube.com/watch?v=$youtubeKey")
                 if (source != null) {
+                    Log.d("TrailerDebug", "YouTube source extracted key=$youtubeKey audio=${!source.audioUrl.isNullOrBlank()}")
                     videoUrl = source.videoUrl
                     audioUrl = source.audioUrl
+                } else {
+                    Log.w("TrailerDebug", "YouTube source extraction returned null key=$youtubeKey")
                 }
-            } catch (_: Exception) {}
+            } catch (e: Exception) {
+                Log.w("TrailerDebug", "YouTube source extraction failed key=$youtubeKey: ${e.message}")
+            }
         }
         if (videoUrl != null) {
             shouldPlay = true
@@ -130,6 +136,7 @@ fun TrailerPlayer(
         DisposableEffect(lifecycleOwner, player) {
             val listener = object : Player.Listener {
                 override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    Log.w("TrailerDebug", "ExoPlayer failed key=$youtubeKey: ${error.errorCodeName} ${error.message}")
                     extractor.evictCache(youtubeKey)
                 }
                 override fun onPlaybackStateChanged(playbackState: Int) {

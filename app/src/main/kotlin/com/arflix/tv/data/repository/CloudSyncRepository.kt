@@ -229,6 +229,7 @@ class CloudSyncRepository @Inject constructor(
     private suspend fun clearLocalDirtyAfterSuccessfulPush() {
         latestLocalDirtyAt = 0L
         isPushDirty = false
+        iptvRepository.clearGroupOrderLocallyDirty()
         context.settingsDataStore.edit { prefs ->
             prefs.remove(cloudSyncLocalDirtyAtKey)
             prefs[cloudSyncLastPushAtKey] = System.currentTimeMillis()

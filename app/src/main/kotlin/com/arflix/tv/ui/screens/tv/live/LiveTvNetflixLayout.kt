@@ -106,6 +106,7 @@ internal fun LiveTvNetflixLayout(
     isPlaylistRefreshing: Boolean,
     variantCountFor: (EnrichedChannel) -> Int,
     isFullScreen: Boolean,
+    isBuffering: Boolean = false,
     lookupBackdrop: suspend (String) -> String? = { null },
     onSelectCategory: (String) -> Unit,
     onOpenSearch: () -> Unit,
@@ -157,6 +158,7 @@ internal fun LiveTvNetflixLayout(
                 exoPlayer = exoPlayer,
                 channel = playingChannel,
                 isFullScreen = isFullScreen,
+                isBuffering = isBuffering,
                 focusRequester = heroFocusRequester,
                 onClick = onOpenFullscreen,
                 onMoveUp = onMoveUpFromCategory,
@@ -235,6 +237,7 @@ private fun HeroVideoCard(
     exoPlayer: ExoPlayer,
     channel: EnrichedChannel?,
     isFullScreen: Boolean,
+    isBuffering: Boolean,
     focusRequester: FocusRequester,
     onClick: () -> Unit,
     onMoveUp: () -> Unit,
@@ -316,6 +319,16 @@ private fun HeroVideoCard(
             },
             modifier = Modifier.fillMaxSize(),
         )
+        if (isBuffering && !isFullScreen) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.38f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                LoadingIndicator(size = 44.dp, color = LiveColors.Accent, strokeWidth = 3.dp)
+            }
+        }
     }
 }
 

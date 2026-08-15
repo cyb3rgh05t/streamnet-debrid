@@ -305,6 +305,10 @@ class IptvRepository @Inject constructor(
 
     fun isGroupOrderLocallyDirty(): Boolean = groupOrderLocallyDirty
 
+    fun clearGroupOrderLocallyDirty() {
+        groupOrderLocallyDirty = false
+    }
+
     @Volatile
     private var cachedNowNext: ConcurrentHashMap<String, IptvNowNext> = ConcurrentHashMap()
     private val emptyShortEpgCooldownUntil = ConcurrentHashMap<String, Long>()
@@ -1561,8 +1565,10 @@ class IptvRepository @Inject constructor(
     }
 
     suspend fun toggleHiddenGroup(playlistId: String, groupName: String) {
-        val trimmed = PlaylistGroupKey.build(playlistId, groupName.trim())
-        if (groupName.trim().isEmpty()) return
+        val normalizedPlaylistId = playlistId.trim()
+        if (normalizedPlaylistId.isEmpty()) return
+        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
+        val trimmed = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
         context.settingsDataStore.edit { prefs ->
             val existing = decodeHiddenGroups(prefs).toMutableList()
             if (existing.contains(trimmed)) {
@@ -1576,9 +1582,13 @@ class IptvRepository @Inject constructor(
     }
 
     suspend fun moveGroupUp(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
-        val target = PlaylistGroupKey.build(playlistId, groupName.trim())
-        if (groupName.trim().isEmpty()) return
-        val currentKeys = currentGroups.map { PlaylistGroupKey.build(playlistId, it.trim()) }
+        val normalizedPlaylistId = playlistId.trim()
+        if (normalizedPlaylistId.isEmpty()) return
+        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
+        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
+        val currentKeys = currentGroups.map {
+            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
+        }
         context.settingsDataStore.edit { prefs ->
             val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
             if (order.isEmpty()) return@edit
@@ -1592,9 +1602,13 @@ class IptvRepository @Inject constructor(
     }
 
     suspend fun moveGroupToTop(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
-        val target = PlaylistGroupKey.build(playlistId, groupName.trim())
-        if (groupName.trim().isEmpty()) return
-        val currentKeys = currentGroups.map { PlaylistGroupKey.build(playlistId, it.trim()) }
+        val normalizedPlaylistId = playlistId.trim()
+        if (normalizedPlaylistId.isEmpty()) return
+        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
+        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
+        val currentKeys = currentGroups.map {
+            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
+        }
         context.settingsDataStore.edit { prefs ->
             val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
             if (order.isEmpty()) return@edit
@@ -1609,9 +1623,13 @@ class IptvRepository @Inject constructor(
     }
 
     suspend fun moveGroupDown(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
-        val target = PlaylistGroupKey.build(playlistId, groupName.trim())
-        if (groupName.trim().isEmpty()) return
-        val currentKeys = currentGroups.map { PlaylistGroupKey.build(playlistId, it.trim()) }
+        val normalizedPlaylistId = playlistId.trim()
+        if (normalizedPlaylistId.isEmpty()) return
+        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
+        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
+        val currentKeys = currentGroups.map {
+            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
+        }
         context.settingsDataStore.edit { prefs ->
             val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
             if (order.isEmpty()) return@edit
@@ -3124,15 +3142,31 @@ class IptvRepository @Inject constructor(
             .map { it.trim() }
             .filter { it.isNotBlank() }
             .distinct()
+        val targetPlaylistId = current.firstOrNull()?.let { PlaylistGroupKey(it).playlistId }
+        if (targetPlaylistId.isNullOrBlank()) return savedOrder.distinct().toMutableList()
         val currentSet = current.toHashSet()
-        val merged = savedOrder
+        val normalizedSaved = savedOrder
             .map { it.trim() }
-            .filter { it.isNotBlank() && (currentSet.isEmpty() || it in currentSet) }
+            .filter { it.isNotBlank() }
             .distinct()
+        val targetOrder = normalizedSaved
+            .filter { PlaylistGroupKey(it).playlistId == targetPlaylistId && it in currentSet }
             .toMutableList()
         current.forEach { group ->
-            if (group !in merged) merged.add(group)
+            if (group !in targetOrder) targetOrder.add(group)
         }
+        val firstTargetIndex = normalizedSaved.indexOfFirst {
+            PlaylistGroupKey(it).playlistId == targetPlaylistId
+        }
+        val merged = normalizedSaved
+            .filterNot { PlaylistGroupKey(it).playlistId == targetPlaylistId }
+            .toMutableList()
+        val insertionIndex = if (firstTargetIndex < 0) merged.size else {
+            normalizedSaved.take(firstTargetIndex)
+                .count { PlaylistGroupKey(it).playlistId != targetPlaylistId }
+                .coerceAtMost(merged.size)
+        }
+        merged.addAll(insertionIndex, targetOrder)
         return merged
     }
 
@@ -3264,9 +3298,8 @@ class IptvRepository @Inject constructor(
             prefs[epgUrlKeyFor(safeProfileId)] = encryptConfigValue(normalizedEpg)
             prefs[favoriteGroupsKeyFor(safeProfileId)] = gson.toJson(state.favoriteGroups.distinct())
             prefs[favoriteChannelsKeyFor(safeProfileId)] = gson.toJson(state.favoriteChannels.distinct())
-            if (state.hiddenGroups.isNotEmpty()) {
-                prefs[hiddenGroupsKeyFor(safeProfileId)] = gson.toJson(state.hiddenGroups.distinct())
-            }
+            if (state.hiddenGroups.isEmpty()) prefs.remove(hiddenGroupsKeyFor(safeProfileId))
+            else prefs[hiddenGroupsKeyFor(safeProfileId)] = gson.toJson(state.hiddenGroups.distinct())
             if (normalizedGroupOrder.isEmpty()) prefs.remove(groupOrderKeyFor(safeProfileId))
             else prefs[groupOrderKeyFor(safeProfileId)] = gson.toJson(normalizedGroupOrder)
             prefs[groupOrderSchemaKeyFor(safeProfileId)] = IPTV_GROUP_ORDER_SCHEMA.toString()
