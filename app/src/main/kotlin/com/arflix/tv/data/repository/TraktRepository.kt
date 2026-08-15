@@ -29,6 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.delay
@@ -88,6 +90,8 @@ class TraktRepository @Inject constructor(
     private val USER_ID_KEY = stringPreferencesKey("user_id")
     private val clientId = Constants.TRAKT_CLIENT_ID
     private val clientSecret = Constants.TRAKT_CLIENT_SECRET
+    private val PERSONAL_LIST_PAGE_SIZE = 100
+    private val PERSONAL_LIST_ITEM_LIMIT = 500
     // Profile-scoped preference keys - each profile has its own Trakt connection
     private fun accessTokenKey() = profileManager.profileStringKey("trakt_access_token")
     private fun refreshTokenKey() = profileManager.profileStringKey("trakt_refresh_token")
@@ -153,9 +157,11 @@ class TraktRepository @Inject constructor(
     /**
      * Check if current profile is authenticated with Trakt
      */
-    val isAuthenticated: Flow<Boolean> = context.traktDataStore.data.map { prefs ->
-        prefs[accessTokenKey()] != null
-    }
+    val isAuthenticated: Flow<Boolean> = profileManager.activeProfileId
+        .combine(context.traktDataStore.data) { profileId, prefs ->
+            !prefs[profileManager.profileStringKeyFor(profileId, "trakt_access_token")].isNullOrBlank()
+        }
+        .distinctUntilChanged()
 
     /**
      * Get token expiration timestamp (seconds since epoch) for current profile
@@ -1989,6 +1995,25 @@ class TraktRepository @Inject constructor(
         }
     }
 
+    /**
+     * Reads only the persisted profile cache. Unlike [getContinueWatching] and
+     * [preloadContinueWatchingCache], this method never contacts a tracking service.
+     * Home startup uses it as a last local fallback before refreshing in background.
+     */
+    suspend fun loadPersistedContinueWatchingForStartup(): List<ContinueWatchingItem> {
+        ensureProfileCacheScope()
+        val profileId = currentProfileId()
+        if (cachedContinueWatchingProfileId == profileId && cachedContinueWatching.isNotEmpty()) {
+            return filterDismissedContinueWatchingItems(cachedContinueWatching)
+        }
+        val cached = filterDismissedContinueWatchingItems(loadContinueWatchingCache())
+        if (cached.isNotEmpty()) {
+            cachedContinueWatching = cached
+            cachedContinueWatchingProfileId = profileId
+        }
+        return cached
+    }
+
     // Cache for preloaded profile data (keyed by profileId)
     private val preloadedProfileCache = ConcurrentHashMap<String, List<ContinueWatchingItem>>()
 
@@ -2832,6 +2857,101 @@ class TraktRepository @Inject constructor(
     }
 
     // ========== Watchlist ==========
+
+    data class PersonalList(
+        val id: String,
+        val title: String,
+        val itemCount: Int
+    )
+
+    suspend fun getPersonalLists(): List<PersonalList> {
+        val auth = getAuthHeader() ?: return emptyList()
+        return try {
+            traktApi.getMyLists(auth = auth, clientId = clientId)
+                .mapNotNull { list ->
+                    val id = list.ids?.slug?.takeIf { it.isNotBlank() }
+                        ?: list.ids?.trakt?.toString()
+                        ?: return@mapNotNull null
+                    PersonalList(
+                        id = id,
+                        title = list.name?.takeIf { it.isNotBlank() } ?: "Trakt list",
+                        itemCount = list.itemCount ?: 0
+                    )
+                }
+                .distinctBy(PersonalList::id)
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLogger.e("TraktRepository", "Failed loading personal lists: ${error.message}")
+            emptyList()
+        }
+    }
+
+    suspend fun getPersonalListItems(listId: String): List<MediaItem> {
+        val auth = getAuthHeader() ?: return emptyList()
+
+        suspend fun loadType(type: String): List<TraktPublicListItem> {
+            val result = mutableListOf<TraktPublicListItem>()
+            var page = 1
+            while (true) {
+                val rows = traktApi.getMyListItems(
+                    auth = auth,
+                    clientId = clientId,
+                    listId = listId,
+                    type = type,
+                    page = page,
+                    limit = PERSONAL_LIST_PAGE_SIZE
+                )
+                result += rows
+                if (rows.size < PERSONAL_LIST_PAGE_SIZE || result.size >= PERSONAL_LIST_ITEM_LIMIT) break
+                page += 1
+            }
+            return result.take(PERSONAL_LIST_ITEM_LIMIT)
+        }
+
+        return try {
+            coroutineScope {
+                val movies = async { loadType("movies") }
+                val shows = async { loadType("shows") }
+                (movies.await() + shows.await())
+                    .sortedBy { it.rank ?: Int.MAX_VALUE }
+                    .mapIndexedNotNull { index, item ->
+                        when (item.type) {
+                            "movie" -> item.movie?.let { movie ->
+                                movie.ids.tmdb?.takeIf { it > 0 }?.let { tmdbId ->
+                                    MediaItem(
+                                        id = tmdbId,
+                                        title = movie.title,
+                                        year = movie.year?.toString().orEmpty(),
+                                        mediaType = MediaType.MOVIE,
+                                        sourceOrder = index
+                                    )
+                                }
+                            }
+                            "show" -> item.show?.let { show ->
+                                show.ids.tmdb?.takeIf { it > 0 }?.let { tmdbId ->
+                                    MediaItem(
+                                        id = tmdbId,
+                                        title = show.title,
+                                        year = show.year?.toString().orEmpty(),
+                                        mediaType = MediaType.TV,
+                                        sourceOrder = index
+                                    )
+                                }
+                            }
+                            else -> null
+                        }
+                    }
+                    .distinctBy { it.mediaType to it.id }
+                    .take(PERSONAL_LIST_ITEM_LIMIT)
+            }
+        } catch (error: kotlinx.coroutines.CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLogger.e("TraktRepository", "Failed loading personal list $listId: ${error.message}")
+            emptyList()
+        }
+    }
 
     data class WatchlistSyncResult(
         val items: List<MediaItem>,

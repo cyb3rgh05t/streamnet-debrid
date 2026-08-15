@@ -45,6 +45,7 @@ class SimklSyncService @Inject constructor(
     private val cachedWatchedEpisodes = mutableSetOf<String>()
     private val cachedWatchlist = mutableMapOf<Pair<MediaType, Int>, MediaItem>()
     private val cachedContinueWatching = mutableMapOf<Pair<MediaType, Int>, ContinueWatchingItem>()
+    private val cachedLibraryItems = mutableMapOf<String, LinkedHashMap<Pair<MediaType, Int>, MediaItem>>()
     private val resolvedExternalIds = ConcurrentHashMap<String, Int>()
     private val unresolvedExternalIds = ConcurrentHashMap.newKeySet<String>()
 
@@ -121,6 +122,7 @@ class SimklSyncService @Inject constructor(
         cachedWatchedEpisodes.clear()
         cachedWatchlist.clear()
         cachedContinueWatching.clear()
+        cachedLibraryItems.clear()
         processMoviesResponse(stagedMovies)
         processShowsResponse(stagedShows)
         processShowsResponse(stagedAnime)
@@ -136,6 +138,7 @@ class SimklSyncService @Inject constructor(
         cachedWatchedEpisodes.clear()
         cachedWatchlist.clear()
         cachedContinueWatching.clear()
+        cachedLibraryItems.clear()
     }
 
     private fun processMoviesResponse(response: SimklAllItemsResponse) {
@@ -143,6 +146,16 @@ class SimklSyncService @Inject constructor(
             val movie = movieItem.movie ?: return@forEach
             val tmdbId = resolvedTmdbId(movie.ids, MediaType.MOVIE) ?: return@forEach
             val status = movieItem.status
+            cacheLibraryItem(
+                status = status,
+                key = MediaType.MOVIE to tmdbId,
+                item = MediaItem(
+                    id = tmdbId,
+                    title = movie.title.orEmpty(),
+                    year = movie.year?.toString().orEmpty(),
+                    mediaType = MediaType.MOVIE
+                )
+            )
             if (status == "completed") {
                 cachedWatchedMovies.add(tmdbId)
             }
@@ -164,6 +177,16 @@ class SimklSyncService @Inject constructor(
             val show = showItem.show ?: return@forEach
             val showTmdb = resolvedTmdbId(show.ids, MediaType.TV) ?: return@forEach
             val status = showItem.status
+            cacheLibraryItem(
+                status = status,
+                key = MediaType.TV to showTmdb,
+                item = MediaItem(
+                    id = showTmdb,
+                    title = show.title.orEmpty(),
+                    year = show.year?.toString().orEmpty(),
+                    mediaType = MediaType.TV
+                )
+            )
             if (status == "plantowatch") {
                 cachedWatchlist[MediaType.TV to showTmdb] = MediaItem(
                     id = showTmdb,
@@ -199,6 +222,15 @@ class SimklSyncService @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun cacheLibraryItem(
+        status: String?,
+        key: Pair<MediaType, Int>,
+        item: MediaItem
+    ) {
+        val normalized = status?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return
+        cachedLibraryItems.getOrPut(normalized) { linkedMapOf() }[key] = item
     }
 
     private fun parseNextToWatch(value: String?): com.arflix.tv.data.api.SimklNextToWatchInfo? {
@@ -336,6 +368,11 @@ class SimklSyncService @Inject constructor(
     suspend fun getWatchlistItems(): List<MediaItem> {
         syncIfNeeded()
         return cachedWatchlist.values.toList()
+    }
+
+    suspend fun getLibraryItems(status: String, forceRefresh: Boolean = false): List<MediaItem> {
+        syncIfNeeded(forceRefresh)
+        return cachedLibraryItems[status.trim().lowercase()]?.values?.toList().orEmpty()
     }
 
     suspend fun getContinueWatching(forceRefresh: Boolean = false): List<ContinueWatchingItem> {

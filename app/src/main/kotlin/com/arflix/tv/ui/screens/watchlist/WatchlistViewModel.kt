@@ -17,10 +17,13 @@ import com.arflix.tv.data.repository.HomeServerKind
 import com.arflix.tv.data.repository.HomeServerLibrarySort
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryEntry
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
+import com.arflix.tv.data.repository.simkl.SimklAuthManager
+import com.arflix.tv.data.repository.simkl.SimklSyncService
 import com.arflix.tv.util.AppLogger
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,9 +31,13 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -39,6 +46,11 @@ import javax.inject.Inject
 
 enum class ToastType {
     SUCCESS, ERROR, INFO
+}
+
+enum class TrackerLibraryProvider(val displayName: String) {
+    TRAKT("Trakt"),
+    SIMKL("Simkl")
 }
 
 sealed interface WatchlistSourceItem {
@@ -85,6 +97,16 @@ sealed interface WatchlistSourceItem {
             title
         }
     }
+
+    data class TrackerList(
+        val provider: TrackerLibraryProvider,
+        val listKey: String,
+        override val title: String
+    ) : WatchlistSourceItem {
+        override val id: String = "tracker_${provider.name.lowercase()}_$listKey"
+        override val subtitle: String = provider.displayName
+        override val displayLabel: String = title
+    }
 }
 
 data class WatchlistUiState(
@@ -105,6 +127,20 @@ data class WatchlistUiState(
     val allItems: List<MediaItem> get() = movies + series
     val selectedSource: WatchlistSourceItem get() = sources.firstOrNull { it.id == selectedSourceId } ?: WatchlistSourceItem.MyWatchlist
 }
+
+data class HomeLibraryUiState(
+    val providers: List<HomeServerKind> = emptyList(),
+    val libraries: List<HomeServerCatalogCandidate> = emptyList(),
+    val selectedProvider: HomeServerKind? = null,
+    val selectedSourceRef: String? = null,
+    val items: List<MediaItem> = emptyList(),
+    val isLoading: Boolean = false,
+    val isLoadingMore: Boolean = false,
+    val hasMore: Boolean = false,
+    val sort: HomeServerLibrarySort = HomeServerLibrarySort.RECENTLY_ADDED,
+    val searchQuery: String = "",
+    val error: String? = null
+)
 
 internal fun watchlistLogoKey(item: MediaItem): String {
     return if (item.id > 0) {
@@ -131,7 +167,8 @@ private data class SourcePageState(
 
 internal fun buildWatchlistSources(
     catalogs: List<CatalogConfig>,
-    homeServerCandidates: List<HomeServerCatalogCandidate>
+    homeServerCandidates: List<HomeServerCatalogCandidate>,
+    trackerLists: List<WatchlistSourceItem.TrackerList> = emptyList()
 ): List<WatchlistSourceItem> {
     val customCatalogs = catalogs.filter { config ->
         !config.isPreinstalled &&
@@ -141,7 +178,7 @@ internal fun buildWatchlistSources(
             config.sourceType != CatalogSourceType.HOME_SERVER
     }.map { WatchlistSourceItem.Catalog(it) }
     val homeServers = homeServerCandidates.map { WatchlistSourceItem.HomeServer(it) }
-    return (listOf<WatchlistSourceItem>(WatchlistSourceItem.MyWatchlist) + customCatalogs + homeServers)
+    return (listOf<WatchlistSourceItem>(WatchlistSourceItem.MyWatchlist) + homeServers + trackerLists + customCatalogs)
         .distinctBy(WatchlistSourceItem::id)
 }
 
@@ -155,7 +192,10 @@ class WatchlistViewModel @Inject constructor(
     private val mediaRepository: MediaRepository,
     private val homeServerRepository: HomeServerRepository,
     private val catalogRepository: CatalogRepository,
-    private val watchHistoryRepository: WatchHistoryRepository
+    private val watchHistoryRepository: WatchHistoryRepository,
+    private val simklAuthManager: SimklAuthManager,
+    private val simklSyncService: SimklSyncService,
+    private val profileManager: ProfileManager
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(WatchlistUiState())
     val uiState: StateFlow<WatchlistUiState> = _uiState.asStateFlow()
@@ -163,10 +203,18 @@ class WatchlistViewModel @Inject constructor(
     private val _logoUrls = MutableStateFlow<Map<String, String>>(emptyMap())
     val logoUrls: StateFlow<Map<String, String>> = _logoUrls.asStateFlow()
 
+    private val _libraryState = MutableStateFlow(HomeLibraryUiState())
+    val libraryState: StateFlow<HomeLibraryUiState> = _libraryState.asStateFlow()
+    private val libraryCache = linkedMapOf<String, Pair<List<MediaItem>, Boolean>>()
+    private var libraryLoadJob: Job? = null
+    private var librarySearchJob: Job? = null
+    private var libraryRequestId = 0
+
     private val sourceItemsCache = linkedMapOf<String, List<MediaItem>>()
     private val sourcePageStates = mutableMapOf<String, SourcePageState>()
     private var currentCatalogs: List<CatalogConfig> = emptyList()
     private var currentHomeServerCandidates: List<HomeServerCatalogCandidate> = emptyList()
+    private var currentTrackerLists: List<WatchlistSourceItem.TrackerList> = emptyList()
     private var sourceLoadJob: Job? = null
     private var sourceLoadMoreJob: Job? = null
     private var traktSyncInFlight = false
@@ -198,6 +246,7 @@ class WatchlistViewModel @Inject constructor(
     init {
         observeWatchlistChanges()
         observeCatalogsAndHomeServers()
+        observeTrackerLibraries()
         loadWatchlistInstant()
     }
 
@@ -232,7 +281,266 @@ class WatchlistViewModel @Inject constructor(
                 val candidates = runCatching { homeServerRepository.getCatalogCandidates() }
                     .getOrDefault(emptyList())
                     .filter { it.serverKind in usable && it.collectionType.lowercase() in BROWSABLE_LIBRARY_TYPES }
+                updateHomeLibraryState(usable, candidates)
                 updateAvailableSources(homeServerCandidates = candidates)
+            }
+        }
+    }
+
+    private fun observeTrackerLibraries() {
+        viewModelScope.launch {
+            profileManager.activeProfileId
+                .combine(traktRepository.isAuthenticated) { profileId, traktConnected ->
+                    profileId to traktConnected
+                }
+                .distinctUntilChanged()
+                .collectLatest { (_, traktConnected) ->
+                    sourceLoadJob?.cancel()
+                    sourceLoadMoreJob?.cancel()
+                    sourceItemsCache.keys.removeAll { it.startsWith("tracker_") }
+                    sourcePageStates.keys.removeAll { it.startsWith("tracker_") }
+                    currentTrackerLists = emptyList()
+                    updateAvailableSources()
+                    refreshTrackerLibraries(traktConnected)
+                }
+        }
+    }
+
+    private suspend fun refreshTrackerLibraries(traktConnected: Boolean) {
+        val simklConnected = runCatching { simklAuthManager.isConnected() }.getOrDefault(false)
+        val trackerLists = buildList {
+            if (traktConnected) {
+                val personalLists = runCatching { traktRepository.getPersonalLists() }
+                    .getOrDefault(emptyList())
+                if (personalLists.isEmpty()) {
+                    add(
+                        WatchlistSourceItem.TrackerList(
+                            provider = TrackerLibraryProvider.TRAKT,
+                            listKey = TRAKT_WATCHLIST_KEY,
+                            title = "Watchlist"
+                        )
+                    )
+                } else {
+                    personalLists.forEach { list ->
+                        add(
+                            WatchlistSourceItem.TrackerList(
+                                provider = TrackerLibraryProvider.TRAKT,
+                                listKey = list.id,
+                                title = list.title
+                            )
+                        )
+                    }
+                }
+            }
+            if (simklConnected) {
+                SIMKL_LIBRARY_LISTS.forEach { (status, title) ->
+                    add(
+                        WatchlistSourceItem.TrackerList(
+                            provider = TrackerLibraryProvider.SIMKL,
+                            listKey = status,
+                            title = title
+                        )
+                    )
+                }
+            }
+        }
+
+        currentTrackerLists = trackerLists
+        updateAvailableSources()
+    }
+
+    private fun updateHomeLibraryState(
+        usableProviders: List<HomeServerKind>,
+        candidates: List<HomeServerCatalogCandidate>
+    ) {
+        val providers = usableProviders.distinct().sortedBy { kind ->
+            when (kind) {
+                HomeServerKind.PLEX -> 0
+                HomeServerKind.JELLYFIN -> 1
+                HomeServerKind.EMBY -> 2
+                HomeServerKind.UNKNOWN -> 3
+            }
+        }
+        val current = _libraryState.value
+        val selectedProvider = current.selectedProvider?.takeIf { it in providers }
+        val selectedSource = current.selectedSourceRef?.takeIf { source ->
+            candidates.any { it.sourceRef == source && it.serverKind == selectedProvider }
+        }
+        _libraryState.value = current.copy(
+            providers = providers,
+            libraries = candidates,
+            selectedProvider = selectedProvider,
+            selectedSourceRef = selectedSource,
+            items = if (selectedProvider == null) emptyList() else current.items
+        )
+    }
+
+    fun selectLibraryProvider(provider: HomeServerKind?) {
+        val current = _libraryState.value
+        if (current.selectedProvider == provider) return
+        libraryLoadJob?.cancel()
+        librarySearchJob?.cancel()
+        if (provider == null) {
+            _libraryState.value = current.copy(
+                selectedProvider = null,
+                selectedSourceRef = null,
+                items = emptyList(),
+                isLoading = false,
+                isLoadingMore = false,
+                error = null
+            )
+            return
+        }
+        val firstLibrary = current.libraries.firstOrNull { it.serverKind == provider }
+        _libraryState.value = current.copy(
+            selectedProvider = provider,
+            selectedSourceRef = firstLibrary?.sourceRef,
+            items = emptyList(),
+            isLoading = firstLibrary != null,
+            isLoadingMore = false,
+            error = null
+        )
+        if (firstLibrary != null) loadLibraryFirstPage()
+    }
+
+    fun selectLibrary(sourceRef: String) {
+        if (_libraryState.value.selectedSourceRef == sourceRef) return
+        librarySearchJob?.cancel()
+        _libraryState.value = _libraryState.value.copy(
+            selectedSourceRef = sourceRef,
+            items = emptyList(),
+            isLoadingMore = false,
+            error = null
+        )
+        loadLibraryFirstPage()
+    }
+
+    fun setLibrarySort(sort: HomeServerLibrarySort) {
+        if (_libraryState.value.sort == sort) return
+        _libraryState.value = _libraryState.value.copy(sort = sort, error = null)
+        loadLibraryFirstPage()
+    }
+
+    fun setLibrarySearch(query: String) {
+        if (_libraryState.value.searchQuery == query) return
+        libraryRequestId++
+        libraryLoadJob?.cancel()
+        _libraryState.value = _libraryState.value.copy(searchQuery = query)
+        librarySearchJob?.cancel()
+        librarySearchJob = viewModelScope.launch {
+            delay(300L)
+            loadLibraryFirstPage()
+        }
+    }
+
+    fun refreshLibrary() = loadLibraryFirstPage(force = true)
+
+    private fun libraryCacheKey(state: HomeLibraryUiState): String = listOf(
+        state.selectedSourceRef.orEmpty(),
+        state.sort.name,
+        state.searchQuery.trim().lowercase()
+    ).joinToString("|")
+
+    private fun loadLibraryFirstPage(force: Boolean = false) {
+        val snapshot = _libraryState.value
+        val sourceRef = snapshot.selectedSourceRef ?: return
+        val cacheKey = libraryCacheKey(snapshot)
+        val cached = libraryCache[cacheKey]
+        if (cached != null && !force) {
+            _libraryState.value = snapshot.copy(
+                items = cached.first,
+                hasMore = cached.second,
+                isLoading = false,
+                isLoadingMore = false,
+                error = null
+            )
+        } else {
+            _libraryState.value = snapshot.copy(
+                isLoading = true,
+                isLoadingMore = false,
+                error = null
+            )
+        }
+        val requestId = ++libraryRequestId
+        libraryLoadJob?.cancel()
+        libraryLoadJob = viewModelScope.launch {
+            runCatching {
+                mediaRepository.loadHomeServerLibraryPage(
+                    sourceRef = sourceRef,
+                    offset = 0,
+                    limit = LIBRARY_PAGE_SIZE,
+                    sort = snapshot.sort,
+                    searchQuery = snapshot.searchQuery
+                )
+            }.onSuccess { page ->
+                if (requestId != libraryRequestId) return@onSuccess
+                val items = page.items.enrichWithPlaybackProgress()
+                libraryCache[cacheKey] = items to page.hasMore
+                while (libraryCache.size > LIBRARY_CACHE_ENTRY_LIMIT) {
+                    libraryCache.remove(libraryCache.keys.first())
+                }
+                _libraryState.value = _libraryState.value.copy(
+                    items = items,
+                    hasMore = page.hasMore,
+                    isLoading = false,
+                    isLoadingMore = false,
+                    error = null
+                )
+                fetchLogos(items.take(LIBRARY_LOGO_INITIAL_PREFETCH))
+            }.onFailure { error ->
+                if (requestId != libraryRequestId) return@onFailure
+                _libraryState.value = _libraryState.value.copy(
+                    items = if (cached == null) emptyList() else _libraryState.value.items,
+                    isLoading = false,
+                    isLoadingMore = false,
+                    error = if (cached == null) {
+                        error.message ?: context.getString(R.string.homeserver_connection_failed)
+                    } else {
+                        null
+                    }
+                )
+            }
+        }
+    }
+
+    fun loadMoreLibrary() {
+        val snapshot = _libraryState.value
+        val sourceRef = snapshot.selectedSourceRef ?: return
+        if (!snapshot.hasMore || snapshot.isLoading || snapshot.isLoadingMore) return
+        val requestId = libraryRequestId
+        val cacheKey = libraryCacheKey(snapshot)
+        _libraryState.value = snapshot.copy(isLoadingMore = true)
+        viewModelScope.launch {
+            runCatching {
+                mediaRepository.loadHomeServerLibraryPage(
+                    sourceRef = sourceRef,
+                    offset = snapshot.items.size,
+                    limit = LIBRARY_PAGE_SIZE,
+                    sort = snapshot.sort,
+                    searchQuery = snapshot.searchQuery
+                )
+            }.onSuccess { page ->
+                if (requestId != libraryRequestId) return@onSuccess
+                val current = _libraryState.value
+                val existing = current.items.mapTo(HashSet()) { item ->
+                    "${item.homeServerSourceRef}:${item.homeServerItemId}:${item.mediaType}:${item.id}"
+                }
+                val fresh = page.items.filter { item ->
+                    "${item.homeServerSourceRef}:${item.homeServerItemId}:${item.mediaType}:${item.id}" !in existing
+                }.enrichWithPlaybackProgress()
+                val merged = current.items + fresh
+                _libraryState.value = current.copy(
+                    items = merged,
+                    hasMore = page.hasMore,
+                    isLoadingMore = false,
+                    error = null
+                )
+                libraryCache[cacheKey] = merged to page.hasMore
+                fetchLogos(fresh.take(LIBRARY_LOGO_INITIAL_PREFETCH))
+            }.onFailure {
+                if (requestId == libraryRequestId) {
+                    _libraryState.value = _libraryState.value.copy(isLoadingMore = false)
+                }
             }
         }
     }
@@ -244,7 +552,11 @@ class WatchlistViewModel @Inject constructor(
         if (catalogs != null) currentCatalogs = catalogs
         if (homeServerCandidates != null) currentHomeServerCandidates = homeServerCandidates
 
-        val allSources = buildWatchlistSources(currentCatalogs, currentHomeServerCandidates)
+        val allSources = buildWatchlistSources(
+            catalogs = currentCatalogs,
+            homeServerCandidates = currentHomeServerCandidates,
+            trackerLists = currentTrackerLists
+        )
         val previousSources = _uiState.value.sources.associateBy { it.id }
         val changedSourceIds = allSources.mapNotNull { source ->
             source.id.takeIf { previousSources[source.id] != source }
@@ -373,6 +685,51 @@ class WatchlistViewModel @Inject constructor(
                     }
                 }
             }
+            is WatchlistSourceItem.TrackerList -> {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = cached == null,
+                    error = null,
+                    hasMore = false,
+                    isLoadingMore = false
+                )
+                sourceLoadJob = viewModelScope.launch {
+                    runCatching {
+                        val baseItems = when (activeSource.provider) {
+                            TrackerLibraryProvider.TRAKT -> {
+                                if (activeSource.listKey == TRAKT_WATCHLIST_KEY) {
+                                    traktRepository.getWatchlist()
+                                } else {
+                                    traktRepository.getPersonalListItems(activeSource.listKey)
+                                }
+                            }
+                            TrackerLibraryProvider.SIMKL -> simklSyncService.getLibraryItems(
+                                status = activeSource.listKey,
+                                forceRefresh = forceRefresh
+                            )
+                        }
+                        hydrateTrackerItems(baseItems)
+                    }.onSuccess { items ->
+                        val enriched = items.enrichWithPlaybackProgress()
+                        sourceItemsCache[cacheKey] = enriched
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                movies = enriched.filter { it.mediaType == MOVIE },
+                                series = enriched.filter { it.mediaType == TV },
+                                error = null
+                            )
+                            fetchLogos(enriched)
+                        }
+                    }.onFailure { error ->
+                        if (_uiState.value.selectedSourceId == activeSource.id) {
+                            _uiState.value = _uiState.value.copy(
+                                isLoading = false,
+                                error = error.message ?: context.getString(R.string.watchlist_error_refresh)
+                            )
+                        }
+                    }
+                }
+            }
             is WatchlistSourceItem.HomeServer -> {
                 _uiState.value = _uiState.value.copy(
                     isLoading = cached == null,
@@ -417,6 +774,24 @@ class WatchlistViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private suspend fun hydrateTrackerItems(items: List<MediaItem>): List<MediaItem> = coroutineScope {
+        val limiter = Semaphore(6)
+        items.take(TRACKER_LIST_ITEM_LIMIT).mapIndexed { index, item ->
+            async {
+                limiter.withPermit {
+                    runCatching {
+                        when (item.mediaType) {
+                            MOVIE -> mediaRepository.getMovieDetails(item.id)
+                            TV -> mediaRepository.getTvDetails(item.id)
+                        }.copy(sourceOrder = index)
+                    }.getOrElse {
+                        item.copy(sourceOrder = index)
+                    }
+                }
+            }
+        }.awaitAll()
     }
 
     fun loadMoreActiveSource() {
@@ -887,6 +1262,16 @@ class WatchlistViewModel @Inject constructor(
     companion object {
         private const val LIBRARY_PAGE_SIZE = 60
         private const val LIBRARY_LOGO_INITIAL_PREFETCH = 12
+        private const val LIBRARY_CACHE_ENTRY_LIMIT = 12
+        private const val TRACKER_LIST_ITEM_LIMIT = 240
+        private const val TRAKT_WATCHLIST_KEY = "__watchlist__"
+        private val SIMKL_LIBRARY_LISTS = listOf(
+            "watching" to "Watching",
+            "plantowatch" to "Plan to watch",
+            "completed" to "Completed",
+            "hold" to "On hold",
+            "dropped" to "Dropped"
+        )
         private val BROWSABLE_LIBRARY_TYPES = setOf(
             "",
             "movie",

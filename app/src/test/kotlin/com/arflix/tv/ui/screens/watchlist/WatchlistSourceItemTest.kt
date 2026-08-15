@@ -75,6 +75,43 @@ class WatchlistSourceItemTest {
     }
 
     @Test
+    fun sourcesKeepWatchlistHomeServersAndTrackersInLibraryOrder() {
+        val candidate = HomeServerCatalogCandidate(
+            serverKind = HomeServerKind.JELLYFIN,
+            serverName = "Jellyfin",
+            collectionName = "Movies",
+            collectionType = "movies",
+            title = "Movies",
+            sourceRef = "jellyfin:movies"
+        )
+        val trakt = WatchlistSourceItem.TrackerList(
+            provider = TrackerLibraryProvider.TRAKT,
+            listKey = "favorites",
+            title = "Favorites"
+        )
+        val simkl = WatchlistSourceItem.TrackerList(
+            provider = TrackerLibraryProvider.SIMKL,
+            listKey = "watching",
+            title = "Watching"
+        )
+
+        val sources = buildWatchlistSources(
+            catalogs = emptyList(),
+            homeServerCandidates = listOf(candidate),
+            trackerLists = listOf(trakt, simkl)
+        )
+
+        assertThat(sources.map(WatchlistSourceItem::id)).containsExactly(
+            WatchlistSourceItem.MyWatchlist.id,
+            WatchlistSourceItem.HomeServer(candidate).id,
+            trakt.id,
+            simkl.id
+        ).inOrder()
+        assertThat(trakt.subtitle).isEqualTo("Trakt")
+        assertThat(simkl.subtitle).isEqualTo("Simkl")
+    }
+
+    @Test
     fun watchlistUiStateCorrectlyIdentifiesEmptyAndSingleType() {
         val emptyState = WatchlistUiState(
             movies = emptyList(),

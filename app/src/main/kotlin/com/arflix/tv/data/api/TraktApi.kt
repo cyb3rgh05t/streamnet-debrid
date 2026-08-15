@@ -401,6 +401,25 @@ interface TraktApi {
 
     // ========== Public Lists ==========
 
+    @GET("users/me/lists")
+    suspend fun getMyLists(
+        @Header("Authorization") auth: String,
+        @Header("trakt-api-key") clientId: String,
+        @Header("trakt-api-version") version: String = "2"
+    ): List<TraktSearchList>
+
+    @GET("users/me/lists/{listId}/items/{type}")
+    suspend fun getMyListItems(
+        @Header("Authorization") auth: String,
+        @Header("trakt-api-key") clientId: String,
+        @Header("trakt-api-version") version: String = "2",
+        @Path("listId") listId: String,
+        @Path("type") type: String,
+        @Query("extended") extended: String = "full",
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 100
+    ): List<TraktPublicListItem>
+
     @GET("users/{username}/lists/{listId}")
     suspend fun getUserListSummary(
         @Header("trakt-api-key") clientId: String,

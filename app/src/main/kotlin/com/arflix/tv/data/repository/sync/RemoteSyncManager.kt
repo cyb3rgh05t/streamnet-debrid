@@ -49,8 +49,17 @@ class RemoteSyncManager @Inject constructor(
             ?: traktProvider.takeIf { it.isConnected() }
     }
 
-    suspend fun isRemoteConnected(): Boolean =
-        connected(store.readProviders(TrackingFeature.WATCHLIST) + store.writeProviders()).isNotEmpty()
+    suspend fun isRemoteConnected(
+        feature: TrackingFeature = TrackingFeature.WATCHLIST
+    ): Boolean {
+        val readers = store.readProviders(feature)
+        val candidates = if (feature == TrackingFeature.WATCHLIST) {
+            readers + store.writeProviders()
+        } else {
+            readers
+        }
+        return connected(candidates).isNotEmpty()
+    }
 
     // ===== Watchlist =====
 

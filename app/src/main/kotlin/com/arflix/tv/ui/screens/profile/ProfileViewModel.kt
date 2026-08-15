@@ -219,9 +219,12 @@ class ProfileViewModel @Inject constructor(
                 // Activate any preloaded Continue Watching cache for instant Home population.
                 traktRepository.activatePreloadedCache(profile.id)
 
-                // Persist the active profile before the UI navigates away.
-                withContext(Dispatchers.IO) {
-                    profileRepository.setActiveProfile(profile.id)
+                // Persist only actual profile changes. Re-selecting the current
+                // profile used to mark the full cloud payload dirty on every launch.
+                if (!isSameProfile) {
+                    withContext(Dispatchers.IO) {
+                        profileRepository.setActiveProfile(profile.id)
+                    }
                 }
 
                 viewModelScope.launch(Dispatchers.IO) {
@@ -229,22 +232,9 @@ class ProfileViewModel @Inject constructor(
                     runCatching { iptvRepository.warmupFromCacheOnly() }
                 }
 
-                // Pull cloud state and push immediately, but in background so navigation stays
-                // instant and responsive after active profile is set.
-                viewModelScope.launch(Dispatchers.IO) {
-                    val restoreResult = runCatching { cloudSyncRepository.pullFromCloud() }.getOrNull()
-                    if (restoreResult != CloudSyncRepository.RestoreResult.FAILED &&
-                        profileRepository.getActiveProfileId() == profile.id
-                    ) {
-                        runCatching { cloudSyncRepository.pushToCloud(force = true) }
-                    }
-                }
-
-                viewModelScope.launch(Dispatchers.IO) {
-                    delay(1_000L)
-                    if (profileRepository.getActiveProfileId() != profile.id) return@launch
-                    runCatching { cloudSyncRepository.pullFromCloud() }
-                }
+                // Home performs one throttled cloud pull after its local snapshot is
+                // visible. Doing two pulls plus a forced megabyte-sized push here made
+                // catalog loading compete with cloud serialization and network traffic.
 
                 // Defer network parsing to keep initial Home navigation smooth. The
                 // cache-only warmup above is safe to run immediately because it never

@@ -80,6 +80,15 @@ class RemoteSyncManagerTest {
     }
 
     @Test
+    fun continueWatchingConnectivityUsesItsOwnProviderSelection() = runBlocking {
+        coEvery { store.readProviders(TrackingFeature.CONTINUE_WATCHING) } returns setOf(SyncProvider.TRAKT)
+
+        assertTrue(manager.isRemoteConnected(TrackingFeature.CONTINUE_WATCHING))
+        coVerify(exactly = 1) { trakt.isConnected() }
+        coVerify(exactly = 0) { simkl.isConnected() }
+    }
+
+    @Test
     fun dismissContinueWatchingReachesEveryWriteProvider() = runBlocking {
         coEvery { store.writeProviders() } returns setOf(SyncProvider.TRAKT, SyncProvider.SIMKL)
         coEvery { trakt.dismissContinueWatching(any(), any(), any(), any()) } throws IllegalStateException("offline")
