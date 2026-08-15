@@ -42,6 +42,18 @@ object DiscordRpcManager {
     private val _username = MutableStateFlow<String?>(null)
     val usernameFlow: StateFlow<String?> = _username.asStateFlow()
 
+    private val _authUrl = MutableStateFlow<String?>(null)
+    val authUrlFlow: StateFlow<String?> = _authUrl.asStateFlow()
+
+    private val _isAuthDialogVisible = MutableStateFlow(false)
+    val isAuthDialogVisibleFlow: StateFlow<Boolean> = _isAuthDialogVisible.asStateFlow()
+
+    private val _isAuthLoading = MutableStateFlow(false)
+    val isAuthLoadingFlow: StateFlow<Boolean> = _isAuthLoading.asStateFlow()
+
+    private var localAuthServer: LocalAuthServer? = null
+    private var authPollingJob: Job? = null
+
     enum class ConnectionState {
         DISCONNECTED,
         CONNECTING,
@@ -99,89 +111,134 @@ object DiscordRpcManager {
         }
     }
 
-    fun login(context: Context) {
+    private suspend fun startCloudSession(): String? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(com.arflix.tv.util.Constants.TV_AUTH_START_URL)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("apikey", com.arflix.tv.util.Constants.APP_ANON_KEY)
+            conn.setRequestProperty("Authorization", "Bearer ${com.arflix.tv.util.Constants.APP_ANON_KEY}")
+            conn.doOutput = true
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            conn.outputStream.use { it.write("{}".toByteArray()) }
+            if (conn.responseCode == 200) {
+                val resp = conn.inputStream.bufferedReader().readText()
+                val json = JSONObject(resp)
+                val code = json.optString("device_code")
+                return@withContext if (code.isNotBlank()) code else null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not start cloud session for Discord pairing", e)
+        }
+        null
+    }
+
+    private suspend fun pollCloudStatus(deviceCode: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val url = URL(com.arflix.tv.util.Constants.TV_AUTH_STATUS_URL)
+            val conn = url.openConnection() as HttpURLConnection
+            conn.requestMethod = "POST"
+            conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
+            conn.setRequestProperty("apikey", com.arflix.tv.util.Constants.APP_ANON_KEY)
+            conn.setRequestProperty("Authorization", "Bearer ${com.arflix.tv.util.Constants.APP_ANON_KEY}")
+            conn.doOutput = true
+            conn.connectTimeout = 5000
+            conn.readTimeout = 5000
+            val payload = JSONObject().put("device_code", deviceCode).toString()
+            conn.outputStream.use { it.write(payload.toByteArray()) }
+            if (conn.responseCode == 200) {
+                val resp = conn.inputStream.bufferedReader().readText()
+                val json = JSONObject(resp)
+                if (json.optString("status") == "approved") {
+                    return@withContext json.optString("access_token")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error polling cloud status for Discord pairing", e)
+        }
+        null
+    }
+
+    private const val REDIRECT_URI_WEB = "https://auth.arvio.tv/discord/callback"
+    private const val REDIRECT_URI_APP = "arvio://discord/auth"
+
+    fun openAuthDialog() {
+        authPollingJob?.cancel()
         coroutineScope.launch {
             try {
+                _isAuthLoading.value = false
                 val verifier = PkceUtil.generateCodeVerifier()
-                appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                    .edit()
-                    .putString(KEY_CODE_VERIFIER, verifier)
-                    .apply()
+                if (::appContext.isInitialized) {
+                    appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                        .edit()
+                        .putString(KEY_CODE_VERIFIER, verifier)
+                        .apply()
+                }
 
                 val challenge = PkceUtil.generateCodeChallenge(verifier)
-                val authorizeUrl = Uri.parse("https://discord.com/api/oauth2/authorize")
-                    .buildUpon()
-                    .appendQueryParameter("client_id", DISCORD_CLIENT_ID)
-                    .appendQueryParameter("response_type", "code")
-                    .appendQueryParameter("redirect_uri", "arvio://discord/auth")
-                    .appendQueryParameter("scope", "identify sdk.social_layer_presence")
-                    .appendQueryParameter("code_challenge", challenge)
-                    .appendQueryParameter("code_challenge_method", "S256")
-                    .build()
 
-                val pm = context.packageManager
+                if (localAuthServer == null) {
+                    localAuthServer = LocalAuthServer { code ->
+                        completeAuthWithCode(code)
+                    }
+                }
+                localAuthServer?.start(coroutineScope)
 
-                // Option 1: Try launching directly into Discord App package
-                val discordAppIntent = Intent(Intent.ACTION_VIEW, authorizeUrl).apply {
-                    setPackage("com.discord")
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val deviceCode = startCloudSession()
+                val qrUrl = if (!deviceCode.isNullOrBlank()) {
+                    authPollingJob = launch(Dispatchers.IO) {
+                        while (isActive && _isAuthDialogVisible.value) {
+                            delay(2000)
+                            val code = pollCloudStatus(deviceCode)
+                            if (!code.isNullOrBlank()) {
+                                withContext(Dispatchers.Main) {
+                                    completeAuthWithCode(code)
+                                }
+                                break
+                            }
+                        }
+                    }
+                    "https://auth.arvio.tv/discord/?session=${Uri.encode(deviceCode)}&challenge=${Uri.encode(challenge)}"
+                } else {
+                    Uri.parse("https://discord.com/api/oauth2/authorize")
+                        .buildUpon()
+                        .appendQueryParameter("client_id", DISCORD_CLIENT_ID)
+                        .appendQueryParameter("response_type", "code")
+                        .appendQueryParameter("redirect_uri", REDIRECT_URI_WEB)
+                        .appendQueryParameter("scope", "identify sdk.social_layer_presence")
+                        .appendQueryParameter("code_challenge", challenge)
+                        .appendQueryParameter("code_challenge_method", "S256")
+                        .build()
+                        .toString()
                 }
 
-                if (discordAppIntent.resolveActivity(pm) != null) {
-                    Log.i(TAG, "Launching Discord auth flow in Discord App: $authorizeUrl")
-                    context.startActivity(discordAppIntent)
-                    return@launch
-                }
-
-                // Option 2: Try discord:// custom scheme
-                val discordSchemeUrl = Uri.parse("discord://action/oauth2/authorize")
-                    .buildUpon()
-                    .appendQueryParameter("client_id", DISCORD_CLIENT_ID)
-                    .appendQueryParameter("response_type", "code")
-                    .appendQueryParameter("redirect_uri", "arvio://discord/auth")
-                    .appendQueryParameter("scope", "identify sdk.social_layer_presence")
-                    .appendQueryParameter("code_challenge", challenge)
-                    .appendQueryParameter("code_challenge_method", "S256")
-                    .build()
-
-                val schemeIntent = Intent(Intent.ACTION_VIEW, discordSchemeUrl).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-
-                if (schemeIntent.resolveActivity(pm) != null) {
-                    Log.i(TAG, "Launching Discord auth flow via discord:// scheme: $discordSchemeUrl")
-                    context.startActivity(schemeIntent)
-                    return@launch
-                }
-
-                // Option 3: Fallback to System Browser
-                Log.i(TAG, "Discord App not resolved. Fallback to browser auth: $authorizeUrl")
-                val browserIntent = Intent(Intent.ACTION_VIEW, authorizeUrl).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
-                context.startActivity(browserIntent)
+                Log.i(TAG, "Generated QR Auth URL: $qrUrl")
+                _authUrl.value = qrUrl
+                _isAuthDialogVisible.value = true
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to start Discord authentication flow", e)
+                Log.e(TAG, "Failed to start TV auth session", e)
             }
         }
     }
 
-    fun onLoginDeepLink(uri: Uri) {
-        Log.i(TAG, "onLoginDeepLink received redirect URI: $uri")
-        val error = uri.getQueryParameter("error")
-        val errorDesc = uri.getQueryParameter("error_description")
-        if (error != null) {
-            Log.e(TAG, "Discord authorization returned error: $error ($errorDesc)")
-            return
-        }
+    fun closeAuthDialog() {
+        _isAuthDialogVisible.value = false
+        _isAuthLoading.value = false
+        authPollingJob?.cancel()
+        authPollingJob = null
+        localAuthServer?.stop()
+    }
 
-        val code = uri.getQueryParameter("code")
-        if (code == null) {
-            Log.e(TAG, "Login deep-link received but code parameter is missing.")
-            return
-        }
+    fun login(context: Context) {
+        // On TV or any device, open the TV auth dialog
+        openAuthDialog()
+    }
 
+    fun completeAuthWithCode(code: String) {
         coroutineScope.launch {
+            if (!::appContext.isInitialized) return@launch
             val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             val verifier = prefs.getString(KEY_CODE_VERIFIER, null)
             if (verifier == null) {
@@ -189,6 +246,7 @@ object DiscordRpcManager {
                 return@launch
             }
 
+            _isAuthLoading.value = true
             Log.i(TAG, "Exchanging code for access token...")
             val token = exchangeCodeForToken(code, verifier)
             if (token != null) {
@@ -207,10 +265,31 @@ object DiscordRpcManager {
                 }
 
                 connectInternal(token)
+                closeAuthDialog()
             } else {
                 Log.e(TAG, "Token exchange failed.")
+                _isAuthLoading.value = false
             }
         }
+    }
+
+    fun onLoginDeepLink(uri: Uri) {
+        Log.i(TAG, "onLoginDeepLink received redirect URI: $uri")
+        val error = uri.getQueryParameter("error")
+        val errorDesc = uri.getQueryParameter("error_description")
+        if (error != null) {
+            Log.e(TAG, "Discord authorization returned error: $error ($errorDesc)")
+            _isAuthLoading.value = false
+            return
+        }
+
+        val code = uri.getQueryParameter("code")
+        if (code == null) {
+            Log.e(TAG, "Login deep-link received but code parameter is missing.")
+            return
+        }
+
+        completeAuthWithCode(code)
     }
 
     private fun connectInternal(token: String) {
@@ -365,33 +444,36 @@ object DiscordRpcManager {
 
     private suspend fun exchangeCodeForToken(code: String, verifier: String): String? =
         withContext(Dispatchers.IO) {
-            try {
-                val url = URL("https://discord.com/api/oauth2/token")
-                val conn = url.openConnection() as HttpURLConnection
-                conn.requestMethod = "POST"
-                conn.doOutput = true
-                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            val urisToTry = listOf(REDIRECT_URI_WEB, REDIRECT_URI_APP)
+            for (uri in urisToTry) {
+                try {
+                    val url = URL("https://discord.com/api/oauth2/token")
+                    val conn = url.openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.doOutput = true
+                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
 
-                val params = "client_id=$DISCORD_CLIENT_ID" +
-                        "&grant_type=authorization_code" +
-                        "&code=$code" +
-                        "&redirect_uri=arvio%3A%2F%2Fdiscord%2Fauth" +
-                        "&code_verifier=$verifier"
+                    val params = "client_id=$DISCORD_CLIENT_ID" +
+                            "&grant_type=authorization_code" +
+                            "&code=$code" +
+                            "&redirect_uri=" + java.net.URLEncoder.encode(uri, "UTF-8") +
+                            "&code_verifier=$verifier"
 
-                conn.outputStream.use { os ->
-                    os.write(params.toByteArray(Charsets.UTF_8))
+                    conn.outputStream.use { os ->
+                        os.write(params.toByteArray(Charsets.UTF_8))
+                    }
+
+                    if (conn.responseCode == 200) {
+                        val response = conn.inputStream.bufferedReader().readText()
+                        val json = JSONObject(response)
+                        return@withContext json.getString("access_token")
+                    } else {
+                        val errorResp = conn.errorStream?.bufferedReader()?.readText() ?: ""
+                        Log.w(TAG, "Token exchange with $uri returned status: ${conn.responseCode}, body: $errorResp")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "Exception during token exchange with $uri", e)
                 }
-
-                if (conn.responseCode == 200) {
-                    val response = conn.inputStream.bufferedReader().readText()
-                    val json = JSONObject(response)
-                    return@withContext json.getString("access_token")
-                } else {
-                    val errorResp = conn.errorStream?.bufferedReader()?.readText() ?: ""
-                    Log.e(TAG, "Token exchange failed status: ${conn.responseCode}, body: $errorResp")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Exception during token exchange", e)
             }
             return@withContext null
         }
@@ -410,6 +492,85 @@ object DiscordRpcManager {
             val md = MessageDigest.getInstance("SHA-256")
             val digest = md.digest(bytes)
             return Base64.encodeToString(digest, Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        }
+    }
+
+    private class LocalAuthServer(private val onCodeReceived: (String) -> Unit) {
+        private var serverSocket: java.net.ServerSocket? = null
+        private var job: Job? = null
+
+        fun start(scope: CoroutineScope): Int {
+            stop()
+            return try {
+                val socket = java.net.ServerSocket(0)
+                serverSocket = socket
+                val port = socket.localPort
+                job = scope.launch(Dispatchers.IO) {
+                    while (isActive && !socket.isClosed) {
+                        try {
+                            val client = socket.accept()
+                            launch(Dispatchers.IO) {
+                                handleClient(client)
+                            }
+                        } catch (_: Exception) {
+                            break
+                        }
+                    }
+                }
+                port
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to start local auth server", e)
+                -1
+            }
+        }
+
+        private fun handleClient(client: java.net.Socket) {
+            try {
+                client.soTimeout = 5000
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(client.getInputStream()))
+                val firstLine = reader.readLine() ?: return
+                val parts = firstLine.split(" ")
+                if (parts.size >= 2) {
+                    val pathAndQuery = parts[1]
+                    val uri = Uri.parse("http://localhost$pathAndQuery")
+                    val code = uri.getQueryParameter("code")
+                    if (code != null) {
+                        val html = """
+                            <!DOCTYPE html>
+                            <html>
+                            <head><meta name="viewport" content="width=device-width, initial-scale=1"><title>Discord Connected</title>
+                            <style>body{background:#0a0806;color:#f5efe5;font-family:sans-serif;text-align:center;padding:40px;}h1{color:#5865F2;}</style>
+                            </head>
+                            <body>
+                              <h1>Discord Connected!</h1>
+                              <p>You can now return to ARVIO on your TV.</p>
+                            </body>
+                            </html>
+                        """.trimIndent()
+                        val response = "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: ${html.toByteArray().size}\r\nConnection: close\r\n\r\n$html"
+                        client.getOutputStream().write(response.toByteArray())
+                        client.getOutputStream().flush()
+                        onCodeReceived(code)
+                    } else {
+                        val resp = "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\nMissing code"
+                        client.getOutputStream().write(resp.toByteArray())
+                        client.getOutputStream().flush()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling local client request", e)
+            } finally {
+                try { client.close() } catch (_: Exception) {}
+            }
+        }
+
+        fun stop() {
+            job?.cancel()
+            job = null
+            try {
+                serverSocket?.close()
+            } catch (_: Exception) {}
+            serverSocket = null
         }
     }
 }

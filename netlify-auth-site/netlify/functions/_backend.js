@@ -2993,6 +2993,7 @@ module.exports = {
   handleTvAuthComplete,
   handleTvAuthStart,
   handleTvAuthStatus,
+  handleDiscordAuthCallback,
   _test: {
     signArvioAccessToken,
     signArvioRefreshToken,
