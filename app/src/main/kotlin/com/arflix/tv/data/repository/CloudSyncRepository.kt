@@ -959,8 +959,12 @@ class CloudSyncRepository @Inject constructor(
             )
         }
 
-        val groupOrderMerged = if (existingRemotePayload != null && !iptvRepository.isGroupOrderLocallyDirty()) {
-            mergeRemoteGroupOrder(payload, existingRemotePayload)
+        val groupOrderMerged = if (existingRemotePayload != null) {
+            mergeRemoteGroupOrder(
+                payload,
+                existingRemotePayload,
+                iptvRepository.groupOrderLocallyDirtyProfiles(),
+            )
         } else {
             payload
         }
@@ -1027,7 +1031,11 @@ class CloudSyncRepository @Inject constructor(
         return result
     }
 
-    private fun mergeRemoteGroupOrder(localPayload: String, remotePayload: String): String {
+    private fun mergeRemoteGroupOrder(
+        localPayload: String,
+        remotePayload: String,
+        locallyDirtyProfileIds: Set<String>,
+    ): String {
         return runCatching {
             val local = JSONObject(localPayload)
             val remote = JSONObject(remotePayload)
@@ -1036,14 +1044,13 @@ class CloudSyncRepository @Inject constructor(
             val remoteKeys = remoteByProfile.keys()
             while (remoteKeys.hasNext()) {
                 val profileId = remoteKeys.next()
+                if (profileId in locallyDirtyProfileIds) continue
                 val remoteProfile = remoteByProfile.optJSONObject(profileId) ?: continue
                 val localProfile = localByProfile.optJSONObject(profileId) ?: continue
                 if (remoteProfile.optInt("groupOrderSchema", 0) < IPTV_GROUP_ORDER_SCHEMA) continue
                 val remoteGroupOrder = remoteProfile.optJSONArray("groupOrder") ?: continue
-                if (remoteGroupOrder.length() > 0) {
-                    localProfile.put("groupOrder", remoteGroupOrder)
-                    localProfile.put("groupOrderSchema", remoteProfile.optInt("groupOrderSchema"))
-                }
+                localProfile.put("groupOrder", remoteGroupOrder)
+                localProfile.put("groupOrderSchema", remoteProfile.optInt("groupOrderSchema"))
             }
             local.toString()
         }.getOrDefault(localPayload)

@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.profile
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arflix.tv.R
@@ -194,6 +195,7 @@ class ProfileViewModel @Inject constructor(
 
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSwitchingProfile = true)
+            val loadingStartedAtMs = SystemClock.elapsedRealtime()
             try {
                 val previousProfileId = withContext(Dispatchers.IO) {
                     profileRepository.getActiveProfileId()
@@ -247,6 +249,10 @@ class ProfileViewModel @Inject constructor(
                     }
                 }
             } finally {
+                val remainingLoadingTimeMs = 400L - (SystemClock.elapsedRealtime() - loadingStartedAtMs)
+                if (remainingLoadingTimeMs > 0L) {
+                    delay(remainingLoadingTimeMs)
+                }
                 _uiState.value = _uiState.value.copy(isSwitchingProfile = false)
             }
         }

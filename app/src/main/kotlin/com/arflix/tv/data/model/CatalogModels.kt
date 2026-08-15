@@ -20,8 +20,11 @@ enum class CollectionGroupKind {
     FEATURED,
     SERVICE,
     GENRE,
+    MOVIE_GENRE,
+    TV_GENRE,
     DECADE,
     FRANCHISE,
+    STUDIO,
     NETWORK
 }
 
@@ -53,7 +56,9 @@ enum class CollectionSourceKind {
     // to complete curated franchise rows with community-maintained extras
     // (upcoming titles, spin-offs) without requiring the user to have any
     // Stremio addon installed — the endpoint is anonymous and cache-friendly.
-    MDBLIST_PUBLIC
+    MDBLIST_PUBLIC,
+    VODWISHARR_STUDIO,
+    VODWISHARR_NETWORK
 }
 
 data class CollectionSourceConfig(
@@ -67,6 +72,8 @@ data class CollectionSourceConfig(
     val tmdbCollectionId: Int? = null,
     val tmdbKeywordId: Int? = null,
     val tmdbWatchProviderId: Int? = null,
+    val tmdbStudioId: Int? = null,
+    val tmdbNetworkId: Int? = null,
     val watchRegion: String? = null,
     val sortBy: String? = null,
     // Encoded as e.g. "movie:11" / "tv:82856". Preserves order — the list is

@@ -442,7 +442,7 @@ private fun MainActivity.parseInstallPackUrl(intent: android.content.Intent?): S
     val data = intent?.data ?: return null
     val scheme = data.scheme ?: return null
     val host = data.host ?: return null
-    return if (scheme == "arvio" && host == "install-pack") {
+    return if ((scheme == "streamnet" || scheme == "arvio") && host == "install-pack") {
         data.getQueryParameter("url")
     } else if ((scheme == "http" || scheme == "https") && host == "arvio.app" && data.path?.startsWith("/install-pack") == true) {
         data.getQueryParameter("url")

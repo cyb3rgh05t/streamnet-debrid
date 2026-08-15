@@ -71,12 +71,15 @@ import com.arflix.tv.data.model.CollectionTileShape
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.repository.CatalogRepository
+import com.arflix.tv.data.repository.GenreFanartRepository
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.rememberCatalogueRowLayoutMode
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.NeutralLogoBrandGradient
+import com.arflix.tv.ui.theme.logoBrandGradient
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
@@ -125,6 +128,7 @@ data class CollectionDetailsUiState(
 class CollectionDetailsViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val mediaRepository: MediaRepository,
+    private val genreFanartRepository: GenreFanartRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CollectionDetailsUiState())
     val uiState: StateFlow<CollectionDetailsUiState> = _uiState.asStateFlow()
@@ -148,8 +152,12 @@ class CollectionDetailsViewModel @Inject constructor(
             if (current.catalog?.id == normalizedCatalogId && !current.isLoadingMovies && !current.isLoadingSeries) return@launch
 
             _uiState.value = CollectionDetailsUiState(isLoadingMovies = true, isLoadingSeries = true)
-            val catalog = catalogRepository.getCatalogs().firstOrNull { it.id == normalizedCatalogId || it.id == catalogId }
+            val baseCatalog = catalogRepository.getCatalogs()
+                .firstOrNull { it.id == normalizedCatalogId || it.id == catalogId }
                 ?: syntheticTmdbCollectionCatalog(normalizedCatalogId)
+            val catalog = baseCatalog?.let {
+                genreFanartRepository.decorateCatalogs(listOf(it)).first()
+            }
             if (catalog == null) {
                 _uiState.value = CollectionDetailsUiState(
                     isLoadingMovies = false,
@@ -410,7 +418,13 @@ fun CollectionDetailsScreen(
     BackHandler(onBack = onBack)
 
     val rowKey = remember(catalogId) { "collection:$catalogId" }
-    val usePosterCards = uiState.catalog?.collectionGroup != CollectionGroupKind.GENRE &&
+    val usePosterCards = uiState.catalog?.collectionGroup !in setOf(
+        CollectionGroupKind.GENRE,
+        CollectionGroupKind.MOVIE_GENRE,
+        CollectionGroupKind.TV_GENRE,
+        CollectionGroupKind.STUDIO,
+        CollectionGroupKind.NETWORK
+    ) &&
         rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
     val configuration = LocalConfiguration.current
     val isMobile = LocalDeviceType.current.isTouchDevice()
@@ -620,19 +634,50 @@ fun CollectionDetailsScreen(
 
 @Composable
 private fun CollectionBackdrop(catalog: CatalogConfig?) {
-    val accent = collectionAccentColor(catalog?.collectionGroup)
+    val showAsLogo = catalog?.collectionGroup == CollectionGroupKind.STUDIO ||
+        catalog?.collectionGroup == CollectionGroupKind.NETWORK
     val backdrop = catalog?.collectionHeroImageUrl
         ?.takeIf { it.isNotBlank() }
         ?: catalog?.collectionCoverImageUrl?.takeIf { it.isNotBlank() }
+    var logoGradient by remember(backdrop) { mutableStateOf(NeutralLogoBrandGradient) }
+    val accent = if (showAsLogo) logoGradient.first() else collectionAccentColor(catalog?.collectionGroup)
 
     Box(modifier = Modifier.fillMaxSize()) {
+        if (showAsLogo) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            logoGradient
+                        )
+                    )
+            )
+        }
         if (backdrop != null) {
             AsyncImage(
                 model = backdrop,
                 contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                alpha = 0.2f
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (showAsLogo) Modifier.padding(horizontal = 180.dp, vertical = 100.dp)
+                        else Modifier
+                    ),
+                contentScale = if (showAsLogo) {
+                    androidx.compose.ui.layout.ContentScale.Fit
+                } else {
+                    androidx.compose.ui.layout.ContentScale.Crop
+                },
+                alpha = if (showAsLogo) 0.32f else 0.2f,
+                onSuccess = { success ->
+                    if (showAsLogo) {
+                        logoGradient = logoBrandGradient(
+                            success.result.drawable,
+                            allowLightBackground = false,
+                        )
+                    }
+                },
             )
         }
         Box(
@@ -668,10 +713,13 @@ private fun CollectionBackdrop(catalog: CatalogConfig?) {
 private fun collectionAccentColor(group: CollectionGroupKind?): Color = when (group) {
     CollectionGroupKind.FEATURED -> Color(0xFFE6A23C)
     CollectionGroupKind.SERVICE -> Color(0xFF1AA7EC)
-    CollectionGroupKind.GENRE -> Color(0xFFC65D3B)
+    CollectionGroupKind.GENRE,
+    CollectionGroupKind.MOVIE_GENRE,
+    CollectionGroupKind.TV_GENRE -> Color(0xFFC65D3B)
     CollectionGroupKind.DECADE -> Color(0xFFB98B32)
     CollectionGroupKind.FRANCHISE -> Color(0xFF2F9C95)
-    CollectionGroupKind.NETWORK -> Color(0xFF4F9D69)
+    CollectionGroupKind.STUDIO,
+    CollectionGroupKind.NETWORK -> NeutralLogoBrandGradient.first()
     null -> Color.White
 }
 

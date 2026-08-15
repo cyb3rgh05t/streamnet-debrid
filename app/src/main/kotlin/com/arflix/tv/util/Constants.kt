@@ -58,6 +58,8 @@ object Constants {
     val SIMKL_CLIENT_ID: String get() = usableSecret(BuildConfig.SIMKL_CLIENT_ID)
     val TVDB_API_KEY: String get() = usableSecret(BuildConfig.TVDB_API_KEY)
     val FANART_API_KEY: String get() = usableSecret(BuildConfig.FANART_API_KEY)
+    val VODWISHARR_API_KEY: String get() = usableSecret(BuildConfig.VODWISHARR_API_KEY)
+    const val VODWISHARR_API_URL = "https://streamnetvod.mystreamnet.club/api/v1/"
 
     // Image URLs - tuned for TV quality with smooth scrolling/perf.
     const val IMAGE_BASE = "https://image.tmdb.org/t/p/w780"

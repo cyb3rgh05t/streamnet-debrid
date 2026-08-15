@@ -7,6 +7,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
@@ -52,6 +53,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -96,6 +98,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -134,6 +137,7 @@ import coil.request.ImageRequest
 import coil.size.Precision
 import com.arflix.tv.data.model.Category
 import com.arflix.tv.data.model.CatalogConfig
+import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.CollectionTileShape
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
@@ -167,6 +171,8 @@ import com.arflix.tv.ui.skin.rememberArvioCardShape
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.NeutralLogoBrandGradient
+import com.arflix.tv.ui.theme.logoBrandGradient
 import com.arflix.tv.ui.theme.BackgroundCard
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.AccentRed
@@ -301,9 +307,12 @@ private fun localizedCategoryTitle(category: Category): String = when (category.
     "trending_anime"           -> stringResource(R.string.trending_anime)
     "collection_row_service"   -> stringResource(R.string.services)
     "collection_row_genre"     -> stringResource(R.string.genres)
+    "collection_row_movie_genre" -> stringResource(R.string.movie_genres)
+    "collection_row_tv_genre"  -> stringResource(R.string.tv_genres)
+    "collection_row_studio"    -> stringResource(R.string.movie_studios)
+    "collection_row_network"   -> stringResource(R.string.tv_networks)
     "collection_row_decade"    -> stringResource(R.string.decades)
     "collection_row_franchise" -> stringResource(R.string.franchises)
-    "collection_row_network"   -> stringResource(R.string.networks)
     "collection_row_featured"  -> stringResource(R.string.featured)
     "top10_movies_today"       -> stringResource(R.string.home_top10_movies_today)
     "top10_shows_today"        -> stringResource(R.string.home_top10_shows_today)
@@ -463,7 +472,7 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
     val heroDataSourceFactory =
-        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("ARVIO/1.7.0 (Android TV)")
+        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("StreamNetTV/1.7.0 (Android TV)")
     val heroHlsFactory = HlsMediaSource.Factory(heroDataSourceFactory)
         .setAllowChunklessPreparation(true)
     val heroDefaultFactory = DefaultMediaSourceFactory(context)
@@ -521,6 +530,7 @@ private suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeSc
 private fun HomeBackdropCrossfade(
     backdropUrl: String?,
     backdropSize: Pair<Int, Int>,
+    showAsLogo: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -528,6 +538,22 @@ private fun HomeBackdropCrossfade(
     var pendingBackdropUrl by remember { mutableStateOf<String?>(null) }
     var pendingBackdropReady by remember { mutableStateOf(false) }
     val pendingAlpha = remember { Animatable(0f) }
+    var logoGradient by remember { mutableStateOf(NeutralLogoBrandGradient) }
+    val animatedLogoStart by animateColorAsState(
+        targetValue = logoGradient[0],
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "company_hero_gradient_start",
+    )
+    val animatedLogoMiddle by animateColorAsState(
+        targetValue = logoGradient[1],
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "company_hero_gradient_middle",
+    )
+    val animatedLogoEnd by animateColorAsState(
+        targetValue = logoGradient[2],
+        animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing),
+        label = "company_hero_gradient_end",
+    )
     val (backdropWidthPx, backdropHeightPx) = backdropSize
 
     LaunchedEffect(backdropUrl) {
@@ -566,7 +592,7 @@ private fun HomeBackdropCrossfade(
         pendingAlpha.snapTo(0f)
         pendingAlpha.animateTo(
             targetValue = 1f,
-            animationSpec = tween(durationMillis = 420)
+            animationSpec = tween(durationMillis = 520, easing = FastOutSlowInEasing)
         )
         displayedBackdropUrl = target
         pendingBackdropUrl = null
@@ -587,7 +613,17 @@ private fun HomeBackdropCrossfade(
             .build()
         }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier.background(
+            if (showAsLogo) {
+                Brush.linearGradient(
+                    listOf(animatedLogoStart, animatedLogoMiddle, animatedLogoEnd)
+                )
+            } else {
+                Brush.linearGradient(listOf(Color.Transparent, Color.Transparent))
+            }
+        )
+    ) {
         displayedBackdropUrl?.let { stableBackdropUrl ->
             val request = remember(stableBackdropUrl, backdropWidthPx, backdropHeightPx) {
                 buildBackdropRequest(stableBackdropUrl)
@@ -595,8 +631,23 @@ private fun HomeBackdropCrossfade(
             AsyncImage(
                 model = request,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize()
+                contentScale = if (showAsLogo) ContentScale.Fit else ContentScale.Crop,
+                onSuccess = { success ->
+                    if (showAsLogo) {
+                        logoGradient = logoBrandGradient(
+                            success.result.drawable,
+                            allowLightBackground = false,
+                        )
+                    }
+                },
+                colorFilter = if (showAsLogo) ColorFilter.tint(Color.White) else null,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(
+                        if (showAsLogo) Modifier.padding(horizontal = 180.dp, vertical = 120.dp)
+                        else Modifier
+                    )
+                    .graphicsLayer { alpha = if (showAsLogo) 0.2f else 1f }
             )
         }
 
@@ -607,11 +658,26 @@ private fun HomeBackdropCrossfade(
             AsyncImage(
                 model = request,
                 contentDescription = null,
-                contentScale = ContentScale.Crop,
-                onSuccess = { pendingBackdropReady = true },
+                contentScale = if (showAsLogo) ContentScale.Fit else ContentScale.Crop,
+                onSuccess = { success ->
+                    if (showAsLogo) {
+                        logoGradient = logoBrandGradient(
+                            success.result.drawable,
+                            allowLightBackground = false,
+                        )
+                    }
+                    pendingBackdropReady = true
+                },
+                colorFilter = if (showAsLogo) ColorFilter.tint(Color.White) else null,
                 modifier = Modifier
                     .fillMaxSize()
-                    .graphicsLayer { alpha = pendingAlpha.value }
+                    .then(
+                        if (showAsLogo) Modifier.padding(horizontal = 180.dp, vertical = 120.dp)
+                        else Modifier
+                    )
+                    .graphicsLayer {
+                        alpha = pendingAlpha.value * if (showAsLogo) 0.2f else 1f
+                    }
             )
         }
     }
@@ -1077,6 +1143,8 @@ fun HomeScreen(
                 else -> item.backdrop ?: item.image
             }
         }
+        val showHeroAsCompanyLogo = displayHeroItem?.collectionGroup == CollectionGroupKind.STUDIO ||
+            displayHeroItem?.collectionGroup == CollectionGroupKind.NETWORK
         var settledBackdrop by remember { mutableStateOf<String?>(null) }
         val latestCurrentBackdrop by rememberUpdatedState(currentBackdrop)
         LaunchedEffect(currentBackdrop, isMobile) {
@@ -1118,6 +1186,7 @@ fun HomeScreen(
                     HomeBackdropCrossfade(
                         backdropUrl = settledBackdrop,
                         backdropSize = backdropSize,
+                        showAsLogo = showHeroAsCompanyLogo,
                         modifier = Modifier.fillMaxSize()
                     )
                 }
@@ -1559,7 +1628,9 @@ private fun IptvHeroSection(
                     contentDescription = item.title,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(60.dp).height(30.dp),
+                    modifier = Modifier
+                        .height(30.dp)
+                        .widthIn(min = 24.dp, max = 84.dp),
                 )
             } else {
                 Text(
@@ -1575,10 +1646,11 @@ private fun IptvHeroSection(
                 )
             }
             item.subtitle.takeIf { it.isNotBlank() }?.let { category ->
-                Text(
-                    text = "|",
-                    style = ArflixTypography.caption.copy(fontSize = 13.sp, shadow = textShadow),
-                    color = Color.White.copy(alpha = 0.5f),
+                Box(
+                    modifier = Modifier
+                        .width(1.dp)
+                        .height(20.dp)
+                        .background(Color.White.copy(alpha = 0.42f))
                 )
                 Text(
                     text = category,
@@ -2141,21 +2213,113 @@ private fun HomeHeroLayer(
                 .zIndex(3f)
         ) {
             heroItem?.let { item ->
-                if (!item.status.orEmpty().startsWith("collection:")) {
-                    HeroSection(
+                val isCollection = item.status.orEmpty().startsWith("collection:")
+                val isGenreCollection = item.collectionGroup == CollectionGroupKind.GENRE ||
+                    item.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
+                    item.collectionGroup == CollectionGroupKind.TV_GENRE
+                val isCompanyCollection = item.collectionGroup == CollectionGroupKind.STUDIO ||
+                    item.collectionGroup == CollectionGroupKind.NETWORK
+                val heroContentModifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(
+                        start = contentStartPadding,
+                        end = 400.dp
+                    )
+                    .offset(y = -heroBottomPadding)
+
+                when {
+                    !isCollection -> HeroSection(
                         item = item,
                         logoUrl = heroLogoUrl,
                         overviewOverride = heroOverviewOverride,
                         showBudget = showBudget,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(
-                                start = contentStartPadding,
-                                end = 400.dp
+                        modifier = heroContentModifier
+                    )
+                    isCompanyCollection -> CompanyHeroLogo(
+                        logoUrl = item.image,
+                        companyName = item.title,
+                        modifier = heroContentModifier
+                            .width(360.dp)
+                            .height(92.dp)
+                    )
+                    isGenreCollection -> HomeHeroMarqueeTitle(
+                        text = item.title.uppercase(),
+                        style = ArflixTypography.heroTitle.copy(
+                            fontSize = 38.sp,
+                            fontWeight = FontWeight.Black,
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.95f),
+                                offset = Offset(0f, 2f),
+                                blurRadius = 10f
                             )
-                            .offset(y = -heroBottomPadding)
+                        ),
+                        color = TextPrimary,
+                        maxLines = 1,
+                        modifier = heroContentModifier
+                            .width(420.dp)
+                            .height(72.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompanyHeroLogo(
+    logoUrl: String,
+    companyName: String,
+    modifier: Modifier = Modifier,
+) {
+    var logoFailed by remember(logoUrl) { mutableStateOf(logoUrl.isBlank()) }
+    var titleGradient by remember(logoUrl) { mutableStateOf(NeutralLogoBrandGradient) }
+    Box(
+        modifier = modifier.background(
+            Brush.horizontalGradient(
+                listOf(
+                    titleGradient[0].copy(alpha = 0.96f),
+                    titleGradient[1].copy(alpha = 0.82f),
+                    Color.Transparent,
+                )
+            )
+        )
+    ) {
+        Crossfade(
+            targetState = logoUrl,
+            animationSpec = tween(durationMillis = 360, easing = FastOutSlowInEasing),
+            label = "company_hero_logo",
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 52.dp, top = 10.dp, bottom = 10.dp),
+        ) { activeLogoUrl ->
+            if (activeLogoUrl.isNotBlank() && !logoFailed) {
+                AsyncImage(
+                    model = activeLogoUrl,
+                    contentDescription = companyName,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    onSuccess = { success ->
+                        titleGradient = logoBrandGradient(success.result.drawable)
+                    },
+                    onError = { logoFailed = true },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            } else {
+                HomeHeroMarqueeTitle(
+                    text = companyName.uppercase(),
+                    style = ArflixTypography.heroTitle.copy(
+                        fontSize = 38.sp,
+                        fontWeight = FontWeight.Black,
+                        shadow = Shadow(
+                            color = Color.Black.copy(alpha = 0.95f),
+                            offset = Offset(0f, 2f),
+                            blurRadius = 10f,
+                        ),
+                    ),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxSize(),
+                )
             }
         }
     }

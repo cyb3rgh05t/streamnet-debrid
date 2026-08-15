@@ -10,6 +10,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -24,15 +25,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.ui.theme.ArflixTypography
-import com.arflix.tv.ui.theme.Pink
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
@@ -115,16 +117,18 @@ fun Screensaver(
             Box(
                 modifier = Modifier
                     .offset(
-                        x = (screenWidth - 200.dp) * positionX,
-                        y = (screenHeight - 100.dp) * positionY
+                        x = (screenWidth - 260.dp) * positionX,
+                        y = (screenHeight - 90.dp) * positionY
                     )
-                    .size(200.dp, 100.dp),
+                    .size(260.dp, 90.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = "ARFLIX",
-                    style = ArflixTypography.heroTitle,
-                    color = Pink.copy(alpha = alpha)
+                Image(
+                    painter = painterResource(R.drawable.streamnet_tv_logo_full),
+                    contentDescription = stringResource(R.string.app_name),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { this.alpha = alpha }
                 )
             }
 

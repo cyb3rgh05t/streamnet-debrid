@@ -961,12 +961,12 @@ class AuthRepository @Inject constructor(
     }
 
     private fun safeErrorMessage(error: Exception?, fallback: String): String {
-        val rawMessage = error?.message ?: return fallback
+        val rawMessage = error?.message?.streamNetBranded() ?: return fallback
         val message = rawMessage.lowercase()
         val netlifyPasswordHelp =
-            "Invalid email or password. If this is an existing ARVIO Cloud account, create a new password at auth.arvio.tv and then sign in again."
+            "Invalid email or password. If this is an existing StreamNet TV Cloud account, create a new password on the StreamNet TV authentication page and then sign in again."
         return when {
-            "arvio cloud moved" in message || "password setup" in message -> rawMessage
+            "arvio cloud moved" in message || "streamnet tv cloud moved" in message || "password setup" in message -> rawMessage
             Constants.USE_NETLIFY_CLOUD_SYNC && "invalid email or password" in message -> netlifyPasswordHelp
             "database error saving new user" in message -> context.getString(R.string.auth_account_exists)
             "settingssessionmanager" in message -> context.getString(R.string.auth_signin_retry)
@@ -1870,9 +1870,11 @@ class AuthRepository @Inject constructor(
     private fun cloudAuthErrorMessage(json: JSONObject?, defaultError: String): String {
         if (json == null) return defaultError
         val code = json.optString("code")
-        val message = json.optString("error").takeIf { it.isNotBlank() } ?: defaultError
+        val message = (json.optString("error").takeIf { it.isNotBlank() } ?: defaultError).streamNetBranded()
         if (code == "password_setup_required") {
-            val setupError = json.optString("setup_error").takeIf { it.isNotBlank() && it != "null" }
+            val setupError = json.optString("setup_error")
+                .takeIf { it.isNotBlank() && it != "null" }
+                ?.streamNetBranded()
             return if (json.optBoolean("email_sent", false)) {
                 "$message Check your email to create the new password."
             } else if (!setupError.isNullOrBlank()) {
@@ -1883,6 +1885,10 @@ class AuthRepository @Inject constructor(
         }
         return message
     }
+
+    private fun String.streamNetBranded(): String =
+        replace("ARVIO", "StreamNet TV", ignoreCase = true)
+            .replace("ARFLIX", "StreamNet TV", ignoreCase = true)
 
     private suspend fun callSupabaseRpc(functionName: String, body: String): String {
         val session = ensureValidSession() ?: throw IllegalStateException("Session expired")

@@ -108,6 +108,38 @@ class IptvProviderOrderTest {
         assertThat(retained).isEmpty()
     }
 
+    @Test
+    fun categoryMovesOnlyReorderTheSelectedPlaylistSlots() {
+        val saved = listOf(
+            "one|News",
+            "two|Sports",
+            "one|Kids",
+            "two|Movies",
+            "one|Docs",
+        )
+        val currentGroups = listOf("News", "Kids", "Docs")
+
+        val movedUp = reorderIptvPlaylistGroup(
+            saved, "one", currentGroups, "Docs", IptvGroupOrderMove.UP
+        )
+        val movedDown = reorderIptvPlaylistGroup(
+            saved, "one", currentGroups, "News", IptvGroupOrderMove.DOWN
+        )
+        val movedToTop = reorderIptvPlaylistGroup(
+            saved, "one", currentGroups, "Docs", IptvGroupOrderMove.TOP
+        )
+
+        assertThat(movedUp)
+            .containsExactly("one|News", "two|Sports", "one|Docs", "two|Movies", "one|Kids")
+            .inOrder()
+        assertThat(movedDown)
+            .containsExactly("one|Kids", "two|Sports", "one|News", "two|Movies", "one|Docs")
+            .inOrder()
+        assertThat(movedToTop)
+            .containsExactly("one|Docs", "two|Sports", "one|News", "two|Movies", "one|Kids")
+            .inOrder()
+    }
+
     private fun apiChannel(
         streamId: Int,
         name: String,

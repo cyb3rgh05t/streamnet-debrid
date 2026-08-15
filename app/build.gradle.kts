@@ -56,6 +56,7 @@ android {
         )
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
+        buildConfigField("String", "VODWISHARR_API_KEY", "\"${escapeBuildConfigString(localSecretValue("VODWISHARR_API_KEY"))}\"")
 
 
         // Support both 32-bit and 64-bit devices (required for Google Play since 2019)

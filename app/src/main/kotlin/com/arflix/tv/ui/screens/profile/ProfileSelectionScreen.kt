@@ -45,6 +45,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -85,26 +90,7 @@ fun ProfileSelectionScreen(
     // Track if profile was selected in this session to trigger navigation
     var navigateTriggered by remember { mutableStateOf(false) }
 
-    // Guard against Enter key events from previous screen (TV only — touch devices don't need this)
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
-    var isReadyForInput by remember { mutableStateOf(isTouchDevice) }
-
-    // Set ready for input after a short delay to ignore stray key events (TV only)
-    LaunchedEffect(Unit) {
-        if (!isTouchDevice) {
-            delay(300)
-            isReadyForInput = true
-        }
-    }
-
-    // Reset input guard when dialogs close (TV only)
-    LaunchedEffect(uiState.showAddDialog, uiState.editingProfile) {
-        if (!isTouchDevice && !uiState.showAddDialog && uiState.editingProfile == null && isReadyForInput) {
-            isReadyForInput = false
-            delay(300)
-            isReadyForInput = true
-        }
-    }
 
     // Navigate when activeProfile changes after user selection
     LaunchedEffect(uiState.activeProfile?.id, uiState.isSwitchingProfile) {
@@ -246,8 +232,7 @@ fun ProfileSelectionScreen(
                             avatarSize = avatarSize,
                             modifier = Modifier.focusRequester(focusRequesters[index]),
                             onClick = {
-                                // Guard against stray Enter key events from previous screen
-                                if (!isReadyForInput || uiState.isSwitchingProfile) return@ProfileAvatar
+                                if (uiState.isSwitchingProfile) return@ProfileAvatar
 
                                 if (uiState.isManageMode) {
                                     viewModel.showEditDialog(profile)
@@ -270,7 +255,7 @@ fun ProfileSelectionScreen(
                         AddProfileButton(
                             avatarSize = avatarSize,
                             modifier = Modifier.focusRequester(focusRequesters[uiState.profiles.size]),
-                            onClick = { if (isReadyForInput && !uiState.isSwitchingProfile) viewModel.showAddDialog() }
+                            onClick = { if (!uiState.isSwitchingProfile) viewModel.showAddDialog() }
                         )
                     }
                 }
@@ -282,7 +267,7 @@ fun ProfileSelectionScreen(
             ManageProfilesButton(
                 isManageMode = uiState.isManageMode,
                 onClick = {
-                    if ((isTouchDevice || isReadyForInput) && !uiState.isSwitchingProfile) {
+                    if (!uiState.isSwitchingProfile) {
                         viewModel.toggleManageMode()
                     }
                 }
@@ -294,7 +279,7 @@ fun ProfileSelectionScreen(
                 // Cloud connect button — focusable on TV, tappable on mobile
                 CloudConnectButton(
                     onClick = {
-                        if ((isTouchDevice || isReadyForInput) && !uiState.isSwitchingProfile) {
+                        if (!uiState.isSwitchingProfile) {
                             onConnectCloud()
                         }
                     }
@@ -395,6 +380,7 @@ private fun ProfileAvatar(
     onDelete: () -> Unit
 ) {
     var isFocused by remember { mutableIntStateOf(0) }
+    var selectKeyDownSeen by remember { mutableStateOf(false) }
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val scale by animateFloatAsState(
         targetValue = if (isFocused > 0) {
@@ -432,6 +418,26 @@ private fun ProfileAvatar(
                     modifier = Modifier
                         .size(avatarSize)
                         .scale(scale)
+                        .onPreviewKeyEvent { event ->
+                            if (event.key !in listOf(Key.Enter, Key.NumPadEnter, Key.DirectionCenter)) {
+                                return@onPreviewKeyEvent false
+                            }
+
+                            when (event.type) {
+                                KeyEventType.KeyDown -> {
+                                    selectKeyDownSeen = true
+                                    true
+                                }
+                                KeyEventType.KeyUp -> {
+                                    if (selectKeyDownSeen) {
+                                        selectKeyDownSeen = false
+                                        onClick()
+                                    }
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
                         .onFocusChanged { focusState ->
                             val wasFocused = isFocused > 0
                             isFocused = if (focusState.isFocused) 1 else 0

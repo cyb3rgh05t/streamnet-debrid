@@ -166,30 +166,82 @@ class PreinstalledServicesTest {
     }
 
     @Test
-    fun `genre collections include direct TMDB fallbacks`() {
-        val genres = MediaRepository.buildPreinstalledDefaults()
-            .filter { it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.GENRE }
-        assertTrue("Expected genre collections", genres.isNotEmpty())
-        genres.forEach { cfg ->
-            assertTrue(
-                "${cfg.title} must have a direct TMDB genre or keyword fallback",
-                cfg.collectionSources.any {
-                    it.kind == CollectionSourceKind.TMDB_GENRE ||
-                        it.kind == CollectionSourceKind.TMDB_KEYWORD
-                }
-            )
+    fun `movie and TV genres have separate rails and TMDB sources`() {
+        val catalogs = MediaRepository.buildPreinstalledDefaults()
+        val movieGenres = catalogs.filter {
+            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.MOVIE_GENRE
+        }
+        val tvGenres = catalogs.filter {
+            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.TV_GENRE
         }
 
-        val action = genres.first { it.title == "Action" }
-        assertTrue(action.collectionSources.any {
-            it.kind == CollectionSourceKind.TMDB_GENRE &&
-                it.mediaType == "movie" &&
-                it.tmdbGenreId == 28
+        assertEquals(19, movieGenres.size)
+        assertEquals(16, tvGenres.size)
+        assertTrue(catalogs.any {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.MOVIE_GENRE
         })
-        assertTrue(action.collectionSources.any {
-            it.kind == CollectionSourceKind.TMDB_GENRE &&
-                it.mediaType == "series" &&
-                it.tmdbGenreId == 10759
+        assertTrue(catalogs.any {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.TV_GENRE
         })
+        assertFalse(catalogs.any {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.GENRE
+        })
+
+        movieGenres.forEach { catalog ->
+            assertTrue(catalog.collectionSources.all {
+                it.kind == CollectionSourceKind.TMDB_GENRE && it.mediaType == "movie"
+            })
+        }
+        tvGenres.forEach { catalog ->
+            assertTrue(catalog.collectionSources.all {
+                it.kind == CollectionSourceKind.TMDB_GENRE && it.mediaType == "series"
+            })
+        }
+
+        assertTrue(movieGenres.first { it.title == "Action" }.collectionSources.any {
+            it.tmdbGenreId == 28
+        })
+        assertTrue(tvGenres.first { it.title == "Action & Adventure" }.collectionSources.any {
+            it.tmdbGenreId == 10759
+        })
+    }
+
+    @Test
+    fun `movie studios and TV networks have separate rails and source IDs`() {
+        val catalogs = MediaRepository.buildPreinstalledDefaults()
+        val studios = catalogs.filter {
+            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.STUDIO
+        }
+        val networks = catalogs.filter {
+            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.NETWORK
+        }
+
+        assertEquals(11, studios.size)
+        assertEquals(22, networks.size)
+        assertTrue(catalogs.any {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.STUDIO
+        })
+        assertTrue(catalogs.any {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.NETWORK
+        })
+        assertTrue(studios.all { catalog ->
+            catalog.collectionSources.single().let { source ->
+                source.kind == CollectionSourceKind.VODWISHARR_STUDIO &&
+                    source.mediaType == "movie" && source.tmdbStudioId != null &&
+                    source.tmdbNetworkId == null
+            }
+        })
+        assertTrue(networks.all { catalog ->
+            catalog.collectionSources.single().let { source ->
+                source.kind == CollectionSourceKind.VODWISHARR_NETWORK &&
+                    source.mediaType == "series" && source.tmdbNetworkId != null &&
+                    source.tmdbStudioId == null
+            }
+        })
+
+        assertEquals(174, studios.first { it.title == "Warner Bros. Pictures" }
+            .collectionSources.single().tmdbStudioId)
+        assertEquals(174, networks.first { it.title == "AMC" }
+            .collectionSources.single().tmdbNetworkId)
     }
 }

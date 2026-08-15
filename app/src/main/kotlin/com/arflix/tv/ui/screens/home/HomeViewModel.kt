@@ -39,6 +39,7 @@ import com.arflix.tv.data.repository.needsRichCurrentEpg
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.CloudSyncStatus
 import com.arflix.tv.data.repository.CollectionTemplateManifest
+import com.arflix.tv.data.repository.GenreFanartRepository
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.data.repository.sync.TrackingFeature
@@ -182,6 +183,7 @@ class HomeViewModel @Inject constructor(
     private val traktSyncService: TraktSyncService,
     private val iptvRepository: IptvRepository,
     private val homeServerRepository: HomeServerRepository,
+    private val genreFanartRepository: GenreFanartRepository,
     private val watchHistoryRepository: WatchHistoryRepository,
     private val watchlistRepository: WatchlistRepository,
     private val cloudSyncRepository: CloudSyncRepository,
@@ -2329,6 +2331,10 @@ class HomeViewModel @Inject constructor(
         "Featured" to R.string.featured,
         "Services" to R.string.services,
         "Genres" to R.string.genres,
+        "Movie Genres" to R.string.movie_genres,
+        "TV Genres" to R.string.tv_genres,
+        "Movie Studios" to R.string.movie_studios,
+        "TV Networks" to R.string.tv_networks,
         "Decades" to R.string.decades,
         "Franchises" to R.string.franchises,
         "Networks" to R.string.networks,
@@ -2862,9 +2868,11 @@ class HomeViewModel @Inject constructor(
                     resolved
                 }
                 val collectionRows = withContext(networkDispatcher) {
-                    val collectionConfigs = savedCatalogs.filter { cfg ->
-                        isCollectionTileConfig(cfg) && CollectionTemplateManifest.isValidCollectionConfig(cfg)
-                    }
+                    val collectionConfigs = genreFanartRepository.decorateCatalogs(
+                        savedCatalogs.filter { cfg ->
+                            isCollectionTileConfig(cfg) && CollectionTemplateManifest.isValidCollectionConfig(cfg)
+                        }
+                    )
 
                     savedCatalogs.mapNotNull { cfg ->
                         if (!isCollectionRailConfig(cfg) || !CollectionTemplateManifest.isValidCollectionConfig(cfg)) {

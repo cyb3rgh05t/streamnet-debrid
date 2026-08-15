@@ -238,6 +238,10 @@ class MediaRepository @Inject constructor(
                 append(':')
                 append(source.tmdbWatchProviderId ?: -1)
                 append(':')
+                append(source.tmdbStudioId ?: -1)
+                append(':')
+                append(source.tmdbNetworkId ?: -1)
+                append(':')
                 append(source.watchRegion.orEmpty())
                 append(':')
                 append(source.sortBy.orEmpty())
@@ -266,7 +270,11 @@ class MediaRepository @Inject constructor(
         // instead of clamping at the default 72/96/120 ceiling. FRANCHISE and
         // other fixed groups keep the small cap.
         val unlimitedGroup = catalog.collectionGroup == CollectionGroupKind.SERVICE ||
-            catalog.collectionGroup == CollectionGroupKind.GENRE
+            catalog.collectionGroup == CollectionGroupKind.GENRE ||
+            catalog.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
+            catalog.collectionGroup == CollectionGroupKind.TV_GENRE ||
+            catalog.collectionGroup == CollectionGroupKind.STUDIO ||
+            catalog.collectionGroup == CollectionGroupKind.NETWORK
 
         // Resolve all sources in parallel so a slow/failed source never blocks the
         // others — this alone fixes "empty" genre collections where one source 404s.
@@ -394,7 +402,7 @@ class MediaRepository @Inject constructor(
         val request = Request.Builder()
             .url("https://v3-cinemeta.strem.io/meta/$typePath/$imdbId.json")
             .header("Accept", "application/json")
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; ARVIO)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
             .build()
 
         runCatching {
@@ -517,7 +525,7 @@ class MediaRepository @Inject constructor(
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
-                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; ARVIO)"))
+                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
                 .build()
 
             val fetched = runCatching {
@@ -549,7 +557,7 @@ class MediaRepository @Inject constructor(
         val request = Request.Builder()
             .url("https://v3-cinemeta.strem.io/meta/series/$imdbId.json")
             .header("Accept", "application/json")
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; ARVIO)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
             .build()
 
         runCatching {
@@ -1518,6 +1526,8 @@ class MediaRepository @Inject constructor(
                         source.tmdbCollectionId?.toString().orEmpty(),
                         source.tmdbKeywordId?.toString().orEmpty(),
                         source.tmdbWatchProviderId?.toString().orEmpty(),
+                        source.tmdbStudioId?.toString().orEmpty(),
+                        source.tmdbNetworkId?.toString().orEmpty(),
                         source.watchRegion.orEmpty(),
                         source.sortBy.orEmpty(),
                         source.curatedRefs?.joinToString(",").orEmpty(),
@@ -1537,7 +1547,10 @@ class MediaRepository @Inject constructor(
             }
 
             val templateCollections = CollectionTemplateManifest.entries.map { entry ->
-                val legacy = resolveLegacyCollection(entry.title)
+                val legacy = if (
+                    entry.group == CollectionGroupKind.MOVIE_GENRE ||
+                    entry.group == CollectionGroupKind.TV_GENRE
+                ) null else resolveLegacyCollection(entry.title)
                 val legacyStaticCover = legacy?.collectionCoverImageUrl?.takeUnless {
                     it.contains(".gif", ignoreCase = true) || it.contains("gifv", ignoreCase = true)
                 }
@@ -1555,6 +1568,10 @@ class MediaRepository @Inject constructor(
                 val preferredHero = when (entry.group) {
                     CollectionGroupKind.SERVICE,
                     CollectionGroupKind.GENRE,
+                    CollectionGroupKind.MOVIE_GENRE,
+                    CollectionGroupKind.TV_GENRE,
+                    CollectionGroupKind.STUDIO,
+                    CollectionGroupKind.NETWORK,
                     CollectionGroupKind.FRANCHISE -> preferredCover
                     else -> legacy?.collectionHeroImageUrl ?: preferredCover
                 }
@@ -1573,7 +1590,11 @@ class MediaRepository @Inject constructor(
                     collectionHeroGifUrl = preferredHero,
                     collectionHeroVideoUrl = entry.heroVideoUrl ?: legacy?.collectionHeroVideoUrl,
                     collectionClearLogoUrl = null,
-                    collectionTileShape = if (entry.group == CollectionGroupKind.GENRE) {
+                    collectionTileShape = if (
+                        entry.group == CollectionGroupKind.GENRE ||
+                        entry.group == CollectionGroupKind.MOVIE_GENRE ||
+                        entry.group == CollectionGroupKind.TV_GENRE
+                    ) {
                         CollectionTileShape.LANDSCAPE
                     } else {
                         entry.tileShape
@@ -2090,6 +2111,8 @@ class MediaRepository @Inject constructor(
                 CollectionSourceKind.TMDB_WATCH_PROVIDER -> loadCollectionWatchProviderRefs(source, limit)
                 CollectionSourceKind.CURATED_IDS -> loadCollectionCuratedRefs(source, limit)
                 CollectionSourceKind.MDBLIST_PUBLIC -> loadCollectionMdblistPublicRefs(source, limit)
+                CollectionSourceKind.VODWISHARR_STUDIO,
+                CollectionSourceKind.VODWISHARR_NETWORK -> loadVodwisharrCompanyRefs(source, limit)
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -2098,6 +2121,55 @@ class MediaRepository @Inject constructor(
 
             emptyList()
         }
+    }
+
+    private suspend fun loadVodwisharrCompanyRefs(
+        source: CollectionSourceConfig,
+        limit: Int
+    ): List<Pair<MediaType, Int>> = withContext(Dispatchers.IO) {
+        if (limit <= 0 || Constants.VODWISHARR_API_KEY.isBlank()) return@withContext emptyList()
+        val isStudio = source.kind == CollectionSourceKind.VODWISHARR_STUDIO
+        val companyId = if (isStudio) source.tmdbStudioId else source.tmdbNetworkId
+        if (companyId == null || companyId <= 0) return@withContext emptyList()
+
+        val endpoint = if (isStudio) {
+            "discover/movies/studio/$companyId"
+        } else {
+            "discover/tv/network/$companyId"
+        }
+        val mediaType = if (isStudio) MediaType.MOVIE else MediaType.TV
+        val refs = LinkedHashSet<Pair<MediaType, Int>>()
+        var page = 1
+        var totalPages = 1
+
+        while (page <= totalPages && refs.size < limit) {
+            val url = (Constants.VODWISHARR_API_URL + endpoint).toHttpUrl().newBuilder()
+                .addQueryParameter("page", page.toString())
+                .addQueryParameter("language", contentLanguage)
+                .build()
+            val request = Request.Builder()
+                .url(url)
+                .header("Accept", "application/json")
+                .header("X-API-Key", Constants.VODWISHARR_API_KEY)
+                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+                .build()
+            val responseJson = runCatching {
+                okHttpClient.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    response.body?.string()?.let(::JSONObject)
+                }
+            }.getOrNull() ?: break
+
+            totalPages = responseJson.optInt("totalPages", page).coerceAtLeast(page)
+            val results = responseJson.optJSONArray("results") ?: break
+            for (index in 0 until results.length()) {
+                val id = results.optJSONObject(index)?.optInt("id", -1) ?: continue
+                if (id > 0) refs.add(mediaType to id)
+                if (refs.size >= limit) break
+            }
+            page++
+        }
+        refs.take(limit)
     }
 
     /**
@@ -3966,7 +4038,7 @@ class MediaRepository @Inject constructor(
     private fun fetchUrl(url: String): String? {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; ARVIO)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
             .build()
         return runCatching {
             okHttpClient.newCall(request).execute().use { response ->

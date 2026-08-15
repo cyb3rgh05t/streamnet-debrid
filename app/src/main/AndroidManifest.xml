@@ -72,12 +72,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Custom Scheme: arvio://install-pack?url=... -->
+            <!-- StreamNet scheme plus legacy ARVIO compatibility alias. -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="arvio" android:host="install-pack" />
+                <data android:scheme="streamnet" android:host="install-pack" />
             </intent-filter>
 
 

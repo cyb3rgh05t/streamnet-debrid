@@ -1397,8 +1397,11 @@ class CatalogRepository @Inject constructor(
             CollectionGroupKind.FEATURED.name -> CollectionGroupKind.FEATURED
             CollectionGroupKind.SERVICE.name -> CollectionGroupKind.SERVICE
             CollectionGroupKind.GENRE.name -> CollectionGroupKind.GENRE
+            CollectionGroupKind.MOVIE_GENRE.name -> CollectionGroupKind.MOVIE_GENRE
+            CollectionGroupKind.TV_GENRE.name -> CollectionGroupKind.TV_GENRE
             CollectionGroupKind.DECADE.name -> CollectionGroupKind.DECADE
             CollectionGroupKind.FRANCHISE.name -> CollectionGroupKind.FRANCHISE
+            CollectionGroupKind.STUDIO.name -> CollectionGroupKind.STUDIO
             CollectionGroupKind.NETWORK.name -> CollectionGroupKind.NETWORK
             else -> null
         }

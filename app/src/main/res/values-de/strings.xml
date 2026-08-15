@@ -148,6 +148,10 @@
     <string name="addons">Addons</string>
     <string name="services">Dienste</string>
     <string name="genres">Genres</string>
+    <string name="movie_genres">Filmgenres</string>
+    <string name="tv_genres">Seriengenres</string>
+    <string name="movie_studios">Filmstudios</string>
+    <string name="tv_networks">TV-Netzwerke</string>
     <string name="decades">Jahrzehnte</string>
     <string name="franchises">Franchises</string>
     <string name="networks">Netzwerke</string>

@@ -111,7 +111,7 @@ fun CrashReportScreen(
 
     val formattedReport = remember(crashId, sentryLink, crashMsg, crashVersion, timeString) {
         """
-        **🚨 ARVIO Crash Report**
+        **StreamNet TV Crash Report**
         **Crash ID:** `$crashId`
         **Sentry Link:** $sentryLink
         **Version:** $crashVersion
@@ -141,7 +141,7 @@ fun CrashReportScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "⚠️ ARVIO Encountered an Error",
+                text = "StreamNet TV Encountered an Error",
                 color = Color.White,
                 fontSize = if (isTv) 26.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -176,7 +176,7 @@ fun CrashReportScreen(
                 }
 
                 Text(
-                    text = "Scan to open arvio.tv — 1 tap to copy report & jump into Discord.",
+                    text = "Scan to open the StreamNet TV report page, copy the report, and open Discord.",
                     color = Color(0xFF00F0D0),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -220,7 +220,7 @@ fun CrashReportScreen(
                     Button(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("ARVIO Crash Report", formattedReport)
+                            val clip = ClipData.newPlainText("StreamNet TV Crash Report", formattedReport)
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, "Crash details copied! Opening Discord...", Toast.LENGTH_LONG).show()
 
@@ -255,7 +255,7 @@ fun CrashReportScreen(
                             }
                         )
                 ) {
-                    Text("Restart ARVIO", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text("Restart StreamNet TV", color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }

@@ -155,6 +155,77 @@ private object IptvIdSentinels {
 private const val LargeIptvListChannelCount = 10_000
 internal const val IPTV_GROUP_ORDER_SCHEMA = 3
 
+internal enum class IptvGroupOrderMove { UP, DOWN, TOP }
+
+internal fun reorderIptvPlaylistGroup(
+    savedOrder: List<String>,
+    playlistId: String,
+    currentGroups: List<String>,
+    groupName: String,
+    move: IptvGroupOrderMove,
+): List<String> {
+    val normalizedPlaylistId = playlistId.trim()
+    if (normalizedPlaylistId.isEmpty()) return savedOrder.distinct()
+    val currentKeys = currentGroups
+        .map { group ->
+            PlaylistGroupKey.build(normalizedPlaylistId, group.trim().ifBlank { "Ungrouped" })
+        }
+        .distinct()
+    val target = PlaylistGroupKey.build(
+        normalizedPlaylistId,
+        groupName.trim().ifBlank { "Ungrouped" },
+    )
+    if (target !in currentKeys) return savedOrder.distinct()
+
+    val normalizedSaved = savedOrder.map(String::trim).filter(String::isNotBlank).distinct()
+    val currentSet = currentKeys.toHashSet()
+    val targetOrder = normalizedSaved
+        .filter { key -> PlaylistGroupKey(key).playlistId == normalizedPlaylistId && key in currentSet }
+        .toMutableList()
+    currentKeys.forEach { key -> if (key !in targetOrder) targetOrder.add(key) }
+
+    val firstTargetIndex = normalizedSaved.indexOfFirst {
+        PlaylistGroupKey(it).playlistId == normalizedPlaylistId
+    }
+    val merged = normalizedSaved
+        .filterNot { PlaylistGroupKey(it).playlistId == normalizedPlaylistId }
+        .toMutableList()
+    val insertionIndex = if (firstTargetIndex < 0) merged.size else {
+        normalizedSaved.take(firstTargetIndex)
+            .count { PlaylistGroupKey(it).playlistId != normalizedPlaylistId }
+            .coerceAtMost(merged.size)
+    }
+    merged.addAll(insertionIndex, targetOrder)
+
+    val playlistSlots = merged.indices.filter {
+        PlaylistGroupKey(merged[it]).playlistId == normalizedPlaylistId
+    }
+    val targetPosition = playlistSlots.indexOfFirst { merged[it] == target }
+    when (move) {
+        IptvGroupOrderMove.UP -> if (targetPosition > 0) {
+            val previousSlot = playlistSlots[targetPosition - 1]
+            val targetSlot = playlistSlots[targetPosition]
+            val previous = merged[previousSlot]
+            merged[previousSlot] = merged[targetSlot]
+            merged[targetSlot] = previous
+        }
+        IptvGroupOrderMove.DOWN -> if (targetPosition in 0 until playlistSlots.lastIndex) {
+            val targetSlot = playlistSlots[targetPosition]
+            val nextSlot = playlistSlots[targetPosition + 1]
+            val next = merged[nextSlot]
+            merged[nextSlot] = merged[targetSlot]
+            merged[targetSlot] = next
+        }
+        IptvGroupOrderMove.TOP -> if (targetPosition > 0) {
+            val reordered = playlistSlots.map(merged::get).toMutableList()
+            reordered.removeAt(targetPosition)
+            reordered.add(0, target)
+            playlistSlots.forEachIndexed { index, slot -> merged[slot] = reordered[index] }
+        }
+    }
+    return merged
+}
+
 internal fun mergeIptvProgramsPreferRichFresh(
     existing: List<IptvProgram>,
     fresh: List<IptvProgram>,
@@ -300,13 +371,16 @@ class IptvRepository @Inject constructor(
     @Volatile
     private var cachedPagedChannelStoreCount: Pair<String, Int>? = null
 
-    @Volatile
-    private var groupOrderLocallyDirty = false
+    private val groupOrderLocallyDirtyProfiles = ConcurrentHashMap.newKeySet<String>()
 
-    fun isGroupOrderLocallyDirty(): Boolean = groupOrderLocallyDirty
+    fun groupOrderLocallyDirtyProfiles(): Set<String> = groupOrderLocallyDirtyProfiles.toSet()
+
+    private fun markGroupOrderLocallyDirty() {
+        groupOrderLocallyDirtyProfiles += profileManager.getProfileIdSync()
+    }
 
     fun clearGroupOrderLocallyDirty() {
-        groupOrderLocallyDirty = false
+        groupOrderLocallyDirtyProfiles.clear()
     }
 
     @Volatile
@@ -645,7 +719,7 @@ class IptvRepository @Inject constructor(
             else prefs[groupOrderKey()] = gson.toJson(retainedOrder)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -682,7 +756,7 @@ class IptvRepository @Inject constructor(
             else prefs[groupOrderKey()] = gson.toJson(retainedOrder)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -707,7 +781,7 @@ class IptvRepository @Inject constructor(
             prefs[stalkerPortalUrlKey()] = encryptConfigValue(normalizedUrl)
             prefs[stalkerMacAddressKey()] = normalizedMac
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -1483,7 +1557,7 @@ class IptvRepository @Inject constructor(
             prefs.remove(groupOrderSchemaKey())
             prefs.remove(tvSessionKey())
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         invalidateCache()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "clear iptv config")
@@ -1584,61 +1658,42 @@ class IptvRepository @Inject constructor(
     suspend fun moveGroupUp(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
         val normalizedPlaylistId = playlistId.trim()
         if (normalizedPlaylistId.isEmpty()) return
-        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
-        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
-        val currentKeys = currentGroups.map {
-            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
-        }
         context.settingsDataStore.edit { prefs ->
-            val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
-            if (order.isEmpty()) return@edit
-            val idx = order.indexOf(target)
-            if (idx > 0) { order.removeAt(idx); order.add(idx - 1, target) }
+            val order = reorderIptvPlaylistGroup(
+                decodeGroupOrder(prefs), normalizedPlaylistId, currentGroups, groupName, IptvGroupOrderMove.UP
+            )
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group up")
     }
 
     suspend fun moveGroupToTop(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
         val normalizedPlaylistId = playlistId.trim()
         if (normalizedPlaylistId.isEmpty()) return
-        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
-        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
-        val currentKeys = currentGroups.map {
-            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
-        }
         context.settingsDataStore.edit { prefs ->
-            val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
-            if (order.isEmpty()) return@edit
-            if (target !in order && currentKeys.contains(target)) order.add(target)
-            order.remove(target)
-            order.add(0, target)
+            val order = reorderIptvPlaylistGroup(
+                decodeGroupOrder(prefs), normalizedPlaylistId, currentGroups, groupName, IptvGroupOrderMove.TOP
+            )
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group to top")
     }
 
     suspend fun moveGroupDown(playlistId: String, groupName: String, currentGroups: List<String> = emptyList()) {
         val normalizedPlaylistId = playlistId.trim()
         if (normalizedPlaylistId.isEmpty()) return
-        val normalizedGroup = groupName.trim().ifBlank { "Ungrouped" }
-        val target = PlaylistGroupKey.build(normalizedPlaylistId, normalizedGroup)
-        val currentKeys = currentGroups.map {
-            PlaylistGroupKey.build(normalizedPlaylistId, it.trim().ifBlank { "Ungrouped" })
-        }
         context.settingsDataStore.edit { prefs ->
-            val order = mergedGroupOrder(decodeGroupOrder(prefs), currentKeys)
-            if (order.isEmpty()) return@edit
-            val idx = order.indexOf(target)
-            if (idx >= 0 && idx < order.size - 1) { order.removeAt(idx); order.add(idx + 1, target) }
+            val order = reorderIptvPlaylistGroup(
+                decodeGroupOrder(prefs), normalizedPlaylistId, currentGroups, groupName, IptvGroupOrderMove.DOWN
+            )
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group down")
     }
 
@@ -1649,7 +1704,7 @@ class IptvRepository @Inject constructor(
             prefs[groupOrderKey()] = gson.toJson(existing)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        groupOrderLocallyDirty = true
+        markGroupOrderLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "reset group order")
     }
 
@@ -3137,39 +3192,6 @@ class IptvRepository @Inject constructor(
         }.getOrDefault(emptyList())
     }
 
-    private fun mergedGroupOrder(savedOrder: List<String>, currentGroups: List<String>): MutableList<String> {
-        val current = currentGroups
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-        val targetPlaylistId = current.firstOrNull()?.let { PlaylistGroupKey(it).playlistId }
-        if (targetPlaylistId.isNullOrBlank()) return savedOrder.distinct().toMutableList()
-        val currentSet = current.toHashSet()
-        val normalizedSaved = savedOrder
-            .map { it.trim() }
-            .filter { it.isNotBlank() }
-            .distinct()
-        val targetOrder = normalizedSaved
-            .filter { PlaylistGroupKey(it).playlistId == targetPlaylistId && it in currentSet }
-            .toMutableList()
-        current.forEach { group ->
-            if (group !in targetOrder) targetOrder.add(group)
-        }
-        val firstTargetIndex = normalizedSaved.indexOfFirst {
-            PlaylistGroupKey(it).playlistId == targetPlaylistId
-        }
-        val merged = normalizedSaved
-            .filterNot { PlaylistGroupKey(it).playlistId == targetPlaylistId }
-            .toMutableList()
-        val insertionIndex = if (firstTargetIndex < 0) merged.size else {
-            normalizedSaved.take(firstTargetIndex)
-                .count { PlaylistGroupKey(it).playlistId != targetPlaylistId }
-                .coerceAtMost(merged.size)
-        }
-        merged.addAll(insertionIndex, targetOrder)
-        return merged
-    }
-
     private fun decodeFavoriteChannels(prefs: Preferences): List<String> {
         val raw = prefs[favoriteChannelsKey()].orEmpty()
         if (raw.isBlank()) return emptyList()
@@ -3324,7 +3346,7 @@ class IptvRepository @Inject constructor(
             }
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
         }
-        groupOrderLocallyDirty = false
+        groupOrderLocallyDirtyProfiles.remove(safeProfileId)
         if (profileManager.getProfileIdSync() == safeProfileId) {
             invalidateCache()
         }

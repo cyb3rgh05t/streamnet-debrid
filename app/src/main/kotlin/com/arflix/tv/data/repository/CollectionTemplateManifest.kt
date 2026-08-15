@@ -45,11 +45,14 @@ internal object CollectionTemplateManifest {
 
     val railOrder = listOf(
         CollectionGroupKind.SERVICE,
-        CollectionGroupKind.GENRE,
+        CollectionGroupKind.MOVIE_GENRE,
+        CollectionGroupKind.TV_GENRE,
+        CollectionGroupKind.STUDIO,
+        CollectionGroupKind.NETWORK,
         CollectionGroupKind.FRANCHISE
     )
 
-    val entries: List<CollectionTemplateEntry> = listOf(
+    private val legacyEntries: List<CollectionTemplateEntry> = listOf(
         entry(
             title = "Latest Movies",
             group = CollectionGroupKind.FEATURED,
@@ -946,6 +949,119 @@ internal object CollectionTemplateManifest {
         )
     )
 
+    private data class GenreSpec(val id: Int, val title: String)
+    private data class CompanySpec(val id: Int, val title: String, val logoPath: String)
+
+    private val movieGenreSpecs = listOf(
+        GenreSpec(28, "Action"), GenreSpec(12, "Adventure"), GenreSpec(16, "Animation"),
+        GenreSpec(35, "Comedy"), GenreSpec(80, "Crime"), GenreSpec(99, "Documentary"),
+        GenreSpec(18, "Drama"), GenreSpec(10751, "Family"), GenreSpec(14, "Fantasy"),
+        GenreSpec(36, "History"), GenreSpec(27, "Horror"), GenreSpec(10402, "Music"),
+        GenreSpec(9648, "Mystery"), GenreSpec(10749, "Romance"), GenreSpec(878, "Science Fiction"),
+        GenreSpec(10770, "TV Movie"), GenreSpec(53, "Thriller"), GenreSpec(10752, "War"),
+        GenreSpec(37, "Western")
+    )
+
+    private val tvGenreSpecs = listOf(
+        GenreSpec(10759, "Action & Adventure"), GenreSpec(16, "Animation"),
+        GenreSpec(35, "Comedy"), GenreSpec(80, "Crime"), GenreSpec(99, "Documentary"),
+        GenreSpec(18, "Drama"), GenreSpec(10751, "Family"), GenreSpec(10762, "Kids"),
+        GenreSpec(9648, "Mystery"), GenreSpec(10763, "News"), GenreSpec(10764, "Reality"),
+        GenreSpec(10765, "Sci-Fi & Fantasy"), GenreSpec(10766, "Soap"),
+        GenreSpec(10767, "Talk"), GenreSpec(10768, "War & Politics"), GenreSpec(37, "Western")
+    )
+
+    private val studioSpecs = listOf(
+        CompanySpec(2, "Disney", "/wdrCwmRnLFJhEoH8GSfymY85KHT.png"),
+        CompanySpec(127928, "20th Century Studios", "/h0rjX5vjW5r8yEnUBStFarjcLT4.png"),
+        CompanySpec(34, "Sony Pictures", "/xAb1o9HrSvKBo9mnXC8fJKDNu00.png"),
+        CompanySpec(174, "Warner Bros. Pictures", "/5b1qrm4UTPRTtpC5zXccCTkHdBl.png"),
+        CompanySpec(33, "Universal", "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png"),
+        CompanySpec(4, "Paramount", "/lH1dIv66K2BLgyDa3I3Pj6Q2Lre.png"),
+        CompanySpec(3, "Pixar", "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png"),
+        CompanySpec(521, "Dreamworks", "/kP7t6RwGz2AvvTkvnI1uteEwHet.png"),
+        CompanySpec(420, "Marvel Studios", "/hUzeosd33nzE5MCNsZxCGEKTXaQ.png"),
+        CompanySpec(9993, "DC", "/zC29tHZxkdeiVR1IXbrQJJQSuUQ.png"),
+        CompanySpec(41077, "A24", "/1ZXsGaFPgrgS6ZZGS37AqD5uU12.png")
+    )
+
+    private val networkSpecs = listOf(
+        CompanySpec(213, "Netflix", "/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"),
+        CompanySpec(2739, "Disney+", "/uzKjVDmQ1WRMvGBb7UNRE0wTn1H.png"),
+        CompanySpec(1024, "Prime Video", "/ifhbNuuVnlwYy5oXA5VIb2YR8AZ.png"),
+        CompanySpec(2552, "Apple TV+", "/4KAy34EHvRM25Ih8wb82AuGU7zJ.png"),
+        CompanySpec(453, "Hulu", "/pqUTCleNUiTLAVlelGxUgWn1ELh.png"),
+        CompanySpec(49, "HBO", "/tuomPhY2UtuPTqqFnKMVHvSb724.png"),
+        CompanySpec(4353, "Discovery+", "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png"),
+        CompanySpec(2, "ABC", "/ndAvF4JLsliGreX87jAc9GdjmJY.png"),
+        CompanySpec(19, "FOX", "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png"),
+        CompanySpec(359, "Cinemax", "/6mSHSquNpfLgDdv6VnOOvC5Uz2h.png"),
+        CompanySpec(174, "AMC", "/pmvRmATOCaDykE6JrVoeYxlFHw3.png"),
+        CompanySpec(67, "Showtime", "/Allse9kbjiP6ExaQrnSpIhkurEi.png"),
+        CompanySpec(318, "Starz", "/8GJjw3HHsAJYwIWKIPBPfqMxlEa.png"),
+        CompanySpec(71, "The CW", "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png"),
+        CompanySpec(6, "NBC", "/cm111bsDVlYaC1foL0itvEI4yLG.png"),
+        CompanySpec(16, "CBS", "/nm8d7P7MJNiBLdgIzUK0gkuEA4r.png"),
+        CompanySpec(4330, "Paramount+", "/fi83B1oztoS47xxcemFdPMhIzK.png"),
+        CompanySpec(4, "BBC One", "/mVn7xESaTNmjBUyUtGNvDQd3CT1.png"),
+        CompanySpec(56, "Cartoon Network", "/c5OC6oVCg6QP4eqzW6XIq17CQjI.png"),
+        CompanySpec(13, "Nickelodeon", "/ikZXxg6GnwpzqiZbRPhJGaZapqB.png"),
+        CompanySpec(3353, "Peacock", "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png"),
+        CompanySpec(80, "Adult Swim", "/9AKyspxVzywuaMuZ1Bvilu8sXly.png")
+    )
+
+    private val legacyGenreCovers = legacyEntries
+        .filter { it.group == CollectionGroupKind.GENRE }
+        .associate { it.title to it.coverImageUrl }
+
+    private fun genreEntries(
+        specs: List<GenreSpec>,
+        group: CollectionGroupKind,
+        mediaType: String
+    ): List<CollectionTemplateEntry> = specs.map { spec ->
+        entry(
+            title = spec.title,
+            group = group,
+            coverImageUrl = legacyGenreCovers[spec.title].orEmpty(),
+            tileShape = CollectionTileShape.LANDSCAPE,
+            hideTitle = false,
+            heroVideoUrl = null,
+            sources = listOf(tmdbGenreSource(mediaType, spec.id)),
+            listMetadata = emptyList()
+        )
+    }
+
+    private fun companyEntries(
+        specs: List<CompanySpec>,
+        group: CollectionGroupKind
+    ): List<CollectionTemplateEntry> = specs.map { spec ->
+        entry(
+            title = spec.title,
+            group = group,
+            coverImageUrl = "https://image.tmdb.org/t/p/w780${spec.logoPath}",
+            tileShape = CollectionTileShape.LANDSCAPE,
+            hideTitle = true,
+            heroVideoUrl = null,
+            sources = listOf(
+                if (group == CollectionGroupKind.STUDIO) {
+                    vodwisharrStudioSource(spec.id)
+                } else {
+                    vodwisharrNetworkSource(spec.id)
+                }
+            ),
+            listMetadata = emptyList()
+        )
+    }
+
+    val entries: List<CollectionTemplateEntry> =
+        legacyEntries.filterNot {
+            it.group == CollectionGroupKind.GENRE || it.group == CollectionGroupKind.NETWORK
+        } +
+            genreEntries(movieGenreSpecs, CollectionGroupKind.MOVIE_GENRE, "movie") +
+            genreEntries(tvGenreSpecs, CollectionGroupKind.TV_GENRE, "series") +
+            companyEntries(studioSpecs, CollectionGroupKind.STUDIO) +
+            companyEntries(networkSpecs, CollectionGroupKind.NETWORK)
+
     private val entriesById: Map<String, CollectionTemplateEntry> = entries.associateBy { it.id }
     private val entryIds: Set<String> = entriesById.keys
     private val validRailGroups: Set<CollectionGroupKind> = railOrder.toSet()
@@ -961,9 +1077,12 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.FEATURED -> "Featured"
         CollectionGroupKind.SERVICE -> "Services"
         CollectionGroupKind.GENRE -> "Genres"
+        CollectionGroupKind.MOVIE_GENRE -> "Movie Genres"
+        CollectionGroupKind.TV_GENRE -> "TV Genres"
         CollectionGroupKind.DECADE -> "Decades"
         CollectionGroupKind.FRANCHISE -> "Franchises"
-        CollectionGroupKind.NETWORK -> "Networks"
+        CollectionGroupKind.STUDIO -> "Movie Studios"
+        CollectionGroupKind.NETWORK -> "TV Networks"
     }
 
     fun hasEntriesFor(group: CollectionGroupKind): Boolean =
@@ -999,9 +1118,12 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.FEATURED -> "Curated spotlight picks sourced from the latest public lists."
         CollectionGroupKind.SERVICE -> "Browse movies and series grouped by streaming service."
         CollectionGroupKind.GENRE -> "A themed mix of movies and series built around a single genre mood."
+        CollectionGroupKind.MOVIE_GENRE -> "Browse popular movies from this genre."
+        CollectionGroupKind.TV_GENRE -> "Browse popular series from this genre."
         CollectionGroupKind.DECADE -> "Explore movies collected around a specific decade."
         CollectionGroupKind.FRANCHISE -> "A franchise timeline or universe collection gathered from dedicated lists."
-        CollectionGroupKind.NETWORK -> "Shows and movies grouped around a specific network or brand."
+        CollectionGroupKind.STUDIO -> "Browse popular movies from this studio."
+        CollectionGroupKind.NETWORK -> "Browse popular series from this TV network."
     }
 
     private fun entry(
@@ -1084,6 +1206,18 @@ internal object CollectionTemplateManifest {
         tmdbWatchProviderId = providerId,
         watchRegion = "US",
         sortBy = "popularity.desc"
+    )
+
+    private fun vodwisharrStudioSource(studioId: Int) = CollectionSourceConfig(
+        kind = CollectionSourceKind.VODWISHARR_STUDIO,
+        mediaType = "movie",
+        tmdbStudioId = studioId
+    )
+
+    private fun vodwisharrNetworkSource(networkId: Int) = CollectionSourceConfig(
+        kind = CollectionSourceKind.VODWISHARR_NETWORK,
+        mediaType = "series",
+        tmdbNetworkId = networkId
     )
 
     private fun slugify(value: String): String {

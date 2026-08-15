@@ -3131,8 +3131,8 @@ class SettingsViewModel @Inject constructor(
             if (!ensureCloudSyncSession()) {
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Cloud session expired. Reconnect ARVIO Cloud, then sync again.",
-                    toastMessage = "Reconnect ARVIO Cloud to sync",
+                    lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet TV Cloud, then sync again.",
+                    toastMessage = "Reconnect StreamNet TV Cloud to sync",
                     toastType = ToastType.INFO
                 )
                 return@launch

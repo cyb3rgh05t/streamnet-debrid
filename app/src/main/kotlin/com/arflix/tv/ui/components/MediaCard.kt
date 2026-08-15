@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -30,6 +31,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -48,6 +50,8 @@ import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.skin.rememberArvioCardShape
+import com.arflix.tv.ui.theme.NeutralLogoBrandGradient
+import com.arflix.tv.ui.theme.logoBrandGradient
 import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
@@ -140,7 +144,21 @@ fun MediaCard(
         item.backdrop?.takeIf { it.isNotBlank() && it != item.image }
     } else null
     val showCollectionTitleOverlay = isCollectionTile && showTitle
-    val isGenreCollectionTile = item.collectionGroup == CollectionGroupKind.GENRE
+    val isGenreCollectionTile = item.collectionGroup == CollectionGroupKind.GENRE ||
+        item.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
+        item.collectionGroup == CollectionGroupKind.TV_GENRE
+    val isCompanyCollectionTile = item.collectionGroup == CollectionGroupKind.STUDIO ||
+        item.collectionGroup == CollectionGroupKind.NETWORK
+    var companyGradient by remember(item.id) { mutableStateOf(NeutralLogoBrandGradient) }
+    val companyCardBrush = remember(companyGradient, visualFocused, isCompanyCollectionTile) {
+        if (!isCompanyCollectionTile) null else {
+            Brush.linearGradient(
+                companyGradient.map { color ->
+                    if (visualFocused) color.copy(alpha = 1f) else color.copy(alpha = 0.78f)
+                }
+            )
+        }
+    }
     val rawImageUrl = if (visualFocused && enableFocusedImageSwap) {
         explicitFocusUrl ?: collectionFocusUrl ?: baseImageUrl
     } else {
@@ -226,9 +244,23 @@ fun MediaCard(
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = item.title,
-                        contentScale = ContentScale.Crop,
+                        contentScale = if (isCompanyCollectionTile) ContentScale.Fit else ContentScale.Crop,
+                        onSuccess = { success ->
+                            if (isCompanyCollectionTile) {
+                                companyGradient = logoBrandGradient(success.result.drawable)
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxSize()
+                            .then(
+                                if (isCompanyCollectionTile) {
+                                    Modifier
+                                        .background(companyCardBrush!!)
+                                        .padding(horizontal = 28.dp, vertical = 20.dp)
+                                } else {
+                                    Modifier
+                                }
+                            )
                             .graphicsLayer {
                                 if (isMgmServiceTile) {
                                     scaleX = 1.5f
@@ -254,34 +286,38 @@ fun MediaCard(
                     }
                 }
                 if (showCollectionTitleOverlay) {
-                    Box(
-                        modifier = Modifier
-                            .align(if (isGenreCollectionTile) Alignment.Center else Alignment.TopStart)
-                            .then(if (isGenreCollectionTile) Modifier.fillMaxWidth() else Modifier)
-                            .padding(
-                                start = 12.dp,
-                                end = 12.dp,
-                                top = 12.dp,
-                                bottom = 12.dp
-                            )
+                    val titleOverlayModifier = if (isGenreCollectionTile) {
+                        Modifier
+                            .align(Alignment.Center)
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 12.dp)
+                    } else {
+                        Modifier
+                            .align(Alignment.TopStart)
+                            .padding(12.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                Color.Black.copy(alpha = if (visualFocused) 0.62f else 0.52f)
-                            )
+                            .background(Color.Black.copy(alpha = if (visualFocused) 0.62f else 0.52f))
                             .border(
                                 width = if (visualFocused) 1.5.dp else 1.dp,
                                 color = Color.White.copy(alpha = if (visualFocused) 0.9f else 0.28f),
                                 shape = RoundedCornerShape(10.dp)
                             )
-                            .padding(
-                                horizontal = 10.dp,
-                                vertical = 7.dp
-                            )
+                            .padding(horizontal = 10.dp, vertical = 7.dp)
+                    }
+                    Box(
+                        modifier = titleOverlayModifier
                     ) {
                         Text(
                             text = item.title,
                             style = ArvioSkin.typography.cardTitle.copy(
-                                fontSize = if (isLandscape) 15.sp else 14.sp
+                                fontSize = if (isLandscape) 15.sp else 14.sp,
+                                shadow = if (isGenreCollectionTile) {
+                                    Shadow(
+                                        color = Color.Black.copy(alpha = 0.95f),
+                                        offset = Offset(0f, 2f),
+                                        blurRadius = 8f
+                                    )
+                                } else null
                             ),
                             color = Color.White.copy(alpha = 0.98f),
                             textAlign = if (isGenreCollectionTile) TextAlign.Center else TextAlign.Start,
