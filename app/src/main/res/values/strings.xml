@@ -914,6 +914,7 @@
     <string name="live_empty_no_timeline_channel">No programme timeline is available for this channel.</string>
     <string name="live_empty_no_timeline_yet">No guide timeline is available yet.</string>
     <string name="live_empty_no_channels_category">No channels in this category</string>
+    <string name="live_empty_no_favorites">No favorites yet</string>
     <string name="live_empty_no_playlist">No IPTV playlist configured.</string>
     <string name="live_placeholder_loading_guide">Loading guide...</string>
     <string name="live_placeholder_no_guide_matched">No guide data matched</string>

@@ -7,7 +7,6 @@ import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvChannel
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.data.model.IptvSnapshot
-import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.IptvConfig
 import com.arflix.tv.ui.screens.tv.live.LiveTvGuideSources
 import com.arflix.tv.data.repository.IptvPlaybackTarget
@@ -96,7 +95,6 @@ data class TvUiState(
 class TvViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     val iptvRepository: IptvRepository,
-    private val cloudSyncRepository: CloudSyncRepository,
     private val mediaRepository: MediaRepository,
 ) : ViewModel() {
 
@@ -107,7 +105,6 @@ class TvViewModel @Inject constructor(
     private var warmVodJob: Job? = null
     private var pendingForcedReload: Boolean = false
     private var periodicEpgJob: Job? = null
-    private var iptvCloudSyncJob: Job? = null
     private var lastObservedConfigSignature: String? = null
     @Volatile private var cacheBootstrapComplete: Boolean = false
     private var lastAutomaticEpgReloadAt: Long = 0L
@@ -217,16 +214,23 @@ class TvViewModel @Inject constructor(
                 // favorites from DataStore before this cached snapshot was loaded from disk.
                 // Prefer those in-memory favorites over whatever was baked into the cache,
                 // which can be stale if the user added/removed favorites since the last save.
-                val liveSnapshot = _uiState.value.snapshot
-                val snapshotToUse = if (liveSnapshot.favoriteChannels.isNotEmpty() || liveSnapshot.favoriteGroups.isNotEmpty()) {
+                val liveState = _uiState.value
+                val liveSnapshot = liveState.snapshot
+                val snapshotWithCurrentFavorites = if (liveSnapshot.favoriteChannels.isNotEmpty() || liveSnapshot.favoriteGroups.isNotEmpty()) {
                     cached.copy(
                         favoriteChannels = liveSnapshot.favoriteChannels,
                         favoriteGroups = liveSnapshot.favoriteGroups,
-                        hiddenGroups = liveSnapshot.hiddenGroups,
-                        groupOrder = liveSnapshot.groupOrder
                     )
                 } else {
                     cached
+                }
+                val snapshotToUse = if (liveState.iptvPreferencesLoaded) {
+                    snapshotWithCurrentFavorites.copy(
+                        hiddenGroups = liveSnapshot.hiddenGroups,
+                        groupOrder = liveSnapshot.groupOrder,
+                    )
+                } else {
+                    snapshotWithCurrentFavorites
                 }
                 val cappedSnapshot = capLargeListGuideSnapshot(
                     snapshot = snapshotToUse,
@@ -697,9 +701,17 @@ class TvViewModel @Inject constructor(
         incoming: IptvSnapshot,
         current: TvUiState
     ): IptvSnapshot {
+        val incomingWithCurrentPreferences = if (current.iptvPreferencesLoaded) {
+            incoming.copy(
+                hiddenGroups = current.snapshot.hiddenGroups,
+                groupOrder = current.snapshot.groupOrder,
+            )
+        } else {
+            incoming
+        }
         val retainedGuide = current.snapshot.nowNext
-        if (retainedGuide.isEmpty()) return incoming
-        val merged = incoming.nowNext.toMutableMap()
+        if (retainedGuide.isEmpty()) return incomingWithCurrentPreferences
+        val merged = incomingWithCurrentPreferences.nowNext.toMutableMap()
         retainedGuide.forEach { (channelId, retained) ->
             if (!hasProgramData(retained)) return@forEach
             val fresh = merged[channelId]
@@ -709,7 +721,7 @@ class TvViewModel @Inject constructor(
                 retained
             }
         }
-        return incoming.copy(nowNext = merged)
+        return incomingWithCurrentPreferences.copy(nowNext = merged)
     }
 
     private fun capLargeListGuideSnapshot(
@@ -1329,14 +1341,12 @@ class TvViewModel @Inject constructor(
     fun toggleFavoriteGroup(groupName: String) {
         viewModelScope.launch {
             iptvRepository.toggleFavoriteGroup(groupName)
-            scheduleIptvCloudSync()
         }
     }
 
     fun toggleFavoriteChannel(channelId: String) {
         viewModelScope.launch {
             iptvRepository.toggleFavoriteChannel(channelId)
-            scheduleIptvCloudSync()
         }
     }
 
@@ -1356,7 +1366,6 @@ class TvViewModel @Inject constructor(
                     iptvRepository.toggleHiddenGroup(activePlaylistId, groupName)
                 }
             }
-            scheduleIptvCloudSync()
         }
     }
 
@@ -1956,7 +1965,6 @@ class TvViewModel @Inject constructor(
                     iptvRepository.moveGroupUp(activePlaylistId, groupName, currentVisiblePlaylistGroups(activePlaylistId))
                 }
             }
-            scheduleIptvCloudSync()
         }
     }
 
@@ -1976,7 +1984,6 @@ class TvViewModel @Inject constructor(
                     iptvRepository.moveGroupToTop(activePlaylistId, groupName, currentVisiblePlaylistGroups(activePlaylistId))
                 }
             }
-            scheduleIptvCloudSync()
         }
     }
 
@@ -1996,7 +2003,6 @@ class TvViewModel @Inject constructor(
                     iptvRepository.moveGroupDown(activePlaylistId, groupName, currentVisiblePlaylistGroups(activePlaylistId))
                 }
             }
-            scheduleIptvCloudSync()
         }
     }
 
@@ -2096,13 +2102,16 @@ class TvViewModel @Inject constructor(
             lastChannelId = normalizedChannelId,
             lastGroupName = normalizedGroupName,
             lastFocusedZone = normalizedFocusZone,
-            lastOpenedAt = if (markOpened || channelChanged) System.currentTimeMillis() else current.lastOpenedAt,
+            lastOpenedAt = if (channelChanged || (markOpened && current.lastOpenedAt <= 0L)) {
+                System.currentTimeMillis()
+            } else {
+                current.lastOpenedAt
+            },
             recentChannelIds = recentChannelIds
         )
         if (next == current) {
             if (flushImmediately) {
                 iptvRepository.saveTvSessionStateInRepositoryScope(next)
-                scheduleIptvCloudSync()
             }
             return
         }
@@ -2112,14 +2121,10 @@ class TvViewModel @Inject constructor(
         tvSessionSaveJob?.cancel()
         if (flushImmediately) {
             iptvRepository.saveTvSessionStateInRepositoryScope(next)
-            scheduleIptvCloudSync()
             return
         }
         tvSessionSaveJob = viewModelScope.launch(Dispatchers.IO) {
             iptvRepository.saveTvSessionState(next)
-            if (markOpened || channelChanged) {
-                scheduleIptvCloudSync()
-            }
         }
     }
 
@@ -2292,17 +2297,6 @@ class TvViewModel @Inject constructor(
         )
     }
 
-    private fun scheduleIptvCloudSync() {
-        iptvCloudSyncJob?.cancel()
-        iptvCloudSyncJob = viewModelScope.launch(Dispatchers.IO) {
-            kotlinx.coroutines.delay(350L)
-            val firstAttempt = runCatching { cloudSyncRepository.pushToCloud(force = true) }.getOrNull()
-            if (firstAttempt?.isFailure != false) {
-                kotlinx.coroutines.delay(1_200L)
-                runCatching { cloudSyncRepository.pushToCloud(force = true) }
-            }
-        }
-    }
 }
 
 private fun buildStartupWarmGroups(state: TvUiState): List<String> {

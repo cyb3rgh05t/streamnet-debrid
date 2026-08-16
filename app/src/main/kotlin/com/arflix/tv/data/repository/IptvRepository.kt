@@ -371,16 +371,16 @@ class IptvRepository @Inject constructor(
     @Volatile
     private var cachedPagedChannelStoreCount: Pair<String, Int>? = null
 
-    private val groupOrderLocallyDirtyProfiles = ConcurrentHashMap.newKeySet<String>()
+    private val groupPreferencesLocallyDirtyProfiles = ConcurrentHashMap.newKeySet<String>()
 
-    fun groupOrderLocallyDirtyProfiles(): Set<String> = groupOrderLocallyDirtyProfiles.toSet()
+    fun groupPreferencesLocallyDirtyProfiles(): Set<String> = groupPreferencesLocallyDirtyProfiles.toSet()
 
-    private fun markGroupOrderLocallyDirty() {
-        groupOrderLocallyDirtyProfiles += profileManager.getProfileIdSync()
+    private fun markGroupPreferencesLocallyDirty() {
+        groupPreferencesLocallyDirtyProfiles += profileManager.getProfileIdSync()
     }
 
-    fun clearGroupOrderLocallyDirty() {
-        groupOrderLocallyDirtyProfiles.clear()
+    fun clearGroupPreferencesLocallyDirty() {
+        groupPreferencesLocallyDirtyProfiles.clear()
     }
 
     @Volatile
@@ -641,13 +641,13 @@ class IptvRepository @Inject constructor(
         }
 
     fun observeHiddenGroups(): Flow<List<String>> =
-        profileManager.activeProfileId.combine(context.settingsDataStore.data) { _, prefs ->
-            decodeHiddenGroups(prefs)
+        profileManager.activeProfileId.combine(context.settingsDataStore.data) { profileId, prefs ->
+            decodeHiddenGroups(prefs, profileId)
         }
 
     fun observeGroupOrder(): Flow<List<String>> =
-        profileManager.activeProfileId.combine(context.settingsDataStore.data) { _, prefs ->
-            decodeGroupOrder(prefs)
+        profileManager.activeProfileId.combine(context.settingsDataStore.data) { profileId, prefs ->
+            decodeGroupOrder(prefs, profileId)
         }
 
     fun observeTvSessionState(): Flow<IptvTvSessionState> =
@@ -656,25 +656,31 @@ class IptvRepository @Inject constructor(
         }
 
     suspend fun saveTvSessionState(state: IptvTvSessionState) {
+        val normalizedState = state.copy(
+            lastChannelId = state.lastChannelId.trim(),
+            lastGroupName = state.lastGroupName.trim(),
+            lastFocusedZone = state.lastFocusedZone.trim().ifBlank { "GUIDE" },
+            recentChannelIds = state.recentChannelIds
+                .map { it.trim() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .takeLast(40)
+        )
+        var changed = false
         context.settingsDataStore.edit { prefs ->
-            if (state == IptvTvSessionState()) {
+            if (decodeTvSessionState(prefs[tvSessionKey()].orEmpty()) == normalizedState) {
+                return@edit
+            }
+            changed = true
+            if (normalizedState == IptvTvSessionState()) {
                 prefs.remove(tvSessionKey())
             } else {
-                prefs[tvSessionKey()] = gson.toJson(
-                    state.copy(
-                        lastChannelId = state.lastChannelId.trim(),
-                        lastGroupName = state.lastGroupName.trim(),
-                        lastFocusedZone = state.lastFocusedZone.trim().ifBlank { "GUIDE" },
-                        recentChannelIds = state.recentChannelIds
-                            .map { it.trim() }
-                            .filter { it.isNotBlank() }
-                            .distinct()
-                            .takeLast(40)
-                    )
-                )
+                prefs[tvSessionKey()] = gson.toJson(normalizedState)
             }
         }
-        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save tv session")
+        if (changed) {
+            invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save tv session")
+        }
     }
 
     fun saveTvSessionStateInRepositoryScope(state: IptvTvSessionState) {
@@ -719,7 +725,7 @@ class IptvRepository @Inject constructor(
             else prefs[groupOrderKey()] = gson.toJson(retainedOrder)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -756,7 +762,7 @@ class IptvRepository @Inject constructor(
             else prefs[groupOrderKey()] = gson.toJson(retainedOrder)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -781,7 +787,7 @@ class IptvRepository @Inject constructor(
             prefs[stalkerPortalUrlKey()] = encryptConfigValue(normalizedUrl)
             prefs[stalkerMacAddressKey()] = normalizedMac
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         if (sourceChanged) {
             withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         }
@@ -1557,7 +1563,7 @@ class IptvRepository @Inject constructor(
             prefs.remove(groupOrderSchemaKey())
             prefs.remove(tvSessionKey())
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         withContext(Dispatchers.IO) { deletePersistedSourceCaches(previousSourceKey) }
         invalidateCache()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "clear iptv config")
@@ -1652,6 +1658,7 @@ class IptvRepository @Inject constructor(
             }
             prefs[hiddenGroupsKey()] = gson.toJson(existing)
         }
+        markGroupPreferencesLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "toggle hidden group")
     }
 
@@ -1665,7 +1672,7 @@ class IptvRepository @Inject constructor(
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group up")
     }
 
@@ -1679,7 +1686,7 @@ class IptvRepository @Inject constructor(
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group to top")
     }
 
@@ -1693,7 +1700,7 @@ class IptvRepository @Inject constructor(
             prefs[groupOrderKey()] = gson.toJson(order)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "move group down")
     }
 
@@ -1704,7 +1711,7 @@ class IptvRepository @Inject constructor(
             prefs[groupOrderKey()] = gson.toJson(existing)
             prefs[groupOrderSchemaKey()] = IPTV_GROUP_ORDER_SCHEMA.toString()
         }
-        markGroupOrderLocallyDirty()
+        markGroupPreferencesLocallyDirty()
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "reset group order")
     }
 
@@ -3150,13 +3157,17 @@ class IptvRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "iptv_tv_session")
 
     private fun decodeHiddenGroups(prefs: Preferences): List<String> {
-        val raw = prefs[hiddenGroupsKey()].orEmpty()
+        return decodeHiddenGroups(prefs, profileManager.getProfileIdSync())
+    }
+
+    private fun decodeHiddenGroups(prefs: Preferences, profileId: String): List<String> {
+        val raw = prefs[hiddenGroupsKeyFor(profileId)].orEmpty()
         if (raw.isBlank()) return emptyList()
         return runCatching {
             val type = TypeToken.getParameterized(List::class.java, String::class.java).type
             val list = gson.fromJson<List<String>>(raw, type)?.map { it.trim() }?.filter { it.isNotBlank() }?.distinct() ?: emptyList()
             if (list.any { !it.contains('|') }) {
-                val playlistsRaw = prefs[playlistsKey()].orEmpty()
+                val playlistsRaw = prefs[playlistsKeyFor(profileId)].orEmpty()
                 if (playlistsRaw.isBlank()) {
                     list
                 } else {
@@ -3171,14 +3182,18 @@ class IptvRepository @Inject constructor(
     }
 
     private fun decodeGroupOrder(prefs: Preferences): List<String> {
-        if (prefs[groupOrderSchemaKey()]?.toIntOrNull() != IPTV_GROUP_ORDER_SCHEMA) return emptyList()
-        val raw = prefs[groupOrderKey()].orEmpty()
+        return decodeGroupOrder(prefs, profileManager.getProfileIdSync())
+    }
+
+    private fun decodeGroupOrder(prefs: Preferences, profileId: String): List<String> {
+        if (prefs[groupOrderSchemaKeyFor(profileId)]?.toIntOrNull() != IPTV_GROUP_ORDER_SCHEMA) return emptyList()
+        val raw = prefs[groupOrderKeyFor(profileId)].orEmpty()
         if (raw.isBlank()) return emptyList()
         return runCatching {
             val type = TypeToken.getParameterized(List::class.java, String::class.java).type
             val list = gson.fromJson<List<String>>(raw, type)?.map { it.trim() }?.filter { it.isNotBlank() }?.distinct() ?: emptyList()
             if (list.any { !it.contains('|') }) {
-                val playlistsRaw = prefs[playlistsKey()].orEmpty()
+                val playlistsRaw = prefs[playlistsKeyFor(profileId)].orEmpty()
                 if (playlistsRaw.isBlank()) {
                     list
                 } else {
@@ -3346,7 +3361,7 @@ class IptvRepository @Inject constructor(
             }
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
         }
-        groupOrderLocallyDirtyProfiles.remove(safeProfileId)
+        groupPreferencesLocallyDirtyProfiles.remove(safeProfileId)
         if (profileManager.getProfileIdSync() == safeProfileId) {
             invalidateCache()
         }

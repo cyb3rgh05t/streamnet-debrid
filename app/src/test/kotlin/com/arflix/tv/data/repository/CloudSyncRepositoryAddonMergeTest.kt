@@ -5,8 +5,27 @@ import com.arflix.tv.data.model.AddonType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
+import org.json.JSONObject
 
 class CloudSyncRepositoryAddonMergeTest {
+    @Test
+    fun `remote IPTV group preferences win unless changed locally`() {
+        val local = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Local Hidden"],"groupOrder":["list|Local First"],"groupOrderSchema":3}}}"""
+        val remote = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Remote Hidden"],"groupOrder":["list|Remote First"],"groupOrderSchema":3}}}"""
+
+        val merged = JSONObject(mergeRemoteIptvGroupPreferences(local, remote, emptySet()))
+            .getJSONObject("iptvByProfile")
+            .getJSONObject("main")
+        val locallyDirty = JSONObject(mergeRemoteIptvGroupPreferences(local, remote, setOf("main")))
+            .getJSONObject("iptvByProfile")
+            .getJSONObject("main")
+
+        assertEquals("list|Remote Hidden", merged.getJSONArray("hiddenGroups").getString(0))
+        assertEquals("list|Remote First", merged.getJSONArray("groupOrder").getString(0))
+        assertEquals("list|Local Hidden", locallyDirty.getJSONArray("hiddenGroups").getString(0))
+        assertEquals("list|Local First", locallyDirty.getJSONArray("groupOrder").getString(0))
+    }
+
     @Test
     fun `cloud addons win when ids match`() {
         val local = addon(id = "flix", name = "Local Flix")

@@ -484,7 +484,7 @@ fun LiveTvScreen(
     LaunchedEffect(selectedProviderId, selectedCategoryId) {
         pagedLoadedLimit = GuideMaxWindowRows
     }
-    LaunchedEffect(state.snapshot.channels, selectedCategoryId, favSet, recents.value, hiddenGroupSet, state.snapshot.groupOrder, pagedLoadedLimit) {
+    LaunchedEffect(state.snapshot.channels, state.snapshot.loadedAt, selectedCategoryId, favSet, recents.value, hiddenGroupSet, state.snapshot.groupOrder, pagedLoadedLimit) {
         val snapshot = state.snapshot.channels
         var pagedTotal = withContext(Dispatchers.IO) {
             if (viewModel.iptvRepository.pagedChannelsReady()) {
@@ -525,6 +525,8 @@ fun LiveTvScreen(
             val signature = buildString {
                 append("paged:")
                 append(pagedTotal)
+                append(':')
+                append(state.snapshot.loadedAt.toEpochMilli())
                 append(':')
                 append(selectedCategoryId)
                 append(':')
@@ -721,6 +723,10 @@ fun LiveTvScreen(
             append(snapshot.firstOrNull()?.id)
             append(':')
             append(snapshot.lastOrNull()?.id)
+            append(':')
+            append(state.snapshot.loadedAt.toEpochMilli())
+            append(':')
+            append(hiddenGroupSet.hashCode())
             append(':')
             append(state.snapshot.groupOrder.hashCode())
             append(':')
@@ -2113,6 +2119,7 @@ fun LiveTvScreen(
     var lastPreparedStreamUrl by remember { mutableStateOf<String?>(null) }
     var lastPreparedIsHls by remember { mutableStateOf(false) }
     var lastPreparedHeaders by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
+    var lastPreparedDrmInfo by remember { mutableStateOf<com.arflix.tv.data.model.DrmInfo?>(null) }
     var lastPreparedCatchupOffsetMs by remember { mutableLongStateOf(-1L) }
     var playerRetryCount by remember { mutableIntStateOf(0) }
     var playbackDiagnostic by remember { mutableStateOf<PlaybackDiagnostic?>(null) }
@@ -2133,6 +2140,7 @@ fun LiveTvScreen(
             stream == lastPreparedStreamUrl &&
             isHls == lastPreparedIsHls &&
             headers == lastPreparedHeaders &&
+            drmInfo == lastPreparedDrmInfo &&
             (playingCatchupProgram == null || catchupUrlAnchorOffsetMs == lastPreparedCatchupOffsetMs)
         ) {
             return
@@ -2183,6 +2191,7 @@ fun LiveTvScreen(
         lastPreparedStreamUrl = stream
         lastPreparedIsHls = isHls
         lastPreparedHeaders = headers
+        lastPreparedDrmInfo = drmInfo
         lastPreparedCatchupOffsetMs = if (playingCatchupProgram != null) catchupUrlAnchorOffsetMs else -1L
         if (resetRetry) playerRetryCount = 0
         if (resetRetry) {
@@ -2317,7 +2326,15 @@ fun LiveTvScreen(
             }
         }
     }
-    LaunchedEffect(currentStreamUrl, playingCatchupProgram, catchupUrlAnchorOffsetMs, playingChannel?.id) {
+    LaunchedEffect(
+        currentStreamUrl,
+        playingCatchupProgram,
+        catchupUrlAnchorOffsetMs,
+        playingChannel?.id,
+        playingChannel?.source?.requestHeaders,
+        playingChannel?.source?.drmInfo,
+        state.snapshot.loadedAt,
+    ) {
         val rawStream = currentStreamUrl ?: return@LaunchedEffect
         val sourceChannel = playingChannel?.source
         val streamProgram = playingCatchupProgram?.shiftedForCatchup(catchupUrlAnchorOffsetMs)
@@ -2739,6 +2756,8 @@ fun LiveTvScreen(
                 LiveTvNetflixLayout(
                     tree = visibleEnrichedState.value.tree,
                     selectedCategoryId = selectedCategoryId,
+                    hiddenGroups = hiddenGroupSet,
+                    groupOrder = state.snapshot.groupOrder,
                     channels = filteredChannels,
                     playingChannelId = playingChannelId,
                     focusedChannelId = focusedChannelId,

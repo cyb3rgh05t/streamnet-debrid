@@ -142,6 +142,29 @@ class LiveCategoryIndexTest {
         assertCustomCategoryOrder(showSpecialCategories = false)
     }
 
+    @Test
+    fun pagedCategoriesApplyPlaylistOrderAndVisibility() {
+        val state = buildPagedStartupChannelState(
+            channels = listOf(channel("list:1", "News One", "News")),
+            totalChannelCount = 3,
+            playlistGroupCounts = listOf(
+                Triple("list", "News", 1),
+                Triple("list", "Sports", 1),
+                Triple("list", "Movies", 1),
+            ),
+            favorites = emptySet(),
+            recents = emptySet(),
+            hiddenGroups = setOf("list|Sports"),
+            groupOrder = listOf("list|Movies", "list|Sports", "list|News"),
+        )
+
+        assertThat(state.tree.global.categories.map { it.label })
+            .containsExactly("Movies", "News")
+            .inOrder()
+        assertThat(state.tree.hidden.categories.map { it.label })
+            .containsExactly("Sports")
+    }
+
     private fun assertCustomCategoryOrder(showSpecialCategories: Boolean) {
         val channels = listOf(
             channel("list:1", "News One", "News"),

@@ -94,6 +94,8 @@ private data class NetflixCategoryItem(val id: String, val label: String, val co
 internal fun LiveTvNetflixLayout(
     tree: LiveCategoryTree,
     selectedCategoryId: String,
+    hiddenGroups: Set<String>,
+    groupOrder: List<String>,
     channels: List<EnrichedChannel>,
     playingChannelId: String?,
     focusedChannelId: String?,
@@ -135,9 +137,17 @@ internal fun LiveTvNetflixLayout(
                 ?: channels.firstOrNull()?.id
         }
     }
-    val previewChannel = channels.firstOrNull { it.id == previewChannelId }
-        ?: playingChannel
+    val previewChannel = if (channels.isEmpty()) {
+        null
+    } else {
+        channels.firstOrNull { it.id == previewChannelId } ?: playingChannel
+    }
     val previewNowNext = previewChannel?.let { nowNextMap[it.id] }
+    val emptyCategoryMessage = when {
+        channels.isNotEmpty() -> null
+        selectedCategoryId == "fav" -> stringResource(R.string.live_empty_no_favorites)
+        else -> stringResource(R.string.live_empty_no_channels_category)
+    }
     val previewBackdropUrl by produceState<String?>(
         initialValue = null,
         key1 = previewNowNext?.now?.title,
@@ -176,6 +186,7 @@ internal fun LiveTvNetflixLayout(
                 playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
                 isPlaylistRefreshing = isPlaylistRefreshing,
                 onRefreshPlaylist = onRefreshPlaylist,
+                emptyMessage = emptyCategoryMessage,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
@@ -184,6 +195,8 @@ internal fun LiveTvNetflixLayout(
 
         NetflixCategoryChipRow(
             tree = tree,
+            hiddenGroups = hiddenGroups,
+            groupOrder = groupOrder,
             selectedId = selectedCategoryId,
             onSelect = onSelectCategory,
             onOpenSearch = onOpenSearch,
@@ -223,6 +236,7 @@ internal fun LiveTvNetflixLayout(
             railEntrySignal = railEntrySignal,
             railFocusPending = railFocusPending,
             onRailFocusSettled = { railFocusPending = false },
+            emptyMessage = emptyCategoryMessage,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -343,6 +357,7 @@ private fun HeroInfoPanel(
     playlistLastRefreshedAtMillis: Long?,
     isPlaylistRefreshing: Boolean,
     onRefreshPlaylist: () -> Unit,
+    emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
     Box(
@@ -414,9 +429,13 @@ private fun HeroInfoPanel(
 
             val nowProgram = nowNext?.now
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(text = stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
+                if (emptyMessage == null) {
+                    Text(text = stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
+                }
                 Text(
-                    text = nowProgram?.title ?: stringResource(R.string.live_placeholder_guide_pending),
+                    text = emptyMessage
+                        ?: nowProgram?.title
+                        ?: stringResource(R.string.live_placeholder_guide_pending),
                     style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
@@ -539,6 +558,8 @@ private fun collectUpcoming(nowNext: IptvNowNext?): List<IptvProgram> {
 @Composable
 private fun NetflixCategoryChipRow(
     tree: LiveCategoryTree,
+    hiddenGroups: Set<String>,
+    groupOrder: List<String>,
     selectedId: String,
     onSelect: (String) -> Unit,
     onOpenSearch: () -> Unit,
@@ -549,7 +570,7 @@ private fun NetflixCategoryChipRow(
     focusSelectedCategorySignal: Int,
     modifier: Modifier = Modifier,
 ) {
-    val items = rememberNetflixCategoryItems(tree)
+    val items = rememberNetflixCategoryItems(tree, hiddenGroups, groupOrder)
     val listState = rememberLazyListState()
     val selectedIndex = remember(items, selectedId) {
         items.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
@@ -639,13 +660,41 @@ private fun NetflixChip(
 }
 
 @Composable
-private fun rememberNetflixCategoryItems(tree: LiveCategoryTree): List<NetflixCategoryItem> {
+private fun rememberNetflixCategoryItems(
+    tree: LiveCategoryTree,
+    hiddenGroups: Set<String>,
+    groupOrder: List<String>,
+): List<NetflixCategoryItem> {
     // Resolve labels at Composable scope before entering remember.
     val allTop = tree.top.map { it to liveCategoryLabel(it.label) }
-    val allGlobal = tree.global.categories.map { it to liveCategoryLabel(it.label) }
+    val orderedGlobal = remember(tree.global.categories, hiddenGroups, groupOrder) {
+        val orderByKey = groupOrder.withIndex().associate { (index, key) -> key to index }
+        tree.global.categories
+            .withIndex()
+            .filter { (_, category) ->
+                val playlistId = category.playlistId
+                val groupName = category.playlistGroupName
+                playlistId == null || groupName == null ||
+                    com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, groupName) !in hiddenGroups
+            }
+            .sortedWith(
+                compareBy<IndexedValue<LiveCategory>> { (_, category) ->
+                    val playlistId = category.playlistId
+                    val groupName = category.playlistGroupName
+                    if (playlistId == null || groupName == null) {
+                        Int.MAX_VALUE
+                    } else {
+                        orderByKey[com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, groupName)]
+                            ?: Int.MAX_VALUE
+                    }
+                }.thenBy { it.index }
+            )
+            .map { it.value }
+    }
+    val allGlobal = orderedGlobal.map { it to liveCategoryLabel(it.label) }
     val allCountries = tree.countries.categories.map { it to liveCategoryLabel(it.label) }
     val allAdult = tree.adult.categories.map { it to liveCategoryLabel(it.label) }
-    return remember(tree) {
+    return remember(tree, orderedGlobal) {
         buildList {
             allTop.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
             allGlobal.forEach { (cat, label) -> add(NetflixCategoryItem(cat.id, label, cat.count)) }
@@ -675,11 +724,12 @@ private fun NetflixChannelRail(
     railEntrySignal: Int,
     railFocusPending: Boolean,
     onRailFocusSettled: () -> Unit,
+    emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
     if (channels.isEmpty()) {
         Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
-            Text(text = stringResource(R.string.live_placeholder_guide_pending),
+            Text(text = emptyMessage ?: stringResource(R.string.live_empty_no_channels_category),
                 style = LiveType.CatLabel.copy(color = LiveColors.FgMute),
                 modifier = Modifier.padding(horizontal = 16.dp))
         }

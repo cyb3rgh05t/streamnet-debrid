@@ -77,6 +77,34 @@ internal fun reconcileAddonsWithCloud(
     return reconciled.values.toList() to false
 }
 
+internal fun mergeRemoteIptvGroupPreferences(
+    localPayload: String,
+    remotePayload: String,
+    locallyDirtyProfileIds: Set<String>,
+): String {
+    return runCatching {
+        val local = JSONObject(localPayload)
+        val remote = JSONObject(remotePayload)
+        val localByProfile = local.optJSONObject("iptvByProfile") ?: return@runCatching localPayload
+        val remoteByProfile = remote.optJSONObject("iptvByProfile") ?: return@runCatching localPayload
+        val remoteKeys = remoteByProfile.keys()
+        while (remoteKeys.hasNext()) {
+            val profileId = remoteKeys.next()
+            if (profileId in locallyDirtyProfileIds) continue
+            val remoteProfile = remoteByProfile.optJSONObject(profileId) ?: continue
+            val localProfile = localByProfile.optJSONObject(profileId) ?: continue
+            remoteProfile.optJSONArray("hiddenGroups")?.let { remoteHiddenGroups ->
+                localProfile.put("hiddenGroups", remoteHiddenGroups)
+            }
+            if (remoteProfile.optInt("groupOrderSchema", 0) < IPTV_GROUP_ORDER_SCHEMA) continue
+            val remoteGroupOrder = remoteProfile.optJSONArray("groupOrder") ?: continue
+            localProfile.put("groupOrder", remoteGroupOrder)
+            localProfile.put("groupOrderSchema", remoteProfile.optInt("groupOrderSchema"))
+        }
+        local.toString()
+    }.getOrDefault(localPayload)
+}
+
 /**
  * Shared cloud sync logic used by both SettingsViewModel (full push/pull on
  * Settings screen) and ProfileViewModel (pull on profile selection).
@@ -229,7 +257,7 @@ class CloudSyncRepository @Inject constructor(
     private suspend fun clearLocalDirtyAfterSuccessfulPush() {
         latestLocalDirtyAt = 0L
         isPushDirty = false
-        iptvRepository.clearGroupOrderLocallyDirty()
+        iptvRepository.clearGroupPreferencesLocallyDirty()
         context.settingsDataStore.edit { prefs ->
             prefs.remove(cloudSyncLocalDirtyAtKey)
             prefs[cloudSyncLastPushAtKey] = System.currentTimeMillis()
@@ -959,11 +987,11 @@ class CloudSyncRepository @Inject constructor(
             )
         }
 
-        val groupOrderMerged = if (existingRemotePayload != null) {
-            mergeRemoteGroupOrder(
+        val groupPreferencesMerged = if (existingRemotePayload != null) {
+            mergeRemoteIptvGroupPreferences(
                 payload,
                 existingRemotePayload,
-                iptvRepository.groupOrderLocallyDirtyProfiles(),
+                iptvRepository.groupPreferencesLocallyDirtyProfiles(),
             )
         } else {
             payload
@@ -972,9 +1000,9 @@ class CloudSyncRepository @Inject constructor(
         // recently, but never overwrite a cloud field with an older local value. This is what stops
         // a stale device from reverting a peer's setting (even via the pull's pre-push).
         val settingsMergedPayload = if (existingRemotePayload != null) {
-            mergeSettingsByTimestamp(baseStr = groupOrderMerged, otherStr = existingRemotePayload).json
+            mergeSettingsByTimestamp(baseStr = groupPreferencesMerged, otherStr = existingRemotePayload).json
         } else {
-            groupOrderMerged
+            groupPreferencesMerged
         }
         val effectivePayload = if (existingRemotePayload != null) {
             mergeWatchlistByTimestamp(localPayload = settingsMergedPayload, remotePayload = existingRemotePayload)
@@ -1029,31 +1057,6 @@ class CloudSyncRepository @Inject constructor(
             )
         }
         return result
-    }
-
-    private fun mergeRemoteGroupOrder(
-        localPayload: String,
-        remotePayload: String,
-        locallyDirtyProfileIds: Set<String>,
-    ): String {
-        return runCatching {
-            val local = JSONObject(localPayload)
-            val remote = JSONObject(remotePayload)
-            val localByProfile = local.optJSONObject("iptvByProfile") ?: return@runCatching localPayload
-            val remoteByProfile = remote.optJSONObject("iptvByProfile") ?: return@runCatching localPayload
-            val remoteKeys = remoteByProfile.keys()
-            while (remoteKeys.hasNext()) {
-                val profileId = remoteKeys.next()
-                if (profileId in locallyDirtyProfileIds) continue
-                val remoteProfile = remoteByProfile.optJSONObject(profileId) ?: continue
-                val localProfile = localByProfile.optJSONObject(profileId) ?: continue
-                if (remoteProfile.optInt("groupOrderSchema", 0) < IPTV_GROUP_ORDER_SCHEMA) continue
-                val remoteGroupOrder = remoteProfile.optJSONArray("groupOrder") ?: continue
-                localProfile.put("groupOrder", remoteGroupOrder)
-                localProfile.put("groupOrderSchema", remoteProfile.optInt("groupOrderSchema"))
-            }
-            local.toString()
-        }.getOrDefault(localPayload)
     }
 
     private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {
