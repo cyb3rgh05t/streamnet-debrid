@@ -3325,6 +3325,15 @@ class SettingsViewModel @Inject constructor(
                 }
                 CloudRestoreResult.RESTORED
             }
+            CloudSyncRepository.RestoreResult.UNCHANGED -> {
+                if (!silent) {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = "Cloud data is already current",
+                        toastType = ToastType.SUCCESS
+                    )
+                }
+                CloudRestoreResult.RESTORED
+            }
             CloudSyncRepository.RestoreResult.NO_BACKUP -> {
                 if (!silent) {
                     _uiState.value = _uiState.value.copy(

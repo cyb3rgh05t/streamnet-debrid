@@ -13,7 +13,7 @@ const [localPart, domain] = baseAddress.split("@");
 const email = `${localPart}+arvio-delete-${Math.floor(Date.now() / 1000)}@${domain}`;
 const password = `DeleteTest-${crypto.randomBytes(24).toString("hex")}!`;
 const siteID = process.env.NETLIFY_SITE_ID || "17ccb668-bf3c-412d-9573-a28a09e52122";
-const functionBase = "https://auth.arvio.tv/.netlify/functions";
+const functionBase = "https://auth.streamnet.club/.netlify/functions";
 const html = fs.readFileSync(new URL("../delete-account.html", import.meta.url), "utf8");
 const appKey = html.match(/const APP_ANON_KEY = "([^"]+)"/)?.[1] || "";
 if (!appKey) throw new Error("APP_ANON_KEY was not found in delete-account.html");

@@ -260,7 +260,7 @@ class CloudSyncRepository @Inject constructor(
         }
     }
 
-    enum class RestoreResult { RESTORED, NO_BACKUP, FAILED }
+    enum class RestoreResult { RESTORED, UNCHANGED, NO_BACKUP, FAILED }
 
     // ── Data class for per-profile settings stored in cloud ──
 
@@ -1220,7 +1220,7 @@ class CloudSyncRepository @Inject constructor(
                 message = "pull_skipped_identical_payload",
                 severity = "info"
             )
-            return@withLock RestoreResult.RESTORED
+            return@withLock RestoreResult.UNCHANGED
         }
 
         runCatching {

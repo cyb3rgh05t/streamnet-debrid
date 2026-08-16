@@ -207,7 +207,7 @@ class CatalogRepository @Inject constructor(
         val resolved = sanitizeCollectionCatalogs(readCatalogsFromPrefs(profileId, prefs))
         // One-time migration/sync for old keys and merged legacy custom entries.
         if (resolved.isNotEmpty() && resolved != primary) {
-            saveCatalogs(resolved)
+            saveCatalogs(resolved, markCloudDirty = false)
         }
         return resolved
     }
@@ -355,7 +355,10 @@ class CatalogRepository @Inject constructor(
         invalidationBus.markDirty(CloudSyncScope.CATALOGS, profileId, "restore hidden catalogs")
     }
 
-    private suspend fun saveCatalogs(catalogs: List<CatalogConfig>) {
+    private suspend fun saveCatalogs(
+        catalogs: List<CatalogConfig>,
+        markCloudDirty: Boolean = true,
+    ) {
         val profileId = activeProfileId()
         val sanitized = catalogs
             .distinctBy { it.id }
@@ -363,7 +366,9 @@ class CatalogRepository @Inject constructor(
         context.settingsDataStore.edit { prefs ->
             prefs[catalogsKey(profileId)] = gson.toJson(sanitized)
         }
-        invalidationBus.markDirty(CloudSyncScope.CATALOGS, profileId, "save catalogs")
+        if (markCloudDirty) {
+            invalidationBus.markDirty(CloudSyncScope.CATALOGS, profileId, "save catalogs")
+        }
     }
 
     suspend fun replaceCatalogsForProfile(profileId: String, catalogs: List<CatalogConfig>) {

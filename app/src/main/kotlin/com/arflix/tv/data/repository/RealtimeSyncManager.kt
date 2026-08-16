@@ -60,12 +60,9 @@ class RealtimeSyncManager @Inject constructor(
         private const val HEARTBEAT_INTERVAL_MS = 30_000L
         private const val INITIAL_RECONNECT_DELAY_MS = 5_000L
         private const val MAX_RECONNECT_DELAY_MS = 40_000L
-        // Lowered from 90s → 45s. This is the fallback polling that catches
-        // cases where the WebSocket delivered no event (network dropped mid-
-        // change, server filter missed it). Halving the interval tightens
-        // the worst-case propagation window for cross-device sync without
-        // meaningfully increasing load (one GET every 45s while signed in).
-        private const val PERIODIC_SYNC_INTERVAL_MS = 15 * 60 * 1000L
+        // Netlify Blobs do not expose realtime events, so signed-in devices poll
+        // the account snapshot while the app process is active.
+        private const val PERIODIC_SYNC_INTERVAL_MS = 60_000L
         private const val DEBOUNCE_MS = 2_000L
         private const val WATCH_HISTORY_DEBOUNCE_MS = 1_000L
         private const val WATCH_HISTORY_SELF_ECHO_GUARD_MS = 1_500L
@@ -136,6 +133,9 @@ class RealtimeSyncManager @Inject constructor(
                 } else {
                     CloudSyncStatus.CONNECTED
                 }
+            }
+            if (BuildConfig.ENABLE_PERIODIC_CLOUD_PULL) {
+                startPeriodicSync()
             }
             return
         }
@@ -540,7 +540,10 @@ class RealtimeSyncManager @Inject constructor(
                 }
                 Log.d(TAG, "Periodic sync tick")
                 try {
-                    cloudSyncRepository.pullFromCloud()
+                    val result = cloudSyncRepository.pullFromCloud()
+                    if (result == CloudSyncRepository.RestoreResult.RESTORED) {
+                        _accountSyncEvents.tryEmit(Unit)
+                    }
                 } catch (e: retrofit2.HttpException) {
                     Log.w(TAG, "Periodic sync failed (HTTP): ${e.message}")
                 } catch (e: java.io.IOException) {

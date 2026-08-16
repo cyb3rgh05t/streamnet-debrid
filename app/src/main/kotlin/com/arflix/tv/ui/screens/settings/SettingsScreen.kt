@@ -233,7 +233,7 @@ class SettingsFocusTracker {
 
 val LocalSettingsFocusTracker = compositionLocalOf<SettingsFocusTracker?> { null }
 
-private const val ACCOUNT_DELETION_URL = "https://auth.arvio.tv/delete"
+private const val ACCOUNT_DELETION_URL = "https://auth.streamnet.club/delete"
 private const val PRIVACY_POLICY_URL = "https://arvio.tv/privacy"
 
 private val tvGeneralSectionIds = setOf(
@@ -3138,7 +3138,7 @@ private fun CloudPairModal(
     val effectiveVerificationUrl = remember(verificationUrl, userCode) {
         verificationUrl.ifBlank {
             userCode.takeIf { it.isNotBlank() }?.let { code ->
-                "https://auth.arvio.tv/?code=$code"
+                "https://auth.streamnet.club/?code=$code"
             }.orEmpty()
         }
     }
