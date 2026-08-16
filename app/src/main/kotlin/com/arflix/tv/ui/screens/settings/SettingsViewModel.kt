@@ -3278,7 +3278,8 @@ class SettingsViewModel @Inject constructor(
             val restoreResult = withTimeoutOrNull(30_000L) {
                 restoreCloudStateToLocalInternal(
                     silent = true,
-                    pushPendingLocalFirst = false
+                    pushPendingLocalFirst = false,
+                    forceApplyRemote = true,
                 )
             } ?: CloudRestoreResult.FAILED
 
@@ -3311,9 +3312,15 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun restoreCloudStateToLocalInternal(
         silent: Boolean,
-        pushPendingLocalFirst: Boolean = true
+        pushPendingLocalFirst: Boolean = true,
+        forceApplyRemote: Boolean = false,
     ): CloudRestoreResult {
-        return when (cloudSyncRepository.pullFromCloud(pushPendingLocalFirst = pushPendingLocalFirst)) {
+        return when (
+            cloudSyncRepository.pullFromCloud(
+                pushPendingLocalFirst = pushPendingLocalFirst,
+                forceApplyRemote = forceApplyRemote,
+            )
+        ) {
             CloudSyncRepository.RestoreResult.RESTORED -> {
                 loadSettings()
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }

@@ -131,6 +131,10 @@ class CloudSyncRepository @Inject constructor(
     private val pluginDataStore: com.arflix.tv.data.local.PluginDataStore,
     private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore
 ) {
+    private companion object {
+        const val FORCED_RESTORE_PUSH_GUARD_MS = 15_000L
+    }
+
     private val TAG = "CloudSync"
     private val gson = Gson()
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -893,12 +897,25 @@ class CloudSyncRepository @Inject constructor(
     @Volatile
     private var lastPushAttemptAt: Long = 0L
 
+    @Volatile
+    private var automaticPushBlockedUntil: Long = 0L
+
     // ══════════════════════════════════════════════════════════
     //  PUSH LOCAL STATE TO CLOUD
     // ══════════════════════════════════════════════════════════
 
-    suspend fun pushToCloud(force: Boolean = false): Result<Unit> = cloudSyncMutex.withLock {
-        pushToCloudLocked(force = force, allowRemoteRestoreBeforePush = !force)
+    suspend fun pushToCloud(force: Boolean = false): Result<Unit> {
+        if (System.currentTimeMillis() < automaticPushBlockedUntil) {
+            AppLogger.breadcrumb(
+                tag = "CloudSync",
+                message = "push_skipped_forced_restore_guard",
+                severity = "info",
+            )
+            return Result.success(Unit)
+        }
+        return cloudSyncMutex.withLock {
+            pushToCloudLocked(force = force, allowRemoteRestoreBeforePush = !force)
+        }
     }
 
     suspend fun pushLocalSnapshotToCloud(): Result<Unit> = cloudSyncMutex.withLock {
@@ -1105,7 +1122,14 @@ class CloudSyncRepository @Inject constructor(
      * Restores the full cloud state to local repositories.
      * Returns [RestoreResult] indicating what happened.
      */
-    suspend fun pullFromCloud(pushPendingLocalFirst: Boolean = true): RestoreResult = cloudSyncMutex.withLock {
+    suspend fun pullFromCloud(
+        pushPendingLocalFirst: Boolean = true,
+        forceApplyRemote: Boolean = false,
+    ): RestoreResult {
+        if (forceApplyRemote) {
+            automaticPushBlockedUntil = System.currentTimeMillis() + FORCED_RESTORE_PUSH_GUARD_MS
+        }
+        return cloudSyncMutex.withLock {
         val hasPendingLocalChanges = hasPendingLocalChanges()
         if (pushPendingLocalFirst && hasPendingLocalChanges) {
             AppLogger.breadcrumb(
@@ -1216,7 +1240,7 @@ class CloudSyncRepository @Inject constructor(
         val lastAppliedHash = prefs[androidx.datastore.preferences.core.intPreferencesKey("cloud_sync_last_applied_hash")]
         val payloadHash = payload.hashCode()
 
-        if (lastAppliedHash == payloadHash) {
+        if (!forceApplyRemote && lastAppliedHash == payloadHash) {
             Log.i(TAG, "Pull skipped identical payload")
             AppLogger.breadcrumb(
                 tag = "CloudSync",
@@ -1258,6 +1282,7 @@ class CloudSyncRepository @Inject constructor(
                 RestoreResult.FAILED
             }
         )
+        }
     }
 
     /**

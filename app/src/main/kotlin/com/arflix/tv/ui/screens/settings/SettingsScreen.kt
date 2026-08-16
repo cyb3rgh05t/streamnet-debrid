@@ -479,7 +479,7 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 14 // Accounts, tracking routing, sync/update, privacy and deletion
+            "accounts" -> 15 // Accounts, tracking routing, cloud actions, update, privacy and deletion
             else -> 0
         }
     }
@@ -684,6 +684,7 @@ fun SettingsScreen(
     }
 
     var showCloudDisconnectConfirm by remember { mutableStateOf(false) }
+    var showCloudPullConfirm by remember { mutableStateOf(false) }
     var showTraktDisconnectConfirm by remember { mutableStateOf(false) }
     var showMdbListConnect by remember { mutableStateOf(false) }
     var showMdbListDisconnectConfirm by remember { mutableStateOf(false) }
@@ -728,6 +729,7 @@ fun SettingsScreen(
         uiState.showAppUpdateDialog ||
         uiState.showUnknownSourcesDialog ||
         showCloudDisconnectConfirm ||
+        showCloudPullConfirm ||
         showTraktDisconnectConfirm ||
         showMdbListConnect ||
         showMdbListDisconnectConfirm ||
@@ -1227,16 +1229,17 @@ fun SettingsScreen(
                                                 }
                                                 9 -> onNavigateToTelegramSettings()
                                                 10 -> viewModel.forceCloudSyncNow()
-                                                11 -> {
+                                                11 -> showCloudPullConfirm = true
+                                                12 -> {
                                                     if (uiState.updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) {
                                                         viewModel.installAppUpdateOrRequestPermission()
                                                     } else {
                                                         viewModel.checkForAppUpdates(force = true, showNoUpdateFeedback = true)
                                                     }
                                                 }
-                                                12 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
-                                                13 -> openExternalUrl(context, PRIVACY_POLICY_URL)
-                                                14 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
+                                                13 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
+                                                14 -> openExternalUrl(context, PRIVACY_POLICY_URL)
+                                                15 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
                                             }
                                         }
                                         "plugins" -> {
@@ -1783,6 +1786,7 @@ fun SettingsScreen(
                             onTrackingReadMode = viewModel::setTrackingReadMode,
                             onTrackingWriteTarget = viewModel::setTrackingWriteTarget,
                             onForceCloudSync = { viewModel.forceCloudSyncNow() },
+                            onForceCloudPull = { showCloudPullConfirm = true },
                             onSwitchProfile = onSwitchProfile,
                             onCheckUpdates = { viewModel.checkForAppUpdates(force = true, showNoUpdateFeedback = true) },
                             onInstallUpdate = { viewModel.installAppUpdateOrRequestPermission() },
@@ -2239,6 +2243,19 @@ fun SettingsScreen(
                     viewModel.logout()
                 },
                 onDismiss = { showCloudDisconnectConfirm = false }
+            )
+        }
+
+        if (showCloudPullConfirm) {
+            AccountDisconnectConfirmDialog(
+                title = stringResource(R.string.settings_cloud_pull_confirm_title),
+                description = stringResource(R.string.settings_cloud_pull_confirm_desc),
+                confirmLabel = stringResource(R.string.settings_cloud_restore),
+                onConfirm = {
+                    showCloudPullConfirm = false
+                    viewModel.forceCloudPullOnly()
+                },
+                onDismiss = { showCloudPullConfirm = false }
             )
         }
 
@@ -8372,6 +8389,7 @@ private fun AccountsSettings(
     onCancelTrakt: () -> Unit,
     onDisconnectTrakt: () -> Unit,
     onForceCloudSync: () -> Unit,
+    onForceCloudPull: () -> Unit,
     onSwitchProfile: () -> Unit,
     onCheckUpdates: () -> Unit,
     onInstallUpdate: () -> Unit,
@@ -8561,6 +8579,17 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            title = stringResource(R.string.settings_force_pull),
+            description = stringResource(R.string.settings_force_pull_desc),
+            actionLabel = if (isForceCloudSyncing) stringResource(R.string.settings_badge_syncing) else stringResource(R.string.settings_action_pull),
+            isFocused = focusedIndex == 11,
+            onClick = { if (!isForceCloudSyncing) onForceCloudPull() },
+            modifier = Modifier.settingsFocusSlot(11)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        SettingsActionRow(
             title = stringResource(R.string.app_update),
             description = when {
                 !isSelfUpdateSupported -> stringResource(R.string.settings_update_managed_play)
@@ -8577,11 +8606,11 @@ private fun AccountsSettings(
                 updateStatus is com.arflix.tv.updater.UpdateStatus.UpdateAvailable -> stringResource(R.string.settings_badge_update)
                 else -> stringResource(R.string.settings_badge_check)
             },
-            isFocused = focusedIndex == 11,
+            isFocused = focusedIndex == 12,
             onClick = {
                 if (updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) onInstallUpdate() else onCheckUpdates()
             },
-            modifier = Modifier.settingsFocusSlot(11)
+            modifier = Modifier.settingsFocusSlot(12)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8590,9 +8619,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_diagnostics_sharing),
             subtitle = stringResource(R.string.settings_diagnostics_sharing_desc),
             isEnabled = diagnosticsSharingEnabled,
-            isFocused = focusedIndex == 12,
+            isFocused = focusedIndex == 13,
             onToggle = onDiagnosticsSharingToggle,
-            modifier = Modifier.settingsFocusSlot(12)
+            modifier = Modifier.settingsFocusSlot(13)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8601,9 +8630,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_privacy_policy),
             description = stringResource(R.string.settings_privacy_policy_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 13,
+            isFocused = focusedIndex == 14,
             onClick = onOpenPrivacy,
-            modifier = Modifier.settingsFocusSlot(13)
+            modifier = Modifier.settingsFocusSlot(14)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -8612,9 +8641,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_account_data_deletion),
             description = stringResource(R.string.settings_account_data_deletion_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 14,
+            isFocused = focusedIndex == 15,
             onClick = onOpenDataDeletion,
-            modifier = Modifier.settingsFocusSlot(14)
+            modifier = Modifier.settingsFocusSlot(15)
         )
     }
 }
