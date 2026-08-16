@@ -1,9 +1,14 @@
 // AI subtitle translation — web port of the Android app's
-// SubtitleTranslationService/Manager: same providers (Groq llama-3.3-70b /
-// Gemini 2.5 Flash), same prompt, same ⏎ line-break sentinel, batched with a
+// SubtitleTranslationService/Manager: same providers (Groq gpt-oss-120b /
+// Gemini), same prompt, same ⏎ line-break sentinel, batched with a
 // short window, cached per cue text, 5s backoff on 429.
 
-const GROQ_MODEL_ID = "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile was decommissioned by Groq (August 16, 2026); gpt-oss-120b is the
+// recommended replacement — faster, same 30 RPM free tier. It always reasons: "low" is the floor,
+// and "hidden" keeps the chain-of-thought out of message.content. Mirrors the Android service.
+const GROQ_MODEL_ID = "openai/gpt-oss-120b";
+const GROQ_REASONING_EFFORT = "low";
+const GROQ_REASONING_FORMAT = "hidden";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GEMINI_MODEL_ID = "gemini-2.5-flash";
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_ID}:generateContent`;
@@ -118,6 +123,8 @@ export class SubtitleTranslator {
       body: JSON.stringify({
         model: GROQ_MODEL_ID,
         temperature: 0.1,
+        reasoning_effort: GROQ_REASONING_EFFORT,
+        reasoning_format: GROQ_REASONING_FORMAT,
         messages: [
           { role: "system", content: systemPrompt(this.targetLanguage) },
           { role: "user", content: JSON.stringify(lines) }

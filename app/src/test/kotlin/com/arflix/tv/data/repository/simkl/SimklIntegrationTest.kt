@@ -8,6 +8,9 @@ import com.arflix.tv.data.api.SimklAllItemsResponse
 import com.arflix.tv.data.api.SimklScrobbleBody
 import com.arflix.tv.data.api.SimklScrobbleResponse
 import com.arflix.tv.data.api.TmdbApi
+import com.arflix.tv.data.api.TmdbListResponse
+import com.arflix.tv.data.api.TmdbMediaItem
+import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.repository.sync.SyncProviderStore
 import com.google.gson.Gson
 import io.mockk.coEvery
@@ -20,6 +23,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
+import java.io.IOException
 
 class SimklIntegrationTest {
 
@@ -193,6 +197,94 @@ class SimklIntegrationTest {
         syncService.syncIfNeeded()
 
         coVerify(exactly = 3) { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) }
+    }
+
+    @Test
+    fun testOneFailedCategoryKeepsSuccessfulSimklLibraryAndStopsImmediateRetry() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getActivities(any(), any()) } returns
+            SimklActivitiesResponse(all = "2026-08-16T10:00:00Z")
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            SimklAllItemsResponse()
+        coEvery {
+            simklApi.getAllItems(any(), any(), "movies", any(), any(), any(), any(), any(), any())
+        } throws IOException("temporary Simkl failure")
+        coEvery {
+            simklApi.getAllItems(any(), any(), "shows", any(), any(), any(), any(), any(), any())
+        } returns Gson().fromJson(
+            """{"shows":[{"status":"watching","show":{"title":"Available Show","year":2025,"ids":{"tmdb":440}} ,"next_to_watch":"S01E02"}]}""",
+            SimklAllItemsResponse::class.java
+        )
+        coEvery { simklApi.getPlayback(any(), any()) } returns emptyList()
+
+        val library = syncService.getLibraryItems("watching", forceRefresh = true)
+        val continueWatching = syncService.getContinueWatching()
+
+        assertEquals(listOf(440), library.map { it.id })
+        assertEquals(listOf(440), continueWatching.map { it.id })
+        coVerify(exactly = 1) { simklApi.getActivities(any(), any()) }
+        coVerify(exactly = 1) {
+            simklApi.getAllItems(any(), any(), "movies", any(), any(), any(), any(), any(), any())
+        }
+    }
+
+    @Test
+    fun testTransientRefreshFailurePreservesPreviousSimklSnapshot() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getActivities(any(), any()) } returns
+            SimklActivitiesResponse(all = "2026-08-16T11:00:00Z")
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            SimklAllItemsResponse()
+        coEvery {
+            simklApi.getAllItems(any(), any(), "movies", any(), any(), any(), any(), any(), any())
+        } returns Gson().fromJson(
+            """{"movies":[{"status":"plantowatch","movie":{"title":"Saved Movie","year":2024,"ids":{"tmdb":550}}}]}""",
+            SimklAllItemsResponse::class.java
+        )
+        coEvery { simklApi.getPlayback(any(), any()) } returns emptyList()
+
+        assertEquals(listOf(550), syncService.getLibraryItems("plantowatch", forceRefresh = true).map { it.id })
+
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } throws
+            IOException("temporary Simkl outage")
+        coEvery { simklApi.getPlayback(any(), any()) } throws IOException("temporary playback outage")
+
+        val afterFailure = syncService.getLibraryItems("plantowatch", forceRefresh = true)
+
+        assertEquals(listOf(550), afterFailure.map { it.id })
+    }
+
+    @Test
+    fun testSimklOnlyItemFallsBackToStrictTitleAndYearMatch() = runBlocking {
+        coEvery { syncProviderStore.getSimklAccessToken() } returns "token_123"
+        coEvery { simklApi.getActivities(any(), any()) } returns
+            SimklActivitiesResponse(all = "2026-08-16T12:00:00Z")
+        coEvery { simklApi.getAllItems(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns
+            SimklAllItemsResponse()
+        coEvery {
+            simklApi.getAllItems(any(), any(), "anime", any(), any(), any(), any(), any(), any())
+        } returns Gson().fromJson(
+            """{"anime":[{"status":"plantowatch","show":{"title":"Simkl Anime","year":2025,"ids":{"simkl":98765}}}]}""",
+            SimklAllItemsResponse::class.java
+        )
+        coEvery { simklApi.getPlayback(any(), any()) } returns emptyList()
+        coEvery {
+            tmdbApi.searchTv(any(), "Simkl Anime", any(), any(), 2025)
+        } returns TmdbListResponse(
+            results = listOf(
+                TmdbMediaItem(
+                    id = 660,
+                    name = "Simkl Anime",
+                    firstAirDate = "2025-01-10",
+                    popularity = 10f
+                )
+            )
+        )
+
+        val library = syncService.getLibraryItems("plantowatch", forceRefresh = true)
+
+        assertEquals(listOf(660), library.map { it.id })
+        assertEquals(MediaType.TV, library.single().mediaType)
     }
 
     @Test

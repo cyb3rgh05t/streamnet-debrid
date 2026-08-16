@@ -5,6 +5,7 @@ import { resolveTmdbId } from "./tmdb";
 
 const LEGACY_SIMKL_TOKEN_KEY = "arvio.web.simkl.token";
 const SNAPSHOT_TTL_MS = 15 * 60 * 1000;
+const FAILED_SNAPSHOT_RETRY_MS = 60 * 1000;
 const SCROBBLE_WRITE_LOCK_MS = 20_500;
 
 export interface SimklToken {
@@ -45,6 +46,7 @@ type SimklSnapshot = {
   scope: string;
   activity: string | null;
   checkedAt: number;
+  complete: boolean;
   movies: SimklMovieRow[];
   shows: SimklShowRow[];
   anime: SimklShowRow[];
@@ -91,6 +93,7 @@ export class SimklClient implements SyncClient {
   }
   private snapshot: SimklSnapshot | null = null;
   private snapshotPromise: Promise<SimklSnapshot> | null = null;
+  private lastSnapshotFailureAt = 0;
   private lastScrobbleWriteAt = 0;
   private pendingScrobble: {
     scope: string;
@@ -114,6 +117,7 @@ export class SimklClient implements SyncClient {
     this.profileId = normalized;
     this.snapshot = null;
     this.snapshotPromise = null;
+    this.lastSnapshotFailureAt = 0;
     if (!normalized) {
       this.token = null;
       return;
@@ -137,6 +141,7 @@ export class SimklClient implements SyncClient {
     this.token = next;
     this.snapshot = null;
     this.snapshotPromise = null;
+    this.lastSnapshotFailureAt = 0;
     if (!this.profileId) return;
     if (this.token) saveStored(this.tokenKey(this.profileId), this.token);
     else removeStored(this.tokenKey(this.profileId));
@@ -162,6 +167,7 @@ export class SimklClient implements SyncClient {
   private invalidateSnapshot() {
     this.snapshot = null;
     this.snapshotPromise = null;
+    this.lastSnapshotFailureAt = 0;
   }
 
   private resetScrobbleQueue() {
@@ -173,34 +179,56 @@ export class SimklClient implements SyncClient {
 
   private async loadSnapshot(): Promise<SimklSnapshot> {
     if (!this.isConnected) {
-      return { scope: this.scope(), activity: null, checkedAt: Date.now(), movies: [], shows: [], anime: [] };
+      return {
+        scope: this.scope(), activity: null, checkedAt: Date.now(), complete: true,
+        movies: [], shows: [], anime: []
+      };
     }
     const scope = this.scope();
     const accessToken = this.token?.access_token;
     const cached = this.snapshot?.scope === scope ? this.snapshot : null;
-    if (cached && Date.now() - cached.checkedAt < SNAPSHOT_TTL_MS) return cached;
+    const now = Date.now();
+    if (cached?.complete && now - cached.checkedAt < SNAPSHOT_TTL_MS) return cached;
+    if (now - this.lastSnapshotFailureAt < FAILED_SNAPSHOT_RETRY_MS) {
+      return cached ?? {
+        scope, activity: null, checkedAt: now, complete: false,
+        movies: [], shows: [], anime: []
+      };
+    }
     if (this.snapshotPromise) return this.snapshotPromise;
 
     const request = (async () => {
       const activities = await this.simkl<unknown>("/sync/activities", {}, accessToken).catch(() => null);
       const marker = activityMarker(activities);
-      if (cached && marker && marker === cached.activity) {
+      if (cached?.complete && marker && marker === cached.activity) {
         return { ...cached, checkedAt: Date.now() };
       }
 
       const query = "?extended=full&episode_watched_at=yes&include_all_episodes=yes&next_watch_info=yes";
-      const [moviesRes, showsRes, animeRes] = await Promise.all([
+      const [moviesResult, showsResult, animeResult] = await Promise.allSettled([
         this.simkl<unknown>(`/sync/all-items/movies/all${query}`, {}, accessToken),
         this.simkl<unknown>(`/sync/all-items/shows/all${query}`, {}, accessToken),
         this.simkl<unknown>(`/sync/all-items/anime/all${query}`, {}, accessToken)
       ]);
+      const complete = moviesResult.status === "fulfilled" &&
+        showsResult.status === "fulfilled" && animeResult.status === "fulfilled";
+      if (complete) this.lastSnapshotFailureAt = 0;
+      else this.lastSnapshotFailureAt = Date.now();
+
       return {
         scope,
-        activity: marker,
+        activity: complete ? marker : cached?.activity ?? null,
         checkedAt: Date.now(),
-        movies: extractItems<SimklMovieRow>(moviesRes, "movies"),
-        shows: extractItems<SimklShowRow>(showsRes, "shows"),
-        anime: extractItems<SimklShowRow>(animeRes, "anime")
+        complete,
+        movies: moviesResult.status === "fulfilled"
+          ? extractItems<SimklMovieRow>(moviesResult.value, "movies")
+          : cached?.movies ?? [],
+        shows: showsResult.status === "fulfilled"
+          ? extractItems<SimklShowRow>(showsResult.value, "shows")
+          : cached?.shows ?? [],
+        anime: animeResult.status === "fulfilled"
+          ? extractItems<SimklShowRow>(animeResult.value, "anime")
+          : cached?.anime ?? []
       };
     })();
     this.snapshotPromise = request;
@@ -362,7 +390,7 @@ export class SimklClient implements SyncClient {
     ));
   }
 
-  private async resolveMedia<T extends { ids?: SimklIds }>(
+  private async resolveMedia<T extends { ids?: SimklIds; title?: string; year?: number }>(
     media: T | undefined,
     mediaType: "movie" | "tv"
   ): Promise<T | undefined> {
@@ -371,7 +399,9 @@ export class SimklClient implements SyncClient {
       mediaType,
       id: null,
       tmdbId: null,
-      imdbId: media.ids?.imdb ?? null
+      imdbId: media.ids?.imdb ?? null,
+      title: media.title ?? null,
+      year: media.year ?? null
     });
     return tmdbId ? { ...media, ids: { ...media.ids, tmdb: tmdbId } } : media;
   }

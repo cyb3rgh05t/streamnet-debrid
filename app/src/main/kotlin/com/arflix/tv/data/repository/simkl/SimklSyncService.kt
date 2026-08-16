@@ -22,10 +22,13 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
+import java.text.Normalizer
 import javax.inject.Inject
 import javax.inject.Singleton
 import java.time.Instant
+import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 @Singleton
 class SimklSyncService @Inject constructor(
@@ -33,6 +36,13 @@ class SimklSyncService @Inject constructor(
     private val authManager: SimklAuthManager,
     private val tmdbApi: TmdbApi
 ) {
+    companion object {
+        private const val SNAPSHOT_TTL_MS = 15 * 60 * 1000L
+        private const val FAILED_SYNC_BACKOFF_MS = 60 * 1000L
+        private val DIACRITICS_REGEX = Regex("\\p{M}+")
+        private val NON_ALPHA_NUM_REGEX = Regex("[^a-z0-9]+")
+    }
+
     private val clientId: String get() = Constants.SIMKL_CLIENT_ID
 
     private val syncMutex = Mutex()
@@ -40,6 +50,12 @@ class SimklSyncService @Inject constructor(
     private var hasInitialSnapshot = false
     private var lastActivityTimestamp: String? = null
     private var lastActivityCheckTime: Long = 0L
+    private var lastSyncAttemptTime: Long = 0L
+
+    private var snapshotMovies: SimklAllItemsResponse? = null
+    private var snapshotShows: SimklAllItemsResponse? = null
+    private var snapshotAnime: SimklAllItemsResponse? = null
+    private var snapshotPlayback: List<com.arflix.tv.data.api.SimklPlaybackItem>? = null
 
     private val cachedWatchedMovies = mutableSetOf<Int>()
     private val cachedWatchedEpisodes = mutableSetOf<String>()
@@ -47,7 +63,6 @@ class SimklSyncService @Inject constructor(
     private val cachedContinueWatching = mutableMapOf<Pair<MediaType, Int>, ContinueWatchingItem>()
     private val cachedLibraryItems = mutableMapOf<String, LinkedHashMap<Pair<MediaType, Int>, MediaItem>>()
     private val resolvedExternalIds = ConcurrentHashMap<String, Int>()
-    private val unresolvedExternalIds = ConcurrentHashMap.newKeySet<String>()
 
     private fun episodeKey(tmdbId: Int, season: Int, episode: Int): String =
         "show_tmdb:$tmdbId:$season:$episode"
@@ -56,7 +71,7 @@ class SimklSyncService @Inject constructor(
 
     /**
      * Follows official Simkl sync guidelines:
-     * Phase 1: Fetch libraries separately and sequentially without date_from on initial load.
+     * Phase 1: Fetch libraries separately without date_from on initial load.
      * Phase 2: Check /sync/activities first. If timestamp changed, fetch delta using /sync/all-items/?date_from=...
      * Throttles background checks to once every 15 minutes unless forced.
      */
@@ -74,9 +89,13 @@ class SimklSyncService @Inject constructor(
         val authHeader = "Bearer $token"
 
         val now = System.currentTimeMillis()
-        if (!force && hasInitialSnapshot && now - lastActivityCheckTime < 15 * 60 * 1000L) {
+        if (!force && hasInitialSnapshot && now - lastActivityCheckTime < SNAPSHOT_TTL_MS) {
             return@withLock
         }
+        if (!force && now - lastSyncAttemptTime < FAILED_SYNC_BACKOFF_MS) {
+            return@withLock
+        }
+        lastSyncAttemptTime = now
 
         try {
             val activities = simklApi.getActivities(authHeader, clientId)
@@ -87,46 +106,101 @@ class SimklSyncService @Inject constructor(
 
             if (force || !hasInitialSnapshot || currentActivityDate != lastActivityTimestamp) {
                 AppLogger.d("SimklSyncService", "Refreshing complete Simkl snapshot")
-                refreshSnapshot(authHeader)
-                hasInitialSnapshot = true
-                lastActivityTimestamp = currentActivityDate
+                val outcome = refreshSnapshot(authHeader)
+                hasInitialSnapshot = outcome.hasUsableSnapshot
+                if (outcome.complete) {
+                    lastActivityTimestamp = currentActivityDate
+                    lastActivityCheckTime = now
+                } else {
+                    // Keep partial/previous data visible and retry after the short failure backoff.
+                    lastActivityCheckTime = 0L
+                }
             } else {
                 AppLogger.d("SimklSyncService", "Simkl activities unchanged ($currentActivityDate). Skipping sync.")
+                lastActivityCheckTime = now
             }
-            lastActivityCheckTime = now
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            lastActivityCheckTime = 0L
             AppLogger.e("SimklSyncService", "Error during Simkl sync: ${e.message}")
         }
     }
 
-    private suspend fun refreshSnapshot(authHeader: String) = coroutineScope {
-        val movies = async { simklApi.getAllItems(authHeader, clientId, "movies") }
-        val shows = async { simklApi.getAllItems(authHeader, clientId, "shows") }
-        val anime = async { simklApi.getAllItems(authHeader, clientId, "anime") }
-        val playback = async {
-            runCatching { simklApi.getPlayback(authHeader, clientId) }
-                .onFailure { AppLogger.e("SimklSyncService", "Playback sync failed: ${it.message}") }
-                .getOrDefault(emptyList())
+    private data class SnapshotFetch<T>(val value: T?, val succeeded: Boolean)
+
+    private data class SnapshotRefreshOutcome(
+        val hasUsableSnapshot: Boolean,
+        val complete: Boolean
+    )
+
+    private suspend fun <T> fetchSnapshotPart(label: String, block: suspend () -> T): SnapshotFetch<T> {
+        return try {
+            SnapshotFetch(block(), true)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.e("SimklSyncService", "$label sync failed: ${e.message}")
+            SnapshotFetch(null, false)
         }
-        val stagedMovies = movies.await()
-        val stagedShows = shows.await()
-        val stagedAnime = anime.await()
-        val stagedPlayback = playback.await()
+    }
 
-        resolveMissingTmdbIds(stagedMovies, stagedShows, stagedAnime, stagedPlayback)
+    private suspend fun refreshSnapshot(authHeader: String): SnapshotRefreshOutcome = coroutineScope {
+        val moviesRequest = async {
+            fetchSnapshotPart("Movies") { simklApi.getAllItems(authHeader, clientId, "movies") }
+        }
+        val showsRequest = async {
+            fetchSnapshotPart("Shows") { simklApi.getAllItems(authHeader, clientId, "shows") }
+        }
+        val animeRequest = async {
+            fetchSnapshotPart("Anime") { simklApi.getAllItems(authHeader, clientId, "anime") }
+        }
+        val playbackRequest = async {
+            fetchSnapshotPart("Playback") { simklApi.getPlayback(authHeader, clientId) }
+        }
 
+        val movies = moviesRequest.await()
+        val shows = showsRequest.await()
+        val anime = animeRequest.await()
+        val playback = playbackRequest.await()
+
+        if (movies.succeeded) snapshotMovies = movies.value
+        if (shows.succeeded) snapshotShows = shows.value
+        if (anime.succeeded) snapshotAnime = anime.value
+        if (playback.succeeded) snapshotPlayback = playback.value
+
+        val stagedMovies = snapshotMovies ?: SimklAllItemsResponse()
+        val stagedShows = snapshotShows ?: SimklAllItemsResponse()
+        val stagedAnime = snapshotAnime ?: SimklAllItemsResponse()
+        val stagedPlayback = snapshotPlayback.orEmpty()
+        val hasUsableSnapshot = snapshotMovies != null || snapshotShows != null ||
+            snapshotAnime != null || snapshotPlayback != null
+
+        if (hasUsableSnapshot) {
+            resolveMissingTmdbIds(stagedMovies, stagedShows, stagedAnime, stagedPlayback)
+            rebuildCaches(stagedMovies, stagedShows, stagedAnime, stagedPlayback)
+        }
+
+        SnapshotRefreshOutcome(
+            hasUsableSnapshot = hasUsableSnapshot,
+            complete = movies.succeeded && shows.succeeded && anime.succeeded
+        )
+    }
+
+    private fun rebuildCaches(
+        movies: SimklAllItemsResponse,
+        shows: SimklAllItemsResponse,
+        anime: SimklAllItemsResponse,
+        playback: List<com.arflix.tv.data.api.SimklPlaybackItem>
+    ) {
         cachedWatchedMovies.clear()
         cachedWatchedEpisodes.clear()
         cachedWatchlist.clear()
         cachedContinueWatching.clear()
         cachedLibraryItems.clear()
-        processMoviesResponse(stagedMovies)
-        processShowsResponse(stagedShows)
-        processShowsResponse(stagedAnime)
-        processPlayback(stagedPlayback)
+        processMoviesResponse(movies)
+        processShowsResponse(shows)
+        processShowsResponse(anime)
+        processPlayback(playback)
     }
 
     private fun clearCachedState() {
@@ -134,6 +208,11 @@ class SimklSyncService @Inject constructor(
         hasInitialSnapshot = false
         lastActivityTimestamp = null
         lastActivityCheckTime = 0L
+        lastSyncAttemptTime = 0L
+        snapshotMovies = null
+        snapshotShows = null
+        snapshotAnime = null
+        snapshotPlayback = null
         cachedWatchedMovies.clear()
         cachedWatchedEpisodes.clear()
         cachedWatchlist.clear()
@@ -144,7 +223,7 @@ class SimklSyncService @Inject constructor(
     private fun processMoviesResponse(response: SimklAllItemsResponse) {
         response.movies?.forEach { movieItem ->
             val movie = movieItem.movie ?: return@forEach
-            val tmdbId = resolvedTmdbId(movie.ids, MediaType.MOVIE) ?: return@forEach
+            val tmdbId = resolvedTmdbId(movie.ids, MediaType.MOVIE, movie.title, movie.year) ?: return@forEach
             val status = movieItem.status
             cacheLibraryItem(
                 status = status,
@@ -175,7 +254,7 @@ class SimklSyncService @Inject constructor(
         val allShows = (response.shows.orEmpty() + response.anime.orEmpty())
         allShows.forEach { showItem ->
             val show = showItem.show ?: return@forEach
-            val showTmdb = resolvedTmdbId(show.ids, MediaType.TV) ?: return@forEach
+            val showTmdb = resolvedTmdbId(show.ids, MediaType.TV, show.title, show.year) ?: return@forEach
             val status = showItem.status
             cacheLibraryItem(
                 status = status,
@@ -246,7 +325,7 @@ class SimklSyncService @Inject constructor(
         items.forEach { row ->
             val movie = row.movie
             if (movie != null) {
-                val tmdbId = resolvedTmdbId(movie.ids, MediaType.MOVIE) ?: return@forEach
+                val tmdbId = resolvedTmdbId(movie.ids, MediaType.MOVIE, movie.title, movie.year) ?: return@forEach
                 val progress = row.progress.toInt().coerceIn(0, 100)
                 val durationSeconds = movie.runtime?.times(60L) ?: 0L
                 cachedContinueWatching[MediaType.MOVIE to tmdbId] = ContinueWatchingItem(
@@ -263,7 +342,7 @@ class SimklSyncService @Inject constructor(
             }
 
             val show = row.show ?: row.anime ?: return@forEach
-            val tmdbId = resolvedTmdbId(show.ids, MediaType.TV) ?: return@forEach
+            val tmdbId = resolvedTmdbId(show.ids, MediaType.TV, show.title, show.year) ?: return@forEach
             val season = row.episode?.season ?: return@forEach
             val episode = row.episode.number ?: return@forEach
             val progress = row.progress.toInt().coerceIn(0, 100)
@@ -290,8 +369,29 @@ class SimklSyncService @Inject constructor(
         else -> null
     }
 
-    private fun resolvedTmdbId(ids: SimklIds, mediaType: MediaType): Int? =
-        ids.tmdb ?: externalKey(ids, mediaType)?.let(resolvedExternalIds::get)
+    private fun resolutionKey(
+        ids: SimklIds,
+        mediaType: MediaType,
+        title: String? = null,
+        year: Int? = null
+    ): String? = externalKey(ids, mediaType)
+        ?: ids.simkl?.let { "${mediaType.name}:simkl:$it" }
+        ?: normalizeTitle(title.orEmpty()).takeIf { it.isNotBlank() }
+            ?.let { "${mediaType.name}:title:$it:${year ?: 0}" }
+
+    private fun resolvedTmdbId(
+        ids: SimklIds,
+        mediaType: MediaType,
+        title: String? = null,
+        year: Int? = null
+    ): Int? = ids.tmdb ?: resolutionKey(ids, mediaType, title, year)?.let(resolvedExternalIds::get)
+
+    private data class TmdbResolutionCandidate(
+        val mediaType: MediaType,
+        val ids: SimklIds,
+        val title: String?,
+        val year: Int?
+    )
 
     private suspend fun resolveMissingTmdbIds(
         movies: SimklAllItemsResponse,
@@ -299,57 +399,149 @@ class SimklSyncService @Inject constructor(
         anime: SimklAllItemsResponse,
         playback: List<com.arflix.tv.data.api.SimklPlaybackItem>
     ) = coroutineScope {
-        if (Constants.TMDB_API_KEY.isBlank()) return@coroutineScope
-        val candidates = buildList<Pair<MediaType, SimklIds>> {
+        val candidates = buildList<TmdbResolutionCandidate> {
             movies.movies.orEmpty().mapNotNullTo(this) { row ->
-                row.movie?.ids?.let { MediaType.MOVIE to it }
+                row.movie?.let { TmdbResolutionCandidate(MediaType.MOVIE, it.ids, it.title, it.year) }
             }
             (shows.shows.orEmpty() + shows.anime.orEmpty() + anime.shows.orEmpty() + anime.anime.orEmpty())
-                .mapNotNullTo(this) { row -> row.show?.ids?.let { MediaType.TV to it } }
+                .mapNotNullTo(this) { row ->
+                    row.show?.let { TmdbResolutionCandidate(MediaType.TV, it.ids, it.title, it.year) }
+                }
             playback.forEach { row ->
-                row.movie?.ids?.let { add(MediaType.MOVIE to it) }
-                (row.show ?: row.anime)?.ids?.let { add(MediaType.TV to it) }
+                row.movie?.let { add(TmdbResolutionCandidate(MediaType.MOVIE, it.ids, it.title, it.year)) }
+                (row.show ?: row.anime)?.let {
+                    add(TmdbResolutionCandidate(MediaType.TV, it.ids, it.title, it.year))
+                }
             }
-        }.filter { (type, ids) ->
-            ids.tmdb == null && externalKey(ids, type)?.let { key ->
-                !resolvedExternalIds.containsKey(key) && !unresolvedExternalIds.contains(key)
-            } == true
-        }.distinctBy { (type, ids) -> externalKey(ids, type) }
+        }.filter { candidate ->
+            candidate.ids.tmdb == null && resolutionKey(
+                candidate.ids,
+                candidate.mediaType,
+                candidate.title,
+                candidate.year
+            )?.let { !resolvedExternalIds.containsKey(it) } == true
+        }.distinctBy { candidate ->
+            resolutionKey(candidate.ids, candidate.mediaType, candidate.title, candidate.year)
+        }
 
         val permits = Semaphore(6)
-        candidates.map { (mediaType, ids) ->
+        candidates.map { candidate ->
             async {
                 permits.withPermit {
-                    val key = externalKey(ids, mediaType) ?: return@withPermit
-                    val result = runCatching {
-                        when {
-                            !ids.imdb.isNullOrBlank() -> tmdbApi.findByExternalId(
-                                ids.imdb,
-                                Constants.TMDB_API_KEY,
-                                "imdb_id"
-                            )
-                            !ids.tvdb.isNullOrBlank() -> tmdbApi.findByExternalId(
-                                ids.tvdb,
-                                Constants.TMDB_API_KEY,
-                                "tvdb_id"
-                            )
-                            else -> null
-                        }
-                    }.getOrNull()
-                    val tmdbId = if (mediaType == MediaType.MOVIE) {
-                        result?.movieResults?.maxByOrNull { it.popularity }?.id
-                    } else {
-                        result?.tvResults?.maxByOrNull { it.popularity }?.id
-                    }?.takeIf { it > 0 }
+                    val key = resolutionKey(
+                        candidate.ids,
+                        candidate.mediaType,
+                        candidate.title,
+                        candidate.year
+                    ) ?: return@withPermit
+                    val tmdbId = resolveCandidate(candidate)
                     if (tmdbId != null) {
                         resolvedExternalIds[key] = tmdbId
-                    } else {
-                        unresolvedExternalIds.add(key)
                     }
                 }
             }
         }.forEach { it.await() }
     }
+
+    private suspend fun resolveCandidate(candidate: TmdbResolutionCandidate): Int? {
+        val externalMatch = try {
+            val result = when {
+                !candidate.ids.imdb.isNullOrBlank() -> tmdbApi.findByExternalId(
+                    candidate.ids.imdb,
+                    Constants.TMDB_API_KEY,
+                    "imdb_id"
+                )
+                !candidate.ids.tvdb.isNullOrBlank() -> tmdbApi.findByExternalId(
+                    candidate.ids.tvdb,
+                    Constants.TMDB_API_KEY,
+                    "tvdb_id"
+                )
+                else -> null
+            }
+            if (candidate.mediaType == MediaType.MOVIE) {
+                result?.movieResults?.maxByOrNull { it.popularity }?.id
+            } else {
+                result?.tvResults?.maxByOrNull { it.popularity }?.id
+            }?.takeIf { it > 0 }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        if (externalMatch != null) return externalMatch
+
+        val title = candidate.title?.trim().orEmpty()
+        if (title.isBlank()) return null
+        return searchTmdbCandidate(candidate, constrainYear = true)
+            ?: candidate.year?.let { searchTmdbCandidate(candidate, constrainYear = false) }
+    }
+
+    private suspend fun searchTmdbCandidate(
+        candidate: TmdbResolutionCandidate,
+        constrainYear: Boolean
+    ): Int? {
+        val title = candidate.title?.trim().orEmpty()
+        if (title.isBlank()) return null
+        val year = candidate.year.takeIf { constrainYear }
+        val results = try {
+            when (candidate.mediaType) {
+                MediaType.MOVIE -> tmdbApi.searchMovies(
+                    apiKey = Constants.TMDB_API_KEY,
+                    query = title,
+                    page = 1,
+                    primaryReleaseYear = year,
+                    year = year
+                ).results
+                MediaType.TV -> tmdbApi.searchTv(
+                    apiKey = Constants.TMDB_API_KEY,
+                    query = title,
+                    page = 1,
+                    firstAirDateYear = year
+                ).results
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            return null
+        }
+
+        val requestedTitle = normalizeTitle(title)
+        return results.map { result ->
+            val titleScore = listOfNotNull(
+                result.title,
+                result.name,
+                result.originalTitle,
+                result.originalName
+            ).maxOfOrNull { candidateTitle ->
+                val normalized = normalizeTitle(candidateTitle)
+                when {
+                    normalized == requestedTitle -> 120
+                    normalized.isNotBlank() && requestedTitle.isNotBlank() &&
+                        (normalized in requestedTitle || requestedTitle in normalized) -> 60
+                    else -> 0
+                }
+            } ?: 0
+            val resultYear = (result.releaseDate ?: result.firstAirDate)?.take(4)?.toIntOrNull()
+            val yearScore = when {
+                candidate.year == null || resultYear == null -> 0
+                candidate.year == resultYear -> 35
+                abs(candidate.year - resultYear) == 1 -> 15
+                else -> -70
+            }
+            result to (titleScore + yearScore + result.popularity.toInt().coerceIn(0, 20))
+        }.maxByOrNull { it.second }
+            ?.takeIf { it.second >= 85 }
+            ?.first
+            ?.id
+            ?.takeIf { it > 0 }
+    }
+
+    private fun normalizeTitle(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFD)
+        .replace(DIACRITICS_REGEX, "")
+        .lowercase(Locale.US)
+        .replace("&", " and ")
+        .replace(NON_ALPHA_NUM_REGEX, " ")
+        .trim()
 
     private fun parseTimestamp(value: String?): Long = runCatching {
         value?.let(Instant::parse)?.toEpochMilli()
@@ -603,8 +795,12 @@ class SimklSyncService @Inject constructor(
         return try {
             val playback = simklApi.getPlayback(authHeader, clientId)
             val matches = playback.filter { row ->
-                val ids = if (mediaType == MediaType.MOVIE) row.movie?.ids else (row.show ?: row.anime)?.ids
-                if (resolvedTmdbId(ids ?: return@filter false, mediaType) != tmdbId) return@filter false
+                val resolvedId = if (mediaType == MediaType.MOVIE) {
+                    row.movie?.let { resolvedTmdbId(it.ids, mediaType, it.title, it.year) }
+                } else {
+                    (row.show ?: row.anime)?.let { resolvedTmdbId(it.ids, mediaType, it.title, it.year) }
+                }
+                if (resolvedId != tmdbId) return@filter false
                 if (mediaType == MediaType.MOVIE) return@filter true
                 val rowEpisode = row.episode ?: return@filter false
                 (season == null || rowEpisode.season == season) &&

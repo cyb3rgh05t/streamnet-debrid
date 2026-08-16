@@ -11,6 +11,8 @@ type TmdbItem = {
   id: number;
   title?: string;
   name?: string;
+  original_title?: string;
+  original_name?: string;
   overview?: string;
   poster_path?: string | null;
   backdrop_path?: string | null;
@@ -693,6 +695,8 @@ export function resolveTmdbId(item: {
   id?: number | null;
   tmdbId?: number | null;
   imdbId?: string | null;
+  title?: string | null;
+  year?: number | string | null;
 }): Promise<number | null> {
   const directId = item.tmdbId && item.tmdbId > 0
     ? item.tmdbId
@@ -702,19 +706,62 @@ export function resolveTmdbId(item: {
   if (directId) return Promise.resolve(directId);
 
   const imdbId = item.imdbId?.trim().toLowerCase();
-  if (!imdbId || !/^tt\d+$/.test(imdbId)) return Promise.resolve(null);
-  const cacheKey = `${item.mediaType}:${imdbId}`;
+  const title = item.title?.trim() ?? "";
+  const year = typeof item.year === "number" ? item.year : Number(item.year) || null;
+  const normalizedTitle = normalizeLookupTitle(title);
+  if ((!imdbId || !/^tt\d+$/.test(imdbId)) && !normalizedTitle) return Promise.resolve(null);
+  const cacheKey = imdbId && /^tt\d+$/.test(imdbId)
+    ? `${item.mediaType}:imdb:${imdbId}`
+    : `${item.mediaType}:title:${normalizedTitle}:${year ?? 0}`;
   const cached = externalTmdbIdCache.get(cacheKey);
   if (cached) return cached;
 
-  const request = tmdb<TmdbExternalFind>(`find/${imdbId}`, { external_source: "imdb_id" })
-    .then((payload) => {
-      const results = item.mediaType === "tv" ? payload.tv_results : payload.movie_results;
-      return results?.[0]?.id ?? null;
-    })
-    .catch(() => null);
+  const request = (async () => {
+    if (imdbId && /^tt\d+$/.test(imdbId)) {
+      const payload = await tmdb<TmdbExternalFind>(`find/${imdbId}`, { external_source: "imdb_id" })
+        .catch(() => null);
+      const externalResults = item.mediaType === "tv" ? payload?.tv_results : payload?.movie_results;
+      const externalId = externalResults?.[0]?.id;
+      if (externalId) return externalId;
+    }
+    if (!normalizedTitle) return null;
+
+    const path = item.mediaType === "tv" ? "search/tv" : "search/movie";
+    const yearParam = item.mediaType === "tv" ? "first_air_date_year" : "primary_release_year";
+    const search = await tmdb<TmdbList>(path, {
+      query: title,
+      ...(year ? { [yearParam]: year } : {})
+    }).catch(() => null);
+    const best = search?.results.map((candidate) => {
+      const titleScore = [candidate.title, candidate.name, candidate.original_title, candidate.original_name]
+        .filter((value): value is string => Boolean(value))
+        .reduce((score, value) => {
+          const normalized = normalizeLookupTitle(value);
+          if (normalized === normalizedTitle) return Math.max(score, 120);
+          if (normalized && (normalized.includes(normalizedTitle) || normalizedTitle.includes(normalized))) {
+            return Math.max(score, 60);
+          }
+          return score;
+        }, 0);
+      const candidateYear = Number(yearFrom(candidate.release_date ?? candidate.first_air_date)) || null;
+      const yearScore = !year || !candidateYear ? 0
+        : year === candidateYear ? 35
+          : Math.abs(year - candidateYear) === 1 ? 15 : -70;
+      return { candidate, score: titleScore + yearScore };
+    }).sort((a, b) => b.score - a.score)[0];
+    return best && best.score >= 85 ? best.candidate.id : null;
+  })().catch(() => null);
   externalTmdbIdCache.set(cacheKey, request);
   return request;
+}
+
+function normalizeLookupTitle(value: string): string {
+  return value.normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 type CinemetaSeries = {

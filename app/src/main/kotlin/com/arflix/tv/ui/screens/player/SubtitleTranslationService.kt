@@ -32,8 +32,17 @@ private val BLOCKED_FINISH_REASONS = setOf(
     "PROHIBITED_CONTENT", "SAFETY", "RECITATION", "BLOCKLIST", "SPII"
 )
 
-private const val GROQ_MODEL_ID = "llama-3.3-70b-versatile"
+// llama-3.3-70b-versatile was decommissioned by Groq (August 16, 2026). gpt-oss-120b is Groq's
+// recommended replacement: ~500 tok/s (vs 280), same 30 RPM free tier, 2x the daily token budget.
+// It is a reasoning model — see GROQ_REASONING_EFFORT below.
+private const val GROQ_MODEL_ID = "openai/gpt-oss-120b"
 private const val GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+// gpt-oss cannot disable reasoning entirely (unlike Gemini's thinkingLevel=minimal or Qwen's
+// reasoning_effort=none) — "low" is the floor. Anything higher spends seconds of thinking on what
+// is a mechanical translation, which subtitles can't wait for. "hidden" keeps the chain-of-thought
+// out of message.content so extractJsonArray() doesn't have to parse around it.
+private const val GROQ_REASONING_EFFORT = "low"
+private const val GROQ_REASONING_FORMAT = "hidden"
 // gemini-2.5-flash was retired by Google (HTTP 404 "no longer available", July 2026).
 // gemini-3.5-flash-lite: ~2x throughput (350 vs 165 tok/s) and ~3.5x cheaper than 3.5-flash,
 // positioned by Google for high-volume translation. Same v1beta API + thinkingLevel field.
@@ -172,6 +181,8 @@ class SubtitleTranslationService(
         val body = JSONObject().apply {
             put("model", GROQ_MODEL_ID)
             put("temperature", 0.1)
+            put("reasoning_effort", GROQ_REASONING_EFFORT)
+            put("reasoning_format", GROQ_REASONING_FORMAT)
             put("messages", JSONArray().apply {
                 put(JSONObject().apply {
                     put("role", "system")

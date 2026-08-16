@@ -27,7 +27,7 @@ context.
 | Auto Find Best Subtitle Match | `subtitle_ai_find_best_match` | `false` | Auto-runs the scan on playback. **AI-independent** (works with no API key). Off by default — users opt in. Key name kept for backward compat. |
 | AI subtitle translation (master) | `subtitle_ai_enabled` | `false` | Enables AI features: translation option in menu, AI interim during scans, hearing fallback. |
 | Auto-Select AI Translation | `subtitle_ai_auto_select` | `false` | Allows AI translation to activate **automatically** (incl. as the scan's on-screen interim). |
-| Model | `subtitle_ai_model` | `GROQ_LLAMA_70B` | Groq or Gemini for batch translation. **Hearing requires Gemini.** |
+| Model | `subtitle_ai_model` | `GROQ_LLAMA_70B` | Groq (`openai/gpt-oss-120b` — the enum name is historical) or Gemini for batch translation. **Hearing requires Gemini.** |
 | API key | `subtitle_ai_api_key` (global) | — | One key used for both batch translation and Gemini Live. |
 
 All of the above (except profile-scoped language) sync via `CloudSyncRepository`

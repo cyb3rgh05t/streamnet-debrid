@@ -2970,25 +2970,30 @@ class StreamRepository @Inject constructor(
         onPendingAddons: ((List<String>) -> Unit)? = null
     ): List<Subtitle> = withContext(Dispatchers.IO) {
         val allAddons = installedAddons.first()
-        // Include:
-        // - Addons classified as AddonType.SUBTITLE (OpenSubtitles and, going forward,
-        //   any user-added pure-subtitle addon like Wizdom/Ktuvit now that addCustomAddon
-        //   classifies them correctly).
-        // - Addons classified as CUSTOM whose manifest declares a `subtitles` resource.
-        //   This covers two cases: (a) addons installed before the classification fix
-        //   landed, which are still stored as CUSTOM; (b) hybrid addons that provide
-        //   both streams and subtitles. Both should be queried for subtitles.
+        // Selection is by CAPABILITY, not by AddonType. The old gate accepted only SUBTITLE, or
+        // CUSTOM-with-a-`subtitles`-manifest, and silently dropped everything else — which made
+        // whole addons invisible depending on *how they were installed*:
+        //   - the web installer stamps type=COMMUNITY on anything that isn't subtitle-only
+        //     (web/lib/addons.ts), and COMMUNITY was never queried at all;
+        //   - a cloud/legacy payload with no cached manifest parses back as CUSTOM + manifest=null
+        //     (parseAddons defaults the type), which failed the manifest check.
+        // Either way the symptom is identical and confusing: the addon is installed and enabled,
+        // shows in the addon list, and yet contributes zero subtitles — while OpenSubtitles
+        // (hardcoded SUBTITLE) keeps working, so it looks like "only OpenSubtitles loads".
         // Fixes issue #80.
+        val speculativeAddonIds = mutableSetOf<String>()
         val subtitleAddons = allAddons.filter { addon ->
             if (!addon.isInstalled || !addon.isEnabled) return@filter false
             if (addon.type == AddonType.SUBTITLE) return@filter true
-            if (addon.type == AddonType.CUSTOM) {
-                val declaresSubtitles = addon.manifest?.resources?.any { res ->
-                    res.name.equals("subtitles", ignoreCase = true)
-                } == true
-                return@filter declaresSubtitles
+            val declared = addon.manifest?.resources.orEmpty()
+            if (declared.isNotEmpty()) {
+                return@filter declared.any { res -> res.name.equals("subtitles", ignoreCase = true) }
             }
-            false
+            // No manifest cached — capability unknown. Ask anyway (a stream-only addon just 404s
+            // or returns an empty list) rather than dropping a possibly-working subtitle provider.
+            // These are marked speculative so they don't pay the cold-start retry below.
+            speculativeAddonIds += addon.id
+            addon.type == AddonType.CUSTOM || addon.type == AddonType.COMMUNITY
         }
 
         val videoHash = stream?.behaviorHints?.videoHash?.trim().takeUnless { it.isNullOrBlank() }
@@ -3044,8 +3049,10 @@ class StreamRepository @Inject constructor(
 
                 // Aggregator endpoints (AIOStreams) often hang or 502 on the first (cold) hit and
                 // succeed once their upstream fan-out is warm — one retry recovers those.
+                // Speculative addons (queried without a manifest, capability unknown) are expected
+                // to come back empty, so they don't get to spend another 1.5s proving it.
                 var subs = attempt()
-                if (subs.isEmpty()) {
+                if (subs.isEmpty() && addon.id !in speculativeAddonIds) {
                     delay(1_500)
                     subs = attempt()
                 }

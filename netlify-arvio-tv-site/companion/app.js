@@ -829,7 +829,7 @@ async function renderAI() {
         <label class="model-card ${model==='GROQ_LLAMA_70B'?'selected':''}">
           <input type="radio" name="ai-model" value="GROQ_LLAMA_70B" ${model==='GROQ_LLAMA_70B'?'checked':''} onchange="updateAISetting('subtitleAiModel',this.value)">
           <div>
-            <div class="model-name">⚡ Groq Llama 70B <span class="badge badge-gold" style="font-size:10px">${t('ai_recommended')}</span></div>
+            <div class="model-name">⚡ Groq GPT-OSS 120B <span class="badge badge-gold" style="font-size:10px">${t('ai_recommended')}</span></div>
             <div class="model-desc">${t('ai_groq_desc')}</div>
           </div>
         </label>
