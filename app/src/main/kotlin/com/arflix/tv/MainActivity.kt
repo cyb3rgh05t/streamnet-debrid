@@ -109,6 +109,11 @@ import com.arflix.tv.navigation.Screen
 import com.arflix.tv.ui.screens.login.LoginScreen
 import com.arflix.tv.ui.startup.StartupViewModel
 import com.arflix.tv.ui.theme.ArflixTvTheme
+import com.arflix.tv.updater.AppUpdateRepository
+import com.arflix.tv.updater.UpdatePreferences
+import com.arflix.tv.updater.UpdateStatus
+import com.arflix.tv.updater.UpdateStatusManager
+import com.arflix.tv.updater.VersionUtils
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.worker.TraktSyncWorker
@@ -165,7 +170,17 @@ class MainActivity : ComponentActivity() {
     @Inject
     lateinit var iptvRepository: Lazy<com.arflix.tv.data.repository.IptvRepository>
 
+    @Inject
+    lateinit var appUpdateRepository: AppUpdateRepository
+
+    @Inject
+    lateinit var updatePreferences: UpdatePreferences
+
+    @Inject
+    lateinit var updateStatusManager: UpdateStatusManager
+
     private var jankStats: JankStats? = null
+    private var automaticUpdateCheckJob: kotlinx.coroutines.Job? = null
     private var pendingLauncherRequest by mutableStateOf<LauncherContinueWatchingRequest?>(null)
     private var pendingInstallPackUrl by mutableStateOf<String?>(null)
 
@@ -413,6 +428,33 @@ class MainActivity : ComponentActivity() {
         pendingInstallPackUrl = parseInstallPackUrl(intent)
     }
 
+    override fun onResume() {
+        super.onResume()
+        checkForAppUpdateIfDue()
+    }
+
+    private fun checkForAppUpdateIfDue() {
+        if (!appUpdateRepository.supportsSelfUpdate()) return
+        if (automaticUpdateCheckJob?.isActive == true) return
+        if (updateStatusManager.status.value !is UpdateStatus.Idle) return
+
+        automaticUpdateCheckJob = lifecycleScope.launch {
+            val lastCheckAtMs = updatePreferences.lastCheckAtMs.first()
+            if (System.currentTimeMillis() - lastCheckAtMs < APP_UPDATE_CHECK_INTERVAL_MS) {
+                return@launch
+            }
+
+            val result = appUpdateRepository.getLatestUpdate()
+            updatePreferences.setLastCheckAtMs(System.currentTimeMillis())
+            result.onSuccess { update ->
+                val installedVersion = appUpdateRepository.getInstalledVersionName()
+                if (VersionUtils.isRemoteNewer(update.tag, installedVersion)) {
+                    updateStatusManager.updateStatus(UpdateStatus.UpdateAvailable(update))
+                }
+            }
+        }
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
@@ -431,6 +473,10 @@ class MainActivity : ComponentActivity() {
         jankStats?.isTrackingEnabled = false
         jankStats = null
         super.onDestroy()
+    }
+
+    companion object {
+        private const val APP_UPDATE_CHECK_INTERVAL_MS = 60L * 60L * 1000L
     }
 }
 

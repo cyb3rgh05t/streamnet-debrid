@@ -1159,6 +1159,7 @@ fun HomeScreen(
         val currentBackdrop = displayHeroItem?.let { item ->
             when {
                 viewModel.isIptvItem(item) -> iptvHeroBackdrop
+                    ?: "android.resource://${context.packageName}/${R.drawable.live_tv_theatre_fanart}"
                 viewModel.isCollectionItem(item) -> viewModel.getCollectionHeroImageUrl(item) ?: item.image
                 else -> item.backdrop ?: item.image
             }

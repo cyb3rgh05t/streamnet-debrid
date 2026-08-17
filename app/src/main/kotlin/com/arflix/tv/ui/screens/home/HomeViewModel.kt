@@ -2209,12 +2209,6 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        // Check for updates shortly after startup
-        viewModelScope.launch {
-            delay(if (isLowRamDevice) 15_000L else 10_000L)
-            checkForAppUpdates(silent = true)
-        }
-
     }
 
     /**

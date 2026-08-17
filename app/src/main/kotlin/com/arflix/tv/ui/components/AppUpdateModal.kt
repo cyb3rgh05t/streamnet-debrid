@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -125,6 +126,7 @@ fun AppUpdateModal(
     val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
     val update = status.updateOrNull()
     val cardShape = RoundedCornerShape(12.dp)
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -143,16 +145,22 @@ fun AppUpdateModal(
         )
     ) {
         ModalScrim(onDismiss = onDismiss) {
+            BoxWithConstraints(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center,
+            ) {
             Column(
                 modifier = Modifier
                     .then(
-                        if (LocalDeviceType.current.isTouchDevice()) Modifier.fillMaxWidth(0.92f).widthIn(max = 600.dp)
+                        if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 600.dp)
                         else Modifier.width(760.dp)
                     )
+                    .heightIn(max = if (isTouchDevice) maxHeight * 0.92f else maxHeight)
                     .clip(cardShape)
                     .background(ArvioSkin.colors.surface)
                     .border(1.dp, accent.copy(alpha = 0.38f), cardShape)
-                    .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 28.dp)
+                    .then(if (isTouchDevice) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .padding(if (isTouchDevice) 16.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -224,31 +232,23 @@ fun AppUpdateModal(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 if (update != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(ArvioSkin.colors.background.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
-                            .padding(horizontal = 16.dp, vertical = 13.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        VersionBlock(
-                            label = stringResource(R.string.update_installed_version),
-                            value = BuildConfig.VERSION_NAME,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = null,
-                            tint = accent,
-                            modifier = Modifier.padding(horizontal = 14.dp).size(20.dp),
-                        )
-                        VersionBlock(
-                            label = stringResource(R.string.update_available_version),
-                            value = update.tag,
-                            valueColor = accent,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Column(horizontalAlignment = Alignment.End) {
+                    if (isTouchDevice) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(ArvioSkin.colors.background.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            VersionBlock(
+                                label = stringResource(R.string.update_installed_version),
+                                value = BuildConfig.VERSION_NAME,
+                            )
+                            VersionBlock(
+                                label = stringResource(R.string.update_available_version),
+                                value = update.tag,
+                                valueColor = accent,
+                            )
                             androidx.compose.material3.Text(
                                 text = update.assetName,
                                 style = ArflixTypography.caption,
@@ -260,6 +260,46 @@ fun AppUpdateModal(
                                     style = ArflixTypography.badge,
                                     color = ArvioSkin.colors.textMuted,
                                 )
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(ArvioSkin.colors.background.copy(alpha = 0.72f), RoundedCornerShape(10.dp))
+                                .padding(horizontal = 16.dp, vertical = 13.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            VersionBlock(
+                                label = stringResource(R.string.update_installed_version),
+                                value = BuildConfig.VERSION_NAME,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = null,
+                                tint = accent,
+                                modifier = Modifier.padding(horizontal = 14.dp).size(20.dp),
+                            )
+                            VersionBlock(
+                                label = stringResource(R.string.update_available_version),
+                                value = update.tag,
+                                valueColor = accent,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Column(horizontalAlignment = Alignment.End) {
+                                androidx.compose.material3.Text(
+                                    text = update.assetName,
+                                    style = ArflixTypography.caption,
+                                    color = ArvioSkin.colors.textMuted,
+                                )
+                                update.assetSizeBytes?.let { size ->
+                                    androidx.compose.material3.Text(
+                                        text = formatUpdateSize(size),
+                                        style = ArflixTypography.badge,
+                                        color = ArvioSkin.colors.textMuted,
+                                    )
+                                }
                             }
                         }
                     }
@@ -317,7 +357,11 @@ fun AppUpdateModal(
                                     text = status.update.notes.take(1800),
                                     style = ArflixTypography.caption.copy(lineHeight = 18.sp),
                                     color = ArvioSkin.colors.textMuted,
-                                    modifier = Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState()),
+                                    modifier = if (isTouchDevice) {
+                                        Modifier
+                                    } else {
+                                        Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState())
+                                    },
                                 )
                             }
                         }
@@ -327,20 +371,40 @@ fun AppUpdateModal(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-                ) {
-                    buttons.forEachIndexed { index, btn ->
-                        UpdateActionButton(
-                            label = btn.label,
-                            isFocused = focusedIndex == index,
-                            onClick = btn.action,
-                            highlighted = btn.highlighted,
-                            enabled = btn.enabled
-                        )
+                if (isTouchDevice) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        buttons.indices.reversed().forEach { index ->
+                            val btn = buttons[index]
+                            UpdateActionButton(
+                                label = btn.label,
+                                isFocused = focusedIndex == index,
+                                onClick = btn.action,
+                                highlighted = btn.highlighted,
+                                enabled = btn.enabled,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
+                    ) {
+                        buttons.forEachIndexed { index, btn ->
+                            UpdateActionButton(
+                                label = btn.label,
+                                isFocused = focusedIndex == index,
+                                onClick = btn.action,
+                                highlighted = btn.highlighted,
+                                enabled = btn.enabled
+                            )
+                        }
                     }
                 }
+            }
             }
         }
     }
@@ -382,7 +446,8 @@ private fun UpdateActionButton(
     isFocused: Boolean,
     onClick: () -> Unit,
     highlighted: Boolean = false,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
 ) {
     val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
     val background = when {
@@ -399,7 +464,7 @@ private fun UpdateActionButton(
     }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(RoundedCornerShape(10.dp))
             .background(background)
             .border(
