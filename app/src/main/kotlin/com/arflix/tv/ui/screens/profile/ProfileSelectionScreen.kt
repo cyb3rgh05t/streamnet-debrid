@@ -92,8 +92,15 @@ fun ProfileSelectionScreen(
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
-    // Navigate when activeProfile changes after user selection
-    LaunchedEffect(uiState.activeProfile?.id, uiState.isSwitchingProfile) {
+    // Navigate after the user picks a profile.
+    // `navigateTriggered` MUST be a key. Keying only on the uiState values meant the tap itself
+    // never re-evaluated this, so navigation depended on *observing* a change in one of them —
+    // and re-selecting the already-active profile changes neither: activeProfile.id stays put,
+    // and isSwitchingProfile goes true→false inside a single frame, which the StateFlow conflates
+    // away before Compose ever reads it. The effect then never restarted and the tap did nothing,
+    // until some unrelated hitch let a frame land mid-switch. (Re-selecting the active profile
+    // became fast enough to hit this when d9e49b10 dropped its setActiveProfile disk write.)
+    LaunchedEffect(navigateTriggered, uiState.activeProfile?.id, uiState.isSwitchingProfile) {
         if (
             navigateTriggered &&
             uiState.activeProfile != null &&
