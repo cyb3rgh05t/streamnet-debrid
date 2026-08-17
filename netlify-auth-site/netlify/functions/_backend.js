@@ -21,11 +21,12 @@ let pool;
 function getPool() {
   if (pool) return pool;
   const connectionString =
+    process.env.ARVIO_DATABASE_URL ||
     process.env.NETLIFY_DB_URL ||
     process.env.NETLIFY_DATABASE_URL ||
     process.env.DATABASE_URL;
   if (!connectionString) {
-    throw new Error("NETLIFY_DB_URL is not configured");
+    throw new Error("ARVIO_DATABASE_URL is not configured");
   }
   pool = new Pool({
     connectionString,
@@ -2059,6 +2060,133 @@ async function saveSnapshotToBlobs(event, identity, snapshot) {
   return normalized;
 }
 
+function normalizeDatabaseSnapshot(row) {
+  if (!row) return null;
+  return {
+    payload: row.payload,
+    payloadVersion: row.payload_version ?? 1,
+    restoreRank: row.restore_rank ?? 0,
+    profileCount: row.profile_count ?? null,
+    scopedCoverage: row.scoped_coverage ?? 0,
+    payloadUpdatedAt: row.payload_updated_at ?? null,
+    source: row.source || "database",
+    updatedAt: row.updated_at ?? null,
+    revision: Number(row.revision || 1),
+  };
+}
+
+async function loadSnapshotFromDatabase(identity) {
+  const client = await getPool().connect();
+  try {
+    const account = await getOrCreateAccount(client, identity);
+    const result = await client.query(
+      `SELECT payload, payload_version, restore_rank, profile_count,
+              scoped_coverage, payload_updated_at, source, updated_at, revision
+         FROM public.account_sync_snapshots
+        WHERE account_id = $1`,
+      [account.id],
+    );
+    return normalizeDatabaseSnapshot(result.rows[0]);
+  } finally {
+    client.release();
+  }
+}
+
+async function compareAndSetDatabaseSnapshot(client, accountId, snapshot, expectedRevision) {
+  const currentResult = await client.query(
+    `SELECT payload, payload_version, restore_rank, profile_count,
+            scoped_coverage, payload_updated_at, source, updated_at, revision
+       FROM public.account_sync_snapshots
+      WHERE account_id = $1
+      FOR UPDATE`,
+    [accountId],
+  );
+  const current = normalizeDatabaseSnapshot(currentResult.rows[0]);
+  const currentRevision = current?.revision ?? 0;
+  if (expectedRevision !== null && expectedRevision !== currentRevision) {
+    return { saved: false, current };
+  }
+
+  const nextRevision = currentRevision + 1;
+  const result = await client.query(
+    `INSERT INTO public.account_sync_snapshots (
+       account_id, payload, payload_version, restore_rank, profile_count,
+       scoped_coverage, payload_updated_at, source, revision, updated_at
+     )
+     VALUES ($1, $2::jsonb, $3, $4, $5, $6, $7, $8, $9, now())
+     ON CONFLICT (account_id) DO UPDATE SET
+       payload = EXCLUDED.payload,
+       payload_version = EXCLUDED.payload_version,
+       restore_rank = EXCLUDED.restore_rank,
+       profile_count = EXCLUDED.profile_count,
+       scoped_coverage = EXCLUDED.scoped_coverage,
+       payload_updated_at = EXCLUDED.payload_updated_at,
+       source = EXCLUDED.source,
+       revision = EXCLUDED.revision,
+       updated_at = now()
+     RETURNING payload, payload_version, restore_rank, profile_count,
+               scoped_coverage, payload_updated_at, source, updated_at, revision`,
+    [
+      accountId,
+      JSON.stringify(snapshot.payload),
+      snapshot.payloadVersion ?? snapshot.payload_version ?? 1,
+      snapshot.restoreRank ?? snapshot.restore_rank ?? 0,
+      snapshot.profileCount ?? snapshot.profile_count ?? null,
+      snapshot.scopedCoverage ?? snapshot.scoped_coverage ?? 0,
+      snapshot.payloadUpdatedAt ?? snapshot.payload_updated_at ?? null,
+      snapshot.source || "database",
+      nextRevision,
+    ],
+  );
+  return { saved: true, snapshot: normalizeDatabaseSnapshot(result.rows[0]) };
+}
+
+async function saveSnapshotToDatabase(identity, snapshot, expectedRevision = null) {
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const account = await getOrCreateAccount(client, identity);
+    await client.query(
+      `SELECT id
+         FROM public.arvio_accounts
+        WHERE id = $1
+        FOR UPDATE`,
+      [account.id],
+    );
+    const result = await compareAndSetDatabaseSnapshot(
+      client,
+      account.id,
+      snapshot,
+      expectedRevision,
+    );
+    if (!result.saved) {
+      await client.query("ROLLBACK");
+      return result;
+    }
+    await client.query("COMMIT");
+    return result;
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function loadOrClaimSnapshot(event, identity) {
+  const databaseSnapshot = await loadSnapshotFromDatabase(identity);
+  if (databaseSnapshot) return databaseSnapshot;
+
+  const blobSnapshot = await loadSnapshotFromBlobs(event, identity);
+  if (!blobSnapshot) return null;
+  const claimed = await saveSnapshotToDatabase(
+    identity,
+    { ...blobSnapshot, source: blobSnapshot.source || "netlify_blob_import" },
+    0,
+  );
+  return claimed.saved ? claimed.snapshot : claimed.current;
+}
+
 async function appendSnapshotEvent(event, identity, snapshot) {
   const stores = snapshotStores(event);
   const cursor = Date.now();
@@ -2315,6 +2443,7 @@ async function deleteAuthRecordsForAccount(event, accountId) {
 
 async function deleteDatabaseAccount(email, accountId) {
   const connectionString =
+    process.env.ARVIO_DATABASE_URL ||
     process.env.NETLIFY_DB_URL ||
     process.env.NETLIFY_DATABASE_URL ||
     process.env.DATABASE_URL;
@@ -2797,6 +2926,9 @@ module.exports = {
   snapshotKeys,
   loadSnapshotFromBlobs,
   saveSnapshotToBlobs,
+  loadSnapshotFromDatabase,
+  saveSnapshotToDatabase,
+  loadOrClaimSnapshot,
   appendSnapshotEvent,
   listBlobKeys,
   deleteBlobPrefix,
@@ -2827,5 +2959,6 @@ module.exports = {
     safeTokenEqual,
     isAllowedSimklRequest,
     consumeSimklRateLimit,
+    compareAndSetDatabaseSnapshot,
   },
 };

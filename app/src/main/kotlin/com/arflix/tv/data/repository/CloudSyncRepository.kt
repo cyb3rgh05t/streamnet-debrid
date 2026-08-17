@@ -964,9 +964,24 @@ class CloudSyncRepository @Inject constructor(
             return Result.failure(it)
         }
 
-        val existingRemotePayload = authRepository.loadAccountSyncPayload()
-            .getOrNull()
-            ?.takeIf { it.isNotBlank() }
+        val remoteSnapshotResult = authRepository.loadAccountSyncSnapshot()
+        if (remoteSnapshotResult.isFailure) {
+            val error = remoteSnapshotResult.exceptionOrNull()
+                ?: IllegalStateException("Cloud snapshot revision unavailable")
+            markPushFailedDirty()
+            pushFailureCount++
+            AppLogger.recordException(
+                throwable = error,
+                context = mapOf(
+                    "error_area" to "CloudSync",
+                    "cloud_flow" to "push_load_revision",
+                    "dirty" to isPushDirty.toString()
+                )
+            )
+            return Result.failure(error)
+        }
+        val remoteSnapshot = remoteSnapshotResult.getOrNull()
+        val existingRemotePayload = remoteSnapshot?.payload?.takeIf { it.isNotBlank() }
         if (
             allowRemoteRestoreBeforePush &&
             existingRemotePayload != null &&
@@ -1004,30 +1019,14 @@ class CloudSyncRepository @Inject constructor(
             )
         }
 
-        val groupPreferencesMerged = if (existingRemotePayload != null) {
-            mergeRemoteIptvGroupPreferences(
-                payload,
-                existingRemotePayload,
-                iptvRepository.groupPreferencesLocallyDirtyProfiles(),
-            )
+        val effectivePayload = if (existingRemotePayload != null) {
+            mergePayloadForPush(payload, existingRemotePayload)
         } else {
             payload
         }
-        // Field-level merge against the already-loaded remote: keep local fields we changed more
-        // recently, but never overwrite a cloud field with an older local value. This is what stops
-        // a stale device from reverting a peer's setting (even via the pull's pre-push).
-        val settingsMergedPayload = if (existingRemotePayload != null) {
-            mergeSettingsByTimestamp(baseStr = groupPreferencesMerged, otherStr = existingRemotePayload).json
-        } else {
-            groupPreferencesMerged
-        }
-        val effectivePayload = if (existingRemotePayload != null) {
-            mergeWatchlistByTimestamp(localPayload = settingsMergedPayload, remotePayload = existingRemotePayload)
-        } else {
-            settingsMergedPayload
-        }
 
-        val payloadHash = runCatching {
+        var uploadedPayload = effectivePayload
+        var payloadHash = runCatching {
             JSONObject(effectivePayload).apply { remove("updatedAt") }.toString().hashCode()
         }.getOrNull()
 
@@ -1040,15 +1039,29 @@ class CloudSyncRepository @Inject constructor(
             return Result.success(Unit)
         }
 
-        val result = authRepository.saveAccountSyncPayload(effectivePayload)
+        var result = authRepository.saveAccountSyncPayload(uploadedPayload, remoteSnapshot?.revision)
+        val conflict = result.exceptionOrNull() as? AccountSyncRevisionConflictException
+        val conflictPayload = conflict?.currentPayload?.takeIf { it.isNotBlank() }
+        if (conflictPayload != null) {
+            uploadedPayload = mergePayloadForPush(uploadedPayload, conflictPayload)
+            payloadHash = runCatching {
+                JSONObject(uploadedPayload).apply { remove("updatedAt") }.toString().hashCode()
+            }.getOrNull()
+            AppLogger.breadcrumb(
+                tag = "CloudSync",
+                message = "push_revision_conflict_retry revision=${conflict.currentRevision}",
+                severity = "info"
+            )
+            result = authRepository.saveAccountSyncPayload(uploadedPayload, conflict.currentRevision)
+        }
         if (result.isSuccess) {
             clearLocalDirtyAfterSuccessfulPush()
             lastPushedPayloadHash = payloadHash
             pushFailureCount = 0
-            Log.i(TAG, "Push succeeded size=${payloadSizeBucket(effectivePayload)}")
+            Log.i(TAG, "Push succeeded size=${payloadSizeBucket(uploadedPayload)}")
             AppLogger.breadcrumb(
                 tag = "CloudSync",
-                message = "push_success size=${payloadSizeBucket(effectivePayload)} user=${userId.take(8)}",
+                message = "push_success size=${payloadSizeBucket(uploadedPayload)} user=${userId.take(8)}",
                 severity = "info"
             )
             onPushCompleted?.invoke()
@@ -1060,7 +1073,7 @@ class CloudSyncRepository @Inject constructor(
             pushFailureCount++
             Log.w(
                 TAG,
-                "Push failed size=${payloadSizeBucket(effectivePayload)} failures=$pushFailureCount error=${result.exceptionOrNull()?.message}"
+                "Push failed size=${payloadSizeBucket(uploadedPayload)} failures=$pushFailureCount error=${result.exceptionOrNull()?.message}"
             )
             AppLogger.recordException(
                 throwable = result.exceptionOrNull() ?: IllegalStateException("Cloud push failed"),
@@ -1068,12 +1081,28 @@ class CloudSyncRepository @Inject constructor(
                     "error_area" to "CloudSync",
                     "cloud_flow" to "push_save_payload",
                     "dirty" to isPushDirty.toString(),
-                    "payload_size" to payloadSizeBucket(effectivePayload),
+                    "payload_size" to payloadSizeBucket(uploadedPayload),
                     "failure_count" to pushFailureCount.toString()
                 )
             )
         }
         return result
+    }
+
+    private fun mergePayloadForPush(localPayload: String, remotePayload: String): String {
+        val groupPreferencesMerged = mergeRemoteIptvGroupPreferences(
+            localPayload,
+            remotePayload,
+            iptvRepository.groupPreferencesLocallyDirtyProfiles(),
+        )
+        val settingsMergedPayload = mergeSettingsByTimestamp(
+            baseStr = groupPreferencesMerged,
+            otherStr = remotePayload,
+        ).json
+        return mergeWatchlistByTimestamp(
+            localPayload = settingsMergedPayload,
+            remotePayload = remotePayload,
+        )
     }
 
     private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {

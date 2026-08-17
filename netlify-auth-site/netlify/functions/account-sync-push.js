@@ -6,7 +6,8 @@ const {
   isExistingSnapshotRicher,
   applyAddonWipeGuard,
   resolveIdentity,
-  loadSnapshotFromBlobs,
+  loadOrClaimSnapshot,
+  saveSnapshotToDatabase,
   saveSnapshotToBlobs,
   appendSnapshotEvent
 } = require("./_backend");
@@ -56,8 +57,13 @@ exports.handler = async (event) => {
     if (!rawPayload) {
       return json(400, { accepted: false, reason: "missing_payload" });
     }
+    const hasExpectedRevision = Object.prototype.hasOwnProperty.call(body, "expectedRevision");
+    const expectedRevision = hasExpectedRevision ? Number(body.expectedRevision) : null;
+    if (hasExpectedRevision && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
+      return json(400, { accepted: false, reason: "invalid_expected_revision" });
+    }
 
-    const existing = await loadSnapshotFromBlobs(event, identity);
+    const existing = await loadOrClaimSnapshot(event, identity);
     // Server-side addon wipe guard: refuse pushes that catastrophically shrink
     // the addon list (recurring client bug); existing addons are merged back.
     const parsedPayload = typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
@@ -76,6 +82,7 @@ exports.handler = async (event) => {
         accepted: false,
         reason: "existing_snapshot_is_richer",
         existing,
+        revision: existing?.revision ?? 0,
         incoming: {
           restoreRank: incoming.restoreRank,
           profileCount: incoming.profileCount,
@@ -84,7 +91,7 @@ exports.handler = async (event) => {
       });
     }
 
-    const saved = await saveSnapshotToBlobs(event, identity, {
+    const snapshot = {
       payload: incoming.payload,
       payloadVersion: incoming.payloadVersion,
       restoreRank: incoming.restoreRank,
@@ -92,11 +99,33 @@ exports.handler = async (event) => {
       scopedCoverage: incoming.scopedCoverage,
       payloadUpdatedAt: incoming.payloadUpdatedAt,
       source: "netlify"
+    };
+    const result = await saveSnapshotToDatabase(identity, snapshot, expectedRevision);
+    if (!result.saved) {
+      return json(409, {
+        accepted: false,
+        reason: "revision_conflict",
+        revision: result.current?.revision ?? 0,
+        current: result.current
+      });
+    }
+    const saved = result.snapshot;
+    const mirrorResults = await Promise.allSettled([
+      saveSnapshotToBlobs(event, identity, saved),
+      appendSnapshotEvent(event, identity, saved)
+    ]);
+    mirrorResults.forEach((mirrorResult, index) => {
+      if (mirrorResult.status === "rejected") {
+        console.warn("account-sync-push: post-commit mirror failed", {
+          target: index === 0 ? "blob" : "event",
+          message: mirrorResult.reason?.message || String(mirrorResult.reason)
+        });
+      }
     });
-    await appendSnapshotEvent(event, identity, saved);
 
     return json(200, {
       accepted: true,
+      revision: saved.revision,
       addonGuard: guarded,
       restoreRank: incoming.restoreRank,
       profileCount: incoming.profileCount,

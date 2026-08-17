@@ -2,7 +2,7 @@ const {
   json,
   options,
   resolveIdentity,
-  loadSnapshotFromBlobs
+  loadOrClaimSnapshot
 } = require("./_backend");
 
 exports.handler = async (event) => {
@@ -14,7 +14,7 @@ exports.handler = async (event) => {
 
   try {
     const identity = await resolveIdentity(event);
-    const snapshot = await loadSnapshotFromBlobs(event, identity);
+    const snapshot = await loadOrClaimSnapshot(event, identity);
 
     if (!snapshot) {
       return json(200, {
@@ -23,7 +23,8 @@ exports.handler = async (event) => {
         updatedAt: null,
         profileCount: null,
         restoreRank: 0,
-        scopedCoverage: 0
+        scopedCoverage: 0,
+        revision: 0
       });
     }
 
@@ -34,7 +35,8 @@ exports.handler = async (event) => {
       payloadUpdatedAt: snapshot.payloadUpdatedAt || snapshot.payload_updated_at || null,
       profileCount: snapshot.profileCount ?? snapshot.profile_count ?? null,
       restoreRank: snapshot.restoreRank ?? snapshot.restore_rank ?? 0,
-      scopedCoverage: snapshot.scopedCoverage ?? snapshot.scoped_coverage ?? 0
+      scopedCoverage: snapshot.scopedCoverage ?? snapshot.scoped_coverage ?? 0,
+      revision: snapshot.revision
     });
   } catch (error) {
     console.error("account-sync-pull failed", error);
