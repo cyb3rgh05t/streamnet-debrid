@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 
 /**
- * ARVIO Color Palette
+ * StreamNet TV Color Palette
  * Arctic Fuse 2 Inspired - Minimal Dark Theme
  */
 

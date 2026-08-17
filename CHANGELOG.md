@@ -68,13 +68,13 @@ All notable changes to this project are documented in this file.
 - Fixed sideload production-plugin routing, extractor unloading, mobile routing, and TV focus limits. Contributor: @Himanth-reddy via #466.
 - Fixed analytics compilation and logging consistency introduced by the broader reliability work. Contributor: @Himanth-reddy via #476.
 
-### ARVIO Cloud, security, and accounts
+### StreamNet TV Cloud, security, and accounts
 
-- Centralized web and TV-pairing authentication through `auth.arvio.tv` for a consistent ARVIO Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
+- Centralized web and TV-pairing authentication through `auth.arvio.tv` for a consistent StreamNet TV Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
 - Hardened Catalog Pack submissions with URL validation, SSRF protection, rate limiting, and safer manifest handling. Contributor: @Himanth-reddy via #463.
 - Expanded disposable-email blocking for cloud account registration. Contributor: @mvanhorn via #496.
 - Fixed web login redirect loops, stale-account profile leakage, signup routing, and login wordmark overlap. Contributor: @Himanth-reddy via #475.
-- Added the ARVIO Web membership and trial flow while keeping the Android APK free.
+- Added the StreamNet TV Web membership and trial flow while keeping the Android APK free.
 - Improved linked Ko-fi entitlement refresh and made membership-trial failures report their actual cause.
 
 ### Web app
@@ -93,7 +93,7 @@ All notable changes to this project are documented in this file.
 - Fixed overlapping details metadata, genre chips, overview content, hero spacing, and stacked page padding. Contributor: @Himanth-reddy via #494.
 - Refined the responsive settings navigation, sidebar focus, mobile overlay bounds, and active-state styling. Contributor: @Himanth-reddy via #474.
 - Added a dedicated VLC integration section with Linux support and protocol diagnostics. Contributor: @Himanth-reddy via #473.
-- Updated the website and README with ARVIO Web and iPad information.
+- Updated the website and README with StreamNet TV Web and iPad information.
 
 ### Contributors
 
@@ -108,7 +108,7 @@ All notable changes to this project are documented in this file.
 ### Home server sources and catalogs
 
 - Added Home Server source support for user-owned Jellyfin, Emby, and Plex libraries.
-- Added Home Server catalog import so personal server collections can appear as ARVIO catalogs.
+- Added Home Server catalog import so personal server collections can appear as StreamNet TV catalogs.
 - Added distinct server labels in sources so multiple connected servers can be identified clearly.
 - Improved Home Server matching speed, source labels, playback readiness, and autoplay behavior.
 - Improved Plex authentication discovery and matching reliability.
@@ -287,7 +287,7 @@ Thank you to everyone who helped with this release, including:
 ### Sources
 
 - Metadata and discovery: TMDB, IMDb metadata/logo assets, Trakt.
-- Sync/auth: Supabase and ARVIO Cloud.
+- Sync/auth: Supabase and StreamNet TV Cloud.
 - Playback/addons: IPTV M3U/Xtream/Stalker sources, Stremio-compatible addons, and community HTTP sources.
 - Smoothness references: Android TV device traces and public Android TV performance research.
 
@@ -348,7 +348,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Added
 
-- Trakt watchlist two-way sync: items added in ARVIO sync to Trakt and vice versa
+- Trakt watchlist two-way sync: items added in StreamNet TV sync to Trakt and vice versa
 - Clearlogo overlays on watchlist cards
 - Clearlogo repositioned to bottom-left corner on all landscape cards for a cleaner look
 - Watchlist preloads on app startup for instant display
@@ -394,7 +394,7 @@ Thank you to everyone who helped with this release, including:
 - Mobile Profile page: scrollable LazyRow for 4+ profiles, smaller avatars on phone.
 - Long-press context menu on mobile Home cards (via combinedClickable).
 - Cloud connect button on profile selection page (opens QR on TV, email/password on mobile).
-- Default home launcher intent filter so ARVIO can be set as default launcher.
+- Default home launcher intent filter so StreamNet TV can be set as default launcher.
 - Background logo prefetch for all Home categories on mobile (not just first 2 rows).
 - Frame rate matching: real display mode switching via Display.Mode API with stabilization polling.
 
@@ -476,7 +476,7 @@ Thank you to everyone who helped with this release, including:
 - Continue Watching now refreshes more reliably across Trakt and non-Trakt profiles, including remove/dismiss persistence and next-episode advancement.
 - Details now keeps the correct Continue Watching target and watched markers when opening into a resumed episode/season path.
 - Home context menu focus, overlay layering, and back handling regressions.
-- ARVIO Cloud TV pairing fallback/verification flow and missing release-build Supabase host configuration.
+- StreamNet TV Cloud TV pairing fallback/verification flow and missing release-build Supabase host configuration.
 - Live TV guide viewport/focus polish, including more visible channels and cleaner spacing.
 - Startup crash caused by restricted TV provider channel selection query in launcher integration.
 
@@ -520,12 +520,12 @@ Thank you to everyone who helped with this release, including:
 - Continue Watching no longer shows a 60-second empty gap when auto-playing the next episode.
 - "Mark as Watched" from the context menu now correctly removes the item from Continue Watching.
 - "Mark as Watched" now automatically adds the next episode to Continue Watching.
-- Watched status now loads from ARVIO Cloud for non-Trakt profiles, so badges appear without a Trakt account.
+- Watched status now loads from StreamNet TV Cloud for non-Trakt profiles, so badges appear without a Trakt account.
 - Continue Watching now syncs across devices for non-Trakt profiles using profile name instead of device-local UUID.
 - Legacy Continue Watching entries no longer leak across profiles.
 - Fixed duplicate key crash ("Key was already used") in Continue Watching row when the same show appeared twice.
 - Watched badges now appear on initial Details page load without needing to navigate away and back.
-- ARVIO Cloud watched data queries now paginate correctly for large libraries (previously capped at 1,000 rows).
+- StreamNet TV Cloud watched data queries now paginate correctly for large libraries (previously capped at 1,000 rows).
 - Hero clear logo now loads immediately on startup when selecting a profile, instead of requiring a focus change.
 - When no streaming addons are configured, the app now shows a friendly setup guide instead of a playback error.
 - Source selector shows setup instructions instead of generic "No sources found" when no addons are installed.
@@ -545,7 +545,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Changed
 
-- App version updated to `1.6.0` (`versionCode 160`) and Settings label updated to `ARVIO V1.6`.
+- App version updated to `1.6.0` (`versionCode 160`) and Settings label updated to `StreamNet TV V1.6`.
 - Live TV EPG lane now uses real upcoming program blocks and only shows filler when timeline data is genuinely unavailable.
 - IPTV loading/retry strategy tuned to reduce multi-minute startup delays and improve responsiveness.
 - Playback startup buffering strategy rebalanced for movie/TV streams (larger startup gate + safer initial buffer thresholds).
@@ -566,7 +566,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Added
 
-- ARVIO Cloud TV pairing flow via QR sign-in/register and direct account linking.
+- StreamNet TV Cloud TV pairing flow via QR sign-in/register and direct account linking.
 - VOD sources available inside source selection for playback.
 - Skip Intro integration in player with dedicated button and backend wiring.
 - QR rendering component for in-app pairing.
@@ -591,7 +591,7 @@ Thank you to everyone who helped with this release, including:
 - Large 4K stream handling and retention so high-size sources are given a fair start window.
 - VOD source visibility and matching reliability, including TV-show catalog flow improvements.
 - Subtitle menu back-navigation behavior (back now closes subtitle layer correctly instead of exiting playback flow).
-- ARVIO Cloud account pairing reliability between app and web sign-in path.
+- StreamNet TV Cloud account pairing reliability between app and web sign-in path.
 - TV remote navigation issues in settings forms/addon-list sections.
 - EPG reliability and parser flow issues affecting guide behavior.
 
@@ -599,7 +599,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Added
 
-- Optional `ARVIO Cloud` account connection in Settings for syncing profiles, addons, catalogs, and IPTV settings.
+- Optional `StreamNet TV Cloud` account connection in Settings for syncing profiles, addons, catalogs, and IPTV settings.
 - Supabase migration and edge functions for TV device auth flow: `tv-auth-start`, `tv-auth-status`, `tv-auth-complete`.
 
 ### Fixed

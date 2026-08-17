@@ -513,7 +513,7 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 }
 
 /**
- * Simple ARVIO loading screen - app logo + spinner
+ * Simple StreamNet TV loading screen - app logo + spinner
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

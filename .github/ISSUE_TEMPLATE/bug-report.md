@@ -1,25 +1,28 @@
 ---
 name: Bug Report
-about: Create a report to help us improve ARVIO
+about: Create a report to help us improve StreamNet TV
 title: "[BUG]:"
 labels: bug
-assignees: ''
-
+assignees: ""
 ---
 
 ### Describe the Bug
+
 A clear and concise description of what the bug is.
 
 ### Steps to Reproduce
-1. Open ARVIO on `[Device / Platform]`
+
+1. Open StreamNet TV on `[Device / Platform]`
 2. Go to `[e.g., Live TV / Details Screen / Settings]`
 3. Click or select `[...]`
 4. Notice the error `[...]`
 
 ### Expected Behavior
+
 A clear and concise description of what you expected to happen.
 
 ### Screenshots / Video
+
 If applicable, add screenshots or a short screen recording to help explain the problem (especially helpful for TV UI navigation, focus issues, or playback glitches).
 
 ---
@@ -40,7 +43,7 @@ If applicable, add screenshots or a short screen recording to help explain the p
   - **App Version:** [e.g., v1.9.91]
   - **Install Source:** [e.g., Google Play Store, GitHub APK]
 
-- [ ] **ARVIO Web (iOS / iPadOS / Desktop Browser)**
+- [ ] **StreamNet TV Web (iOS / iPadOS / Desktop Browser)**
   - **Device:** [e.g., iPhone 15 Pro, iPad Air, Mac, Windows PC]
   - **OS Version:** [e.g., iOS 17.5, iPadOS 17.5, macOS 14.5, Windows 11]
   - **Browser:** [e.g., Safari, Chrome 127, Firefox]
@@ -48,21 +51,24 @@ If applicable, add screenshots or a short screen recording to help explain the p
 ---
 
 ### Affected Component / Feature
-*(Select all that apply)*
+
+_(Select all that apply)_
+
 - [ ] **Playback / Player** (ExoPlayer/Media3, video stutter, audio passthrough, HDR/DV)
 - [ ] **Subtitles / Audio** (Subtitle sync, missing tracks, AI subtitles)
 - [ ] **IPTV / Live TV** (M3U / Xtream playlists, EPG guide, stream playback)
 - [ ] **Home Servers & Sources** (Jellyfin, Emby, Plex, Telegram, Addons)
 - [ ] **Catalogs & Metadata** (TMDB details, Trakt lists, MDBList)
-- [ ] **ARVIO Cloud / Profiles** (Cloud sync, watch progress, profile PINs, Trakt scrobbling)
+- [ ] **StreamNet TV Cloud / Profiles** (Cloud sync, watch progress, profile PINs, Trakt scrobbling)
 - [ ] **UI / Remote Navigation** (D-Pad focus issues, gestures, predictive back)
 - [ ] **Crash / App Freeze**
 
 ---
 
-### Media & Playback Details *(If reporting a video/audio/playback issue)*
+### Media & Playback Details _(If reporting a video/audio/playback issue)_
+
 - **Source Type:** [e.g., Addon/Debrid, Jellyfin, IPTV Xtream, Direct URL, Telegram]
 - **Stream Format / Codecs:** [e.g., 4K HDR / Dolby Vision / H.265 / AV1 / EAC3 5.1]
 - **Player Settings:** [e.g., Tunneled Playback ON/OFF, Audio Passthrough ON/OFF]
 
-### Crash Logs / Logcat *(If applicable)*
+### Crash Logs / Logcat _(If applicable)_

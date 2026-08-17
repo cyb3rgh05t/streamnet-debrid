@@ -501,7 +501,7 @@ class SportsRepository @Inject constructor(
         if (blockedPhrases.any { phrase -> text.contains(phrase) }) return false
 
         // Highfly marks some real HLS channels as notWebReady because browser
-        // playback is restricted. They are still valid for ARVIO's native
+        // playback is restricted. They are still valid for StreamNet TV's native
         // ExoPlayer path, so only reject notWebReady when the URL itself does
         // not look like a native stream.
         if (behaviorHints?.notWebReady == true && !isNativePlayableSportsUrl(rawUrl)) return false

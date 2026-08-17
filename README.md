@@ -1,8 +1,8 @@
-# ARVIO
+# StreamNet TV
 
-ARVIO is an Android media hub for TV, phone, and tablet form factors. This repository is maintained as a source-code and development mirror for the Android application.
+StreamNet TV is an Android media hub for TV, phone, and tablet form factors. This repository is maintained as a source-code and development mirror for the Android application.
 
-The app provides a media browser, player shell, profile support, optional cloud sync, IPTV playlist support, catalog configuration, home-server integrations, and integrations with user-configured sources. ARVIO does not host, store, sell, or distribute movies, series, live TV channels, playlists, streams, or other third-party media.
+The app provides a media browser, player shell, profile support, optional cloud sync, IPTV playlist support, catalog configuration, home-server integrations, and integrations with user-configured sources. StreamNet TV does not host, store, sell, or distribute movies, series, live TV channels, playlists, streams, or other third-party media.
 
 ## Repository Purpose
 
@@ -21,7 +21,7 @@ It is not intended as an advertising page, download landing page, or content dis
 - Android TV, Fire TV, phone, and tablet UI
 - TMDB-powered movie, series, cast, collection, franchise, and metadata browsing
 - IPTV M3U/Xtream playlist support with provider categories, favorites, hidden categories, EPG, and mobile/tablet fullscreen playback
-- Optional ARVIO Cloud sync for profiles, settings, catalogs, IPTV state, watch state, and custom profile avatars
+- Optional StreamNet TV Cloud sync for profiles, settings, catalogs, IPTV state, watch state, and custom profile avatars
 - Optional per-profile Trakt.tv integration for watchlist, history, progress, and continue watching
 - Catalog management with manual URLs and public Trakt/MDBList list discovery
 - Home-server source and catalog support for user-owned Jellyfin, Emby, and Plex libraries
@@ -32,60 +32,59 @@ It is not intended as an advertising page, download landing page, or content dis
 - Profile PINs and custom profile avatars
 - ExoPlayer/Media3 playback with TV remote, mobile, and tablet controls
 
-
 ## Availability
 
-ARVIO is available on Google Play:
+StreamNet TV is available on Google Play:
 
 [<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="160">](https://play.google.com/store/apps/details?id=com.arvio.tv)
 
-## Support ARVIO
+## Support StreamNet TV
 
-ARVIO is a free hobby project built and maintained with a lot of time, testing, hosting, and service costs. The goal is to keep ARVIO free as it grows, but running and improving it still costs money every month.
+StreamNet TV is a free hobby project built and maintained with a lot of time, testing, hosting, and service costs. The goal is to keep StreamNet TV free as it grows, but running and improving it still costs money every month.
 
-If ARVIO helps you and you want to support development, donations are appreciated:
+If StreamNet TV helps you and you want to support development, donations are appreciated:
 
-[Support ARVIO on Ko-fi](https://ko-fi.com/arvio)
+[Support StreamNet TV on Ko-fi](https://ko-fi.com/arvio)
 
 ## Screenshots
 
-| Home | Details |
-|------|---------|
+| Home                                      | Details                                         |
+| ----------------------------------------- | ----------------------------------------------- |
 | ![Home screen](screenshots/home_v190.png) | ![Details screen](screenshots/details_v190.png) |
 
-| Live TV | Collections |
-|---------|-------------|
+| Live TV                                          | Collections                                              |
+| ------------------------------------------------ | -------------------------------------------------------- |
 | ![Live TV screen](screenshots/live_tv_v1991.png) | ![Collections screen](screenshots/collections_v1991.png) |
 
-| Mobile | Profiles |
-|--------|----------|
+| Mobile                                         | Profiles                                           |
+| ---------------------------------------------- | -------------------------------------------------- |
 | ![Mobile screen](screenshots/mobile_home.webp) | ![Profiles screen](screenshots/profiles_v1991.png) |
 
-### ARVIO Web — iPhone, iPad & any browser
+### StreamNet TV Web — iPhone, iPad & any browser
 
-The same ARVIO experience in the browser at [web.arvio.tv](https://web.arvio.tv) — for the devices an APK can't reach. Profiles, watchlist and progress sync with the app.
+The same StreamNet TV experience in the browser at [web.arvio.tv](https://web.arvio.tv) — for the devices an APK can't reach. Profiles, watchlist and progress sync with the app.
 
-| Web · Home (iPad) | Web · Details (iPad) |
-|-------------------|----------------------|
-| ![ARVIO Web home on iPad](screenshots/ipad_home.webp) | ![ARVIO Web details on iPad](screenshots/ipad_details.webp) |
+| Web · Home (iPad)                                            | Web · Details (iPad)                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------------------ |
+| ![StreamNet TV Web home on iPad](screenshots/ipad_home.webp) | ![StreamNet TV Web details on iPad](screenshots/ipad_details.webp) |
 
-| Web · Live TV guide (iPad) | Web · Catalogs (iPad) |
-|----------------------------|-----------------------|
-| ![ARVIO Web live TV on iPad](screenshots/ipad_live_tv.webp) | ![ARVIO Web catalogs on iPad](screenshots/ipad_catalogs.webp) |
+| Web · Live TV guide (iPad)                                         | Web · Catalogs (iPad)                                                |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| ![StreamNet TV Web live TV on iPad](screenshots/ipad_live_tv.webp) | ![StreamNet TV Web catalogs on iPad](screenshots/ipad_catalogs.webp) |
 
 ## Content And Source Policy
 
-ARVIO is a media browser and player interface for user-configured sources. It works like a media player or browser: users provide their own services, playlists, addons, and URLs.
+StreamNet TV is a media browser and player interface for user-configured sources. It works like a media player or browser: users provide their own services, playlists, addons, and URLs.
 
-This repository does not include hosted media content, bundled playlists, IPTV credentials, debrid accounts, third-party streaming catalogs, or links intended to enable unauthorized access to content. No movies, series, live TV channels, playlists, or other third-party media are hosted by this repository or by ARVIO.
+This repository does not include hosted media content, bundled playlists, IPTV credentials, debrid accounts, third-party streaming catalogs, or links intended to enable unauthorized access to content. No movies, series, live TV channels, playlists, or other third-party media are hosted by this repository or by StreamNet TV.
 
-Users are solely responsible for their usage and must comply with applicable local laws. If you believe content accessed through an external source violates copyright law, contact the actual file host, service provider, or source maintainer. The ARVIO repository and developers cannot remove content hosted by third parties.
+Users are solely responsible for their usage and must comply with applicable local laws. If you believe content accessed through an external source violates copyright law, contact the actual file host, service provider, or source maintainer. The StreamNet TV repository and developers cannot remove content hosted by third parties.
 
 Contributors should not submit copyrighted media, credentials, private keys, access tokens, or links intended to enable unauthorized access to content.
 
 ## Cloud Sync
 
-ARVIO Cloud is optional. When enabled, it can sync profiles, settings, catalogs, IPTV state, watch progress, watchlist state, and profile avatars across devices. See [PRIVACY.md](PRIVACY.md) for details and account deletion instructions.
+StreamNet TV Cloud is optional. When enabled, it can sync profiles, settings, catalogs, IPTV state, watch progress, watchlist state, and profile avatars across devices. See [PRIVACY.md](PRIVACY.md) for details and account deletion instructions.
 
 ## Build And Run
 

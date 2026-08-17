@@ -168,7 +168,7 @@ fun tr(text: String): String {
         "Add movies and shows to watch later" -> R.string.add_later
         "No results found",
         "Unable to load content",
-        "ARVIO uses community streaming addons to find video sources. Without at least one streaming addon, content cannot be played." -> R.string.no_results
+        "StreamNet TV uses community streaming addons to find video sources. Without at least one streaming addon, content cannot be played." -> R.string.no_results
         "No results found for" -> R.string.no_results_for
         // Actions
         "Close",
@@ -484,7 +484,7 @@ private object AppLanguageRegexes {
         "Next Episode" to next,
         "Switch tabs • Navigate • BACK Close" to "$subtitles • $back • $close",
         "Switch tabs â€¢ Navigate â€¢ BACK Close" to "$subtitles • $back • $close",
-        "ARVIO uses community streaming addons to find video sources. Without at least one streaming addon, content cannot be played." to noResults,
+        "StreamNet TV uses community streaming addons to find video sources. Without at least one streaming addon, content cannot be played." to noResults,
         "No audio tracks available" to audio,
         "TRY AGAIN" to retry.uppercase(Locale.ROOT),
         "GO BACK" to back.uppercase(Locale.ROOT),

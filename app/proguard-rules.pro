@@ -1,5 +1,5 @@
 # ============================================
-# ARVIO ProGuard/R8 Rules
+# StreamNet TV ProGuard/R8 Rules
 # Production-ready optimization rules
 # ============================================
 

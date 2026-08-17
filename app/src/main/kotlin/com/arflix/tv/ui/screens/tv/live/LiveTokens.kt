@@ -14,7 +14,7 @@ import com.arflix.tv.ui.theme.InterFontFamily
 import com.arflix.tv.ui.theme.LocalArvioColors
 import com.arflix.tv.ui.theme.appBackgroundDark
 
-// ARVIO Live TV — design tokens. OKLCH reference kept in spec.md §2.
+// StreamNet TV Live TV — design tokens. OKLCH reference kept in spec.md §2.
 // Mapped from handoff/tokens.kt. `InterFontFamily` ships; JetBrains Mono
 // falls back to system Monospace (Inter's tabular figures are acceptable
 // for the numeric/badge slots; can swap for bundled JBMono later).
