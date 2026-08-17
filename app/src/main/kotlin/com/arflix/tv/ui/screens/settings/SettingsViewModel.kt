@@ -34,6 +34,7 @@ import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.PlexPinAuthSession
 import com.arflix.tv.data.repository.IptvConfig
 import com.arflix.tv.data.repository.IptvRepository
+import com.arflix.tv.data.repository.normalizeIptvSortOrder
 import com.arflix.tv.data.repository.IptvPlaylistEntry
 import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
 import com.arflix.tv.data.repository.MediaRepository
@@ -1941,7 +1942,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.observeConfig().collect { config ->
                 val current = _uiState.value
-                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvShowSpecialCategories != config.showSpecialCategories) {
+                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories) {
                     _uiState.value = current.copy(
                         iptvM3uUrl = config.m3uUrl,
                         iptvEpgUrl = config.epgUrl,
@@ -2480,8 +2481,11 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setIptvSortOrder(mode: String) {
+        val normalized = normalizeIptvSortOrder(mode)
+        _uiState.value = _uiState.value.copy(iptvSortOrder = normalized)
         viewModelScope.launch {
-            iptvRepository.saveSortOrder(mode)
+            iptvRepository.saveSortOrder(normalized)
+            syncLocalStateToCloud(silent = true)
         }
     }
 

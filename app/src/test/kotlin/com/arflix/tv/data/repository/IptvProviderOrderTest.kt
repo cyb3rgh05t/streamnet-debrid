@@ -15,6 +15,19 @@ class IptvProviderOrderTest {
     }
 
     @Test
+    fun iptvSortOrderCyclesThroughExpectedSequence() {
+        fun nextSortOrder(current: String): String = when (normalizeIptvSortOrder(current)) {
+            "provider" -> "number"
+            "number" -> "name"
+            else -> "provider"
+        }
+
+        assertThat(nextSortOrder("provider")).isEqualTo("number")
+        assertThat(nextSortOrder("number")).isEqualTo("name")
+        assertThat(nextSortOrder("name")).isEqualTo("provider")
+    }
+
+    @Test
     fun xtreamCategoryEndpointDefinesGroupOrder() {
         val categorizedChannels = listOf(
             "sports" to apiChannel(301, "Sports One", "Sports"),
