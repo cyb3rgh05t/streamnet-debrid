@@ -4159,6 +4159,17 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
+    suspend fun saveProgressAndWait(
+        position: Long,
+        duration: Long,
+        progressPercent: Int,
+        isPlaying: Boolean,
+        playbackState: Int
+    ) {
+        saveProgress(position, duration, progressPercent, isPlaying, playbackState)
+        progressSaveJob?.join()
+    }
+
     private var progressSaveJob: Job? = null
     private var subtitleRefreshJob: Job? = null
     private var vodAppendJob: Job? = null

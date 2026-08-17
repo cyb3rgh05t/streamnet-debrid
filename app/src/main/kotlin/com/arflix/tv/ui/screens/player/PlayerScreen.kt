@@ -356,6 +356,8 @@ fun PlayerScreen(
     var currentPosition by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var progress by remember { mutableFloatStateOf(0f) }
+    var currentPlaybackState by remember { mutableIntStateOf(Player.STATE_IDLE) }
+    var nextEpisodeTransitionInProgress by remember { mutableStateOf(false) }
 
     // Skip overlay state - shows +10/-10 without showing full controls
     var skipAmount by remember { mutableIntStateOf(0) }
@@ -407,9 +409,48 @@ fun PlayerScreen(
     var pendingNextBingeGroup by remember { mutableStateOf<String?>(null) }
     var nextEpisodePromptButton by remember { mutableIntStateOf(0) } // 0 = next, 1 = cancel
     val nextEpisodePromptGate = remember { NextEpisodePromptGate() }
+
+    val playNextEpisode: (Int, Int, String?, String?, String?) -> Unit =
+        { nextSeason, nextEpisode, nextAddonId, nextSourceName, nextBingeGroup ->
+            if (!nextEpisodeTransitionInProgress) {
+                nextEpisodeTransitionInProgress = true
+
+                val positionSnapshot = currentPosition
+                val durationSnapshot = duration
+                val playbackStateSnapshot = currentPlaybackState
+                val progressPercentSnapshot = if (durationSnapshot > 0L) {
+                    ((positionSnapshot.toDouble() / durationSnapshot.toDouble()) * 100.0)
+                        .toInt()
+                        .coerceIn(0, 100)
+                } else {
+                    0
+                }
+
+                coroutineScope.launch {
+                    runCatching {
+                        viewModel.saveProgressAndWait(
+                            position = positionSnapshot,
+                            duration = durationSnapshot,
+                            progressPercent = progressPercentSnapshot,
+                            isPlaying = false,
+                            playbackState = playbackStateSnapshot
+                        )
+                    }
+
+                    onPlayNext(
+                        nextSeason,
+                        nextEpisode,
+                        nextAddonId,
+                        nextSourceName,
+                        nextBingeGroup
+                    )
+                }
+            }
+        }
+
     val playPendingNextEpisode: () -> Unit = {
         showNextEpisodePrompt = false
-        onPlayNext(
+        playNextEpisode(
             pendingNextSeason,
             pendingNextEpisode,
             pendingNextAddonId,
@@ -994,6 +1035,7 @@ fun PlayerScreen(
                 // Add error listener to try next stream on codec errors
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
+                        currentPlaybackState = playbackState
                         val stateStr = when (playbackState) {
                             Player.STATE_IDLE -> "IDLE"
                             Player.STATE_BUFFERING -> "BUFFERING"
@@ -2610,7 +2652,7 @@ fun PlayerScreen(
                             // current episode. No-op for movies (there is no next).
                             if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
                                 val selected = uiState.selectedStream
-                                onPlayNext(
+                                playNextEpisode(
                                     seasonNumber,
                                     episodeNumber + 1,
                                     selected?.addonId?.takeIf { it.isNotBlank() },
@@ -3612,7 +3654,7 @@ fun PlayerScreen(
                                     val season = seasonNumber ?: return@PlayerIconButton
                                     val episode = episodeNumber ?: return@PlayerIconButton
                                     val selected = uiState.selectedStream
-                                    onPlayNext(season, episode + 1, selected?.addonId?.takeIf { it.isNotBlank() }, selected?.source?.takeIf { it.isNotBlank() }, selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() })
+                                    playNextEpisode(season, episode + 1, selected?.addonId?.takeIf { it.isNotBlank() }, selected?.source?.takeIf { it.isNotBlank() }, selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() })
                                 },
                                 onLeftKey = { aspectButtonFocusRequester.requestFocus() },
                                 onRightKey = { subtitleButtonFocusRequester.requestFocus() },
