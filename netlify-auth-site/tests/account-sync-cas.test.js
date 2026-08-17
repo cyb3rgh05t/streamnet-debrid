@@ -30,21 +30,79 @@ class FakeSnapshotClient {
   }
 }
 
+class FakeBlobStore {
+  constructor() {
+    this.entry = null;
+    this.version = 0;
+  }
+
+  async getWithMetadata() {
+    if (!this.entry) return null;
+    return structuredClone(this.entry);
+  }
+
+  async setJSON(_key, data, options) {
+    if (options.onlyIfNew && this.entry) return { modified: false };
+    if (options.onlyIfMatch && options.onlyIfMatch !== this.entry?.etag) {
+      return { modified: false };
+    }
+    this.version += 1;
+    this.entry = {
+      data: structuredClone(data),
+      etag: `v${this.version}`,
+      metadata: structuredClone(options.metadata),
+    };
+    return { modified: true, etag: this.entry.etag };
+  }
+}
+
 test("account snapshot compare-and-set rejects stale revisions", async () => {
   const client = new FakeSnapshotClient();
   const compareAndSet = _test.compareAndSetDatabaseSnapshot;
 
-  const first = await compareAndSet(client, "account-1", { payload: { value: "first" } }, 0);
+  const first = await compareAndSet(
+    client,
+    "account-1",
+    { payload: { value: "first" } },
+    0,
+  );
   assert.equal(first.saved, true);
   assert.equal(first.snapshot.revision, 1);
 
-  const second = await compareAndSet(client, "account-1", { payload: { value: "second" } }, 1);
+  const second = await compareAndSet(
+    client,
+    "account-1",
+    { payload: { value: "second" } },
+    1,
+  );
   assert.equal(second.saved, true);
   assert.equal(second.snapshot.revision, 2);
 
-  const stale = await compareAndSet(client, "account-1", { payload: { value: "stale" } }, 1);
+  const stale = await compareAndSet(
+    client,
+    "account-1",
+    { payload: { value: "stale" } },
+    1,
+  );
   assert.equal(stale.saved, false);
   assert.equal(stale.current.revision, 2);
   assert.deepEqual(stale.current.payload, { value: "second" });
   assert.deepEqual(client.row.payload, { value: "second" });
+});
+
+test("account snapshot Blob mirror rejects out-of-order revisions", async () => {
+  const store = new FakeBlobStore();
+  const saveMirror = _test.saveSnapshotBlobIfNewer;
+
+  await saveMirror(store, "snapshot.json", { revision: 6, payload: "new" }, {});
+  await saveMirror(
+    store,
+    "snapshot.json",
+    { revision: 5, payload: "stale" },
+    {},
+  );
+
+  assert.equal(store.entry.data.revision, 6);
+  assert.equal(store.entry.data.payload, "new");
+  assert.equal(store.version, 1);
 });

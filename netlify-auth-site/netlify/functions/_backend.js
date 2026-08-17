@@ -2034,6 +2034,31 @@ async function loadSnapshotFromBlobs(event, identity) {
   return claimed;
 }
 
+async function saveSnapshotBlobIfNewer(store, key, snapshot, metadata) {
+  const incomingRevision = Number(snapshot.revision);
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const existing = await store.getWithMetadata(key, { type: "json" });
+    const existingRevision = Number(existing?.data?.revision);
+    if (
+      Number.isSafeInteger(existingRevision) &&
+      (!Number.isSafeInteger(incomingRevision) ||
+        existingRevision >= incomingRevision)
+    ) {
+      return existing.data;
+    }
+
+    const write = await store.setJSON(key, snapshot, {
+      metadata,
+      ...(existing?.etag
+        ? { onlyIfMatch: existing.etag }
+        : { onlyIfNew: true }),
+    });
+    if (write.modified) return snapshot;
+  }
+
+  throw new Error("Snapshot Blob mirror conflicted; retry shortly");
+}
+
 async function saveSnapshotToBlobs(event, identity, snapshot) {
   const stores = snapshotStores(event);
   const keys = snapshotKeys(identity);
@@ -2047,6 +2072,9 @@ async function saveSnapshotToBlobs(event, identity, snapshot) {
       snapshot.payloadUpdatedAt ?? snapshot.payload_updated_at ?? null,
     source: snapshot.source || "netlify",
     updatedAt: snapshot.updatedAt || new Date().toISOString(),
+    ...(Number.isSafeInteger(Number(snapshot.revision))
+      ? { revision: Number(snapshot.revision) }
+      : {}),
   };
   const metadata = {
     email: normalizeEmail(identity.email),
@@ -2055,8 +2083,15 @@ async function saveSnapshotToBlobs(event, identity, snapshot) {
     profileCount: String(normalized.profileCount ?? ""),
     updatedAt: normalized.updatedAt,
   };
-  await stores.account.setJSON(keys.supabase, normalized, { metadata });
-  await stores.account.setJSON(keys.email, normalized, { metadata });
+  await Promise.all([
+    saveSnapshotBlobIfNewer(
+      stores.account,
+      keys.supabase,
+      normalized,
+      metadata,
+    ),
+    saveSnapshotBlobIfNewer(stores.account, keys.email, normalized, metadata),
+  ]);
   return normalized;
 }
 
@@ -2092,7 +2127,12 @@ async function loadSnapshotFromDatabase(identity) {
   }
 }
 
-async function compareAndSetDatabaseSnapshot(client, accountId, snapshot, expectedRevision) {
+async function compareAndSetDatabaseSnapshot(
+  client,
+  accountId,
+  snapshot,
+  expectedRevision,
+) {
   const currentResult = await client.query(
     `SELECT payload, payload_version, restore_rank, profile_count,
             scoped_coverage, payload_updated_at, source, updated_at, revision
@@ -2141,7 +2181,11 @@ async function compareAndSetDatabaseSnapshot(client, accountId, snapshot, expect
   return { saved: true, snapshot: normalizeDatabaseSnapshot(result.rows[0]) };
 }
 
-async function saveSnapshotToDatabase(identity, snapshot, expectedRevision = null) {
+async function saveSnapshotToDatabase(
+  identity,
+  snapshot,
+  expectedRevision = null,
+) {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
@@ -2960,5 +3004,6 @@ module.exports = {
     isAllowedSimklRequest,
     consumeSimklRateLimit,
     compareAndSetDatabaseSnapshot,
+    saveSnapshotBlobIfNewer,
   },
 };

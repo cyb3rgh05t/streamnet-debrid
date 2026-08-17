@@ -2,7 +2,7 @@ const {
   json,
   options,
   resolveIdentity,
-  loadOrClaimSnapshot
+  loadOrClaimSnapshot,
 } = require("./_backend");
 
 exports.handler = async (event) => {
@@ -24,19 +24,24 @@ exports.handler = async (event) => {
         profileCount: null,
         restoreRank: 0,
         scopedCoverage: 0,
-        revision: 0
+        revision: 0,
       });
     }
 
     return json(200, {
       payload: snapshot.payload,
       source: snapshot.source,
-      updatedAt: snapshot.updatedAt || snapshot.updated_at || snapshot.payloadUpdatedAt || null,
-      payloadUpdatedAt: snapshot.payloadUpdatedAt || snapshot.payload_updated_at || null,
+      updatedAt:
+        snapshot.updatedAt ||
+        snapshot.updated_at ||
+        snapshot.payloadUpdatedAt ||
+        null,
+      payloadUpdatedAt:
+        snapshot.payloadUpdatedAt || snapshot.payload_updated_at || null,
       profileCount: snapshot.profileCount ?? snapshot.profile_count ?? null,
       restoreRank: snapshot.restoreRank ?? snapshot.restore_rank ?? 0,
       scopedCoverage: snapshot.scopedCoverage ?? snapshot.scoped_coverage ?? 0,
-      revision: snapshot.revision
+      revision: snapshot.revision,
     });
   } catch (error) {
     console.error("account-sync-pull failed", error);

@@ -9,7 +9,7 @@ const {
   loadOrClaimSnapshot,
   saveSnapshotToDatabase,
   saveSnapshotToBlobs,
-  appendSnapshotEvent
+  appendSnapshotEvent,
 } = require("./_backend");
 
 const TRACKING_V2_FIELDS = [
@@ -17,24 +17,43 @@ const TRACKING_V2_FIELDS = [
   "continueWatchingReadMode",
   "watchedReadMode",
   "writeToTrakt",
-  "writeToSimkl"
+  "writeToSimkl",
 ];
 
 function preserveTrackingRouting(existingSnapshot, incomingPayload) {
   const previous = existingSnapshot?.payload?.mdbListSyncByProfile;
   const incoming = incomingPayload?.mdbListSyncByProfile;
-  if (!previous || typeof previous !== "object" || Array.isArray(previous) ||
-      !incoming || typeof incoming !== "object" || Array.isArray(incoming)) {
+  if (
+    !previous ||
+    typeof previous !== "object" ||
+    Array.isArray(previous) ||
+    !incoming ||
+    typeof incoming !== "object" ||
+    Array.isArray(incoming)
+  ) {
     return incomingPayload;
   }
   const merged = { ...incoming };
   for (const [profileId, previousSelection] of Object.entries(previous)) {
-    if (!previousSelection || typeof previousSelection !== "object" || Array.isArray(previousSelection)) continue;
+    if (
+      !previousSelection ||
+      typeof previousSelection !== "object" ||
+      Array.isArray(previousSelection)
+    )
+      continue;
     const incomingSelection = merged[profileId];
-    if (!incomingSelection || typeof incomingSelection !== "object" || Array.isArray(incomingSelection)) continue;
+    if (
+      !incomingSelection ||
+      typeof incomingSelection !== "object" ||
+      Array.isArray(incomingSelection)
+    )
+      continue;
     const next = { ...incomingSelection };
     for (const field of TRACKING_V2_FIELDS) {
-      if (!Object.prototype.hasOwnProperty.call(next, field) && Object.prototype.hasOwnProperty.call(previousSelection, field)) {
+      if (
+        !Object.prototype.hasOwnProperty.call(next, field) &&
+        Object.prototype.hasOwnProperty.call(previousSelection, field)
+      ) {
         next[field] = previousSelection[field];
       }
     }
@@ -57,23 +76,45 @@ exports.handler = async (event) => {
     if (!rawPayload) {
       return json(400, { accepted: false, reason: "missing_payload" });
     }
-    const hasExpectedRevision = Object.prototype.hasOwnProperty.call(body, "expectedRevision");
-    const expectedRevision = hasExpectedRevision ? Number(body.expectedRevision) : null;
-    if (hasExpectedRevision && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) {
-      return json(400, { accepted: false, reason: "invalid_expected_revision" });
+    const hasExpectedRevision = Object.prototype.hasOwnProperty.call(
+      body,
+      "expectedRevision",
+    );
+    const expectedRevision = hasExpectedRevision
+      ? Number(body.expectedRevision)
+      : null;
+    if (
+      hasExpectedRevision &&
+      (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)
+    ) {
+      return json(400, {
+        accepted: false,
+        reason: "invalid_expected_revision",
+      });
     }
 
     const existing = await loadOrClaimSnapshot(event, identity);
     // Server-side addon wipe guard: refuse pushes that catastrophically shrink
     // the addon list (recurring client bug); existing addons are merged back.
-    const parsedPayload = typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
-    const { payload: addonGuardedPayload, guarded } = applyAddonWipeGuard(existing, parsedPayload);
-    const guardedPayload = preserveTrackingRouting(existing, addonGuardedPayload);
+    const parsedPayload =
+      typeof rawPayload === "string" ? JSON.parse(rawPayload) : rawPayload;
+    const { payload: addonGuardedPayload, guarded } = applyAddonWipeGuard(
+      existing,
+      parsedPayload,
+    );
+    const guardedPayload = preserveTrackingRouting(
+      existing,
+      addonGuardedPayload,
+    );
     if (guarded) {
       console.warn("account-sync-push: addon wipe guard engaged", {
         user: identity.supabaseUserId,
-        incomingRootAddons: Array.isArray(parsedPayload.addons) ? parsedPayload.addons.length : null,
-        preservedRootAddons: Array.isArray(guardedPayload.addons) ? guardedPayload.addons.length : null
+        incomingRootAddons: Array.isArray(parsedPayload.addons)
+          ? parsedPayload.addons.length
+          : null,
+        preservedRootAddons: Array.isArray(guardedPayload.addons)
+          ? guardedPayload.addons.length
+          : null,
       });
     }
     const incoming = payloadMetrics(guardedPayload);
@@ -86,8 +127,8 @@ exports.handler = async (event) => {
         incoming: {
           restoreRank: incoming.restoreRank,
           profileCount: incoming.profileCount,
-          scopedCoverage: incoming.scopedCoverage
-        }
+          scopedCoverage: incoming.scopedCoverage,
+        },
       });
     }
 
@@ -98,27 +139,31 @@ exports.handler = async (event) => {
       profileCount: incoming.profileCount,
       scopedCoverage: incoming.scopedCoverage,
       payloadUpdatedAt: incoming.payloadUpdatedAt,
-      source: "netlify"
+      source: "netlify",
     };
-    const result = await saveSnapshotToDatabase(identity, snapshot, expectedRevision);
+    const result = await saveSnapshotToDatabase(
+      identity,
+      snapshot,
+      expectedRevision,
+    );
     if (!result.saved) {
       return json(409, {
         accepted: false,
         reason: "revision_conflict",
         revision: result.current?.revision ?? 0,
-        current: result.current
+        current: result.current,
       });
     }
     const saved = result.snapshot;
     const mirrorResults = await Promise.allSettled([
       saveSnapshotToBlobs(event, identity, saved),
-      appendSnapshotEvent(event, identity, saved)
+      appendSnapshotEvent(event, identity, saved),
     ]);
     mirrorResults.forEach((mirrorResult, index) => {
       if (mirrorResult.status === "rejected") {
         console.warn("account-sync-push: post-commit mirror failed", {
           target: index === 0 ? "blob" : "event",
-          message: mirrorResult.reason?.message || String(mirrorResult.reason)
+          message: mirrorResult.reason?.message || String(mirrorResult.reason),
         });
       }
     });
@@ -129,14 +174,14 @@ exports.handler = async (event) => {
       addonGuard: guarded,
       restoreRank: incoming.restoreRank,
       profileCount: incoming.profileCount,
-      scopedCoverage: incoming.scopedCoverage
+      scopedCoverage: incoming.scopedCoverage,
     });
   } catch (error) {
     console.error("account-sync-push failed", error);
     return json(error?.statusCode || 500, {
       accepted: false,
       error: "sync_push_failed",
-      message: error.message
+      message: error.message,
     });
   }
 };
