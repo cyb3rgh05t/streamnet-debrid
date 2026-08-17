@@ -951,6 +951,8 @@ class DetailsViewModel @Inject constructor(
                     }
                     _uiState.value = _uiState.value.copy(
                         item = currentItem.copy(isWatched = newWatched),
+                        playLabel = null,
+                        playPositionMs = null,
                         toastMessage = if (newWatched) context.getString(R.string.details_marked_watched) else context.getString(R.string.details_marked_unwatched),
                         toastType = ToastType.SUCCESS
                     )
@@ -1031,9 +1033,16 @@ class DetailsViewModel @Inject constructor(
                     }
 
                     val anyWatched = updatedEpisodes.any { it.isWatched }
+                    val optimisticProgress = _uiState.value.seasonProgress.toMutableMap().apply {
+                        this[targetEpisode.seasonNumber] = Pair(
+                            updatedEpisodes.count { it.isWatched },
+                            updatedEpisodes.size
+                        )
+                    }
                     _uiState.value = _uiState.value.copy(
                         item = currentItem.copy(isWatched = anyWatched),
                         episodes = updatedEpisodes,
+                        seasonProgress = optimisticProgress,
                         toastMessage = if (episodeWatched) {
                             context.getString(R.string.details_episode_marked_watched, targetEpisode.seasonNumber, targetEpisode.episodeNumber)
                         } else {
@@ -1041,10 +1050,13 @@ class DetailsViewModel @Inject constructor(
                         },
                         toastType = ToastType.SUCCESS
                     )
+                    refreshSeriesPlayTarget(optimisticProgress)
+                    persistSeriesContinueWatchingTarget(currentItem)
                     runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 }
                 runCatching { cloudSyncRepository.pushToCloud() }
             } catch (e: Exception) {
+                Log.e(TAG, "[PlayTarget] Primary watched toggle failed tmdb=$currentMediaId", e)
                 _uiState.value = _uiState.value.copy(
                     toastMessage = context.getString(R.string.details_failed_update_watched),
                     toastType = ToastType.ERROR
@@ -1770,13 +1782,23 @@ class DetailsViewModel @Inject constructor(
                         ep.copy(isWatched = watched)
                     } else ep
                 }
-                _uiState.value = _uiState.value.copy(episodes = updatedEpisodes)
+                val optimisticProgress = _uiState.value.seasonProgress.toMutableMap().apply {
+                    if (_uiState.value.currentSeason == season && updatedEpisodes.isNotEmpty()) {
+                        this[season] = Pair(updatedEpisodes.count { it.isWatched }, updatedEpisodes.size)
+                    }
+                }
+                _uiState.value = _uiState.value.copy(
+                    episodes = updatedEpisodes,
+                    seasonProgress = optimisticProgress
+                )
+                refreshSeriesPlayTarget(optimisticProgress)
+                _uiState.value.item?.let { persistSeriesContinueWatchingTarget(it) }
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 // Push cloud snapshot so other devices see the episode watched-status
                 // change and the updated Continue Watching entry.
                 runCatching { cloudSyncRepository.pushToCloud() }
             } catch (e: Exception) {
-                // Failed silently
+                Log.e(TAG, "[PlayTarget] Episode toggle failed tmdb=$currentMediaId s=$season e=$episode", e)
             }
         }
     }
@@ -1890,19 +1912,15 @@ class DetailsViewModel @Inject constructor(
                     }
                 }
 
-                val playTarget = buildPlayTarget(currentMediaType, refreshedProgress, null)
-
                 _uiState.value = _uiState.value.copy(
                     item = currentItem.copy(isWatched = nextUnwatched == null),
                     episodes = updatedEpisodes,
                     seasonProgress = refreshedProgress?.progress ?: optimisticProgress,
-                    playSeason = playTarget?.season ?: _uiState.value.playSeason,
-                    playEpisode = playTarget?.episode ?: _uiState.value.playEpisode,
-                    playLabel = playTarget?.label ?: _uiState.value.playLabel,
-                    playPositionMs = playTarget?.positionMs ?: _uiState.value.playPositionMs,
                     toastMessage = context.getString(R.string.details_season_marked_watched, season),
                     toastType = ToastType.SUCCESS
                 )
+                refreshSeriesPlayTarget(refreshedProgress?.progress ?: optimisticProgress, refreshedProgress)
+                persistSeriesContinueWatchingTarget(currentItem)
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 // Push cloud snapshot so other devices see the entire season marked watched
                 // and the updated Continue Watching entry pointing to the next unwatched episode.
@@ -1994,6 +2012,8 @@ class DetailsViewModel @Inject constructor(
                     toastMessage = context.getString(R.string.details_season_marked_unwatched, season),
                     toastType = ToastType.SUCCESS
                 )
+                refreshSeriesPlayTarget(refreshedProgress?.progress ?: optimisticProgress, refreshedProgress)
+                persistSeriesContinueWatchingTarget(currentItem)
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 runCatching { cloudSyncRepository.pushToCloud() }
             } catch (_: Exception) {
@@ -2002,6 +2022,85 @@ class DetailsViewModel @Inject constructor(
                     toastType = ToastType.ERROR
                 )
             }
+        }
+    }
+
+    private suspend fun refreshSeriesPlayTarget(
+        fallbackProgress: Map<Int, Pair<Int, Int>>,
+        prefetchedProgress: SeasonProgressResult? = null
+    ) {
+        val repositoryProgress = prefetchedProgress ?: runCatching { fetchSeasonProgress(currentMediaId) }.getOrNull()
+        val latestState = _uiState.value
+        val mergedProgress = repositoryProgress?.progress.orEmpty().toMutableMap().apply {
+            putAll(fallbackProgress)
+        }
+        val visibleEpisodes = latestState.episodes.filter { it.seasonNumber == latestState.currentSeason }
+        val nextUnwatched = mergedProgress.keys.sorted().firstNotNullOfOrNull { season ->
+            val counts = mergedProgress[season] ?: return@firstNotNullOfOrNull null
+            if (season == latestState.currentSeason && visibleEpisodes.isNotEmpty()) {
+                visibleEpisodes.firstOrNull { !it.isWatched }?.let { Pair(season, it.episodeNumber) }
+            } else if (counts.first < counts.second) {
+                Pair(season, counts.first + 1)
+            } else {
+                null
+            }
+        }
+        val progress = SeasonProgressResult(
+            progress = mergedProgress,
+            hasWatched = mergedProgress.values.any { it.first > 0 },
+            nextUnwatched = nextUnwatched
+        )
+        val playTarget = buildPlayTarget(currentMediaType, progress, null)
+        _uiState.value = latestState.copy(
+            seasonProgress = progress.progress,
+            playSeason = playTarget?.season,
+            playEpisode = playTarget?.episode,
+            playLabel = playTarget?.label,
+            playPositionMs = playTarget?.positionMs
+        )
+    }
+
+    private suspend fun persistSeriesContinueWatchingTarget(item: MediaItem) {
+        runCatching {
+            traktRepository.removeFromContinueWatchingCache(currentMediaId, null, null, MediaType.TV)
+            watchHistoryRepository.removeFromHistory(currentMediaId, null, null)
+
+            val state = _uiState.value
+            val hasUnwatchedEpisodes = state.seasonProgress.values.any { (watched, total) -> watched < total }
+            val season = state.playSeason
+            val episode = state.playEpisode
+            if (hasUnwatchedEpisodes && season != null && episode != null) {
+                traktRepository.saveLocalContinueWatching(
+                    mediaType = MediaType.TV,
+                    tmdbId = currentMediaId,
+                    title = item.title,
+                    posterPath = item.image,
+                    backdropPath = item.backdrop,
+                    season = season,
+                    episode = episode,
+                    episodeTitle = null,
+                    progress = 3,
+                    positionSeconds = 0L,
+                    durationSeconds = 1L,
+                    year = item.year
+                )
+                watchHistoryRepository.saveProgress(
+                    mediaType = MediaType.TV,
+                    tmdbId = currentMediaId,
+                    title = item.title,
+                    poster = item.image,
+                    backdrop = item.backdrop,
+                    season = season,
+                    episode = episode,
+                    episodeTitle = null,
+                    progress = 0.01f,
+                    duration = 0L,
+                    position = 0L
+                )
+            }
+        }.onFailure { error ->
+            if (error is CancellationException) throw error
+            Log.e(TAG, "[PlayTarget] Failed to persist CW target tmdb=$currentMediaId", error)
         }
     }
 

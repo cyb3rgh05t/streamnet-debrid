@@ -64,6 +64,8 @@ import com.arflix.tv.ui.theme.BackgroundElevated
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.util.LocalDeviceType
 
 /**
@@ -105,6 +107,7 @@ fun ContextMenu(
     onDismiss: () -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
     var focusedIndex by remember { mutableIntStateOf(0) }
     val focusRequester = remember { FocusRequester() }
 
@@ -167,6 +170,7 @@ fun ContextMenu(
                         .padding(top = 110.dp)
                         .width(360.dp)
                         .background(BackgroundElevated, RoundedCornerShape(18.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
                         .padding(20.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
@@ -194,7 +198,7 @@ fun ContextMenu(
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(1.dp)
-                            .background(Color.White.copy(alpha = 0.1f))
+                            .background(TextSecondary.copy(alpha = 0.2f))
                     )
 
                     Spacer(modifier = Modifier.height(12.dp))
@@ -206,7 +210,8 @@ fun ContextMenu(
                         actions.forEachIndexed { index, action ->
                             ContextMenuItem(
                                 action = action,
-                                isFocused = index == focusedIndex
+                                isFocused = index == focusedIndex,
+                                accentColor = accentColor
                             )
                         }
                     }
@@ -217,7 +222,7 @@ fun ContextMenu(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
-                            .background(Color.White.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                            .background(TextSecondary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Icon(
@@ -271,6 +276,11 @@ fun ContextMenu(
                                 BackgroundElevated,
                                 RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                             )
+                            .border(
+                                1.dp,
+                                accentColor.copy(alpha = 0.35f),
+                                RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
+                            )
                             .clickable(
                                 indication = null,
                                 interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
@@ -284,7 +294,7 @@ fun ContextMenu(
                                 .width(36.dp)
                                 .height(4.dp)
                                 .background(
-                                    Color.White.copy(alpha = 0.2f),
+                                    accentColor.copy(alpha = 0.65f),
                                     RoundedCornerShape(2.dp)
                                 )
                         )
@@ -317,7 +327,7 @@ fun ContextMenu(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(1.dp)
-                                .background(Color.White.copy(alpha = 0.08f))
+                                .background(TextSecondary.copy(alpha = 0.16f))
                         )
 
                         // Action items
@@ -334,7 +344,7 @@ fun ContextMenu(
                                 Icon(
                                     imageVector = action.icon,
                                     contentDescription = null,
-                                    tint = action.color,
+                                    tint = if (action.color == Pink) accentColor else action.color,
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
@@ -350,7 +360,7 @@ fun ContextMenu(
                                         .fillMaxWidth()
                                         .padding(horizontal = 16.dp)
                                         .height(1.dp)
-                                        .background(Color.White.copy(alpha = 0.05f))
+                                        .background(TextSecondary.copy(alpha = 0.1f))
                                 )
                             }
                         }
@@ -365,17 +375,19 @@ fun ContextMenu(
 @Composable
 private fun ContextMenuItem(
     action: ContextAction,
-    isFocused: Boolean
+    isFocused: Boolean,
+    accentColor: Color
 ) {
-    val bgColor = if (isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent
-    val borderColor = if (isFocused) Pink else Color.Transparent
+    val focusedContentColor = contrastingContentColor(accentColor)
+    val bgColor = if (isFocused) accentColor else Color.Transparent
+    val borderColor = if (isFocused) Color.Transparent else TextSecondary.copy(alpha = 0.16f)
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(bgColor, RoundedCornerShape(12.dp))
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
+                width = if (isFocused) 0.dp else 1.dp,
                 color = borderColor,
                 shape = RoundedCornerShape(12.dp)
             )
@@ -385,7 +397,7 @@ private fun ContextMenuItem(
         Icon(
             imageVector = action.icon,
             contentDescription = null,
-            tint = if (isFocused) Pink else action.color,
+            tint = if (isFocused) focusedContentColor else if (action.color == Pink) accentColor else action.color,
             modifier = Modifier.size(24.dp)
         )
 
@@ -394,7 +406,7 @@ private fun ContextMenuItem(
         Text(
             text = action.label,
             style = ArflixTypography.body,
-            color = if (isFocused) TextPrimary else action.color
+            color = if (isFocused) focusedContentColor else TextPrimary
         )
 
         Spacer(modifier = Modifier.weight(1f))
@@ -403,13 +415,13 @@ private fun ContextMenuItem(
             Box(
                 modifier = Modifier
                     .size(24.dp)
-                    .background(Pink, RoundedCornerShape(6.dp)),
+                    .background(focusedContentColor.copy(alpha = 0.16f), RoundedCornerShape(6.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = Color.Black,
+                    tint = focusedContentColor,
                     modifier = Modifier.size(16.dp)
                 )
             }
