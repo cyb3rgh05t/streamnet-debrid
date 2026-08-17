@@ -5129,10 +5129,6 @@ class HomeViewModel @Inject constructor(
         } ?: return
 
         if (!appUpdateRepository.supportsSelfUpdate()) return
-        if (!com.arflix.tv.updater.ApkInstaller.canRequestPackageInstalls(context)) {
-            _uiState.value = _uiState.value.copy(showUnknownSourcesDialog = true, showAppUpdateDialog = false)
-            return
-        }
 
         downloadJob = viewModelScope.launch {
             updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.Downloading(0f, update))
@@ -5152,8 +5148,6 @@ class HomeViewModel @Inject constructor(
 
             result.onSuccess { file ->
                 updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.ReadyToInstall(file.absolutePath, update))
-                // Automatically prompt install once downloaded
-                installAppUpdateOrRequestPermission()
             }.onFailure { error ->
                 updateStatusManager.updateStatus(
                     com.arflix.tv.updater.UpdateStatus.Failure(error.message ?: context.getString(R.string.update_download_failed), update)
@@ -5211,6 +5205,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun openUnknownSourcesSettings() {
+        _uiState.value = _uiState.value.copy(
+            showUnknownSourcesDialog = false,
+            showAppUpdateDialog = true,
+        )
         com.arflix.tv.updater.ApkInstaller.buildUnknownSourcesSettingsIntent(context)?.let { intent ->
             context.startActivity(intent)
         }

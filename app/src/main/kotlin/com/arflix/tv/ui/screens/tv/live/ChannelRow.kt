@@ -78,6 +78,7 @@ fun ChannelRow(
     variantCount: Int = 1,
     onOpenVariants: () -> Unit = {},
     rowHeight: androidx.compose.ui.unit.Dp = LiveDims.EpgRowHeight,
+    compact: Boolean = false,
     forceFocused: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
@@ -161,11 +162,16 @@ fun ChannelRow(
                 .background(if (isActive) LiveColors.Accent else Color.Transparent),
         )
 
+        if (compact) {
+            ChannelLogo(channel = channel, size = 36.dp)
+            Spacer(Modifier.width(10.dp))
+        }
+
         // ─ channel number ────────────────────────────────────
         Box(
             modifier = Modifier
                 .width(48.dp)
-                .padding(start = 10.dp, end = 6.dp),
+                .padding(start = if (compact) 0.dp else 10.dp, end = 6.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             Text(
@@ -176,8 +182,9 @@ fun ChannelRow(
             )
         }
 
-        // ─ logo ──────────────────────────────────────────────
-        ChannelLogo(channel = channel, size = 36.dp)
+        if (!compact) {
+            ChannelLogo(channel = channel, size = 36.dp)
+        }
 
         Spacer(Modifier.width(10.dp))
 
@@ -229,14 +236,16 @@ fun ChannelRow(
             }
         }
 
-        // ─ stacked badges (quality + lang) ───────────────────
-        Column(
-            modifier = Modifier.padding(end = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            horizontalAlignment = Alignment.End,
-        ) {
-            SmallPillBadge(if (variantCount > 1) stringResource(R.string.live_label_quality_variants, channel.quality.label, variantCount) else channel.quality.label)
-            SmallPillBadge(channel.lang)
+        if (!compact) {
+            // ─ stacked badges (quality + lang) ───────────────
+            Column(
+                modifier = Modifier.padding(end = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                horizontalAlignment = Alignment.End,
+            ) {
+                SmallPillBadge(if (variantCount > 1) stringResource(R.string.live_label_quality_variants, channel.quality.label, variantCount) else channel.quality.label)
+                SmallPillBadge(channel.lang)
+            }
         }
     }
 }

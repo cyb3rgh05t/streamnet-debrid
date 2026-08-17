@@ -181,6 +181,7 @@ class MainActivity : ComponentActivity() {
 
     private var jankStats: JankStats? = null
     private var automaticUpdateCheckJob: kotlinx.coroutines.Job? = null
+    private var forceNextAutomaticUpdateCheck = false
     private var pendingLauncherRequest by mutableStateOf<LauncherContinueWatchingRequest?>(null)
     private var pendingInstallPackUrl by mutableStateOf<String?>(null)
 
@@ -216,6 +217,7 @@ class MainActivity : ComponentActivity() {
         }
 
         super.onCreate(savedInstanceState)
+        forceNextAutomaticUpdateCheck = savedInstanceState == null
         window.setBackgroundDrawable(ColorDrawable(android.graphics.Color.BLACK))
         window.decorView.setBackgroundColor(android.graphics.Color.BLACK)
         @Suppress("DEPRECATION")
@@ -430,17 +432,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        checkForAppUpdateIfDue()
+        val force = forceNextAutomaticUpdateCheck
+        forceNextAutomaticUpdateCheck = false
+        checkForAppUpdateIfDue(force = force)
     }
 
-    private fun checkForAppUpdateIfDue() {
+    private fun checkForAppUpdateIfDue(force: Boolean) {
         if (!appUpdateRepository.supportsSelfUpdate()) return
         if (automaticUpdateCheckJob?.isActive == true) return
         if (updateStatusManager.status.value !is UpdateStatus.Idle) return
 
         automaticUpdateCheckJob = lifecycleScope.launch {
             val lastCheckAtMs = updatePreferences.lastCheckAtMs.first()
-            if (System.currentTimeMillis() - lastCheckAtMs < APP_UPDATE_CHECK_INTERVAL_MS) {
+            if (!force && System.currentTimeMillis() - lastCheckAtMs < APP_UPDATE_CHECK_INTERVAL_MS) {
                 return@launch
             }
 

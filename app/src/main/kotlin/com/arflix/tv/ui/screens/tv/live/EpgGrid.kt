@@ -515,6 +515,7 @@ fun EpgGrid(
                                 variantCount = variantCountFor(ch),
                                 onOpenVariants = { onOpenVariants(ch) },
                                 rowHeight = rowHeight,
+                                compact = compact,
                                 forceFocused = gridFocused && locallyFocused,
                                 modifier = Modifier
                                     .width(channelColumnWidth)

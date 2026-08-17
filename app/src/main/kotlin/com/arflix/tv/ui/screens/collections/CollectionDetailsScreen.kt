@@ -374,6 +374,9 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun supportsTab(catalog: CatalogConfig, tab: CollectionTab): Boolean {
+        if (catalog.collectionGroup == CollectionGroupKind.NETWORK) {
+            return tab == CollectionTab.SERIES
+        }
         return catalog.collectionSources.any { sourceMatchesTab(it, tab) }
     }
 
