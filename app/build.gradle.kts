@@ -18,6 +18,9 @@ plugins {
     // id("com.google.firebase.crashlytics")
 }
 
+val discordSdkAar = layout.projectDirectory.file("libs/discord_partner_sdk.aar").asFile
+val hasDiscordSdk = discordSdkAar.isFile
+
 android {
     namespace = "com.arflix.tv"
     compileSdk = 36
@@ -44,6 +47,12 @@ android {
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "true")
         buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
         buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "true")
+        buildConfigField("Boolean", "DISCORD_RICH_PRESENCE_AVAILABLE", hasDiscordSdk.toString())
+        buildConfigField(
+            "String",
+            "DISCORD_APPLICATION_ID",
+            "\"${escapeBuildConfigString(localSecretValue("DISCORD_CLIENT_ID").ifBlank { "1501197333826637835" })}\""
+        )
         buildConfigField(
             "String",
             "NETLIFY_BACKEND_URL",
@@ -64,9 +73,11 @@ android {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
         }
 
-        externalNativeBuild {
-            cmake {
-                arguments += "-DANDROID_STL=c++_shared"
+        if (hasDiscordSdk) {
+            externalNativeBuild {
+                cmake {
+                    arguments += "-DANDROID_STL=c++_shared"
+                }
             }
         }
 
@@ -190,7 +201,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
-        prefab = true
+        prefab = hasDiscordSdk
     }
 
     packaging {
@@ -208,10 +219,12 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            version = "3.22.1"
+    if (hasDiscordSdk) {
+        externalNativeBuild {
+            cmake {
+                path = file("src/main/cpp/CMakeLists.txt")
+                version = "3.22.1"
+            }
         }
     }
 
@@ -265,12 +278,11 @@ ksp {
     }
 
     dependencies {
-    // Discord Partner SDK (native C++ integration via Prefab)
-    val discordSdkAar = file("libs/discord_partner_sdk.aar")
-    if (discordSdkAar.exists()) {
+    // Discord Partner SDK is licensed separately and intentionally not committed.
+    if (hasDiscordSdk) {
         implementation(files(discordSdkAar))
     } else {
-        logger.warn("Discord Partner SDK AAR not found. Compiling native JNI bridge with stub fallback.")
+        logger.warn("Discord Partner SDK AAR not found. Discord Rich Presence will be unavailable.")
     }
 
     // Gson explicit pin to keep `JsonParser`/AST extension API stable with current sources.

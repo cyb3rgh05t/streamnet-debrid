@@ -1118,6 +1118,67 @@ function isTvSessionExpired(session) {
   return !session?.expiresAt || Date.now() > Date.parse(session.expiresAt);
 }
 
+function discordSessionStore(event) {
+  connectLambda(event);
+  return getStore("discord-auth-sessions");
+}
+
+function discordSessionKeys(session) {
+  const deviceHash = sha256(session.deviceCode);
+  const expiryHour = new Date(session.expiresAt).toISOString().slice(0, 13).replace(/[-T:]/g, "");
+  return {
+    device: `device/${deviceHash}.json`,
+    expiry: `expiry/${expiryHour}/${deviceHash}.json`
+  };
+}
+
+async function loadDiscordSession(event, deviceCode) {
+  return getJSONOrNull(discordSessionStore(event), `device/${sha256(deviceCode)}.json`);
+}
+
+async function saveDiscordSession(event, session) {
+  const store = discordSessionStore(event);
+  const keys = discordSessionKeys(session);
+  await store.setJSON(keys.device, session, {
+    metadata: {
+      status: session.status,
+      expiresAt: session.expiresAt
+    }
+  });
+  await store.setJSON(keys.expiry, {
+    deviceKey: keys.device,
+    expiresAt: session.expiresAt
+  }, {
+    metadata: { expiresAt: session.expiresAt }
+  });
+}
+
+async function deleteDiscordSession(event, session) {
+  if (!session?.deviceCode || !session?.expiresAt) return;
+  const store = discordSessionStore(event);
+  const keys = discordSessionKeys(session);
+  await Promise.all([
+    store.delete(keys.device).catch(() => {}),
+    store.delete(keys.expiry).catch(() => {})
+  ]);
+}
+
+function isDiscordSessionExpired(session) {
+  return !session?.expiresAt || Date.now() > Date.parse(session.expiresAt);
+}
+
+function validDiscordDeviceCode(value) {
+  return /^[A-Za-z0-9_-]{40,128}$/.test(String(value || ""));
+}
+
+function validDiscordClientId(value) {
+  return /^\d{17,20}$/.test(String(value || ""));
+}
+
+function validPkceChallenge(value) {
+  return /^[A-Za-z0-9_-]{43,128}$/.test(String(value || ""));
+}
+
 function methodGuard(event, methods) {
   const method = event.httpMethod || "GET";
   if (methods.includes(method)) return null;
@@ -1199,6 +1260,104 @@ async function handleAuthRefresh(event) {
     return json(200, token);
   } catch (error) {
     return handlerError(event, error, "Session refresh failed");
+  }
+}
+
+async function handleDiscordAuthStart(event) {
+  const preflight = options(event);
+  if (preflight) return preflight;
+  const wrongMethod = methodGuard(event, ["POST"]);
+  if (wrongMethod) return wrongMethod;
+  try {
+    assertAppRequest(event);
+    const body = parseBody(event);
+    const clientId = String(body.client_id || "").trim();
+    const challenge = String(body.code_challenge || "").trim();
+    if (!validDiscordClientId(clientId)) return json(400, { error: "Invalid client_id" });
+    if (!validPkceChallenge(challenge)) return json(400, { error: "Invalid code_challenge" });
+
+    const deviceCode = crypto.randomBytes(32).toString("base64url");
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    await saveDiscordSession(event, {
+      deviceCode,
+      status: "pending",
+      createdAt: new Date().toISOString(),
+      expiresAt
+    });
+
+    const verifyBase = (
+      process.env.DISCORD_AUTH_VERIFY_BASE_URL ||
+      "https://auth.arvio.tv"
+    ).replace(/\/+$/, "");
+    const query = new URLSearchParams({
+      session: deviceCode,
+      challenge,
+      client_id: clientId
+    });
+    return json(200, {
+      device_code: deviceCode,
+      verification_uri_complete: `${verifyBase}/discord/?${query.toString()}`,
+      expires_in: 600,
+      interval: 3
+    });
+  } catch (error) {
+    return handlerError(event, error, "Failed to start Discord pairing");
+  }
+}
+
+async function handleDiscordAuthStatus(event) {
+  const preflight = options(event);
+  if (preflight) return preflight;
+  const wrongMethod = methodGuard(event, ["POST"]);
+  if (wrongMethod) return wrongMethod;
+  try {
+    assertAppRequest(event);
+    const body = parseBody(event);
+    const deviceCode = String(body.device_code || "").trim();
+    if (!validDiscordDeviceCode(deviceCode)) return json(400, { error: "Invalid device_code" });
+
+    const session = await loadDiscordSession(event, deviceCode);
+    if (!session) return json(200, { status: "expired" });
+    if (isDiscordSessionExpired(session)) {
+      await deleteDiscordSession(event, session);
+      return json(200, { status: "expired" });
+    }
+    if (session.status === "approved" && session.code) {
+      await deleteDiscordSession(event, session);
+      return json(200, { status: "approved", code: session.code });
+    }
+    return json(200, { status: "pending" });
+  } catch (error) {
+    return handlerError(event, error, "Failed to poll Discord pairing");
+  }
+}
+
+async function handleDiscordAuthCallback(event) {
+  const preflight = options(event);
+  if (preflight) return preflight;
+  const wrongMethod = methodGuard(event, ["POST"]);
+  if (wrongMethod) return wrongMethod;
+  try {
+    const body = parseBody(event);
+    const deviceCode = String(body.device_code || "").trim();
+    const code = String(body.code || "").trim();
+    if (!validDiscordDeviceCode(deviceCode)) return json(400, { error: "Invalid device_code" });
+    if (!code || code.length > 2048) return json(400, { error: "Invalid authorization code" });
+
+    const session = await loadDiscordSession(event, deviceCode);
+    if (!session || session.status !== "pending" || isDiscordSessionExpired(session)) {
+      if (session) await deleteDiscordSession(event, session);
+      return json(400, { error: "Invalid or expired pairing session" });
+    }
+    await saveDiscordSession(event, {
+      ...session,
+      status: "approved",
+      approvedAt: new Date().toISOString(),
+      code
+    });
+    return json(200, { ok: true });
+  } catch (error) {
+    return handlerError(event, error, "Discord pairing failed");
   }
 }
 
@@ -2861,6 +3020,7 @@ async function handleRetentionCleanup(event) {
   const now = new Date();
   const currentHour = now.toISOString().slice(0, 13).replace(/[-T:]/g, "");
   const tvStore = tvSessionStores(event);
+  const discordStore = discordSessionStore(event);
   const authStore = authStores(event);
   const deletionStore = accountDeletionStore(event);
 
@@ -2886,6 +3046,16 @@ async function handleRetentionCleanup(event) {
             .catch(() => {})
         : Promise.resolve(),
       tvStore.delete(key).catch(() => {}),
+    ]);
+  });
+
+  const discordExpiryKeys = (await listBlobKeys(discordStore, "expiry/"))
+    .filter((key) => String(key.split("/")[1] || "") < currentHour);
+  await mapWithConcurrency(discordExpiryKeys, 16, async (key) => {
+    const reference = await getJSONOrNull(discordStore, key);
+    await Promise.all([
+      reference?.deviceKey ? discordStore.delete(reference.deviceKey).catch(() => {}) : Promise.resolve(),
+      discordStore.delete(key).catch(() => {})
     ]);
   });
 
@@ -2944,6 +3114,7 @@ async function handleRetentionCleanup(event) {
   return json(200, {
     ok: true,
     tv_sessions: tvExpiryKeys.length,
+    discord_sessions: discordExpiryKeys.length,
     password_setup_tokens: passwordExpiryKeys.length,
     deletion_jobs: deletionJobs,
     revocations,
@@ -2993,6 +3164,8 @@ module.exports = {
   handleTvAuthComplete,
   handleTvAuthStart,
   handleTvAuthStatus,
+  handleDiscordAuthStart,
+  handleDiscordAuthStatus,
   handleDiscordAuthCallback,
   _test: {
     signArvioAccessToken,
@@ -3006,5 +3179,8 @@ module.exports = {
     consumeSimklRateLimit,
     compareAndSetDatabaseSnapshot,
     saveSnapshotBlobIfNewer,
-  },
+    validDiscordDeviceCode,
+    validDiscordClientId,
+    validPkceChallenge,
+  }
 };

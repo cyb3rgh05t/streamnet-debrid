@@ -1,36 +1,51 @@
 package com.arflix.tv.ui.screens.details.discord
 
 import android.util.Log
+import com.arflix.tv.BuildConfig
 
 object DiscordBridge {
     private const val TAG = "DiscordBridge"
+    private var nativeLoaded = false
 
     init {
-        try {
-            System.loadLibrary("arvio_native")
-            Log.i(TAG, "Successfully loaded arvio_native library.")
-        } catch (e: UnsatisfiedLinkError) {
-            Log.e(TAG, "Failed to load arvio_native library: ${e.message}")
+        if (BuildConfig.DISCORD_RICH_PRESENCE_AVAILABLE) {
+            nativeLoaded = try {
+                System.loadLibrary("arvio_native")
+                Log.i(TAG, "Successfully loaded arvio_native library.")
+                true
+            } catch (error: UnsatisfiedLinkError) {
+                Log.e(TAG, "Failed to load arvio_native library: ${error.message}")
+                false
+            }
         }
     }
+
+    val isAvailable: Boolean
+        get() = BuildConfig.DISCORD_RICH_PRESENCE_AVAILABLE && nativeLoaded
 
     interface Callback {
         fun onStatusChanged(status: Int, error: Int, errorDetail: Int)
     }
 
-    fun init(clientId: String, callback: Callback) {
+    fun init(clientId: String, callback: Callback): Boolean {
+        if (!isAvailable) return false
         try {
             nativeInit(clientId, callback)
+            return true
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "nativeInit not linked: ${e.message}")
+            return false
         }
     }
 
-    fun connect(accessToken: String) {
+    fun connect(accessToken: String): Boolean {
+        if (!isAvailable) return false
         try {
             nativeConnect(accessToken)
+            return true
         } catch (e: UnsatisfiedLinkError) {
             Log.e(TAG, "nativeConnect not linked: ${e.message}")
+            return false
         }
     }
 
@@ -42,6 +57,7 @@ object DiscordBridge {
         largeImage: String?,
         largeText: String?
     ) {
+        if (!isAvailable) return
         try {
             nativeUpdateActivity(details, state, startTime, endTime, largeImage, largeText)
         } catch (e: UnsatisfiedLinkError) {
@@ -50,6 +66,7 @@ object DiscordBridge {
     }
 
     fun clearActivity() {
+        if (!isAvailable) return
         try {
             nativeClearActivity()
         } catch (e: UnsatisfiedLinkError) {
@@ -58,6 +75,7 @@ object DiscordBridge {
     }
 
     fun disconnect() {
+        if (!isAvailable) return
         try {
             nativeDisconnect()
         } catch (e: UnsatisfiedLinkError) {
@@ -66,6 +84,7 @@ object DiscordBridge {
     }
 
     fun tick() {
+        if (!isAvailable) return
         try {
             nativeTick()
         } catch (e: UnsatisfiedLinkError) {

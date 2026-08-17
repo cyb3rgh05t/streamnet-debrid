@@ -41,11 +41,13 @@
       var params = new URLSearchParams(window.location.search);
       var session = params.get("session") || params.get("state") || "";
       var challenge = params.get("challenge") || params.get("code_challenge") || "";
-      var clientId = "1501197333826637835";
+      var clientId = params.get("client_id") || "";
       var redirectUri = window.location.origin + "/discord/callback";
 
-      if (!challenge) {
-        document.body.innerHTML = "<div style='color:#ff8a76;'><h3>Invalid Authorization Request</h3><p>Missing challenge parameter. Please scan the QR code on your TV again.</p></div>";
+      if (!/^[A-Za-z0-9_-]{40,128}$/.test(session) ||
+          !/^[A-Za-z0-9_-]{43,128}$/.test(challenge) ||
+          !/^\d{17,20}$/.test(clientId)) {
+        document.body.innerHTML = "<div style='color:#ff8a76;'><h3>Invalid Authorization Request</h3><p>Please scan the QR code on your TV again.</p></div>";
         return;
       }
 

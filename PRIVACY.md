@@ -54,6 +54,7 @@ Data is also sent to services you deliberately use or connect:
 | Firebase Crashlytics     | Crash-reporting fallback in configured builds                                   | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
 | TMDB                     | Movie and TV metadata and images                                                | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
 | Trakt.tv                 | Optional watch history, progress, ratings, and watchlist sync                   | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
+| Discord                  | Optional Rich Presence login and the title/playback status you choose to display | [discord.com/privacy](https://discord.com/privacy)                                 |
 | Ko-fi                    | Optional StreamNet TV Web membership verification                               | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
 | User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add | Governed by the provider you configure                                             |
 

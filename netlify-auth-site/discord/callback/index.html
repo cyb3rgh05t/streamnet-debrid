@@ -108,9 +108,9 @@
         return;
       }
 
-      if (!code) {
+      if (!code || !/^[A-Za-z0-9_-]{40,128}$/.test(state || "")) {
         heading.textContent = "No Code Received";
-        message.textContent = "Discord did not return an authorization code.";
+        message.textContent = "Discord did not return a valid pairing response.";
         return;
       }
 
@@ -138,9 +138,9 @@
         }
       }
 
-      heading.textContent = "Authorization Complete!";
-      message.textContent = "Enter this code on your TV if it does not connect automatically:";
-      codeContainer.style.display = "block";
+      heading.textContent = "Could Not Reach Your TV";
+      heading.style.color = "#ff8a76";
+      message.textContent = "Return to ARVIO and scan the QR code again.";
     })();
   </script>
 </body>

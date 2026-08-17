@@ -25,6 +25,8 @@ object Constants {
     val TV_AUTH_STATUS_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-status"
     val TV_AUTH_POLL_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-poll"
     val TV_AUTH_COMPLETE_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-complete"
+    val DISCORD_AUTH_START_URL: String get() = "$NETLIFY_BACKEND_URL/discord-auth-start"
+    val DISCORD_AUTH_STATUS_URL: String get() = "$NETLIFY_BACKEND_URL/discord-auth-status"
     val AUTH_LOGIN_URL: String get() = "$NETLIFY_BACKEND_URL/auth-login"
     val AUTH_REFRESH_URL: String get() = "$NETLIFY_BACKEND_URL/auth-refresh"
     val AUTH_PASSWORD_START_URL: String get() = "$NETLIFY_BACKEND_URL/auth-password-start"
