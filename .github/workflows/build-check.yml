@@ -160,9 +160,11 @@ jobs:
             sha256sum "$artifact_name" > "$artifact_name.sha256"
           )
 
-          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
-          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
-          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          {
+            echo "version_name=$version_name"
+            echo "version_code=$version_code"
+            echo "artifact_name=$artifact_name"
+          } >> "$GITHUB_OUTPUT"
           {
             echo "### Signed Android release"
             echo "- Version: $version_name ($version_code)"
