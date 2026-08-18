@@ -149,7 +149,7 @@ jobs:
 
           version_name="$(jq -r '.elements[0].versionName' "$metadata")"
           version_code="$(jq -r '.elements[0].versionCode' "$metadata")"
-          artifact_name="StreamNet-${version_name}-${version_code}-sideload-release.apk"
+          artifact_name="StreamNet-Debrid-${version_name}.apk"
           mkdir -p release-artifacts
           cp "$apk" "release-artifacts/$artifact_name"
           (
