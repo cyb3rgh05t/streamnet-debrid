@@ -17,6 +17,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ARVIO"
+rootProject.name = "StreamNet Debrid"
 include(":app")
 include(":benchmark")

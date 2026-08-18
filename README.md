@@ -1,20 +1,8 @@
-# StreamNet TV
+# StreamNet Debrid
 
-StreamNet TV is an Android media hub for TV, phone, and tablet form factors. This repository is maintained as a source-code and development mirror for the Android application.
+StreamNet Debrid is an Android media hub for TV, phone, and tablet form factors. This repository is maintained as a source-code and development mirror for the Android application.
 
-The app provides a media browser, player shell, profile support, optional cloud sync, IPTV playlist support, catalog configuration, home-server integrations, and integrations with user-configured sources. StreamNet TV does not host, store, sell, or distribute movies, series, live TV channels, playlists, streams, or other third-party media.
-
-## Repository Purpose
-
-This GitHub repository is for:
-
-- Source code review and development
-- Issue investigation and technical discussion
-- Build documentation
-- License and privacy documentation
-- Contribution review
-
-It is not intended as an advertising page, download landing page, or content distribution repository.
+The app provides a media browser, player shell, profile support, optional cloud sync, IPTV playlist support, catalog configuration, home-server integrations, and integrations with user-configured sources. StreamNet Debrid does not host, store, sell, or distribute movies, series, live TV channels, playlists, streams, or other third-party media.
 
 ## Features
 
@@ -32,19 +20,13 @@ It is not intended as an advertising page, download landing page, or content dis
 - Profile PINs and custom profile avatars
 - ExoPlayer/Media3 playback with TV remote, mobile, and tablet controls
 
-## Availability
+## Support StreamNet Debrid
 
-StreamNet TV is available on Google Play:
+StreamNet Debrid is a free hobby project built and maintained with a lot of time, testing, hosting, and service costs. The goal is to keep StreamNet TV free as it grows, but running and improving it still costs money every month.
 
-[<img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" alt="Get it on Google Play" width="160">](https://play.google.com/store/apps/details?id=com.arvio.tv)
+If StreamNet Debrid helps you and you want to support development, donations are appreciated:
 
-## Support StreamNet TV
-
-StreamNet TV is a free hobby project built and maintained with a lot of time, testing, hosting, and service costs. The goal is to keep StreamNet TV free as it grows, but running and improving it still costs money every month.
-
-If StreamNet TV helps you and you want to support development, donations are appreciated:
-
-[Support StreamNet TV on Ko-fi](https://ko-fi.com/arvio)
+[Support StreamNet Debrid on Ko-fi](https://ko-fi.com/streamnetclub)
 
 ## Screenshots
 
@@ -60,9 +42,9 @@ If StreamNet TV helps you and you want to support development, donations are app
 | ---------------------------------------------- | -------------------------------------------------- |
 | ![Mobile screen](screenshots/mobile_home.webp) | ![Profiles screen](screenshots/profiles_v1991.png) |
 
-### StreamNet TV Web — iPhone, iPad & any browser
+### StreamNet Debrid Web — iPhone, iPad & any browser
 
-The same StreamNet TV experience in the browser at [web.arvio.tv](https://web.arvio.tv) — for the devices an APK can't reach. Profiles, watchlist and progress sync with the app.
+The same StreamNet Debrid experience in the browser at [web.streamnet.live](https://web.streamnet.live) — for the devices an APK can't reach. Profiles, watchlist and progress sync with the app.
 
 | Web · Home (iPad)                                            | Web · Details (iPad)                                               |
 | ------------------------------------------------------------ | ------------------------------------------------------------------ |
@@ -74,11 +56,11 @@ The same StreamNet TV experience in the browser at [web.arvio.tv](https://web.ar
 
 ## Content And Source Policy
 
-StreamNet TV is a media browser and player interface for user-configured sources. It works like a media player or browser: users provide their own services, playlists, addons, and URLs.
+StreamNet Debrid is a media browser and player interface for user-configured sources. It works like a media player or browser: users provide their own services, playlists, addons, and URLs.
 
-This repository does not include hosted media content, bundled playlists, IPTV credentials, debrid accounts, third-party streaming catalogs, or links intended to enable unauthorized access to content. No movies, series, live TV channels, playlists, or other third-party media are hosted by this repository or by StreamNet TV.
+This repository does not include hosted media content, bundled playlists, IPTV credentials, debrid accounts, third-party streaming catalogs, or links intended to enable unauthorized access to content. No movies, series, live TV channels, playlists, or other third-party media are hosted by this repository or by StreamNet Debrid.
 
-Users are solely responsible for their usage and must comply with applicable local laws. If you believe content accessed through an external source violates copyright law, contact the actual file host, service provider, or source maintainer. The StreamNet TV repository and developers cannot remove content hosted by third parties.
+Users are solely responsible for their usage and must comply with applicable local laws. If you believe content accessed through an external source violates copyright law, contact the actual file host, service provider, or source maintainer. The StreamNet Debrid repository and developers cannot remove content hosted by third parties.
 
 Contributors should not submit copyrighted media, credentials, private keys, access tokens, or links intended to enable unauthorized access to content.
 
@@ -169,7 +151,7 @@ Smoke-test startup, profile switching, playback, stream fallback, subtitle/audio
 
 ## Privacy
 
-See [PRIVACY.md](PRIVACY.md) for the privacy policy. Cloud account and synced data deletion is available at [auth.arvio.tv/delete](https://auth.arvio.tv/delete).
+See [PRIVACY.md](PRIVACY.md) for the privacy policy. Cloud account and synced data deletion is available at [auth.streamnet.club/delete](https://auth.streamnet.club/delete).
 
 ## License
 

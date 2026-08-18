@@ -1,14 +1,14 @@
-# ARVIO Web
+# StreamNet TV Web
 
-Browser-native ARVIO app for iPad, desktop, and TV browsers. This app lives beside the Android app and mirrors the same product surface without touching Android-only code.
+Browser-native StreamNet TV app for iPad, desktop, and TV browsers. This app lives beside the Android app and mirrors the same product surface without touching Android-only code.
 
 ## What It Reuses
 
-- ARVIO Netlify auth and account sync (`auth-login`, `auth-refresh`, `account-sync-pull`, `account-sync-push`).
+- StreamNet TV Netlify auth and account sync (`auth-login`, `auth-refresh`, `account-sync-pull`, `account-sync-push`).
 - Android's TMDB and Trakt proxy model through Next API routes.
 - Stremio-style addon manifest and stream response contracts.
 - IPTV M3U playlist parsing, channel groups, favorites, and browser HLS playback.
-- ARVIO visual language: dark full-screen shell, left TV navigation, hero, rails, details drawer, source selector, player overlay, Live TV, addons, settings.
+- StreamNet TV visual language: dark full-screen shell, left TV navigation, hero, rails, details drawer, source selector, player overlay, Live TV, addons, settings.
 
 ## Environment
 
@@ -47,7 +47,7 @@ The source for `web.arvio.tv` is this `web/` directory. Do not connect Netlify t
 Recommended Netlify settings for the `arvio-web` site:
 
 ```text
-Repository: ProdigyV21/ARVIO
+Repository: ProdigyV21/StreamNet TV
 Branch: main
 Base directory: web
 Build command: npm run build

@@ -1,6 +1,6 @@
 // Web subscription entitlements. Stored in a dedicated Netlify Blobs store,
 // keyed by sha256(email) so the Ko-fi webhook (which only knows the buyer's
-// email, not an ARVIO access token) and the app (which has a JWT identity with
+// email, not an StreamNet TV access token) and the app (which has a JWT identity with
 // an email) resolve the SAME record. The APK never reads this — web only.
 //
 // An entitlement record:
@@ -29,12 +29,16 @@ function entitlementKey(emailHash) {
 
 async function readEntitlement(store, emailHash) {
   try {
-    return await store.get(entitlementKey(emailHash), { type: "json", consistency: "strong" });
+    return await store.get(entitlementKey(emailHash), {
+      type: "json",
+      consistency: "strong",
+    });
   } catch (error) {
     if (String(error?.message || "").includes("uncachedEdgeURL")) {
       return store.get(entitlementKey(emailHash), { type: "json" });
     }
-    if (error?.status === 404 || error?.name === "BlobNotFoundError") return null;
+    if (error?.status === 404 || error?.name === "BlobNotFoundError")
+      return null;
     throw error;
   }
 }
@@ -51,20 +55,31 @@ async function writeEntitlement(store, emailHash, record) {
 function evaluateEntitlement(record) {
   const now = Date.now();
   if (!record) {
-    return { entitled: false, reason: "none", status: "none", trialAvailable: true, expiresAt: null, source: null };
+    return {
+      entitled: false,
+      reason: "none",
+      status: "none",
+      trialAvailable: true,
+      expiresAt: null,
+      source: null,
+    };
   }
   const expiresAt = record.expiresAt ? Date.parse(record.expiresAt) : null;
   const active =
     record.status === "active" && (expiresAt === null || expiresAt > now);
   return {
     entitled: active,
-    reason: active ? (record.source === "trial" ? "trial" : "subscription") : "expired",
+    reason: active
+      ? record.source === "trial"
+        ? "trial"
+        : "subscription"
+      : "expired",
     status: record.status || "none",
     source: record.source || null,
     tier: record.tier || null,
     expiresAt: record.expiresAt || null,
     trialAvailable: !record.trialUsed && !active,
-    updatedAt: record.updatedAt || null
+    updatedAt: record.updatedAt || null,
   };
 }
 
@@ -72,7 +87,10 @@ function evaluateEntitlement(record) {
 // null). Merges onto any existing record so a trial->paid upgrade keeps history.
 function buildPaidRecord(existing, { source, tier, days, event }) {
   const now = new Date();
-  const expiresAt = days == null ? null : new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+  const expiresAt =
+    days == null
+      ? null
+      : new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
   return {
     ...(existing || {}),
     status: "active",
@@ -82,7 +100,7 @@ function buildPaidRecord(existing, { source, tier, days, event }) {
     expiresAt,
     trialUsed: existing ? existing.trialUsed === true : false,
     lastEvent: event || null,
-    updatedAt: now.toISOString()
+    updatedAt: now.toISOString(),
   };
 }
 
@@ -92,5 +110,5 @@ module.exports = {
   readEntitlement,
   writeEntitlement,
   evaluateEntitlement,
-  buildPaidRecord
+  buildPaidRecord,
 };
