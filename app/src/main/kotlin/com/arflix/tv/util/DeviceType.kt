@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
 import androidx.compose.runtime.compositionLocalOf
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlin.math.min
@@ -36,8 +37,16 @@ val SKIP_PROFILE_SELECTION_KEY = booleanPreferencesKey("skip_profile_selection")
 /** Key for forcing pure-black (OLED) app background */
 val OLED_BLACK_BACKGROUND_KEY = booleanPreferencesKey("oled_black_background")
 
-/** Key for the user-selected accent colour (e.g. "White", "Red", "Blue") */
+/** Legacy fallback for profiles that do not have an accent colour yet. */
 val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")
+
+fun profileAccentColorKey(profileId: String) =
+    stringPreferencesKey("profile_${profileId}_accent_color")
+
+fun readProfileAccentColor(preferences: Preferences, profileId: String?): String? =
+    profileId?.takeIf { it.isNotBlank() }
+        ?.let { preferences[profileAccentColorKey(it)] }
+        ?: preferences[ACCENT_COLOR_KEY]
 
 /**
  * Fast-path cache for the device-mode override. Read before onCreate() during

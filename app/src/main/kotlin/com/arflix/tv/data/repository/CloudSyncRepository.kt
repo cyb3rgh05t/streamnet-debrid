@@ -21,6 +21,7 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
+import com.arflix.tv.util.profileAccentColorKey
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -315,6 +316,7 @@ class CloudSyncRepository @Inject constructor(
         val trailerDelaySeconds: Int = 2,
         val trailerInCards: Boolean = true,
         val clockFormat: String = "24h",
+        val accentColor: String? = null,
         val showBudget: Boolean = true,
         val showLoadingStats: Boolean? = null,
         val spoilerBlurEnabled: Boolean = false,
@@ -344,6 +346,7 @@ class CloudSyncRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "trailer_delay_seconds")
     private fun clockFormatKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "clock_format")
+    private fun accentColorKeyFor(profileId: String) = profileAccentColorKey(profileId)
     private fun showBudgetKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_budget_on_home")
     private fun showLoadingStatsKeyFor(profileId: String) =
@@ -663,6 +666,9 @@ class CloudSyncRepository @Inject constructor(
                         trailerDelaySeconds = prefs[trailerDelayKeyFor(profile.id)]?.toIntOrNull() ?: 2,
                         trailerInCards = prefs[trailerInCardsKeyFor(profile.id)] ?: true,
                         clockFormat = prefs[clockFormatKeyFor(profile.id)] ?: "24h",
+                        accentColor = prefs[accentColorKeyFor(profile.id)]
+                            ?: prefs[ACCENT_COLOR_KEY]
+                            ?: "Orange",
                         showBudget = prefs[showBudgetKeyFor(profile.id)] ?: true,
                         showLoadingStats = prefs[showLoadingStatsKeyFor(profile.id)] ?: true,
                         spoilerBlurEnabled = prefs[spoilerBlurKeyFor(profile.id)] ?: false,
@@ -1450,6 +1456,9 @@ class CloudSyncRepository @Inject constructor(
                         prefs[trailerDelayKeyFor(profileId)] = state.trailerDelaySeconds.toString()
                         prefs[trailerInCardsKeyFor(profileId)] = state.trailerInCards
                         prefs[clockFormatKeyFor(profileId)] = state.clockFormat
+                        state.accentColor?.takeIf { it.isNotBlank() }?.let {
+                            prefs[accentColorKeyFor(profileId)] = it
+                        }
                         prefs[showBudgetKeyFor(profileId)] = state.showBudget
                         state.showLoadingStats?.let { prefs[showLoadingStatsKeyFor(profileId)] = it }
                         prefs[spoilerBlurKeyFor(profileId)] = state.spoilerBlurEnabled

@@ -65,7 +65,6 @@ import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
-import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.LocalHasTouchScreen
 import com.arflix.tv.util.LocalAppLanguage
@@ -73,6 +72,7 @@ import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.detectAutoDeviceType
 import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.util.deviceHasTouchScreen
+import com.arflix.tv.util.readProfileAccentColor
 import com.arflix.tv.util.settingsDataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -302,11 +302,13 @@ class MainActivity : ComponentActivity() {
             val oledBlackBackground by remember {
                 this@MainActivity.settingsDataStore.data.map { it[OLED_BLACK_BACKGROUND_KEY] ?: false }
             }.collectAsStateWithLifecycle(initialValue = false)
-            val accentColorName by remember {
-                this@MainActivity.settingsDataStore.data.map { it[ACCENT_COLOR_KEY] }
-            }.collectAsStateWithLifecycle(initialValue = null)
             val activeProfileId by remember {
                 profileRepository.get().activeProfileId
+            }.collectAsStateWithLifecycle(initialValue = null)
+            val accentColorName by remember(activeProfileId) {
+                this@MainActivity.settingsDataStore.data.map { preferences ->
+                    readProfileAccentColor(preferences, activeProfileId)
+                }
             }.collectAsStateWithLifecycle(initialValue = null)
             val appLanguage by remember(activeProfileId) {
                 this@MainActivity.settingsDataStore.data.map { prefs ->
@@ -520,7 +522,7 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 fun ArvioLoadingScreen() {
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
     val reveal = remember { Animatable(0f) }
-    val accentColor = resolveAccentColor(fallback = Color(0xFFE5A209))
+    val accentColor = Color(0xFFFF8800)
 
     LaunchedEffect(Unit) {
         reveal.animateTo(

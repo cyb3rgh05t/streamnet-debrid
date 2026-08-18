@@ -308,6 +308,7 @@ class SettingsViewModel @Inject constructor(
     private fun showBudgetKey() = profileManager.profileBooleanKey("show_budget_on_home")
     private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
     private fun clockFormatKey() = profileManager.profileStringKey("clock_format")
+    private fun accentColorKey() = profileManager.profileStringKey("accent_color")
     private fun smoothScrollingKey() = profileManager.profileBooleanKey("smooth_scrolling")
     private fun spoilerBlurKey() = profileManager.profileBooleanKey("spoiler_blur")
     // Stored as a string because ProfileManager has no int helper and we only persist
@@ -513,7 +514,10 @@ class SettingsViewModel @Inject constructor(
             // One-time migration: read old "focus_border_color" key if new "accent_color" is absent
             val OLD_FOCUS_BORDER_COLOR_KEY = stringPreferencesKey("focus_border_color")
             val legacyColor = prefs[OLD_FOCUS_BORDER_COLOR_KEY]
-            val accentColor = prefs[com.arflix.tv.util.ACCENT_COLOR_KEY] ?: legacyColor ?: "Orange"
+            val accentColor = prefs[accentColorKey()]
+                ?: prefs[com.arflix.tv.util.ACCENT_COLOR_KEY]
+                ?: legacyColor
+                ?: "Orange"
             // Schedule async migration to copy old key → new key and delete old
             if (legacyColor != null) {
                 viewModelScope.launch {
@@ -1428,7 +1432,7 @@ class SettingsViewModel @Inject constructor(
         val nextIndex = (colors.indexOf(current) + 1) % colors.size
         val next = colors[nextIndex]
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[com.arflix.tv.util.ACCENT_COLOR_KEY] = next }
+            context.settingsDataStore.edit { it[accentColorKey()] = next }
             _uiState.value = _uiState.value.copy(accentColor = next)
             syncLocalStateToCloud(silent = true)
         }

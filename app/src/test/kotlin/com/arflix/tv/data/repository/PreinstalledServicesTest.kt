@@ -107,8 +107,8 @@ class PreinstalledServicesTest {
             val video = cfg.collectionHeroVideoUrl
             assertNotNull("${cfg.id} heroVideo", video)
             assertTrue(
-                "${cfg.id} heroVideo must be mrtxiv asset, was $video",
-                video!!.contains("raw.githubusercontent.com/mrtxiv/networks-video-collection") &&
+                "${cfg.id} heroVideo must use the StreamNet fork, was $video",
+                video!!.contains("raw.githubusercontent.com/cyb3rgh05t/networks-video-collection") &&
                     video.endsWith(expectedVideos[cfg.id]!!)
             )
         }
@@ -244,4 +244,5 @@ class PreinstalledServicesTest {
         assertEquals(174, networks.first { it.title == "AMC" }
             .collectionSources.single().tmdbNetworkId)
     }
+
 }

@@ -7,15 +7,15 @@ import android.graphics.drawable.Drawable
 import androidx.compose.ui.graphics.Color
 
 val NeutralLogoBrandGradient = listOf(
-    Color(0xFF303236),
-    Color(0xFF1C1D20),
+    Color(0xFF394B67),
+    Color(0xFF26334A),
     Color(0xFF101112),
 )
 
 private val LightLogoBrandGradient = listOf(
-    Color(0xFFE8EAED),
-    Color(0xFFC8CCD2),
-    Color(0xFF8D939C),
+    Color(0xFFF1C76A),
+    Color(0xFFB86A5D),
+    Color(0xFF415B83),
 )
 
 fun logoBrandGradient(
@@ -82,7 +82,7 @@ fun logoBrandGradient(
         distance in 2..10
     } ?: primaryBucket
 
-    fun darkBrandColor(bucket: Int, value: Float): Color {
+    fun darkBrandColor(bucket: Int, saturation: Float, value: Float): Color {
         val weight = bucketWeights[bucket]
         val average = android.graphics.Color.rgb(
             (bucketRed[bucket] / weight).toInt(),
@@ -92,7 +92,7 @@ fun logoBrandGradient(
         android.graphics.Color.colorToHSV(average, hsv)
         return Color(
             android.graphics.Color.HSVToColor(
-                floatArrayOf(hsv[0], hsv[1].coerceAtLeast(0.34f), value)
+                floatArrayOf(hsv[0], hsv[1].coerceAtLeast(saturation), value)
             )
         )
     }
@@ -120,8 +120,8 @@ fun logoBrandGradient(
         )
     } else {
         listOf(
-            darkBrandColor(primaryBucket, 0.42f),
-            darkBrandColor(secondaryBucket, 0.24f),
+            darkBrandColor(primaryBucket, 0.62f, 0.62f),
+            darkBrandColor(secondaryBucket, 0.54f, 0.42f),
             Color(0xFF101112),
         )
     }

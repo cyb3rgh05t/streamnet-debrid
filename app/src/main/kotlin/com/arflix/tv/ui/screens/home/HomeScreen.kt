@@ -97,7 +97,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shadow
@@ -647,20 +646,22 @@ private fun HomeBackdropCrossfade(
                         logoGradient = logoGradientCache.getOrPut(stableBackdropUrl) {
                             logoBrandGradient(
                                 success.result.drawable,
-                                allowLightBackground = false,
+                                allowLightBackground = true,
                             )
                         }
                     }
                 },
-                colorFilter = if (displayedAsLogo) ColorFilter.tint(Color.White) else null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (displayedAsLogo) Modifier.padding(horizontal = 180.dp, vertical = 120.dp)
-                        else Modifier
-                    )
+                modifier = if (displayedAsLogo) {
+                    Modifier
+                        .align(Alignment.Center)
+                        .offset(y = (-88).dp)
+                        .fillMaxWidth(0.46f)
+                        .fillMaxHeight(0.34f)
+                } else {
+                    Modifier.fillMaxSize()
+                }
                     .graphicsLayer {
-                        val baseAlpha = if (displayedAsLogo) 0.2f else 1f
+                        val baseAlpha = if (displayedAsLogo) 0.72f else 1f
                         val outgoingAlpha = if (pendingBackdropReady) 1f - pendingAlpha.value else 1f
                         alpha = baseAlpha * outgoingAlpha
                     }
@@ -681,22 +682,24 @@ private fun HomeBackdropCrossfade(
                         pendingLogoGradient = logoGradientCache.getOrPut(nextBackdropUrl) {
                             logoBrandGradient(
                                 success.result.drawable,
-                                allowLightBackground = false,
+                                allowLightBackground = true,
                             )
                         }
                         logoGradient = pendingLogoGradient ?: logoGradient
                     }
                     pendingBackdropReady = true
                 },
-                colorFilter = if (pendingAsLogo) ColorFilter.tint(Color.White) else null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(
-                        if (pendingAsLogo) Modifier.padding(horizontal = 180.dp, vertical = 120.dp)
-                        else Modifier
-                    )
+                modifier = if (pendingAsLogo) {
+                    Modifier
+                        .align(Alignment.Center)
+                        .offset(y = (-88).dp)
+                        .fillMaxWidth(0.46f)
+                        .fillMaxHeight(0.34f)
+                } else {
+                    Modifier.fillMaxSize()
+                }
                     .graphicsLayer {
-                        alpha = pendingAlpha.value * if (pendingAsLogo) 0.2f else 1f
+                        alpha = pendingAlpha.value * if (pendingAsLogo) 0.72f else 1f
                     }
             )
         }

@@ -32,7 +32,7 @@ internal data class CollectionTemplateEntry(
 )
 
 internal object CollectionTemplateManifest {
-    private const val VIDEO_BASE = "https://raw.githubusercontent.com/mrtxiv/networks-video-collection/3486fc9a3d0efe59d1929e75f66021dc4e15bcb7/networks%20videos/"
+    private const val VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3486fc9a3d0efe59d1929e75f66021dc4e15bcb7/networks%20videos/"
     private const val STREAMING_SERVICE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/46fd4f8c335a7c581a7dcdb7dfac268c68ef84fc/Landscape%20Streaming%20Services/"
     private const val GENRE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/main/Landscape%20Genres/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
@@ -950,8 +950,12 @@ internal object CollectionTemplateManifest {
     )
 
     private data class GenreSpec(val id: Int, val title: String)
-    private data class CompanySpec(val id: Int, val title: String, val logoPath: String)
-
+    private data class CompanySpec(
+        val id: Int,
+        val title: String,
+        val logoPath: String,
+        val heroVideoFile: String? = null
+    )
     private val movieGenreSpecs = listOf(
         GenreSpec(28, "Action"), GenreSpec(12, "Adventure"), GenreSpec(16, "Animation"),
         GenreSpec(35, "Comedy"), GenreSpec(80, "Crime"), GenreSpec(99, "Documentary"),
@@ -986,12 +990,12 @@ internal object CollectionTemplateManifest {
     )
 
     private val networkSpecs = listOf(
-        CompanySpec(213, "Netflix", "/wwemzKWzjKYJFfCeiB57q3r4Bcm.png"),
-        CompanySpec(2739, "Disney+", "/uzKjVDmQ1WRMvGBb7UNRE0wTn1H.png"),
-        CompanySpec(1024, "Prime Video", "/ifhbNuuVnlwYy5oXA5VIb2YR8AZ.png"),
-        CompanySpec(2552, "Apple TV+", "/4KAy34EHvRM25Ih8wb82AuGU7zJ.png"),
-        CompanySpec(453, "Hulu", "/pqUTCleNUiTLAVlelGxUgWn1ELh.png"),
-        CompanySpec(49, "HBO", "/tuomPhY2UtuPTqqFnKMVHvSb724.png"),
+        CompanySpec(213, "Netflix", "/wwemzKWzjKYJFfCeiB57q3r4Bcm.png", "netflix.mp4"),
+        CompanySpec(2739, "Disney+", "/uzKjVDmQ1WRMvGBb7UNRE0wTn1H.png", "disneyplus.mp4"),
+        CompanySpec(1024, "Prime Video", "/ifhbNuuVnlwYy5oXA5VIb2YR8AZ.png", "amazonprime.mp4"),
+        CompanySpec(2552, "Apple TV+", "/4KAy34EHvRM25Ih8wb82AuGU7zJ.png", "appletv.mp4"),
+        CompanySpec(453, "Hulu", "/pqUTCleNUiTLAVlelGxUgWn1ELh.png", "hulu.mp4"),
+        CompanySpec(49, "HBO", "/tuomPhY2UtuPTqqFnKMVHvSb724.png", "hbomax.mp4"),
         CompanySpec(4353, "Discovery+", "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png"),
         CompanySpec(2, "ABC", "/ndAvF4JLsliGreX87jAc9GdjmJY.png"),
         CompanySpec(19, "FOX", "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png"),
@@ -1002,7 +1006,7 @@ internal object CollectionTemplateManifest {
         CompanySpec(71, "The CW", "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png"),
         CompanySpec(6, "NBC", "/cm111bsDVlYaC1foL0itvEI4yLG.png"),
         CompanySpec(16, "CBS", "/nm8d7P7MJNiBLdgIzUK0gkuEA4r.png"),
-        CompanySpec(4330, "Paramount+", "/fi83B1oztoS47xxcemFdPMhIzK.png"),
+        CompanySpec(4330, "Paramount+", "/fi83B1oztoS47xxcemFdPMhIzK.png", "paramount.mp4"),
         CompanySpec(4, "BBC One", "/mVn7xESaTNmjBUyUtGNvDQd3CT1.png"),
         CompanySpec(56, "Cartoon Network", "/c5OC6oVCg6QP4eqzW6XIq17CQjI.png"),
         CompanySpec(13, "Nickelodeon", "/ikZXxg6GnwpzqiZbRPhJGaZapqB.png"),
@@ -1041,7 +1045,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "https://image.tmdb.org/t/p/w780${spec.logoPath}",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = spec.heroVideoFile?.let { VIDEO_BASE + it },
             sources = listOf(
                 if (group == CollectionGroupKind.STUDIO) {
                     vodwisharrStudioSource(spec.id)
