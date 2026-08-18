@@ -46,7 +46,6 @@ jobs:
 
   signed-apk:
     name: Build signed release APK
-    if: github.event_name == 'workflow_dispatch'
     needs: verify
     runs-on: ubuntu-latest
     permissions:
