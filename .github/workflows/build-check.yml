@@ -143,7 +143,7 @@ jobs:
             > keystore.properties
 
       - name: Build release APK
-        run: ./gradlew :app:assembleSideloadRelease --no-daemon --stacktrace
+        run: ./gradlew :app:clean :app:assembleSideloadRelease --no-daemon --stacktrace
 
       - name: Verify and package APK
         id: package
@@ -159,8 +159,8 @@ jobs:
           test -n "$apksigner"
           "$apksigner" verify --verbose --print-certs "$apk"
 
-          version_name="$(jq -r '.elements[0].versionName' "$metadata")"
-          version_code="$(jq -r '.elements[0].versionCode' "$metadata")"
+          version_name="$(jq -er '.elements[0].versionName | select(type == "string" and length > 0)' "$metadata")"
+          version_code="$(jq -er '.elements[0].versionCode | select(type == "number")' "$metadata")"
           artifact_name="StreamNet-Debrid-${version_name}.apk"
           mkdir -p release-artifacts
           cp "$apk" "release-artifacts/$artifact_name"
