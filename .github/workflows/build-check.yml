@@ -1,10 +1,13 @@
-name: Build Check
+name: Android Build
 
 on:
   pull_request:
     branches:
       - main
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 concurrency:
   group: build-check-${{ github.ref }}
@@ -30,11 +33,11 @@ jobs:
         run: cp secrets.defaults.properties secrets.properties
 
       - name: Compile and test
-        run: ./gradlew testSideloadDebugUnitTest --no-daemon
+        run: ./gradlew test :app:compileSideloadDebugKotlin --no-daemon --stacktrace
 
   signed-apk:
-    name: Build signed test APK
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    name: Build signed release APK
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -51,6 +54,7 @@ jobs:
       - name: Validate required credentials
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
+          NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -61,6 +65,11 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           : "${APP_ANON_KEY:?Missing APP_ANON_KEY repository secret}"
+          : "${NETLIFY_BACKEND_URL:?Missing NETLIFY_BACKEND_URL repository secret}"
+          case "$NETLIFY_BACKEND_URL" in
+            http://*|https://*) ;;
+            *) echo "NETLIFY_BACKEND_URL must be an HTTP(S) URL" >&2; exit 1 ;;
+          esac
           : "${SUPABASE_URL:?Missing SUPABASE_URL repository secret}"
           case "$SUPABASE_URL" in
             http://*|https://*) ;;
@@ -77,6 +86,7 @@ jobs:
       - name: Prepare runtime configuration
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
+          NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
@@ -84,9 +94,14 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          TVDB_API_KEY: ${{ secrets.TVDB_API_KEY }}
+          FANART_API_KEY: ${{ secrets.FANART_API_KEY }}
+          VODWISHARR_API_KEY: ${{ secrets.VODWISHARR_API_KEY }}
         run: |
           printf '%s\n' \
             "APP_ANON_KEY=$APP_ANON_KEY" \
+            "NETLIFY_BACKEND_URL=$NETLIFY_BACKEND_URL" \
             "SUPABASE_URL=$SUPABASE_URL" \
             "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
             "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
@@ -94,6 +109,10 @@ jobs:
             "TMDB_API_KEY=$TMDB_API_KEY" \
             "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID" \
             "TRAKT_CLIENT_SECRET=$TRAKT_CLIENT_SECRET" \
+            "SIMKL_CLIENT_ID=$SIMKL_CLIENT_ID" \
+            "TVDB_API_KEY=$TVDB_API_KEY" \
+            "FANART_API_KEY=$FANART_API_KEY" \
+            "VODWISHARR_API_KEY=$VODWISHARR_API_KEY" \
             > secrets.properties
 
       - name: Prepare production signing
@@ -112,12 +131,46 @@ jobs:
             > keystore.properties
 
       - name: Build release APK
-        run: ./gradlew assembleSideloadRelease --no-daemon
+        run: ./gradlew :app:assembleSideloadRelease --no-daemon --stacktrace
+
+      - name: Verify and package APK
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="app/build/outputs/apk/sideload/release/app-sideload-release.apk"
+          metadata="app/build/outputs/apk/sideload/release/output-metadata.json"
+          test -f "$apk"
+          test -f "$metadata"
+
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner | sort -V | tail -n 1)"
+          test -n "$apksigner"
+          "$apksigner" verify --verbose --print-certs "$apk"
+
+          version_name="$(jq -r '.elements[0].versionName' "$metadata")"
+          version_code="$(jq -r '.elements[0].versionCode' "$metadata")"
+          artifact_name="StreamNet-${version_name}-${version_code}-sideload-release.apk"
+          mkdir -p release-artifacts
+          cp "$apk" "release-artifacts/$artifact_name"
+          (
+            cd release-artifacts
+            sha256sum "$artifact_name" > "$artifact_name.sha256"
+          )
+
+          echo "version_name=$version_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$version_code" >> "$GITHUB_OUTPUT"
+          echo "artifact_name=$artifact_name" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Signed Android release"
+            echo "- Version: $version_name ($version_code)"
+            echo "- APK: $artifact_name"
+            echo "- SHA-256: $(cut -d ' ' -f 1 "release-artifacts/$artifact_name.sha256")"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: arvio-sideload-release-${{ github.run_id }}
-          path: app/build/outputs/apk/sideload/release/*.apk
+          name: streamnet-sideload-${{ steps.package.outputs.version_name }}-${{ github.run_number }}
+          path: release-artifacts/*
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 14
