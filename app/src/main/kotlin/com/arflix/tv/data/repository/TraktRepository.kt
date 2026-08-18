@@ -2869,8 +2869,8 @@ class TraktRepository @Inject constructor(
         return try {
             traktApi.getMyLists(auth = auth, clientId = clientId)
                 .mapNotNull { list ->
-                    val id = list.ids?.slug?.takeIf { it.isNotBlank() }
-                        ?: list.ids?.trakt?.toString()
+                    val id = list.ids?.trakt?.takeIf { it > 0 }?.toString()
+                        ?: list.ids?.slug?.takeIf { it.isNotBlank() }
                         ?: return@mapNotNull null
                     PersonalList(
                         id = id,
@@ -2890,7 +2890,7 @@ class TraktRepository @Inject constructor(
     suspend fun getPersonalListItems(listId: String): List<MediaItem> {
         val auth = getAuthHeader() ?: return emptyList()
 
-        suspend fun loadType(type: String): List<TraktPublicListItem> {
+        suspend fun loadItems(): List<TraktPublicListItem> {
             val result = mutableListOf<TraktPublicListItem>()
             var page = 1
             while (true) {
@@ -2898,7 +2898,7 @@ class TraktRepository @Inject constructor(
                     auth = auth,
                     clientId = clientId,
                     listId = listId,
-                    type = type,
+                    type = TRAKT_PERSONAL_LIST_ITEM_TYPES,
                     page = page,
                     limit = PERSONAL_LIST_PAGE_SIZE
                 )
@@ -2910,41 +2910,14 @@ class TraktRepository @Inject constructor(
         }
 
         return try {
-            coroutineScope {
-                val movies = async { loadType("movies") }
-                val shows = async { loadType("shows") }
-                (movies.await() + shows.await())
-                    .sortedBy { it.rank ?: Int.MAX_VALUE }
-                    .mapIndexedNotNull { index, item ->
-                        when (item.type) {
-                            "movie" -> item.movie?.let { movie ->
-                                movie.ids.tmdb?.takeIf { it > 0 }?.let { tmdbId ->
-                                    MediaItem(
-                                        id = tmdbId,
-                                        title = movie.title,
-                                        year = movie.year?.toString().orEmpty(),
-                                        mediaType = MediaType.MOVIE,
-                                        sourceOrder = index
-                                    )
-                                }
-                            }
-                            "show" -> item.show?.let { show ->
-                                show.ids.tmdb?.takeIf { it > 0 }?.let { tmdbId ->
-                                    MediaItem(
-                                        id = tmdbId,
-                                        title = show.title,
-                                        year = show.year?.toString().orEmpty(),
-                                        mediaType = MediaType.TV,
-                                        sourceOrder = index
-                                    )
-                                }
-                            }
-                            else -> null
-                        }
-                    }
-                    .distinctBy { it.mediaType to it.id }
-                    .take(PERSONAL_LIST_ITEM_LIMIT)
-            }
+            val rows = loadItems()
+            val items = mapTraktPersonalListItems(rows, PERSONAL_LIST_ITEM_LIMIT)
+            AppLogger.breadcrumb(
+                tag = "Trakt",
+                message = "personal_list_mapped raw=${rows.size} mapped=${items.size}",
+                severity = if (rows.isNotEmpty() && items.isEmpty()) "warning" else "info"
+            )
+            items
         } catch (error: kotlinx.coroutines.CancellationException) {
             throw error
         } catch (error: Exception) {

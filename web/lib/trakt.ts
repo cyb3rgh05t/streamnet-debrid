@@ -146,9 +146,18 @@ export class TraktClient {
   async listItems(listId: string | number) {
     const token = await this.refreshIfNeeded();
     if (!token) return [];
-    return this.trakt<unknown[]>(`/users/me/lists/${listId}/items/movies,shows`, {
-      headers: { "x-user-token": token.access_token }
-    });
+    const rows: unknown[] = [];
+    const safeListId = encodeURIComponent(String(listId));
+    const limit = 100;
+    for (let page = 1; page <= 5; page += 1) {
+      const batch = await this.trakt<unknown[]>(
+        `/users/me/lists/${safeListId}/items/movie,show?extended=full&page=${page}&limit=${limit}`,
+        { headers: { "x-user-token": token.access_token } }
+      );
+      rows.push(...batch);
+      if (batch.length < limit) break;
+    }
+    return rows;
   }
 
   async playback() {
