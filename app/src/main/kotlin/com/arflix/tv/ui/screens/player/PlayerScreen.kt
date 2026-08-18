@@ -2413,22 +2413,24 @@ fun PlayerScreen(
             controlsSeekJob?.cancel()
             playerReleasedAtomic.set(true)
             playerReleased = true
-            runCatching {
-                val safeDuration = exoPlayer.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
-                val safeProgressPercent = if (safeDuration > 0L) {
-                    ((exoPlayer.currentPosition.toDouble() / safeDuration.toDouble()) * 100.0)
-                        .toInt()
-                        .coerceIn(0, 100)
-                } else {
-                    0
+            if (!nextEpisodeTransitionInProgress) {
+                runCatching {
+                    val safeDuration = exoPlayer.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
+                    val safeProgressPercent = if (safeDuration > 0L) {
+                        ((exoPlayer.currentPosition.toDouble() / safeDuration.toDouble()) * 100.0)
+                            .toInt()
+                            .coerceIn(0, 100)
+                    } else {
+                        0
+                    }
+                    viewModel.saveProgress(
+                        exoPlayer.currentPosition,
+                        safeDuration,
+                        safeProgressPercent,
+                        isPlaying = exoPlayer.isPlaying,
+                        playbackState = exoPlayer.playbackState
+                    )
                 }
-                viewModel.saveProgress(
-                    exoPlayer.currentPosition,
-                    safeDuration,
-                    safeProgressPercent,
-                    isPlaying = exoPlayer.isPlaying,
-                    playbackState = exoPlayer.playbackState
-                )
             }
             runCatching { exoPlayer.release() }
             // Restore the system stream volume if the player left it at zero.

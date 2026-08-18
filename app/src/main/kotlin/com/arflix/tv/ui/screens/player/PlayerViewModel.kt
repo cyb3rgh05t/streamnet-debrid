@@ -3910,17 +3910,24 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    fun saveProgress(position: Long, duration: Long, progressPercent: Int, isPlaying: Boolean, playbackState: Int) {
-        if (duration <= 0) return
+    fun saveProgress(
+        position: Long,
+        duration: Long,
+        progressPercent: Int,
+        isPlaying: Boolean,
+        playbackState: Int
+    ): Job? {
+        if (duration <= 0) return null
 
-        // On pause/stop, always save (cancel any in-flight periodic save).
-        // During playback, skip if a previous save is still running (debounce).
+        // On pause/stop, replace an in-flight periodic save. During normal playback,
+        // debounce by returning the save that is already running.
         if (!isPlaying || playbackState == Player.STATE_ENDED) {
             progressSaveJob?.cancel()
         } else if (progressSaveJob?.isActive == true) {
-            return
+            return progressSaveJob
         }
-        progressSaveJob = viewModelScope.launch(Dispatchers.IO) {
+
+        val job = viewModelScope.launch(Dispatchers.IO) {
             val currentTime = System.currentTimeMillis()
             val progressFraction = (progressPercent / 100f).coerceIn(0f, 1f)
             val selectedStream = _uiState.value.selectedStream
@@ -4154,9 +4161,15 @@ class PlayerViewModel @Inject constructor(
             }
 
             lastIsPlaying = isPlaying
-        }.also { job ->
-            job.invokeOnCompletion { progressSaveJob = null }
         }
+
+        progressSaveJob = job
+        job.invokeOnCompletion {
+            if (progressSaveJob === job) {
+                progressSaveJob = null
+            }
+        }
+        return job
     }
 
     suspend fun saveProgressAndWait(
@@ -4166,8 +4179,19 @@ class PlayerViewModel @Inject constructor(
         isPlaying: Boolean,
         playbackState: Int
     ) {
-        saveProgress(position, duration, progressPercent, isPlaying, playbackState)
-        progressSaveJob?.join()
+        // Let an in-flight save finish before starting the final transition save.
+        // This avoids cancelling after hasMarkedWatched was set but before the
+        // corresponding remote/history writes completed.
+        progressSaveJob?.takeIf { it.isActive }?.join()
+
+        val finalJob = saveProgress(
+            position = position,
+            duration = duration,
+            progressPercent = progressPercent,
+            isPlaying = isPlaying,
+            playbackState = playbackState
+        )
+        finalJob?.join()
     }
 
     private var progressSaveJob: Job? = null
