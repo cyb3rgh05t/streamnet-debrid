@@ -38,7 +38,10 @@ jobs:
   signed-apk:
     name: Build signed release APK
     if: github.event_name == 'workflow_dispatch'
+    needs: verify
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout
@@ -174,3 +177,21 @@ jobs:
           path: release-artifacts/*
           if-no-files-found: error
           retention-days: 14
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION_NAME: ${{ steps.package.outputs.version_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="v${VERSION_NAME}"
+
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" release-artifacts/* --clobber
+          else
+            gh release create "$tag" release-artifacts/* \
+              --target "$GITHUB_SHA" \
+              --title "StreamNet Debrid ${VERSION_NAME}" \
+              --generate-notes
+          fi
