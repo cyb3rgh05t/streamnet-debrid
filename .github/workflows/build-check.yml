@@ -180,12 +180,12 @@ jobs:
 
       - name: Create GitHub release
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.TOKEN }}
           VERSION_NAME: ${{ steps.package.outputs.version_name }}
         shell: bash
         run: |
           set -euo pipefail
-          tag="v${VERSION_NAME}"
+          tag="${VERSION_NAME}"
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release-artifacts/* --clobber
