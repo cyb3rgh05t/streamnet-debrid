@@ -1,7 +1,7 @@
 name: Deploy Web App
 
 on:
-  push:
+  pull_request:
     branches:
       - main
     paths:
@@ -63,8 +63,8 @@ jobs:
         shell: bash
         run: |
           for attempt in {1..20}; do
-            status=$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" https://web.arvio.tv/ || true)
-            live_stamp=$(curl --silent --show-error --fail https://web.arvio.tv/version.json | jq -r .v 2>/dev/null || true)
+            status=$(curl --silent --show-error --output /dev/null --write-out "%{http_code}" https://web.streamnet.club/ || true)
+            live_stamp=$(curl --silent --show-error --fail https://web.streamnet.club/version.json | jq -r .v 2>/dev/null || true)
             if [[ "$status" == "200" && "$live_stamp" == "$EXPECTED_BUILD_STAMP" ]]; then
               echo "Production deployment verified: $live_stamp"
               exit 0
