@@ -353,7 +353,7 @@ fun PluginScreen(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
-                    text = "Reset Plugins & Extensions",
+                    text = stringResource(R.string.reset_plugins_extensions),
                     style = ArflixTypography.button,
                     color = Color.Red
                 )

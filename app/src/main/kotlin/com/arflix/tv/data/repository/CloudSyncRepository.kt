@@ -21,6 +21,7 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
+import com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY
 import com.arflix.tv.util.profileAccentColorKey
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
@@ -94,6 +95,13 @@ internal fun mergeRemoteIptvGroupPreferences(
             if (profileId in locallyDirtyProfileIds) continue
             val remoteProfile = remoteByProfile.optJSONObject(profileId) ?: continue
             val localProfile = localByProfile.optJSONObject(profileId) ?: continue
+            val localUpdatedAt = localProfile.optLong("groupPreferencesUpdatedAt", 0L)
+            val remoteUpdatedAt = remoteProfile.optLong("groupPreferencesUpdatedAt", 0L)
+            val useRemote = when {
+                remoteUpdatedAt > 0L -> remoteUpdatedAt >= localUpdatedAt
+                else -> localUpdatedAt == 0L
+            }
+            if (!useRemote) continue
             remoteProfile.optJSONArray("hiddenGroups")?.let { remoteHiddenGroups ->
                 localProfile.put("hiddenGroups", remoteHiddenGroups)
             }
@@ -101,6 +109,9 @@ internal fun mergeRemoteIptvGroupPreferences(
             val remoteGroupOrder = remoteProfile.optJSONArray("groupOrder") ?: continue
             localProfile.put("groupOrder", remoteGroupOrder)
             localProfile.put("groupOrderSchema", remoteProfile.optInt("groupOrderSchema"))
+            if (remoteUpdatedAt > 0L) {
+                localProfile.put("groupPreferencesUpdatedAt", remoteUpdatedAt)
+            }
         }
         local.toString()
     }.getOrDefault(localPayload)
@@ -468,7 +479,7 @@ class CloudSyncRepository @Inject constructor(
     // existing merges; `defaultSubtitle` keeps its own `subtitleSettingsUpdatedAt` logic.
 
     private val globalMergeKeys = listOf(
-        "accentColor", "oledBlackBackground", "skipProfileSelection", "customUserAgent",
+        "accentColor", "oledBlackBackground", "skipProfileSelection", "startOnDeviceBoot", "customUserAgent",
         "dnsProvider", "subtitleAiEnabled", "subtitleAiAutoSelect", "subtitleAiFindBestMatch",
         "subtitlePreloadEnabled", "dolbyVisionCompatEnabled", "subtitleAiApiKey",
         "subtitleAiModel", "subtitleRemoveHearingImpaired"
@@ -723,6 +734,7 @@ class CloudSyncRepository @Inject constructor(
         root.put("subtitleUsageJson", prefs[subtitleUsageKey()] ?: "")
         root.put("subtitleSettingsUpdatedAt", prefs[subtitleSettingsUpdatedAtKey()]?.toLongOrNull() ?: 0L)
         root.put("skipProfileSelection", prefs[SKIP_PROFILE_SELECTION_KEY] ?: false)
+        root.put("startOnDeviceBoot", prefs[START_ON_DEVICE_BOOT_KEY] ?: false)
 
         // Global AI subtitle settings (non-profile-scoped)
         root.put("subtitleAiEnabled", prefs[subtitleAiEnabledKey] ?: false)
@@ -1582,6 +1594,12 @@ class CloudSyncRepository @Inject constructor(
         if (root.has("skipProfileSelection")) {
             context.settingsDataStore.edit { prefs ->
                 prefs[SKIP_PROFILE_SELECTION_KEY] = root.optBoolean("skipProfileSelection", false)
+            }
+        }
+
+        if (root.has("startOnDeviceBoot")) {
+            context.settingsDataStore.edit { prefs ->
+                prefs[START_ON_DEVICE_BOOT_KEY] = root.optBoolean("startOnDeviceBoot", false)
             }
         }
 

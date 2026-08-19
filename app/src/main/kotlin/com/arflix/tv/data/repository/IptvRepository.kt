@@ -321,6 +321,7 @@ data class IptvCloudProfileState(
     val hiddenGroups: List<String> = emptyList(),
     val groupOrder: List<String> = emptyList(),
     val groupOrderSchema: Int = 0,
+    val groupPreferencesUpdatedAt: Long = 0L,
     val sortOrder: String = "provider",
     val playlists: List<IptvPlaylistEntry> = emptyList(),
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
@@ -375,8 +376,12 @@ class IptvRepository @Inject constructor(
 
     fun groupPreferencesLocallyDirtyProfiles(): Set<String> = groupPreferencesLocallyDirtyProfiles.toSet()
 
-    private fun markGroupPreferencesLocallyDirty() {
-        groupPreferencesLocallyDirtyProfiles += profileManager.getProfileIdSync()
+    private suspend fun markGroupPreferencesLocallyDirty() {
+        val profileId = profileManager.getProfileIdSync()
+        context.settingsDataStore.edit { prefs ->
+            prefs[groupPreferencesUpdatedAtKey()] = System.currentTimeMillis().toString()
+        }
+        groupPreferencesLocallyDirtyProfiles += profileId
     }
 
     fun clearGroupPreferencesLocallyDirty() {
@@ -3150,6 +3155,10 @@ class IptvRepository @Inject constructor(
         profileManager.profileStringKey("iptv_group_order_schema")
     private fun groupOrderSchemaKeyFor(profileId: String): Preferences.Key<String> =
         profileManager.profileStringKeyFor(profileId, "iptv_group_order_schema")
+    private fun groupPreferencesUpdatedAtKey(): Preferences.Key<String> =
+        profileManager.profileStringKey("iptv_group_preferences_updated_at")
+    private fun groupPreferencesUpdatedAtKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_group_preferences_updated_at")
     private fun playlistsKeyFor(profileId: String): Preferences.Key<String> =
         profileManager.profileStringKeyFor(profileId, "iptv_playlists_json")
     private fun tvSessionKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_tv_session")
@@ -3273,6 +3282,7 @@ class IptvRepository @Inject constructor(
         val hiddenRaw = prefs[hiddenGroupsKeyFor(safeProfileId)].orEmpty()
         val orderRaw = prefs[groupOrderKeyFor(safeProfileId)].orEmpty()
         val orderSchema = prefs[groupOrderSchemaKeyFor(safeProfileId)]?.toIntOrNull() ?: 0
+        val groupPreferencesUpdatedAt = prefs[groupPreferencesUpdatedAtKeyFor(safeProfileId)]?.toLongOrNull() ?: 0L
         val playlistsRaw = prefs[playlistsKeyFor(safeProfileId)].orEmpty()
         val tvSessionRaw = prefs[tvSessionKeyFor(safeProfileId)].orEmpty()
         val playlists = decodePlaylists(playlistsRaw)
@@ -3297,6 +3307,7 @@ class IptvRepository @Inject constructor(
                 }.getOrDefault(emptyList())
             } else emptyList(),
             groupOrderSchema = IPTV_GROUP_ORDER_SCHEMA,
+            groupPreferencesUpdatedAt = groupPreferencesUpdatedAt,
             sortOrder = normalizeIptvSortOrder(prefs[sortOrderKeyFor(safeProfileId)]),
             playlists = playlists,
             tvSession = decodeTvSessionState(tvSessionRaw),
@@ -3330,16 +3341,29 @@ class IptvRepository @Inject constructor(
             .map { it.trim() }
             .filter { it.isNotBlank() && PlaylistGroupKey(it).playlistId in validPlaylistIds }
             .distinct()
+        var importedGroupPreferences = false
         context.settingsDataStore.edit { prefs ->
+            val localGroupPreferencesUpdatedAt = prefs[groupPreferencesUpdatedAtKeyFor(safeProfileId)]
+                ?.toLongOrNull() ?: 0L
+            val applyRemoteGroupPreferences = when {
+                state.groupPreferencesUpdatedAt > 0L -> state.groupPreferencesUpdatedAt >= localGroupPreferencesUpdatedAt
+                else -> localGroupPreferencesUpdatedAt == 0L
+            }
             prefs[m3uUrlKeyFor(safeProfileId)] = encryptConfigValue(normalizedM3u)
             prefs[epgUrlKeyFor(safeProfileId)] = encryptConfigValue(normalizedEpg)
             prefs[favoriteGroupsKeyFor(safeProfileId)] = gson.toJson(state.favoriteGroups.distinct())
             prefs[favoriteChannelsKeyFor(safeProfileId)] = gson.toJson(state.favoriteChannels.distinct())
-            if (state.hiddenGroups.isEmpty()) prefs.remove(hiddenGroupsKeyFor(safeProfileId))
-            else prefs[hiddenGroupsKeyFor(safeProfileId)] = gson.toJson(state.hiddenGroups.distinct())
-            if (normalizedGroupOrder.isEmpty()) prefs.remove(groupOrderKeyFor(safeProfileId))
-            else prefs[groupOrderKeyFor(safeProfileId)] = gson.toJson(normalizedGroupOrder)
-            prefs[groupOrderSchemaKeyFor(safeProfileId)] = IPTV_GROUP_ORDER_SCHEMA.toString()
+            if (applyRemoteGroupPreferences) {
+                importedGroupPreferences = true
+                if (state.hiddenGroups.isEmpty()) prefs.remove(hiddenGroupsKeyFor(safeProfileId))
+                else prefs[hiddenGroupsKeyFor(safeProfileId)] = gson.toJson(state.hiddenGroups.distinct())
+                if (normalizedGroupOrder.isEmpty()) prefs.remove(groupOrderKeyFor(safeProfileId))
+                else prefs[groupOrderKeyFor(safeProfileId)] = gson.toJson(normalizedGroupOrder)
+                prefs[groupOrderSchemaKeyFor(safeProfileId)] = IPTV_GROUP_ORDER_SCHEMA.toString()
+                if (state.groupPreferencesUpdatedAt > 0L) {
+                    prefs[groupPreferencesUpdatedAtKeyFor(safeProfileId)] = state.groupPreferencesUpdatedAt.toString()
+                }
+            }
             prefs[sortOrderKeyFor(safeProfileId)] = normalizeIptvSortOrder(state.sortOrder)
             if (effectivePlaylists.isEmpty()) prefs.remove(playlistsKeyFor(safeProfileId))
             else prefs[playlistsKeyFor(safeProfileId)] = gson.toJson(effectivePlaylists)
@@ -3361,7 +3385,9 @@ class IptvRepository @Inject constructor(
             }
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
         }
-        groupPreferencesLocallyDirtyProfiles.remove(safeProfileId)
+        if (importedGroupPreferences) {
+            groupPreferencesLocallyDirtyProfiles.remove(safeProfileId)
+        }
         if (profileManager.getProfileIdSync() == safeProfileId) {
             invalidateCache()
         }
@@ -8286,7 +8312,7 @@ class IptvRepository @Inject constructor(
             description = description
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
-                ?.take(600),
+                ?.take(1_200),
             startUtcMillis = startUtcMillis,
             endUtcMillis = endUtcMillis
         )

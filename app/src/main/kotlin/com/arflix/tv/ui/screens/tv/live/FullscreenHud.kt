@@ -485,21 +485,21 @@ fun FullscreenHud(
                         // Previous channel (|<)
                         HudIconButton(
                             icon = Icons.Filled.SkipPrevious,
-                            contentDescription = "Previous Channel",
+                            contentDescription = stringResource(R.string.previous_channel),
                             onClick = { onPreviousCatchupClick?.invoke() },
                         )
 
                         // Rewind (<<)
                         HudIconButton(
                             icon = Icons.Filled.FastRewind,
-                            contentDescription = "Rewind",
+                            contentDescription = stringResource(R.string.rewind),
                             onClick = { onRewindClick?.invoke() },
                         )
 
                         // Central Play/Pause button (Instant local state toggle!)
                         HudIconButton(
                             icon = if (localIsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (localIsPlaying) "Pause" else "Play",
+                            contentDescription = if (localIsPlaying) stringResource(R.string.pause) else stringResource(R.string.play),
                             emphasis = true,
                             focusRequester = playPauseFocusRequester,
                             onClick = {
@@ -511,14 +511,14 @@ fun FullscreenHud(
                         // Fast Forward (>>)
                         HudIconButton(
                             icon = Icons.Filled.FastForward,
-                            contentDescription = "Fast Forward",
+                            contentDescription = stringResource(R.string.fast_forward),
                             onClick = { onFastForwardClick?.invoke() },
                         )
 
                         // Next channel (>|)
                         HudIconButton(
                             icon = Icons.Filled.SkipNext,
-                            contentDescription = "Next Channel",
+                            contentDescription = stringResource(R.string.next_channel),
                             onClick = { onNextCatchupClick?.invoke() },
                         )
                     }
@@ -532,7 +532,7 @@ fun FullscreenHud(
                         // Replay / Restart
                         HudIconButton(
                             icon = Icons.Filled.Replay,
-                            contentDescription = "Replay",
+                            contentDescription = stringResource(R.string.live_label_catchup),
                             onClick = { onReplayClick?.invoke() },
                         )
 

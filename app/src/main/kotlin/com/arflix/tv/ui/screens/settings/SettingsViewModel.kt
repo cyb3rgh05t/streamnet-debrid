@@ -219,6 +219,8 @@ data class SettingsUiState(
     val deviceModeOverride: String = "auto",
     // Skip profile selection
     val skipProfileSelection: Boolean = false,
+    // App auto-start after device boot
+    val startOnDeviceBoot: Boolean = false,
     val oledBlackBackground: Boolean = false,
     val clockFormat: String = "24h",
     val qualityFilters: List<QualityFilterConfig> = emptyList(),
@@ -488,6 +490,7 @@ class SettingsViewModel @Inject constructor(
             val frameRateMode = normalizeFrameRateMode(prefs[frameRateMatchingModeKey()])
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
+            val startOnDeviceBoot = prefs[com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY] ?: false
             val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
             val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
@@ -657,6 +660,7 @@ class SettingsViewModel @Inject constructor(
                 contentLanguage = contentLang,
                 deviceModeOverride = deviceModeOverride,
                 skipProfileSelection = skipProfileSelection,
+                startOnDeviceBoot = startOnDeviceBoot,
                 oledBlackBackground = oledBlackBackground,
                 clockFormat = clockFormat,
                 accentColor = accentColor,
@@ -1292,6 +1296,16 @@ class SettingsViewModel @Inject constructor(
                 prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] = skip
             }
             _uiState.value = _uiState.value.copy(skipProfileSelection = skip)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun setStartOnDeviceBoot(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { prefs ->
+                prefs[com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY] = enabled
+            }
+            _uiState.value = _uiState.value.copy(startOnDeviceBoot = enabled)
             syncLocalStateToCloud(silent = true)
         }
     }

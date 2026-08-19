@@ -147,6 +147,7 @@ import com.arflix.tv.ui.components.TrailerPlayer
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
+import com.arflix.tv.ui.components.AutoScrollingSynopsis
 import com.arflix.tv.ui.components.MobileHeroBanner
 import com.arflix.tv.ui.components.ProfileAvatarVisual
 import com.arflix.tv.util.DeviceType
@@ -314,7 +315,28 @@ private fun localizedCategoryTitle(category: Category): String = when (category.
     "collection_row_featured"  -> stringResource(R.string.featured)
     "top10_movies_today"       -> stringResource(R.string.home_top10_movies_today)
     "top10_shows_today"        -> stringResource(R.string.home_top10_shows_today)
-    else                       -> category.title
+    "just_added"               -> stringResource(R.string.home_just_added)
+    "top_movies_week"          -> stringResource(R.string.home_top_movies_week)
+    "new_kdramas"              -> stringResource(R.string.home_new_kdramas)
+    "coming_soon"              -> stringResource(R.string.home_coming_soon)
+    else -> when (category.title) {
+        "Continue Watching" -> stringResource(R.string.continue_watching)
+        "Latest Movies" -> stringResource(R.string.collections_latest_movies)
+        "Latest Shows" -> stringResource(R.string.collections_latest_shows)
+        "Trending Movies", "Trending in Movies" -> stringResource(R.string.trending_movies)
+        "Trending Shows", "Trending in Shows" -> stringResource(R.string.trending_in_shows)
+        "Trending Anime", "Trending in Anime" -> stringResource(R.string.trending_anime)
+        "Featured" -> stringResource(R.string.featured)
+        "Services" -> stringResource(R.string.services)
+        "Genres" -> stringResource(R.string.genres)
+        "Movie Genres" -> stringResource(R.string.movie_genres)
+        "TV Genres" -> stringResource(R.string.tv_genres)
+        "Movie Studios" -> stringResource(R.string.movie_studios)
+        "TV Networks" -> stringResource(R.string.tv_networks)
+        "Decades" -> stringResource(R.string.decades)
+        "Franchises" -> stringResource(R.string.franchises)
+        else -> category.title
+    }
 }
 
 private fun deduplicateHomeCategories(categories: List<Category>): List<Category> {
@@ -1708,7 +1730,7 @@ private fun IptvHeroSection(
                     )
                     minutesLeft?.let {
                         Text(
-                            text = "$it min",
+                            text = stringResource(R.string.live_label_minutes_left, it),
                             style = ArflixTypography.caption.copy(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Bold,
@@ -2125,24 +2147,19 @@ private fun HeroSection(
                 }
 
                 val overviewMaxHeight = 72.dp
-                Box(
+                AutoScrollingSynopsis(
+                    text = displayOverview,
+                    style = ArflixTypography.body.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 16.sp,
+                        shadow = textShadow
+                    ),
+                    color = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier
                         .width(360.dp)
                         .height(overviewMaxHeight)
-                ) {
-                    Text(
-                        text = displayOverview,
-                        style = ArflixTypography.body.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 16.sp,
-                            shadow = textShadow
-                        ),
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                )
             }
         }
     }
@@ -2414,7 +2431,7 @@ private fun MobileHeroOverlay(
             }
 
             Spacer(modifier = Modifier.height(6.dp))
-            Text(
+            AutoScrollingSynopsis(
                 text = displayOverview,
                 style = ArflixTypography.body.copy(
                     fontSize = 11.sp,
@@ -2422,8 +2439,9 @@ private fun MobileHeroOverlay(
                     shadow = textShadow
                 ),
                 color = Color.White.copy(alpha = 0.75f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(32.dp)
             )
 
             Spacer(modifier = Modifier.height(10.dp))

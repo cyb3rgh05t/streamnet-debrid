@@ -363,7 +363,9 @@ internal class IptvEpgIndex(context: Context) : SQLiteOpenHelper(
         // that, and the reduced caps below keep per-channel memory bounded.
         const val DATABASE_VERSION = 3
         const val MAX_SQL_ARGS = 900
-        const val MAX_DESCRIPTION_CHARS = 200
+        // Keep full programme synopses for the hero and guide detail panels while
+        // still bounding the SQLite index for very large IPTV lineups.
+        const val MAX_DESCRIPTION_CHARS = 1_200
         // ±48h of guide needs only ~24-48 programmes each way. Keeping 96+240 held far
         // more in memory than the grid ever shows.
         const val MAX_UPCOMING_PROGRAMS = 48

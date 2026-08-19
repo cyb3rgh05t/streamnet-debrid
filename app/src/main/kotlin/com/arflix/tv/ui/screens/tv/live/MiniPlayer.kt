@@ -280,16 +280,10 @@ private fun ChannelIdentityRow(
         if (channel != null) {
             ChannelLogo(channel = channel, size = 30.dp)
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
+                val genreName = formatGenreName(channel.genre.name)
+                if (genreName.isNotBlank()) {
                     Text(
-                        text = stringResource(R.string.live_label_ch, channel.number),
-                        style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
-                    )
-                    Text(
-                        text = formatGenreName(channel.genre.name),
+                        text = genreName,
                         style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
                     )
                 }
@@ -299,13 +293,8 @@ private fun ChannelIdentityRow(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    QualityBadge(channel.quality)
-                    if (variantCount > 1) {
-                        SourceBadge(variantCount, onOpenVariants)
-                    }
-                    channel.country?.takeIf { it != channel.lang }?.let { LangBadge(it) }
-                    LangBadge(channel.lang)
+                if (variantCount > 1) {
+                    SourceBadge(variantCount, onOpenVariants)
                 }
             }
         } else {

@@ -441,8 +441,12 @@ private fun HeroInfoPanel(
                 )
                 val desc = nowProgram?.description?.trim().orEmpty()
                 if (desc.isNotBlank()) {
-                    Text(text = desc, style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
-                        maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = desc,
+                        style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
                 if (nowProgram != null) {
                     val progress = ((clockTickMillis - nowProgram.startUtcMillis).toFloat() /
@@ -957,19 +961,12 @@ private fun NetflixChannelCard(
                 .padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    text = "${stringResource(R.string.live_badge_ch)} ${channel.number}",
-                    style = LiveType.NumberMono.copy(color = LiveColors.Accent, fontSize = 7.sp),
-                )
-                Text(
-                    text = channel.name,
-                    style = LiveType.ChannelName.copy(color = Color.White.copy(alpha = 0.78f), fontSize = 8.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
-                )
-            }
+            Text(
+                text = channel.name,
+                style = LiveType.ChannelName.copy(color = Color.White.copy(alpha = 0.78f), fontSize = 8.sp),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 text = now?.title ?: stringResource(R.string.live_status_guide_pending),
                 style = LiveType.ProgramTitle.copy(color = Color.White, fontSize = 9.sp),

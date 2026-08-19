@@ -327,12 +327,8 @@ private fun FullscreenGuideContent(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(if (isTouchDevice) 5.dp else 6.dp)) {
-                    GuideChip(stringResource(R.string.live_label_ch, channel.number), LiveColors.FgDim, Color.White.copy(alpha = 0.08f))
-                    GuideChip(channel.quality.label, LiveColors.FgDim, Color.White.copy(alpha = 0.08f))
-                    if (catchupSupported) {
-                        GuideChip(stringResource(R.string.live_label_catchup), LiveColors.Bg, LiveColors.Accent)
-                    }
+                if (catchupSupported) {
+                    GuideChip(stringResource(R.string.live_label_catchup), LiveColors.Bg, LiveColors.Accent)
                 }
             }
         }

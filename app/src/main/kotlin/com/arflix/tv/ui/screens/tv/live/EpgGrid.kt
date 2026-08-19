@@ -368,13 +368,6 @@ fun EpgGrid(
                     Text(safeTotalChannelCount.toString(),
                         style = LiveType.NumberMono.copy(color = LiveColors.FgDim))
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(stringResource(R.string.live_badge_ch), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
-                    Text(
-                        selectedChannel?.number?.toString() ?: "—",
-                        style = LiveType.NumberMono.copy(color = LiveColors.Accent),
-                    )
-                }
             }
             // Divider
             Box(

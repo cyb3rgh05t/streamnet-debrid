@@ -164,29 +164,14 @@ fun ChannelRow(
 
         if (compact) {
             ChannelLogo(channel = channel, size = 36.dp)
-            Spacer(Modifier.width(10.dp))
-        }
-
-        // ─ channel number ────────────────────────────────────
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .padding(start = if (compact) 0.dp else 10.dp, end = 6.dp),
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Text(
-                text = channel.number.toString(),
-                style = LiveType.NumberMono.copy(
-                    color = if (isActive) LiveColors.Accent else LiveColors.FgMute,
-                ),
-            )
+            Spacer(Modifier.width(8.dp))
         }
 
         if (!compact) {
             ChannelLogo(channel = channel, size = 36.dp)
         }
 
-        Spacer(Modifier.width(10.dp))
+        Spacer(Modifier.width(8.dp))
 
         // ─ name / program / progress / time ──────────────────
         Column(
@@ -236,17 +221,6 @@ fun ChannelRow(
             }
         }
 
-        if (!compact) {
-            // ─ stacked badges (quality + lang) ───────────────
-            Column(
-                modifier = Modifier.padding(end = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-                horizontalAlignment = Alignment.End,
-            ) {
-                SmallPillBadge(if (variantCount > 1) stringResource(R.string.live_label_quality_variants, channel.quality.label, variantCount) else channel.quality.label)
-                SmallPillBadge(channel.lang)
-            }
-        }
     }
 }
 

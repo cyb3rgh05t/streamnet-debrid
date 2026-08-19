@@ -364,11 +364,6 @@ private fun SearchResultRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        Text(
-            text = channel.number.toString(),
-            style = LiveType.NumberMono.copy(color = LiveColors.FgMute),
-            modifier = Modifier.width(40.dp),
-        )
         ChannelLogo(channel = channel, size = 40.dp)
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -383,24 +378,6 @@ private fun SearchResultRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(LiveColors.Panel)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            ) {
-                Text(channel.quality.label, style = LiveType.Badge.copy(color = LiveColors.Fg))
-            }
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(LiveColors.Panel)
-                    .padding(horizontal = 8.dp, vertical = 3.dp),
-            ) {
-                Text(channel.lang, style = LiveType.Badge.copy(color = LiveColors.FgMute))
-            }
         }
     }
 }

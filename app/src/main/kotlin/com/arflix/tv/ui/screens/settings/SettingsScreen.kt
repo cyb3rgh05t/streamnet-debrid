@@ -246,13 +246,13 @@ private val tvGeneralSectionIds = setOf(
     "network"
 )
 
-private fun tvGeneralRowsForSection(section: String): List<Int> {
+private fun tvGeneralRowsForSection(section: String, includeBootStart: Boolean = true): List<Int> {
     return when (section) {
         "language" -> listOf(0, 3, 1, 2)
         "subtitles" -> listOf(4, 5, 6, 7, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(17, 18, 20, 21, 24, 23, 22, 41, 36)
+        "appearance" -> listOf(17, 18) + listOfNotNull(if (includeBootStart) 20 else null) + listOf(21, 22, 23, 24, 41, 36)
         "profiles" -> listOf(19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -465,7 +465,7 @@ fun SettingsScreen(
     }
     val sectionMaxIndex: (String) -> Int = { section ->
         when (section) {
-            in tvGeneralSectionIds -> (tvGeneralRowsForSection(section).size - 1).coerceAtLeast(0)
+            in tvGeneralSectionIds -> (tvGeneralRowsForSection(section, includeBootStart = !isTouchDevice).size - 1).coerceAtLeast(0)
             "iptv" -> if (showIptvCategoriesSettings) {
                 orderedIptvGroups(
                     playlistId = uiState.iptvSelectedPlaylistId.orEmpty(),
@@ -947,7 +947,7 @@ fun SettingsScreen(
                                 Zone.CONTENT -> {
                                     when (currentSection) {
                                         in tvGeneralSectionIds -> {
-                                            when (tvGeneralRowsForSection(currentSection).getOrNull(contentFocusIndex)) {
+                                            when (tvGeneralRowsForSection(currentSection, includeBootStart = !isTouchDevice).getOrNull(contentFocusIndex)) {
                                                 0 -> openContentLanguagePicker()
                                                 1 -> openSubtitlePicker()
                                                 2 -> openSecondarySubtitlePicker()
@@ -1451,6 +1451,7 @@ fun SettingsScreen(
                             subtitleStylized = uiState.subtitleStylized,
                             deviceModeOverride = uiState.deviceModeOverride,
                             skipProfileSelection = uiState.skipProfileSelection,
+                            startOnDeviceBoot = uiState.startOnDeviceBoot,
                             oledBlackBackground = uiState.oledBlackBackground,
                             clockFormat = uiState.clockFormat,
                             showBudget = uiState.showBudget,
@@ -1476,6 +1477,7 @@ fun SettingsScreen(
                             onDeviceModeClick = openUiModeWarningDialog,
                             onContentLanguageClick = openContentLanguagePicker,
                             onSkipProfileSelectionToggle = { viewModel.setSkipProfileSelection(it) },
+                            onStartOnDeviceBootToggle = { viewModel.setStartOnDeviceBoot(it) },
                             onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
                             onClockFormatClick = { viewModel.cycleClockFormat() },
                             onShowBudgetToggle = { viewModel.setShowBudget(it) },
@@ -2027,9 +2029,9 @@ fun SettingsScreen(
 
         if (showCatalogPackInput) {
             InputModal(
-                title = "Import Catalog Pack",
+                title = stringResource(R.string.catalog_pack_import_row_title),
                 fields = listOf(
-                    InputField(label = "Pack URL", value = catalogPackInputUrl, onValueChange = { catalogPackInputUrl = it })
+                    InputField(label = stringResource(R.string.catalog_pack_url), value = catalogPackInputUrl, onValueChange = { catalogPackInputUrl = it })
                 ),
                 onConfirm = {
                     if (catalogPackInputUrl.isNotBlank()) {
@@ -2329,8 +2331,8 @@ fun SettingsScreen(
         uiState.simklUserCode?.let { simklCode ->
             val verificationUrl = uiState.simklVerificationUrl ?: "https://simkl.com/pin"
             TraktActivationModal(
-                title = "Connect Simkl",
-                instruction = "Visit $verificationUrl on your phone or computer and enter this code:",
+                title = stringResource(R.string.settings_connect_simkl),
+                instruction = stringResource(R.string.settings_simkl_auth_instruction, verificationUrl),
                 verificationUrl = verificationUrl,
                 userCode = simklCode,
                 onDismiss = { viewModel.disconnectSimkl() }
@@ -5301,6 +5303,7 @@ private fun TvGeneralSettingsRows(
     subtitleStyle: String = "Bold",
     deviceModeOverride: String = "auto",
     skipProfileSelection: Boolean = false,
+    startOnDeviceBoot: Boolean = false,
     oledBlackBackground: Boolean = false,
     clockFormat: String = "24h",
     showBudget: Boolean = true,
@@ -5322,6 +5325,7 @@ private fun TvGeneralSettingsRows(
     onDeviceModeClick: () -> Unit = {},
     onContentLanguageClick: () -> Unit = {},
     onSkipProfileSelectionToggle: (Boolean) -> Unit = {},
+    onStartOnDeviceBootToggle: (Boolean) -> Unit = {},
     onOledBlackBackgroundToggle: (Boolean) -> Unit = {},
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
@@ -5371,7 +5375,10 @@ private fun TvGeneralSettingsRows(
     onCustomUserAgentClick: () -> Unit = {}
 ) {
     Column {
-        tvGeneralRowsForSection(section).forEachIndexed { localIndex, rowId ->
+        tvGeneralRowsForSection(
+            section,
+            includeBootStart = !LocalDeviceType.current.isTouchDevice()
+        ).forEachIndexed { localIndex, rowId ->
             if (localIndex > 0) Spacer(modifier = Modifier.height(10.dp))
             when (rowId) {
                 0 -> SettingsRow(
@@ -5439,13 +5446,14 @@ private fun TvGeneralSettingsRows(
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
                 19 -> SettingsToggleRow(stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))
-                20 -> SettingsToggleRow(stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
-                21 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
-                22 -> SettingsToggleRow(stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
+                20 -> SettingsToggleRow(stringResource(R.string.start_on_device_boot), stringResource(R.string.start_on_device_boot_desc), startOnDeviceBoot, focusedIndex == localIndex, onStartOnDeviceBootToggle, Modifier.settingsFocusSlot(localIndex))
+                21 -> SettingsToggleRow(stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
+                22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
+                23 -> SettingsToggleRow(stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
                 41 -> SettingsToggleRow(stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
                 36 -> SettingsToggleRow(stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
-                23 -> SettingsToggleRow(stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
-                24 -> SettingsRow(Icons.Default.Palette, stringResource(R.string.accent_color), stringResource(R.string.accent_color_desc), accentColor, focusedIndex == localIndex, onAccentColorClick, Modifier.settingsFocusSlot(localIndex))
+                24 -> SettingsToggleRow(stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
+                25 -> SettingsRow(Icons.Default.Palette, stringResource(R.string.accent_color), stringResource(R.string.accent_color_desc), accentColor, focusedIndex == localIndex, onAccentColorClick, Modifier.settingsFocusSlot(localIndex))
                 25 -> SettingsRow(Icons.Default.Language, stringResource(R.string.dns_provider), stringResource(R.string.dns_desc), dnsProvider, focusedIndex == localIndex, onDnsProviderClick, Modifier.settingsFocusSlot(localIndex))
                 26 -> SettingsToggleRow(stringResource(R.string.show_loading_stats), stringResource(R.string.show_loading_stats_desc), showLoadingStats, focusedIndex == localIndex, onShowLoadingStatsToggle, Modifier.settingsFocusSlot(localIndex))
                 27 -> SettingsRow(
@@ -5505,6 +5513,7 @@ private fun GeneralSettings(
     subtitleStyle: String = "Bold",
     deviceModeOverride: String = "auto",
     skipProfileSelection: Boolean = false,
+    startOnDeviceBoot: Boolean = false,
     oledBlackBackground: Boolean = false,
     clockFormat: String = "24h",
     showBudget: Boolean = true,
@@ -5525,6 +5534,7 @@ private fun GeneralSettings(
     onDeviceModeClick: () -> Unit = {},
     onContentLanguageClick: () -> Unit = {},
     onSkipProfileSelectionToggle: (Boolean) -> Unit = {},
+    onStartOnDeviceBootToggle: (Boolean) -> Unit = {},
     onOledBlackBackgroundToggle: (Boolean) -> Unit = {},
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
@@ -5790,12 +5800,21 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            title = stringResource(R.string.start_on_device_boot),
+            subtitle = stringResource(R.string.start_on_device_boot_desc),
+            isEnabled = startOnDeviceBoot,
+            isFocused = focusedIndex == 20,
+            onToggle = onStartOnDeviceBootToggle,
+            modifier = Modifier.settingsFocusSlot(20)
+        )
+        Spacer(modifier = Modifier.height(10.dp))
+        SettingsToggleRow(
             title = stringResource(R.string.oled_black_background),
             subtitle = stringResource(R.string.oled_black_background_desc),
             isEnabled = oledBlackBackground,
-            isFocused = focusedIndex == 20,
+            isFocused = focusedIndex == 21,
             onToggle = onOledBlackBackgroundToggle,
-            modifier = Modifier.settingsFocusSlot(20)
+            modifier = Modifier.settingsFocusSlot(21)
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsRow(
@@ -5803,9 +5822,9 @@ private fun GeneralSettings(
             title = stringResource(R.string.clock_format),
             subtitle = stringResource(R.string.clock_format_desc),
             value = if (clockFormat == "12h") stringResource(R.string.settings_clock_12h) else stringResource(R.string.settings_clock_24h),
-            isFocused = focusedIndex == 21,
+            isFocused = focusedIndex == 22,
             onClick = onClockFormatClick,
-            modifier = Modifier.settingsFocusSlot(21)
+            modifier = Modifier.settingsFocusSlot(22)
         )
         Spacer(modifier = Modifier.height(10.dp))
         // Home hero controls — issue #72. The movie Budget line on the hero banner
@@ -5814,9 +5833,9 @@ private fun GeneralSettings(
             title = stringResource(R.string.show_budget),
             subtitle = stringResource(R.string.show_budget_desc),
             isEnabled = showBudget,
-            isFocused = focusedIndex == 22,
+            isFocused = focusedIndex == 23,
             onToggle = onShowBudgetToggle,
-            modifier = Modifier.settingsFocusSlot(22)
+            modifier = Modifier.settingsFocusSlot(23)
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
@@ -7654,10 +7673,10 @@ private fun RestoreHiddenCatalogsRow(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(Icons.Default.Visibility, contentDescription = "Versteckte Kataloge anzeigen", tint = Pink, modifier = Modifier.size(20.dp))
+        Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.catalogs_show_hidden), tint = Pink, modifier = Modifier.size(20.dp))
         Spacer(modifier = Modifier.width(10.dp))
         Text(
-            text = "Versteckte Kataloge wiederherstellen",
+            text = stringResource(R.string.catalogs_restore_hidden),
             style = ArflixTypography.button,
             color = if (focusedIndex == focusIndex) TextPrimary else Pink
         )
@@ -7703,7 +7722,7 @@ private fun CatalogsSettings(
             }
             MobileSettingsCategory(title = stringResource(R.string.settings_section_add_catalog)) {
                 MobileSettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_catalog), subtitle = stringResource(R.string.add_catalog_desc), value = "", isFocused = false, showDivider = true, onClick = onAddCatalog)
-                MobileSettingsRow(icon = Icons.Default.Widgets, title = "Import Catalog Pack", subtitle = "Import a bundle of catalogs from a JSON manifest URL", value = "", isFocused = false, showDivider = false, onClick = onImportCatalogPack)
+                MobileSettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = "", isFocused = false, showDivider = false, onClick = onImportCatalogPack)
             }
             if (catalogs.isNotEmpty()) {
                 MobileSettingsCategory(title = stringResource(R.string.settings_section_my_catalogs)) {
@@ -7798,7 +7817,7 @@ private fun CatalogsSettings(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Unarchive,
-                                                contentDescription = "Unpack catalog row",
+                                                contentDescription = stringResource(R.string.catalog_pack_remove_catalog),
                                                 tint = Color.White.copy(alpha = 0.7f),
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -7833,14 +7852,14 @@ private fun CatalogsSettings(
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(stringResource(R.string.settings_n_selected, selectedIds.size), style = ArflixTypography.sectionTitle, color = TextPrimary)
                     Spacer(modifier = Modifier.weight(1f))
-                    if (selectedIds.isNotEmpty()) { Box(modifier = Modifier.size(36.dp).clickable { selectedIds.forEach { id -> val cat = catalogs.find { it.id == id }; if (cat != null) onDeleteCatalog(cat) }; selectionMode = false; selectedIds = emptySet() }.background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.VisibilityOff, contentDescription = "Kataloge ausblenden", tint = Color.White, modifier = Modifier.size(20.dp)) }; Spacer(modifier = Modifier.width(12.dp)) }
+                    if (selectedIds.isNotEmpty()) { Box(modifier = Modifier.size(36.dp).clickable { selectedIds.forEach { id -> val cat = catalogs.find { it.id == id }; if (cat != null) onDeleteCatalog(cat) }; selectionMode = false; selectedIds = emptySet() }.background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.catalogs_delete_selected), tint = Color.White, modifier = Modifier.size(20.dp)) }; Spacer(modifier = Modifier.width(12.dp)) }
                     Box(modifier = Modifier.size(36.dp).clickable { selectionMode = false; selectedIds = emptySet() }.background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White, modifier = Modifier.size(20.dp)) }
                 }
             }
             Text(text = stringResource(R.string.catalogs), style = ArflixTypography.caption, color = TextSecondary.copy(alpha = 0.65f), modifier = Modifier.padding(bottom = 20.dp))
             SettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_catalog), subtitle = stringResource(R.string.add_catalog_desc), value = stringResource(R.string.settings_badge_add), isFocused = focusedIndex == 0, onClick = onAddCatalog, modifier = Modifier.settingsFocusSlot(0))
             Spacer(modifier = Modifier.height(16.dp))
-            SettingsRow(icon = Icons.Default.Widgets, title = "Import Catalog Pack", subtitle = "Import a bundle of catalogs from a JSON manifest URL", value = "IMPORT", isFocused = focusedIndex == 1, onClick = onImportCatalogPack, modifier = Modifier.settingsFocusSlot(1))
+            SettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = stringResource(R.string.catalog_pack_import_action), isFocused = focusedIndex == 1, onClick = onImportCatalogPack, modifier = Modifier.settingsFocusSlot(1))
             Spacer(modifier = Modifier.height(16.dp))
             catalogs.forEachIndexed { index, catalog ->
                 val rowFocusIndex = index + 2; val isRowFocused = focusedIndex == rowFocusIndex
@@ -7893,7 +7912,7 @@ private fun CatalogsSettings(
                         catalog.sourceType == CatalogSourceType.HOME_SERVER -> stringResource(R.string.settings_from_home_server)
                         else -> catalog.sourceUrl ?: stringResource(R.string.settings_custom_catalog)
                     }
-                    "Pack: ${catalog.effectivePackName} • $baseSubtitle"
+                    stringResource(R.string.catalog_pack_label, catalog.effectivePackName, baseSubtitle)
                 }
                 val isSelected = selectedIds.contains(catalog.id)
                 val layoutToggleEnabled = catalog.kind != CatalogKind.COLLECTION_RAIL
@@ -8478,8 +8497,8 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
-            title = "Watchlist source",
-            description = "Choose which connected service supplies your watchlist.",
+            title = stringResource(R.string.tracking_watchlist_source),
+            description = stringResource(R.string.tracking_watchlist_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingWatchlistReadMode),
             isFocused = focusedIndex == 4,
             onClick = {
@@ -8494,8 +8513,8 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
-            title = "Continue Watching source",
-            description = "Choose where playback progress and Up Next are loaded from.",
+            title = stringResource(R.string.tracking_continue_source),
+            description = stringResource(R.string.tracking_continue_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingContinueReadMode),
             isFocused = focusedIndex == 5,
             onClick = {
@@ -8510,8 +8529,8 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
-            title = "Watched history source",
-            description = "Choose which connected service supplies watched badges.",
+            title = stringResource(R.string.tracking_watched_source),
+            description = stringResource(R.string.tracking_watched_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingWatchedReadMode),
             isFocused = focusedIndex == 6,
             onClick = {
@@ -8526,8 +8545,8 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsToggleRow(
-            title = "Update Trakt while watching",
-            subtitle = if (isTraktAuthenticated) "Send progress and watched changes to Trakt." else "Connect Trakt to enable this.",
+            title = stringResource(R.string.tracking_update_trakt),
+            subtitle = if (isTraktAuthenticated) stringResource(R.string.tracking_update_trakt_desc) else stringResource(R.string.tracking_update_trakt_connect),
             isEnabled = isTraktAuthenticated && trackingUiState.trackingWriteToTrakt,
             isFocused = focusedIndex == 7,
             onToggle = { enabled -> if (isTraktAuthenticated) onTrackingWriteTarget(com.arflix.tv.data.repository.sync.SyncProvider.TRAKT, enabled) },
@@ -8537,8 +8556,8 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsToggleRow(
-            title = "Update Simkl while watching",
-            subtitle = if (isSimklConnected) "Send progress and watched changes to Simkl." else "Connect Simkl to enable this.",
+            title = stringResource(R.string.tracking_update_simkl),
+            subtitle = if (isSimklConnected) stringResource(R.string.tracking_update_simkl_desc) else stringResource(R.string.tracking_update_simkl_connect),
             isEnabled = isSimklConnected && trackingUiState.trackingWriteToSimkl,
             isFocused = focusedIndex == 8,
             onToggle = { enabled -> if (isSimklConnected) onTrackingWriteTarget(com.arflix.tv.data.repository.sync.SyncProvider.SIMKL, enabled) },
@@ -9237,9 +9256,9 @@ private fun TrackingIntegrationsPage(
         }
 
         if (uiState.isTraktAuthenticated || uiState.isSimklConnected || uiState.isMdbListConnected) {
-            MobileSettingsCategory(title = "DATA ROUTING") {
+            MobileSettingsCategory(title = stringResource(R.string.tracking_data_routing)) {
                 TrackingRoutingRow(
-                    title = "Watchlist source",
+                    title = stringResource(R.string.tracking_watchlist_source),
                     value = trackingModeLabel(uiState.trackingWatchlistReadMode),
                     showDivider = true,
                     onClick = {
@@ -9250,7 +9269,7 @@ private fun TrackingIntegrationsPage(
                     }
                 )
                 TrackingRoutingRow(
-                    title = "Continue Watching source",
+                    title = stringResource(R.string.tracking_continue_source),
                     value = trackingModeLabel(uiState.trackingContinueReadMode),
                     showDivider = true,
                     onClick = {
@@ -9261,7 +9280,7 @@ private fun TrackingIntegrationsPage(
                     }
                 )
                 TrackingRoutingRow(
-                    title = "Watched history source",
+                    title = stringResource(R.string.tracking_watched_source),
                     value = trackingModeLabel(uiState.trackingWatchedReadMode),
                     showDivider = uiState.isTraktAuthenticated || uiState.isSimklConnected,
                     onClick = {
@@ -9273,8 +9292,8 @@ private fun TrackingIntegrationsPage(
                 )
                 if (uiState.isTraktAuthenticated) {
                     TrackingRoutingRow(
-                        title = "Update Trakt while watching",
-                        value = if (uiState.trackingWriteToTrakt) "On" else "Off",
+                        title = stringResource(R.string.tracking_update_trakt),
+                        value = if (uiState.trackingWriteToTrakt) stringResource(R.string.on) else stringResource(R.string.off),
                         showDivider = uiState.isSimklConnected,
                         onClick = {
                             onWriteTarget(
@@ -9286,8 +9305,8 @@ private fun TrackingIntegrationsPage(
                 }
                 if (uiState.isSimklConnected) {
                     TrackingRoutingRow(
-                        title = "Update Simkl while watching",
-                        value = if (uiState.trackingWriteToSimkl) "On" else "Off",
+                        title = stringResource(R.string.tracking_update_simkl),
+                        value = if (uiState.trackingWriteToSimkl) stringResource(R.string.on) else stringResource(R.string.off),
                         showDivider = false,
                         onClick = {
                             onWriteTarget(
@@ -9302,12 +9321,13 @@ private fun TrackingIntegrationsPage(
     }
 }
 
+@Composable
 private fun trackingModeLabel(mode: com.arflix.tv.data.repository.sync.TrackingReadMode): String = when (mode) {
     com.arflix.tv.data.repository.sync.TrackingReadMode.BOTH -> "Trakt + Simkl"
     com.arflix.tv.data.repository.sync.TrackingReadMode.TRAKT -> "Trakt"
     com.arflix.tv.data.repository.sync.TrackingReadMode.SIMKL -> "Simkl"
     com.arflix.tv.data.repository.sync.TrackingReadMode.MDBLIST -> "MDBList"
-    com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO -> "Automatic"
+    com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO -> stringResource(R.string.tracking_mode_automatic)
 }
 
 private fun nextTrackingMode(
@@ -10981,7 +11001,7 @@ private fun CatalogPackImportDialog(
                         LoadingIndicator(size = 40.dp)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Loading catalog pack details...",
+                            text = stringResource(R.string.catalog_pack_loading),
                             style = ArflixTypography.body,
                             color = TextPrimary
                         )
@@ -10989,7 +11009,7 @@ private fun CatalogPackImportDialog(
                 } else if (error != null) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         Text(
-                            text = "Import Failed",
+                            text = stringResource(R.string.catalog_pack_import_failed),
                             style = ArflixTypography.sectionTitle,
                             color = Color(0xFFDC2626)
                         )
@@ -11010,7 +11030,7 @@ private fun CatalogPackImportDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Close",
+                                text = stringResource(R.string.close),
                                 style = ArflixTypography.button,
                                 color = Color.Black
                             )
@@ -11028,13 +11048,17 @@ private fun CatalogPackImportDialog(
                                 Icon(Icons.Default.Unarchive, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
                             }
                             Column {
-                                Text(text = "Import Catalog Pack", style = ArflixTypography.sectionTitle, color = TextPrimary)
+                                Text(text = stringResource(R.string.catalog_pack_import_title), style = ArflixTypography.sectionTitle, color = TextPrimary)
                                 Text(text = pendingPack.name ?: "", style = ArflixTypography.body, color = accentColor)
                             }
                         }
                         if (!pendingPack.author.isNullOrBlank()) {
                             Text(
-                                text = "Author: ${pendingPack.author} • v${pendingPack.version ?: "1.0.0"}",
+                                text = stringResource(
+                                    R.string.catalog_pack_author_version,
+                                    pendingPack.author,
+                                    pendingPack.version ?: "1.0.0"
+                                ),
                                 style = ArflixTypography.caption,
                                 color = TextSecondary.copy(alpha = 0.8f)
                             )
@@ -11049,7 +11073,7 @@ private fun CatalogPackImportDialog(
                         }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = "Catalogs included (${pendingPack.catalogs?.size ?: 0}):",
+                            text = stringResource(R.string.catalog_pack_included, pendingPack.catalogs?.size ?: 0),
                             style = ArflixTypography.caption,
                             color = TextSecondary.copy(alpha = 0.6f)
                         )
@@ -11113,7 +11137,7 @@ private fun CatalogPackImportDialog(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Default.Check, contentDescription = null, tint = if (isConfirmFocused) Color.Black else accentColor, modifier = Modifier.size(17.dp))
-                                    Text(text = "Install Pack", style = ArflixTypography.button, color = if (isConfirmFocused) Color.Black else TextPrimary)
+                                    Text(text = stringResource(R.string.catalog_pack_install), style = ArflixTypography.button, color = if (isConfirmFocused) Color.Black else TextPrimary)
                                 }
                             }
 
@@ -11134,7 +11158,7 @@ private fun CatalogPackImportDialog(
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(17.dp))
-                                    Text(text = "Cancel", style = ArflixTypography.button, color = TextPrimary)
+                                    Text(text = stringResource(R.string.cancel), style = ArflixTypography.button, color = TextPrimary)
                                 }
                             }
                         }
@@ -11207,13 +11231,13 @@ private fun CatalogPackDeleteConfirmDialog(
                     }
             ) {
                 Text(
-                    text = "Delete Catalog Pack",
+                    text = stringResource(R.string.catalog_pack_delete_title),
                     style = ArflixTypography.sectionTitle,
                     color = Color(0xFFDC2626)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "Do you want to delete the pack \"$packName\"? This will remove all catalogs that were imported with this pack.",
+                    text = stringResource(R.string.catalog_pack_delete_message, packName),
                     style = ArflixTypography.body,
                     color = TextSecondary
                 )
@@ -11241,7 +11265,7 @@ private fun CatalogPackDeleteConfirmDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Delete Pack",
+                            text = stringResource(R.string.catalog_pack_delete),
                             style = ArflixTypography.button,
                             color = if (isConfirmFocused) Color.Black else Color.White
                         )
@@ -11266,7 +11290,7 @@ private fun CatalogPackDeleteConfirmDialog(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Cancel",
+                            text = stringResource(R.string.cancel),
                             style = ArflixTypography.button,
                             color = if (isCancelFocused) Color.Black else Color.White
                         )

@@ -533,11 +533,6 @@ private fun VariantRow(
                 .size(8.dp)
                 .background(if (focused) LiveColors.Accent else LiveColors.FgMute, CircleShape),
         )
-        Text(
-            text = channel.number.toString(),
-            style = LiveType.NumberMono.copy(color = LiveColors.FgMute),
-            modifier = Modifier.width(44.dp),
-        )
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = channel.name,
@@ -552,21 +547,5 @@ private fun VariantRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        Text(
-            text = channel.quality.label,
-            style = LiveType.Badge.copy(color = LiveColors.Fg),
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(LiveColors.PanelRaised)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-        )
-        Text(
-            text = channel.lang,
-            style = LiveType.Badge.copy(color = LiveColors.FgMute),
-            modifier = Modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(LiveColors.PanelRaised)
-                .padding(horizontal = 8.dp, vertical = 3.dp),
-        )
     }
 }

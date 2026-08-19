@@ -142,6 +142,7 @@ import com.arflix.tv.ui.components.SeasonContextMenu
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
+import com.arflix.tv.ui.components.AutoScrollingSynopsis
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.PersonModal
@@ -2063,24 +2064,19 @@ private fun DetailsContent(
 
                 val displayOverview = item.overview
 
-                Box(
+                AutoScrollingSynopsis(
+                    text = displayOverview,
+                    style = ArflixTypography.body.copy(
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 16.sp,
+                        shadow = textShadow
+                    ),
+                    color = Color.White.copy(alpha = 0.9f),
                     modifier = Modifier
                         .width(360.dp)
                         .height(overviewMaxHeight)
-                ) {
-                    Text(
-                        text = displayOverview,
-                        style = ArflixTypography.body.copy(
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 16.sp,
-                            shadow = textShadow
-                        ),
-                        color = Color.White.copy(alpha = 0.9f),
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                )
 
             }
         }
@@ -2705,7 +2701,7 @@ private fun DetailsEpisodeRatingsRail(
                         if (safePageIndex > 0) {
                             Icon(
                                 imageVector = Icons.Default.ChevronLeft,
-                                contentDescription = "Previous page",
+                                contentDescription = stringResource(R.string.previous_page),
                                 tint = Color.White,
                                 modifier = Modifier.size(24.dp).offset(x = leftOffset)
                             )
@@ -2781,7 +2777,7 @@ private fun DetailsEpisodeRatingsRail(
                     } else if (safePageIndex < totalPages - 1) {
                         Icon(
                             imageVector = Icons.Default.ChevronRight,
-                            contentDescription = "Next page",
+                            contentDescription = stringResource(R.string.next_page),
                             tint = Color.White,
                             modifier = Modifier.size(24.dp).offset(x = rightOffset)
                         )

@@ -54,6 +54,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
+import com.arflix.tv.ui.components.AutoScrollingSynopsis
 import com.arflix.tv.ui.skin.resolveAccentColor
 
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -1774,13 +1775,13 @@ private fun FullscreenEpgOverlay(
                     nowProgram.description?.let { desc ->
                         if (desc.isNotBlank()) {
                             Spacer(modifier = Modifier.height(if (isMobile) 4.dp else 6.dp))
-                            Text(
+                            AutoScrollingSynopsis(
                                 text = desc,
                                 style = ArflixTypography.caption.copy(fontSize = if (isMobile) 11.sp else 13.sp),
                                 color = Color.White.copy(alpha = 0.55f),
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth(if (isMobile) 0.85f else 0.6f)
+                                modifier = Modifier
+                                    .fillMaxWidth(if (isMobile) 0.85f else 0.6f)
+                                    .height(if (isMobile) 32.dp else 40.dp)
                             )
                         }
                     }

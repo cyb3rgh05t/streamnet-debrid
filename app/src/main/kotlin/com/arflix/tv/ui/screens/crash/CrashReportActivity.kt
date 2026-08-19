@@ -24,12 +24,14 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arflix.tv.MainActivity
+import com.arflix.tv.R
 import com.arflix.tv.ui.components.QrCodeImage
 import com.arflix.tv.ui.theme.ArflixTvTheme
 import com.arflix.tv.util.DeviceType
@@ -141,7 +143,7 @@ fun CrashReportScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "StreamNet TV Encountered an Error",
+                text = stringResource(R.string.crash_title),
                 color = Color.White,
                 fontSize = if (isTv) 26.sp else 22.sp,
                 fontWeight = FontWeight.Bold,
@@ -150,9 +152,9 @@ fun CrashReportScreen(
 
             Text(
                 text = if (isTv) {
-                    "Scan the QR code below with your phone camera to automatically copy the crash report & open our Discord bug channel."
+                    stringResource(R.string.crash_tv_message)
                 } else {
-                    "We apologize for the interruption. You can report this crash directly to our Discord channel to help us fix it."
+                    stringResource(R.string.crash_touch_message)
                 },
                 color = Color(0xFFA0A6B2),
                 fontSize = 14.sp,
@@ -176,7 +178,7 @@ fun CrashReportScreen(
                 }
 
                 Text(
-                    text = "Scan to open the StreamNet TV report page, copy the report, and open Discord.",
+                    text = stringResource(R.string.crash_qr_hint),
                     color = Color(0xFF00F0D0),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -195,7 +197,7 @@ fun CrashReportScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        text = "Crash Reference Details",
+                        text = stringResource(R.string.crash_reference_details),
                         color = Color.White,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -222,7 +224,7 @@ fun CrashReportScreen(
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             val clip = ClipData.newPlainText("StreamNet TV Crash Report", formattedReport)
                             clipboard.setPrimaryClip(clip)
-                            Toast.makeText(context, "Crash details copied! Opening Discord...", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.crash_details_copied), Toast.LENGTH_LONG).show()
 
                             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(CrashReportActivity.DISCORD_BUG_CHANNEL_URL)).apply {
                                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -233,7 +235,7 @@ fun CrashReportScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text("Report on Discord", color = Color.White, fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.crash_report_discord), color = Color.White, fontWeight = FontWeight.SemiBold)
                     }
                 }
 
@@ -255,7 +257,7 @@ fun CrashReportScreen(
                             }
                         )
                 ) {
-                    Text("Restart StreamNet TV", color = Color.Black, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.crash_restart), color = Color.Black, fontWeight = FontWeight.Bold)
                 }
             }
         }
