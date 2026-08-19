@@ -62,6 +62,27 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      - name: Validate private Discord SDK access
+        env:
+          DISCORD_SDK_DEPLOY_KEY: ${{ secrets.DISCORD_SDK_DEPLOY_KEY }}
+        run: |
+          : "${DISCORD_SDK_DEPLOY_KEY:?Missing DISCORD_SDK_DEPLOY_KEY repository secret}"
+
+      - name: Fetch private Discord Partner SDK
+        uses: actions/checkout@v4
+        with:
+          repository: ProdigyV21/ARVIO-private-dependencies
+          ref: main
+          path: .private-dependencies
+          ssh-key: ${{ secrets.DISCORD_SDK_DEPLOY_KEY }}
+          persist-credentials: false
+
+      - name: Install Discord Partner SDK
+        run: |
+          install -d app/libs
+          install -m 0600 .private-dependencies/discord_partner_sdk.aar app/libs/discord_partner_sdk.aar
+          echo "dc7b1014ae4797e5469261d151fd26fc056524d03e42e55fd39e085f0f09e71a  app/libs/discord_partner_sdk.aar" | sha256sum --check --strict
+
       - name: Validate required credentials
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}

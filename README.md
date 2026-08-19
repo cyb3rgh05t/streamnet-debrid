@@ -128,6 +128,9 @@ Android Partner SDK. Place the approved file at
 `secrets.properties`. Builds without that AAR remain valid, but show Discord as
 unavailable instead of compiling a simulated connection. Do not commit or
 redistribute the AAR unless your Discord SDK agreement explicitly permits it.
+Trusted signed builds restore the AAR from the private
+`ProdigyV21/ARVIO-private-dependencies` repository through a read-only deploy
+key stored as the `DISCORD_SDK_DEPLOY_KEY` repository secret.
 
 TMDB and Trakt credentials are not committed to the repository. When a valid
 Supabase config is present, app requests are routed through the tracked

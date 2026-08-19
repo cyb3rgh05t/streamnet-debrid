@@ -484,7 +484,7 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 16 // Accounts, tracking routing, telegram, discord, sync/update, privacy and deletion
+            "accounts" -> 15 // Accounts, tracking routing, telegram, discord, sync/update, privacy and deletion
             else -> 0
         }
     }
