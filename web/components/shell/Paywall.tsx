@@ -176,7 +176,8 @@ function PaywallScreen({
 
         <div className="paywall-benefits" aria-label="ARVIO Web benefits">
           <span><Check size={15} /> Same profiles, libraries and watch progress</span>
-          <span><Check size={15} /> Browser playback, downloads and one-click VLC</span>
+          <span><Check size={15} /> Download sources directly to your device</span>
+          <span><Check size={15} /> Browser playback and one-click VLC</span>
           <span><Check size={15} /> Android and TV app remains completely free</span>
         </div>
 
