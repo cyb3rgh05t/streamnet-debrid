@@ -18,6 +18,7 @@ export interface EntitlementState {
   tier?: string | null;
   expiresAt: string | null;
   trialAvailable: boolean;
+  trialDurationDays?: number;
   updatedAt?: string | null;
 }
 
@@ -77,7 +78,7 @@ export async function fetchEntitlement(auth: AuthClient): Promise<EntitlementSta
   return state;
 }
 
-/** Start the one-time 24h trial for the signed-in account. */
+/** Start the one-time 3-day trial for the signed-in account. */
 export async function startTrial(auth: AuthClient): Promise<EntitlementState> {
   if (!auth.session) throw new HttpError(401, "Sign in required");
   const attempt = () => backendRequest<EntitlementState>(auth, "entitlement-status", {

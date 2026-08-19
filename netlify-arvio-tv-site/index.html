@@ -1062,6 +1062,102 @@
   .meta-k { font-family: var(--mono); font-size: 11px; color: var(--ink-3); letter-spacing: 0.12em; text-transform: uppercase; font-weight: 500; }
   .meta-v { font-size: clamp(28px, 2.6vw, 40px); line-height: 1; margin-top: 10px; letter-spacing: -0.035em; font-weight: 700; }
 
+  /* ============ PREMIUM SPOTLIGHT ============ */
+  .premium-spotlight {
+    padding: 72px 0;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--bg-1);
+  }
+  .premium-spotlight-inner {
+    display: grid;
+    grid-template-columns: minmax(0, .82fr) minmax(460px, 1.18fr);
+    gap: 64px;
+    align-items: center;
+  }
+  .premium-kicker {
+    font-family: var(--mono);
+    color: var(--accent);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .premium-spotlight h2 {
+    margin: 14px 0 16px;
+    max-width: 640px;
+    color: var(--ink);
+    font-size: 56px;
+    line-height: 1.02;
+    letter-spacing: 0;
+  }
+  .premium-spotlight-copy {
+    max-width: 580px;
+    color: var(--ink-2);
+    font-size: 16px;
+    line-height: 1.65;
+  }
+  .premium-points {
+    display: grid;
+    gap: 10px;
+    margin: 24px 0;
+    color: var(--ink);
+    font-size: 14px;
+  }
+  .premium-points span {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .premium-check {
+    width: 19px;
+    height: 19px;
+    flex: 0 0 auto;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--accent);
+    border-radius: 50%;
+    color: var(--accent);
+    font-size: 11px;
+  }
+  .premium-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .premium-price { color: var(--ink-2); font-size: 14px; }
+  .premium-price strong { color: var(--ink); font-size: 18px; }
+  .premium-proof {
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+    margin-top: 24px;
+    font-family: var(--mono);
+    color: var(--ink-3);
+    font-size: 11px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+  .premium-preview {
+    position: relative;
+    aspect-ratio: 16 / 10;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg-2);
+    box-shadow: 0 30px 90px -50px oklch(0 0 0 / .85);
+  }
+  .premium-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .premium-preview-label {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    padding: 7px 10px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    background: oklch(0.12 0.006 60 / .9);
+    color: oklch(0.94 0.006 60);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0;
+    text-transform: uppercase;
+  }
+
   /* ============ SHOWCASE ============ */
   .showcase {
     padding: 40px 0 120px;
@@ -2022,6 +2118,8 @@
     .oss-inner { grid-template-columns: 1fr; gap: 24px; }
     .foot-top { grid-template-columns: 1fr 1fr; }
     .download { padding: 100px 0; }
+    .premium-spotlight-inner { grid-template-columns: 1fr; gap: 36px; }
+    .premium-spotlight h2 { font-size: 40px; }
   }
 
   @media (max-width: 768px) {
@@ -2034,6 +2132,8 @@
     .brand-mark { width: 26px; height: 22px; }
     .brand-wordmark { display: block !important; width: 95px; height: 22px; }
     .nav-cta { padding: 8px 12px; font-size: 12px; }
+    .premium-spotlight { padding: 52px 0; }
+    .premium-spotlight h2 { font-size: 34px; }
   }
 
   @media (max-width: 420px) {
@@ -2329,9 +2429,9 @@
               <strong>Get ARVIO</strong>
             </span>
           </a>
-          <a class="btn btn-ghost" href="#screens">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M10 8l6 4-6 4V8z"></path></svg>
-            View screenshots
+          <a class="btn btn-ghost" href="/go/premium">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg>
+            Try Premium free
           </a>
         </div>
         <div class="hero-sideload reveal in" data-delay="4">
@@ -2391,6 +2491,32 @@
     </div>
   </div>
 </header>
+
+<section class="premium-spotlight" aria-labelledby="premium-title">
+  <div class="wrap premium-spotlight-inner">
+    <div class="reveal">
+      <div class="premium-kicker">ARVIO Premium · Web access</div>
+      <h2 id="premium-title">Your ARVIO setup, now on every screen.</h2>
+      <p class="premium-spotlight-copy">Open the same profiles, libraries, addons and watch progress on iPhone, iPad, desktop and smart-TV browsers. No new setup and no separate library.</p>
+      <div class="premium-points">
+        <span><i class="premium-check">✓</i> Everything stays connected through ARVIO Cloud</span>
+        <span><i class="premium-check">✓</i> Browser playback, downloads and one-click VLC</span>
+        <span><i class="premium-check">✓</i> Android and TV app remains completely free</span>
+      </div>
+      <div class="premium-actions">
+        <a class="btn btn-play" href="/go/premium"><strong>Start 3-day free trial</strong></a>
+        <span class="premium-price"><strong>$2.99</strong> / month after trial</span>
+      </div>
+      <div class="premium-proof">
+        <span>10,000+ users</span><span>10+ contributors</span><span>Open source</span>
+      </div>
+    </div>
+    <a class="premium-preview reveal" data-delay="1" href="/go/premium" aria-label="Try ARVIO Premium">
+      <img src="assets/web-home.webp" alt="ARVIO Web running on an iPad" loading="eager" decoding="async">
+      <span class="premium-preview-label">Actual ARVIO Web interface</span>
+    </a>
+  </div>
+</section>
 
 <!-- SHOWCASE -->
 <section class="showcase">
@@ -2746,8 +2872,8 @@
 <section class="section" id="web">
   <div class="wrap">
     <div class="section-head reveal">
-      <div class="section-num">06 / Web app</div>
-      <h2 class="section-title">ARVIO Web: every <span class="accent">other screen.</span></h2>
+      <div class="section-num">06 / Premium</div>
+      <h2 class="section-title">ARVIO on every <span class="accent">other screen.</span></h2>
     </div>
 
     <div class="setup-grid">
@@ -2771,9 +2897,9 @@
         <div class="setup-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"></rect><path d="M2 10h20"></path></svg>
         </div>
-        <div class="setup-title">$2.99/month — app stays free</div>
-        <div class="setup-desc">Web streaming runs on real servers and bandwidth, so ARVIO Web is a Ko‑fi membership. Subscribe with your ARVIO Cloud email — or link a different Ko‑fi email in the premium popup. The Android/TV app remains 100% free.</div>
-        <div class="setup-time">APK stays free</div>
+        <div class="setup-title">Try it free for 3 days</div>
+        <div class="setup-desc">Start after connecting ARVIO Cloud, then continue for $2.99/month through Ko‑fi. The Android/TV app remains 100% free.</div>
+        <div class="setup-time">No payment details for trial</div>
       </div>
     </div>
 
@@ -2788,7 +2914,7 @@
     <div class="guide-warning reveal" data-delay="2" style="margin-top:22px">Browsers only decode a limited set of formats — true for every web streamer. Most sources play directly (use the "Browser playable" filter); heavy 4K HEVC, Dolby Vision and REMUX releases, lossless audio and some Live TV providers don't. That's what the one‑tap "Open in VLC" button is for: it hands the stream to VLC on iPhone, iPad, Android, macOS and Windows (one‑time one‑click setup), which plays everything. The app has none of these limits — its native player decodes it all.</div>
 
     <div class="reveal" data-delay="3" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:24px">
-      <a class="btn btn-ghost" href="https://web.arvio.tv">Open ARVIO Web</a>
+      <a class="btn btn-play" href="/go/premium"><strong>Start 3-day free trial</strong></a>
       <a class="btn btn-ghost" href="https://ko-fi.com/arvio/tiers" target="_blank" rel="noopener">Ko‑fi membership</a>
       <a class="btn btn-ghost" href="https://github.com/ProdigyV21/ARVIO">Source on GitHub</a>
     </div>
@@ -2994,7 +3120,7 @@
           <span>Is ARVIO free? Are there ads?</span>
           <span class="faq-q-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
         </summary>
-        <div class="faq-a">The Android/TV app is free and open source, with no ads, marketing analytics, or gated app features. Release builds can send limited crash diagnostics and one pseudonymous daily app-open event to help maintain reliability. This can be disabled per device in Settings. The one optional paid service is <a href="https://web.arvio.tv">ARVIO Web</a>, the browser version, at $2.99/month because browser streaming uses hosted servers and bandwidth. The Android app never requires it.</div>
+        <div class="faq-a">The Android/TV app is free and open source, with no ads, third-party behavioral analytics, or gated app features. Release builds can send limited crash diagnostics and one pseudonymous daily app-open event to help maintain reliability. This can be disabled per device in Settings. The one optional paid service is <a href="/go/premium">ARVIO Web</a>, the browser version, at $2.99/month because browser streaming uses hosted servers and bandwidth. The Android app never requires it.</div>
       </details>
 
       <details class="faq-item reveal">
@@ -3010,7 +3136,7 @@
           <span>What is ARVIO Web and what does it cost?</span>
           <span class="faq-q-icon"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg></span>
         </summary>
-        <div class="faq-a">The full ARVIO experience in your browser at <a href="https://web.arvio.tv">web.arvio.tv</a> — iPhone, iPad, MacBook, Windows, anything. Profiles, watchlist and progress sync with the app. It costs $2.99/month via <a href="https://ko-fi.com/arvio/tiers">Ko‑fi membership</a>: subscribe with the same email as your ARVIO Cloud account and access unlocks automatically. Paid with a different email? Enter your Ko‑fi email in the premium popup to link it. Note: browsers can't decode everything — heavy 4K/REMUX releases and some Live TV open in VLC with one tap instead (the app's native player has no such limits).</div>
+        <div class="faq-a">The full ARVIO experience in your browser at <a href="/go/premium">web.arvio.tv</a> — iPhone, iPad, MacBook, Windows, anything. Profiles, watchlist and progress sync with the app. A one-time 3-day trial starts after you connect ARVIO Cloud. It then costs $2.99/month via <a href="https://ko-fi.com/arvio/tiers">Ko‑fi membership</a>: subscribe with the same email as your ARVIO Cloud account and access unlocks automatically. Paid with a different email? Enter your Ko‑fi email in the Premium screen to link it. Note: browsers can't decode everything — heavy 4K/REMUX releases and some Live TV open in VLC with one tap instead (the app's native player has no such limits).</div>
       </details>
 
       <details class="faq-item reveal">

@@ -1,7 +1,7 @@
 // GET  /entitlement-status  → the web app reads the signed-in account's web
 //                             subscription status (paid / trial / none).
 // POST /entitlement-status  { action: "start-trial" } → consume the one-time
-//                             24h trial for this account.
+//                             3-day trial for this account.
 // Auth: the account's ARVIO access token (same as account-sync-*). The email is
 // taken from the verified identity, so a user can only read/trial THEIR account.
 const { json, options, resolveIdentity, normalizeEmail, sha256 } = require("./_backend");
@@ -12,6 +12,8 @@ const {
   writeEntitlement,
   evaluateEntitlement
 } = require("./_entitlements");
+const { recordPremiumEvent } = require("./_premium-funnel");
+const { queueTrialEmails } = require("./_trial-emails");
 
 exports.handler = async (event) => {
   const cors = options(event);
@@ -35,7 +37,7 @@ exports.handler = async (event) => {
     const store = entitlementsStore(event);
     let record = await readEntitlement(store, emailHash);
 
-    // Start-trial: grant a one-time 24h trial if never used and not already paid.
+    // Start-trial: grant a one-time 3-day trial if never used and not already paid.
     if (event.httpMethod === "POST") {
       let body = {};
       try { body = JSON.parse(event.body || "{}"); } catch { body = {}; }
@@ -60,6 +62,18 @@ exports.handler = async (event) => {
           updatedAt: now.toISOString()
         };
         await writeEntitlement(store, emailHash, record);
+        await recordPremiumEvent(event, {
+          email,
+          accountId: identity.supabaseUserId,
+          eventName: "trial_started",
+          metadata: { duration_days: 3 }
+        }).catch((error) => console.error("trial funnel recording failed", error));
+        try {
+          await queueTrialEmails(event, email, record.expiresAt);
+        } catch (error) {
+          // Email must never prevent an otherwise valid trial from starting.
+          console.error("trial email scheduling failed", error);
+        }
         return json(200, { ...evaluateEntitlement(record), trialStarted: true });
       }
       return json(400, { error: "unknown_action" });

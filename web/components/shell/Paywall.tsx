@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, ExternalLink, Loader2, LogOut, Sparkles } from "lucide-react";
+import { BadgeCheck, Check, ExternalLink, Loader2, LogOut, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { config } from "@/lib/config";
 import { HttpError } from "@/lib/http";
@@ -13,8 +13,9 @@ import {
   type EntitlementState
 } from "@/lib/entitlement";
 import { authClient, useApp } from "@/lib/store";
+import { capturePremiumAttribution, trackPremiumEvent, trackPremiumMilestone, TRIAL_INTENT_KEY } from "@/lib/premiumAnalytics";
 
-// 24-hour free trial: enabled — try-before-you-buy converts far better than a
+// Three-day free trial: enabled — enough time to use ARVIO Web on normal days,
 // blind $2.99 ask. One trial per account (trialUsed is stamped server-side).
 const SHOW_TRIAL = true;
 
@@ -85,16 +86,31 @@ function PaywallScreen({
   const [linkOpen, setLinkOpen] = useState(false);
   const [kofiEmail, setKofiEmail] = useState("");
   const trialAvailable = state?.trialAvailable ?? true;
+  const trialDays = state?.trialDurationDays ?? 3;
+  const expired = state?.reason === "expired" || state?.status === "cancelled";
+
+  useEffect(() => {
+    capturePremiumAttribution();
+    if (!isSignedIn) return;
+    void trackPremiumEvent(authClient, "paywall_view", {}, true);
+    void trackPremiumMilestone(authClient, "account_connected");
+  }, [isSignedIn]);
 
   const beginTrial = useCallback(async () => {
     if (!isSignedIn) {
+      capturePremiumAttribution();
+      try { localStorage.setItem(TRIAL_INTENT_KEY, "1"); } catch { /* storage is optional */ }
       onConnect();
       return;
     }
+    void trackPremiumEvent(authClient, "trial_requested");
     setBusy("trial"); setError(null);
     try {
       const next = await startTrial(authClient);
-      if (next.entitled) onEntitled(next);
+      if (next.entitled) {
+        try { localStorage.removeItem(TRIAL_INTENT_KEY); } catch { /* storage is optional */ }
+        onEntitled(next);
+      }
       else setError("Your free trial has already been used.");
     } catch (err) {
       // startTrial already refreshed + retried on a stale token; reaching this
@@ -105,28 +121,44 @@ function PaywallScreen({
       if (status === 401) {
         onConnect();
         return;
-      } else if (status === 409) setError("Your free trial has already been used.");
-      else setError("Could not start the trial — please try again in a moment.");
+      } else if (status === 409) {
+        try { localStorage.removeItem(TRIAL_INTENT_KEY); } catch { /* storage is optional */ }
+        setError("Your free trial has already been used.");
+      } else setError("Could not start the trial — please try again in a moment.");
+      void trackPremiumEvent(authClient, "trial_start_failed", { status: status || 0 });
     } finally {
       setBusy(null);
     }
   }, [isSignedIn, onConnect, onEntitled]);
 
+  useEffect(() => {
+    if (!isSignedIn || busy !== null || !trialAvailable || expired) return;
+    let pending = false;
+    try { pending = localStorage.getItem(TRIAL_INTENT_KEY) === "1"; } catch { pending = false; }
+    if (pending) {
+      try { localStorage.removeItem(TRIAL_INTENT_KEY); } catch { /* storage is optional */ }
+      void beginTrial();
+    }
+  }, [beginTrial, busy, expired, isSignedIn, trialAvailable]);
+
   const link = useCallback(async () => {
     if (!kofiEmail.trim()) return;
+    void trackPremiumEvent(authClient, "membership_link_started");
     setBusy("link"); setError(null);
     try {
       const next = await linkKofiEmail(authClient, kofiEmail.trim());
-      if (next.entitled) onEntitled(next);
+      if (next.entitled) {
+        void trackPremiumEvent(authClient, "membership_linked");
+        onEntitled(next);
+      }
       else setError("No active membership was found for that email.");
     } catch {
+      void trackPremiumEvent(authClient, "membership_link_failed");
       setError("No active membership was found for that email.");
     } finally {
       setBusy(null);
     }
   }, [kofiEmail, onEntitled]);
-
-  const expired = state?.reason === "expired" || state?.status === "cancelled";
 
   return (
     <main className="paywall">
@@ -138,10 +170,15 @@ function PaywallScreen({
 
         <h1>{expired ? "Your ARVIO Web membership has ended" : "ARVIO Web is a members feature"}</h1>
         <p className="paywall-sub">
-          Live TV in the browser, one-click playback in VLC and downloads are part of
-          ARVIO Web membership. The Android app stays completely free — this unlocks
-          ARVIO on iPhone, iPad, smart-TV browsers and any desktop.
+          Take your existing ARVIO setup to iPhone, iPad, smart-TV browsers and any desktop.
+          Your profiles, libraries, addons and progress stay connected through ARVIO Cloud.
         </p>
+
+        <div className="paywall-benefits" aria-label="ARVIO Web benefits">
+          <span><Check size={15} /> Same profiles, libraries and watch progress</span>
+          <span><Check size={15} /> Browser playback, downloads and one-click VLC</span>
+          <span><Check size={15} /> Android and TV app remains completely free</span>
+        </div>
 
         <div className="paywall-price">
           <span className="paywall-amount">$2.99</span>
@@ -153,6 +190,7 @@ function PaywallScreen({
           href={kofiSubscribeUrl()}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={() => { void trackPremiumEvent(authClient, "checkout_opened"); }}
         >
           <BadgeCheck size={18} /> Subscribe on Ko-fi <ExternalLink size={15} />
         </a>
@@ -160,7 +198,7 @@ function PaywallScreen({
         {SHOW_TRIAL && trialAvailable && !expired && (
           <button type="button" className="paywall-trial" onClick={() => void beginTrial()} disabled={busy !== null}>
             {busy === "trial" ? <Loader2 className="paywall-spinner" size={16} /> : <Sparkles size={16} />}
-            {isSignedIn ? "Start 24-hour free trial" : "Connect to Cloud for free trial"}
+            {isSignedIn ? `Start ${trialDays}-day free trial` : `Connect to Cloud for ${trialDays}-day trial`}
           </button>
         )}
 
@@ -183,6 +221,8 @@ function PaywallScreen({
         )}
 
         {error && <p className="paywall-error">{error}</p>}
+
+        <p className="paywall-proof">10,000+ users · 10+ contributors · open source</p>
 
         {isSignedIn && (
           <button type="button" className="paywall-signout" onClick={onSignOut}>

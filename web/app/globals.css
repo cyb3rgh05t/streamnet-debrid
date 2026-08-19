@@ -951,7 +951,7 @@ input:focus {
 @keyframes arvio-spin { to { transform: rotate(360deg); } }
 .paywall-card {
   width: 100%;
-  max-width: 420px;
+  max-width: 460px;
   text-align: center;
   background: rgba(16, 18, 21, 0.9);
   border: 1px solid rgba(255, 255, 255, 0.08);
@@ -978,7 +978,25 @@ input:focus {
   color: var(--muted);
   font-size: 14px;
   line-height: 1.55;
+  margin: 0 0 16px;
+}
+.paywall-benefits {
+  display: grid;
+  gap: 8px;
   margin: 0 0 22px;
+  text-align: left;
+}
+.paywall-benefits span {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.paywall-benefits svg {
+  flex: 0 0 auto;
+  color: #16d99a;
 }
 .paywall-price {
   display: flex;
@@ -1062,6 +1080,11 @@ input:focus {
   color: #ff8080;
   font-size: 13px;
   margin: 14px 0 0;
+}
+.paywall-proof {
+  margin: 18px 0 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
 }
 .paywall-signout {
   margin-top: 22px;

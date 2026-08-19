@@ -18,3 +18,9 @@
   to = "https://web.arvio.tv/:splat"
   status = 302
   force = true
+
+[[redirects]]
+  from = "/go/premium"
+  to = "https://web.arvio.tv/?utm_source=arvio.tv&utm_medium=website&utm_campaign=premium&intent=trial"
+  status = 302
+  force = true

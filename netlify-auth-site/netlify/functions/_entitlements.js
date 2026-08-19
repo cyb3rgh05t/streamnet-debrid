@@ -10,13 +10,14 @@
 //     tier: string | null,
 //     startedAt: ISO string,
 //     expiresAt: ISO string | null,   // null = lifetime
-//     trialUsed: boolean,             // a one-time 24h trial was consumed
+//     trialUsed: boolean,             // a one-time 3-day trial was consumed
 //     lastEvent: string | null,
 //     updatedAt: ISO string
 //   }
 const { connectLambda, getStore } = require("@netlify/blobs");
 
-const TRIAL_MS = 24 * 60 * 60 * 1000;
+const TRIAL_DAYS = 3;
+const TRIAL_MS = TRIAL_DAYS * 24 * 60 * 60 * 1000;
 
 function entitlementsStore(event) {
   connectLambda(event);
@@ -60,6 +61,7 @@ function evaluateEntitlement(record) {
       reason: "none",
       status: "none",
       trialAvailable: true,
+      trialDurationDays: TRIAL_DAYS,
       expiresAt: null,
       source: null,
     };
@@ -79,6 +81,7 @@ function evaluateEntitlement(record) {
     tier: record.tier || null,
     expiresAt: record.expiresAt || null,
     trialAvailable: !record.trialUsed && !active,
+    trialDurationDays: TRIAL_DAYS,
     updatedAt: record.updatedAt || null,
   };
 }
@@ -106,6 +109,7 @@ function buildPaidRecord(existing, { source, tier, days, event }) {
 
 module.exports = {
   TRIAL_MS,
+  TRIAL_DAYS,
   entitlementsStore,
   readEntitlement,
   writeEntitlement,

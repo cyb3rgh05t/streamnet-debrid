@@ -41,6 +41,7 @@ import {
   nextStallAction,
 } from "@/lib/playerRecovery";
 import { authClient, useApp } from "@/lib/store";
+import { trackPremiumMilestone } from "@/lib/premiumAnalytics";
 import { syncClient } from "@/lib/sync";
 import { SubtitleTranslator, subtitleLanguageName } from "@/lib/subtitleAi";
 import { getLogoUrl } from "@/lib/tmdb";
@@ -398,6 +399,11 @@ function VideoPlayer({
       video.removeEventListener("loadeddata", onReady);
     };
   }, [stream.url, remuxRestartKey]);
+
+  useEffect(() => {
+    if (!booted) return;
+    void trackPremiumMilestone(authClient, "first_playback", { playback_type: liveTv ? "live" : "vod" });
+  }, [booted, liveTv]);
 
   // Black-frame guard: some Dolby Vision sources decode audio fine but render an
   // all-black picture in browsers that can't handle the DV enhancement layer

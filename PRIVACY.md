@@ -1,6 +1,6 @@
 # Privacy Policy
 
-**Last updated: August 10, 2026**
+**Last updated: August 19, 2026**
 
 ## 1. Scope And Controller
 
@@ -42,6 +42,18 @@ At most once per 24 hours, StreamNet TV can send an `app_open` event containing 
 
 These activities are based on StreamNet TV's legitimate interests in finding crashes, measuring release health, and maintaining a reliable service (Article 6(1)(f)). You can object at any time by turning **Share diagnostics and usage** off in Settings. Turning it off does not affect playback, accounts, or cloud sync.
 
+### Website analytics and the ARVIO Premium funnel
+
+The public website uses Netlify's server-side traffic analytics to count page requests, approximate unique visitors, referrers, and countries from delivery logs. ARVIO does not add advertising trackers or cross-site profiling cookies.
+
+After you sign in to ARVIO Web, ARVIO records a small set of Premium service events such as viewing the membership screen, starting a trial, opening checkout, linking a membership, and completing the first successful playback. Account identifiers are converted into a keyed pseudonymous value before storage. Events can contain coarse campaign attribution and device or outcome labels, but not your email address, watched title, stream URL, addon URL, or payment details. Ko-fi separately handles payment details under its own privacy policy.
+
+These measurements are used to understand whether account connection, trials, playback, and membership activation work correctly and where the service needs improvement. They are not used for advertising or sold to third parties. They are based on ARVIO's legitimate interests in operating and improving the optional Premium service (Article 6(1)(f)).
+
+### Trial emails
+
+When you deliberately start an ARVIO Web trial, ARVIO sends only three service messages: confirmation that the trial started, one reminder before it expires, and one final expiry notice. The temporary delivery queue stores the email address encrypted and is not a general marketing mailing list.
+
 ## 5. Optional Third-Party Services
 
 Data is also sent to services you deliberately use or connect:
@@ -65,6 +77,8 @@ StreamNet TV sends only the data needed for the requested integration. Third-par
 - Local data remains until you remove it, clear app data, or uninstall StreamNet TV.
 - StreamNet TV Cloud account and sync data remains while the account is active and is deleted when account deletion completes, except for a minimal record required to prove or secure the deletion.
 - Stored first-party app-open events are retained for up to 31 days.
+- Pseudonymous Premium funnel events are retained for up to 90 days.
+- Completed Premium trial email jobs are removed within 14 days. Pending jobs contain an encrypted email address only until delivery finishes or retries end.
 - Password-reset and device-pairing codes expire after a short operational period.
 - Crash diagnostics follow the configured Sentry or Firebase retention period and are kept only as long as needed to investigate app stability.
 - Infrastructure security logs follow the hosting provider's operational retention schedule.

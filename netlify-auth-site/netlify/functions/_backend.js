@@ -2632,6 +2632,24 @@ async function deleteUsageForAccount(event, accountId) {
   return deleted;
 }
 
+async function deletePremiumDataForAccount(event, email) {
+  connectLambda(event);
+  const normalizedEmail = normalizeEmail(email);
+  const accountKey = privacyHash("premium-funnel-account", normalizedEmail);
+  const funnelStore = getStore("premium-funnel");
+  const trialEmailStore = getStore("premium-trial-emails");
+  const entitlementStore = getStore("entitlements");
+  let funnelEvents = 0;
+  for (let daysAgo = 0; daysAgo <= 90; daysAgo++) {
+    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    funnelEvents += await deleteBlobPrefix(funnelStore, `events/date/${date}/account/${accountKey}/`);
+  }
+  const trialEmailJobs = await deleteBlobPrefix(trialEmailStore, `jobs/${accountKey}/`);
+  const entitlementKey = `email/${sha256(normalizedEmail)}.json`;
+  const entitlementDeleted = await entitlementStore.delete(entitlementKey).then(() => 1).catch(() => 0);
+  return { funnelEvents, trialEmailJobs, entitlementDeleted };
+}
+
 async function deleteReferencedAuthRecords(store, prefix) {
   const references = await listBlobKeys(store, prefix);
   await mapWithConcurrency(references, 16, async (key) => {
@@ -2746,12 +2764,13 @@ async function purgeAccountData(event, email, accountId) {
   const identity = { email, supabaseUserId: accountId };
   const keys = snapshotKeys(identity);
 
-  const [events, authRecords, tvSessions, usageEvents, database] =
+  const [events, authRecords, tvSessions, usageEvents, premiumData, database] =
     await Promise.all([
       deleteBlobPrefix(stores.events, `supabase/${accountId}/`),
       deleteAuthRecordsForAccount(event, accountId),
       deleteTvSessionsForAccount(event, accountId),
       deleteUsageForAccount(event, accountId),
+      deletePremiumDataForAccount(event, email),
       deleteDatabaseAccount(email, accountId),
     ]);
 
@@ -2772,6 +2791,9 @@ async function purgeAccountData(event, email, accountId) {
     refreshTokens: authRecords.refreshTokens,
     tvSessions,
     usageEvents,
+    premiumFunnelEvents: premiumData.funnelEvents,
+    premiumTrialEmailJobs: premiumData.trialEmailJobs,
+    premiumEntitlements: premiumData.entitlementDeleted,
     databaseRows: database.deleted,
     databaseSkipped: database.skipped,
   };
@@ -3188,6 +3210,7 @@ module.exports = {
   handleDiscordAuthStart,
   handleDiscordAuthStatus,
   handleDiscordAuthCallback,
+  sendTransactionalEmail,
   _test: {
     signArvioAccessToken,
     signArvioRefreshToken,

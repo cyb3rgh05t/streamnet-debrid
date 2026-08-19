@@ -12,6 +12,7 @@ const {
   writeEntitlement,
   buildPaidRecord
 } = require("./_entitlements");
+const { recordPremiumEvent } = require("./_premium-funnel");
 
 function parseKofiData(event) {
   // Ko-fi posts form-urlencoded: data=<url-encoded JSON string>.
@@ -78,6 +79,11 @@ exports.handler = async (event) => {
       event: isFirstSub ? "kofi-subscription-started" : "kofi-subscription-renewed"
     });
     await writeEntitlement(store, emailHash, record);
+    await recordPremiumEvent(event, {
+      email,
+      eventName: isFirstSub ? "subscription_started" : "subscription_renewed",
+      metadata: { source: "kofi", tier: data.tier_name || "membership" }
+    }).catch((error) => console.error("kofi funnel recording failed", error));
 
     return json(200, { ok: true, entitled: true, expiresAt: record.expiresAt });
   } catch (error) {

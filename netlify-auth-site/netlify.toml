@@ -4,6 +4,9 @@
 [functions."retention-cleanup"]
   schedule = "@daily"
 
+[functions."trial-email-worker"]
+  schedule = "*/30 * * * *"
+
 [[redirects]]
   from = "/delete"
   to = "/delete-account.html"
