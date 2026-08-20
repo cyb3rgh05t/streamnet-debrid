@@ -132,6 +132,10 @@ Trusted signed builds download the AAR from `DISCORD_PARTNER_SDK_URL`; set
 `DISCORD_PARTNER_SDK_BEARER_TOKEN` if the URL requires bearer-token access,
 `DISCORD_PARTNER_SDK_AAR_SHA256` as an optional integrity check, and
 `DISCORD_CLIENT_ID` to the Discord application id.
+For private GitHub release assets, use a URL like
+`https://github.com/OWNER/PRIVATE_REPO/releases/download/TAG/discord_partner_sdk.aar`
+and provide a fine-grained token with read access to that private repository as
+`DISCORD_PARTNER_SDK_BEARER_TOKEN`.
 
 TMDB and Trakt credentials are not committed to the repository. When a valid
 Supabase config is present, app requests are routed through the tracked
