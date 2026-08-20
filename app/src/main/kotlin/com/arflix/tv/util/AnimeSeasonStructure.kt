@@ -44,6 +44,22 @@ internal data class AnimeSeasonStructure(
     }
 }
 
+internal fun fallbackAdjacentEpisodeIdentity(
+    current: EpisodeIdentity,
+    forward: Boolean
+): EpisodeIdentity? {
+    val delta = if (forward) 1 else -1
+    val displayEpisode = current.displayEpisode + delta
+    val tmdbEpisode = current.tmdbEpisode + delta
+    if (displayEpisode <= 0 || tmdbEpisode <= 0) return null
+    return EpisodeIdentity(
+        displaySeason = current.displaySeason,
+        displayEpisode = displayEpisode,
+        tmdbSeason = current.tmdbSeason,
+        tmdbEpisode = tmdbEpisode
+    )
+}
+
 /**
  * Builds an anime-facing season structure without title-specific rules.
  *

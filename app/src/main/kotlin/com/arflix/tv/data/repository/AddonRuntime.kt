@@ -19,7 +19,8 @@ data class EpisodeRuntimeRequest(
     val genreIds: List<Int>,
     val originalLanguage: String?,
     val title: String,
-    val airDate: String?
+    val airDate: String?,
+    val animeQueryOverride: String? = null
 )
 
 interface AddonRuntime {

@@ -246,6 +246,8 @@ fun PlayerScreen(
     episodeNumber: Int? = null,
     tmdbSeasonNumber: Int? = seasonNumber,
     tmdbEpisodeNumber: Int? = episodeNumber,
+    kitsuId: Int? = null,
+    kitsuEpisodeNumber: Int? = null,
     imdbId: String? = null,
     streamUrl: String? = null,
     preferredAddonId: String? = null,
@@ -255,7 +257,7 @@ fun PlayerScreen(
     isLiveStream: Boolean = false,
     viewModel: PlayerViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
-    onPlayNext: (Int, Int, Int, Int, String?, String?, String?) -> Unit = { _, _, _, _, _, _, _ -> }
+    onPlayNext: (EpisodeIdentity, String?, String?, String?) -> Unit = { _, _, _, _ -> }
 ) {
     val playerAccent = LocalAccentColorOverride.current ?: Color.White
     val context = LocalContext.current
@@ -405,22 +407,21 @@ fun PlayerScreen(
     // advance to the next episode. Gated on the existing autoPlayNext profile setting —
     // when disabled we simply stay on the ended frame rather than advancing silently.
     var showNextEpisodePrompt by remember { mutableStateOf(false) }
-    var pendingNextSeason by remember { mutableIntStateOf(0) }
-    var pendingNextEpisode by remember { mutableIntStateOf(0) }
-    var pendingNextTmdbSeason by remember { mutableIntStateOf(0) }
-    var pendingNextTmdbEpisode by remember { mutableIntStateOf(0) }
+    var pendingNextIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
     var pendingNextAddonId by remember { mutableStateOf<String?>(null) }
     var pendingNextSourceName by remember { mutableStateOf<String?>(null) }
     var pendingNextBingeGroup by remember { mutableStateOf<String?>(null) }
     var nextEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
     var previousEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
-    LaunchedEffect(mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber) {
+    LaunchedEffect(mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber) {
         if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
             val current = EpisodeIdentity(
                 displaySeason = seasonNumber,
                 displayEpisode = episodeNumber,
                 tmdbSeason = tmdbSeasonNumber ?: seasonNumber,
-                tmdbEpisode = tmdbEpisodeNumber ?: episodeNumber
+                tmdbEpisode = tmdbEpisodeNumber ?: episodeNumber,
+                kitsuId = kitsuId,
+                kitsuEpisode = kitsuEpisodeNumber
             )
             nextEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = true)
             previousEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = false)
@@ -432,8 +433,8 @@ fun PlayerScreen(
     var nextEpisodePromptButton by remember { mutableIntStateOf(0) } // 0 = next, 1 = cancel
     val nextEpisodePromptGate = remember { NextEpisodePromptGate() }
 
-    val playNextEpisode: (Int, Int, Int, Int, String?, String?, String?) -> Unit =
-        { nextSeason, nextEpisode, nextTmdbSeason, nextTmdbEpisode, nextAddonId, nextSourceName, nextBingeGroup ->
+    val playNextEpisode: (EpisodeIdentity, String?, String?, String?) -> Unit =
+        { identity, nextAddonId, nextSourceName, nextBingeGroup ->
             if (!nextEpisodeTransitionInProgress) {
                 nextEpisodeTransitionInProgress = true
 
@@ -460,10 +461,7 @@ fun PlayerScreen(
                     }
 
                     onPlayNext(
-                        nextSeason,
-                        nextEpisode,
-                        nextTmdbSeason,
-                        nextTmdbEpisode,
+                        identity,
                         nextAddonId,
                         nextSourceName,
                         nextBingeGroup
@@ -472,13 +470,11 @@ fun PlayerScreen(
             }
         }
 
-    val playPendingNextEpisode: () -> Unit = {
+    val playPendingNextEpisode: () -> Unit = playNext@{
         showNextEpisodePrompt = false
+        val identity = pendingNextIdentity ?: return@playNext
         playNextEpisode(
-            pendingNextSeason,
-            pendingNextEpisode,
-            pendingNextTmdbSeason,
-            pendingNextTmdbEpisode,
+            identity,
             pendingNextAddonId,
             pendingNextSourceName,
             pendingNextBingeGroup
@@ -710,7 +706,7 @@ fun PlayerScreen(
     }
 
     // Load media
-    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs, isLiveStream) {
+    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs, isLiveStream) {
         playbackIssueReported = false
         startupRecoverAttempted = false
         startupHardFailureReported = false
@@ -738,6 +734,7 @@ fun PlayerScreen(
             episodeNumber = tmdbEpisodeNumber,
             displaySeasonNumber = seasonNumber,
             displayEpisodeNumber = episodeNumber,
+            animeQueryOverride = kitsuId?.let { id -> kitsuEpisodeNumber?.let { episode -> "kitsu:$id:$episode" } },
             providedImdbId = imdbId,
             providedStreamUrl = streamUrl,
             preferredAddonId = preferredAddonId,
@@ -2422,10 +2419,7 @@ fun PlayerScreen(
                     tmdbSeasonNumber ?: endedEpisodeKey.seasonNumber,
                     (tmdbEpisodeNumber ?: endedEpisodeKey.episodeNumber) + 1
                 )
-                pendingNextSeason = next.displaySeason
-                pendingNextEpisode = next.displayEpisode
-                pendingNextTmdbSeason = next.tmdbSeason
-                pendingNextTmdbEpisode = next.tmdbEpisode
+                pendingNextIdentity = next
                 pendingNextAddonId = selected?.addonId?.takeIf { it.isNotBlank() }
                 pendingNextSourceName = selected?.source?.takeIf { it.isNotBlank() }
                 pendingNextBingeGroup = selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -2690,10 +2684,7 @@ fun PlayerScreen(
                                 val selected = uiState.selectedStream
                                 val next = nextEpisodeIdentity ?: return@onKeyEvent true
                                 playNextEpisode(
-                                    next.displaySeason,
-                                    next.displayEpisode,
-                                    next.tmdbSeason,
-                                    next.tmdbEpisode,
+                                    next,
                                     selected?.addonId?.takeIf { it.isNotBlank() },
                                     selected?.source?.takeIf { it.isNotBlank() },
                                     selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -2707,10 +2698,7 @@ fun PlayerScreen(
                                 val selected = uiState.selectedStream
                                 val previous = previousEpisodeIdentity ?: return@onKeyEvent true
                                 onPlayNext(
-                                    previous.displaySeason,
-                                    previous.displayEpisode,
-                                    previous.tmdbSeason,
-                                    previous.tmdbEpisode,
+                                    previous,
                                     selected?.addonId?.takeIf { it.isNotBlank() },
                                     selected?.source?.takeIf { it.isNotBlank() },
                                     selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -3696,10 +3684,7 @@ fun PlayerScreen(
                                     val next = nextEpisodeIdentity ?: return@PlayerIconButton
                                     val selected = uiState.selectedStream
                                     playNextEpisode(
-                                        next.displaySeason,
-                                        next.displayEpisode,
-                                        next.tmdbSeason,
-                                        next.tmdbEpisode,
+                                        next,
                                         selected?.addonId?.takeIf { it.isNotBlank() },
                                         selected?.source?.takeIf { it.isNotBlank() },
                                         selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -3954,9 +3939,9 @@ fun PlayerScreen(
             // episode's metadata would require an extra TMDB round-trip during playback.
             // Fall back to a generic "Episode N" label — the show title, S/E number, and
             // backdrop image still give users enough context to decide Continue/Cancel.
-            episodeTitle = "Episode $pendingNextEpisode",
-            seasonNumber = pendingNextSeason,
-            episodeNumber = pendingNextEpisode,
+            episodeTitle = "Episode ${pendingNextIdentity?.displayEpisode ?: 0}",
+            seasonNumber = pendingNextIdentity?.displaySeason ?: 0,
+            episodeNumber = pendingNextIdentity?.displayEpisode ?: 0,
             episodeImage = uiState.backdropUrl,
             countdownSeconds = 10,
             focusedButtonOverride = nextEpisodePromptButton,

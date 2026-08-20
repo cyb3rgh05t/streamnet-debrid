@@ -81,7 +81,7 @@ sealed class Screen(val route: String) {
         }
     }
 
-    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&tmdbSeasonNumber={tmdbSeasonNumber}&tmdbEpisodeNumber={tmdbEpisodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
+    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&tmdbSeasonNumber={tmdbSeasonNumber}&tmdbEpisodeNumber={tmdbEpisodeNumber}&kitsuId={kitsuId}&kitsuEpisodeNumber={kitsuEpisodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
         fun createRoute(
             mediaType: MediaType,
             mediaId: Int,
@@ -89,6 +89,8 @@ sealed class Screen(val route: String) {
             episodeNumber: Int? = null,
             tmdbSeasonNumber: Int? = seasonNumber,
             tmdbEpisodeNumber: Int? = episodeNumber,
+            kitsuId: Int? = null,
+            kitsuEpisodeNumber: Int? = null,
             imdbId: String? = null,
             streamUrl: String? = null,
             preferredAddonId: String? = null,
@@ -103,6 +105,8 @@ sealed class Screen(val route: String) {
             episodeNumber?.let { params.add("episodeNumber=$it") }
             tmdbSeasonNumber?.let { params.add("tmdbSeasonNumber=$it") }
             tmdbEpisodeNumber?.let { params.add("tmdbEpisodeNumber=$it") }
+            kitsuId?.let { params.add("kitsuId=$it") }
+            kitsuEpisodeNumber?.let { params.add("kitsuEpisodeNumber=$it") }
             imdbId?.let { params.add("imdbId=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             streamUrl?.let { params.add("streamUrl=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             preferredAddonId?.let { params.add("preferredAddonId=${java.net.URLEncoder.encode(it, "UTF-8")}") }
@@ -430,15 +434,17 @@ fun AppNavigation(
                 initialSeason = initialSeason,
                 initialEpisode = initialEpisode,
                 currentProfile = currentProfile,
-                onNavigateToPlayer = { type, id, season, episode, tmdbSeason, tmdbEpisode, imdbId, url, preferredAddonId, preferredSourceName, startPositionMs ->
+                onNavigateToPlayer = { type, id, identity, imdbId, url, preferredAddonId, preferredSourceName, startPositionMs ->
                     navController.navigate(
                         Screen.Player.createRoute(
                             mediaType = type,
                             mediaId = id,
-                            seasonNumber = season,
-                            episodeNumber = episode,
-                            tmdbSeasonNumber = tmdbSeason,
-                            tmdbEpisodeNumber = tmdbEpisode,
+                            seasonNumber = identity?.displaySeason,
+                            episodeNumber = identity?.displayEpisode,
+                            tmdbSeasonNumber = identity?.tmdbSeason,
+                            tmdbEpisodeNumber = identity?.tmdbEpisode,
+                            kitsuId = identity?.kitsuId,
+                            kitsuEpisodeNumber = identity?.kitsuEpisode,
                             imdbId = imdbId,
                             streamUrl = url,
                             preferredAddonId = preferredAddonId,
@@ -500,6 +506,14 @@ fun AppNavigation(
                     type = NavType.IntType
                     defaultValue = -1
                 },
+                navArgument("kitsuId") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                },
+                navArgument("kitsuEpisodeNumber") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                },
                 navArgument("imdbId") {
                     type = NavType.StringType
                     defaultValue = ""
@@ -538,6 +552,8 @@ fun AppNavigation(
                 ?: seasonNumber
             val tmdbEpisodeNumber = backStackEntry.arguments?.getInt("tmdbEpisodeNumber")?.takeIf { it >= 0 }
                 ?: episodeNumber
+            val kitsuId = backStackEntry.arguments?.getInt("kitsuId")?.takeIf { it > 0 }
+            val kitsuEpisodeNumber = backStackEntry.arguments?.getInt("kitsuEpisodeNumber")?.takeIf { it > 0 }
             val imdbId = backStackEntry.arguments?.getString("imdbId")?.takeIf { it.isNotBlank() }
             val streamUrl = backStackEntry.arguments?.getString("streamUrl")?.takeIf { it.isNotEmpty() }
             val preferredAddonId = backStackEntry.arguments?.getString("preferredAddonId")?.takeIf { it.isNotBlank() }
@@ -554,6 +570,8 @@ fun AppNavigation(
                 episodeNumber = episodeNumber,
                 tmdbSeasonNumber = tmdbSeasonNumber,
                 tmdbEpisodeNumber = tmdbEpisodeNumber,
+                kitsuId = kitsuId,
+                kitsuEpisodeNumber = kitsuEpisodeNumber,
                 imdbId = imdbId,
                 streamUrl = streamUrl,
                 preferredAddonId = preferredAddonId,
@@ -562,16 +580,18 @@ fun AppNavigation(
                 startPositionMs = startPositionMs,
                 isLiveStream = isLiveStream,
                 onBack = { navController.popBackStack() },
-                onPlayNext = { nextSeason, nextEpisode, nextTmdbSeason, nextTmdbEpisode, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
+                onPlayNext = { nextIdentity, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
                     // Navigate to next episode
                     navController.navigate(
                         Screen.Player.createRoute(
                             mediaType = mediaType,
                             mediaId = mediaId,
-                            seasonNumber = nextSeason,
-                            episodeNumber = nextEpisode,
-                            tmdbSeasonNumber = nextTmdbSeason,
-                            tmdbEpisodeNumber = nextTmdbEpisode,
+                            seasonNumber = nextIdentity.displaySeason,
+                            episodeNumber = nextIdentity.displayEpisode,
+                            tmdbSeasonNumber = nextIdentity.tmdbSeason,
+                            tmdbEpisodeNumber = nextIdentity.tmdbEpisode,
+                            kitsuId = nextIdentity.kitsuId,
+                            kitsuEpisodeNumber = nextIdentity.kitsuEpisode,
                             preferredAddonId = nextPreferredAddonId,
                             preferredSourceName = nextPreferredSourceName,
                             preferredBingeGroup = nextPreferredBingeGroup

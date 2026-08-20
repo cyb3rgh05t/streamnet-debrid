@@ -440,12 +440,19 @@ class DetailsViewModel @Inject constructor(
                     launch {
                         val firstEpisodes = runCatching { episodesDeferred?.await() }.getOrNull()
                         if (!firstEpisodes.isNullOrEmpty()) {
+                            val episodeItem = runCatching { itemDeferred.await() }.getOrNull() ?: initialItem
+                            val displayedEpisodes = normalizeAnimeEpisodesForDisplay(
+                                tmdbId = mediaId,
+                                displaySeason = seasonToLoad,
+                                item = episodeItem,
+                                canonicalEpisodes = firstEpisodes
+                            )
                             updateState { state ->
-                                if (state.currentSeason == seasonToLoad && state.episodes == firstEpisodes) {
+                                if (state.currentSeason == seasonToLoad && state.episodes == displayedEpisodes) {
                                     state
                                 } else {
                                     state.copy(
-                                        episodes = firstEpisodes,
+                                        episodes = displayedEpisodes,
                                         currentSeason = seasonToLoad
                                     )
                                 }
@@ -563,6 +570,15 @@ class DetailsViewModel @Inject constructor(
                                     )
                                 } ?: state.playLabel
                             )
+                        }
+                        val displayProgress = runCatching { fetchSeasonProgress(mediaId) }.getOrNull()
+                        if (animeSeasonStructure === structure && isCurrentRequest()) {
+                            updateState { state ->
+                                state.copy(
+                                    seasonProgress = displayProgress?.progress ?: state.seasonProgress,
+                                    totalSeasons = structure.seasonCount
+                                )
+                            }
                         }
                     }
                 }
@@ -796,7 +812,12 @@ class DetailsViewModel @Inject constructor(
                 }
 
                 launch {
-                    val seasonProgressResult = runCatching { seasonProgressDeferred?.await() }.getOrNull()
+                    val structureAtRead = animeSeasonStructure
+                    val seasonProgressResult = if (structureAtRead == null) {
+                        runCatching { seasonProgressDeferred?.await() }.getOrNull()
+                    } else {
+                        runCatching { fetchSeasonProgress(mediaId) }.getOrNull()
+                    }
                     val baseSeasonProgress = seasonProgressResult?.progress ?: emptyMap()
                     val resumeTarget = runCatching { resumeDeferred.await() }.getOrNull()
                     val fallbackTargetSeason = initialSeason ?: resumeTarget?.season
@@ -827,10 +848,14 @@ class DetailsViewModel @Inject constructor(
                         baseState.totalSeasons
                     }
                     updateState { state ->
-                        state.copy(
-                            seasonProgress = seasonProgress,
-                            totalSeasons = resolvedTotalSeasons
-                        )
+                        if (structureAtRead == null && animeSeasonStructure != null) {
+                            state
+                        } else {
+                            state.copy(
+                                seasonProgress = seasonProgress,
+                                totalSeasons = resolvedTotalSeasons
+                            )
+                        }
                     }
                 }
 
@@ -976,28 +1001,12 @@ class DetailsViewModel @Inject constructor(
                     loadAnimeDisplaySeason(currentMediaId, seasonNumber, structure)
                 } else {
                     val canonicalEpisodes = mediaRepository.getSeasonEpisodes(currentMediaId, seasonNumber)
-                    val item = _uiState.value.item
-                    val isAnime = animeMapper.isAnimeContent(
-                        currentMediaId,
-                        item?.genreIds.orEmpty(),
-                        item?.originalLanguage
+                    normalizeAnimeEpisodesForDisplay(
+                        tmdbId = currentMediaId,
+                        displaySeason = seasonNumber,
+                        item = _uiState.value.item,
+                        canonicalEpisodes = canonicalEpisodes
                     )
-                    if (isAnime && canonicalEpisodes.isNotEmpty() && canonicalEpisodes.first().episodeNumber != 1) {
-                        canonicalEpisodes.mapIndexed { index, episode ->
-                            episode.copy(
-                                episodeNumber = index + 1,
-                                seasonNumber = seasonNumber,
-                                identity = EpisodeIdentity(
-                                    displaySeason = seasonNumber,
-                                    displayEpisode = index + 1,
-                                    tmdbSeason = episode.seasonNumber,
-                                    tmdbEpisode = episode.episodeNumber
-                                )
-                            )
-                        }
-                    } else {
-                        canonicalEpisodes
-                    }
                 }
                 // A newer request superseded this one while we were fetching — drop the stale result.
                 if (seasonLoadRequestedSeason != seasonNumber) return@launch
@@ -1068,6 +1077,44 @@ class DetailsViewModel @Inject constructor(
                     episodeNumber = identity.displayEpisode,
                     identity = identity
                 )
+        }
+    }
+
+    fun resolveEpisodeIdentity(
+        displaySeason: Int?,
+        displayEpisode: Int?,
+        tmdbSeason: Int?,
+        tmdbEpisode: Int?
+    ): EpisodeIdentity? {
+        if (displaySeason == null || displayEpisode == null || tmdbSeason == null || tmdbEpisode == null) {
+            return null
+        }
+        return animeSeasonStructure?.identityForDisplay(displaySeason, displayEpisode)
+            ?: animeSeasonStructure?.identityForTmdb(tmdbSeason, tmdbEpisode)
+            ?: EpisodeIdentity(displaySeason, displayEpisode, tmdbSeason, tmdbEpisode)
+    }
+
+    private fun normalizeAnimeEpisodesForDisplay(
+        tmdbId: Int,
+        displaySeason: Int,
+        item: MediaItem?,
+        canonicalEpisodes: List<Episode>
+    ): List<Episode> {
+        val usesAbsoluteNumbers = canonicalEpisodes.isNotEmpty() &&
+            canonicalEpisodes.first().episodeNumber != 1 &&
+            animeMapper.isAnimeContent(tmdbId, item?.genreIds.orEmpty(), item?.originalLanguage)
+        if (!usesAbsoluteNumbers) return canonicalEpisodes
+        return canonicalEpisodes.mapIndexed { index, episode ->
+            episode.copy(
+                episodeNumber = index + 1,
+                seasonNumber = displaySeason,
+                identity = EpisodeIdentity(
+                    displaySeason = displaySeason,
+                    displayEpisode = index + 1,
+                    tmdbSeason = episode.seasonNumber,
+                    tmdbEpisode = episode.episodeNumber
+                )
+            )
         }
     }
 

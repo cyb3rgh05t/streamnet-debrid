@@ -1,5 +1,6 @@
 package com.arflix.tv.util
 
+import com.arflix.tv.data.model.EpisodeIdentity
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -195,5 +196,39 @@ class AnimeSeasonStructureTest {
                 )
             )
         )
+    }
+
+    @Test
+    fun `fallback next keeps local display numbering for absolute TMDB episodes`() {
+        val next = fallbackAdjacentEpisodeIdentity(
+            current = EpisodeIdentity(
+                displaySeason = 22,
+                displayEpisode = 1,
+                tmdbSeason = 22,
+                tmdbEpisode = 1089
+            ),
+            forward = true
+        )!!
+
+        assertEquals(22, next.displaySeason)
+        assertEquals(2, next.displayEpisode)
+        assertEquals(22, next.tmdbSeason)
+        assertEquals(1090, next.tmdbEpisode)
+    }
+
+    @Test
+    fun `fallback previous keeps local display numbering for absolute TMDB episodes`() {
+        val previous = fallbackAdjacentEpisodeIdentity(
+            current = EpisodeIdentity(
+                displaySeason = 22,
+                displayEpisode = 2,
+                tmdbSeason = 22,
+                tmdbEpisode = 1090
+            ),
+            forward = false
+        )!!
+
+        assertEquals(1, previous.displayEpisode)
+        assertEquals(1089, previous.tmdbEpisode)
     }
 }
