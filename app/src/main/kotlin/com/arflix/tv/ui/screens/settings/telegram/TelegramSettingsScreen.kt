@@ -64,13 +64,15 @@ import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.data.telegram.TelegramAuthState
 import com.arflix.tv.ui.components.LoadingIndicator
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.ui.theme.BackgroundElevated
-import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.SuccessGreen
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.ui.theme.appBackgroundDark
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.util.LocalDeviceType
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.qrcode.QRCodeWriter
@@ -84,6 +86,7 @@ fun TelegramSettingsScreen(
     val authState by viewModel.authState.collectAsState()
     val cacheSizeBytes by viewModel.cacheSizeBytes.collectAsState()
     var showDisconnectConfirm by remember { mutableStateOf(false) }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
 
     Box(
         modifier = Modifier
@@ -99,7 +102,8 @@ fun TelegramSettingsScreen(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                        .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.24f), RoundedCornerShape(8.dp))
                         .clickable { onBack() },
                     contentAlignment = Alignment.Center
                 ) {
@@ -112,7 +116,7 @@ fun TelegramSettingsScreen(
                 }
                 Spacer(modifier = Modifier.width(16.dp))
                 Text(
-                    text = "Telegram",
+                    text = stringResource(R.string.telegram_title),
                     style = ArflixTypography.sectionTitle,
                     color = TextPrimary
                 )
@@ -209,12 +213,13 @@ private fun IdleContent(onConnect: () -> Unit) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun LoadingContent(message: String) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(56.dp))
-        LoadingIndicator(color = Pink, size = 40.dp, strokeWidth = 3.dp)
+        LoadingIndicator(color = accentColor, size = 40.dp, strokeWidth = 3.dp)
         Spacer(modifier = Modifier.height(16.dp))
         Text(text = message, style = ArflixTypography.caption.copy(fontSize = 14.sp), color = TextSecondary)
     }
@@ -223,6 +228,7 @@ private fun LoadingContent(message: String) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun QrContent(link: String) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     val qrBitmap = remember(link) { generateQrBitmap(link, 400) }
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -248,6 +254,7 @@ private fun QrContent(link: String) {
                 modifier = Modifier
                     .size(200.dp)
                     .background(Color.White, RoundedCornerShape(12.dp))
+                    .border(2.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(12.dp))
                     .padding(12.dp)
             ) {
                 Image(
@@ -257,7 +264,7 @@ private fun QrContent(link: String) {
                 )
             }
         } else {
-            LoadingIndicator(color = Pink, size = 40.dp, strokeWidth = 3.dp)
+            LoadingIndicator(color = accentColor, size = 40.dp, strokeWidth = 3.dp)
         }
         Spacer(modifier = Modifier.height(16.dp))
         Text(
@@ -286,6 +293,7 @@ private fun generateQrBitmap(content: String, size: Int): Bitmap? = try {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun PhoneContent(onSubmit: (String) -> Unit) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     var phone by remember { mutableStateOf("+") }
     var isSubmitting by remember { mutableStateOf(false) }
     var showValidation by remember { mutableStateOf(false) }
@@ -328,7 +336,7 @@ private fun PhoneContent(onSubmit: (String) -> Unit) {
             placeholder = { Text("+1 650 555 1234", color = TextSecondary.copy(alpha = 0.35f)) },
             supportingText = {
                 if (showError) {
-                    Text(stringResource(R.string.telegram_phone_error), color = Pink)
+                    Text(stringResource(R.string.telegram_phone_error), color = accentColor)
                 } else {
                     Text(stringResource(R.string.telegram_phone_format), color = TextSecondary.copy(alpha = 0.5f))
                 }
@@ -345,7 +353,7 @@ private fun PhoneContent(onSubmit: (String) -> Unit) {
         )
         Spacer(modifier = Modifier.height(20.dp))
         if (isSubmitting) {
-            LoadingIndicator(color = Pink, size = 32.dp, strokeWidth = 2.5.dp)
+            LoadingIndicator(color = accentColor, size = 32.dp, strokeWidth = 2.5.dp)
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = stringResource(R.string.telegram_sending_code),
@@ -463,6 +471,7 @@ private fun ConnectedContent(
     onDisconnect: () -> Unit,
     onClearCache: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -512,12 +521,12 @@ private fun ConnectedContent(
                 .clickable { if (cacheSizeBytes > 0L) onClearCache() }
                 .onFocusChanged { cacheFocused = it.isFocused }
                 .background(
-                    if (cacheFocused) Pink.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.04f),
+                    if (cacheFocused) accentColor.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.04f),
                     RoundedCornerShape(12.dp)
                 )
                 .border(
                     width = if (cacheFocused) 2.dp else 1.dp,
-                    color = if (cacheFocused) Pink else Color.White.copy(alpha = 0.08f),
+                    color = if (cacheFocused) accentColor else Color.White.copy(alpha = 0.08f),
                     shape = RoundedCornerShape(12.dp)
                 )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -528,7 +537,7 @@ private fun ConnectedContent(
                 Text(
                     text = stringResource(R.string.telegram_video_cache),
                     style = ArflixTypography.cardTitle.copy(fontSize = 14.sp),
-                    color = if (cacheFocused) Pink else TextPrimary
+                    color = if (cacheFocused) accentColor else TextPrimary
                 )
                 Text(
                     text = formatCacheSize(cacheSizeBytes),
@@ -540,7 +549,7 @@ private fun ConnectedContent(
                 Text(
                     text = stringResource(R.string.telegram_clear_cache_btn),
                     style = ArflixTypography.label.copy(fontSize = 11.sp),
-                    color = Pink
+                    color = accentColor
                 )
             }
         }
@@ -550,12 +559,13 @@ private fun ConnectedContent(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ErrorContent(message: String, onRetry: () -> Unit) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Spacer(modifier = Modifier.height(40.dp))
-        Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = Pink, modifier = Modifier.size(40.dp))
+        Icon(imageVector = Icons.Default.Close, contentDescription = null, tint = accentColor, modifier = Modifier.size(40.dp))
         Spacer(modifier = Modifier.height(12.dp))
         Text(text = stringResource(R.string.telegram_connection_failed), style = ArflixTypography.cardTitle.copy(fontSize = 18.sp), color = TextPrimary)
         Spacer(modifier = Modifier.height(8.dp))
@@ -568,10 +578,12 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ActionButton(label: String, onClick: () -> Unit) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val accentContentColor = contrastingContentColor(accentColor)
     Box(
         modifier = Modifier
-            .background(Pink.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-            .border(1.dp, Pink.copy(alpha = 0.4f), RoundedCornerShape(999.dp))
+            .background(accentColor, RoundedCornerShape(999.dp))
+            .border(1.dp, accentColor.copy(alpha = 0.78f), RoundedCornerShape(999.dp))
             .clickable { onClick() }
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center
@@ -579,7 +591,7 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
         Text(
             text = label,
             style = ArflixTypography.label.copy(fontSize = 13.sp, letterSpacing = 0.8.sp),
-            color = Pink
+            color = accentContentColor
         )
     }
 }
@@ -588,6 +600,8 @@ private fun ActionButton(label: String, onClick: () -> Unit) {
 @Composable
 private fun DisconnectConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val focusRequester = remember { FocusRequester() }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val accentContentColor = contrastingContentColor(accentColor)
     var focusedButton by remember { mutableIntStateOf(0) } // 0 = cancel, 1 = disconnect
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
@@ -608,6 +622,7 @@ private fun DisconnectConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
             modifier = Modifier
                 .widthIn(max = 360.dp)
                 .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                .border(1.dp, accentColor.copy(alpha = 0.24f), RoundedCornerShape(16.dp))
                 .clickable(enabled = false) {}
                 .focusRequester(focusRequester)
                 .focusable()
@@ -667,12 +682,12 @@ private fun DisconnectConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
                     modifier = Modifier
                         .weight(1f)
                         .background(
-                            if (focusedButton == 1) Pink.copy(alpha = 0.3f) else Pink.copy(alpha = 0.12f),
+                            if (focusedButton == 1) accentColor else accentColor.copy(alpha = 0.12f),
                             RoundedCornerShape(8.dp)
                         )
                         .border(
                             width = if (focusedButton == 1) 2.dp else 1.dp,
-                            color = if (focusedButton == 1) Pink else Pink.copy(alpha = 0.35f),
+                            color = if (focusedButton == 1) accentColor else accentColor.copy(alpha = 0.35f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .clickable { onConfirm() }
@@ -682,7 +697,7 @@ private fun DisconnectConfirmDialog(onConfirm: () -> Unit, onDismiss: () -> Unit
                     Text(
                         text = stringResource(R.string.telegram_disconnect_btn),
                         style = ArflixTypography.label.copy(fontSize = 12.sp),
-                        color = Pink
+                        color = if (focusedButton == 1) accentContentColor else accentColor
                     )
                 }
             }
@@ -700,10 +715,12 @@ private fun formatCacheSize(bytes: Long): String = when {
 
 @Composable
 private fun inputColors() = TextFieldDefaults.colors(
+    focusedIndicatorColor = resolveAccentColor(fallback = AccentYellow),
+    cursorColor = resolveAccentColor(fallback = AccentYellow),
     focusedContainerColor = BackgroundElevated,
     unfocusedContainerColor = BackgroundElevated,
     focusedTextColor = TextPrimary,
     unfocusedTextColor = TextPrimary,
-    focusedLabelColor = Pink,
+    focusedLabelColor = resolveAccentColor(fallback = AccentYellow),
     unfocusedLabelColor = TextSecondary
 )

@@ -2662,7 +2662,7 @@ class SettingsViewModel @Inject constructor(
             if (userCode.isNullOrBlank()) {
                 clearCloudAuthSession()
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Cloud sign-in session was unavailable. Try again.",
+                    toastMessage = context.getString(R.string.cloud_signin_could_not_start),
                     toastType = ToastType.ERROR,
                     cloudAuthStatusMessage = null,
                     isCloudAuthWorking = false
@@ -2677,7 +2677,7 @@ class SettingsViewModel @Inject constructor(
                 intent = if (createAccount) "signup" else "signin"
             ).onSuccess {
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Waiting for approval...",
+                    toastMessage = context.getString(R.string.settings_waiting_for_approval),
                     toastType = ToastType.INFO,
                     showCloudEmailPasswordDialog = false,
                     showCloudPairDialog = true,

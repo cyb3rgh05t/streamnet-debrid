@@ -46,17 +46,17 @@ These activities are based on StreamNet TV's legitimate interests in finding cra
 
 Data is also sent to services you deliberately use or connect:
 
-| Service                  | Purpose                                                                         | Privacy policy                                                                     |
-| ------------------------ | ------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Netlify infrastructure   | StreamNet TV websites, account functions, cloud sync, and storage               | [netlify.com/privacy](https://www.netlify.com/privacy/)                            |
-| Resend                   | Account verification and password-reset email delivery                          | [resend.com/legal/privacy-policy](https://resend.com/legal/privacy-policy)         |
-| Sentry                   | Crash reporting and diagnostics when enabled                                    | [sentry.io/privacy](https://sentry.io/privacy/)                                    |
-| Firebase Crashlytics     | Crash-reporting fallback in configured builds                                   | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
-| TMDB                     | Movie and TV metadata and images                                                | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
-| Trakt.tv                 | Optional watch history, progress, ratings, and watchlist sync                   | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
+| Service                  | Purpose                                                                          | Privacy policy                                                                     |
+| ------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Netlify infrastructure   | StreamNet TV websites, account functions, cloud sync, and storage                | [netlify.com/privacy](https://www.netlify.com/privacy/)                            |
+| Resend                   | Account verification and password-reset email delivery                           | [resend.com/legal/privacy-policy](https://resend.com/legal/privacy-policy)         |
+| Sentry                   | Crash reporting and diagnostics when enabled                                     | [sentry.io/privacy](https://sentry.io/privacy/)                                    |
+| Firebase Crashlytics     | Crash-reporting fallback in configured builds                                    | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
+| TMDB                     | Movie and TV metadata and images                                                 | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
+| Trakt.tv                 | Optional watch history, progress, ratings, and watchlist sync                    | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
 | Discord                  | Optional Rich Presence login and the title/playback status you choose to display | [discord.com/privacy](https://discord.com/privacy)                                 |
-| Ko-fi                    | Optional StreamNet TV Web membership verification                               | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
-| User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add | Governed by the provider you configure                                             |
+| Ko-fi                    | Optional StreamNet TV Web membership verification                                | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
+| User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add  | Governed by the provider you configure                                             |
 
 StreamNet TV sends only the data needed for the requested integration. Third-party services may process data outside the European Economic Area under their own transfer mechanisms and terms.
 

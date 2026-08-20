@@ -759,6 +759,7 @@
 
     <!-- Extracted from code: Telegram and Plugin screens -->
     <string name="telegram_connecting">Connecting...</string>
+    <string name="telegram_title">Telegram</string>
     <string name="telegram_preparing_qr">Preparing QR code...</string>
     <string name="telegram_connect_title">Connect Telegram</string>
     <string name="telegram_connect_desc">Search your channels and groups for video files whenever you open a movie or show.</string>
@@ -789,6 +790,21 @@
     <string name="telegram_try_again">TRY AGAIN</string>
     <string name="telegram_disconnect_confirm_title">Disconnect Telegram?</string>
     <string name="telegram_disconnect_confirm_desc">You\'ll need to sign in again to use Telegram as a source.</string>
+    <string name="discord_rpc_title">Discord RPC</string>
+    <string name="discord_rich_presence_title">Discord Rich Presence</string>
+    <string name="discord_tv_login_title">Discord TV Login</string>
+    <string name="discord_connect_title">Connect Discord</string>
+    <string name="discord_connect_desc">Scan this QR code with your phone camera to authorize Discord Rich Presence for your profile.</string>
+    <string name="discord_connecting">Connecting...</string>
+    <string name="discord_waiting_for_approval">Waiting for approval...</string>
+    <string name="discord_pairing_steps">1. Scan QR code on your phone\n2. Tap \"Authorize\" on Discord\n3. Connects automatically</string>
+    <string name="discord_login_on_tv">Log in directly on TV</string>
+    <string name="discord_scroll_up">▲ Scroll Up</string>
+    <string name="discord_scroll_down">▼ Scroll Down</string>
+    <string name="discord_not_included">Not included in this build</string>
+    <string name="discord_connected_as">Connected as %1$s</string>
+    <string name="discord_unavailable">Unavailable</string>
+    <string name="discord_help_desc">Show your watch status on your Discord profile.</string>
     <string name="plugin_screen_title">Plugins (Testing)</string>
     <string name="plugin_screen_add_repo">Add Repository</string>
     <string name="plugin_screen_installed_repos">Installed Repositories</string>

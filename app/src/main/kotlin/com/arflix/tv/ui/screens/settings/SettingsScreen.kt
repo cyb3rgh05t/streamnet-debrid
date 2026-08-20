@@ -3654,7 +3654,8 @@ private fun DiscordWebViewModal(
     onDismiss: () -> Unit,
     onCompleteWithCode: (String) -> Unit
 ) {
-    val accentColor = Color(0xFF5865F2) // Discord Blurple
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val accentContentColor = contrastingContentColor(accentColor)
     val focusRequester = remember { FocusRequester() }
     var cursorX by remember { mutableStateOf(400f) }
     var cursorY by remember { mutableStateOf(300f) }
@@ -3812,7 +3813,8 @@ private fun DiscordWebViewModal(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .background(accentColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+                                .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
                                 .clickable {
                                     if (webViewRef?.canGoBack() == true) webViewRef?.goBack() else onDismiss()
                                 }
@@ -3821,17 +3823,17 @@ private fun DiscordWebViewModal(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.ArrowBack,
-                                    contentDescription = "Back",
+                                    contentDescription = stringResource(R.string.back),
                                     tint = TextPrimary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Back", color = TextPrimary, style = ArflixTypography.caption)
+                                Text(stringResource(R.string.back), color = TextPrimary, style = ArflixTypography.caption)
                             }
                         }
                         Spacer(modifier = Modifier.width(16.dp))
                         Text(
-                            text = "Discord TV Login",
+                            text = stringResource(R.string.discord_tv_login_title),
                             style = ArflixTypography.sectionTitle,
                             color = TextPrimary
                         )
@@ -3844,38 +3846,40 @@ private fun DiscordWebViewModal(
                     ) {
                         Box(
                             modifier = Modifier
-                                .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
                                 .clickable { scrollPage(false) }
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            Text("▲ Scroll Up", color = TextPrimary, style = ArflixTypography.caption)
+                            Text(stringResource(R.string.discord_scroll_up), color = TextPrimary, style = ArflixTypography.caption)
                         }
 
                         Box(
                             modifier = Modifier
-                                .background(accentColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
+                                .background(accentColor, RoundedCornerShape(8.dp))
                                 .border(1.dp, accentColor, RoundedCornerShape(8.dp))
                                 .clickable { scrollPage(true) }
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
                         ) {
-                            Text("▼ Scroll Down", color = Color.White, style = ArflixTypography.caption)
+                            Text(stringResource(R.string.discord_scroll_down), color = accentContentColor, style = ArflixTypography.caption)
                         }
 
                         Box(
                             modifier = Modifier
                                 .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                                .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
                                 .clickable { onDismiss() }
                                 .padding(horizontal = 14.dp, vertical = 8.dp)
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
-                                    contentDescription = "Close",
+                                    contentDescription = stringResource(R.string.close),
                                     tint = TextSecondary,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Close", color = TextSecondary, style = ArflixTypography.caption)
+                                Text(stringResource(R.string.close), color = TextSecondary, style = ArflixTypography.caption)
                             }
                         }
                     }
@@ -3886,7 +3890,7 @@ private fun DiscordWebViewModal(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(RoundedCornerShape(12.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.34f), RoundedCornerShape(12.dp))
                         .onGloballyPositioned { coordinates ->
                             containerWidth = coordinates.size.width.toFloat()
                             containerHeight = coordinates.size.height.toFloat()
@@ -3977,7 +3981,8 @@ private fun DiscordActivationModal(
     onDismiss: () -> Unit,
     onCompleteWithCode: (String) -> Unit
 ) {
-    val accentColor = Color(0xFF5865F2) // Discord Blurple
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val accentContentColor = contrastingContentColor(accentColor)
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val qrContainerSize = if (isMobile) 0.dp else 190.dp
@@ -4044,7 +4049,7 @@ private fun DiscordActivationModal(
                             else Modifier.width(580.dp)
                         )
                         .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(16.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                         .clickable(enabled = false) {}
                         .padding(if (isMobile) 20.dp else 28.dp)
                 ) {
@@ -4052,7 +4057,8 @@ private fun DiscordActivationModal(
                         Box(
                             modifier = Modifier
                                 .size(36.dp)
-                                .background(accentColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                                .background(accentColor.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                                .border(1.dp, accentColor.copy(alpha = 0.32f), RoundedCornerShape(8.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
@@ -4064,14 +4070,14 @@ private fun DiscordActivationModal(
                         }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Connect Discord",
+                            text = stringResource(R.string.discord_connect_title),
                             style = ArflixTypography.sectionTitle,
                             color = TextPrimary
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "Scan this QR code with your phone camera to authorize Discord Rich Presence for your profile.",
+                        text = stringResource(R.string.discord_connect_desc),
                         style = ArflixTypography.body,
                         color = TextSecondary
                     )
@@ -4109,7 +4115,7 @@ private fun DiscordActivationModal(
                                     LoadingIndicator(size = 20.dp, color = accentColor)
                                     Spacer(modifier = Modifier.width(10.dp))
                                     Text(
-                                        text = "Connecting...",
+                                        text = stringResource(R.string.discord_connecting),
                                         style = ArflixTypography.body,
                                         color = TextPrimary
                                     )
@@ -4119,14 +4125,14 @@ private fun DiscordActivationModal(
                                     LoadingIndicator(size = 18.dp, color = accentColor)
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Waiting for approval...",
+                                        text = stringResource(R.string.discord_waiting_for_approval),
                                         style = ArflixTypography.caption,
                                         color = TextSecondary.copy(alpha = 0.85f)
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = "1. Scan QR code on your phone\n2. Tap 'Authorize' on Discord\n3. Connects automatically",
+                                    text = stringResource(R.string.discord_pairing_steps),
                                     style = ArflixTypography.caption.copy(fontSize = 12.sp, lineHeight = 18.sp),
                                     color = TextSecondary.copy(alpha = 0.7f)
                                 )
@@ -4145,20 +4151,20 @@ private fun DiscordActivationModal(
                         Box(
                             modifier = Modifier
                                 .background(
-                                    if (focusedButton == 0) accentColor.copy(alpha = 0.25f) else Color.Transparent,
+                                    if (focusedButton == 0) accentColor else accentColor.copy(alpha = 0.12f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .border(
                                     1.dp,
-                                    if (focusedButton == 0) accentColor else Color.White.copy(alpha = 0.15f),
+                                    if (focusedButton == 0) accentColor else accentColor.copy(alpha = 0.32f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .clickable { showInAppWebView = true }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             Text(
-                                text = "Log in directly on TV",
-                                color = if (focusedButton == 0) Color.White else accentColor,
+                                text = stringResource(R.string.discord_login_on_tv),
+                                color = if (focusedButton == 0) accentContentColor else accentColor,
                                 style = ArflixTypography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                             )
                         }
@@ -4489,7 +4495,7 @@ private fun MobileSettingsMainPage(
                 )
                 MobileSettingsRow(
                     iconRes = R.drawable.ic_telegram,
-                    title = "Telegram",
+                    title = stringResource(R.string.telegram_title),
                     value = "",
                     isExternalLink = true,
                     isFocused = false,
@@ -4501,16 +4507,16 @@ private fun MobileSettingsMainPage(
                 val context = LocalContext.current
                 MobileSettingsRow(
                     icon = Icons.Default.Link,
-                    title = "Discord RPC",
+                    title = stringResource(R.string.discord_rpc_title),
                     subtitle = when {
-                        !isDiscordSupported -> "Not included in this build"
-                        isDiscordLoggedIn && !discordUsername.isNullOrBlank() -> "Connected as $discordUsername"
+                        !isDiscordSupported -> stringResource(R.string.discord_not_included)
+                        isDiscordLoggedIn && !discordUsername.isNullOrBlank() -> stringResource(R.string.discord_connected_as, discordUsername!!)
                         else -> ""
                     },
                     value = when {
-                        !isDiscordSupported -> "Unavailable"
-                        isDiscordLoggedIn -> "Disconnect"
-                        else -> "Connect"
+                        !isDiscordSupported -> stringResource(R.string.discord_unavailable)
+                        isDiscordLoggedIn -> stringResource(R.string.settings_disconnect)
+                        else -> stringResource(R.string.connect)
                     },
                     enabled = isDiscordSupported,
                     isFocused = false,
@@ -5869,7 +5875,7 @@ private fun tvSettingsFocusedHelp(section: String, focusedIndex: Int): TvSetting
         "accounts" -> when (focusedIndex) {
             0 -> TvSettingsHelp(stringResource(R.string.cloud_account), stringResource(R.string.settings_help_cloud_account_desc))
             1 -> TvSettingsHelp(stringResource(R.string.settings_help_trakt), stringResource(R.string.settings_help_trakt_desc))
-            10 -> TvSettingsHelp("Discord RPC", "Show your watch status on your Discord profile.")
+            10 -> TvSettingsHelp(stringResource(R.string.discord_rpc_title), stringResource(R.string.discord_help_desc))
             11 -> TvSettingsHelp(stringResource(R.string.force_cloud_sync), stringResource(R.string.settings_help_force_sync_desc))
             12 -> TvSettingsHelp(stringResource(R.string.settings_help_app_updates), stringResource(R.string.settings_help_app_updates_desc))
             13 -> TvSettingsHelp(stringResource(R.string.settings_diagnostics_sharing), stringResource(R.string.settings_diagnostics_sharing_desc))
@@ -9181,7 +9187,7 @@ private fun AccountsSettings(
 
         // Telegram
         SettingsActionRow(
-            title = "Telegram",
+            title = stringResource(R.string.telegram_title),
             description = stringResource(R.string.settings_telegram_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
             isFocused = focusedIndex == 9,
@@ -9197,10 +9203,10 @@ private fun AccountsSettings(
         val discordUsername by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.usernameFlow.collectAsStateWithLifecycle(initialValue = null)
         val isDiscordSupported = com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isSupported
         AccountRow(
-            name = "Discord Rich Presence",
+            name = stringResource(R.string.discord_rich_presence_title),
             description = when {
-                !isDiscordSupported -> "Not included in this build"
-                isDiscordLoggedIn && !discordUsername.isNullOrBlank() -> "Connected as $discordUsername"
+                !isDiscordSupported -> stringResource(R.string.discord_not_included)
+                isDiscordLoggedIn && !discordUsername.isNullOrBlank() -> stringResource(R.string.discord_connected_as, discordUsername!!)
                 else -> ""
             },
             isConnected = isDiscordLoggedIn,
@@ -9243,9 +9249,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_force_pull),
             description = stringResource(R.string.settings_force_pull_desc),
             actionLabel = if (isForceCloudSyncing) stringResource(R.string.settings_badge_syncing) else stringResource(R.string.settings_action_pull),
-            isFocused = focusedIndex == 11,
+            isFocused = focusedIndex == 12,
             onClick = { if (!isForceCloudSyncing) onForceCloudPull() },
-            modifier = Modifier.settingsFocusSlot(11)
+            modifier = Modifier.settingsFocusSlot(12)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -9267,11 +9273,11 @@ private fun AccountsSettings(
                 updateStatus is com.arflix.tv.updater.UpdateStatus.UpdateAvailable -> stringResource(R.string.settings_badge_update)
                 else -> stringResource(R.string.settings_badge_check)
             },
-            isFocused = focusedIndex == 12,
+            isFocused = focusedIndex == 13,
             onClick = {
                 if (updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) onInstallUpdate() else onCheckUpdates()
             },
-            modifier = Modifier.settingsFocusSlot(12)
+            modifier = Modifier.settingsFocusSlot(13)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -9487,6 +9493,7 @@ private fun AccountActionRow(
     isFocused: Boolean
 ) {
     val focusRingColor = resolveAccentColor(fallback = Pink)
+    val focusContentColor = contrastingContentColor(focusRingColor)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -9557,6 +9564,7 @@ private fun SettingsActionRow(
     modifier: Modifier = Modifier
 ) {
     val focusRingColor = resolveAccentColor(fallback = Pink)
+    val focusContentColor = contrastingContentColor(focusRingColor)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -9596,15 +9604,15 @@ private fun SettingsActionRow(
         Spacer(modifier = Modifier.width(12.dp))
         Box(
             modifier = Modifier
-                .background(Pink.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                .border(1.dp, Pink.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                .background(if (isFocused) focusRingColor else focusRingColor.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+                .border(1.dp, focusRingColor.copy(alpha = if (isFocused) 0.85f else 0.32f), RoundedCornerShape(999.dp))
                 .padding(horizontal = 12.dp, vertical = 6.dp),
             contentAlignment = Alignment.Center
         ) {
             Text(
                 text = actionLabel.uppercase(),
                 style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
-                color = Pink,
+                color = if (isFocused) focusContentColor else focusRingColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -10250,23 +10258,24 @@ private fun AccountRow(
                     strokeWidth = 2.dp
                 )
             } else if (isEnabled) {
+                val accentColor = resolveAccentColor(fallback = Pink)
                 Box(
                     modifier = Modifier
-                        .background(Pink.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                        .border(1.dp, Pink.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                        .background(accentColor.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = stringResource(R.string.connect).uppercase(),
                         style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
-                        color = Pink,
+                        color = accentColor,
                         maxLines = 1
                     )
                 }
             } else {
                 Text(
-                    text = "UNAVAILABLE",
+                    text = stringResource(R.string.discord_unavailable).uppercase(),
                     style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
                     color = TextSecondary,
                     maxLines = 1

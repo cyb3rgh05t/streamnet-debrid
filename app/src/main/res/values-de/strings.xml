@@ -795,6 +795,7 @@
     <string name="context_press_back_cancel">Zum Abbrechen Zurück drücken</string>
     <!-- Telegram und Plugins -->
     <string name="telegram_connecting">Verbindung wird hergestellt...</string>
+    <string name="telegram_title">Telegram</string>
     <string name="telegram_preparing_qr">QR-Code wird vorbereitet...</string>
     <string name="telegram_connect_title">Telegram verbinden</string>
     <string name="telegram_connect_desc">Deine Kanäle und Gruppen bei jedem Öffnen eines Films oder einer Serie nach Videodateien durchsuchen.</string>
@@ -825,6 +826,21 @@
     <string name="telegram_try_again">ERNEUT VERSUCHEN</string>
     <string name="telegram_disconnect_confirm_title">Telegram trennen?</string>
     <string name="telegram_disconnect_confirm_desc">Du musst dich erneut anmelden, um Telegram als Quelle zu verwenden.</string>
+    <string name="discord_rpc_title">Discord RPC</string>
+    <string name="discord_rich_presence_title">Discord Rich Presence</string>
+    <string name="discord_tv_login_title">Discord-TV-Anmeldung</string>
+    <string name="discord_connect_title">Discord verbinden</string>
+    <string name="discord_connect_desc">Scanne diesen QR-Code mit der Kamera deines Smartphones, um Discord Rich Presence für dein Profil zu autorisieren.</string>
+    <string name="discord_connecting">Verbindung wird hergestellt...</string>
+    <string name="discord_waiting_for_approval">Warte auf Freigabe...</string>
+    <string name="discord_pairing_steps">1. QR-Code mit dem Smartphone scannen\n2. In Discord auf \"Autorisieren\" tippen\n3. Die Verbindung wird automatisch hergestellt</string>
+    <string name="discord_login_on_tv">Direkt am TV anmelden</string>
+    <string name="discord_scroll_up">▲ Nach oben scrollen</string>
+    <string name="discord_scroll_down">▼ Nach unten scrollen</string>
+    <string name="discord_not_included">In diesem Build nicht enthalten</string>
+    <string name="discord_connected_as">Verbunden als %1$s</string>
+    <string name="discord_unavailable">Nicht verfügbar</string>
+    <string name="discord_help_desc">Zeigt deinen Wiedergabestatus in deinem Discord-Profil an.</string>
     <string name="plugin_screen_title">Plugins (Test)</string>
     <string name="plugin_screen_add_repo">Repository hinzufügen</string>
     <string name="plugin_screen_installed_repos">Installierte Repositorys</string>

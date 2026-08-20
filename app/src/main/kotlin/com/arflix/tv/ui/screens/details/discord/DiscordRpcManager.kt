@@ -35,7 +35,7 @@ object DiscordRpcManager {
     private const val KEY_ACCESS_TOKEN_EXPIRES_AT = "access_token_expires_at"
     private const val KEY_CODE_VERIFIER = "code_verifier"
     private const val KEY_USERNAME = "username"
-    private const val REDIRECT_URI_WEB = "https://auth.arvio.tv/discord/callback"
+    private const val REDIRECT_URI_WEB = "https://auth.streamnet.club/discord/callback"
     private const val TOKEN_REFRESH_MARGIN_MS = 60_000L
 
     private val discordClientId: String

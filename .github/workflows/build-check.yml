@@ -62,26 +62,23 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Validate private Discord SDK access
+      - name: Validate private Discord SDK secret
         env:
-          DISCORD_SDK_DEPLOY_KEY: ${{ secrets.DISCORD_SDK_DEPLOY_KEY }}
+          DISCORD_PARTNER_SDK_AAR_BASE64: ${{ secrets.DISCORD_PARTNER_SDK_AAR_BASE64 }}
         run: |
-          : "${DISCORD_SDK_DEPLOY_KEY:?Missing DISCORD_SDK_DEPLOY_KEY repository secret}"
-
-      - name: Fetch private Discord Partner SDK
-        uses: actions/checkout@v4
-        with:
-          repository: ProdigyV21/ARVIO-private-dependencies
-          ref: main
-          path: .private-dependencies
-          ssh-key: ${{ secrets.DISCORD_SDK_DEPLOY_KEY }}
-          persist-credentials: false
+          : "${DISCORD_PARTNER_SDK_AAR_BASE64:?Missing DISCORD_PARTNER_SDK_AAR_BASE64 repository secret}"
 
       - name: Install Discord Partner SDK
+        env:
+          DISCORD_PARTNER_SDK_AAR_BASE64: ${{ secrets.DISCORD_PARTNER_SDK_AAR_BASE64 }}
+          DISCORD_PARTNER_SDK_AAR_SHA256: ${{ secrets.DISCORD_PARTNER_SDK_AAR_SHA256 }}
         run: |
           install -d app/libs
-          install -m 0600 .private-dependencies/discord_partner_sdk.aar app/libs/discord_partner_sdk.aar
-          echo "dc7b1014ae4797e5469261d151fd26fc056524d03e42e55fd39e085f0f09e71a  app/libs/discord_partner_sdk.aar" | sha256sum --check --strict
+          printf '%s' "$DISCORD_PARTNER_SDK_AAR_BASE64" | base64 --decode > app/libs/discord_partner_sdk.aar
+          chmod 0600 app/libs/discord_partner_sdk.aar
+          if [ -n "${DISCORD_PARTNER_SDK_AAR_SHA256:-}" ]; then
+            echo "$DISCORD_PARTNER_SDK_AAR_SHA256  app/libs/discord_partner_sdk.aar" | sha256sum --check --strict
+          fi
 
       - name: Validate required credentials
         env:
@@ -91,6 +88,7 @@ jobs:
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -110,6 +108,8 @@ jobs:
           : "${TMDB_API_KEY:?Missing TMDB_API_KEY repository secret}"
           : "${TRAKT_CLIENT_ID:?Missing TRAKT_CLIENT_ID repository secret}"
           : "${TRAKT_CLIENT_SECRET:?Missing TRAKT_CLIENT_SECRET repository secret}"
+          : "${DISCORD_CLIENT_ID:?Missing DISCORD_CLIENT_ID repository secret}"
+          [[ "$DISCORD_CLIENT_ID" =~ ^[0-9]{17,20}$ ]] || { echo "DISCORD_CLIENT_ID must be a 17-20 digit Discord application id" >&2; exit 1; }
           : "${KEYSTORE_BASE64:?Missing KEYSTORE_BASE64 repository secret}"
           : "${KEYSTORE_PASSWORD:?Missing KEYSTORE_PASSWORD repository secret}"
           : "${KEY_ALIAS:?Missing KEY_ALIAS repository secret}"
@@ -130,6 +130,7 @@ jobs:
           TVDB_API_KEY: ${{ secrets.TVDB_API_KEY }}
           FANART_API_KEY: ${{ secrets.FANART_API_KEY }}
           VODWISHARR_API_KEY: ${{ secrets.VODWISHARR_API_KEY }}
+          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
         run: |
           printf '%s\n' \
             "APP_ANON_KEY=$APP_ANON_KEY" \
@@ -145,6 +146,7 @@ jobs:
             "TVDB_API_KEY=$TVDB_API_KEY" \
             "FANART_API_KEY=$FANART_API_KEY" \
             "VODWISHARR_API_KEY=$VODWISHARR_API_KEY" \
+            "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" \
             > secrets.properties
 
       - name: Prepare production signing
