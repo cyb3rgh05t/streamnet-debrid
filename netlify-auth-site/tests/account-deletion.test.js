@@ -14,8 +14,14 @@ test("access and refresh tokens cannot be exchanged across token types", () => {
   const access = security.signArvioAccessToken(account);
   const refresh = security.signArvioRefreshToken(account);
 
-  assert.equal(security.verifyArvioAccessToken(access).supabaseUserId, "account-123");
-  assert.equal(security.verifyArvioRefreshToken(refresh).email, "user@example.org");
+  assert.equal(
+    security.verifyArvioAccessToken(access).supabaseUserId,
+    "account-123",
+  );
+  assert.equal(
+    security.verifyArvioRefreshToken(refresh).email,
+    "user@example.org",
+  );
   assert.throws(() => security.verifyArvioAccessToken(refresh), /token type/i);
   assert.throws(() => security.verifyArvioRefreshToken(access), /token type/i);
 });
@@ -25,18 +31,30 @@ test("new password setup keys are account scoped and legacy keys remain readable
   const token = `p2.${Buffer.from(accountId).toString("base64url")}.random-token`;
   const prefix = security.passwordSetupPrefixForAccount(accountId);
 
-  assert.match(security.passwordSetupKeyForToken(token), new RegExp(`^${prefix}`));
-  assert.match(security.passwordSetupKeyForToken("legacy-token"), /^password-setup\/[a-f0-9]{64}\.json$/);
+  assert.match(
+    security.passwordSetupKeyForToken(token),
+    new RegExp(`^${prefix}`),
+  );
+  assert.match(
+    security.passwordSetupKeyForToken("legacy-token"),
+    /^password-setup\/[a-f0-9]{64}\.json$/,
+  );
 });
 
 test("receipt comparison rejects altered tokens", () => {
   const receipt = "receipt-token";
   assert.equal(security.safeTokenEqual(receipt, backend.sha256(receipt)), true);
-  assert.equal(security.safeTokenEqual("different", backend.sha256(receipt)), false);
+  assert.equal(
+    security.safeTokenEqual("different", backend.sha256(receipt)),
+    false,
+  );
 });
 
 test("deletion page uses authenticated self-service flow without storing credentials", () => {
-  const html = fs.readFileSync(path.join(__dirname, "..", "delete-account.html"), "utf8");
+  const html = fs.readFileSync(
+    path.join(__dirname, "..", "delete-account.html"),
+    "utf8",
+  );
   assert.match(html, /account-delete-start/);
   assert.match(html, /account-delete-status/);
   assert.match(html, /Type DELETE to confirm/i);
@@ -45,7 +63,10 @@ test("deletion page uses authenticated self-service flow without storing credent
 });
 
 test("account creation presents the privacy notice before signup", () => {
-  const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
+  const html = fs.readFileSync(
+    path.join(__dirname, "..", "index.html"),
+    "utf8",
+  );
   assert.match(html, /href="\/delete-account"/);
   assert.match(html, /StreamNet TV Cloud account/i);
   assert.match(html, /account, create a new one, or reset your password/i);
@@ -56,21 +77,21 @@ test("deletion endpoints reject missing app auth, bad user auth, and missing rec
   const missingAppAuth = await backend.handleAccountDeleteStart({
     httpMethod: "POST",
     headers: {},
-    body: JSON.stringify({ confirmation: "DELETE" })
+    body: JSON.stringify({ confirmation: "DELETE" }),
   });
   assert.equal(missingAppAuth.statusCode, 401);
 
   const badUserAuth = await backend.handleAccountDeleteStart({
     httpMethod: "POST",
     headers: { apikey: "test-app-key", authorization: "Bearer invalid-token" },
-    body: JSON.stringify({ confirmation: "DELETE" })
+    body: JSON.stringify({ confirmation: "DELETE" }),
   });
   assert.equal(badUserAuth.statusCode, 401);
 
   const missingReceipt = await backend.handleAccountDeleteStatus({
     httpMethod: "POST",
     headers: { apikey: "test-app-key", authorization: "Bearer test-app-key" },
-    body: "{}"
+    body: "{}",
   });
   assert.equal(missingReceipt.statusCode, 400);
 });
@@ -78,7 +99,7 @@ test("deletion endpoints reject missing app auth, bad user auth, and missing rec
 test("usage endpoint stores pseudonymous keys instead of raw identifiers", () => {
   const source = fs.readFileSync(
     path.join(__dirname, "..", "netlify", "functions", "app-usage-event.js"),
-    "utf8"
+    "utf8",
   );
   assert.match(source, /privacyHash\("usage-account"/);
   assert.match(source, /accountKey/);

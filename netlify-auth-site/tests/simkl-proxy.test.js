@@ -18,7 +18,7 @@ class FakeBlobStore {
     return {
       data: structuredClone(this.entry.data),
       etag: this.entry.etag,
-      metadata: {}
+      metadata: {},
     };
   }
 
@@ -61,7 +61,7 @@ test("Simkl proxy ignores caller credentials and injects server credentials", as
       capturedUrl = String(url);
       return new Response(JSON.stringify({ user_code: "ABCD" }), {
         status: 200,
-        headers: { "content-type": "application/json" }
+        headers: { "content-type": "application/json" },
       });
     };
     const response = await backend.handleSimklProxy({
@@ -71,8 +71,8 @@ test("Simkl proxy ignores caller credentials and injects server credentials", as
         path: "/oauth/pin",
         method: "GET",
         client_id: "caller-client-id",
-        client_secret: "caller-secret"
-      }
+        client_secret: "caller-secret",
+      },
     });
     assert.equal(response.statusCode, 200);
     const target = new URL(capturedUrl);
@@ -90,14 +90,20 @@ test("Simkl OAuth token exchange always uses the server secret", async () => {
   try {
     global.fetch = async (_url, options) => {
       capturedBody = JSON.parse(options.body);
-      return new Response(JSON.stringify({ access_token: "token" }), { status: 200 });
+      return new Response(JSON.stringify({ access_token: "token" }), {
+        status: 200,
+      });
     };
     const response = await backend.handleSimklProxy({
       httpMethod: "POST",
       headers: {},
       queryStringParameters: { path: "/oauth/token", method: "POST" },
-      body: JSON.stringify({ code: "code", client_id: "caller", client_secret: "caller" }),
-      isBase64Encoded: false
+      body: JSON.stringify({
+        code: "code",
+        client_id: "caller",
+        client_secret: "caller",
+      }),
+      isBase64Encoded: false,
     });
     assert.equal(response.statusCode, 200);
     assert.equal(capturedBody.client_id, "server-client-id");
@@ -111,11 +117,13 @@ test("Simkl proxy rejects a method declared differently from the HTTP request", 
   const response = await backend.handleSimklProxy({
     httpMethod: "GET",
     headers: {},
-    queryStringParameters: { path: "/sync/history", method: "POST" }
+    queryStringParameters: { path: "/sync/history", method: "POST" },
   });
 
   assert.equal(response.statusCode, 400);
-  assert.deepEqual(JSON.parse(response.body), { error: "HTTP method mismatch" });
+  assert.deepEqual(JSON.parse(response.body), {
+    error: "HTTP method mismatch",
+  });
 });
 
 test("Simkl proxy rate limiting persists counts and resets after one minute", async () => {
@@ -126,21 +134,21 @@ test("Simkl proxy rate limiting persists counts and resets after one minute", as
   assert.deepEqual(await consume(store, "client", 2, start), {
     exceeded: false,
     remaining: 1,
-    resetSeconds: 60
+    resetSeconds: 60,
   });
   assert.deepEqual(await consume(store, "client", 2, start + 1_000), {
     exceeded: false,
     remaining: 0,
-    resetSeconds: 59
+    resetSeconds: 59,
   });
   assert.deepEqual(await consume(store, "client", 2, start + 2_000), {
     exceeded: true,
     remaining: 0,
-    resetSeconds: 58
+    resetSeconds: 58,
   });
   assert.deepEqual(await consume(store, "client", 2, start + 60_000), {
     exceeded: false,
     remaining: 1,
-    resetSeconds: 60
+    resetSeconds: 60,
   });
 });
