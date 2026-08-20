@@ -46,8 +46,9 @@ test("deletion page uses authenticated self-service flow without storing credent
 
 test("account creation presents the privacy notice before signup", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
-  assert.match(html, /Creating an account stores your email and the cloud data/i);
-  assert.match(html, /https:\/\/arvio\.tv\/privacy/);
+  assert.match(html, /href="\/delete-account"/);
+  assert.match(html, /StreamNet TV Cloud account/i);
+  assert.match(html, /account, create a new one, or reset your password/i);
   assert.doesNotMatch(html, /fonts\.googleapis\.com/);
 });
 

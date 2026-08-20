@@ -8,7 +8,7 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 - `netlify-auth-site/` - StreamNet auth, cloud sync, Discord, premium/entitlement and account functions
 - `supabase/` - Supabase project config, migrations and edge functions still used by the backend
 
-Removed/omitted surfaces include the public ARVIO marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
+Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
 
 ## Android Build
 

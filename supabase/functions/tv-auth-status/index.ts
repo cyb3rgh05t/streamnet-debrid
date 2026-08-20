@@ -3,7 +3,7 @@
 // CORS: restrict origins using env `CORS_ALLOWED_ORIGINS` (comma-separated).
 const DEFAULT_ALLOWED_ORIGINS = (
   Deno.env.get("CORS_ALLOWED_ORIGINS") ||
-  "https://auth.streamnet.club,https://streamnet.club,https://arvio.tv"
+  "https://auth.streamnet.club,https://streamnet.club"
 )
   .split(",")
   .map((s) => s.trim())

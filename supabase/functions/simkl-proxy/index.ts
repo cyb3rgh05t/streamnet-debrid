@@ -60,7 +60,7 @@ function checkRateLimit(ip: string): { allowed: boolean; remaining: number; rese
   return { allowed: true, remaining: RATE_LIMIT - record.count, resetIn: record.resetTime - now }
 }
 
-const DEFAULT_ALLOWED_ORIGINS = (Deno.env.get('CORS_ALLOWED_ORIGINS') || 'https://auth.arvio.tv,https://arvio.tv').split(',').map(s => s.trim()).filter(Boolean)
+const DEFAULT_ALLOWED_ORIGINS = (Deno.env.get('CORS_ALLOWED_ORIGINS') || 'https://auth.streamnet.club,https://streamnet.club').split(',').map(s => s.trim()).filter(Boolean)
 
 function corsHeaders(req: Request) {
   const origin = req.headers.get('origin') || ''

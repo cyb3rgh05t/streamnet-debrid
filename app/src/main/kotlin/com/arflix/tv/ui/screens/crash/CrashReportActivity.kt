@@ -125,7 +125,7 @@ fun CrashReportScreen(
     val webBridgeUrl = remember(crashId, crashVersion, crashMsg, crashTime) {
         val encodedErr = Uri.encode(crashMsg.take(300))
         val encodedV = Uri.encode(crashVersion)
-        "https://arvio.tv/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
+        "https://streamnet.club/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
     }
 
     Box(
@@ -162,7 +162,7 @@ fun CrashReportScreen(
             )
 
             if (isTv) {
-                // TV layout: Show clean QR Code prominently pointing to arvio.tv/report
+                // TV layout: Show clean QR Code prominently pointing to streamnet.club/report
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = Color.White,

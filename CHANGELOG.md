@@ -70,7 +70,7 @@ All notable changes to this project are documented in this file.
 
 ### StreamNet TV Cloud, security, and accounts
 
-- Centralized web and TV-pairing authentication through `auth.arvio.tv` for a consistent StreamNet TV Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
+- Centralized web and TV-pairing authentication through `auth.streamnet.club` for a consistent StreamNet TV Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
 - Hardened Catalog Pack submissions with URL validation, SSRF protection, rate limiting, and safer manifest handling. Contributor: @Himanth-reddy via #463.
 - Expanded disposable-email blocking for cloud account registration. Contributor: @mvanhorn via #496.
 - Fixed web login redirect loops, stale-account profile leakage, signup routing, and login wordmark overlap. Contributor: @Himanth-reddy via #475.

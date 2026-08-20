@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>StreamNet TV – Cloud Account</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap"
-      rel="stylesheet"
-    />
     <style>
       :root {
         --bg-1: #0f0d0b;
@@ -1098,7 +1092,7 @@
         },
       };
 
-      const storedLang = window.localStorage.getItem("arvio:lang");
+      const storedLang = window.localStorage.getItem("streamnet:lang");
       let currentLang = storedLang
         ? storedLang === "de"
           ? "de"
@@ -1158,7 +1152,7 @@
 
       function setLanguage(lang) {
         currentLang = lang === "de" ? "de" : "en";
-        window.localStorage.setItem("arvio:lang", currentLang);
+        window.localStorage.setItem("streamnet:lang", currentLang);
         renderStaticI18n();
         renderModeCopy();
       }
@@ -1303,7 +1297,7 @@
       }
 
       function emailSendCooldownKey(action, email) {
-        return `arvio:${action}:${normalizeEmail(email)}`;
+        return `streamnet:${action}:${normalizeEmail(email)}`;
       }
 
       function assertEmailSendCooldown(action, email) {

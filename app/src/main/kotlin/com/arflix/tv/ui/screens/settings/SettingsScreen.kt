@@ -239,7 +239,7 @@ class SettingsFocusTracker {
 val LocalSettingsFocusTracker = compositionLocalOf<SettingsFocusTracker?> { null }
 
 private const val ACCOUNT_DELETION_URL = "https://auth.streamnet.club/delete"
-private const val PRIVACY_POLICY_URL = "https://arvio.tv/privacy"
+private const val PRIVACY_POLICY_URL = "https://streamnet.club/privacy"
 
 private val tvGeneralSectionIds = setOf(
     "language",
@@ -3925,7 +3925,7 @@ private fun DiscordWebViewModal(
                                             return true
                                         }
                                         val code = url.getQueryParameter("code")
-                                        if (code != null && (url.host == "auth.arvio.tv" || url.host == "localhost" || url.scheme == "arvio")) {
+                                        if (code != null && (url.host == "auth.streamnet.club" || url.host == "localhost" || url.scheme == "arvio")) {
                                             onCompleteWithCode(code)
                                             onDismiss()
                                             return true

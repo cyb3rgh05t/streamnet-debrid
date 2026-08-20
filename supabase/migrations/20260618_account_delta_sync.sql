@@ -1,4 +1,4 @@
--- Nuvio-style cloud sync foundation for ARVIO.
+-- StreamNet cloud sync foundation.
 --
 -- Keep the legacy account_sync_state full snapshot for old clients, but add
 -- small row-based current state + append-only delta events so newer clients can

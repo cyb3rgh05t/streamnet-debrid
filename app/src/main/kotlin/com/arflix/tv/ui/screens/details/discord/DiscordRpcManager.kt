@@ -422,7 +422,7 @@ object DiscordRpcManager {
                 startTime = startTime / 1_000,
                 endTime = 0L,
                 largeImage = largeImage,
-                largeText = "ARVIO"
+                largeText = "StreamNet TV"
             )
         }
     }

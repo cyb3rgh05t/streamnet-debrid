@@ -42,13 +42,13 @@ At most once per 24 hours, StreamNet TV can send an `app_open` event containing 
 
 These activities are based on StreamNet TV's legitimate interests in finding crashes, measuring release health, and maintaining a reliable service (Article 6(1)(f)). You can object at any time by turning **Share diagnostics and usage** off in Settings. Turning it off does not affect playback, accounts, or cloud sync.
 
-### Website analytics and the ARVIO Premium funnel
+### Cloud analytics and optional membership events
 
-The public website uses Netlify's server-side traffic analytics to count page requests, approximate unique visitors, referrers, and countries from delivery logs. ARVIO does not add advertising trackers or cross-site profiling cookies.
+StreamNet may use Netlify's server-side traffic analytics to count account portal requests, approximate unique visitors, referrers, and countries from delivery logs. StreamNet does not add advertising trackers or cross-site profiling cookies.
 
 If you use optional membership or entitlement features exposed through StreamNet TV Cloud, StreamNet records a small set of service events such as viewing membership information, starting a trial, opening checkout, linking a membership, and completing the first successful playback. Account identifiers are converted into a keyed pseudonymous value before storage. Events can contain coarse campaign attribution and device or outcome labels, but not your email address, watched title, stream URL, addon URL, or payment details. Ko-fi separately handles payment details under its own privacy policy.
 
-These measurements are used to understand whether account connection, trials, playback, and membership activation work correctly and where the service needs improvement. They are not used for advertising or sold to third parties. They are based on ARVIO's legitimate interests in operating and improving the optional Premium service (Article 6(1)(f)).
+These measurements are used to understand whether account connection, trials, playback, and membership activation work correctly and where the service needs improvement. They are not used for advertising or sold to third parties. They are based on StreamNet's legitimate interests in operating and improving the optional cloud service (Article 6(1)(f)).
 
 ### Trial emails
 
@@ -98,7 +98,7 @@ Depending on where you live, you may have the right to access, correct, export, 
 - Disable diagnostics and usage reporting in app Settings
 - Disconnect Trakt and other optional services in app Settings
 - Revoke StreamNet TV from the relevant third-party account
-- Delete your StreamNet TV Cloud account and synced data at [auth.arvio.tv/delete](https://auth.arvio.tv/delete)
+- Delete your StreamNet TV Cloud account and synced data at [auth.streamnet.club/delete](https://auth.streamnet.club/delete)
 
 StreamNet TV may need to verify that a request concerns your account before acting on it.
 

@@ -677,7 +677,7 @@ async function sendTransactionalEmail(email, subject, text, html) {
       },
       body: JSON.stringify({
         personalizations: [{ to: [{ email }] }],
-        from: { email: from.replace(/^.*<(.+)>$/, "$1"), name: "ARVIO" },
+        from: { email: from.replace(/^.*<(.+)>$/, "$1"), name: "StreamNet TV" },
         subject,
         content: [
           { type: "text/plain", value: text },
@@ -693,16 +693,16 @@ async function sendTransactionalEmail(email, subject, text, html) {
 }
 
 async function sendPasswordSetupEmail(email, setupUrl) {
-  const subject = "Create your ARVIO Cloud password";
+  const subject = "Create your StreamNet TV Cloud password";
   const text = [
-    "ARVIO Cloud moved to a new secure server.",
-    "To keep your account protected, create a new ARVIO Cloud password:",
+    "StreamNet TV Cloud moved to a new secure server.",
+    "To keep your account protected, create a new StreamNet TV Cloud password:",
     setupUrl,
     "This link expires in 1 hour.",
   ].join("\n\n");
   const html = `
-    <p>ARVIO Cloud moved to a new secure server.</p>
-    <p>To keep your account protected, create a new ARVIO Cloud password:</p>
+    <p>StreamNet TV Cloud moved to a new secure server.</p>
+    <p>To keep your account protected, create a new StreamNet TV Cloud password:</p>
     <p><a href="${setupUrl}">Create new password</a></p>
     <p>This link expires in 1 hour.</p>
   `;
@@ -710,16 +710,16 @@ async function sendPasswordSetupEmail(email, setupUrl) {
 }
 
 async function sendAccountDeletionConfirmation(email) {
-  const subject = "Your ARVIO account has been deleted";
+  const subject = "Your StreamNet TV account has been deleted";
   const text = [
-    "Your ARVIO account and cloud-synced data have been permanently deleted.",
+    "Your StreamNet TV account and cloud-synced data have been permanently deleted.",
     "No further action is required.",
-    "If you did not request this deletion, contact arvio.app@gmail.com.",
+    "If you did not request this deletion, contact cyb3rgh05t_01@proton.me.",
   ].join("\n\n");
   const html = `
-    <p>Your ARVIO account and cloud-synced data have been permanently deleted.</p>
+    <p>Your StreamNet TV account and cloud-synced data have been permanently deleted.</p>
     <p>No further action is required.</p>
-    <p>If you did not request this deletion, contact <a href="mailto:arvio.app@gmail.com">arvio.app@gmail.com</a>.</p>
+    <p>If you did not request this deletion, contact <a href="mailto:cyb3rgh05t_01@proton.me">cyb3rgh05t_01@proton.me</a>.</p>
   `;
   return sendTransactionalEmail(email, subject, text, html);
 }
@@ -869,7 +869,7 @@ async function authenticateNetlifyPassword(event, email, password) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. To keep your data protected, create a new ARVIO Cloud password from the email we sent you.",
+      "StreamNet TV Cloud moved to a new secure server. To keep your data protected, create a new StreamNet TV Cloud password from the email we sent you.",
     );
   }
   if (!account || !account.passwordHash) {
@@ -880,7 +880,7 @@ async function authenticateNetlifyPassword(event, email, password) {
       await throwPasswordSetupRequired(
         event,
         email,
-        "ARVIO Cloud moved to a new secure server. To keep your data protected, create a new ARVIO Cloud password from the email we sent you.",
+        "StreamNet TV Cloud moved to a new secure server. To keep your data protected, create a new StreamNet TV Cloud password from the email we sent you.",
       );
     }
     const error = new Error("Invalid email or password");
@@ -916,14 +916,14 @@ async function createNetlifyAccount(event, email, password) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. Create a new ARVIO Cloud password to keep your existing data.",
+      "StreamNet TV Cloud moved to a new secure server. Create a new StreamNet TV Cloud password to keep your existing data.",
     );
   }
   if (legacy && !existing?.passwordHash) {
     await throwPasswordSetupRequired(
       event,
       email,
-      "ARVIO Cloud moved to a new secure server. Create a new ARVIO Cloud password to keep your existing data.",
+      "StreamNet TV Cloud moved to a new secure server. Create a new StreamNet TV Cloud password to keep your existing data.",
     );
   }
   if (existing?.passwordHash) {
@@ -1600,7 +1600,7 @@ async function handleTmdbProxy(event) {
         accept: "application/json",
         "accept-encoding": "identity;q=1, *;q=0",
         "cache-control": "max-age=300",
-        "user-agent": "ARVIO-Netlify-TMDB-Proxy/1.0",
+        "user-agent": "StreamNet-Netlify-TMDB-Proxy/1.0",
       },
     });
     const text = await response.text();
@@ -2632,35 +2632,6 @@ async function deleteUsageForAccount(event, accountId) {
   return deleted;
 }
 
-async function deletePremiumDataForAccount(event, email) {
-  connectLambda(event);
-  const normalizedEmail = normalizeEmail(email);
-  const accountKey = privacyHash("premium-funnel-account", normalizedEmail);
-  const funnelStore = getStore("premium-funnel");
-  const trialEmailStore = getStore("premium-trial-emails");
-  const entitlementStore = getStore("entitlements");
-  let funnelEvents = 0;
-  for (let daysAgo = 0; daysAgo <= 90; daysAgo++) {
-    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
-      .toISOString()
-      .slice(0, 10);
-    funnelEvents += await deleteBlobPrefix(
-      funnelStore,
-      `events/date/${date}/account/${accountKey}/`,
-    );
-  }
-  const trialEmailJobs = await deleteBlobPrefix(
-    trialEmailStore,
-    `jobs/${accountKey}/`,
-  );
-  const entitlementKey = `email/${sha256(normalizedEmail)}.json`;
-  const entitlementDeleted = await entitlementStore
-    .delete(entitlementKey)
-    .then(() => 1)
-    .catch(() => 0);
-  return { funnelEvents, trialEmailJobs, entitlementDeleted };
-}
-
 async function deleteReferencedAuthRecords(store, prefix) {
   const references = await listBlobKeys(store, prefix);
   await mapWithConcurrency(references, 16, async (key) => {
@@ -2775,13 +2746,12 @@ async function purgeAccountData(event, email, accountId) {
   const identity = { email, supabaseUserId: accountId };
   const keys = snapshotKeys(identity);
 
-  const [events, authRecords, tvSessions, usageEvents, premiumData, database] =
+  const [events, authRecords, tvSessions, usageEvents, database] =
     await Promise.all([
       deleteBlobPrefix(stores.events, `supabase/${accountId}/`),
       deleteAuthRecordsForAccount(event, accountId),
       deleteTvSessionsForAccount(event, accountId),
       deleteUsageForAccount(event, accountId),
-      deletePremiumDataForAccount(event, email),
       deleteDatabaseAccount(email, accountId),
     ]);
 
@@ -2802,9 +2772,6 @@ async function purgeAccountData(event, email, accountId) {
     refreshTokens: authRecords.refreshTokens,
     tvSessions,
     usageEvents,
-    premiumFunnelEvents: premiumData.funnelEvents,
-    premiumTrialEmailJobs: premiumData.trialEmailJobs,
-    premiumEntitlements: premiumData.entitlementDeleted,
     databaseRows: database.deleted,
     databaseSkipped: database.skipped,
   };

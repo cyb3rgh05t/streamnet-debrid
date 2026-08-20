@@ -5,7 +5,7 @@ UPDATE public.catalog_packs
 SET normalized_url = lower(
   rtrim(
     CASE
-      WHEN url LIKE '/%' THEN 'https://arvio.app' || url
+      WHEN url LIKE '/%' THEN 'https://auth.streamnet.club' || url
       ELSE url
     END,
     '/'

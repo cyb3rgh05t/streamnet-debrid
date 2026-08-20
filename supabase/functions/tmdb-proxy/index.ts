@@ -86,7 +86,7 @@ setInterval(() => {
 // If not set, default to common safe origins used by the app.
 const DEFAULT_ALLOWED_ORIGINS = (
   Deno.env.get("CORS_ALLOWED_ORIGINS") ||
-  "https://auth.streamnet.club,https://arvio.tv"
+  "https://auth.streamnet.club,https://streamnet.club"
 )
   .split(",")
   .map((s) => s.trim())
@@ -117,7 +117,7 @@ function buildRetryUrl(tmdbUrl: URL, attempt: number): URL {
   if (attempt === 0) return new URL(tmdbUrl.toString());
 
   const retryUrl = new URL(tmdbUrl.toString());
-  retryUrl.searchParams.set("_arvio_retry", `${Date.now()}_${attempt}`);
+  retryUrl.searchParams.set("_streamnet_retry", `${Date.now()}_${attempt}`);
   return retryUrl;
 }
 
@@ -138,7 +138,7 @@ async function fetchTmdbJson(tmdbUrl: URL): Promise<TmdbFetchResult> {
           "Accept-Encoding": "identity;q=1, *;q=0",
           "Cache-Control": attempt === 0 ? "max-age=300" : "no-store",
           Pragma: "no-cache",
-          "User-Agent": "ARVIO-TMDB-Proxy/1.0",
+          "User-Agent": "StreamNet-TMDB-Proxy/1.0",
         },
       });
 

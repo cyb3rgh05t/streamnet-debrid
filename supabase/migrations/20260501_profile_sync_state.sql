@@ -1,4 +1,4 @@
--- Scope Trakt sync_state per ARVIO profile so profiles with separate Trakt
+-- Scope Trakt sync_state per StreamNet profile so profiles with separate Trakt
 -- accounts do not share last-activity cursors or sync progress.
 
 create table if not exists public.sync_state (

@@ -60,7 +60,7 @@ function requestPinnedHttps(url, resolvedAddress) {
     const request = https.request(url, {
       method: "GET",
       agent: false,
-      headers: { "User-Agent": "ARVIO-Pack-Validator/1.0" },
+      headers: { "User-Agent": "StreamNet-Pack-Validator/1.0" },
       // Pin the connection to the address that passed validation. TLS still
       // verifies the certificate against the original URL hostname.
       lookup: (_hostname, options, callback) => {

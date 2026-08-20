@@ -3,7 +3,7 @@
 // CORS: restrict origins using env `CORS_ALLOWED_ORIGINS` (comma-separated).
 const DEFAULT_ALLOWED_ORIGINS = (
   Deno.env.get("CORS_ALLOWED_ORIGINS") ||
-  "https://auth.streamnet.club,https://streamnet.club,https://arvio.tv"
+  "https://auth.streamnet.club,https://streamnet.club"
 )
   .split(",")
   .map((s) => s.trim())
@@ -92,7 +92,7 @@ serve(async (req) => {
     }
 
     // Where the TV should send the user to approve the sign-in.
-    // For Framer, set TV_AUTH_VERIFY_BASE_URL to "https://arvio.tv/pair" (no trailing slash).
+    // For a hosted pairing page, set TV_AUTH_VERIFY_BASE_URL to "https://streamnet.club/pair" (no trailing slash).
     const verifyBase =
       Deno.env.get("TV_AUTH_VERIFY_BASE_URL") ?? Deno.env.get("SITE_URL") ?? "";
 

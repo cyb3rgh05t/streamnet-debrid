@@ -33,7 +33,7 @@ class FakeBlobStore {
   }
 }
 
-test("Simkl proxy only allows ARVIO's exact API surface and methods", () => {
+test("Simkl proxy only allows StreamNet's exact API surface and methods", () => {
   const allowed = backend._test.isAllowedSimklRequest;
   assert.equal(allowed("/oauth/pin", "GET"), true);
   assert.equal(allowed("/oauth/pin/ABCD-1234", "GET"), true);
