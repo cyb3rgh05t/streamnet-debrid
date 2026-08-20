@@ -1,6 +1,4 @@
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const test = require("node:test");
 
 process.env.ARVIO_AUTH_SECRET = "test-only-secret-that-is-longer-than-32-bytes";
@@ -52,21 +50,4 @@ test("premium funnel metadata is bounded and excludes complex values", () => {
     duration_days: 3,
     successful: true
   });
-});
-
-test("public Premium presentation has one tracked route and factual social proof", () => {
-  const root = path.join(__dirname, "..", "..");
-  const html = fs.readFileSync(path.join(root, "netlify-arvio-tv-site", "index.html"), "utf8");
-  const redirects = fs.readFileSync(path.join(root, "netlify-arvio-tv-site", "netlify.toml"), "utf8");
-  assert.match(html, /Start 3-day free trial/i);
-  assert.match(html, /10,000\+ users/i);
-  assert.match(html, /10\+ contributors/i);
-  assert.match(html, /href="\/go\/premium"/);
-  assert.match(redirects, /from = "\/go\/premium"/);
-  assert.match(redirects, /utm_campaign=premium/);
-  assert.match(redirects, /intent=trial/);
-
-  const login = fs.readFileSync(path.join(root, "web", "components", "login", "LoginScreen.tsx"), "utf8");
-  assert.match(login, /TRIAL_INTENT_KEY/);
-  assert.match(login, /get\("intent"\) === "trial"/);
 });

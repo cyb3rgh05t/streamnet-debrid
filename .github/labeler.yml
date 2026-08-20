@@ -3,23 +3,19 @@
   - changed-files:
       - any-glob-to-any-file:
           - "app/**"
-          - "benchmark/**"
           - "gradle/**"
           - "build.gradle.kts"
           - "settings.gradle.kts"
 
-"area: web":
+"area: auth-site":
   - changed-files:
       - any-glob-to-any-file:
-          - "web/**"
-          - "netlify-arvio-tv-site/**"
           - "netlify-auth-site/**"
 
 "area: backend":
   - changed-files:
       - any-glob-to-any-file:
           - "supabase/**"
-          - "resolver-worker/**"
 
 "area: ci":
   - changed-files:

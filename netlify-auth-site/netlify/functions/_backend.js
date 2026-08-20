@@ -2641,12 +2641,23 @@ async function deletePremiumDataForAccount(event, email) {
   const entitlementStore = getStore("entitlements");
   let funnelEvents = 0;
   for (let daysAgo = 0; daysAgo <= 90; daysAgo++) {
-    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    funnelEvents += await deleteBlobPrefix(funnelStore, `events/date/${date}/account/${accountKey}/`);
+    const date = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+      .toISOString()
+      .slice(0, 10);
+    funnelEvents += await deleteBlobPrefix(
+      funnelStore,
+      `events/date/${date}/account/${accountKey}/`,
+    );
   }
-  const trialEmailJobs = await deleteBlobPrefix(trialEmailStore, `jobs/${accountKey}/`);
+  const trialEmailJobs = await deleteBlobPrefix(
+    trialEmailStore,
+    `jobs/${accountKey}/`,
+  );
   const entitlementKey = `email/${sha256(normalizedEmail)}.json`;
-  const entitlementDeleted = await entitlementStore.delete(entitlementKey).then(() => 1).catch(() => 0);
+  const entitlementDeleted = await entitlementStore
+    .delete(entitlementKey)
+    .then(() => 1)
+    .catch(() => 0);
   return { funnelEvents, trialEmailJobs, entitlementDeleted };
 }
 

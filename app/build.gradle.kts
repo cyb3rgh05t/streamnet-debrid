@@ -9,7 +9,6 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.devtools.ksp")
     id("com.google.dagger.hilt.android")
-    id("androidx.baselineprofile")
     id("com.google.android.libraries.mapsplatform.secrets-gradle-plugin")
     id("io.gitlab.arturbosch.detekt")
     kotlin("plugin.serialization")
@@ -228,9 +227,6 @@ android {
         }
     }
 
-    baselineProfile {
-        mergeIntoMain = true
-    }
 }
 
 // VS Code Gradle tooling currently crashes while syncing unit-test ASM transform tasks
@@ -419,8 +415,6 @@ ksp {
     // Sentry crash reporting. Runtime initialization is gated by BuildConfig.ENABLE_CRASH_REPORTING
     // and SENTRY_DSN from secrets.properties/secrets.defaults.properties.
     implementation("io.sentry:sentry-android:8.40.0")
-
-    baselineProfile(project(":benchmark"))
 
     // NanoHTTPD – lightweight HTTP server for QR-based AI key setup
     implementation("org.nanohttpd:nanohttpd:2.3.1")

@@ -1,14 +1,14 @@
 # Privacy Policy
 
-**Last updated: August 19, 2026**
+Last updated: August 19, 2026
 
 ## 1. Scope And Controller
 
-This policy explains how the StreamNet TV project processes personal data in the Android app, StreamNet TV Cloud account portal, and StreamNet TV Web. StreamNet TV is an open-source media hub and does not host, sell, or distribute movies, series, live TV channels, playlists, or third-party streams.
+This policy explains how the StreamNet TV project processes personal data in the Android app and StreamNet TV Cloud account portal. StreamNet TV is an open-source media hub and does not host, sell, or distribute movies, series, live TV channels, playlists, or third-party streams.
 
 The StreamNet TV project owner is the data controller for StreamNet TV Cloud, the account portal, first-party usage measurements, and first-party website services. Third-party services that you connect may act as separate controllers under their own privacy policies.
 
-For privacy requests, use the secure account deletion page at [auth.arvio.tv/delete](https://auth.arvio.tv/delete) or contact the project through [GitHub](https://github.com/ProdigyV21/StreamNet TV). Do not put passwords, tokens, identity documents, or other sensitive data in a public GitHub issue.
+For privacy requests, use the secure account deletion page at [auth.streamnet.club/delete](https://auth.streamnet.club/delete) or contact the project through [GitHub](https://github.com/cyb3rgh05t/streamnet-debrid). Do not put passwords, tokens, identity documents, or other sensitive data in a public GitHub issue.
 
 ## 2. Data Stored Only On Your Device
 
@@ -46,13 +46,13 @@ These activities are based on StreamNet TV's legitimate interests in finding cra
 
 The public website uses Netlify's server-side traffic analytics to count page requests, approximate unique visitors, referrers, and countries from delivery logs. ARVIO does not add advertising trackers or cross-site profiling cookies.
 
-After you sign in to ARVIO Web, ARVIO records a small set of Premium service events such as viewing the membership screen, starting a trial, opening checkout, linking a membership, and completing the first successful playback. Account identifiers are converted into a keyed pseudonymous value before storage. Events can contain coarse campaign attribution and device or outcome labels, but not your email address, watched title, stream URL, addon URL, or payment details. Ko-fi separately handles payment details under its own privacy policy.
+If you use optional membership or entitlement features exposed through StreamNet TV Cloud, StreamNet records a small set of service events such as viewing membership information, starting a trial, opening checkout, linking a membership, and completing the first successful playback. Account identifiers are converted into a keyed pseudonymous value before storage. Events can contain coarse campaign attribution and device or outcome labels, but not your email address, watched title, stream URL, addon URL, or payment details. Ko-fi separately handles payment details under its own privacy policy.
 
 These measurements are used to understand whether account connection, trials, playback, and membership activation work correctly and where the service needs improvement. They are not used for advertising or sold to third parties. They are based on ARVIO's legitimate interests in operating and improving the optional Premium service (Article 6(1)(f)).
 
 ### Trial emails
 
-When you deliberately start an ARVIO Web trial, ARVIO sends only three service messages: confirmation that the trial started, one reminder before it expires, and one final expiry notice. The temporary delivery queue stores the email address encrypted and is not a general marketing mailing list.
+When you deliberately start a StreamNet TV Cloud trial, StreamNet sends only three service messages: confirmation that the trial started, one reminder before it expires, and one final expiry notice. The temporary delivery queue stores the email address encrypted and is not a general marketing mailing list.
 
 ## 5. Optional Third-Party Services
 
@@ -67,7 +67,7 @@ Data is also sent to services you deliberately use or connect:
 | TMDB                     | Movie and TV metadata and images                                                 | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
 | Trakt.tv                 | Optional watch history, progress, ratings, and watchlist sync                    | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
 | Discord                  | Optional Rich Presence login and the title/playback status you choose to display | [discord.com/privacy](https://discord.com/privacy)                                 |
-| Ko-fi                    | Optional StreamNet TV Web membership verification                                | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
+| Ko-fi                    | Optional StreamNet TV Cloud membership verification                              | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
 | User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add  | Governed by the provider you configure                                             |
 
 StreamNet TV sends only the data needed for the requested integration. Third-party services may process data outside the European Economic Area under their own transfer mechanisms and terms.
