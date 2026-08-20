@@ -133,6 +133,45 @@ internal fun mergeLocalHistoryByTimestamp(
     }.getOrDefault(localPayload)
 }
 
+internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: String): String {
+    return runCatching {
+        val local = JSONObject(localPayload)
+        val remote = JSONObject(remotePayload)
+        val localTs = local.optJSONObject("catalogsUpdatedAtByProfile") ?: JSONObject()
+        val remoteTs = remote.optJSONObject("catalogsUpdatedAtByProfile") ?: JSONObject()
+        val mergedTs = JSONObject()
+        val profileIds = LinkedHashSet<String>().apply {
+            localTs.keys().forEachRemaining { add(it) }
+            remoteTs.keys().forEachRemaining { add(it) }
+            local.optJSONObject("catalogsByProfile")?.keys()?.forEachRemaining { add(it) }
+            remote.optJSONObject("catalogsByProfile")?.keys()?.forEachRemaining { add(it) }
+        }
+        profileIds.forEach { profileId ->
+            val localUpdatedAt = localTs.optLong(profileId, 0L)
+            val remoteUpdatedAt = remoteTs.optLong(profileId, 0L)
+            if (remoteUpdatedAt >= localUpdatedAt) {
+                copyProfileArray(remote, local, "catalogsByProfile", profileId)
+                copyProfileArray(remote, local, "hiddenPreinstalledByProfile", profileId)
+                copyProfileArray(remote, local, "hiddenAddonByProfile", profileId)
+                copyProfileArray(remote, local, "hiddenHomeServerByProfile", profileId)
+            }
+            mergedTs.put(profileId, max(localUpdatedAt, remoteUpdatedAt))
+        }
+        if (mergedTs.length() > 0) {
+            local.put("catalogsUpdatedAtByProfile", mergedTs)
+        }
+        local.toString()
+    }.getOrDefault(localPayload)
+}
+
+private fun copyProfileArray(sourceRoot: JSONObject, targetRoot: JSONObject, containerKey: String, profileId: String) {
+    val sourceContainer = sourceRoot.optJSONObject(containerKey) ?: return
+    val sourceArray = sourceContainer.optJSONArray(profileId) ?: return
+    val targetContainer = targetRoot.optJSONObject(containerKey)
+        ?: JSONObject().also { targetRoot.put(containerKey, it) }
+    targetContainer.put(profileId, sourceArray)
+}
+
 private fun mergeLocalContinueWatching(local: JSONObject, remote: JSONObject, gson: Gson) {
     val localProfiles = local.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
     val remoteProfiles = remote.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
@@ -954,6 +993,13 @@ class CloudSyncRepository @Inject constructor(
         }
         root.put("hiddenHomeServerByProfile", JSONObject(gson.toJson(hiddenHomeServerByProfile)))
 
+        val catalogsUpdatedAtByProfile = buildMap<String, Long> {
+            profiles.forEach { profile ->
+                put(profile.id, catalogRepository.getCatalogsUpdatedAtForProfile(profile.id))
+            }
+        }
+        root.put("catalogsUpdatedAtByProfile", JSONObject(gson.toJson(catalogsUpdatedAtByProfile)))
+
         // IPTV config per profile (including favorites)
         val iptvByProfile = buildMap<String, IptvCloudProfileState> {
             profiles.forEach { profile ->
@@ -1227,8 +1273,12 @@ class CloudSyncRepository @Inject constructor(
             localPayload = settingsMergedPayload,
             remotePayload = remotePayload,
         )
-        return mergeLocalHistoryByTimestamp(
+        val catalogsMergedPayload = mergeCatalogsByTimestamp(
             localPayload = watchlistMergedPayload,
+            remotePayload = remotePayload,
+        )
+        return mergeLocalHistoryByTimestamp(
+            localPayload = catalogsMergedPayload,
             remotePayload = remotePayload,
             gson = gson,
         )
@@ -1804,19 +1854,28 @@ class CloudSyncRepository @Inject constructor(
 
         // ── Catalogs ──
         runCatching {
+            val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
             root.optJSONObject("catalogsByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, CatalogConfig::class.java).type).type
                 val map: Map<String, List<CatalogConfig>> = gson.fromJson(json, type) ?: emptyMap()
                 map.forEach { (profileId, catalogs) ->
-                    catalogRepository.replaceCatalogsForProfile(profileId, catalogs)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.replaceCatalogsForProfile(profileId, catalogs, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
                 }
             }
             root.optJSONArray("catalogs")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 if (!root.has("catalogsByProfile")) {
                     val type = TypeToken.getParameterized(List::class.java, CatalogConfig::class.java).type
                     val catalogs: List<CatalogConfig> = gson.fromJson(json, type) ?: emptyList()
-                    if (catalogs.isNotEmpty()) {
-                        catalogRepository.replaceCatalogsForProfile(activeProfileId, catalogs)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(activeProfileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(activeProfileId)
+                    if (catalogs.isNotEmpty() && cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.replaceCatalogsForProfile(activeProfileId, catalogs, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(activeProfileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
                 }
             }
@@ -1824,11 +1883,17 @@ class CloudSyncRepository @Inject constructor(
 
         // ── Hidden preinstalled catalogs ──
         runCatching {
+            val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
             root.optJSONObject("hiddenPreinstalledByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, String::class.java).type).type
                 val map: Map<String, List<String>> = gson.fromJson(json, type) ?: emptyMap()
                 map.forEach { (profileId, hidden) ->
-                    catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(profileId, hidden)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(profileId, hidden, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
                 }
             }
             root.optJSONArray("hiddenPreinstalledCatalogs")?.toString()?.let { json ->
@@ -1839,29 +1904,46 @@ class CloudSyncRepository @Inject constructor(
                         val type = TypeToken.getParameterized(List::class.java, String::class.java).type
                         gson.fromJson<List<String>>(json, type) ?: emptyList()
                     }
-                    catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(activeProfileId, hidden)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(activeProfileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(activeProfileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(activeProfileId, hidden, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(activeProfileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_preinstalled")) }
 
         // ── Hidden addon catalogs ──
         runCatching {
+            val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
             root.optJSONObject("hiddenAddonByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, String::class.java).type).type
                 val map: Map<String, List<String>> = gson.fromJson(json, type) ?: emptyMap()
                 map.forEach { (profileId, hidden) ->
-                    catalogRepository.setHiddenAddonCatalogIdsForProfile(profileId, hidden)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.setHiddenAddonCatalogIdsForProfile(profileId, hidden, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_addons")) }
 
         // ── Hidden Home Server catalogs ──
         runCatching {
+            val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
             root.optJSONObject("hiddenHomeServerByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, String::class.java).type).type
                 val map: Map<String, List<String>> = gson.fromJson(json, type) ?: emptyMap()
                 map.forEach { (profileId, hidden) ->
-                    catalogRepository.setHiddenHomeServerCatalogIdsForProfile(profileId, hidden)
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.setHiddenHomeServerCatalogIdsForProfile(profileId, hidden, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_home_server")) }

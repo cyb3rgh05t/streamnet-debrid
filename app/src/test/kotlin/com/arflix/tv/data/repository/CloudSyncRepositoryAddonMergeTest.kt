@@ -73,6 +73,32 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `stale local catalog push keeps newer remote catalog profile state`() {
+        val local = JSONObject()
+            .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray().put(JSONObject().put("id", "old"))))
+            .put("hiddenAddonByProfile", JSONObject().put("main", org.json.JSONArray().put("old_hidden")))
+            .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 100L))
+            .toString()
+        val remote = JSONObject()
+            .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray().put(JSONObject().put("id", "new"))))
+            .put("hiddenAddonByProfile", JSONObject().put("main", org.json.JSONArray().put("new_hidden")))
+            .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 200L))
+            .toString()
+
+        val merged = JSONObject(mergeCatalogsByTimestamp(local, remote))
+
+        assertEquals(
+            "new",
+            merged.getJSONObject("catalogsByProfile").getJSONArray("main").getJSONObject(0).getString("id")
+        )
+        assertEquals(
+            "new_hidden",
+            merged.getJSONObject("hiddenAddonByProfile").getJSONArray("main").getString(0)
+        )
+        assertEquals(200L, merged.getJSONObject("catalogsUpdatedAtByProfile").getLong("main"))
+    }
+
+    @Test
     fun `cloud addons win when ids match`() {
         val local = addon(id = "flix", name = "Local Flix")
         val cloud = addon(id = "flix", name = "Cloud Flix", isEnabled = false)
