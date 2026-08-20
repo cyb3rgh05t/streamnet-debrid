@@ -18,10 +18,12 @@ import org.junit.Test
 class PreinstalledServicesTest {
 
     @Test
-    fun `IPTV dashboard catalogs are first and adjacent`() {
+    fun `fresh profile starts with trending before collections and IPTV rows`() {
         val ids = MediaRepository.buildPreinstalledDefaults().map { it.id }
 
-        assertEquals(listOf("favorite_tv", "recent_tv"), ids.take(2))
+        assertEquals(listOf("trending_movies", "trending_tv"), ids.take(2))
+        assertTrue(ids.indexOf("favorite_tv") > ids.indexOf("collection_rail_franchise"))
+        assertTrue(ids.indexOf("recent_tv") > ids.indexOf("favorite_tv"))
     }
 
     private val serviceOrder = listOf(
