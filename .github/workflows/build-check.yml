@@ -91,7 +91,9 @@ jobs:
               --pattern "$sdk_asset" \
               --dir app/libs \
               --clobber
-            mv "app/libs/$sdk_asset" app/libs/discord_partner_sdk.aar
+            if [ "app/libs/$sdk_asset" != "app/libs/discord_partner_sdk.aar" ]; then
+              mv "app/libs/$sdk_asset" app/libs/discord_partner_sdk.aar
+            fi
           elif [ -n "${DISCORD_PARTNER_SDK_BEARER_TOKEN:-}" ]; then
             curl --fail --location --retry 3 --connect-timeout 20 \
               --header "Authorization: Bearer $DISCORD_PARTNER_SDK_BEARER_TOKEN" \
