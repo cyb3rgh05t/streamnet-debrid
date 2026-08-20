@@ -13,6 +13,7 @@ import com.arflix.tv.data.api.TmdbApi
 import com.arflix.tv.data.model.Addon
 import com.arflix.tv.data.model.AddonType
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.data.model.Subtitle
@@ -30,6 +31,7 @@ import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryEntry
 import com.arflix.tv.data.repository.WatchHistoryRepository
+import com.arflix.tv.util.AnimeMapper
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.settingsDataStore
@@ -190,6 +192,7 @@ class PlayerViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository,
     private val cloudSyncRepository: CloudSyncRepository,
     private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
+    private val animeMapper: AnimeMapper,
     private val tmdbApi: TmdbApi,
     private val skipIntroRepository: SkipIntroRepository,
     private val playbackTelemetryRepository: PlaybackTelemetryRepository
@@ -202,6 +205,8 @@ class PlayerViewModel @Inject constructor(
     private var currentMediaId: Int = 0
     private var currentSeason: Int? = null
     private var currentEpisode: Int? = null
+    private var currentDisplaySeason: Int? = null
+    private var currentDisplayEpisode: Int? = null
     private var currentTitle: String = ""
     private var currentPoster: String? = null
     private var currentBackdrop: String? = null
@@ -234,6 +239,25 @@ class PlayerViewModel @Inject constructor(
         currentMediaType == MediaType.TV &&
             currentOriginalLanguage.equals("ja", ignoreCase = true) &&
             currentGenreIds.contains(16)
+
+    suspend fun adjacentEpisodeIdentity(
+        tmdbId: Int,
+        current: EpisodeIdentity,
+        forward: Boolean
+    ): EpisodeIdentity? {
+        val structure = runCatching { animeMapper.resolveAnimeSeasonStructure(tmdbId) }.getOrNull()
+        if (structure != null) {
+            return if (forward) {
+                structure.nextAfterDisplay(current.displaySeason, current.displayEpisode)
+            } else {
+                structure.previousBeforeDisplay(current.displaySeason, current.displayEpisode)
+            }
+        }
+        val nextEpisode = current.tmdbEpisode + if (forward) 1 else -1
+        return nextEpisode.takeIf { it > 0 }?.let {
+            EpisodeIdentity.canonical(current.tmdbSeason, it)
+        }
+    }
 
     // AI subtitle settings (read once per video load)
     private var aiSubtitleEnabled = false
@@ -445,6 +469,8 @@ class PlayerViewModel @Inject constructor(
         mediaId: Int,
         seasonNumber: Int?,
         episodeNumber: Int?,
+        displaySeasonNumber: Int? = seasonNumber,
+        displayEpisodeNumber: Int? = episodeNumber,
         providedImdbId: String?,
         providedStreamUrl: String?,
         preferredAddonId: String?,
@@ -459,6 +485,8 @@ class PlayerViewModel @Inject constructor(
         currentMediaId = mediaId
         currentSeason = seasonNumber
         currentEpisode = episodeNumber
+        currentDisplaySeason = displaySeasonNumber
+        currentDisplayEpisode = displayEpisodeNumber
         currentStartPositionMs = startPositionMs
         currentPreferredAddonId = preferredAddonId?.trim()?.takeIf { it.isNotBlank() }
         currentPreferredSourceName = preferredSourceName?.trim()?.takeIf { it.isNotBlank() }
@@ -3743,17 +3771,19 @@ class PlayerViewModel @Inject constructor(
 
     fun retry() {
         loadMedia(
-            currentMediaType,
-            currentMediaId,
-            currentSeason,
-            currentEpisode,
-            currentImdbId,
-            null,
-            currentPreferredAddonId,
-            currentPreferredSourceName,
-            currentPreferredBingeGroup,
-            currentStartPositionMs,
-            currentIsLiveStreamPlayback
+            mediaType = currentMediaType,
+            mediaId = currentMediaId,
+            seasonNumber = currentSeason,
+            episodeNumber = currentEpisode,
+            displaySeasonNumber = currentDisplaySeason,
+            displayEpisodeNumber = currentDisplayEpisode,
+            providedImdbId = currentImdbId,
+            providedStreamUrl = null,
+            preferredAddonId = currentPreferredAddonId,
+            preferredSourceName = currentPreferredSourceName,
+            preferredBingeGroup = currentPreferredBingeGroup,
+            startPositionMs = currentStartPositionMs,
+            isLiveStreamPlayback = currentIsLiveStreamPlayback
         )
     }
 
@@ -4043,6 +4073,8 @@ class PlayerViewModel @Inject constructor(
                         backdropPath = currentBackdrop,
                         season = currentSeason,
                         episode = currentEpisode,
+                        displaySeason = currentDisplaySeason,
+                        displayEpisode = currentDisplayEpisode,
                         episodeTitle = currentEpisodeTitle,
                         progress = progressPercent,
                         positionSeconds = positionSeconds,
@@ -4137,15 +4169,25 @@ class PlayerViewModel @Inject constructor(
                 val cwEpisode = currentEpisode
                 if (currentMediaType == MediaType.TV && cwSeason != null && cwEpisode != null) {
                     try {
-                        val nextEpisode = cwEpisode + 1
+                        val nextIdentity = runCatching {
+                            animeMapper.resolveAnimeSeasonStructure(currentMediaId)
+                                ?.nextAfterDisplay(
+                                    currentDisplaySeason ?: cwSeason,
+                                    currentDisplayEpisode ?: cwEpisode
+                                )
+                        }.getOrNull()
+                        val nextSeason = nextIdentity?.tmdbSeason ?: cwSeason
+                        val nextEpisode = nextIdentity?.tmdbEpisode ?: (cwEpisode + 1)
                         traktRepository.saveLocalContinueWatching(
                             mediaType = currentMediaType,
                             tmdbId = currentMediaId,
                             title = currentItemTitle.ifEmpty { currentTitle },
                             posterPath = currentPoster,
                             backdropPath = currentBackdrop,
-                            season = cwSeason,
+                            season = nextSeason,
                             episode = nextEpisode,
+                            displaySeason = nextIdentity?.displaySeason ?: nextSeason,
+                            displayEpisode = nextIdentity?.displayEpisode ?: nextEpisode,
                             episodeTitle = null,
                             progress = 3, // meets MIN_PROGRESS_THRESHOLD to avoid filter
                             positionSeconds = 0L, // next episode: no resume position yet

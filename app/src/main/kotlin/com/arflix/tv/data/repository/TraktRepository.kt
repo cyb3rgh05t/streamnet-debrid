@@ -2234,6 +2234,8 @@ class TraktRepository @Inject constructor(
         backdropPath: String?,
         season: Int?,
         episode: Int?,
+        displaySeason: Int? = season,
+        displayEpisode: Int? = episode,
         episodeTitle: String?,
         progress: Int, // 0-100
         positionSeconds: Long = 0L,
@@ -2273,6 +2275,8 @@ class TraktRepository @Inject constructor(
             durationSeconds = durationSeconds.coerceAtLeast(0L),
             season = season,
             episode = episode,
+            displaySeason = displaySeason,
+            displayEpisode = displayEpisode,
             episodeTitle = episodeTitle,
             backdropPath = backdropPath,
             posterPath = posterPath,
@@ -4544,6 +4548,8 @@ data class ContinueWatchingItem(
     val durationSeconds: Long = 0L,
     val season: Int? = null,
     val episode: Int? = null,
+    val displaySeason: Int? = season,
+    val displayEpisode: Int? = episode,
     val episodeTitle: String? = null,
     val backdropPath: String? = null,
     val posterPath: String? = null,
@@ -4577,8 +4583,10 @@ data class ContinueWatchingItem(
         val resumeLabel = resumeSeconds.takeIf { it > 0L }?.let { formatResumeClock(it) }
 
         val subtitle = if (mediaType == MediaType.TV && season != null && episode != null) {
-            val base = context?.getString(R.string.continue_season_episode, season, episode)
-                ?: "Continue S${season}E${episode}"
+            val shownSeason = displaySeason ?: season
+            val shownEpisode = displayEpisode ?: episode
+            val base = context?.getString(R.string.continue_season_episode, shownSeason, shownEpisode)
+                ?: "Continue S${shownSeason}E${shownEpisode}"
             if (!resumeLabel.isNullOrBlank()) {
                 context?.getString(R.string.continue_from, resumeLabel) ?: "$base from $resumeLabel"
             } else {

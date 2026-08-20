@@ -137,6 +137,7 @@ import coil.compose.AsyncImage
 import com.arflix.tv.ArflixApplication
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.data.model.Subtitle
 import com.arflix.tv.ui.components.KeepScreenOn
@@ -411,6 +412,23 @@ fun PlayerScreen(
     var pendingNextAddonId by remember { mutableStateOf<String?>(null) }
     var pendingNextSourceName by remember { mutableStateOf<String?>(null) }
     var pendingNextBingeGroup by remember { mutableStateOf<String?>(null) }
+    var nextEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
+    var previousEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
+    LaunchedEffect(mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber) {
+        if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
+            val current = EpisodeIdentity(
+                displaySeason = seasonNumber,
+                displayEpisode = episodeNumber,
+                tmdbSeason = tmdbSeasonNumber ?: seasonNumber,
+                tmdbEpisode = tmdbEpisodeNumber ?: episodeNumber
+            )
+            nextEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = true)
+            previousEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = false)
+        } else {
+            nextEpisodeIdentity = null
+            previousEpisodeIdentity = null
+        }
+    }
     var nextEpisodePromptButton by remember { mutableIntStateOf(0) } // 0 = next, 1 = cancel
     val nextEpisodePromptGate = remember { NextEpisodePromptGate() }
 
@@ -718,6 +736,8 @@ fun PlayerScreen(
             mediaId = mediaId,
             seasonNumber = tmdbSeasonNumber,
             episodeNumber = tmdbEpisodeNumber,
+            displaySeasonNumber = seasonNumber,
+            displayEpisodeNumber = episodeNumber,
             providedImdbId = imdbId,
             providedStreamUrl = streamUrl,
             preferredAddonId = preferredAddonId,
@@ -2398,10 +2418,14 @@ fun PlayerScreen(
                 )
             ) {
                 val selected = uiState.selectedStream
-                pendingNextSeason = endedEpisodeKey.seasonNumber
-                pendingNextEpisode = endedEpisodeKey.episodeNumber + 1
-                pendingNextTmdbSeason = tmdbSeasonNumber ?: endedEpisodeKey.seasonNumber
-                pendingNextTmdbEpisode = (tmdbEpisodeNumber ?: endedEpisodeKey.episodeNumber) + 1
+                val next = nextEpisodeIdentity ?: EpisodeIdentity.canonical(
+                    tmdbSeasonNumber ?: endedEpisodeKey.seasonNumber,
+                    (tmdbEpisodeNumber ?: endedEpisodeKey.episodeNumber) + 1
+                )
+                pendingNextSeason = next.displaySeason
+                pendingNextEpisode = next.displayEpisode
+                pendingNextTmdbSeason = next.tmdbSeason
+                pendingNextTmdbEpisode = next.tmdbEpisode
                 pendingNextAddonId = selected?.addonId?.takeIf { it.isNotBlank() }
                 pendingNextSourceName = selected?.source?.takeIf { it.isNotBlank() }
                 pendingNextBingeGroup = selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -2662,13 +2686,14 @@ fun PlayerScreen(
                         Key.MediaNext -> {
                             // Jump to next episode if this is a TV series and we have a
                             // current episode. No-op for movies (there is no next).
-                            if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
+                            if (mediaType == MediaType.TV && nextEpisodeIdentity != null) {
                                 val selected = uiState.selectedStream
+                                val next = nextEpisodeIdentity ?: return@onKeyEvent true
                                 playNextEpisode(
-                                    seasonNumber,
-                                    episodeNumber + 1,
-                                    tmdbSeasonNumber ?: seasonNumber,
-                                    (tmdbEpisodeNumber ?: episodeNumber) + 1,
+                                    next.displaySeason,
+                                    next.displayEpisode,
+                                    next.tmdbSeason,
+                                    next.tmdbEpisode,
                                     selected?.addonId?.takeIf { it.isNotBlank() },
                                     selected?.source?.takeIf { it.isNotBlank() },
                                     selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -2678,13 +2703,14 @@ fun PlayerScreen(
                         }
                         Key.MediaPrevious -> {
                             // Jump to previous episode for TV series. Movies: no-op.
-                            if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null && episodeNumber > 1) {
+                            if (mediaType == MediaType.TV && previousEpisodeIdentity != null) {
                                 val selected = uiState.selectedStream
+                                val previous = previousEpisodeIdentity ?: return@onKeyEvent true
                                 onPlayNext(
-                                    seasonNumber,
-                                    episodeNumber - 1,
-                                    tmdbSeasonNumber ?: seasonNumber,
-                                    (tmdbEpisodeNumber ?: episodeNumber) - 1,
+                                    previous.displaySeason,
+                                    previous.displayEpisode,
+                                    previous.tmdbSeason,
+                                    previous.tmdbEpisode,
                                     selected?.addonId?.takeIf { it.isNotBlank() },
                                     selected?.source?.takeIf { it.isNotBlank() },
                                     selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
@@ -3667,14 +3693,13 @@ fun PlayerScreen(
                                 focusRequester = nextEpisodeButtonFocusRequester, size = smallBtn, iconSize = smallIcon,
                                 onFocusChanged = {},
                                 onClick = {
-                                    val season = seasonNumber ?: return@PlayerIconButton
-                                    val episode = episodeNumber ?: return@PlayerIconButton
+                                    val next = nextEpisodeIdentity ?: return@PlayerIconButton
                                     val selected = uiState.selectedStream
                                     playNextEpisode(
-                                        season,
-                                        episode + 1,
-                                        tmdbSeasonNumber ?: season,
-                                        (tmdbEpisodeNumber ?: episode) + 1,
+                                        next.displaySeason,
+                                        next.displayEpisode,
+                                        next.tmdbSeason,
+                                        next.tmdbEpisode,
                                         selected?.addonId?.takeIf { it.isNotBlank() },
                                         selected?.source?.takeIf { it.isNotBlank() },
                                         selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }

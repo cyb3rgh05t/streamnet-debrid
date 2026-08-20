@@ -1,5 +1,7 @@
 package com.arflix.tv.util
 
+import com.arflix.tv.data.model.EpisodeIdentity
+
 /** A provider entry that can become one user-visible anime season. */
 internal data class AnimeProviderSeason(
     val kitsuId: Int,
@@ -7,31 +9,38 @@ internal data class AnimeProviderSeason(
     val episodeCount: Int
 )
 
-/** Maps one user-visible anime episode back to the canonical TMDB episode. */
-internal data class AnimeEpisodeIdentity(
-    val displaySeason: Int,
-    val displayEpisode: Int,
-    val tmdbSeason: Int,
-    val tmdbEpisode: Int,
-    val kitsuId: Int
-)
-
 internal data class AnimeSeasonStructure(
-    val seasons: Map<Int, List<AnimeEpisodeIdentity>>
+    val seasons: Map<Int, List<EpisodeIdentity>>
 ) {
     val seasonCount: Int get() = seasons.size
 
-    fun identityForDisplay(season: Int, episode: Int): AnimeEpisodeIdentity? =
+    fun identityForDisplay(season: Int, episode: Int): EpisodeIdentity? =
         seasons[season]?.firstOrNull { it.displayEpisode == episode }
 
-    fun identityForTmdb(season: Int, episode: Int): AnimeEpisodeIdentity? =
+    fun identityForTmdb(season: Int, episode: Int): EpisodeIdentity? =
         seasons.values.asSequence().flatten().firstOrNull {
             it.tmdbSeason == season && it.tmdbEpisode == episode
         }
 
-    fun nextAfterDisplay(season: Int, episode: Int): AnimeEpisodeIdentity? {
+    fun nextAfterDisplay(season: Int, episode: Int): EpisodeIdentity? {
         identityForDisplay(season, episode + 1)?.let { return it }
         return seasons[season + 1]?.firstOrNull()
+    }
+
+    fun previousBeforeDisplay(season: Int, episode: Int): EpisodeIdentity? {
+        identityForDisplay(season, episode - 1)?.let { return it }
+        return seasons[season - 1]?.lastOrNull()
+    }
+
+    fun canonicalEpisodesForDisplaySeason(season: Int): Map<Int, List<Int>> =
+        seasons[season].orEmpty()
+            .groupBy { it.tmdbSeason }
+            .mapValues { (_, identities) -> identities.map { it.tmdbEpisode } }
+
+    fun progressForCanonicalEpisodes(
+        watched: Set<Pair<Int, Int>>
+    ): Map<Int, Pair<Int, Int>> = seasons.mapValues { (_, identities) ->
+        identities.count { (it.tmdbSeason to it.tmdbEpisode) in watched } to identities.size
     }
 }
 
@@ -58,10 +67,11 @@ internal fun buildAnimeSeasonStructure(
         .filter { it.kitsuId > 0 && it.episodeCount > 0 }
         .distinctBy { Triple(it.kitsuId, it.tmdbSeason, it.episodeCount) }
     if (validProviders.size < 2) return null
+    if (validProviders.sumOf { it.episodeCount } != canonicalEpisodes.size) return null
 
     val explicitlyMapped = validProviders.all { it.tmdbSeason != null }
     if (explicitlyMapped) {
-        val result = linkedMapOf<Int, List<AnimeEpisodeIdentity>>()
+        val result = linkedMapOf<Int, List<EpisodeIdentity>>()
         var displaySeason = 1
         var explicitMappingValid = true
         validProviders.groupBy { it.tmdbSeason!! }.toSortedMap().forEach { (tmdbSeason, entries) ->
@@ -73,12 +83,13 @@ internal fun buildAnimeSeasonStructure(
             var tmdbEpisode = 1
             entries.forEach { provider ->
                 result[displaySeason] = (1..provider.episodeCount).map { displayEpisode ->
-                    AnimeEpisodeIdentity(
+                    EpisodeIdentity(
                         displaySeason = displaySeason,
                         displayEpisode = displayEpisode,
                         tmdbSeason = tmdbSeason,
                         tmdbEpisode = tmdbEpisode++,
-                        kitsuId = provider.kitsuId
+                        kitsuId = provider.kitsuId,
+                        kitsuEpisode = displayEpisode
                     )
                 }
                 displaySeason++
@@ -93,8 +104,7 @@ internal fun buildAnimeSeasonStructure(
     // though ARM labels each Kitsu entry with its official season. When the episode totals match
     // exactly, preserve TMDB identity by distributing the official seasons over the canonical
     // episode sequence. Any incomplete or contradictory provider data still falls back to TMDB.
-    if (validProviders.sumOf { it.episodeCount } != canonicalEpisodes.size) return null
-    val result = linkedMapOf<Int, List<AnimeEpisodeIdentity>>()
+    val result = linkedMapOf<Int, List<EpisodeIdentity>>()
     var canonicalIndex = 0
     validProviders.forEachIndexed { index, provider ->
         val remaining = canonicalEpisodes.size - canonicalIndex
@@ -103,12 +113,13 @@ internal fun buildAnimeSeasonStructure(
         val displaySeason = index + 1
         result[displaySeason] = (0 until take).map { offset ->
             val (tmdbSeason, tmdbEpisode) = canonicalEpisodes[canonicalIndex + offset]
-            AnimeEpisodeIdentity(
+            EpisodeIdentity(
                 displaySeason = displaySeason,
                 displayEpisode = offset + 1,
                 tmdbSeason = tmdbSeason,
                 tmdbEpisode = tmdbEpisode,
-                kitsuId = provider.kitsuId
+                kitsuId = provider.kitsuId,
+                kitsuEpisode = offset + 1
             )
         }
         canonicalIndex += take

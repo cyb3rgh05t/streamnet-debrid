@@ -132,6 +132,7 @@ import coil.size.Precision
 import com.arflix.tv.R
 import com.arflix.tv.data.model.CastMember
 import com.arflix.tv.data.model.Episode
+import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Review
@@ -265,7 +266,12 @@ fun DetailsScreen(
         tmdbEpisode: Int? = displayEpisode
     ) {
         showStreamSelector = false
-        viewModel.loadStreams(imdbId, tmdbSeason, tmdbEpisode)
+        val identity = uiState.episodes.firstOrNull {
+            it.seasonNumber == displaySeason && it.episodeNumber == displayEpisode
+        }?.identity ?: if (displaySeason != null && displayEpisode != null && tmdbSeason != null && tmdbEpisode != null) {
+            EpisodeIdentity(displaySeason, displayEpisode, tmdbSeason, tmdbEpisode)
+        } else null
+        viewModel.loadStreams(imdbId, identity)
         autoPlayWaitTick = 0
         pendingAutoPlayRequest = PendingAutoPlayRequest(
             displaySeason = displaySeason,
@@ -364,7 +370,20 @@ fun DetailsScreen(
 
         when {
             selectedStream != null && !shouldWaitForSources -> {
-                viewModel.recordPlayedEpisode(mediaId, request.displaySeason, request.displayEpisode)
+                val identity = uiState.episodes.firstOrNull {
+                    it.seasonNumber == request.displaySeason && it.episodeNumber == request.displayEpisode
+                }?.identity ?: if (
+                    request.displaySeason != null && request.displayEpisode != null &&
+                    request.tmdbSeason != null && request.tmdbEpisode != null
+                ) {
+                    EpisodeIdentity(
+                        request.displaySeason,
+                        request.displayEpisode,
+                        request.tmdbSeason,
+                        request.tmdbEpisode
+                    )
+                } else null
+                viewModel.recordPlayedEpisode(mediaId, identity)
                 onNavigateToPlayer(
                     mediaType,
                     mediaId,
@@ -470,11 +489,10 @@ fun DetailsScreen(
                     if (!state.autoPlaySingleSource) {
                         // Autoplay OFF → open the source picker; never auto-play.
                         showStreamSelector = true
-                        viewModel.loadStreams(
-                            state.imdbId,
-                            state.playTmdbSeason ?: season,
-                            state.playTmdbEpisode ?: episode
-                        )
+                        val identity = state.episodes.firstOrNull {
+                            it.seasonNumber == season && it.episodeNumber == episode
+                        }?.identity
+                        viewModel.loadStreams(state.imdbId, identity)
                     } else {
                         // Autoplay ON → go straight to the player; PlayerScreen auto-picks.
                         requestFastAutoPlay(
@@ -487,7 +505,7 @@ fun DetailsScreen(
                 1 -> { // Sources
                     showStreamSelector = true
                     val ep = state.episodes.getOrNull(currentEpIdx)
-                    viewModel.loadStreams(state.imdbId, ep?.tmdbSeasonNumber, ep?.tmdbEpisodeNumber)
+                    viewModel.loadStreams(state.imdbId, ep?.identity)
                 }
                 2 -> { // Trailer
                     state.trailerKey?.let { showTrailerPlayer = true }
@@ -526,7 +544,7 @@ fun DetailsScreen(
                 episodeIndex = idx
                 if (isMobile || !state.autoPlaySingleSource) {
                     showStreamSelector = true
-                    viewModel.loadStreams(state.imdbId, ep.tmdbSeasonNumber, ep.tmdbEpisodeNumber)
+                    viewModel.loadStreams(state.imdbId, ep.identity)
                 } else {
                     requestFastAutoPlay(
                         state.imdbId, ep.seasonNumber, ep.episodeNumber, null,
@@ -838,11 +856,10 @@ fun DetailsScreen(
                                             if (!uiState.autoPlaySingleSource) {
                                                 // Autoplay OFF → open the source picker; never auto-play.
                                                 showStreamSelector = true
-                                                viewModel.loadStreams(
-                                                    uiState.imdbId,
-                                                    uiState.playTmdbSeason ?: season,
-                                                    uiState.playTmdbEpisode ?: episode
-                                                )
+                                                val identity = uiState.episodes.firstOrNull {
+                                                    it.seasonNumber == season && it.episodeNumber == episode
+                                                }?.identity
+                                                viewModel.loadStreams(uiState.imdbId, identity)
                                             } else {
                                                 // Autoplay ON: pick a concrete stream first, then open PlayerScreen.
                                                 requestFastAutoPlay(
@@ -856,7 +873,7 @@ fun DetailsScreen(
                                             showStreamSelector = true
                                             // Pass the currently focused episode for TV shows
                                             val ep = uiState.episodes.getOrNull(episodeIndex)
-                                            viewModel.loadStreams(uiState.imdbId, ep?.tmdbSeasonNumber, ep?.tmdbEpisodeNumber)
+                                            viewModel.loadStreams(uiState.imdbId, ep?.identity)
                                         }
                                         2 -> { // Trailer
                                             uiState.trailerKey?.let {
@@ -876,7 +893,7 @@ fun DetailsScreen(
                                     if (ep != null) {
                                         if (!uiState.autoPlaySingleSource) {
                                             showStreamSelector = true
-                                            viewModel.loadStreams(uiState.imdbId, ep.tmdbSeasonNumber, ep.tmdbEpisodeNumber)
+                                            viewModel.loadStreams(uiState.imdbId, ep.identity)
                                         } else {
                                             requestFastAutoPlay(
                                                 uiState.imdbId, ep.seasonNumber, ep.episodeNumber, null,
@@ -1095,7 +1112,7 @@ fun DetailsScreen(
                 }
                 showStreamSelector = false
                 val ep = uiState.episodes.getOrNull(episodeIndex)
-                viewModel.recordPlayedEpisode(mediaId, ep?.seasonNumber, ep?.episodeNumber)
+                viewModel.recordPlayedEpisode(mediaId, ep?.identity)
                 onNavigateToPlayer(
                     mediaType, mediaId,
                     ep?.seasonNumber, ep?.episodeNumber,
@@ -1127,7 +1144,7 @@ fun DetailsScreen(
                 onSelectSource = {
                     showEpisodeContextMenu = false
                     showStreamSelector = true
-                    viewModel.loadStreams(uiState.imdbId, episode.tmdbSeasonNumber, episode.tmdbEpisodeNumber)
+                    viewModel.loadStreams(uiState.imdbId, episode.identity)
                 },
                 onToggleWatched = {
                     viewModel.markEpisodeWatched(

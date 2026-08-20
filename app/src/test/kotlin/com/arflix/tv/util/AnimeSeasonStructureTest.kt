@@ -132,4 +132,68 @@ class AnimeSeasonStructureTest {
         assertEquals(1, next.tmdbSeason)
         assertEquals(13, next.tmdbEpisode)
     }
+
+    @Test
+    fun `previous display episode crosses back to the prior official season`() {
+        val result = buildAnimeSeasonStructure(
+            mapOf(1 to 24),
+            listOf(AnimeProviderSeason(1, null, 12), AnimeProviderSeason(2, null, 12))
+        )!!
+
+        val previous = result.previousBeforeDisplay(2, 1)!!
+        assertEquals(1, previous.displaySeason)
+        assertEquals(12, previous.displayEpisode)
+        assertEquals(1, previous.tmdbSeason)
+        assertEquals(12, previous.tmdbEpisode)
+    }
+
+    @Test
+    fun `stream identity retains exact Kitsu override after TMDB conversion`() {
+        val result = buildAnimeSeasonStructure(
+            mapOf(1 to 24),
+            listOf(AnimeProviderSeason(101, null, 12), AnimeProviderSeason(202, null, 12))
+        )!!
+
+        val identity = result.identityForDisplay(2, 8)!!
+        assertEquals(1, identity.tmdbSeason)
+        assertEquals(20, identity.tmdbEpisode)
+        assertEquals("kitsu:202:8", identity.kitsuQuery)
+    }
+
+    @Test
+    fun `season progress is calculated on displayed anime seasons`() {
+        val result = buildAnimeSeasonStructure(
+            mapOf(1 to 24),
+            listOf(AnimeProviderSeason(1, null, 12), AnimeProviderSeason(2, null, 12))
+        )!!
+
+        val progress = result.progressForCanonicalEpisodes(
+            ((1..12).map { 1 to it } + listOf(1 to 13, 1 to 14)).toSet()
+        )
+        assertEquals(12 to 12, progress[1])
+        assertEquals(2 to 12, progress[2])
+    }
+
+    @Test
+    fun `Trakt grouping always returns canonical coordinates`() {
+        val result = buildAnimeSeasonStructure(
+            mapOf(1 to 24),
+            listOf(AnimeProviderSeason(1, null, 12), AnimeProviderSeason(2, null, 12))
+        )!!
+
+        assertEquals(mapOf(1 to (13..24).toList()), result.canonicalEpisodesForDisplaySeason(2))
+    }
+
+    @Test
+    fun `partial explicit ARM mapping falls back instead of hiding episodes`() {
+        assertNull(
+            buildAnimeSeasonStructure(
+                mapOf(1 to 24),
+                listOf(
+                    AnimeProviderSeason(100, 1, 6),
+                    AnimeProviderSeason(200, 1, 6)
+                )
+            )
+        )
+    }
 }
