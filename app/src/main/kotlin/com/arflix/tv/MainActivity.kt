@@ -240,6 +240,9 @@ class MainActivity : ComponentActivity() {
             startActivity(crashIntent)
         }
 
+        // Initialize Discord RPC Manager
+        com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.init(this)
+
         // Set orientation based on device type
         requestedOrientation = when (initialDeviceType) {
             DeviceType.TV -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE

@@ -479,7 +479,7 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 15 // Accounts, tracking routing, cloud actions, update, privacy and deletion
+            "accounts" -> 16 // Accounts, tracking routing, telegram, discord, sync/update, diagnostics, privacy and deletion
             else -> 0
         }
     }
@@ -1228,18 +1228,22 @@ fun SettingsScreen(
                                                     )
                                                 }
                                                 9 -> onNavigateToTelegramSettings()
-                                                10 -> viewModel.forceCloudSyncNow()
-                                                11 -> showCloudPullConfirm = true
-                                                12 -> {
+                                                10 -> {
+                                                    val enabled = com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isRpcEnabledFlow.value
+                                                    com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.setRpcEnabled(!enabled)
+                                                }
+                                                11 -> viewModel.forceCloudSyncNow()
+                                                12 -> showCloudPullConfirm = true
+                                                13 -> {
                                                     if (uiState.updateStatus is com.arflix.tv.updater.UpdateStatus.ReadyToInstall) {
                                                         viewModel.installAppUpdateOrRequestPermission()
                                                     } else {
                                                         viewModel.checkForAppUpdates(force = true, showNoUpdateFeedback = true)
                                                     }
                                                 }
-                                                13 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
-                                                14 -> openExternalUrl(context, PRIVACY_POLICY_URL)
-                                                15 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
+                                                14 -> viewModel.setDiagnosticsSharingEnabled(!uiState.diagnosticsSharingEnabled)
+                                                15 -> openExternalUrl(context, PRIVACY_POLICY_URL)
+                                                16 -> openExternalUrl(context, ACCOUNT_DELETION_URL)
                                             }
                                         }
                                         "plugins" -> {
@@ -3921,6 +3925,18 @@ private fun MobileSettingsMainPage(
                     isFocused = false,
                     onClick = onNavigateToTelegram
                 )
+                val isDiscordRpcEnabled by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isRpcEnabledFlow.collectAsStateWithLifecycle(initialValue = true)
+                val isDiscordInstalled = remember(context) { com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isDiscordInstalled(context) }
+                MobileSettingsRow(
+                    icon = Icons.Default.Link,
+                    title = "Discord Rich Presence",
+                    subtitle = if (!isDiscordInstalled) "Discord app not installed" else if (isDiscordRpcEnabled) "Active" else "Disabled",
+                    value = if (isDiscordRpcEnabled) "Enabled" else "Disabled",
+                    isFocused = false,
+                    onClick = {
+                        com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.setRpcEnabled(!isDiscordRpcEnabled)
+                    }
+                )
                 MobileSettingsRow(
                     icon = Icons.Default.SystemUpdate,
                     title = stringResource(R.string.app_version),
@@ -5268,9 +5284,12 @@ private fun tvSettingsFocusedHelp(section: String, focusedIndex: Int): TvSetting
         "accounts" -> when (focusedIndex) {
             0 -> TvSettingsHelp(stringResource(R.string.cloud_account), stringResource(R.string.settings_help_cloud_account_desc))
             1 -> TvSettingsHelp(stringResource(R.string.settings_help_trakt), stringResource(R.string.settings_help_trakt_desc))
-            2 -> TvSettingsHelp(stringResource(R.string.force_cloud_sync), stringResource(R.string.settings_help_force_sync_desc))
-            3 -> TvSettingsHelp(stringResource(R.string.settings_help_app_updates), stringResource(R.string.settings_help_app_updates_desc))
-            else -> TvSettingsHelp(stringResource(R.string.settings_help_account_data), stringResource(R.string.settings_help_account_data_desc))
+            2 -> TvSettingsHelp(stringResource(R.string.mdblist_account), stringResource(R.string.mdblist_key_help))
+            3 -> TvSettingsHelp("Telegram", stringResource(R.string.settings_telegram_desc))
+            4 -> TvSettingsHelp("Discord RPC", "Show your watch status on your Discord profile.")
+            5 -> TvSettingsHelp(stringResource(R.string.force_cloud_sync), stringResource(R.string.settings_help_force_sync_desc))
+            6 -> TvSettingsHelp(stringResource(R.string.settings_help_app_updates), stringResource(R.string.settings_help_app_updates_desc))
+            else -> TvSettingsHelp(stringResource(R.string.settings_privacy_data_deletion), stringResource(R.string.settings_privacy_data_deletion_desc))
         }
         else -> TvSettingsHelp(stringResource(R.string.settings_help_setting), stringResource(R.string.settings_help_setting_desc))
     }
@@ -8587,6 +8606,28 @@ private fun AccountsSettings(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // Discord Rich Presence
+        val context = LocalContext.current
+        val isDiscordRpcEnabled by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isRpcEnabledFlow.collectAsStateWithLifecycle(initialValue = true)
+        val isDiscordInstalled = remember(context) { com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isDiscordInstalled(context) }
+        val discordSubtitle = when {
+            !isDiscordInstalled -> "Discord app is not installed on this device."
+            isDiscordRpcEnabled -> "Active - Updates your Discord profile activity during playback."
+            else -> "Disabled - Show your watch status on your Discord profile."
+        }
+        SettingsToggleRow(
+            title = "Discord Rich Presence",
+            subtitle = discordSubtitle,
+            isEnabled = isDiscordRpcEnabled,
+            isFocused = focusedIndex == 10,
+            onToggle = { enabled ->
+                com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.setRpcEnabled(enabled)
+            },
+            modifier = Modifier.settingsFocusSlot(10)
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         SettingsActionRow(
             title = stringResource(R.string.force_cloud_sync),
             description = if (isForceCloudSyncing) {
@@ -8599,9 +8640,9 @@ private fun AccountsSettings(
                 stringResource(R.string.settings_signin_to_force_sync)
             },
             actionLabel = if (isForceCloudSyncing) stringResource(R.string.settings_badge_syncing) else stringResource(R.string.settings_badge_sync),
-            isFocused = focusedIndex == 10,
+            isFocused = focusedIndex == 11,
             onClick = { if (!isForceCloudSyncing) onForceCloudSync() },
-            modifier = Modifier.settingsFocusSlot(10)
+            modifier = Modifier.settingsFocusSlot(11)
         )
 
         Spacer(modifier = Modifier.height(16.dp))

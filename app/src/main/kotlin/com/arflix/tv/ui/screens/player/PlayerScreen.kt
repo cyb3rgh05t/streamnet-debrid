@@ -352,6 +352,13 @@ fun PlayerScreen(
         onDispose { }
     }
 
+    // Discord RPC cleanup on player screen exit
+    DisposableEffect(Unit) {
+        onDispose {
+            com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.disconnect()
+        }
+    }
+
     KeepScreenOn()
     var isPlaying by remember { mutableStateOf(false) }
     var isBuffering by remember { mutableStateOf(true) }
@@ -1549,6 +1556,27 @@ fun PlayerScreen(
                 (currentPosition.toFloat() / duration.toFloat()).coerceIn(0f, 1f)
             } else 0f
             isPlaying = castManager.isRemotePlaying()
+            // Update Discord RPC
+            val titleVal = latestUiState.title
+            val subtitleVal = if (mediaType == MediaType.TV) {
+                val epPart = if (seasonNumber != null && episodeNumber != null) "S${seasonNumber}E${episodeNumber}" else ""
+                val epTitle = latestUiState.episodeTitle
+                if (!epTitle.isNullOrBlank()) {
+                    if (epPart.isNotEmpty()) "$epPart - $epTitle" else epTitle
+                } else {
+                    epPart
+                }
+            } else {
+                ""
+            }
+            com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.updatePlayback(
+                title = titleVal ?: "ARVIO",
+                subtitle = subtitleVal,
+                isPlaying = isPlaying,
+                progressMs = currentPosition,
+                durationMs = duration,
+                largeImage = latestUiState.posterUrl ?: latestUiState.logoUrl ?: ""
+            )
             delay(500)
         }
     }
@@ -2170,6 +2198,28 @@ fun PlayerScreen(
             }
             isPlaying = exoPlayer.isPlaying
             isBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING
+
+            // Update Discord RPC
+            val titleVal = latestUiState.title
+            val subtitleVal = if (mediaType == MediaType.TV) {
+                val epPart = if (seasonNumber != null && episodeNumber != null) "S${seasonNumber}E${episodeNumber}" else ""
+                val epTitle = latestUiState.episodeTitle
+                if (!epTitle.isNullOrBlank()) {
+                    if (epPart.isNotEmpty()) "$epPart - $epTitle" else epTitle
+                } else {
+                    epPart
+                }
+            } else {
+                ""
+            }
+            com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.updatePlayback(
+                title = titleVal ?: "ARVIO",
+                subtitle = subtitleVal,
+                isPlaying = isPlaying,
+                progressMs = currentPosition,
+                durationMs = duration,
+                largeImage = latestUiState.posterUrl ?: latestUiState.logoUrl ?: ""
+            )
             val loopNowMs = System.currentTimeMillis()
             val readyAndPlaying = exoPlayer.playbackState == Player.STATE_READY && exoPlayer.isPlaying
             if (readyAndPlaying) {

@@ -17,6 +17,18 @@
         android:name="android.hardware.touchscreen"
         android:required="false" />
 
+    <queries>
+        <package android:name="com.discord" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="discord" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" android:host="discord.com" />
+        </intent>
+    </queries>
+
     <application
         android:name=".ArflixApplication"
         android:allowBackup="false"
@@ -81,9 +93,6 @@
                 <data android:scheme="arvio" android:host="install-pack" />
                 <data android:scheme="streamnet" android:host="install-pack" />
             </intent-filter>
-
-
-
         </activity>
 
         <!-- Crash Report Activity -->

@@ -64,6 +64,12 @@ android {
             abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
         }
 
+        externalNativeBuild {
+            cmake {
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
+
         vectorDrawables {
             useSupportLibrary = true
         }
@@ -184,6 +190,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        prefab = true
     }
 
     packaging {
@@ -198,6 +205,13 @@ android {
         }
         jniLibs {
             useLegacyPackaging = false  // Required for 16KB page size support
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
         }
     }
 
@@ -251,6 +265,14 @@ ksp {
     }
 
     dependencies {
+    // Discord Partner SDK (native C++ integration via Prefab)
+    val discordSdkAar = file("libs/discord_partner_sdk.aar")
+    if (discordSdkAar.exists()) {
+        implementation(files(discordSdkAar))
+    } else {
+        logger.warn("Discord Partner SDK AAR not found. Compiling native JNI bridge with stub fallback.")
+    }
+
     // Gson explicit pin to keep `JsonParser`/AST extension API stable with current sources.
     implementation("com.google.code.gson:gson:2.10.1")
 
