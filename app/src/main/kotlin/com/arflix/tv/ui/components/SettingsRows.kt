@@ -42,6 +42,7 @@ import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.SuccessGreen
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.ui.skin.resolveAccentColor
 
 /** Display-only localization of stored setting values (Off/Any/Medium/White...).
@@ -101,6 +102,7 @@ fun SettingsRow(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focusRingColor = resolveAccentColor(fallback = Pink)
+    val focusContentColor = contrastingContentColor(focusRingColor)
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -155,15 +157,15 @@ fun SettingsRow(
         if (safeValue.isNotBlank()) {
             Box(
                 modifier = Modifier
-                    .background(Pink.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                    .border(1.dp, Pink.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                    .background(if (isFocused) focusRingColor else focusRingColor.copy(alpha = 0.14f), RoundedCornerShape(999.dp))
+                    .border(1.dp, focusRingColor.copy(alpha = if (isFocused) 0.85f else 0.32f), RoundedCornerShape(999.dp))
                     .padding(horizontal = 12.dp, vertical = 6.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = localizeSettingValue(safeValue).uppercase(),
                     style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
-                    color = Pink,
+                    color = if (isFocused) focusContentColor else focusRingColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -229,7 +231,7 @@ fun SettingsToggleRow(
                 .width(44.dp)
                 .height(24.dp)
                 .background(
-                    color = if (isEnabled) SuccessGreen else Color.White.copy(alpha = 0.2f),
+                    color = if (isEnabled) focusRingColor else Color.White.copy(alpha = 0.2f),
                     shape = RoundedCornerShape(13.dp)
                 )
                 .padding(3.dp),
@@ -289,6 +291,7 @@ fun MobileSettingsRow(
     onClick: () -> Unit
 ) {
     val alpha = if (enabled) 1f else 0.4f
+    val accentColor = resolveAccentColor(fallback = Pink)
     Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier
@@ -349,7 +352,7 @@ fun MobileSettingsRow(
                             .width(44.dp)
                             .height(24.dp)
                             .background(
-                                color = if (isChecked) SuccessGreen else Color.White.copy(alpha = 0.2f),
+                                color = if (isChecked) accentColor else Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(13.dp)
                             )
                             .padding(3.dp),

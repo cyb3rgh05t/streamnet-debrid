@@ -257,7 +257,7 @@ private fun tvGeneralRowsForSection(section: String, includeBootStart: Boolean =
         "subtitles" -> listOf(4, 5, 6, 7, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(17, 18) + listOfNotNull(if (includeBootStart) 20 else null) + listOf(21, 22, 23, 24, 41, 36)
+        "appearance" -> listOf(17, 18, 42) + listOfNotNull(if (includeBootStart) 20 else null) + listOf(21, 22, 23, 24, 41, 36)
         "profiles" -> listOf(19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -980,6 +980,7 @@ fun SettingsScreen(
                                                 41 -> viewModel.setShowEpisodeRatings(!uiState.showEpisodeRatings)
                                                  36 -> viewModel.setSmoothScrolling(!uiState.smoothScrolling)
                                                 24 -> viewModel.setSpoilerBlurEnabled(!uiState.spoilerBlurEnabled)
+                                                42 -> viewModel.cycleAccentColor()
                                                 25 -> openDnsProviderPicker()
                                                 26 -> viewModel.setShowLoadingStats(!uiState.showLoadingStats)
                                                 35 -> showCustomUserAgentDialog = true
@@ -6063,7 +6064,7 @@ private fun TvGeneralSettingsRows(
                 41 -> SettingsToggleRow(stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
                 36 -> SettingsToggleRow(stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
                 24 -> SettingsToggleRow(stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
-                25 -> SettingsRow(Icons.Default.Palette, stringResource(R.string.accent_color), stringResource(R.string.accent_color_desc), accentColor, focusedIndex == localIndex, onAccentColorClick, Modifier.settingsFocusSlot(localIndex))
+                42 -> SettingsRow(Icons.Default.Palette, stringResource(R.string.accent_color), stringResource(R.string.accent_color_desc), accentColor, focusedIndex == localIndex, onAccentColorClick, Modifier.settingsFocusSlot(localIndex))
                 25 -> SettingsRow(Icons.Default.Language, stringResource(R.string.dns_provider), stringResource(R.string.dns_desc), dnsProvider, focusedIndex == localIndex, onDnsProviderClick, Modifier.settingsFocusSlot(localIndex))
                 26 -> SettingsToggleRow(stringResource(R.string.show_loading_stats), stringResource(R.string.show_loading_stats_desc), showLoadingStats, focusedIndex == localIndex, onShowLoadingStatsToggle, Modifier.settingsFocusSlot(localIndex))
                 27 -> SettingsRow(
@@ -7191,6 +7192,7 @@ private fun IptvSettings(
     onShowSpecialCategoriesChange: (Boolean) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
     var selectionMode by remember { mutableStateOf(false) }
     var selectedIndices by remember { mutableStateOf(setOf<Int>()) }
 
@@ -7258,7 +7260,7 @@ private fun IptvSettings(
                                 )
                                 Spacer(modifier = Modifier.width(16.dp))
                                 // Toggle chip
-                                Box(modifier = Modifier.width(44.dp).height(24.dp).background(color = if (playlist.enabled) SuccessGreen else Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(13.dp)).clickable { onTogglePlaylist(index) }.padding(3.dp), contentAlignment = if (playlist.enabled) Alignment.CenterEnd else Alignment.CenterStart) {
+                                Box(modifier = Modifier.width(44.dp).height(24.dp).background(color = if (playlist.enabled) accentColor else Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(13.dp)).clickable { onTogglePlaylist(index) }.padding(3.dp), contentAlignment = if (playlist.enabled) Alignment.CenterEnd else Alignment.CenterStart) {
                                     Box(modifier = Modifier.size(18.dp).background(color = Color.White, shape = RoundedCornerShape(10.dp)))
                                 }
                             }
@@ -8653,6 +8655,7 @@ private fun StremioAddonsSettings(
     onRefreshAddons: () -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
 
     if (isMobile) {
         Column(
@@ -8704,7 +8707,7 @@ private fun StremioAddonsSettings(
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             // Toggle switch
-                            Box(modifier = Modifier.width(44.dp).height(24.dp).background(color = if (addon.isEnabled) SuccessGreen else Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(13.dp)).padding(3.dp), contentAlignment = if (addon.isEnabled) Alignment.CenterEnd else Alignment.CenterStart) {
+                            Box(modifier = Modifier.width(44.dp).height(24.dp).background(color = if (addon.isEnabled) accentColor else Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(13.dp)).padding(3.dp), contentAlignment = if (addon.isEnabled) Alignment.CenterEnd else Alignment.CenterStart) {
                                 Box(modifier = Modifier.size(18.dp).background(color = Color.White, shape = RoundedCornerShape(10.dp)))
                             }
                             Spacer(modifier = Modifier.width(12.dp))
@@ -8884,13 +8887,13 @@ private fun AddonRow(
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(Pink.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
+                    .background(focusRingColor.copy(alpha = 0.2f), RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Widgets,
                     contentDescription = null,
-                    tint = Pink,
+                    tint = focusRingColor,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -8921,8 +8924,8 @@ private fun AddonRow(
                     )
                     AddonStatusChip(
                         text = if (isEnabled) stringResource(R.string.settings_enabled) else stringResource(R.string.settings_disabled),
-                        background = if (isEnabled) SuccessGreen.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
-                        textColor = if (isEnabled) SuccessGreen else TextSecondary
+                        background = if (isEnabled) focusRingColor.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.08f),
+                        textColor = if (isEnabled) focusRingColor else TextSecondary
                     )
                 }
             }
@@ -8946,7 +8949,7 @@ private fun AddonRow(
                         .width(44.dp)
                         .height(24.dp)
                         .background(
-                            color = if (isEnabled) SuccessGreen else Color.White.copy(alpha = 0.2f),
+                            color = if (isEnabled) focusRingColor else Color.White.copy(alpha = 0.2f),
                             shape = RoundedCornerShape(13.dp)
                         )
                         .padding(3.dp),
@@ -9532,12 +9535,12 @@ private fun AccountActionRow(
         Box(
             modifier = Modifier
                 .background(
-                    if (isEnabled) Pink.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
+                    if (isEnabled && isFocused) focusRingColor else if (isEnabled) focusRingColor.copy(alpha = 0.15f) else Color.White.copy(alpha = 0.05f),
                     RoundedCornerShape(999.dp)
                 )
                 .border(
                     1.dp,
-                    if (isEnabled) Pink.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f),
+                    if (isEnabled) focusRingColor.copy(alpha = if (isFocused) 0.85f else 0.3f) else Color.White.copy(alpha = 0.15f),
                     RoundedCornerShape(999.dp)
                 )
                 .padding(horizontal = 12.dp, vertical = 6.dp),
@@ -9546,7 +9549,7 @@ private fun AccountActionRow(
             Text(
                 text = actionLabel.uppercase(),
                 style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
-                color = if (isEnabled) Pink else TextSecondary,
+                color = if (isEnabled && isFocused) focusContentColor else if (isEnabled) focusRingColor else TextSecondary,
                 maxLines = 1
             )
         }
@@ -10080,6 +10083,7 @@ private fun TrackingServiceRow(
     onDisconnect: () -> Unit
 ) {
     val rowAlpha = if (comingSoon) 0.5f else 1f
+    val accentColor = resolveAccentColor(fallback = Pink)
 
     Column(modifier = Modifier.alpha(rowAlpha)) {
         Row(
@@ -10145,8 +10149,8 @@ private fun TrackingServiceRow(
                 )
                 else -> Triple(
                     stringResource(R.string.connect),
-                    Pink.copy(alpha = 0.15f),
-                    Pink
+                    accentColor.copy(alpha = 0.15f),
+                    accentColor
                 )
             }
             Box(
@@ -10194,6 +10198,7 @@ private fun AccountRow(
     expirationText: String? = null
 ) {
     val focusRingColor = resolveAccentColor(fallback = Pink)
+    val focusContentColor = contrastingContentColor(focusRingColor)
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -10253,23 +10258,22 @@ private fun AccountRow(
                 }
             } else if (isWorking) {
                 LoadingIndicator(
-                    color = Pink,
+                    color = focusRingColor,
                     size = 24.dp,
                     strokeWidth = 2.dp
                 )
             } else if (isEnabled) {
-                val accentColor = resolveAccentColor(fallback = Pink)
                 Box(
                     modifier = Modifier
-                        .background(accentColor.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
-                        .border(1.dp, accentColor.copy(alpha = 0.3f), RoundedCornerShape(999.dp))
+                        .background(if (isFocused) focusRingColor else focusRingColor.copy(alpha = 0.15f), RoundedCornerShape(999.dp))
+                        .border(1.dp, focusRingColor.copy(alpha = if (isFocused) 0.85f else 0.3f), RoundedCornerShape(999.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = stringResource(R.string.connect).uppercase(),
                         style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
-                        color = accentColor,
+                        color = if (isFocused) focusContentColor else focusRingColor,
                         maxLines = 1
                     )
                 }
@@ -10314,14 +10318,14 @@ private fun AccountRow(
                 Spacer(modifier = Modifier.width(10.dp))
                 Box(
                     modifier = Modifier
-                        .background(Pink.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-                        .border(1.dp, Pink.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
+                        .background(focusRingColor.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
+                        .border(1.dp, focusRingColor.copy(alpha = 0.6f), RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
                         text = authCode,
                         style = ArflixTypography.label,
-                        color = Pink
+                        color = focusRingColor
                     )
                 }
             }
