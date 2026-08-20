@@ -62,19 +62,34 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Validate private Discord SDK secret
+      - name: Validate private Discord SDK download
         env:
-          DISCORD_PARTNER_SDK_AAR_BASE64: ${{ secrets.DISCORD_PARTNER_SDK_AAR_BASE64 }}
+          DISCORD_PARTNER_SDK_URL: ${{ secrets.DISCORD_PARTNER_SDK_URL }}
         run: |
-          : "${DISCORD_PARTNER_SDK_AAR_BASE64:?Missing DISCORD_PARTNER_SDK_AAR_BASE64 repository secret}"
+          : "${DISCORD_PARTNER_SDK_URL:?Missing DISCORD_PARTNER_SDK_URL repository secret}"
+          case "$DISCORD_PARTNER_SDK_URL" in
+            https://*) ;;
+            *) echo "DISCORD_PARTNER_SDK_URL must be an HTTPS URL" >&2; exit 1 ;;
+          esac
 
       - name: Install Discord Partner SDK
         env:
-          DISCORD_PARTNER_SDK_AAR_BASE64: ${{ secrets.DISCORD_PARTNER_SDK_AAR_BASE64 }}
+          DISCORD_PARTNER_SDK_URL: ${{ secrets.DISCORD_PARTNER_SDK_URL }}
+          DISCORD_PARTNER_SDK_BEARER_TOKEN: ${{ secrets.DISCORD_PARTNER_SDK_BEARER_TOKEN }}
           DISCORD_PARTNER_SDK_AAR_SHA256: ${{ secrets.DISCORD_PARTNER_SDK_AAR_SHA256 }}
         run: |
           install -d app/libs
-          printf '%s' "$DISCORD_PARTNER_SDK_AAR_BASE64" | base64 --decode > app/libs/discord_partner_sdk.aar
+          if [ -n "${DISCORD_PARTNER_SDK_BEARER_TOKEN:-}" ]; then
+            curl --fail --location --retry 3 --connect-timeout 20 \
+              --header "Authorization: Bearer $DISCORD_PARTNER_SDK_BEARER_TOKEN" \
+              "$DISCORD_PARTNER_SDK_URL" \
+              --output app/libs/discord_partner_sdk.aar
+          else
+            curl --fail --location --retry 3 --connect-timeout 20 \
+              "$DISCORD_PARTNER_SDK_URL" \
+              --output app/libs/discord_partner_sdk.aar
+          fi
+          test -s app/libs/discord_partner_sdk.aar
           chmod 0600 app/libs/discord_partner_sdk.aar
           if [ -n "${DISCORD_PARTNER_SDK_AAR_SHA256:-}" ]; then
             echo "$DISCORD_PARTNER_SDK_AAR_SHA256  app/libs/discord_partner_sdk.aar" | sha256sum --check --strict
