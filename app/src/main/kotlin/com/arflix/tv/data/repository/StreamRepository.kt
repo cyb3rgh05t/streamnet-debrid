@@ -1848,6 +1848,7 @@ class StreamRepository @Inject constructor(
         genreIds: List<Int> = emptyList(),
         originalLanguage: String? = null,
         title: String = "",
+        animeQueryOverride: String? = null,
         airDate: String? = null
     ): List<StreamSource> {
         val startedAt = System.currentTimeMillis()
@@ -1906,7 +1907,7 @@ class StreamRepository @Inject constructor(
                     ANIME_ID_LOOKUP_TIMEOUT_MS
                 }
                 val animeQuery = if (resolveAsAnime) {
-                    resolveAnimeQuery(animeLookupTimeoutMs)
+                    animeQueryOverride ?: resolveAnimeQuery(animeLookupTimeoutMs)
                 } else null
 
                 val seriesId = "$imdbId:$season:$episode"
@@ -2653,6 +2654,7 @@ class StreamRepository @Inject constructor(
         originalLanguage: String? = null,
         title: String = "",
         forceRefresh: Boolean = false,
+        animeQueryOverride: String? = null,
         airDate: String? = null
     ): Flow<ProgressiveStreamResult> = callbackFlow {
         repositoryScope.launch {
@@ -2787,6 +2789,7 @@ class StreamRepository @Inject constructor(
                             genreIds = genreIds,
                             originalLanguage = originalLanguage,
                             title = title,
+                            animeQueryOverride = animeQueryOverride,
                             airDate = airDate
                         )
                     } catch (e: Exception) {

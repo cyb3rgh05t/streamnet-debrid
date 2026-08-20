@@ -412,6 +412,34 @@ class AnimeMapper @Inject constructor(
     }
 
     /**
+     * Resolve the optional user-visible anime season structure for a TMDB show.
+     * Returns null unless ARM exposes multiple Kitsu entries with complete episode counts.
+     */
+    internal suspend fun resolveAnimeSeasonStructure(tmdbId: Int): AnimeSeasonStructure? = withContext(Dispatchers.IO) {
+        try {
+            val entries = cacheMutex.withLock { armTmdbCache[tmdbId] }
+                ?: fetchArmMapping(tmdbId)
+                ?: return@withContext null
+            val providerEntries = entries
+                .mapNotNull { entry ->
+                    val kitsuId = entry.kitsu ?: return@mapNotNull null
+                    val count = getKitsuEpisodeCount(kitsuId) ?: return@mapNotNull null
+                    AnimeProviderSeason(kitsuId, entry.themoviedbSeason, count)
+                }
+                .distinctBy { Triple(it.kitsuId, it.tmdbSeason, it.episodeCount) }
+            if (providerEntries.size < 2) return@withContext null
+
+            val details = tmdbApi.getTvDetails(tmdbId, Constants.TMDB_API_KEY)
+            val tmdbCounts = details.seasons
+                .filter { it.seasonNumber > 0 && it.episodeCount > 0 }
+                .associate { it.seasonNumber to it.episodeCount }
+            buildAnimeSeasonStructure(tmdbCounts, providerEntries)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * Main resolution function: resolves the correct Kitsu episode query string
      * for Stremio addons. Uses 5-tier fallback chain.
      *

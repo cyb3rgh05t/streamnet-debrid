@@ -101,7 +101,13 @@ data class Episode(
     val imdbRating: String = "",
     val runtime: Int = 0,
     val airDate: String = "",
-    val isWatched: Boolean = false
+    val isWatched: Boolean = false,
+    /** Canonical TMDB coordinates used by Trakt, history, ratings and metadata lookups. */
+    val tmdbSeasonNumber: Int = seasonNumber,
+    val tmdbEpisodeNumber: Int = episodeNumber,
+    /** Provider identity used when the anime-facing structure differs from TMDB. */
+    val kitsuId: Int? = null,
+    val kitsuEpisodeNumber: Int? = null
 ) : Serializable
 
 /**

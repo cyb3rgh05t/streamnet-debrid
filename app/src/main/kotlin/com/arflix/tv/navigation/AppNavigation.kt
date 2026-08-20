@@ -81,12 +81,14 @@ sealed class Screen(val route: String) {
         }
     }
 
-    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
+    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&tmdbSeasonNumber={tmdbSeasonNumber}&tmdbEpisodeNumber={tmdbEpisodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
         fun createRoute(
             mediaType: MediaType,
             mediaId: Int,
             seasonNumber: Int? = null,
             episodeNumber: Int? = null,
+            tmdbSeasonNumber: Int? = seasonNumber,
+            tmdbEpisodeNumber: Int? = episodeNumber,
             imdbId: String? = null,
             streamUrl: String? = null,
             preferredAddonId: String? = null,
@@ -99,6 +101,8 @@ sealed class Screen(val route: String) {
             val params = mutableListOf<String>()
             seasonNumber?.let { params.add("seasonNumber=$it") }
             episodeNumber?.let { params.add("episodeNumber=$it") }
+            tmdbSeasonNumber?.let { params.add("tmdbSeasonNumber=$it") }
+            tmdbEpisodeNumber?.let { params.add("tmdbEpisodeNumber=$it") }
             imdbId?.let { params.add("imdbId=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             streamUrl?.let { params.add("streamUrl=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             preferredAddonId?.let { params.add("preferredAddonId=${java.net.URLEncoder.encode(it, "UTF-8")}") }
@@ -426,13 +430,15 @@ fun AppNavigation(
                 initialSeason = initialSeason,
                 initialEpisode = initialEpisode,
                 currentProfile = currentProfile,
-                onNavigateToPlayer = { type, id, season, episode, imdbId, url, preferredAddonId, preferredSourceName, startPositionMs ->
+                onNavigateToPlayer = { type, id, season, episode, tmdbSeason, tmdbEpisode, imdbId, url, preferredAddonId, preferredSourceName, startPositionMs ->
                     navController.navigate(
                         Screen.Player.createRoute(
                             mediaType = type,
                             mediaId = id,
                             seasonNumber = season,
                             episodeNumber = episode,
+                            tmdbSeasonNumber = tmdbSeason,
+                            tmdbEpisodeNumber = tmdbEpisode,
                             imdbId = imdbId,
                             streamUrl = url,
                             preferredAddonId = preferredAddonId,
@@ -486,6 +492,14 @@ fun AppNavigation(
                     type = NavType.IntType
                     defaultValue = -1
                 },
+                navArgument("tmdbSeasonNumber") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                },
+                navArgument("tmdbEpisodeNumber") {
+                    type = NavType.IntType
+                    defaultValue = -1
+                },
                 navArgument("imdbId") {
                     type = NavType.StringType
                     defaultValue = ""
@@ -520,6 +534,10 @@ fun AppNavigation(
             val mediaId = backStackEntry.arguments?.getInt("mediaId") ?: 0
             val seasonNumber = backStackEntry.arguments?.getInt("seasonNumber")?.takeIf { it >= 0 }
             val episodeNumber = backStackEntry.arguments?.getInt("episodeNumber")?.takeIf { it >= 0 }
+            val tmdbSeasonNumber = backStackEntry.arguments?.getInt("tmdbSeasonNumber")?.takeIf { it >= 0 }
+                ?: seasonNumber
+            val tmdbEpisodeNumber = backStackEntry.arguments?.getInt("tmdbEpisodeNumber")?.takeIf { it >= 0 }
+                ?: episodeNumber
             val imdbId = backStackEntry.arguments?.getString("imdbId")?.takeIf { it.isNotBlank() }
             val streamUrl = backStackEntry.arguments?.getString("streamUrl")?.takeIf { it.isNotEmpty() }
             val preferredAddonId = backStackEntry.arguments?.getString("preferredAddonId")?.takeIf { it.isNotBlank() }
@@ -534,6 +552,8 @@ fun AppNavigation(
                 mediaId = mediaId,
                 seasonNumber = seasonNumber,
                 episodeNumber = episodeNumber,
+                tmdbSeasonNumber = tmdbSeasonNumber,
+                tmdbEpisodeNumber = tmdbEpisodeNumber,
                 imdbId = imdbId,
                 streamUrl = streamUrl,
                 preferredAddonId = preferredAddonId,
@@ -542,7 +562,7 @@ fun AppNavigation(
                 startPositionMs = startPositionMs,
                 isLiveStream = isLiveStream,
                 onBack = { navController.popBackStack() },
-                onPlayNext = { nextSeason, nextEpisode, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
+                onPlayNext = { nextSeason, nextEpisode, nextTmdbSeason, nextTmdbEpisode, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
                     // Navigate to next episode
                     navController.navigate(
                         Screen.Player.createRoute(
@@ -550,6 +570,8 @@ fun AppNavigation(
                             mediaId = mediaId,
                             seasonNumber = nextSeason,
                             episodeNumber = nextEpisode,
+                            tmdbSeasonNumber = nextTmdbSeason,
+                            tmdbEpisodeNumber = nextTmdbEpisode,
                             preferredAddonId = nextPreferredAddonId,
                             preferredSourceName = nextPreferredSourceName,
                             preferredBingeGroup = nextPreferredBingeGroup
