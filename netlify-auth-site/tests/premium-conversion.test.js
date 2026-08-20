@@ -18,7 +18,7 @@ test("new trials last three days while existing records retain their own expiry"
     status: "active",
     source: "trial",
     expiresAt,
-    trialUsed: true
+    trialUsed: true,
   });
   assert.equal(state.entitled, true);
   assert.equal(state.expiresAt, expiresAt);
@@ -32,9 +32,18 @@ test("trial email jobs encrypt addresses and produce exactly three service messa
   assert.deepEqual(trialEmails.JOB_TYPES, ["welcome", "reminder", "expired"]);
 
   const expiresAt = "2026-08-22T12:00:00.000Z";
-  assert.match(trialEmails._test.trialEmailContent("welcome", expiresAt).subject, /3-day/i);
-  assert.match(trialEmails._test.trialEmailContent("reminder", expiresAt).subject, /tomorrow/i);
-  assert.match(trialEmails._test.trialEmailContent("expired", expiresAt).text, /final email/i);
+  assert.match(
+    trialEmails._test.trialEmailContent("welcome", expiresAt).subject,
+    /3-day/i,
+  );
+  assert.match(
+    trialEmails._test.trialEmailContent("reminder", expiresAt).subject,
+    /tomorrow/i,
+  );
+  assert.match(
+    trialEmails._test.trialEmailContent("expired", expiresAt).text,
+    /final email/i,
+  );
 });
 
 test("premium funnel metadata is bounded and excludes complex values", () => {
@@ -43,11 +52,11 @@ test("premium funnel metadata is bounded and excludes complex values", () => {
     duration_days: 3,
     successful: true,
     nested: { private: "value" },
-    "bad key": "ignored"
+    "bad key": "ignored",
   });
   assert.deepEqual(metadata, {
     source: "website spoofed",
     duration_days: 3,
-    successful: true
+    successful: true,
   });
 });
