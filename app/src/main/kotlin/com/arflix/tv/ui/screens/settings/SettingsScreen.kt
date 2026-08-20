@@ -4089,7 +4089,7 @@ private fun DiscordActivationModal(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
-                        if (authUrl.isNotBlank()) {
+                        if (!isMobile && authUrl.isNotBlank()) {
                             Box(
                                 modifier = Modifier
                                     .size(qrContainerSize)
