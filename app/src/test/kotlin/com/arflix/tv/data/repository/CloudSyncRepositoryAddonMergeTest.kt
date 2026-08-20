@@ -2,6 +2,7 @@ package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.model.Addon
 import com.arflix.tv.data.model.AddonType
+import com.arflix.tv.data.model.MediaType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -24,6 +25,51 @@ class CloudSyncRepositoryAddonMergeTest {
         assertEquals("list|Remote First", merged.getJSONArray("groupOrder").getString(0))
         assertEquals("list|Local Hidden", locallyDirty.getJSONArray("hiddenGroups").getString(0))
         assertEquals("list|Local First", locallyDirty.getJSONArray("groupOrder").getString(0))
+    }
+
+    @Test
+    fun `stale local continue watching push keeps newer remote progress`() {
+        val localItem = continueWatchingItem(progress = 20, updatedAtMs = 100L)
+        val remoteItem = continueWatchingItem(progress = 80, updatedAtMs = 200L)
+        val local = JSONObject()
+            .put("localContinueWatchingByProfile", JSONObject().put("main", org.json.JSONArray(listOf(JSONObject(com.google.gson.Gson().toJson(localItem))))))
+            .toString()
+        val remote = JSONObject()
+            .put("localContinueWatchingByProfile", JSONObject().put("main", org.json.JSONArray(listOf(JSONObject(com.google.gson.Gson().toJson(remoteItem))))))
+            .toString()
+
+        val merged = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+            .getJSONObject("localContinueWatchingByProfile")
+            .getJSONArray("main")
+            .getJSONObject(0)
+
+        assertEquals(80, merged.getInt("progress"))
+        assertEquals(200L, merged.getLong("updatedAtMs"))
+    }
+
+    @Test
+    fun `stale local watched push does not remove newer remote watched ids`() {
+        val local = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray(listOf(1))))
+            .put("localWatchedEpisodesByProfile", JSONObject().put("main", org.json.JSONArray(listOf("10:1:1"))))
+            .toString()
+        val remote = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray(listOf(2))))
+            .put("localWatchedEpisodesByProfile", JSONObject().put("main", org.json.JSONArray(listOf("10:1:2"))))
+            .toString()
+
+        val merged = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+
+        assertEquals(
+            listOf(2, 1),
+            (0 until merged.getJSONObject("localWatchedMoviesByProfile").getJSONArray("main").length())
+                .map { merged.getJSONObject("localWatchedMoviesByProfile").getJSONArray("main").getInt(it) }
+        )
+        assertEquals(
+            listOf("10:1:2", "10:1:1"),
+            (0 until merged.getJSONObject("localWatchedEpisodesByProfile").getJSONArray("main").length())
+                .map { merged.getJSONObject("localWatchedEpisodesByProfile").getJSONArray("main").getString(it) }
+        )
     }
 
     @Test
@@ -115,5 +161,15 @@ class CloudSyncRepositoryAddonMergeTest {
         isEnabled = isEnabled,
         type = type,
         url = "https://example.com/$id/manifest.json"
+    )
+
+    private fun continueWatchingItem(progress: Int, updatedAtMs: Long) = ContinueWatchingItem(
+        id = 42,
+        title = "Show",
+        mediaType = MediaType.TV,
+        progress = progress,
+        season = 1,
+        episode = 1,
+        updatedAtMs = updatedAtMs
     )
 }

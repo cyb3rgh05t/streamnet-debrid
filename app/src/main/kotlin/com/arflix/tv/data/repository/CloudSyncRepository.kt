@@ -22,6 +22,7 @@ import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
 import com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY
+import com.arflix.tv.util.Constants
 import com.arflix.tv.util.profileAccentColorKey
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
@@ -115,6 +116,111 @@ internal fun mergeRemoteIptvGroupPreferences(
         }
         local.toString()
     }.getOrDefault(localPayload)
+}
+
+internal fun mergeLocalHistoryByTimestamp(
+    localPayload: String,
+    remotePayload: String,
+    gson: Gson = Gson(),
+): String {
+    return runCatching {
+        val local = JSONObject(localPayload)
+        val remote = JSONObject(remotePayload)
+        mergeLocalContinueWatching(local, remote, gson)
+        mergeProfileIntLists(local, remote, "localWatchedMoviesByProfile")
+        mergeProfileStringLists(local, remote, "localWatchedEpisodesByProfile")
+        local.toString()
+    }.getOrDefault(localPayload)
+}
+
+private fun mergeLocalContinueWatching(local: JSONObject, remote: JSONObject, gson: Gson) {
+    val localProfiles = local.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
+    val remoteProfiles = remote.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
+    val mergedProfiles = JSONObject()
+    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
+        val byItem = LinkedHashMap<String, ContinueWatchingItem>()
+        (decodeContinueWatchingItems(remoteProfiles.optJSONArray(profileId), gson) +
+            decodeContinueWatchingItems(localProfiles.optJSONArray(profileId), gson))
+            .forEach { item ->
+                val key = "${item.mediaType}:${item.id}"
+                val existing = byItem[key]
+                if (existing == null || item.updatedAtMs > existing.updatedAtMs) {
+                    byItem[key] = item
+                }
+            }
+        val merged = byItem.values
+            .sortedByDescending { it.updatedAtMs }
+            .take(Constants.MAX_CONTINUE_WATCHING)
+        if (merged.isNotEmpty()) {
+            mergedProfiles.put(profileId, JSONArray(gson.toJson(merged)))
+        }
+    }
+    if (mergedProfiles.length() > 0) {
+        local.put("localContinueWatchingByProfile", mergedProfiles)
+    }
+}
+
+private fun decodeContinueWatchingItems(array: JSONArray?, gson: Gson): List<ContinueWatchingItem> {
+    if (array == null || array.length() == 0) return emptyList()
+    return runCatching {
+        val type = TypeToken.getParameterized(List::class.java, ContinueWatchingItem::class.java).type
+        gson.fromJson<List<ContinueWatchingItem>>(array.toString(), type).orEmpty()
+    }.getOrDefault(emptyList())
+}
+
+private fun mergeProfileIntLists(local: JSONObject, remote: JSONObject, key: String) {
+    val localProfiles = local.optJSONObject(key) ?: JSONObject()
+    val remoteProfiles = remote.optJSONObject(key) ?: JSONObject()
+    val mergedProfiles = JSONObject()
+    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
+        val merged = LinkedHashSet<Int>()
+        decodeIntArray(remoteProfiles.optJSONArray(profileId)).forEach(merged::add)
+        decodeIntArray(localProfiles.optJSONArray(profileId)).forEach(merged::add)
+        if (merged.isNotEmpty()) {
+            mergedProfiles.put(profileId, JSONArray(merged.toList()))
+        }
+    }
+    if (mergedProfiles.length() > 0) {
+        local.put(key, mergedProfiles)
+    }
+}
+
+private fun mergeProfileStringLists(local: JSONObject, remote: JSONObject, key: String) {
+    val localProfiles = local.optJSONObject(key) ?: JSONObject()
+    val remoteProfiles = remote.optJSONObject(key) ?: JSONObject()
+    val mergedProfiles = JSONObject()
+    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
+        val merged = LinkedHashSet<String>()
+        decodeStringArray(remoteProfiles.optJSONArray(profileId)).forEach(merged::add)
+        decodeStringArray(localProfiles.optJSONArray(profileId)).forEach(merged::add)
+        if (merged.isNotEmpty()) {
+            mergedProfiles.put(profileId, JSONArray(merged.toList()))
+        }
+    }
+    if (mergedProfiles.length() > 0) {
+        local.put(key, mergedProfiles)
+    }
+}
+
+private fun profileIdsFor(first: JSONObject, second: JSONObject): Set<String> {
+    return LinkedHashSet<String>().apply {
+        first.keys().forEachRemaining { add(it) }
+        second.keys().forEachRemaining { add(it) }
+    }
+}
+
+private fun decodeIntArray(array: JSONArray?): List<Int> {
+    if (array == null) return emptyList()
+    return (0 until array.length()).mapNotNull { index ->
+        array.optInt(index).takeIf { array.opt(index) != null }
+    }
+}
+
+private fun decodeStringArray(array: JSONArray?): List<String> {
+    if (array == null) return emptyList()
+    return (0 until array.length()).mapNotNull { index ->
+        array.optString(index).trim().takeIf { it.isNotBlank() }
+    }
 }
 
 /**
@@ -1117,9 +1223,14 @@ class CloudSyncRepository @Inject constructor(
             baseStr = groupPreferencesMerged,
             otherStr = remotePayload,
         ).json
-        return mergeWatchlistByTimestamp(
+        val watchlistMergedPayload = mergeWatchlistByTimestamp(
             localPayload = settingsMergedPayload,
             remotePayload = remotePayload,
+        )
+        return mergeLocalHistoryByTimestamp(
+            localPayload = watchlistMergedPayload,
+            remotePayload = remotePayload,
+            gson = gson,
         )
     }
 
