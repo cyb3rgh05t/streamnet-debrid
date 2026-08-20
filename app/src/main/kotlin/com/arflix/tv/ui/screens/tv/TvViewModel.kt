@@ -180,11 +180,12 @@ class TvViewModel @Inject constructor(
                 cachedEnrichedChannels = null
                 cachedChannelsSignature = null
                 val current = _uiState.value
+                val refreshedWithCurrentPreferences = refreshed.withCurrentIptvPreferences(current)
                 val cappedSnapshot = capLargeListGuideSnapshot(
-                    snapshot = refreshed,
-                    channelsByGroup = refreshed.grouped,
+                    snapshot = refreshedWithCurrentPreferences,
+                    channelsByGroup = refreshedWithCurrentPreferences.grouped,
                     tvSession = current.tvSession,
-                    keepChannelIds = refreshed.nowNext.keys,
+                    keepChannelIds = refreshedWithCurrentPreferences.nowNext.keys,
                 )
                 setUiState(
                     current.copy(
@@ -701,14 +702,7 @@ class TvViewModel @Inject constructor(
         incoming: IptvSnapshot,
         current: TvUiState
     ): IptvSnapshot {
-        val incomingWithCurrentPreferences = if (current.iptvPreferencesLoaded) {
-            incoming.copy(
-                hiddenGroups = current.snapshot.hiddenGroups,
-                groupOrder = current.snapshot.groupOrder,
-            )
-        } else {
-            incoming
-        }
+        val incomingWithCurrentPreferences = incoming.withCurrentIptvPreferences(current)
         val retainedGuide = current.snapshot.nowNext
         if (retainedGuide.isEmpty()) return incomingWithCurrentPreferences
         val merged = incomingWithCurrentPreferences.nowNext.toMutableMap()
@@ -722,6 +716,17 @@ class TvViewModel @Inject constructor(
             }
         }
         return incomingWithCurrentPreferences.copy(nowNext = merged)
+    }
+
+    private fun IptvSnapshot.withCurrentIptvPreferences(current: TvUiState): IptvSnapshot {
+        if (!current.iptvPreferencesLoaded) return this
+        return copy(
+            favoriteGroups = current.snapshot.favoriteGroups,
+            favoriteChannels = current.snapshot.favoriteChannels,
+            hiddenGroups = current.snapshot.hiddenGroups,
+            groupOrder = current.snapshot.groupOrder,
+            sortOrder = current.snapshot.sortOrder,
+        )
     }
 
     private fun capLargeListGuideSnapshot(
