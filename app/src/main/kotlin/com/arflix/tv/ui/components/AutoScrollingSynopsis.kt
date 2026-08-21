@@ -27,10 +27,10 @@ fun AutoScrollingSynopsis(
 ) {
     val scrollState = rememberScrollState()
     val scrollDownDurationMillis = remember(scrollState.maxValue) {
-        (scrollState.maxValue * 250).coerceIn(22_000, 55_000)
+        (scrollState.maxValue * 180).coerceIn(16_000, 40_000)
     }
     val scrollUpDurationMillis = remember(scrollState.maxValue) {
-        (scrollState.maxValue * 55).coerceIn(4_000, 12_000)
+        (scrollState.maxValue * 45).coerceIn(3_000, 9_000)
     }
 
     LaunchedEffect(text) {

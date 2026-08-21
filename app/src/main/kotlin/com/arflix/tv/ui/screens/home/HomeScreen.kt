@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -1417,10 +1418,15 @@ fun HomeScreen(
 
         if (showCinematicHomeLayer) {
             Box(modifier = Modifier.fillMaxSize().graphicsLayer { alpha = trailerOverlayAlpha.value }) {
+            val focusedCategoryId = displayCategories
+                .getOrNull(focusState.currentRowIndex)
+                ?.id
             HomeHeroLayer(
                 heroItem = displayHeroItem,
                 heroLogoUrl = if (isHeroIptv) iptvHeroProgramLogo else displayHeroLogo,
                 heroOverviewOverride = displayHeroOverview,
+                scrollIptvFallbackTitle = isHeroIptv &&
+                    focusedCategoryId == HomeViewModel.RECENT_TV_CATEGORY_ID,
                 contentStartPadding = contentStartPadding,
                 isMobile = isMobile,
                 showBudget = uiState.showBudget,
@@ -1558,11 +1564,19 @@ private fun HomeHeroMarqueeTitle(
     style: TextStyle = ArflixTypography.heroTitle,
     color: Color = Color.White,
     maxLines: Int = 1,
+    slowScroll: Boolean = false,
 ) {
     val marqueeText = text.ifBlank { " " }
     val scrollState = rememberScrollState()
     val shouldScroll = remember(marqueeText) { marqueeText.length > 20 }
     var marqueeActive by remember(marqueeText) { mutableStateOf(false) }
+    val scrollDurationMillis = remember(scrollState.maxValue, slowScroll) {
+        val millisecondsPerPixel = if (slowScroll) 55 else 18
+        (scrollState.maxValue * millisecondsPerPixel).coerceIn(
+            if (slowScroll) 12_000 else 4_000,
+            if (slowScroll) 30_000 else 12_000,
+        )
+    }
 
     LaunchedEffect(marqueeText, shouldScroll) {
         if (!shouldScroll) {
@@ -1578,10 +1592,16 @@ private fun HomeHeroMarqueeTitle(
                 delay(250L)
                 continue
             }
-            scrollState.animateScrollTo(maxScroll)
-            delay(1_200L)
-            scrollState.animateScrollTo(0)
-            delay(700L)
+            scrollState.animateScrollTo(
+                maxScroll,
+                tween(durationMillis = scrollDurationMillis, easing = LinearEasing)
+            )
+            delay(if (slowScroll) 2_000L else 1_200L)
+            scrollState.animateScrollTo(
+                0,
+                tween(durationMillis = scrollDurationMillis / 2, easing = LinearEasing)
+            )
+            delay(if (slowScroll) 1_500L else 700L)
         }
     }
 
@@ -1600,6 +1620,7 @@ private fun HomeHeroMarqueeTitle(
 private fun IptvHeroSection(
     item: MediaItem,
     programLogoUrl: String?,
+    scrollFallbackTitle: Boolean,
     modifier: Modifier = Modifier,
 ) {
     val accent = resolveAccentColor(fallback = AccentRed)
@@ -1656,6 +1677,7 @@ private fun IptvHeroSection(
                     ),
                     color = Color.White,
                     maxLines = 1,
+                    slowScroll = scrollFallbackTitle,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(72.dp)
@@ -1801,6 +1823,7 @@ private fun IptvHeroSection(
 private fun HeroSection(
     item: MediaItem,
     logoUrl: String?,
+    scrollIptvFallbackTitle: Boolean = false,
     overviewOverride: String? = null,
     // Hide the Budget line on the hero metadata row when false. Plumbed from
     // HomeUiState.showBudget, which is loaded from the per-profile
@@ -1810,7 +1833,12 @@ private fun HeroSection(
     modifier: Modifier = Modifier
 ) {
     if (item.status?.startsWith("iptv:") == true) {
-        IptvHeroSection(item = item, programLogoUrl = logoUrl, modifier = modifier)
+        IptvHeroSection(
+            item = item,
+            programLogoUrl = logoUrl,
+            scrollFallbackTitle = scrollIptvFallbackTitle,
+            modifier = modifier,
+        )
         return
     }
 
@@ -2227,6 +2255,7 @@ private fun HomeHeroLayer(
     heroItem: MediaItem?,
     heroLogoUrl: String?,
     heroOverviewOverride: String?,
+    scrollIptvFallbackTitle: Boolean = false,
     contentStartPadding: androidx.compose.ui.unit.Dp,
     isMobile: Boolean = false,
     showBudget: Boolean = true,
@@ -2272,6 +2301,7 @@ private fun HomeHeroLayer(
                         logoUrl = heroLogoUrl,
                         overviewOverride = heroOverviewOverride,
                         showBudget = showBudget,
+                        scrollIptvFallbackTitle = scrollIptvFallbackTitle,
                         modifier = heroContentModifier
                     )
                     isGenreCollection -> HomeHeroMarqueeTitle(
