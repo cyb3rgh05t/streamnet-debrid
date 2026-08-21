@@ -1338,6 +1338,14 @@
     <string name="tracking_update_simkl_connect">Connect Simkl to enable this.</string>
     <string name="tracking_data_routing">Data routing</string>
     <string name="tracking_mode_automatic">Automatic</string>
+
+    <!-- Discord Rich Presence -->
+    <string name="discord_connect_title">Connect Discord</string>
+    <string name="discord_rpc_subtitle">Rich Presence Integration</string>
+    <string name="discord_qr_explanation">Scan this QR code with your phone camera to authorize Discord Rich Presence for your profile.</string>
+    <string name="discord_connecting">Connecting...</string>
+    <string name="discord_waiting_approval">Waiting for approval...</string>
+    <string name="discord_qr_instructions">1. Scan QR code on your phone\n2. Tap \'Authorize\' on Discord\n3. Connects automatically</string>
 </resources>
 
 

@@ -2,6 +2,7 @@ package com.arflix.tv.ui.screens.details.discord
 
 import android.app.Activity
 import android.content.Context
+import android.content.SharedPreferences
 import android.net.Uri
 import android.util.Base64
 import android.util.Log
@@ -27,6 +28,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+internal const val DISCORD_MOBILE_OAUTH_STATE_PREFIX = "mobile_"
+
+internal fun isValidDiscordMobileOAuthState(storedState: String?, callbackState: String?): Boolean =
+    !storedState.isNullOrBlank() &&
+        storedState.startsWith(DISCORD_MOBILE_OAUTH_STATE_PREFIX) &&
+        callbackState == storedState
+
 object DiscordRpcManager {
     private const val TAG = "DiscordRpcManager"
     private const val PREFS_NAME = "discord_rpc_prefs"
@@ -34,6 +42,7 @@ object DiscordRpcManager {
     private const val KEY_REFRESH_TOKEN = "refresh_token"
     private const val KEY_ACCESS_TOKEN_EXPIRES_AT = "access_token_expires_at"
     private const val KEY_CODE_VERIFIER = "code_verifier"
+    private const val KEY_OAUTH_STATE = "oauth_state"
     private const val KEY_USERNAME = "username"
     private const val REDIRECT_URI_WEB = "https://auth.streamnet.club/discord/callback"
     private const val TOKEN_REFRESH_MARGIN_MS = 60_000L
@@ -172,7 +181,53 @@ object DiscordRpcManager {
             Log.w(TAG, "Discord Rich Presence is unavailable in this build.")
             return
         }
-        openAuthDialog()
+
+        val isTv = com.arflix.tv.util.detectDeviceType(context) == com.arflix.tv.util.DeviceType.TV
+        if (isTv) {
+            openAuthDialog()
+        } else {
+            startBrowserAuth(context)
+        }
+    }
+
+    fun getDirectOAuthUrl(): String? {
+        if (!::appContext.isInitialized) return null
+        val verifier = PkceUtil.generateCodeVerifier()
+        val state = DISCORD_MOBILE_OAUTH_STATE_PREFIX + PkceUtil.generateCodeVerifier()
+        val saved = runCatching {
+            appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_CODE_VERIFIER, verifier)
+                .putString(KEY_OAUTH_STATE, state)
+                .commit()
+        }.getOrDefault(false)
+        if (!saved) return null
+
+        val challenge = PkceUtil.generateCodeChallenge(verifier)
+        return "https://discord.com/api/oauth2/authorize?" +
+            "client_id=$discordClientId" +
+            "&response_type=code" +
+            "&redirect_uri=${URLEncoder.encode(REDIRECT_URI_WEB, "UTF-8")}" +
+            "&scope=${URLEncoder.encode("identify sdk.social_layer_presence", "UTF-8")}" +
+            "&state=$state" +
+            "&code_challenge=$challenge" +
+            "&code_challenge_method=S256" +
+            "&prompt=consent"
+    }
+
+    fun startBrowserAuth(context: Context) {
+        if (!initialized) init(context)
+        if (!isSupported) return
+        val url = getDirectOAuthUrl() ?: return
+        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        runCatching {
+            context.startActivity(intent)
+        }.onFailure { error ->
+            Log.e(TAG, "Failed to launch browser for Discord OAuth", error)
+            openAuthDialog()
+        }
     }
 
     private fun openAuthDialog() {
@@ -248,6 +303,7 @@ object DiscordRpcManager {
             val tokens = exchangeCodeForToken(code, verifier)
             if (tokens == null) {
                 Log.e(TAG, "Discord token exchange failed.")
+                clearPendingOAuth(prefs)
                 _isAuthLoading.value = false
                 return@launch
             }
@@ -262,13 +318,43 @@ object DiscordRpcManager {
     }
 
     fun onLoginDeepLink(uri: Uri) {
-        val error = uri.getQueryParameter("error")
-        if (error != null) {
-            Log.e(TAG, "Discord authorization failed: $error")
+        if (!::appContext.isInitialized) return
+
+        val prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val storedState = prefs.getString(KEY_OAUTH_STATE, null)
+        val callbackState = uri.getQueryParameter("state")
+        if (!isValidDiscordMobileOAuthState(storedState, callbackState)) {
+            Log.w(TAG, "Missing or mismatched OAuth state in Discord deep link; ignoring.")
+            clearPendingOAuth(prefs)
             _isAuthLoading.value = false
             return
         }
-        uri.getQueryParameter("code")?.let(::completeAuthWithCode)
+
+        val error = uri.getQueryParameter("error")
+        if (error != null) {
+            Log.e(TAG, "Discord authorization failed: $error")
+            clearPendingOAuth(prefs)
+            _isAuthLoading.value = false
+            return
+        }
+
+        val code = uri.getQueryParameter("code")
+        if (code.isNullOrBlank() || code.length > 2048) {
+            Log.w(TAG, "Missing or invalid Discord authorization code; ignoring.")
+            clearPendingOAuth(prefs)
+            _isAuthLoading.value = false
+            return
+        }
+
+        prefs.edit().remove(KEY_OAUTH_STATE).apply()
+        completeAuthWithCode(code)
+    }
+
+    private fun clearPendingOAuth(prefs: SharedPreferences) {
+        prefs.edit()
+            .remove(KEY_CODE_VERIFIER)
+            .remove(KEY_OAUTH_STATE)
+            .apply()
     }
 
     private suspend fun startCloudSession(challenge: String): PairingSession? =
