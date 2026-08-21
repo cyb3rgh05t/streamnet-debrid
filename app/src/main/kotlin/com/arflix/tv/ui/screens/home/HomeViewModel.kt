@@ -95,17 +95,37 @@ internal fun mergeIptvHomeCategories(
     catalogOrder: List<String>,
 ): List<Category> {
     val tvCategoryIds = setOf(HomeViewModel.FAVORITE_TV_CATEGORY_ID, HomeViewModel.RECENT_TV_CATEGORY_ID)
+    val renderedOrder = catalogOrder.map { catalogId ->
+        catalogId.replaceFirst("collection_rail_", "collection_row_")
+    }
     val merged = current.filterNot { it.id in tvCategoryIds }.toMutableList()
-    catalogOrder.forEachIndexed { orderIndex, categoryId ->
+    renderedOrder.forEachIndexed { orderIndex, categoryId ->
         if (categoryId !in tvCategoryIds) return@forEachIndexed
         val category = freshById[categoryId] ?: return@forEachIndexed
-        val laterCatalogIds = catalogOrder.drop(orderIndex + 1).toSet()
+        val laterCatalogIds = renderedOrder.drop(orderIndex + 1).toSet()
         val insertionIndex = merged.indexOfFirst { it.id in laterCatalogIds }
             .takeIf { it >= 0 }
             ?: merged.size
         merged.add(insertionIndex, category)
     }
     return merged
+}
+
+internal fun orderHomeCategories(
+    categories: List<Category>,
+    catalogOrder: List<String>,
+): List<Category> {
+    val renderedOrder = catalogOrder.map { catalogId ->
+        catalogId.replaceFirst("collection_rail_", "collection_row_")
+    }
+    val categoriesById = categories.associateBy { it.id }
+    val orderedIds = renderedOrder.toSet()
+    val continueWatching = categories.filter { it.id == "continue_watching" }
+    val ordered = renderedOrder.mapNotNull(categoriesById::get)
+    val remaining = categories.filter {
+        it.id != "continue_watching" && it.id !in orderedIds
+    }
+    return continueWatching + ordered + remaining
 }
 
 @androidx.compose.runtime.Immutable
@@ -2011,8 +2031,18 @@ class HomeViewModel @Inject constructor(
             try {
                 applyContentLanguageFromPrefs()
                 val cachedCategories = loadCategoriesCache()
-                if (cachedCategories.isNotEmpty() && _uiState.value.categories.isEmpty()) {
-                    val heroItem = chooseInitialHero(cachedCategories)
+                val orderedCachedCategories = if (cachedCategories.isNotEmpty()) {
+                    runCatching {
+                        orderHomeCategories(
+                            categories = cachedCategories,
+                            catalogOrder = catalogRepository.getCatalogs().map { it.id },
+                        )
+                    }.getOrDefault(cachedCategories)
+                } else {
+                    cachedCategories
+                }
+                if (orderedCachedCategories.isNotEmpty() && _uiState.value.categories.isEmpty()) {
+                    val heroItem = chooseInitialHero(orderedCachedCategories)
                     val heroKey = heroItem?.let { "${it.mediaType}_${it.id}" }
                     val heroLogo = heroKey?.let { getCachedLogo(it) }
                     withContext(Dispatchers.Main) {
@@ -2020,7 +2050,7 @@ class HomeViewModel @Inject constructor(
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isInitialLoad = false,
-                                categories = cachedCategories,
+                                categories = orderedCachedCategories,
                                 heroItem = heroItem,
                                 heroLogoUrl = heroLogo,
                                 error = null
