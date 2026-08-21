@@ -32,7 +32,8 @@ internal data class CollectionTemplateEntry(
 )
 
 internal object CollectionTemplateManifest {
-    private const val VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3486fc9a3d0efe59d1929e75f66021dc4e15bcb7/networks%20videos/"
+    private const val VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/6231c318b0f0aeb1adef87b51928546e70e3b55c/networks%20videos/"
+    private const val STUDIO_VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/8257a3e0822adfc37a17d98f76b8d45b34490518/studios%20videos/"
     private const val STREAMING_SERVICE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/46fd4f8c335a7c581a7dcdb7dfac268c68ef84fc/Landscape%20Streaming%20Services/"
     private const val GENRE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/main/Landscape%20Genres/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
@@ -243,7 +244,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}peacock.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = "${VIDEO_BASE}peacock.mp4",
             sources = listOf(
                 source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.pcp"),
                 source(addonId = "aio-metadata", type = "series", catalogId = "streaming.pcp"),
@@ -263,7 +264,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "${TEMPLATE_IMAGE_BASE}Starz.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = "${VIDEO_BASE}starz.mp4",
             sources = listOf(
                 source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.sta"),
                 source(addonId = "aio-metadata", type = "series", catalogId = "streaming.sta"),
@@ -281,7 +282,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}Shudder.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = "${VIDEO_BASE}shudder.mp4",
             sources = listOf(
                 source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.8862"),
                 source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.8861"),
@@ -299,7 +300,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "https://www.mgmplus.com/_next/static/media/og-image.1p-ndvvwq3kwr.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = "${VIDEO_BASE}mgm.mp4",
             sources = listOf(
                 source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.48305"),
                 source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.48306"),
@@ -317,7 +318,7 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}discovery.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = null,
+            heroVideoUrl = "${VIDEO_BASE}discovery.mp4",
             sources = listOf(
                 source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.dpe"),
                 source(addonId = "aio-metadata", type = "series", catalogId = "streaming.dpe"),
@@ -976,17 +977,17 @@ internal object CollectionTemplateManifest {
     )
 
     private val studioSpecs = listOf(
-        CompanySpec(2, "Disney", "/wdrCwmRnLFJhEoH8GSfymY85KHT.png"),
-        CompanySpec(127928, "20th Century Studios", "/h0rjX5vjW5r8yEnUBStFarjcLT4.png"),
-        CompanySpec(34, "Sony Pictures", "/xAb1o9HrSvKBo9mnXC8fJKDNu00.png"),
-        CompanySpec(174, "Warner Bros. Pictures", "/5b1qrm4UTPRTtpC5zXccCTkHdBl.png"),
-        CompanySpec(33, "Universal", "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png"),
-        CompanySpec(4, "Paramount", "/lH1dIv66K2BLgyDa3I3Pj6Q2Lre.png"),
-        CompanySpec(3, "Pixar", "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png"),
-        CompanySpec(521, "Dreamworks", "/kP7t6RwGz2AvvTkvnI1uteEwHet.png"),
-        CompanySpec(420, "Marvel Studios", "/hUzeosd33nzE5MCNsZxCGEKTXaQ.png"),
-        CompanySpec(9993, "DC", "/zC29tHZxkdeiVR1IXbrQJJQSuUQ.png"),
-        CompanySpec(41077, "A24", "/1ZXsGaFPgrgS6ZZGS37AqD5uU12.png")
+        CompanySpec(2, "Disney", "/wdrCwmRnLFJhEoH8GSfymY85KHT.png", "disney.mp4"),
+        CompanySpec(127928, "20th Century Studios", "/h0rjX5vjW5r8yEnUBStFarjcLT4.png", "20th.mp4"),
+        CompanySpec(34, "Sony Pictures", "/xAb1o9HrSvKBo9mnXC8fJKDNu00.png", "sony.mp4"),
+        CompanySpec(174, "Warner Bros. Pictures", "/5b1qrm4UTPRTtpC5zXccCTkHdBl.png", "warner.mp4"),
+        CompanySpec(33, "Universal", "/8lvHyhjr8oUKOOy2dKXoALWKdp0.png", "universal.mp4"),
+        CompanySpec(4, "Paramount", "/lH1dIv66K2BLgyDa3I3Pj6Q2Lre.png", "paramount.mp4"),
+        CompanySpec(3, "Pixar", "/1TjvGVDMYsj6JBxOAkUHpPEwLf7.png", "pixar.mp4"),
+        CompanySpec(521, "Dreamworks", "/kP7t6RwGz2AvvTkvnI1uteEwHet.png", "dreamworks.mp4"),
+        CompanySpec(420, "Marvel Studios", "/hUzeosd33nzE5MCNsZxCGEKTXaQ.png", "marvel.mp4"),
+        CompanySpec(9993, "DC", "/zC29tHZxkdeiVR1IXbrQJJQSuUQ.png", "dc.mp4"),
+        CompanySpec(41077, "A24", "/1ZXsGaFPgrgS6ZZGS37AqD5uU12.png", "a24.mp4")
     )
 
     private val networkSpecs = listOf(
@@ -996,13 +997,13 @@ internal object CollectionTemplateManifest {
         CompanySpec(2552, "Apple TV+", "/4KAy34EHvRM25Ih8wb82AuGU7zJ.png", "appletv.mp4"),
         CompanySpec(453, "Hulu", "/pqUTCleNUiTLAVlelGxUgWn1ELh.png", "hulu.mp4"),
         CompanySpec(49, "HBO", "/tuomPhY2UtuPTqqFnKMVHvSb724.png", "hbomax.mp4"),
-        CompanySpec(4353, "Discovery+", "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png"),
+        CompanySpec(4353, "Discovery+", "/1D1bS3Dyw4ScYnFWTlBOvJXC3nb.png", "discovery.mp4"),
         CompanySpec(2, "ABC", "/ndAvF4JLsliGreX87jAc9GdjmJY.png"),
         CompanySpec(19, "FOX", "/1DSpHrWyOORkL9N2QHX7Adt31mQ.png"),
         CompanySpec(359, "Cinemax", "/6mSHSquNpfLgDdv6VnOOvC5Uz2h.png"),
-        CompanySpec(174, "AMC", "/pmvRmATOCaDykE6JrVoeYxlFHw3.png"),
-        CompanySpec(67, "Showtime", "/Allse9kbjiP6ExaQrnSpIhkurEi.png"),
-        CompanySpec(318, "Starz", "/8GJjw3HHsAJYwIWKIPBPfqMxlEa.png"),
+        CompanySpec(174, "AMC", "/pmvRmATOCaDykE6JrVoeYxlFHw3.png", "amc.mp4"),
+        CompanySpec(67, "Showtime", "/Allse9kbjiP6ExaQrnSpIhkurEi.png", "showtime.mp4"),
+        CompanySpec(318, "Starz", "/8GJjw3HHsAJYwIWKIPBPfqMxlEa.png", "starz.mp4"),
         CompanySpec(71, "The CW", "/hEpcdJ4O6eitG9ADSnDXNUrlovS.png"),
         CompanySpec(6, "NBC", "/cm111bsDVlYaC1foL0itvEI4yLG.png"),
         CompanySpec(16, "CBS", "/nm8d7P7MJNiBLdgIzUK0gkuEA4r.png"),
@@ -1010,7 +1011,7 @@ internal object CollectionTemplateManifest {
         CompanySpec(4, "BBC One", "/mVn7xESaTNmjBUyUtGNvDQd3CT1.png"),
         CompanySpec(56, "Cartoon Network", "/c5OC6oVCg6QP4eqzW6XIq17CQjI.png"),
         CompanySpec(13, "Nickelodeon", "/ikZXxg6GnwpzqiZbRPhJGaZapqB.png"),
-        CompanySpec(3353, "Peacock", "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png"),
+        CompanySpec(3353, "Peacock", "/gIAcGTjKKr0KOHL5s4O36roJ8p7.png", "peacock.mp4"),
         CompanySpec(80, "Adult Swim", "/9AKyspxVzywuaMuZ1Bvilu8sXly.png")
     )
 
@@ -1045,7 +1046,9 @@ internal object CollectionTemplateManifest {
             coverImageUrl = "https://image.tmdb.org/t/p/w780${spec.logoPath}",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
-            heroVideoUrl = spec.heroVideoFile?.let { VIDEO_BASE + it },
+            heroVideoUrl = spec.heroVideoFile?.let {
+                (if (group == CollectionGroupKind.STUDIO) STUDIO_VIDEO_BASE else VIDEO_BASE) + it
+            },
             sources = listOf(
                 if (group == CollectionGroupKind.STUDIO) {
                     vodwisharrStudioSource(spec.id)

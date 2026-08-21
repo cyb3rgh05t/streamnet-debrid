@@ -795,10 +795,13 @@
     <string name="discord_tv_login_title">Discord TV Login</string>
     <string name="discord_connect_title">Connect Discord</string>
     <string name="discord_connect_desc">Scan this QR code with your phone camera to authorize Discord Rich Presence for your profile.</string>
+    <string name="discord_mobile_connect_desc">Open Discord in your browser to authorize Discord Rich Presence for your profile.</string>
     <string name="discord_connecting">Connecting...</string>
     <string name="discord_waiting_for_approval">Waiting for approval...</string>
     <string name="discord_pairing_steps">1. Scan QR code on your phone\n2. Tap \"Authorize\" on Discord\n3. Connects automatically</string>
+    <string name="discord_mobile_pairing_steps">1. Open Discord in the browser\n2. Tap \"Authorize\"\n3. Return to StreamNet TV</string>
     <string name="discord_login_on_tv">Log in directly on TV</string>
+    <string name="discord_login_in_browser">Open Discord login</string>
     <string name="discord_scroll_up">▲ Scroll Up</string>
     <string name="discord_scroll_down">▼ Scroll Down</string>
     <string name="discord_not_included">Not included in this build</string>

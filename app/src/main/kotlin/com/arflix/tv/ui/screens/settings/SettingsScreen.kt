@@ -484,7 +484,7 @@ fun SettingsScreen(
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 15 // Accounts, tracking routing, telegram, discord, sync/update, privacy and deletion
+            "accounts" -> 16 // Accounts, tracking routing, telegram, discord, sync/update, privacy and deletion
             else -> 0
         }
     }
@@ -3991,6 +3991,16 @@ private fun DiscordActivationModal(
     var showInAppWebView by remember { mutableStateOf(false) }
     var focusedButton by remember { mutableIntStateOf(0) } // 0 = Log in directly on TV, 1 = Cancel
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val context = LocalContext.current
+
+    fun openDiscordInBrowser() {
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(authUrl))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
+    }
 
     LaunchedEffect(Unit) {
         runCatching { focusRequester.requestFocus() }
@@ -4031,7 +4041,7 @@ private fun DiscordActivationModal(
                             Key.DirectionRight -> { focusedButton = if (isRtl) 0 else 1; true }
                             Key.Enter, Key.DirectionCenter -> {
                                 if (focusedButton == 0) {
-                                    showInAppWebView = true
+                                    if (isMobile) openDiscordInBrowser() else showInAppWebView = true
                                 } else {
                                     onDismiss()
                                 }
@@ -4078,7 +4088,9 @@ private fun DiscordActivationModal(
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = stringResource(R.string.discord_connect_desc),
+                        text = stringResource(
+                            if (isMobile) R.string.discord_mobile_connect_desc else R.string.discord_connect_desc
+                        ),
                         style = ArflixTypography.body,
                         color = TextSecondary
                     )
@@ -4133,7 +4145,9 @@ private fun DiscordActivationModal(
                                 }
                                 Spacer(modifier = Modifier.height(14.dp))
                                 Text(
-                                    text = stringResource(R.string.discord_pairing_steps),
+                                    text = stringResource(
+                                        if (isMobile) R.string.discord_mobile_pairing_steps else R.string.discord_pairing_steps
+                                    ),
                                     style = ArflixTypography.caption.copy(fontSize = 12.sp, lineHeight = 18.sp),
                                     color = TextSecondary.copy(alpha = 0.7f)
                                 )
@@ -4160,11 +4174,15 @@ private fun DiscordActivationModal(
                                     if (focusedButton == 0) accentColor else accentColor.copy(alpha = 0.32f),
                                     RoundedCornerShape(10.dp)
                                 )
-                                .clickable { showInAppWebView = true }
+                                .clickable {
+                                    if (isMobile) openDiscordInBrowser() else showInAppWebView = true
+                                }
                                 .padding(horizontal = 16.dp, vertical = 10.dp)
                         ) {
                             Text(
-                                text = stringResource(R.string.discord_login_on_tv),
+                                text = stringResource(
+                                    if (isMobile) R.string.discord_login_in_browser else R.string.discord_login_on_tv
+                                ),
                                 color = if (focusedButton == 0) accentContentColor else accentColor,
                                 style = ArflixTypography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
                             )
@@ -9289,9 +9307,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_diagnostics_sharing),
             subtitle = stringResource(R.string.settings_diagnostics_sharing_desc),
             isEnabled = diagnosticsSharingEnabled,
-            isFocused = focusedIndex == 13,
+            isFocused = focusedIndex == 14,
             onToggle = onDiagnosticsSharingToggle,
-            modifier = Modifier.settingsFocusSlot(13)
+            modifier = Modifier.settingsFocusSlot(14)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -9300,9 +9318,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_privacy_policy),
             description = stringResource(R.string.settings_privacy_policy_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 14,
+            isFocused = focusedIndex == 15,
             onClick = onOpenPrivacy,
-            modifier = Modifier.settingsFocusSlot(14)
+            modifier = Modifier.settingsFocusSlot(15)
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -9311,9 +9329,9 @@ private fun AccountsSettings(
             title = stringResource(R.string.settings_account_data_deletion),
             description = stringResource(R.string.settings_account_data_deletion_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 15,
+            isFocused = focusedIndex == 16,
             onClick = onOpenDataDeletion,
-            modifier = Modifier.settingsFocusSlot(15)
+            modifier = Modifier.settingsFocusSlot(16)
         )
     }
 }

@@ -3547,7 +3547,6 @@ class HomeViewModel @Inject constructor(
 
         savedCatalogs.forEach { cfg ->
             if (isCollectionTileConfig(cfg)) return@forEach
-            if (cfg.id == RECENT_TV_CATEGORY_ID) return@forEach
             val rowItems = if (isCollectionRailConfig(cfg)) {
                 val group = cfg.collectionGroup
                 val matchingConfigs = savedCatalogs.filter {
