@@ -96,66 +96,6 @@
       </div>
     </div>
 
-    <script>
-      (async function () {
-        var params = new URLSearchParams(window.location.search);
-        var code = params.get("code");
-        var state = params.get("state") || params.get("session");
-        var error = params.get("error");
-        var errorDesc = params.get("error_description");
-
-        var heading = document.getElementById("heading");
-        var message = document.getElementById("message");
-        var codeContainer = document.getElementById("code-container");
-        var codeVal = document.getElementById("code-val");
-
-        if (error) {
-          heading.textContent = "Authorization Failed";
-          heading.style.color = "#ff8a76";
-          message.textContent = errorDesc || error;
-          return;
-        }
-
-        if (!code || !/^[A-Za-z0-9_-]{40,128}$/.test(state || "")) {
-          heading.textContent = "No Code Received";
-          message.textContent =
-            "Discord did not return a valid pairing response.";
-          return;
-        }
-
-        if (code) {
-          codeVal.textContent = code;
-        }
-
-        // If we have a TV session ID (state), notify the backend
-        if (state) {
-          try {
-            var response = await fetch(
-              "/.netlify/functions/discord-auth-callback",
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ device_code: state, code: code }),
-              },
-            );
-
-            if (response.ok) {
-              heading.textContent = "Discord Connected! 🎉";
-              heading.style.color = "#6ee7a3";
-              message.textContent =
-                "Your TV has been authorized. You can close this tab now.";
-              return;
-            }
-          } catch (e) {
-            console.error(e);
-          }
-        }
-
-        heading.textContent = "Could Not Reach Your TV";
-        heading.style.color = "#ff8a76";
-        message.textContent =
-          "Return to StreamNet TV and scan the QR code again.";
-      })();
-    </script>
+    <script src="/discord/callback.js"></script>
   </body>
 </html>
