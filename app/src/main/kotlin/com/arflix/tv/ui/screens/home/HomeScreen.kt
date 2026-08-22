@@ -187,6 +187,11 @@ import com.arflix.tv.util.isInCinema
 import com.arflix.tv.util.parseRatingValue
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.C
+import androidx.media3.common.Player
+import androidx.media3.database.StandaloneDatabaseProvider
+import androidx.media3.datasource.cache.CacheDataSource
+import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
+import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -479,8 +484,28 @@ private fun isActionableHomeItem(item: MediaItem?): Boolean {
 @androidx.compose.runtime.Immutable
 private data class HomeHeroPlaybackHandles(
     val player: ExoPlayer,
-    val hlsFactory: HlsMediaSource.Factory
+    val cachedHlsFactory: HlsMediaSource.Factory,
+    val uncachedHlsFactory: HlsMediaSource.Factory,
+    val cachedMediaSourceFactory: DefaultMediaSourceFactory,
+    val uncachedMediaSourceFactory: DefaultMediaSourceFactory
 )
+
+private object HomeHeroPreviewCache {
+    @Volatile
+    private var instance: SimpleCache? = null
+
+    fun getInstance(context: Context): SimpleCache {
+        return instance ?: synchronized(this) {
+            instance ?: run {
+                val cacheDir = java.io.File(context.applicationContext.cacheDir, "media3_home_hero_preview_cache").apply { mkdirs() }
+                val evictor = LeastRecentlyUsedCacheEvictor(96L * 1024L * 1024L)
+                SimpleCache(cacheDir, evictor, StandaloneDatabaseProvider(context.applicationContext)).also {
+                    instance = it
+                }
+            }
+        }
+    }
+}
 
 private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHandles {
     val heroOkHttp = OkHttpClient.Builder()
@@ -494,18 +519,26 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
         .build()
     val heroDataSourceFactory =
         OkHttpDataSource.Factory(heroOkHttp).setUserAgent("StreamNetTV/1.7.0 (Android TV)")
-    val heroHlsFactory = HlsMediaSource.Factory(heroDataSourceFactory)
+    val cachedHeroDataSourceFactory = CacheDataSource.Factory()
+        .setCache(HomeHeroPreviewCache.getInstance(context))
+        .setUpstreamDataSourceFactory(heroDataSourceFactory)
+        .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    val cachedHeroHlsFactory = HlsMediaSource.Factory(cachedHeroDataSourceFactory)
         .setAllowChunklessPreparation(true)
-    val heroDefaultFactory = DefaultMediaSourceFactory(context)
+    val uncachedHeroHlsFactory = HlsMediaSource.Factory(heroDataSourceFactory)
+        .setAllowChunklessPreparation(true)
+    val cachedHeroDefaultFactory = DefaultMediaSourceFactory(context)
+        .setDataSourceFactory(cachedHeroDataSourceFactory)
+    val uncachedHeroDefaultFactory = DefaultMediaSourceFactory(context)
         .setDataSourceFactory(heroDataSourceFactory)
     val loadControl = DefaultLoadControl.Builder()
-        .setBufferDurationsMs(2_000, 8_000, 750, 1_500)
-        .setTargetBufferBytes(12 * 1024 * 1024)
+        .setBufferDurationsMs(4_000, 20_000, 1_200, 2_500)
+        .setTargetBufferBytes(24 * 1024 * 1024)
         .setPrioritizeTimeOverSizeThresholds(true)
         .setBackBuffer(0, false)
         .build()
     val player = ExoPlayer.Builder(context)
-        .setMediaSourceFactory(heroDefaultFactory)
+        .setMediaSourceFactory(cachedHeroDefaultFactory)
         .setLoadControl(loadControl)
         .build()
         .apply {
@@ -515,7 +548,10 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
         }
     return HomeHeroPlaybackHandles(
         player = player,
-        hlsFactory = heroHlsFactory
+        cachedHlsFactory = cachedHeroHlsFactory,
+        uncachedHlsFactory = uncachedHeroHlsFactory,
+        cachedMediaSourceFactory = cachedHeroDefaultFactory,
+        uncachedMediaSourceFactory = uncachedHeroDefaultFactory
     )
 }
 
@@ -1075,32 +1111,36 @@ fun HomeScreen(
 
     var heroPlaybackHandles by remember { mutableStateOf<HomeHeroPlaybackHandles?>(null) }
     var preparedHeroVideoUrl by remember { mutableStateOf<String?>(null) }
+    var readyHeroVideoUrl by remember { mutableStateOf<String?>(null) }
     val heroExoPlayer = heroPlaybackHandles?.player
     DisposableEffect(Unit) {
         onDispose {
             heroPlaybackHandles?.player?.release()
             heroPlaybackHandles = null
             preparedHeroVideoUrl = null
+            readyHeroVideoUrl = null
         }
     }
 
     // Service-collection video lifecycle: play once on focus, with sound,
     // then mark the card "played" so subsequent focus returns fall back to
     // the stock image. IPTV live streams bypass this (they loop naturally).
-    val heroVideoFadeDurationMs = if (isMobile) 420 else 0
+    val heroVideoFadeDurationMs = if (isMobile) 420 else 220
     val focusedCollectionId = displayHeroItem?.id?.takeIf { isHeroCollection }
     val latestFocusedCollectionId by rememberUpdatedState(focusedCollectionId)
+    val latestHeroVideoUrl by rememberUpdatedState(heroVideoUrl)
     val heroVideoAlpha by animateFloatAsState(
-        targetValue = if (heroVideoUrl != null) 1f else 0f,
+        targetValue = if (heroVideoUrl != null && readyHeroVideoUrl == heroVideoUrl) 1f else 0f,
         animationSpec = tween(durationMillis = heroVideoFadeDurationMs),
         label = "home-hero-video-alpha"
     )
     DisposableEffect(heroExoPlayer) {
         val player = heroExoPlayer ?: return@DisposableEffect onDispose { }
-        val listener = object : androidx.media3.common.Player.Listener {
+        val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == androidx.media3.common.Player.STATE_ENDED) {
-                    latestFocusedCollectionId?.let { collectionVideoFinishedId = it }
+                when (playbackState) {
+                    Player.STATE_READY -> latestHeroVideoUrl?.let { readyHeroVideoUrl = it }
+                    Player.STATE_ENDED -> latestFocusedCollectionId?.let { collectionVideoFinishedId = it }
                 }
             }
         }
@@ -1116,6 +1156,7 @@ fun HomeScreen(
         if (heroVideoUrl != null) {
             val handles = heroPlaybackHandles ?: return@LaunchedEffect
             if (preparedHeroVideoUrl != heroVideoUrl) {
+                readyHeroVideoUrl = null
                 player?.stop()
                 player?.clearMediaItems()
                 val mi = androidx.media3.common.MediaItem.Builder()
@@ -1127,9 +1168,11 @@ fun HomeScreen(
                     ).build()
                 val lower = heroVideoUrl.lowercase()
                 if (lower.contains(".m3u8") || lower.contains("/hls") || lower.contains("format=hls")) {
-                    player?.setMediaSource(handles.hlsFactory.createMediaSource(mi))
+                    val hlsFactory = if (isHeroCollection) handles.cachedHlsFactory else handles.uncachedHlsFactory
+                    player?.setMediaSource(hlsFactory.createMediaSource(mi))
                 } else {
-                    player?.setMediaItem(mi)
+                    val mediaSourceFactory = if (isHeroCollection) handles.cachedMediaSourceFactory else handles.uncachedMediaSourceFactory
+                    player?.setMediaSource(mediaSourceFactory.createMediaSource(mi))
                 }
                 player?.prepare()
                 preparedHeroVideoUrl = heroVideoUrl
@@ -1141,6 +1184,7 @@ fun HomeScreen(
             player?.volume = 1f
             player?.playWhenReady = true
         } else {
+            readyHeroVideoUrl = null
             player?.playWhenReady = false
         }
     }
