@@ -1659,12 +1659,13 @@ private fun SourceFilterChip(
     isFocused: Boolean,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(999.dp))
             .background(
                 when {
-                    isFocused -> Color.White
+                    isFocused -> accentColor
                     isSelected -> Color.White.copy(alpha = 0.12f)
                     else -> OledPanel
                 }
@@ -1672,7 +1673,7 @@ private fun SourceFilterChip(
             .border(
                 1.dp,
                 when {
-                    isFocused -> Color.White
+                    isFocused -> accentColor
                     isSelected -> Color.White.copy(alpha = 0.28f)
                     else -> OledMutedBorder
                 },
@@ -1808,6 +1809,7 @@ private fun AddonRailItem(
     isFocused: Boolean,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -1815,7 +1817,7 @@ private fun AddonRailItem(
             .clip(RoundedCornerShape(11.dp))
             .background(
                 when {
-                    isFocused -> Color.White
+                    isFocused -> accentColor
                     isSelected -> OledPanelStrong
                     else -> Color.Transparent
                 },
@@ -1824,7 +1826,7 @@ private fun AddonRailItem(
             .border(
                 1.dp,
                 when {
-                    isFocused -> Color.White
+                    isFocused -> accentColor
                     else -> Color.Transparent
                 },
                 RoundedCornerShape(11.dp)
@@ -1879,6 +1881,7 @@ private fun SourceEmptyState(
     loadingPluginNames: Set<String> = emptySet(),
     message: String? = null
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -1892,7 +1895,7 @@ private fun SourceEmptyState(
         ) {
             val stillSearching = isLoading || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
             if (stillSearching) {
-                LoadingIndicator(color = Color.White, size = 42.dp)
+                LoadingIndicator(color = accentColor, size = 42.dp)
                 Spacer(modifier = Modifier.height(14.dp))
                 Text(
                     text = buildString {
@@ -1931,6 +1934,7 @@ private fun OledSourceRow(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -1942,7 +1946,7 @@ private fun OledSourceRow(
             .clip(RoundedCornerShape(15.dp))
             .background(
                 when {
-                    isFocused -> Color.White.copy(alpha = 0.11f)
+                    isFocused -> accentColor.copy(alpha = 0.16f)
                     isSelected -> Color.White.copy(alpha = 0.07f)
                     else -> Color.White.copy(alpha = 0.028f)
                 },
@@ -1950,7 +1954,7 @@ private fun OledSourceRow(
             )
             .then(
                 if (isFocused) {
-                    Modifier.border(1.5.dp, Color.White.copy(alpha = 0.96f), RoundedCornerShape(15.dp))
+                    Modifier.border(1.5.dp, accentColor, RoundedCornerShape(15.dp))
                 } else {
                     Modifier
                 }

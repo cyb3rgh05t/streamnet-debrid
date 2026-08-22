@@ -30,6 +30,7 @@
     <string name="sources">Quellen</string>
     <string name="details">Details</string>
     <string name="play">Abspielen</string>
+    <string name="play_from_beginning">Von Anfang an abspielen</string>
     <string name="trailer">Trailer</string>
     <string name="seasons">Staffeln</string>
     <string name="season_label">Staffel</string>

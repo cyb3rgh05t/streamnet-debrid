@@ -41,6 +41,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Deferred
 import com.arflix.tv.data.model.PlaylistGroupKey
 import kotlinx.coroutines.launch
@@ -2764,10 +2765,20 @@ class IptvRepository @Inject constructor(
             if (missingXmlChannels.isNotEmpty() && !entireBatchNeedsXml && !preferFullCatchupHistory) {
                 val backgroundChannels = missingXmlChannels.toList()
                 iptvCacheScope.launch {
-                    val (backgroundXml, backgroundIsCached) = fetchVisibleXmlEpgForChannels(
-                        config,
-                        backgroundChannels,
-                    )
+                    val result = try {
+                        fetchVisibleXmlEpgForChannels(
+                            config,
+                            backgroundChannels,
+                        )
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        System.err.println(
+                            "[EPG-Refresh] Background XMLTV enrichment skipped: ${error.message}"
+                        )
+                        return@launch
+                    }
+                    val (backgroundXml, backgroundIsCached) = result
                     if (backgroundXml.isEmpty()) return@launch
 
                     val richEntries = backgroundXml.mapValues { (channelId, fresh) ->

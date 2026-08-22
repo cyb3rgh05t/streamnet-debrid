@@ -1446,11 +1446,13 @@ class PlayerViewModel @Inject constructor(
         // cancels a running "Find best match" scan. It never overrides a real user pick. This also
         // handles embedded tracks that resolve *after* the auto-match already started.
         if (!userPickedSubtitle && normalizedPref.isNotBlank() && !isSubtitleDisabledPreference(preference)) {
-            val embeddedPref = subtitles.firstOrNull {
-                it.isEmbedded && !it.isBitmap && !it.isForced &&
-                    !it.label.contains("forced", ignoreCase = true) &&
+            val embeddedPreferred = subtitles.filter {
+                it.isEmbedded && !it.isBitmap &&
                     (normalizeLanguage(it.lang) == normalizedPref || normalizeLanguage(it.label) == normalizedPref)
             }
+            val embeddedPref = embeddedPreferred.firstOrNull {
+                it.isForced || it.label.contains("forced", ignoreCase = true)
+            } ?: embeddedPreferred.firstOrNull()
             if (embeddedPref != null && _uiState.value.selectedSubtitle?.id != embeddedPref.id) {
                 cancelFindBestMatch()
                 hasManualSubtitleSelection = true
@@ -3826,7 +3828,7 @@ class PlayerViewModel @Inject constructor(
         } ?: 0L
 
         val finalPositionMs = when {
-            navStart > 0L -> navStart
+            navigationStartPositionMs != null -> navStart
             cloudPositionMs > 0L || localPositionMs > 0L -> maxOf(cloudPositionMs, localPositionMs)
             else -> 0L
         }

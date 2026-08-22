@@ -5328,16 +5328,17 @@ private fun TabButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = LocalAccentColorOverride.current ?: Color.White
     // Selected tab shows subtle highlight, not full white (to avoid confusion with list focus)
     Box(
         modifier = modifier
             .clickable { onClick() }
             .background(
-                if (isSelected) Color.White.copy(alpha = 0.2f) else Color.Transparent,
+                if (isSelected) accentColor.copy(alpha = 0.2f) else Color.Transparent,
                 RoundedCornerShape(20.dp)
             )
             .then(
-                if (isSelected) Modifier.border(1.dp, Color.White, RoundedCornerShape(20.dp))
+                if (isSelected) Modifier.border(1.dp, accentColor, RoundedCornerShape(20.dp))
                 else Modifier
             )
             .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -5363,6 +5364,7 @@ private fun TrackMenuItem(
     onClick: () -> Unit,
     subtitleDetail: String? = null
 ) {
+    val accentColor = LocalAccentColorOverride.current ?: Color.White
     // Only use isFocused from parent (programmatic focus via focusedIndex)
     // Don't track actual D-pad focus to avoid double-focus issues
     Row(
@@ -5370,7 +5372,7 @@ private fun TrackMenuItem(
             .fillMaxWidth()
             .clickable { onClick() }
             .background(
-                if (isFocused) Color.White else Color.Transparent,
+                if (isFocused) accentColor else Color.Transparent,
                 RoundedCornerShape(8.dp)
             )
             .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -5406,7 +5408,7 @@ private fun TrackMenuItem(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = stringResource(R.string.selected),
-                tint = if (isFocused) Color.Black else Color.White,
+                tint = if (isFocused) Color.Black else accentColor.copy(alpha = 0.9f),
                 modifier = Modifier.size(18.dp)
             )
         }
@@ -5421,13 +5423,14 @@ private fun LangPanelItem(
     isActivePanel: Boolean,
     isSelected: Boolean
 ) {
+    val accentColor = LocalAccentColorOverride.current ?: Color.White
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .background(
                 when {
-                    isFocused -> Color.White
-                    isActivePanel -> Color.White.copy(alpha = 0.12f)
+                    isFocused -> accentColor
+                    isActivePanel -> accentColor.copy(alpha = 0.12f)
                     else -> Color.Transparent
                 },
                 RoundedCornerShape(8.dp)
@@ -5464,7 +5467,7 @@ private fun LangPanelItem(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = null,
-                tint = if (isFocused) Color.Black else Color.White,
+                tint = if (isFocused) Color.Black else accentColor.copy(alpha = 0.9f),
                 modifier = Modifier.size(14.dp)
             )
         }

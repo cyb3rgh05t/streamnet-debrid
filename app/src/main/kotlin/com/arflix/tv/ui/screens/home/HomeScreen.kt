@@ -4528,9 +4528,6 @@ private fun IptvHomeCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    item.liveChannelNumber?.takeIf { it.isNotBlank() }?.let {
-                        Text("${stringResource(R.string.live_badge_ch)} $it", style = ArflixTypography.caption.copy(fontSize = 7.sp, fontWeight = FontWeight.Bold), color = accent)
-                    }
                     Text(item.title, style = ArflixTypography.caption.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.78f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(item.liveProgramTitle ?: stringResource(R.string.live_status_guide_pending), style = ArflixTypography.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

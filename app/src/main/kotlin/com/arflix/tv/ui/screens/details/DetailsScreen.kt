@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Visibility
@@ -248,6 +249,7 @@ fun DetailsScreen(
     KeepScreenOn(active = showTrailerPlayer)
     var pendingAutoPlayRequest by remember { mutableStateOf<PendingAutoPlayRequest?>(null) }
     var autoPlayWaitTick by remember { mutableIntStateOf(0) }
+    var pendingSourceStartPositionMs by remember { mutableStateOf<Long?>(null) }
 
     // Episode Context Menu state
     var showEpisodeContextMenu by remember { mutableStateOf(false) }
@@ -281,6 +283,31 @@ fun DetailsScreen(
             startPositionMs = startPositionMs,
             requestedAtMs = SystemClock.elapsedRealtime()
         )
+    }
+
+    fun requestPlayFromBeginning(state: DetailsUiState, episodeIndex: Int) {
+        val season = if (mediaType == MediaType.TV) {
+            state.playSeason ?: state.episodes.getOrNull(episodeIndex)?.seasonNumber ?: 1
+        } else null
+        val episode = if (mediaType == MediaType.TV) {
+            state.playEpisode ?: state.episodes.getOrNull(episodeIndex)?.episodeNumber ?: 1
+        } else null
+        viewModel.resetProgressForPlayback(mediaType, season, episode) {
+            if (!state.autoPlaySingleSource) {
+                pendingSourceStartPositionMs = 0L
+                showStreamSelector = true
+                val identity = state.episodes.firstOrNull {
+                    it.seasonNumber == season && it.episodeNumber == episode
+                }?.identity
+                viewModel.loadStreams(state.imdbId, identity)
+            } else {
+                requestFastAutoPlay(
+                    state.imdbId, season, episode, 0L,
+                    state.playTmdbSeason ?: season,
+                    state.playTmdbEpisode ?: episode
+                )
+            }
+        }
     }
 
     // Spoiler blur setting
@@ -449,7 +476,13 @@ fun DetailsScreen(
         { idx: Int ->
             val state = currentUiState.value
             val currentEpIdx = currentEpisodeIndex.value
-            when (idx) {
+                    val hasRestartButton = state.playPositionMs?.let { it > 0L } == true &&
+                        (mediaType == MediaType.MOVIE || (
+                            state.episodes.getOrNull(currentEpIdx)?.seasonNumber == state.playSeason &&
+                                state.episodes.getOrNull(currentEpIdx)?.episodeNumber == state.playEpisode
+                            ))
+                    val actionIndex = if (!hasRestartButton && idx >= 1) idx + 1 else idx
+                    when (actionIndex) {
                 0 -> { // Play
                     val season = if (mediaType == MediaType.TV) {
                         state.playSeason
@@ -487,17 +520,20 @@ fun DetailsScreen(
                         )
                     }
                 }
-                1 -> { // Sources
+                1 -> { // Play from beginning
+                    requestPlayFromBeginning(state, currentEpIdx)
+                }
+                2 -> { // Sources
                     showStreamSelector = true
                     val ep = state.episodes.getOrNull(currentEpIdx)
                     viewModel.loadStreams(state.imdbId, ep?.identity)
                 }
-                2 -> { // Trailer
+                3 -> { // Trailer
                     state.trailerKey?.let { showTrailerPlayer = true }
                 }
-                3 -> viewModel.toggleWatched(currentEpIdx)
-                4 -> viewModel.toggleWatchlist()
-                5 -> { // View Collection — scroll to and focus the collection row on this page
+                4 -> viewModel.toggleWatched(currentEpIdx)
+                5 -> viewModel.toggleWatchlist()
+                6 -> { // View Collection — scroll to and focus the collection row on this page
                     focusedSection = FocusSection.COLLECTION
                     collectionIndex = 0
                 }
@@ -662,7 +698,13 @@ fun DetailsScreen(
                             } else {
                                 handleRight(
                                     focusedSection, buttonIndex, episodeIndex, ratingsIndex, seasonIndex, castIndex, reviewIndex, similarIndex, collectionIndex,
-                                    uiState, { buttonIndex = it }, { episodeIndex = it }, { ratingsIndex = it }, { seasonIndex = it },
+                                    uiState,
+                                    showPlayFromBeginning = uiState.playPositionMs?.let { it > 0L } == true &&
+                                        (mediaType == MediaType.MOVIE || (
+                                            uiState.episodes.getOrNull(episodeIndex)?.seasonNumber == uiState.playSeason &&
+                                                uiState.episodes.getOrNull(episodeIndex)?.episodeNumber == uiState.playEpisode
+                                            )),
+                                    { buttonIndex = it }, { episodeIndex = it }, { ratingsIndex = it }, { seasonIndex = it },
                                     { castIndex = it }, { reviewIndex = it }, { similarIndex = it },
                                     { collectionIndex = it }
                                 )
@@ -816,7 +858,13 @@ fun DetailsScreen(
                             }
                             when (focusedSection) {
                                 FocusSection.BUTTONS -> {
-                                    when (buttonIndex) {
+                                    val hasRestartButton = uiState.playPositionMs?.let { it > 0L } == true &&
+                                        (mediaType == MediaType.MOVIE || (
+                                            uiState.episodes.getOrNull(episodeIndex)?.seasonNumber == uiState.playSeason &&
+                                                uiState.episodes.getOrNull(episodeIndex)?.episodeNumber == uiState.playEpisode
+                                            ))
+                                    val actionIndex = if (!hasRestartButton && buttonIndex >= 1) buttonIndex + 1 else buttonIndex
+                                    when (actionIndex) {
                                         0 -> { // Play - Auto-play highest quality source
                                             val season = if (mediaType == MediaType.TV) {
                                                 uiState.playSeason
@@ -854,20 +902,23 @@ fun DetailsScreen(
                                                 )
                                             }
                                         }
-                                        1 -> { // Sources - Show StreamSelector for manual selection
+                                        1 -> { // Play from beginning
+                                            requestPlayFromBeginning(uiState, episodeIndex)
+                                        }
+                                        2 -> { // Sources - Show StreamSelector for manual selection
                                             showStreamSelector = true
                                             // Pass the currently focused episode for TV shows
                                             val ep = uiState.episodes.getOrNull(episodeIndex)
                                             viewModel.loadStreams(uiState.imdbId, ep?.identity)
                                         }
-                                        2 -> { // Trailer
+                                        3 -> { // Trailer
                                             uiState.trailerKey?.let {
                                                 showTrailerPlayer = true
                                             }
                                         }
-                                        3 -> viewModel.toggleWatched(episodeIndex)
-                                        4 -> viewModel.toggleWatchlist()
-                                        5 -> { // View Collection — scroll to and focus the collection row
+                                        4 -> viewModel.toggleWatched(episodeIndex)
+                                        5 -> viewModel.toggleWatchlist()
+                                        6 -> { // View Collection — scroll to and focus the collection row
                                             focusedSection = FocusSection.COLLECTION
                                             collectionIndex = 0
                                         }
@@ -993,6 +1044,11 @@ fun DetailsScreen(
                     budget = uiState.budget,
                     seasonProgress = uiState.seasonProgress,
                     playLabel = uiState.playLabel,
+                    showPlayFromBeginning = uiState.playPositionMs?.let { it > 0L } == true &&
+                        (mediaType == MediaType.MOVIE || (
+                            uiState.episodes.getOrNull(episodeIndex)?.seasonNumber == uiState.playSeason &&
+                                uiState.episodes.getOrNull(episodeIndex)?.episodeNumber == uiState.playEpisode
+                            )),
                     showEpisodeRatings = uiState.showEpisodeRatings,
                     hasTrailer = uiState.trailerKey != null,
                     contentHasFocus = !isSidebarFocused,
@@ -1105,7 +1161,7 @@ fun DetailsScreen(
                     stream.url?.takeIf { it.isNotBlank() },
                     stream.addonId.takeIf { it.isNotBlank() },
                     stream.source.takeIf { it.isNotBlank() },
-                    null
+                    pendingSourceStartPositionMs.also { pendingSourceStartPositionMs = null }
                 )
             },
             onClose = { showStreamSelector = false }
@@ -1211,13 +1267,18 @@ private fun handleRight(
     buttonIdx: Int, episodeIdx: Int, ratingsIdx: Int, seasonIdx: Int, castIdx: Int, reviewIdx: Int, similarIdx: Int,
     collectionIdx: Int,
     uiState: DetailsUiState,
+    showPlayFromBeginning: Boolean,
     setButton: (Int) -> Unit, setEpisode: (Int) -> Unit, setRatings: (Int) -> Unit, setSeason: (Int) -> Unit,
     setCast: (Int) -> Unit, setReview: (Int) -> Unit, setSimilar: (Int) -> Unit,
     setCollection: (Int) -> Unit
 ): Boolean {
     when (section) {
         FocusSection.BUTTONS -> {
-            val maxButton = if (uiState.collectionId != null) 5 else 4
+            val maxButton = when {
+                uiState.collectionId != null -> if (showPlayFromBeginning) 6 else 5
+                showPlayFromBeginning -> 5
+                else -> 4
+            }
             if (buttonIdx < maxButton) setButton(buttonIdx + 1)
         }
         FocusSection.EPISODES -> if (episodeIdx < uiState.episodes.size - 1) setEpisode(episodeIdx + 1)
@@ -1265,6 +1326,7 @@ private fun DetailsContent(
     budget: String? = null,
     seasonProgress: Map<Int, Pair<Int, Int>> = emptyMap(),
     playLabel: String? = null,
+    showPlayFromBeginning: Boolean = false,
     hasTrailer: Boolean = false,
     contentHasFocus: Boolean = true,
     usePosterCards: Boolean = false,
@@ -1522,6 +1584,19 @@ private fun DetailsContent(
                         onClick = { onButtonClick(0) }
                     )
 
+                    if (showPlayFromBeginning) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        MobileActionButton(
+                            icon = Icons.Default.Replay,
+                            text = stringResource(R.string.play_from_beginning),
+                            isPrimary = false,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(52.dp),
+                            onClick = { onButtonClick(1) }
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
@@ -1529,13 +1604,14 @@ private fun DetailsContent(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        val actionOffset = if (showPlayFromBeginning) 1 else 0
                         MobileIconActionButton(
                             icon = Icons.Default.List,
                             contentDescription = stringResource(R.string.sources),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(54.dp),
-                            onClick = { onButtonClick(1) }
+                            onClick = { onButtonClick(1 + actionOffset) }
                         )
                         MobileIconActionButton(
                             icon = Icons.Default.Movie,
@@ -1544,7 +1620,7 @@ private fun DetailsContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(54.dp),
-                            onClick = { onButtonClick(2) }
+                            onClick = { onButtonClick(2 + actionOffset) }
                         )
                         MobileIconActionButton(
                             icon = if (buttonWatched) Icons.Default.Check else Icons.Default.Visibility,
@@ -1553,7 +1629,7 @@ private fun DetailsContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(54.dp),
-                            onClick = { onButtonClick(3) }
+                            onClick = { onButtonClick(3 + actionOffset) }
                         )
                         MobileIconActionButton(
                             icon = if (isInWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
@@ -1562,7 +1638,7 @@ private fun DetailsContent(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(54.dp),
-                            onClick = { onButtonClick(4) }
+                            onClick = { onButtonClick(4 + actionOffset) }
                         )
                     }
 
@@ -2150,39 +2226,50 @@ private fun DetailsContent(
                         isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 0
                     )
                 }
-                Box(modifier = Modifier.clickable { onButtonClick(1) }) {
+                if (showPlayFromBeginning) {
+                    Box(modifier = Modifier.clickable { onButtonClick(1) }) {
+                        PremiumActionButton(
+                            icon = Icons.Default.Replay,
+                            text = stringResource(R.string.play_from_beginning),
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1,
+                            isIconOnly = true
+                        )
+                    }
+                }
+                val actionOffset = if (showPlayFromBeginning) 1 else 0
+                Box(modifier = Modifier.clickable { onButtonClick(1 + actionOffset) }) {
                     PremiumActionButton(
                         icon = Icons.Default.List,
                         text = stringResource(R.string.sources),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1,
+                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1 + actionOffset,
                         isIconOnly = true
                     )
                 }
                 Box(modifier = Modifier
-                    .clickable(enabled = hasTrailer) { onButtonClick(2) }
+                    .clickable(enabled = hasTrailer) { onButtonClick(2 + actionOffset) }
                     .graphicsLayer { alpha = if (hasTrailer) 1f else 0.4f }
                 ) {
                     PremiumActionButton(
                         icon = Icons.Default.Movie,
                         text = stringResource(R.string.trailer),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 2,
+                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 2 + actionOffset,
                         isIconOnly = true
                     )
                 }
-                Box(modifier = Modifier.clickable { onButtonClick(3) }) {
+                Box(modifier = Modifier.clickable { onButtonClick(3 + actionOffset) }) {
                     PremiumActionButton(
                         icon = if (buttonWatched) Icons.Default.Check else Icons.Default.Visibility,
                         text = if (buttonWatched) stringResource(R.string.watched) else stringResource(R.string.details_btn_mark_watched),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 3,
+                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 3 + actionOffset,
                         isActive = buttonWatched,
                         isIconOnly = true
                     )
                 }
-                Box(modifier = Modifier.clickable { onButtonClick(4) }) {
+                Box(modifier = Modifier.clickable { onButtonClick(4 + actionOffset) }) {
                     PremiumActionButton(
                         icon = if (isInWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
                         text = stringResource(R.string.watchlist),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 4,
+                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 4 + actionOffset,
                         isIconOnly = true,
                         isActive = isInWatchlist
                     )
@@ -2190,11 +2277,11 @@ private fun DetailsContent(
 
                 // "View Collection" button — only shown when this movie belongs to a TMDB collection
                 if (hasCollectionAction) {
-                    Box(modifier = Modifier.clickable { onButtonClick(5) }) {
+                    Box(modifier = Modifier.clickable { onButtonClick(5 + actionOffset) }) {
                         PremiumActionButton(
                             icon = Icons.Default.Star,
                             text = stringResource(R.string.view_collection),
-                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 5,
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 5 + actionOffset,
                             isIconOnly = true
                         )
                     }

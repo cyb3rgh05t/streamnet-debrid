@@ -1254,6 +1254,37 @@ class DetailsViewModel @Inject constructor(
         }
     }
 
+    fun resetProgressForPlayback(
+        mediaType: MediaType,
+        season: Int?,
+        episode: Int?,
+        onComplete: () -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            try {
+                val selectedEpisode = if (mediaType == MediaType.TV) {
+                    _uiState.value.episodes.firstOrNull {
+                        it.seasonNumber == season && it.episodeNumber == episode
+                    }
+                } else null
+                val canonicalSeason = selectedEpisode?.tmdbSeasonNumber ?: season
+                val canonicalEpisode = selectedEpisode?.tmdbEpisodeNumber ?: episode
+                watchHistoryRepository.removeFromHistory(
+                    currentMediaId,
+                    canonicalSeason,
+                    canonicalEpisode
+                )
+                _uiState.value = _uiState.value.copy(playPositionMs = 0L)
+                runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
+                runCatching { cloudSyncRepository.pushToCloud() }
+            } catch (error: Exception) {
+                Log.e(TAG, "[PlayTarget] Failed to reset playback progress", error)
+            } finally {
+                onComplete()
+            }
+        }
+    }
+
     fun toggleWatchlist() {
         val currentItem = _uiState.value.item ?: return
         val newInWatchlist = !_uiState.value.isInWatchlist

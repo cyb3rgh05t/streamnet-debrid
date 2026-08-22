@@ -44,6 +44,7 @@
     <string name="sources">Sources</string>
     <string name="details">Details</string>
     <string name="play">Play</string>
+    <string name="play_from_beginning">Play from beginning</string>
     <string name="trailer">Trailer</string>
     <string name="seasons">Seasons</string>
     <string name="season_label">Season</string>
