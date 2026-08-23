@@ -943,6 +943,7 @@
     <string name="player_ai_rate_limited">KI-Untertitel: Anfragelimit erreicht – Übersetzung pausiert.</string>
     <string name="player_ai_invalid_key">KI-Untertitel: Ungültiger API-Schlüssel.</string>
     <string name="player_ai_translation_error">KI-Untertitel: Übersetzungsfehler – %1$s</string>
+    <string name="player_ai_no_text_source">KI-Untertitel: Diese Datei enthält nur bildbasierte Untertitel (PGS) und keinen übersetzbaren Text.</string>
     <string name="player_error_imdb_resolve">IMDB-ID konnte nicht ermittelt werden. Erneut versuchen.</string>
     <string name="details_error_load_failed">Details konnten nicht geladen werden</string>
     <string name="login_error_enter_password">Bitte Passwort eingeben</string>
@@ -958,6 +959,9 @@
     <string name="continue_at">Bei %1$s fortsetzen</string>
     <string name="continue_from">Ab %1$s fortsetzen</string>
     <string name="continue_label">Fortsetzen</string>
+    <string name="continue_time_left_minutes">Noch %1$d Min.</string>
+    <string name="continue_time_left_hours">Noch %1$d Std.</string>
+    <string name="continue_time_left_hours_minutes">Noch %1$d Std. %2$d Min.</string>
     <string name="play_start_s1e1">S1E1 starten</string>
     <string name="launcher_continue_from">%1$s ab %2$s</string>
     <string name="added_to_watchlist">Zur Merkliste hinzugefügt</string>

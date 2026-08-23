@@ -27,6 +27,7 @@ class SubtitleTranslationManager(
 
     var onTranslatingChanged: ((Boolean) -> Unit)? = null
     var onBatchResult: ((success: Boolean, error: String?) -> Unit)? = null
+    var onUntranslatableSource: (() -> Unit)? = null
 
     val translatedCount: Int get() = cache.size
 

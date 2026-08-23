@@ -1390,7 +1390,18 @@ fun PlayerScreen(
                                         trackTexts.any { it.contains("songs", ignoreCase = true) && it.contains("sign", ignoreCase = true) }
                                     // Image-based subtitle tracks (PGS/VOBSUB/DVB) carry no text — they
                                     // can't be AI-translated, so flag them to exclude as a translation source.
-                                    val isBitmap = isBitmapSubtitleMime(format.sampleMimeType)
+                                    val originalSubtitleMime =
+                                        if (format.sampleMimeType == MimeTypes.APPLICATION_MEDIA3_CUES) {
+                                            format.codecs ?: format.sampleMimeType
+                                        } else {
+                                            format.sampleMimeType
+                                        }
+                                    val isBitmap = isBitmapSubtitleMime(originalSubtitleMime) ||
+                                        (!isAddon && trackTexts.any { text ->
+                                            text.contains("pgs", ignoreCase = true) ||
+                                                text.contains("vobsub", ignoreCase = true) ||
+                                                text.contains("dvbsub", ignoreCase = true)
+                                        })
                                     textTracks.add(Subtitle(
                                         id = if (isAddon) {
                                             matched?.id ?: formatTrackId.substringAfter(ADDON_SUB_ID_PREFIX)

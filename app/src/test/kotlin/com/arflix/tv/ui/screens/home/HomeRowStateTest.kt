@@ -3,6 +3,7 @@ package com.arflix.tv.ui.screens.home
 import com.arflix.tv.data.model.Category
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.repository.MediaRepository
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
@@ -93,6 +94,50 @@ class HomeRowStateTest {
 
         assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(placeholder)))).isFalse()
         assertThat(shouldDisplayHomeCategory(Category("recent_tv", "Recent", listOf(MediaItem(2, "Channel"))))).isTrue()
+    }
+
+    @Test
+    fun `IPTV hero never auto plays on touch devices`() {
+        assertThat(
+            shouldPlayIptvHomeHero(
+                isTouchDevice = true,
+                userHasNavigated = true,
+                suppressPlayback = false,
+            )
+        ).isFalse()
+        assertThat(
+            shouldPlayIptvHomeHero(
+                isTouchDevice = false,
+                userHasNavigated = true,
+                suppressPlayback = false,
+            )
+        ).isTrue()
+    }
+
+    @Test
+    fun `static collection rails never show pagination skeletons`() {
+        listOf("service", "franchise", "studio", "network", "genre").forEach { group ->
+            assertThat(canPaginateHomeCategory("collection_row_$group", hasMore = true)).isFalse()
+        }
+        assertThat(canPaginateHomeCategory("trending_movies", hasMore = true)).isTrue()
+    }
+
+    @Test
+    fun `cached first collection item resolves intro without transient map`() {
+        val defaults = MediaRepository.buildPreinstalledDefaults().associateBy { it.id }
+        val cachedItem = MediaItem(
+            id = 42,
+            title = "Netflix",
+            status = "collection:collection_service_netflix"
+        )
+
+        val catalog = resolveCachedCollectionCatalog(
+            item = cachedItem,
+            catalogsByMediaId = emptyMap(),
+            catalogById = defaults::get,
+        )
+
+        assertThat(catalog?.collectionHeroVideoUrl).endsWith("networks%20videos/netflix.mp4")
     }
 
     fun `poster keys do not change when unrelated items are inserted`() {

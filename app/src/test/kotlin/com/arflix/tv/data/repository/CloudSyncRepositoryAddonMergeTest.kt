@@ -48,6 +48,72 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `newer watched tombstone removes stale remote episode but keeps next episode`() {
+        val watchedEpisode = continueWatchingItem(progress = 80, updatedAtMs = 100L)
+        val nextEpisode = watchedEpisode.copy(
+            episode = 2,
+            displayEpisode = 2,
+            progress = 10,
+            updatedAtMs = 300L
+        )
+        val remote = JSONObject()
+            .put(
+                "localContinueWatchingByProfile",
+                JSONObject().put(
+                    "main",
+                    org.json.JSONArray(
+                        listOf(
+                            JSONObject(com.google.gson.Gson().toJson(watchedEpisode)),
+                            JSONObject(com.google.gson.Gson().toJson(nextEpisode))
+                        )
+                    )
+                )
+            )
+            .toString()
+        val local = JSONObject()
+            .put(
+                "dismissedContinueWatchingByProfile",
+                JSONObject().put("main", "tv:${watchedEpisode.id}:${watchedEpisode.season}:${watchedEpisode.episode},200")
+            )
+            .toString()
+
+        val mergedItems = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+            .getJSONObject("localContinueWatchingByProfile")
+            .getJSONArray("main")
+
+        assertEquals(1, mergedItems.length())
+        assertEquals(2, mergedItems.getJSONObject(0).getInt("episode"))
+    }
+
+    @Test
+    fun `newer watched tombstone leaves an explicit empty profile after stale progress removal`() {
+        val staleMovie = continueWatchingItem(
+            mediaType = MediaType.MOVIE,
+            progress = 70,
+            updatedAtMs = 100L
+        )
+        val local = JSONObject()
+            .put(
+                "localContinueWatchingByProfile",
+                JSONObject().put(
+                    "main",
+                    org.json.JSONArray(listOf(JSONObject(com.google.gson.Gson().toJson(staleMovie))))
+                )
+            )
+            .put(
+                "dismissedContinueWatchingByProfile",
+                JSONObject().put("main", "movie:${staleMovie.id},200")
+            )
+            .toString()
+
+        val mergedItems = JSONObject(mergeLocalHistoryByTimestamp(local, "{}"))
+            .getJSONObject("localContinueWatchingByProfile")
+            .getJSONArray("main")
+
+        assertEquals(0, mergedItems.length())
+    }
+
+    @Test
     fun `stale local watched push does not remove newer remote watched ids`() {
         val local = JSONObject()
             .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray(listOf(1))))
@@ -77,11 +143,13 @@ class CloudSyncRepositoryAddonMergeTest {
         val local = JSONObject()
             .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray().put(JSONObject().put("id", "old"))))
             .put("hiddenAddonByProfile", JSONObject().put("main", org.json.JSONArray().put("old_hidden")))
+            .put("hiddenCustomByProfile", JSONObject().put("main", org.json.JSONArray().put("old_custom_hidden")))
             .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 100L))
             .toString()
         val remote = JSONObject()
             .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray().put(JSONObject().put("id", "new"))))
             .put("hiddenAddonByProfile", JSONObject().put("main", org.json.JSONArray().put("new_hidden")))
+            .put("hiddenCustomByProfile", JSONObject().put("main", org.json.JSONArray().put("new_custom_hidden")))
             .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 200L))
             .toString()
 
@@ -94,6 +162,10 @@ class CloudSyncRepositoryAddonMergeTest {
         assertEquals(
             "new_hidden",
             merged.getJSONObject("hiddenAddonByProfile").getJSONArray("main").getString(0)
+        )
+        assertEquals(
+            "new_custom_hidden",
+            merged.getJSONObject("hiddenCustomByProfile").getJSONArray("main").getString(0)
         )
         assertEquals(200L, merged.getJSONObject("catalogsUpdatedAtByProfile").getLong("main"))
     }

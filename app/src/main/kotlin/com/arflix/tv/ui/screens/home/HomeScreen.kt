@@ -481,6 +481,15 @@ private fun isActionableHomeItem(item: MediaItem?): Boolean {
     return item != null && item.id > 0 && !item.isPlaceholder
 }
 
+internal fun shouldPlayIptvHomeHero(
+    isTouchDevice: Boolean,
+    userHasNavigated: Boolean,
+    suppressPlayback: Boolean,
+): Boolean = !isTouchDevice && userHasNavigated && !suppressPlayback
+
+internal fun canPaginateHomeCategory(categoryId: String, hasMore: Boolean): Boolean =
+    hasMore && !categoryId.startsWith("collection_row_")
+
 @androidx.compose.runtime.Immutable
 private data class HomeHeroPlaybackHandles(
     val player: ExoPlayer,
@@ -1080,18 +1089,20 @@ fun HomeScreen(
     // Keyed on the focused collection id so re-entering the card after
     // moving elsewhere replays it.
     var collectionVideoFinishedId by remember { mutableStateOf<Int?>(null) }
-    val heroVideoAllowed = true
+    val heroVideoAllowed = !isMobile
     val serviceHeroVideoUrl = displayHeroItem
         ?.takeIf { heroVideoAllowed && isHeroCollection && collectionVideoFinishedId != it.id }
         ?.let { viewModel.getCollectionHeroVideoUrl(it) }
     val heroVideoUrl = when {
-        !isMobile && !focusState.userHasNavigated -> null
         !heroVideoAllowed -> null
         // Service collection MP4s should start as soon as the card becomes the hero.
         // Keep the idle gate for heavier IPTV/live playback, but do not delay MP4 previews.
         serviceHeroVideoUrl != null -> serviceHeroVideoUrl
-        suppressHeroVideoPlayback -> null
-        isHeroIptv -> displayHeroItem?.let { viewModel.getIptvStreamUrl(it.id) }
+        isHeroIptv && shouldPlayIptvHomeHero(
+            isTouchDevice = isMobile,
+            userHasNavigated = focusState.userHasNavigated,
+            suppressPlayback = suppressHeroVideoPlayback,
+        ) -> displayHeroItem?.let { viewModel.getIptvStreamUrl(it.id) }
         else -> null
     }
 
@@ -1137,9 +1148,15 @@ fun HomeScreen(
     DisposableEffect(heroExoPlayer) {
         val player = heroExoPlayer ?: return@DisposableEffect onDispose { }
         val listener = object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                latestHeroVideoUrl?.let {
+                    readyHeroVideoUrl = it
+                    player.volume = 1f
+                }
+            }
+
             override fun onPlaybackStateChanged(playbackState: Int) {
                 when (playbackState) {
-                    Player.STATE_READY -> latestHeroVideoUrl?.let { readyHeroVideoUrl = it }
                     Player.STATE_ENDED -> latestFocusedCollectionId?.let { collectionVideoFinishedId = it }
                 }
             }
@@ -1181,11 +1198,12 @@ fun HomeScreen(
             // naturally don't loop (they're live) so REPEAT_MODE_OFF is safe
             // for both paths.
             player?.repeatMode = androidx.media3.common.Player.REPEAT_MODE_OFF
-            player?.volume = 1f
+            if (readyHeroVideoUrl != heroVideoUrl) player?.volume = 0f
             player?.playWhenReady = true
         } else {
             readyHeroVideoUrl = null
             player?.playWhenReady = false
+            player?.volume = 0f
         }
     }
 
@@ -2583,6 +2601,47 @@ private fun MobileHeroOverlay(
 }
 
 /** Netflix-style mobile hero carousel: card-based banner pager with profile/search overlay. */
+@Composable
+private fun MobileHomeHeader(
+    currentProfile: com.arflix.tv.data.model.Profile?,
+    onNavigateToSearch: () -> Unit,
+    onSwitchProfile: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(start = 26.dp, end = 26.dp, top = 12.dp, bottom = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        if (currentProfile != null) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .clickable { onSwitchProfile() }
+            ) {
+                ProfileAvatarVisual(
+                    profile = currentProfile,
+                    letterFontSize = 15.sp,
+                    iconPadding = 5.dp
+                )
+            }
+        } else {
+            Spacer(modifier = Modifier.size(38.dp))
+        }
+        Icon(
+            imageVector = Icons.Filled.Search,
+            contentDescription = stringResource(R.string.search),
+            tint = Color.White,
+            modifier = Modifier
+                .size(26.dp)
+                .clickable { onNavigateToSearch() }
+        )
+    }
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun MobileHeroCarousel(
@@ -2601,7 +2660,14 @@ private fun MobileHeroCarousel(
 
     val heroItems = remember(categories) { mobileHeroItems(categories) }
 
-    if (heroItems.isEmpty()) return
+    if (heroItems.isEmpty()) {
+        MobileHomeHeader(
+            currentProfile = currentProfile,
+            onNavigateToSearch = onNavigateToSearch,
+            onSwitchProfile = onSwitchProfile,
+        )
+        return
+    }
 
     // Circular paging: use a large virtual page count that's a multiple of heroItems.size
     // so page % heroItems.size always maps correctly and starts at item[0].
@@ -2625,40 +2691,11 @@ private fun MobileHeroCarousel(
     }
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        // Profile avatar + search icon row — above the pager, respects status bar
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(start = 26.dp, end = 26.dp, top = 12.dp, bottom = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            if (currentProfile != null) {
-                Box(
-                    modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .clickable { onSwitchProfile() }
-                ) {
-                    ProfileAvatarVisual(
-                        profile = currentProfile,
-                        letterFontSize = 15.sp,
-                        iconPadding = 5.dp
-                    )
-                }
-            } else {
-                Spacer(modifier = Modifier.size(38.dp))
-            }
-            Icon(
-                imageVector = Icons.Filled.Search,
-                contentDescription = stringResource(R.string.search),
-                tint = Color.White,
-                modifier = Modifier
-                    .size(26.dp)
-                    .clickable { onNavigateToSearch() }
-            )
-        }
+        MobileHomeHeader(
+            currentProfile = currentProfile,
+            onNavigateToSearch = onNavigateToSearch,
+            onSwitchProfile = onSwitchProfile,
+        )
 
         // Banner card pager — circular, peeks at adjacent cards on both sides
         HorizontalPager(
@@ -3409,7 +3446,10 @@ private fun MobileHomeRowsLayer(
                     )
                 }
 
-                val rowHasMore = categoryHasMoreMap[category.id] == true
+                val rowHasMore = canPaginateHomeCategory(
+                    categoryId = category.id,
+                    hasMore = categoryHasMoreMap[category.id] == true,
+                )
                 val isPortrait = if (isCollectionRow) {
                     category.items.firstOrNull()?.collectionTileShape == CollectionTileShape.POSTER
                 } else {
@@ -3998,7 +4038,7 @@ private fun ContentRow(
     onItemFocused: (MediaItem, Int) -> Unit
 ) {
     val isCollectionRow = category.id.startsWith("collection_row_")
-    val effectiveCategoryHasMore = !isCollectionRow && categoryHasMore
+    val effectiveCategoryHasMore = canPaginateHomeCategory(category.id, categoryHasMore)
     val rowState = rememberLazyListState()
     val density = LocalDensity.current
     val isContinueWatching = category.id == "continue_watching"

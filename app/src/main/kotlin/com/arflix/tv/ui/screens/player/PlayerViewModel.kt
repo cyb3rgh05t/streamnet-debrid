@@ -300,6 +300,7 @@ class PlayerViewModel @Inject constructor(
     private var aiErrorToastShown = false
     // The source subtitle used for AI translation — retained so the user can re-activate AI after switching away.
     private var aiSourceSubtitle: Subtitle? = null
+    private val untranslatableSourceIds = mutableSetOf<String>()
 
     val translationManager: SubtitleTranslationManager = SubtitleTranslationManager(
         service = SubtitleTranslationService(
@@ -310,6 +311,7 @@ class PlayerViewModel @Inject constructor(
         scope = viewModelScope
     ).also { mgr ->
         mgr.onTranslatingChanged = { isTranslating -> _isTranslatingLive.value = isTranslating }
+        mgr.onUntranslatableSource = { viewModelScope.launch { onAiSourceUntranslatable() } }
         mgr.onBatchResult = { success, errorMessage ->
             // Content-policy blocks are not actionable (Gemini's non-configurable output filter
             // on raw movie dialogue) and don't stop translation of other windows — the service
@@ -595,6 +597,7 @@ class PlayerViewModel @Inject constructor(
             translationManager.updateService(apiKey = aiApiKey, model = aiModel)
             translationManager.removeHearingImpaired = aiRemoveHearingImpaired
             translationManager.isEnabled = false
+            untranslatableSourceIds.clear()
             translationManager.reset()
 
             _uiState.value = PlayerUiState(
@@ -1654,7 +1657,8 @@ class PlayerViewModel @Inject constructor(
         fun Subtitle.isEffectivelyForced() = isForced || label.contains("forced", ignoreCase = true)
         // Bitmap subtitles (PGS/VOBSUB) are images with no text — they can't be translated,
         // so they must never be chosen as the AI source (would render a blank screen).
-        fun Subtitle.isUsableSource() = !isEffectivelyForced() && !isBitmap
+        fun Subtitle.isUsableSource() =
+            !isEffectivelyForced() && !isBitmap && id !in untranslatableSourceIds
         fun List<Subtitle>.bestEmbedded(): Subtitle? {
             val embedded = filter { it.isEmbedded }
             // Prefer plain > SDH/CC; never use forced-only or image-based tracks as AI source
@@ -2453,6 +2457,7 @@ class PlayerViewModel @Inject constructor(
             userPickedSubtitle = false
             autoMatchAttempted = false
             aiSourceSubtitle = null
+            untranslatableSourceIds.clear()
             translationManager.isEnabled = false
 
             // Direct URL - use immediately (ExoPlayer handles redirects)
@@ -2819,6 +2824,26 @@ class PlayerViewModel @Inject constructor(
         return true
     }
 
+    private fun onAiSourceUntranslatable() {
+        if (!_uiState.value.isAiTranslating) return
+        val current = aiSourceSubtitle ?: return
+        if (!untranslatableSourceIds.add(current.id)) return
+        val next = findAiSourceSubtitle(_uiState.value.subtitles)
+        if (next != null && next.id != current.id) {
+            Log.i("SubMatch", "AI source '${current.label}' has no text - switching to '${next.label}'")
+            activateAiTranslation()
+        } else {
+            Log.i("SubMatch", "AI source '${current.label}' has no text - no text source available")
+            translationManager.isEnabled = false
+            aiSourceSubtitle = null
+            _uiState.value = _uiState.value.copy(
+                isAiTranslating = false,
+                isAiAvailable = false,
+                aiErrorToast = context.getString(R.string.player_ai_no_text_source)
+            )
+        }
+    }
+
     /** Existing behavior: translate the built-in/source subtitle to the target language. */
     fun activateAiTranslation() {
         // Defense-in-depth: every caller is already gated on the AI master toggle (menu entry via
@@ -2940,6 +2965,15 @@ class PlayerViewModel @Inject constructor(
                         normalizeLanguage(it.lang) == targetLang
                 }
                 if (hasEmbedded && hasCandidates) break
+                if (hasCandidates) {
+                    val sourceNow = _uiState.value.selectedStream?.source.orEmpty()
+                    if (sourceNow.isNotBlank() && current.any {
+                            !it.isEmbedded && !it.isBitmap && it.url.isNotBlank() &&
+                                normalizeLanguage(it.lang) == targetLang &&
+                                weightedSubtitleScore(sourceNow, it.id) >= 100
+                        }
+                    ) break
+                }
                 if (playingFor >= MATCH_SOURCES_WAIT_MS) break
                 // Past the embedded grace period and the addon fetch is done — whatever is missing
                 // now isn't coming; proceed with what we have.
@@ -3009,6 +3043,20 @@ class PlayerViewModel @Inject constructor(
                         return@launch
                     }
                 }
+            }
+
+            val exactNameMatch = candidates.firstOrNull {
+                weightedSubtitleScore(streamSrc, it.id) >= 100
+            }
+            if (exactNameMatch != null) {
+                val exactRaw = SubtitleSyncMatcher.loadRaw(exactNameMatch.url)
+                val exactLocal = exactRaw?.let { localizeSubtitle(exactNameMatch, it) } ?: exactNameMatch
+                endMatch()
+                selectSubtitle(exactLocal, isUserAction = false)
+                writeCachedMatch(exactNameMatch)
+                Log.i("SubMatch", "exact release-name match - scan skipped: ${exactNameMatch.label}")
+                showMatchToast("Matched: ${exactNameMatch.label} (exact release name)")
+                return@launch
             }
 
             // Prefer any embedded (muxed) track as the sync reference (English first, else any).
@@ -4111,13 +4159,24 @@ class PlayerViewModel @Inject constructor(
                 (playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD)
             ) {
                 hasMarkedWatched = true
+                val completedSeason = currentSeason
+                val completedEpisode = currentEpisode
+                if (currentMediaType == MediaType.MOVIE) {
+                    traktRepository.markMovieWatchedWithoutTraktSync(currentMediaId)
+                } else if (completedSeason != null && completedEpisode != null) {
+                    traktRepository.markEpisodeWatchedWithoutTraktSync(
+                        currentMediaId,
+                        completedSeason,
+                        completedEpisode
+                    )
+                }
                 try {
                     remoteSyncManager.scrobbleStop(
                         mediaType = currentMediaType,
                         tmdbId = currentMediaId,
                         progress = progressPercent.toFloat(),
-                        season = currentSeason,
-                        episode = currentEpisode,
+                        season = completedSeason,
+                        episode = completedEpisode,
                         isAnime = isCurrentAnime()
                     )
                 } catch (e: Exception) {

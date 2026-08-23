@@ -1031,6 +1031,7 @@
     <string name="player_ai_rate_limited">AI subtitles: rate limit hit — translation paused.</string>
     <string name="player_ai_invalid_key">AI subtitles: invalid API key.</string>
     <string name="player_ai_translation_error">AI subtitles: translation error — %1$s</string>
+    <string name="player_ai_no_text_source">AI subtitles: this file only has image-based subtitles (PGS) — there is no text to translate.</string>
     <string name="player_error_imdb_resolve">Unable to resolve IMDB ID. Try again.</string>
     <string name="details_error_load_failed">Failed to load details</string>
 
@@ -1050,6 +1051,9 @@
     <string name="continue_at">Continue at %1$s</string>
     <string name="continue_from">Continue from %1$s</string>
     <string name="continue_label">Continue</string>
+    <string name="continue_time_left_minutes">%1$dmin left</string>
+    <string name="continue_time_left_hours">%1$dhr left</string>
+    <string name="continue_time_left_hours_minutes">%1$dhr %2$dmin left</string>
     <string name="play_start_s1e1">Start S1E1</string>
     <string name="launcher_continue_from">%1$s from %2$s</string>
     <string name="added_to_watchlist">Added to watchlist</string>

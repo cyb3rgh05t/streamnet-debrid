@@ -24,10 +24,22 @@ All notable changes to this project are documented in this file.
 - Matched Home IPTV cards to the Live TV artwork treatment and restored MGM+ service artwork with a valid landscape source.
 - Fixed removing the final watchlist item leaving a stale card visible until navigating away.
 - Synchronized watchlist additions and removals from Home, Details, and Watchlist as authoritative local cloud snapshots, with retryable failure reporting.
+- Marked movies and episodes watched automatically at 90% playback or completion while preserving local, Supabase, Trakt, Simkl, and MDBList synchronization.
+- Prevented manually watched movies and episodes from returning to Continue Watching with stale progress. Exact timestamped removal markers now merge across devices, while the next episode remains eligible for Up Next.
+- Improved Home startup with profile-scoped catalog placeholders, removed trailing skeletons from static collection rails, and kept the mobile profile/search header visible without Continue Watching.
+- Disabled hidden IPTV and collection-preview playback on touch devices and delayed TV preview audio/video reveal until the first rendered frame.
+- Moved bundled collection artwork and converted H.264 intro videos to an immutable StreamNet-owned asset revision for reliable cache invalidation.
+- Localized Continue Watching episode/resume and remaining-time badges in German.
+
+### Player and subtitles
+
+- Skipped subtitle timing scans for exact release-name matches and improved detection and fallback for embedded PGS, VobSub, and DVB bitmap subtitles used with AI translation.
+- Persisted movie and episode watched state locally and to the account snapshot before optional external-provider scrobbling.
 
 ### Localization
 
 - Added new IPTV sort/special-category labels to string resources and added German translations for the new settings text.
+- Added German Continue Watching remaining-time and episode resume labels.
 
 ## [1.9.983] - 2026-07-30
 

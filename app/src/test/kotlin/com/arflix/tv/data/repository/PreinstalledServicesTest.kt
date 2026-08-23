@@ -16,6 +16,7 @@ import org.junit.Test
  * catalogs.
  */
 class PreinstalledServicesTest {
+    private val introVideoCommit = "5ff8719c1aa82c403b7f4abe9425a9c4347fe97c"
 
     @Test
     fun `fresh profile starts with trending before collections and IPTV rows`() {
@@ -111,6 +112,7 @@ class PreinstalledServicesTest {
             assertTrue(
                 "${cfg.id} heroVideo must use the StreamNet fork, was $video",
                 video!!.contains("raw.githubusercontent.com/cyb3rgh05t/networks-video-collection") &&
+                    video.contains(introVideoCommit) &&
                     video.endsWith(expectedVideos[cfg.id]!!)
             )
         }

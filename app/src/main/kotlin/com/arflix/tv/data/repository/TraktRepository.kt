@@ -399,11 +399,14 @@ class TraktRepository @Inject constructor(
         context.settingsDataStore.edit { prefs ->
             values.forEach { (profileId, raw) ->
                 val key = profileManager.profileStringKeyFor(profileId, "trakt_dismissed_continue_watching_v1")
-                val value = raw.trim()
-                if (value.isEmpty()) {
+                val merged = parseDismissedMap(prefs[key])
+                parseDismissedMap(raw).forEach { (dismissedKey, timestamp) ->
+                    merged[dismissedKey] = maxOf(merged[dismissedKey] ?: 0L, timestamp)
+                }
+                if (merged.isEmpty()) {
                     prefs.remove(key)
                 } else {
-                    prefs[key] = value
+                    prefs[key] = encodeDismissedMap(merged)
                 }
             }
         }
@@ -425,8 +428,11 @@ class TraktRepository @Inject constructor(
     }
 
     suspend fun importLocalContinueWatchingForProfiles(values: Map<String, List<ContinueWatchingItem>>) {
+        val filteredValues = values.mapValues { (profileId, items) ->
+            filterDismissedContinueWatchingItems(items, profileId)
+        }
         context.traktDataStore.edit { prefs ->
-            values.forEach { (profileId, items) ->
+            filteredValues.forEach { (profileId, items) ->
                 val key = profileManager.profileStringKeyFor(profileId, "local_continue_watching_v1")
                 if (items.isEmpty()) {
                     prefs.remove(key)
@@ -641,6 +647,24 @@ class TraktRepository @Inject constructor(
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
             }
+        }
+    }
+
+    /**
+     * Mark a movie watched in local caches and Supabase without sending another Trakt request.
+     */
+    suspend fun markMovieWatchedWithoutTraktSync(tmdbId: Int) {
+        ensureProfileCacheScope()
+        updateWatchedCache(tmdbId, null, null, true)
+        persistLocalWatchedSnapshotForCurrentProfile()
+        removeFromContinueWatchingCache(tmdbId, null, null, MediaType.MOVIE)
+
+        try {
+            syncService.markMovieWatchedInSupabaseOnly(tmdbId)
+        } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
+
+            AppLogger.e("TraktRepository", "Failed to mark movie watched in Supabase", e)
         }
     }
 
@@ -2189,6 +2213,19 @@ class TraktRepository @Inject constructor(
     ) {
         ensureProfileCacheScope()
         val profileId = currentProfileId()
+        val resolvedMediaType = mediaType
+            ?: if (seasonNum != null || episodeNum != null) MediaType.TV else null
+        if (resolvedMediaType != null) {
+            val exactKey = buildContinueWatchingKey(
+                resolvedMediaType,
+                showTmdbId,
+                seasonNum,
+                episodeNum
+            )
+            val dismissed = loadDismissedContinueWatching().toMutableMap()
+            dismissed[exactKey] = System.currentTimeMillis()
+            persistDismissedContinueWatching(dismissed)
+        }
         // Always remove from local CW (for non-Trakt profiles) regardless of Trakt cache state
         removeFromLocalContinueWatching(showTmdbId, seasonNum, episodeNum, mediaType)
 
@@ -2744,7 +2781,8 @@ class TraktRepository @Inject constructor(
         return dismissed.keys.mapNotNull { key ->
             when {
                 key.startsWith("movie:") -> key.substringAfterLast(':').toIntOrNull()?.let { "MOVIE:$it" }
-                key.startsWith("tv:") -> key.split(':').getOrNull(1)?.toIntOrNull()?.let { "TV:$it" }
+                key.startsWith("tv:") && key.count { it == ':' } == 1 ->
+                    key.substringAfter(':').toIntOrNull()?.let { "TV:$it" }
                 else -> null
             }
         }.toSet()
@@ -4585,12 +4623,16 @@ data class ContinueWatchingItem(
         val subtitle = if (mediaType == MediaType.TV && season != null && episode != null) {
             val shownSeason = displaySeason ?: season
             val shownEpisode = displayEpisode ?: episode
-            val base = context?.getString(R.string.continue_season_episode, shownSeason, shownEpisode)
-                ?: "Continue S${shownSeason}E${shownEpisode}"
             if (!resumeLabel.isNullOrBlank()) {
-                context?.getString(R.string.continue_from, resumeLabel) ?: "$base from $resumeLabel"
+                context?.getString(
+                    R.string.continue_season_episode_at,
+                    shownSeason,
+                    shownEpisode,
+                    resumeLabel
+                ) ?: "Continue S${shownSeason}E${shownEpisode} from $resumeLabel"
             } else {
-                base
+                context?.getString(R.string.continue_season_episode, shownSeason, shownEpisode)
+                    ?: "Continue S${shownSeason}E${shownEpisode}"
             }
         } else {
             if (mediaType == MediaType.MOVIE) {
@@ -4623,7 +4665,7 @@ data class ContinueWatchingItem(
             else -> 0L
         }
         val timeRemainingLabel = if (showPlaybackProgress) {
-            formatTimeRemainingCompact(timeRemainingSeconds)
+            formatTimeRemainingCompact(context, timeRemainingSeconds)
         } else {
             null
         }
@@ -4727,15 +4769,21 @@ private fun formatResumeClock(totalSeconds: Long): String {
  * Format seconds to a compact human-readable time remaining string.
  * e.g., "45min left", "1hr 15min left", "2hr left"
  */
-private fun formatTimeRemainingCompact(totalSeconds: Long): String? {
+private fun formatTimeRemainingCompact(context: Context?, totalSeconds: Long): String? {
     val safe = totalSeconds.coerceAtLeast(0L)
     if (safe < 60) return null // Less than a minute
     val hours = safe / 3600
     val minutes = (safe % 3600) / 60
     return when {
-        hours > 0 && minutes > 0 -> "${hours}hr ${minutes}min left"
-        hours > 0 -> "${hours}hr left"
-        else -> "${minutes}min left"
+        hours > 0 && minutes > 0 -> context?.getString(
+            R.string.continue_time_left_hours_minutes,
+            hours,
+            minutes
+        ) ?: "${hours}hr ${minutes}min left"
+        hours > 0 -> context?.getString(R.string.continue_time_left_hours, hours)
+            ?: "${hours}hr left"
+        else -> context?.getString(R.string.continue_time_left_minutes, minutes)
+            ?: "${minutes}min left"
     }
 }
 

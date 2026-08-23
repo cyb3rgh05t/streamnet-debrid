@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import com.arflix.tv.data.model.Addon
 import com.arflix.tv.data.model.AddonType
 import com.arflix.tv.data.model.CatalogConfig
+import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Profile
 import com.arflix.tv.data.repository.ContinueWatchingItem
 import com.arflix.tv.network.OkHttpProvider
@@ -126,6 +127,7 @@ internal fun mergeLocalHistoryByTimestamp(
     return runCatching {
         val local = JSONObject(localPayload)
         val remote = JSONObject(remotePayload)
+        mergeDismissedContinueWatching(local, remote)
         mergeLocalContinueWatching(local, remote, gson)
         mergeProfileIntLists(local, remote, "localWatchedMoviesByProfile")
         mergeProfileStringLists(local, remote, "localWatchedEpisodesByProfile")
@@ -154,6 +156,7 @@ internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: Strin
                 copyProfileArray(remote, local, "hiddenPreinstalledByProfile", profileId)
                 copyProfileArray(remote, local, "hiddenAddonByProfile", profileId)
                 copyProfileArray(remote, local, "hiddenHomeServerByProfile", profileId)
+                copyProfileArray(remote, local, "hiddenCustomByProfile", profileId)
             }
             mergedTs.put(profileId, max(localUpdatedAt, remoteUpdatedAt))
         }
@@ -175,12 +178,24 @@ private fun copyProfileArray(sourceRoot: JSONObject, targetRoot: JSONObject, con
 private fun mergeLocalContinueWatching(local: JSONObject, remote: JSONObject, gson: Gson) {
     val localProfiles = local.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
     val remoteProfiles = remote.optJSONObject("localContinueWatchingByProfile") ?: JSONObject()
+    val dismissedProfiles = local.optJSONObject("dismissedContinueWatchingByProfile") ?: JSONObject()
     val mergedProfiles = JSONObject()
     profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
+        val dismissed = decodeDismissedContinueWatching(dismissedProfiles.optString(profileId))
         val byItem = LinkedHashMap<String, ContinueWatchingItem>()
         (decodeContinueWatchingItems(remoteProfiles.optJSONArray(profileId), gson) +
             decodeContinueWatchingItems(localProfiles.optJSONArray(profileId), gson))
             .forEach { item ->
+                val exactKey = if (item.mediaType == MediaType.MOVIE) {
+                    "movie:${item.id}"
+                } else if (item.season != null && item.episode != null) {
+                    "tv:${item.id}:${item.season}:${item.episode}"
+                } else {
+                    "tv:${item.id}"
+                }
+                val showKey = if (item.mediaType == MediaType.MOVIE) "movie:${item.id}" else "tv:${item.id}"
+                val dismissedAt = max(dismissed[exactKey] ?: 0L, dismissed[showKey] ?: 0L)
+                if (dismissedAt >= item.updatedAtMs) return@forEach
                 val key = "${item.mediaType}:${item.id}"
                 val existing = byItem[key]
                 if (existing == null || item.updatedAtMs > existing.updatedAtMs) {
@@ -190,13 +205,42 @@ private fun mergeLocalContinueWatching(local: JSONObject, remote: JSONObject, gs
         val merged = byItem.values
             .sortedByDescending { it.updatedAtMs }
             .take(Constants.MAX_CONTINUE_WATCHING)
+        mergedProfiles.put(profileId, JSONArray(gson.toJson(merged)))
+    }
+    local.put("localContinueWatchingByProfile", mergedProfiles)
+}
+
+private fun mergeDismissedContinueWatching(local: JSONObject, remote: JSONObject) {
+    val localProfiles = local.optJSONObject("dismissedContinueWatchingByProfile") ?: JSONObject()
+    val remoteProfiles = remote.optJSONObject("dismissedContinueWatchingByProfile") ?: JSONObject()
+    val mergedProfiles = JSONObject()
+    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
+        val merged = LinkedHashMap<String, Long>()
+        (decodeDismissedContinueWatching(remoteProfiles.optString(profileId)) +
+            decodeDismissedContinueWatching(localProfiles.optString(profileId)))
+            .forEach { (key, timestamp) ->
+                merged[key] = max(merged[key] ?: 0L, timestamp)
+            }
         if (merged.isNotEmpty()) {
-            mergedProfiles.put(profileId, JSONArray(gson.toJson(merged)))
+            mergedProfiles.put(
+                profileId,
+                merged.entries.joinToString("|") { (key, timestamp) -> "$key,$timestamp" }
+            )
         }
     }
     if (mergedProfiles.length() > 0) {
-        local.put("localContinueWatchingByProfile", mergedProfiles)
+        local.put("dismissedContinueWatchingByProfile", mergedProfiles)
     }
+}
+
+private fun decodeDismissedContinueWatching(raw: String?): Map<String, Long> {
+    if (raw.isNullOrBlank()) return emptyMap()
+    return raw.split('|').mapNotNull { entry ->
+        val separator = entry.lastIndexOf(',')
+        if (separator <= 0 || separator >= entry.lastIndex) return@mapNotNull null
+        val timestamp = entry.substring(separator + 1).toLongOrNull() ?: return@mapNotNull null
+        entry.substring(0, separator) to timestamp
+    }.toMap()
 }
 
 private fun decodeContinueWatchingItems(array: JSONArray?, gson: Gson): List<ContinueWatchingItem> {
@@ -992,6 +1036,13 @@ class CloudSyncRepository @Inject constructor(
             }
         }
         root.put("hiddenHomeServerByProfile", JSONObject(gson.toJson(hiddenHomeServerByProfile)))
+
+        val hiddenCustomByProfile = buildMap<String, List<String>> {
+            profiles.forEach { profile ->
+                put(profile.id, catalogRepository.getHiddenCustomCatalogIdsForProfile(profile.id))
+            }
+        }
+        root.put("hiddenCustomByProfile", JSONObject(gson.toJson(hiddenCustomByProfile)))
 
         val catalogsUpdatedAtByProfile = buildMap<String, Long> {
             profiles.forEach { profile ->
@@ -1947,6 +1998,23 @@ class CloudSyncRepository @Inject constructor(
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_home_server")) }
+
+        // ── Hidden custom catalogs ──
+        runCatching {
+            val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
+            root.optJSONObject("hiddenCustomByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
+                val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, String::class.java).type).type
+                val map: Map<String, List<String>> = gson.fromJson(json, type) ?: emptyMap()
+                map.forEach { (profileId, hidden) ->
+                    val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
+                    val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
+                    if (cloudUpdatedAt >= localUpdatedAt) {
+                        catalogRepository.setHiddenCustomCatalogIdsForProfile(profileId, hidden, stampChange = false)
+                        catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
+                    }
+                }
+            }
+        }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_custom")) }
 
         // ── IPTV config + favorites ──
         runCatching {

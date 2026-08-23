@@ -359,6 +359,12 @@ class CatalogRepository @Inject constructor(
         return decodeHiddenHomeServer(safeProfileId, prefs).toList()
     }
 
+    suspend fun getHiddenCustomCatalogIdsForProfile(profileId: String): List<String> {
+        val safeProfileId = profileId.trim().ifBlank { "default" }
+        val prefs = context.settingsDataStore.data.first()
+        return decodeHiddenCustom(safeProfileId, prefs).toList()
+    }
+
     suspend fun setHiddenHomeServerCatalogIdsForProfile(profileId: String, ids: List<String>, stampChange: Boolean = true) {
         val safeProfileId = profileId.trim().ifBlank { "default" }
         val cleaned = ids.map { it.trim() }.filter { it.isNotBlank() }.distinct()
@@ -371,6 +377,16 @@ class CatalogRepository @Inject constructor(
             if (stampChange) markCatalogsUpdated(prefs, safeProfileId)
         }
         invalidationBus.markDirty(CloudSyncScope.CATALOGS, safeProfileId, "set hidden home server catalogs")
+    }
+
+    suspend fun setHiddenCustomCatalogIdsForProfile(profileId: String, ids: List<String>, stampChange: Boolean = true) {
+        val safeProfileId = profileId.trim().ifBlank { "default" }
+        val cleaned = ids.map { it.trim() }.filter { it.isNotBlank() }.distinct()
+        context.settingsDataStore.edit { prefs ->
+            prefs[hiddenCustomKey(safeProfileId)] = if (cleaned.isEmpty()) "" else gson.toJson(cleaned)
+            if (stampChange) markCatalogsUpdated(prefs, safeProfileId)
+        }
+        invalidationBus.markDirty(CloudSyncScope.CATALOGS, safeProfileId, "set hidden custom catalogs")
     }
 
     suspend fun restoreAllHiddenCatalogsForActiveProfile() {
@@ -524,7 +540,9 @@ class CatalogRepository @Inject constructor(
         }
 
         if (existing != merged) {
-            saveCatalogs(merged)
+            // Defaults and app-version migrations are local maintenance, not a user edit.
+            // Stamping them would let a fresh install outrank an existing cloud setup.
+            saveCatalogs(merged, markCloudDirty = false)
         }
         return merged
     }

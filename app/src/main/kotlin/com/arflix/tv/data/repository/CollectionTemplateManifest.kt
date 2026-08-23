@@ -32,16 +32,18 @@ internal data class CollectionTemplateEntry(
 )
 
 internal object CollectionTemplateManifest {
-    private const val VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/6231c318b0f0aeb1adef87b51928546e70e3b55c/networks%20videos/"
-    private const val STUDIO_VIDEO_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/8257a3e0822adfc37a17d98f76b8d45b34490518/studios%20videos/"
-    private const val STREAMING_SERVICE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/46fd4f8c335a7c581a7dcdb7dfac268c68ef84fc/Landscape%20Streaming%20Services/"
-    private const val GENRE_IMAGE_BASE = "https://raw.githubusercontent.com/chrishudson918/images/main/Landscape%20Genres/"
+    private const val ASSET_COMMIT = "5ff8719c1aa82c403b7f4abe9425a9c4347fe97c"
+    private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
+    private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
+    private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
+    private const val IMAGE_BASE = "${ASSET_BASE}images/"
+    private const val STREAMING_SERVICE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Streaming%20Services/"
+    private const val GENRE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Genres/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
     private const val MARVEL_ADDON_URL = "https://addon-marvel.onrender.com/catalog/marvel-mcu/manifest.json"
     private const val DC_ADDON_URL = "https://addon-dc-cq85.onrender.com/catalog/dc-chronological/manifest.json"
     private const val STAR_WARS_ADDON_URL = "https://addon-star-wars-u9e3.onrender.com/catalog/sw-movies-series-chronological/manifest.json"
-    private val TEMPLATE_IMAGE_BASE = "https://raw.githubusercontent.com/elucidationvortex-source/" +
-        "nu" + "viotemplate/refs/heads/main/images/"
+    private const val TEMPLATE_IMAGE_BASE = IMAGE_BASE
     private val UPLOADED_COVER_BASE = "https://" + "nu" + "vioapp.space/uploads/covers/"
 
     val railOrder = listOf(

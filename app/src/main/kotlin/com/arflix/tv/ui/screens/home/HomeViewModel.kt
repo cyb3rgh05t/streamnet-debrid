@@ -128,6 +128,18 @@ internal fun orderHomeCategories(
     return continueWatching + ordered + remaining
 }
 
+internal fun resolveCachedCollectionCatalog(
+    item: MediaItem,
+    catalogsByMediaId: Map<Int, CatalogConfig>,
+    catalogById: (String) -> CatalogConfig?,
+): CatalogConfig? {
+    catalogsByMediaId[item.id]?.let { return it }
+    val status = item.status ?: return null
+    if (!status.startsWith("collection:")) return null
+    val catalogId = status.removePrefix("collection:").takeIf { it.isNotBlank() } ?: return null
+    return catalogById(catalogId)
+}
+
 @androidx.compose.runtime.Immutable
 data class HomeUiState(
     val isLoading: Boolean = false,
@@ -353,15 +365,16 @@ class HomeViewModel @Inject constructor(
     /** Returns the service / franchise hero-video URL for a focused collection tile, or null. */
     fun getCollectionHeroVideoUrl(item: MediaItem): String? {
         if (!isCollectionItem(item)) return null
-        return collectionCatalogByMediaId[item.id]?.collectionHeroVideoUrl
+        return resolveCollectionCatalog(item)?.collectionHeroVideoUrl
             ?.takeIf { it.isNotBlank() }
     }
 
     fun getCollectionHeroImageUrl(item: MediaItem): String? {
         if (!isCollectionItem(item)) return null
-        return collectionCatalogByMediaId[item.id]?.collectionHeroImageUrl
+        val catalog = resolveCollectionCatalog(item)
+        return catalog?.collectionHeroImageUrl
             ?.takeIf { it.isNotBlank() }
-            ?: collectionCatalogByMediaId[item.id]?.collectionCoverImageUrl?.takeIf { it.isNotBlank() }
+            ?: catalog?.collectionCoverImageUrl?.takeIf { it.isNotBlank() }
     }
 
     private fun isActionableMediaItem(item: MediaItem): Boolean {
@@ -1339,9 +1352,12 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun persistContinueWatchingCache(items: List<ContinueWatchingItem>) {
-        if (items.isEmpty()) return
         runCatching {
             val target = continueWatchingCacheFile()
+            if (items.isEmpty()) {
+                target.delete()
+                return@runCatching
+            }
             val temporary = java.io.File(target.parentFile, "${target.name}.tmp")
             temporary.writeText(gson.toJson(items.take(Constants.MAX_CONTINUE_WATCHING)))
             if (target.exists() && !target.delete()) {
@@ -1981,6 +1997,11 @@ class HomeViewModel @Inject constructor(
                     .firstOrNull { it.id == "continue_watching" }
                     ?.items
                     .orEmpty()
+                if (update is ContinueWatchingUpdate.Remove) {
+                    withContext(Dispatchers.IO) {
+                        persistContinueWatchingCache(emptyList())
+                    }
+                }
                 lastContinueWatchingItems = continueWatchingItems
                 lastContinueWatchingUpdateMs = SystemClock.elapsedRealtime()
                 _uiState.value = _uiState.value.copy(categories = categories)
@@ -2069,25 +2090,22 @@ class HomeViewModel @Inject constructor(
         // resolveContinueWatchingItems call (which saves Trakt-only data to the cache).
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                val dismissedKeys = runCatching {
-                    traktRepository.getDismissedContinueWatchingShowKeys()
-                }.getOrDefault(emptySet())
-                val cached = preloadStartupContinueWatchingItems().filterNot { item ->
-                    dismissedKeys.contains("${item.mediaType.name}:${item.id}")
-                }
+                val cached = traktRepository.filterDismissedContinueWatchingItems(
+                    preloadStartupContinueWatchingItems()
+                )
                 if (cached.isNotEmpty()) {
                     val merged = mergeContinueWatchingResumeData(cached)
                     val cwCategory = Category(
                         id = "continue_watching",
                         title = "Continue Watching",
-                        items = merged.map { it.toMediaItem() }
+                        items = merged.map { it.toMediaItem(context) }
                     )
                     cwCategory.items.forEach { mediaRepository.cacheItem(it) }
 
                     // Set hero item IMMEDIATELY from raw CW data (before the slow
                     // merge step) so the hero section, clear logo, and overview text
                     // appear on the very first frame after profile selection.
-                    val rawFirstItem = cached.firstOrNull()?.toMediaItem()
+                    val rawFirstItem = cached.firstOrNull()?.toMediaItem(context)
                     val heroKey = rawFirstItem?.let { "${it.mediaType}_${it.id}" }
                     val heroLogo = heroKey?.let { getCachedLogo(it) }
 
@@ -2346,9 +2364,26 @@ class HomeViewModel @Inject constructor(
     private var cwFetchJob: Job? = null
     private val prefetchedDetailsKeys = Collections.synchronizedSet(mutableSetOf<String>())
     private val collectionCatalogByMediaId = ConcurrentHashMap<Int, CatalogConfig>()
+    private val defaultCollectionCatalogById: Map<String, CatalogConfig> by lazy(LazyThreadSafetyMode.NONE) {
+        mediaRepository.getDefaultCatalogConfigs()
+            .filter { it.kind == CatalogKind.COLLECTION }
+            .associateBy { it.id }
+    }
+
+    private fun resolveCollectionCatalog(item: MediaItem): CatalogConfig? {
+        val catalog = resolveCachedCollectionCatalog(
+            item = item,
+            catalogsByMediaId = collectionCatalogByMediaId,
+            catalogById = { catalogId ->
+                savedCatalogById[catalogId] ?: defaultCollectionCatalogById[catalogId]
+            }
+        ) ?: return null
+        collectionCatalogByMediaId[item.id] = catalog
+        return catalog
+    }
 
     fun getCollectionCatalog(item: MediaItem): CatalogConfig? {
-        return collectionCatalogByMediaId[item.id]
+        return resolveCollectionCatalog(item)
     }
 
     private val collectionTitleResById: Map<String, Int> = mapOf(
@@ -2534,7 +2569,7 @@ class HomeViewModel @Inject constructor(
         val continueWatchingCategory = Category(
             id = "continue_watching",
             title = "Continue Watching",
-            items = items.map { it.toMediaItem() }
+            items = items.map { it.toMediaItem(context) }
         )
         continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
         lastContinueWatchingItems = continueWatchingCategory.items
@@ -2564,6 +2599,27 @@ class HomeViewModel @Inject constructor(
             applyContentLanguageFromPrefs()
 
             try {
+                if (_uiState.value.categories.isEmpty()) {
+                    val persistedCatalogs = withContext(Dispatchers.IO) {
+                        runCatching { catalogRepository.getCatalogs() }.getOrDefault(emptyList())
+                    }
+                    val persistedSkeleton = buildProfileSkeletonCategories(
+                        savedCatalogs = persistedCatalogs,
+                        cachedContinueWatching = emptyList()
+                    )
+                    if (requestId != loadHomeRequestId) return@loadHome
+                    if (persistedSkeleton.isNotEmpty()) {
+                        _uiState.value = _uiState.value.copy(
+                            isLoading = true,
+                            isInitialLoad = false,
+                            categories = persistedSkeleton,
+                            heroItem = null,
+                            heroLogoUrl = null,
+                            error = null
+                        )
+                    }
+                }
+
                 if (_uiState.value.categories.isEmpty()) {
                     // Build the early skeleton from the default catalog list minus any
                     // preinstalled catalogs the user has explicitly hidden for the active
@@ -2711,7 +2767,7 @@ class HomeViewModel @Inject constructor(
                                 Category(
                                     id = "continue_watching",
                                     title = "Continue Watching",
-                                    items = cachedContinueWatching.map { it.toMediaItem() }
+                                    items = cachedContinueWatching.map { it.toMediaItem(context) }
                                 )
                             )
                         }
@@ -2972,7 +3028,7 @@ class HomeViewModel @Inject constructor(
                     val cwCat = Category(
                         id = "continue_watching",
                         title = "Continue Watching",
-                        items = merged.map { it.toMediaItem() }
+                        items = merged.map { it.toMediaItem(context) }
                     )
                     categories.add(0, cwCat)
                 }
@@ -3193,7 +3249,7 @@ class HomeViewModel @Inject constructor(
                         val continueWatchingCategory = Category(
                             id = "continue_watching",
                             title = "Continue Watching",
-                            items = mergedContinueWatching.map { it.toMediaItem() }
+                            items = mergedContinueWatching.map { it.toMediaItem(context) }
                         )
                         continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
                         lastContinueWatchingItems = continueWatchingCategory.items
@@ -3562,7 +3618,7 @@ class HomeViewModel @Inject constructor(
                 Category(
                     id = "continue_watching",
                     title = "Continue Watching",
-                    items = cachedContinueWatching.map { it.toMediaItem() }
+                    items = cachedContinueWatching.map { it.toMediaItem(context) }
                 )
             )
         } else {
@@ -3883,7 +3939,7 @@ class HomeViewModel @Inject constructor(
                     val continueWatchingCategory = Category(
                         id = "continue_watching",
                         title = "Continue Watching",
-                        items = mergedContinueWatching.map { it.toMediaItem() }
+                        items = mergedContinueWatching.map { it.toMediaItem(context) }
                     )
                     continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
                     lastContinueWatchingItems = continueWatchingCategory.items
@@ -4324,7 +4380,7 @@ class HomeViewModel @Inject constructor(
             if (item.isPlaceholder) return
             heroUpdateJob?.cancel()
             heroDetailsJob?.cancel()
-            val catalog = collectionCatalogByMediaId[item.id]
+            val catalog = resolveCollectionCatalog(item)
             val collectionLogo = catalog?.collectionClearLogoUrl?.takeIf { it.isNotBlank() }
             // Prefer the high-res static hero art for the backdrop so the
             // hero area reads as a cinematic still rather than a looping GIF.
