@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "self-hosted-backend/**"
+      - "netlify-auth-site/delete-account.html"
       - ".github/workflows/publish-self-hosted-backend.yml"
   workflow_dispatch:
 
