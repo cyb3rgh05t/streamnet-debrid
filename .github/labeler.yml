@@ -10,7 +10,7 @@
 "area: auth-site":
   - changed-files:
       - any-glob-to-any-file:
-          - "netlify-auth-site/**"
+          - "legacy/netlify-auth-site/**"
 
 "area: backend":
   - changed-files:

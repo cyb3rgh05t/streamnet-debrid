@@ -203,7 +203,7 @@ Keep secrets in an untracked `.env` file or a server-side secret manager. Never 
 
 Existing cloud data can be preserved. The account snapshot already contains the profiles, profile settings, addons, catalogs, IPTV configuration, watchlist, Continue Watching state, watched state, and deletion tombstones needed for normal restore.
 
-The repository already contains `netlify-auth-site/scripts/import-supabase-export.mjs`. It reads a Supabase export in NDJSON format and selects the strongest snapshot per account from these sources:
+The repository already contains `legacy/netlify-auth-site/scripts/import-supabase-export.mjs`. It reads a Supabase export in NDJSON format and selects the strongest snapshot per account from these sources:
 
 - `public.account_sync_state.ndjson`
 - `public.user_settings.ndjson`

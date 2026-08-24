@@ -30,7 +30,7 @@ The API router deliberately has no Authelia middleware. Android TV and mobile ca
 
 `PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://auth.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
 
-The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory. `netlify-auth-site/` is no longer a runtime dependency for the self-hosted container.
+The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory. `legacy/netlify-auth-site/` is no longer a runtime dependency for the self-hosted container.
 
 Password reset remains unavailable on the self-hosted page until its server-side replacement is complete. Account deletion is available at `https://auth.mystreamnet.club/delete-account`; it requires a fresh sign-in and an exact `DELETE` confirmation, revokes the account sessions, removes the cloud snapshot, and removes pending TV pairing sessions. It does not fall back to Netlify.
 

@@ -6,7 +6,7 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 
 - `app/` - Android TV/mobile APK source
 - `self-hosted-backend/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
-- `netlify-auth-site/` - legacy Netlify reference implementation and migration source; not used by the self-hosted container runtime
+- `legacy/netlify-auth-site/` - legacy Netlify reference implementation and migration source; not used by the self-hosted container runtime
 - `supabase/` - legacy Supabase schema/functions retained for rollback and migration reference
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
@@ -65,13 +65,13 @@ Signed GitHub Actions builds download the AAR from `DISCORD_PARTNER_SDK_URL`. Fo
 
 ## Legacy Netlify Auth Site
 
-`netlify-auth-site/` contains the previous app-facing account backend and static auth pages. Active self-hosted pages are copied into `self-hosted-backend/public/` and packaged from there.
+`legacy/netlify-auth-site/` contains the previous app-facing account backend and static auth pages. Active self-hosted pages are copied into `self-hosted-backend/public/` and packaged from there.
 
 Useful commands:
 
 ```bash
-npm --prefix netlify-auth-site test
-netlify deploy --dir netlify-auth-site --prod
+npm --prefix legacy/netlify-auth-site test
+netlify deploy --dir legacy/netlify-auth-site --prod
 ```
 
 The linked production site should be the StreamNet auth/sync project, not upstream ARVIO infrastructure.
