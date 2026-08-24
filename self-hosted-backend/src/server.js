@@ -21,6 +21,7 @@ const signupAttemptsByEmail = new Map();
 const signupCooldownMs = 5 * 60_000;
 const tvAuthTtlMs = 10 * 60_000;
 const publicDirectory = path.join(process.cwd(), "public");
+const deletionReceipts = new Map();
 
 function randomCode(length) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -152,6 +153,16 @@ app.get("/", async (request, reply) => {
   return reply.type("text/html; charset=utf-8").send(selfHostedPage);
 });
 
+app.get("/delete-account", async (_request, reply) => {
+  const page = await readFile(
+    path.join(publicDirectory, "delete-account.html"),
+    "utf8",
+  );
+  return reply
+    .type("text/html; charset=utf-8")
+    .send(page.replaceAll('const FUNCTIONS = "/.netlify/functions";', 'const FUNCTIONS = "";'));
+});
+
 app.post("/auth-login", async (request, reply) => {
   const email = String(request.body?.email || "")
     .trim()
@@ -255,6 +266,48 @@ app.post("/auth-refresh", async (request, reply) => {
   } finally {
     client.release();
   }
+});
+
+app.post("/account-delete-start", async (request, reply) => {
+  const account = await authenticatedAccount(request);
+  if (request.body?.confirmation !== "DELETE")
+    return reply.code(400).send({ error: "Type DELETE to confirm" });
+
+  const receiptToken = newRefreshToken();
+  const jobId = newRefreshToken();
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    await client.query(
+      "delete from tv_device_auth_sessions where account_id = $1",
+      [account.id],
+    );
+    await client.query("delete from accounts where id = $1", [account.id]);
+    await client.query("commit");
+    deletionReceipts.set(`${jobId}:${hashToken(receiptToken)}`, {
+      status: "complete",
+      expiresAt: Date.now() + 10 * 60_000,
+    });
+    return reply.send({ job_id: jobId, receipt_token: receiptToken });
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
+});
+
+app.post("/account-delete-status", async (request, reply) => {
+  const jobId = String(request.body?.job_id || "");
+  const receiptToken = String(request.body?.receipt_token || "");
+  const key = `${jobId}:${hashToken(receiptToken)}`;
+  const receipt = deletionReceipts.get(key);
+  if (!receipt || Date.now() > receipt.expiresAt) {
+    deletionReceipts.delete(key);
+    return reply.code(404).send({ error: "Deletion receipt not found" });
+  }
+  deletionReceipts.delete(key);
+  return reply.send({ status: receipt.status });
 });
 
 app.post("/tv-auth-start", async (_request, reply) => {
