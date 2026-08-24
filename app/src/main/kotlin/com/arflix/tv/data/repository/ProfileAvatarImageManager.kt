@@ -160,64 +160,13 @@ class ProfileAvatarImageManager @Inject constructor(
 
     private suspend fun uploadAvatar(profileId: String, version: Long, file: File): Result<String> =
         withContext(Dispatchers.IO) {
-            try {
-                if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-                    error("Remote avatar storage is handled by account sync")
-                }
-                val userId = authRepository.getCurrentUserId().orEmpty()
-                val token = authRepository.getAccessToken().orEmpty()
-                if (userId.isBlank() || token.isBlank()) error(context.getString(R.string.error_not_logged_in))
-
-                val path = "$userId/$profileId/$version.jpg"
-                val request = Request.Builder()
-                    .url("${Constants.SUPABASE_URL.trimEnd('/')}/storage/v1/object/$BUCKET/$path")
-                    .header("apikey", Constants.SUPABASE_ANON_KEY)
-                    .header("Authorization", "Bearer $token")
-                    .header("Content-Type", "image/jpeg")
-                    .header("cache-control", "31536000")
-                    .header("x-upsert", "true")
-                    .post(file.asRequestBody("image/jpeg".toMediaType()))
-                    .build()
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) error(context.getString(R.string.avatar_upload_failed, response.code))
-                }
-                Result.success(path)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: java.io.IOException) {
-                Result.failure(e)
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+            Result.failure(IllegalStateException("Remote avatar storage is disabled; use inline account sync"))
+        }
         }
 
     private suspend fun downloadAvatar(storagePath: String, destination: File): Result<Unit> =
         withContext(Dispatchers.IO) {
-            try {
-                if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-                    error("Remote avatar storage is handled by account sync")
-                }
-                val token = authRepository.getAccessToken().orEmpty()
-                if (token.isBlank()) error(context.getString(R.string.error_not_logged_in))
-                val request = Request.Builder()
-                    .url("${Constants.SUPABASE_URL.trimEnd('/')}/storage/v1/object/$BUCKET/$storagePath")
-                    .header("apikey", Constants.SUPABASE_ANON_KEY)
-                    .header("Authorization", "Bearer $token")
-                    .get()
-                    .build()
-                httpClient.newCall(request).execute().use { response ->
-                    if (!response.isSuccessful) error(context.getString(R.string.avatar_download_failed, response.code))
-                    val bytes = response.body?.bytes() ?: error(context.getString(R.string.avatar_response_empty))
-                    destination.writeBytes(bytes)
-                }
-                Result.success(Unit)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: java.io.IOException) {
-                Result.failure(e)
-            } catch (e: Exception) {
-                Result.failure(e)
-            }
+            Result.failure(IllegalStateException("Remote avatar storage is disabled; use inline account sync"))
         }
 
     private suspend fun loadInlineAvatarFromCloud(profileId: String): String? {

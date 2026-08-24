@@ -150,10 +150,6 @@
                 android:value="androidx.startup"
                 tools:node="remove" />
             <meta-data
-                android:name="io.github.jan.supabase.gotrue.SupabaseInitializer"
-                android:value="androidx.startup"
-                tools:node="remove" />
-            <meta-data
                 android:name="androidx.lifecycle.ProcessLifecycleInitializer"
                 android:value="androidx.startup"
                 tools:node="remove" />

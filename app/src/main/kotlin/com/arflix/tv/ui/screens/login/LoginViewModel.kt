@@ -1,8 +1,6 @@
 package com.arflix.tv.ui.screens.login
 
 import android.content.Context
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arflix.tv.R
@@ -24,7 +22,6 @@ data class LoginUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val authState: AuthState = AuthState.Loading,
-    val googleSignInRequest: GetCredentialRequest? = null,
     val loginReady: Boolean = false
 )
 
@@ -125,45 +122,8 @@ class LoginViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Initiate Google Sign-In - returns the request for the Activity to handle
-     */
-    fun getGoogleSignInRequest(): GetCredentialRequest {
-        return authRepository.getGoogleSignInRequest()
-    }
-
-    /**
-     * Handle Google Sign-In result from the Activity
-     */
-    fun handleGoogleSignInResult(result: GetCredentialResponse) {
-        viewModelScope.launch {
-            _uiState.update { it.copy(isLoading = true, error = null) }
-
-            val authResult = authRepository.handleGoogleSignInResult(result)
-
-            if (authResult.isSuccess) {
-                runCatching { cloudSyncRepository.pullFromCloud(pushPendingLocalFirst = false) }
-                runCatching { streamRepository.syncAddonsFromCloud() }
-            }
-
-            _uiState.update { state ->
-                state.copy(
-                    isLoading = false,
-                    error = authResult.exceptionOrNull()?.message,
-                    loginReady = authResult.isSuccess
-                )
-            }
-        }
-    }
-
     fun onLoginNavigationHandled() {
         _uiState.update { it.copy(loginReady = false) }
     }
 
-    /**
-     * Handle Google Sign-In error
-     */
-    fun handleGoogleSignInError(error: String) {
-        _uiState.update { it.copy(isLoading = false, error = error) }
-    }
 }

@@ -33,8 +33,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 353
-        versionName = "2.1.005"
+        versionCode = 354
+        versionName = "2.1.006"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -46,7 +46,6 @@ android {
         buildConfigField("Boolean", "ENABLE_REALTIME_WATCH_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "true")
         buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
-        buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")
         buildConfigField("Boolean", "DISCORD_RICH_PRESENCE_AVAILABLE", hasDiscordSdk.toString())
         buildConfigField(
             "String",
@@ -188,7 +187,6 @@ android {
                 "\"${escapeBuildConfigString(localSecretValue("SELF_HOSTED_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
             )
             buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
-            buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")
             buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
             buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "false")
         }
@@ -390,9 +388,6 @@ ksp {
     implementation("io.coil-kt:coil-svg:2.5.0")
     implementation("com.google.zxing:core:3.5.3")
 
-    // Supabase (optional - for cloud sync)
-    implementation("io.github.jan-tennert.supabase:postgrest-kt:2.0.4")
-    implementation("io.github.jan-tennert.supabase:gotrue-kt:2.0.4")
     implementation("io.ktor:ktor-client-android:2.3.7")
     // Ktor server modules used by Telegram streaming proxy
     implementation("io.ktor:ktor-server-core:2.3.7")
@@ -402,11 +397,6 @@ ksp {
 
     // DataStore for preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
-
-    // Google Sign-In / Credential Manager for TV
-    implementation("androidx.credentials:credentials:1.3.0")
-    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
-    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     // WorkManager for background sync
     implementation("androidx.work:work-runtime-ktx:2.9.0")

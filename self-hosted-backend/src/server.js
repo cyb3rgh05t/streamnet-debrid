@@ -85,6 +85,258 @@ app.get("/health", async () => {
   return { ok: true };
 });
 
+function watchHistoryKey({
+  profile_id: profileId,
+  profileId: camelProfileId,
+  media_type: mediaType,
+  mediaType: camelMediaType,
+  show_tmdb_id: showTmdbId,
+  showTmdbId: camelShowTmdbId,
+  season,
+  episode,
+}) {
+  return [
+    String(profileId ?? camelProfileId ?? "default"),
+    String(mediaType ?? camelMediaType ?? ""),
+    String(showTmdbId ?? camelShowTmdbId ?? ""),
+    String(season ?? ""),
+    String(episode ?? ""),
+  ].join("|");
+}
+
+function watchHistoryPayload(row) {
+  return {
+    ...row.payload,
+    id: row.id,
+    user_id: row.payload.user_id,
+    profile_id: row.profile_id,
+    media_type: row.media_type,
+    show_tmdb_id: row.show_tmdb_id,
+    season: row.season,
+    episode: row.episode,
+    updated_at: row.updated_at,
+  };
+}
+
+app.get("/watch-history", async (request) => {
+  const account = await authenticatedAccount(request);
+  const query = request.query || {};
+  const values = [account.id];
+  const filters = ["account_id = $1"];
+  if (query.profile_id) {
+    values.push(String(query.profile_id));
+    filters.push(`profile_id = $${values.length}`);
+  }
+  if (query.show_tmdb_id) {
+    values.push(Number(query.show_tmdb_id));
+    filters.push(`show_tmdb_id = $${values.length}`);
+  }
+  if (query.media_type) {
+    values.push(String(query.media_type));
+    filters.push(`media_type = $${values.length}`);
+  }
+  if (query.season !== undefined && query.season !== "") {
+    values.push(Number(query.season));
+    filters.push(`season = $${values.length}`);
+  }
+  if (query.episode !== undefined && query.episode !== "") {
+    values.push(Number(query.episode));
+    filters.push(`episode = $${values.length}`);
+  }
+  const result = await pool.query(
+    `select id, payload, profile_id, media_type, show_tmdb_id, season, episode, updated_at
+       from watch_history
+      where ${filters.join(" and ")}
+      order by updated_at desc
+      limit 500`,
+    values,
+  );
+  return result.rows.map(watchHistoryPayload);
+});
+
+app.post("/watch-history", async (request, reply) => {
+  const account = await authenticatedAccount(request);
+  const body = request.body || {};
+  const mediaType = String(body.media_type || "").trim();
+  const showTmdbId = Number(body.show_tmdb_id);
+  if (!mediaType || !Number.isInteger(showTmdbId) || showTmdbId <= 0)
+    return reply
+      .code(400)
+      .send({ error: "media_type and show_tmdb_id are required" });
+  const profileId = String(body.profile_id || "default");
+  const historyKey = watchHistoryKey(body);
+  const result = await pool.query(
+    `insert into watch_history (
+       account_id, history_key, profile_id, media_type, show_tmdb_id,
+       season, episode, payload, updated_at
+     ) values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, now())
+     on conflict (account_id, history_key) do update set
+       payload = excluded.payload,
+       profile_id = excluded.profile_id,
+       media_type = excluded.media_type,
+       show_tmdb_id = excluded.show_tmdb_id,
+       season = excluded.season,
+       episode = excluded.episode,
+       updated_at = now()
+     returning id, payload, profile_id, media_type, show_tmdb_id, season, episode, updated_at`,
+    [
+      account.id,
+      historyKey,
+      profileId,
+      mediaType,
+      showTmdbId,
+      body.season ?? null,
+      body.episode ?? null,
+      JSON.stringify(body),
+    ],
+  );
+  return watchHistoryPayload(result.rows[0]);
+});
+
+app.delete("/watch-history", async (request, reply) => {
+  const account = await authenticatedAccount(request);
+  const query = request.query || {};
+  const values = [account.id];
+  const filters = ["account_id = $1"];
+  for (const [name, expression] of [
+    ["profile_id", "profile_id ="],
+    ["media_type", "media_type ="],
+    ["show_tmdb_id", "show_tmdb_id ="],
+    ["season", "season ="],
+    ["episode", "episode ="],
+  ]) {
+    if (query[name] === undefined || query[name] === "") continue;
+    values.push(
+      name === "show_tmdb_id" || name === "season" || name === "episode"
+        ? Number(query[name])
+        : String(query[name]),
+    );
+    filters.push(`${expression} $${values.length}`);
+  }
+  await pool.query(
+    `delete from watch_history where ${filters.join(" and ")}`,
+    values,
+  );
+  return reply.code(204).send();
+});
+
+function stateQueryValue(value) {
+  const raw = String(value ?? "");
+  return raw.startsWith("eq.") ? raw.slice(3) : raw;
+}
+
+function watchStateKey(type, body) {
+  if (type === "watched_movies") {
+    return `${body.profile_id || "default"}|${body.tmdb_id}`;
+  }
+  if (type === "watched_episodes") {
+    return `${body.profile_id || "default"}|${body.tmdb_id}|${body.season}|${body.episode}`;
+  }
+  return String(body.profile_id || "default");
+}
+
+function watchStateProfile(query) {
+  return stateQueryValue(query.profile_id);
+}
+
+async function readWatchState(type, request) {
+  const account = await authenticatedAccount(request);
+  const query = request.query || {};
+  const values = [account.id, type];
+  const filters = ["account_id = $1", "state_type = $2"];
+  const fields =
+    type === "watched_movies"
+      ? [
+          ["profile_id", "profile_id"],
+          ["tmdb_id", "(payload->>'tmdb_id')::integer"],
+        ]
+      : type === "watched_episodes"
+        ? [
+            ["profile_id", "profile_id"],
+            ["tmdb_id", "(payload->>'tmdb_id')::integer"],
+            ["season", "(payload->>'season')::integer"],
+            ["episode", "(payload->>'episode')::integer"],
+          ]
+        : [["profile_id", "profile_id"]];
+  for (const [queryName, column] of fields) {
+    if (query[queryName] === undefined || query[queryName] === "") continue;
+    values.push(
+      Number.isNaN(Number(stateQueryValue(query[queryName])))
+        ? stateQueryValue(query[queryName])
+        : Number(stateQueryValue(query[queryName])),
+    );
+    filters.push(`${column} = $${values.length}`);
+  }
+  const result = await pool.query(
+    `select payload from watch_state where ${filters.join(" and ")} order by updated_at desc limit 5000`,
+    values,
+  );
+  return result.rows.map((row) => row.payload);
+}
+
+async function writeWatchState(type, request) {
+  const account = await authenticatedAccount(request);
+  const records = Array.isArray(request.body)
+    ? request.body
+    : [request.body || {}];
+  for (const payload of records) {
+    const profileId = String(payload.profile_id || "default");
+    await pool.query(
+      `insert into watch_state (account_id, state_type, state_key, profile_id, payload, updated_at)
+       values ($1, $2, $3, $4, $5::jsonb, now())
+       on conflict (account_id, state_type, state_key) do update set payload = excluded.payload, profile_id = excluded.profile_id, updated_at = now()`,
+      [
+        account.id,
+        type,
+        watchStateKey(type, payload),
+        profileId,
+        JSON.stringify(payload),
+      ],
+    );
+  }
+  return { accepted: true };
+}
+
+async function deleteWatchState(type, request, reply) {
+  const account = await authenticatedAccount(request);
+  const query = request.query || {};
+  const values = [account.id, type];
+  const filters = ["account_id = $1", "state_type = $2"];
+  for (const [name, expression] of [
+    ["profile_id", "profile_id"],
+    ["tmdb_id", "(payload->>'tmdb_id')::integer"],
+    ["season", "(payload->>'season')::integer"],
+    ["episode", "(payload->>'episode')::integer"],
+  ]) {
+    if (query[name] === undefined || query[name] === "") continue;
+    values.push(
+      Number(stateQueryValue(query[name])) || stateQueryValue(query[name]),
+    );
+    filters.push(`${expression} = $${values.length}`);
+  }
+  await pool.query(
+    `delete from watch_state where ${filters.join(" and ")}`,
+    values,
+  );
+  return reply.code(204).send();
+}
+
+for (const [type, pathName] of [
+  ["watched_movies", "watched-movies"],
+  ["watched_episodes", "watched-episodes"],
+  ["sync_state", "sync-state"],
+]) {
+  app.get(`/watch-state/${pathName}`, (request) =>
+    readWatchState(type, request),
+  );
+  app.post(`/watch-state/${pathName}`, (request) =>
+    writeWatchState(type, request),
+  );
+  app.delete(`/watch-state/${pathName}`, (request, reply) =>
+    deleteWatchState(type, request, reply),
+  );
+}
+
 app.post("/app-usage-event", async (request, reply) => {
   const body = request.body || {};
   const eventName = String(body.event_name || "").trim();

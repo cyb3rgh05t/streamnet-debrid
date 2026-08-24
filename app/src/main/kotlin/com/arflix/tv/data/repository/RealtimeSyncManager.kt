@@ -188,12 +188,8 @@ class RealtimeSyncManager @Inject constructor(
 
     private fun connectWebSocketWithToken(userId: String, accessToken: String) {
         if (!isRunning.get()) return
-
-        val supabaseUrl = Constants.SUPABASE_URL
-            .replace("https://", "wss://")
-            .replace("http://", "ws://")
-        val wsUrl = "$supabaseUrl/realtime/v1/websocket?apikey=${Constants.SUPABASE_ANON_KEY}&vsn=1.0.0"
-
+        Log.i(TAG, "Realtime socket is unavailable; periodic account pulls remain enabled")
+        /*
         val request = Request.Builder().url(wsUrl).build()
         currentAccessToken = accessToken
 
@@ -234,6 +230,7 @@ class RealtimeSyncManager @Inject constructor(
                 }
             }
         })
+        */
     }
 
     private fun joinChannel(ws: WebSocket, userId: String) {

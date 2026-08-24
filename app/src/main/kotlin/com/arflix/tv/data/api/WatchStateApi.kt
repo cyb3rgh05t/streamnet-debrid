@@ -10,20 +10,20 @@ import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
- * Supabase REST API interface for watch history and user data
+ * Self-hosted REST API interface for watch history and watched state.
  *
  * Tables used:
  * - watch_history: Playback progress (position, duration, progress%)
- * - watched_movies: Movies marked as watched (source of truth)
- * - watched_episodes: Episodes marked as watched (source of truth)
+ * - watched_movies: Movies marked as watched
+ * - watched_episodes: Episodes marked as watched
  * - episode_progress: In-progress episode playback state
  * - sync_state: Tracks last Trakt sync timestamps
  */
-interface SupabaseApi {
+interface WatchStateApi {
 
     // ========== Watch History (Playback Progress) ==========
 
-    @GET("rest/v1/watch_history")
+    @GET("watch-history")
     suspend fun getWatchHistory(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -37,7 +37,7 @@ interface SupabaseApi {
         @Query("offset") offset: Int? = null
     ): List<WatchHistoryRecord>
 
-    @POST("rest/v1/watch_history")
+    @POST("watch-history")
     suspend fun upsertWatchHistory(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -45,7 +45,7 @@ interface SupabaseApi {
         @Body item: WatchHistoryRecord
     )
 
-    @GET("rest/v1/watch_history")
+    @GET("watch-history")
     suspend fun getWatchHistoryItem(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -61,7 +61,7 @@ interface SupabaseApi {
         @Query("limit") limit: Int? = null
     ): List<WatchHistoryRecord>
 
-    @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/watch_history", hasBody = false)
+    @retrofit2.http.HTTP(method = "DELETE", path = "watch-history", hasBody = false)
     suspend fun deleteWatchHistory(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -74,7 +74,7 @@ interface SupabaseApi {
         @Query("source") source: String? = null
     )
 
-    @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/watch_history", hasBody = false)
+    @retrofit2.http.HTTP(method = "DELETE", path = "watch-history", hasBody = false)
     suspend fun deleteWatchHistoryByIds(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -131,7 +131,7 @@ interface SupabaseApi {
 
     // ========== Watched Status (from Trakt sync) ==========
 
-    @GET("rest/v1/watched_movies")
+    @GET("watch-state/watched-movies")
     suspend fun getWatchedMovies(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -143,7 +143,7 @@ interface SupabaseApi {
         @Query("limit") limit: Int = 1000
     ): List<WatchedMovieRecord>
 
-    @GET("rest/v1/watched_episodes")
+    @GET("watch-state/watched-episodes")
     suspend fun getWatchedEpisodes(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -156,7 +156,7 @@ interface SupabaseApi {
     ): List<WatchedEpisodeRecord>
 
     /** Targeted query for a single show's watched episodes */
-    @GET("rest/v1/watched_episodes")
+    @GET("watch-state/watched-episodes")
     suspend fun getWatchedEpisodesForShow(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -166,7 +166,7 @@ interface SupabaseApi {
         @Query("select") select: String = "user_id,profile_id,tmdb_id,show_trakt_id,season,episode,trakt_episode_id,tmdb_episode_id,watched_at,updated_at,source"
     ): List<WatchedEpisodeRecord>
 
-    @POST("rest/v1/watched_movies")
+    @POST("watch-state/watched-movies")
     suspend fun markMovieWatched(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -174,7 +174,7 @@ interface SupabaseApi {
         @Body record: WatchedMovieRecord
     )
 
-    @POST("rest/v1/watched_episodes")
+    @POST("watch-state/watched-episodes")
     suspend fun markEpisodeWatched(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -183,7 +183,7 @@ interface SupabaseApi {
     )
 
     /** RPC-based episode watched write — bypasses PostgREST table endpoint for reliable persistence */
-    @POST("rest/v1/rpc/mark_episode_watched")
+    @POST("watch-state/watched-episodes")
     suspend fun markEpisodeWatchedRpc(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -191,7 +191,7 @@ interface SupabaseApi {
         @Body params: MarkEpisodeWatchedParams
     )
 
-    @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/watched_movies", hasBody = false)
+    @retrofit2.http.HTTP(method = "DELETE", path = "watch-state/watched-movies", hasBody = false)
     suspend fun deleteWatchedMovie(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -200,7 +200,7 @@ interface SupabaseApi {
         @Query("tmdb_id") tmdbId: String
     )
 
-    @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/watched_episodes", hasBody = false)
+    @retrofit2.http.HTTP(method = "DELETE", path = "watch-state/watched-episodes", hasBody = false)
     suspend fun deleteWatchedEpisode(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -242,7 +242,7 @@ interface SupabaseApi {
 
     // ========== Sync State (Trakt sync tracking) ==========
 
-    @GET("rest/v1/sync_state")
+    @GET("watch-state/sync-state")
     suspend fun getSyncState(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -251,7 +251,7 @@ interface SupabaseApi {
         @Query("select") select: String = "*"
     ): List<SyncStateRecord>
 
-    @POST("rest/v1/sync_state")
+    @POST("watch-state/sync-state")
     suspend fun upsertSyncState(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -261,7 +261,7 @@ interface SupabaseApi {
 
     // ========== Bulk Operations ==========
 
-    @POST("rest/v1/watched_episodes")
+    @POST("watch-state/watched-episodes")
     suspend fun bulkUpsertWatchedEpisodes(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
@@ -269,7 +269,7 @@ interface SupabaseApi {
         @Body records: List<WatchedEpisodeRecord>
     )
 
-    @POST("rest/v1/watched_movies")
+    @POST("watch-state/watched-movies")
     suspend fun bulkUpsertWatchedMovies(
         @Header("Authorization") auth: String,
         @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,

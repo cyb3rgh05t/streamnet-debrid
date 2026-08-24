@@ -5,11 +5,12 @@ import com.arflix.tv.data.api.AniSkipApi
 import com.arflix.tv.data.api.ArmApi
 import com.arflix.tv.data.api.IntroDbApi
 import com.arflix.tv.data.api.StreamApi
-import com.arflix.tv.data.api.SupabaseApi
+import com.arflix.tv.data.api.WatchStateApi
 import com.arflix.tv.data.api.TmdbApi
 import com.arflix.tv.data.api.TraktApi
 import com.arflix.tv.data.api.TvdbApi
 import com.arflix.tv.data.api.FanartApi
+import com.arflix.tv.data.api.WatchHistoryApi
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.Constants
 import dagger.Module
@@ -199,18 +200,30 @@ object AppModule {
     @Provides
     @Singleton
     @JvmStatic
-    fun provideSupabaseApi(okHttpClient: OkHttpClient): SupabaseApi {
+    fun provideWatchStateApi(okHttpClient: OkHttpClient): WatchStateApi {
         // Supabase API client without disk cache to prevent OkHttp from returning
         // cached responses for POST/upsert operations (which silently drops writes)
         val noCacheClient = okHttpClient.newBuilder()
             .cache(null)
             .build()
         return Retrofit.Builder()
-            .baseUrl(Constants.SUPABASE_URL + "/")
+            .baseUrl(Constants.NETLIFY_BACKEND_URL + "/")
             .client(noCacheClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
-            .create(SupabaseApi::class.java)
+            .create(WatchStateApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideWatchHistoryApi(okHttpClient: OkHttpClient): WatchHistoryApi {
+        return Retrofit.Builder()
+            .baseUrl(Constants.NETLIFY_BACKEND_URL + "/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(WatchHistoryApi::class.java)
     }
 
     @Provides

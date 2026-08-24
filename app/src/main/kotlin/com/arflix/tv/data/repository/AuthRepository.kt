@@ -3,11 +3,6 @@ package com.arflix.tv.data.repository
 import android.content.Context
 import android.util.Base64
 import android.util.Log
-import androidx.credentials.CredentialManager
-import androidx.credentials.CustomCredential
-import androidx.credentials.GetCredentialRequest
-import androidx.credentials.GetCredentialResponse
-import androidx.credentials.exceptions.GetCredentialException
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -20,24 +15,8 @@ import com.arflix.tv.util.authDataStore
 import com.arflix.tv.util.settingsDataStore
 import com.arflix.tv.util.hash
 import com.arflix.tv.util.sanitizeEmail
-import com.google.android.libraries.identity.googleid.GetGoogleIdOption
-import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
-import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.gson.JsonParser
 import dagger.hilt.android.qualifiers.ApplicationContext
-import io.github.jan.supabase.SupabaseClient
-import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.gotrue.Auth
-import io.github.jan.supabase.gotrue.auth
-import io.github.jan.supabase.gotrue.MemoryCodeVerifierCache
-import io.github.jan.supabase.gotrue.providers.Google
-import io.github.jan.supabase.gotrue.providers.builtin.Email
-import io.github.jan.supabase.gotrue.providers.builtin.IDToken
-import io.github.jan.supabase.gotrue.user.UserSession
-import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -99,79 +78,6 @@ private data class UserSettingsAccountSyncRow(
 @Serializable
 private data class UserSettingsAccountSyncUpdate(
     val user_id: String,
-    val settings: JsonObject
-)
-
-@Serializable
-private data class UserSettingsSettingsUpdate(
-    val settings: JsonObject
-)
-
-@Serializable
-private data class ProfileAccountSyncRow(
-    val addons: String? = null
-)
-
-@Serializable
-private data class ProfileAccountSyncUpdate(
-    val addons: String
-)
-
-private data class AccountSyncPayloadCandidate(
-    val source: String,
-    val payload: String,
-    val updatedAtMillis: Long,
-    val revision: Long? = null
-)
-
-private class AccountSyncPayloadRejectedException(message: String) : Exception(message)
-
-internal class AccountSyncRevisionConflictException(
-    val currentPayload: String?,
-    val currentRevision: Long
-) : Exception("Cloud sync revision conflict: current revision is $currentRevision")
-
-internal data class AccountSyncSnapshot(
-    val payload: String?,
-    val revision: Long?
-)
-
-private class NetlifyCloudSyncHttpException(
-    val statusCode: Int,
-    val responseBody: String
-) : Exception("Netlify cloud sync failed ($statusCode): ${safePostgrestError(responseBody)}")
-
-private fun parseJsonObject(payload: String): com.google.gson.JsonObject? {
-    return try { JsonParser().parse(payload).asJsonObject } catch (e: com.google.gson.JsonSyntaxException) { null } catch (e: IllegalStateException) { null }
-}
-
-internal fun accountSyncPayloadProfileCount(payload: String): Int? {
-    val root = parseJsonObject(payload) ?: return null
-    if (!root.has("profiles")) return null
-    return root.get("profiles")
-        ?.takeIf { !it.isJsonNull && it.isJsonArray }
-        ?.asJsonArray
-        ?.size()
-        ?: 0
-}
-
-internal fun accountSyncPayloadScopedCoverage(payload: String): Int {
-    val root = parseJsonObject(payload) ?: return 0
-    val profileIds = root.get("profiles")
-        ?.takeIf { !it.isJsonNull && it.isJsonArray }
-        ?.asJsonArray
-        ?.mapNotNull { profile ->
-            profile
-                ?.takeIf { !it.isJsonNull && it.isJsonObject }
-                ?.asJsonObject
-                ?.stringValue("id")
-                ?.takeIf { it.isNotBlank() }
-        }
-        ?.toSet()
-        .orEmpty()
-    if (profileIds.isEmpty()) return 0
-
-    val scopedKeys = listOf(
         "profileSettingsById",
         "addonsByProfile",
         "catalogsByProfile",
@@ -403,24 +309,6 @@ class AuthRepository @Inject constructor(
         val USER_EMAIL = stringPreferencesKey("user_email")
     }
 
-    // Keep reference to session manager for explicit saves
-    private val sessionManager = DataStoreSessionManager(context.authDataStore)
-
-    // Supabase client (lazy to avoid startup overhead when unauthenticated)
-    private val supabase: SupabaseClient by lazy {
-        createSupabaseClient(
-            supabaseUrl = Constants.SUPABASE_URL,
-            supabaseKey = Constants.SUPABASE_ANON_KEY
-        ) {
-            install(Auth) {
-                sessionManager = this@AuthRepository.sessionManager
-                codeVerifierCache = MemoryCodeVerifierCache()
-                autoLoadFromStorage = true
-                autoSaveToStorage = true
-            }
-            install(Postgrest)
-        }
-    }
 
     // Auth state
     private val _authState = MutableStateFlow<AuthState>(AuthState.Loading)
@@ -477,78 +365,7 @@ class AuthRepository @Inject constructor(
                 return
             }
 
-            var session: UserSession? = null
-
-            // Supabase SDK requires main thread for initialization (lifecycle observers)
-            // First try: Load from SessionManager via Supabase SDK
-            try {
-                session = withTimeoutOrNull(2_500L) {
-                    withContext(Dispatchers.Main) {
-                        supabase.auth.loadFromStorage(true)
-                        supabase.auth.currentSessionOrNull()
-                    }
-                }
-            } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            }
-
-            // Second try: Import from cached tokens
-            if (session == null && hasAccessToken && hasRefreshToken) {
-                try {
-                    session = withTimeoutOrNull(2_500L) {
-                        withContext(Dispatchers.Main) {
-                            supabase.auth.importAuthToken(accessToken ?: "", refreshToken ?: "", false, true)
-                            supabase.auth.currentSessionOrNull()
-                        }
-                    }
-                    if (session != null) {
-                        // Save the imported session to SessionManager
-                        storeSession(session)
-                    }
-                } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-
-                }
-            }
-
-            // Third try: Refresh the session
-            if (session == null && hasRefreshToken) {
-                session = withTimeoutOrNull(3_000L) {
-                    withContext(Dispatchers.Main) {
-                        ensureValidSession()
-                    }
-                }
-            }
-            if (hasAccessToken || hasRefreshToken || session != null || !cachedUserId.isNullOrBlank()) {
-                val userId = session?.user?.id ?: cachedUserId
-                val email = session?.user?.email ?: cachedEmail
-
-                if (session != null && userId != null && email != null) {
-                    storeSession(session)
-                    // Load profile
-                    val profile = withTimeoutOrNull(3_000L) { loadUserProfile(userId) }
-                    _userProfile.value = profile
-                    _authState.value = AuthState.Authenticated(userId, email, profile)
-                } else if (userId != null && email != null) {
-                    // Fallback to cached identity even if refresh failed (avoid forcing daily logins).
-                    val profile = try {
-                        withTimeoutOrNull(3_000L) { loadUserProfile(userId) }
-                    } catch (_: Exception) {
-                        null
-                    } ?: UserProfile(id = userId, email = email)
-                    traktRepositoryProvider.get().setUserId(userId)
-                    withTimeoutOrNull(1_500L) {
-                        traktRepositoryProvider.get().syncLocalTokensToProfileIfNeeded()
-                    }
-                    _userProfile.value = profile
-                    _authState.value = AuthState.Authenticated(userId, email, profile)
-                } else {
-                    _authState.value = AuthState.NotAuthenticated
-                }
-            } else {
-                _authState.value = AuthState.NotAuthenticated
-            }
+            _authState.value = AuthState.NotAuthenticated
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
@@ -579,33 +396,9 @@ class AuthRepository @Inject constructor(
                 }
             }
 
-            supabase.auth.signInWith(Email) {
-                this.email = normalizedEmail
-                this.password = password
-            }
-
-            val session = supabase.auth.currentSessionOrNull()
-            val user = session?.user
-
-            if (user != null) {
-                storeSession(session)
-
-                // Load or create profile
-                var profile = loadUserProfile(user.id)
-                if (profile == null) {
-                    profile = createDefaultProfile(user.id, user.email ?: normalizedEmail)
-                }
-
-                _userProfile.value = profile
-                _authState.value = AuthState.Authenticated(user.id, user.email ?: normalizedEmail, profile)
-                AppLogger.breadcrumb("Auth", "email_sign_in_success")
-                Result.success(Unit)
-            } else {
-                val message = safeErrorMessage(null, context.getString(R.string.auth_signin_failed))
-                _authState.value = AuthState.Error(message)
-                AppLogger.breadcrumb("Auth", "email_sign_in_no_session", severity = "warning")
-                Result.failure(Exception(message))
-            }
+            val message = context.getString(R.string.auth_signin_failed)
+            _authState.value = AuthState.Error(message)
+            Result.failure(Exception(message))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
@@ -722,25 +515,11 @@ class AuthRepository @Inject constructor(
     ): Result<Unit> {
         return try {
             _authState.value = AuthState.Loading
-            val session = if (Constants.USE_NETLIFY_CLOUD_SYNC && !extractUserIdFromAccessToken(accessToken).isNullOrBlank()) {
-                null
-            } else {
-                withContext(Dispatchers.Main) {
-                    runCatching { supabase.auth.importAuthToken(accessToken, refreshToken, false, true) }
-                    supabase.auth.currentSessionOrNull() ?: run {
-                        runCatching { supabase.auth.loadFromStorage(true) }
-                        supabase.auth.currentSessionOrNull()
-                    }
-                }
-            }
-            val resolvedUserId = session?.user?.id ?: extractUserIdFromAccessToken(accessToken)
-            val resolvedEmail = session?.user?.email
-                ?: extractUserEmailFromAccessToken(accessToken)
+            val resolvedUserId = extractUserIdFromAccessToken(accessToken)
+            val resolvedEmail = extractUserEmailFromAccessToken(accessToken)
                 ?: context.authDataStore.data.first()[PrefsKeys.USER_EMAIL]
 
-            if (session != null) {
-                storeSession(session)
-            } else if (!resolvedUserId.isNullOrBlank()) {
+            if (!resolvedUserId.isNullOrBlank()) {
                 storeRawSessionTokens(
                     accessToken = accessToken,
                     refreshToken = refreshToken,
@@ -750,17 +529,7 @@ class AuthRepository @Inject constructor(
             }
 
             if (!resolvedUserId.isNullOrBlank()) {
-                var profile = if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-                    null
-                } else {
-                    runCatching { loadUserProfile(resolvedUserId) }.getOrNull()
-                }
-                if (profile == null && !Constants.USE_NETLIFY_CLOUD_SYNC) {
-                    profile = createDefaultProfile(resolvedUserId, resolvedEmail ?: "")
-                }
-                if (profile == null) {
-                    profile = UserProfile(id = resolvedUserId, email = resolvedEmail ?: "")
-                }
+                val profile = UserProfile(id = resolvedUserId, email = resolvedEmail ?: "")
                 _userProfile.value = profile
                 _authState.value = AuthState.Authenticated(
                     resolvedUserId,
@@ -793,95 +562,6 @@ class AuthRepository @Inject constructor(
     }
 
     /**
-     * Sign in with Google using Credential Manager
-     * Returns the GetCredentialRequest for the Activity to handle
-     * Uses GetSignInWithGoogleOption which works better on TV devices
-     */
-    fun getGoogleSignInRequest(): GetCredentialRequest {
-        // Use GetSignInWithGoogleOption for TV - this opens the Google Sign-In UI
-        val signInWithGoogleOption = GetSignInWithGoogleOption.Builder(Constants.GOOGLE_WEB_CLIENT_ID)
-            .setNonce(generateNonce())
-            .build()
-
-        return GetCredentialRequest.Builder()
-            .addCredentialOption(signInWithGoogleOption)
-            .build()
-    }
-
-    /**
-     * Generate a random nonce for Google Sign-In security
-     */
-    private fun generateNonce(): String {
-        val bytes = ByteArray(16)
-        java.security.SecureRandom().nextBytes(bytes)
-        return bytes.joinToString("") { "%02x".format(it) }
-    }
-
-    /**
-     * Handle Google Sign-In credential response
-     */
-    suspend fun handleGoogleSignInResult(result: GetCredentialResponse): Result<Unit> {
-        return try {
-            _authState.value = AuthState.Loading
-
-            val credential = result.credential
-
-            when (credential) {
-                is CustomCredential -> {
-                    if (credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL) {
-                        val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-                        val idToken = googleIdTokenCredential.idToken
-
-                        // Sign in to Supabase with the Google ID token
-                        supabase.auth.signInWith(IDToken) {
-                            this.idToken = idToken
-                            provider = Google
-                        }
-
-                        val session = supabase.auth.currentSessionOrNull()
-                        val user = session?.user
-
-                        if (user != null) {
-                            storeSession(session)
-
-                            // Load or create profile
-                            var profile = loadUserProfile(user.id)
-                            if (profile == null) {
-                                profile = createDefaultProfile(user.id, user.email ?: "")
-                            }
-
-                            _userProfile.value = profile
-                            _authState.value = AuthState.Authenticated(user.id, user.email ?: "", profile)
-                            Result.success(Unit)
-                        } else {
-                            val message = context.getString(R.string.auth_google_failed)
-                            _authState.value = AuthState.Error(message)
-                            Result.failure(Exception(message))
-                        }
-                    } else {
-                        val message = context.getString(R.string.auth_unexpected_credential)
-                        _authState.value = AuthState.Error(message)
-                        Result.failure(Exception(message))
-                    }
-                }
-                else -> {
-                    val message = context.getString(R.string.auth_unexpected_credential)
-                    _authState.value = AuthState.Error(message)
-                    Result.failure(Exception(message))
-                }
-            }
-        } catch (e: GoogleIdTokenParsingException) {
-            _authState.value = AuthState.Error(context.getString(R.string.auth_failed_parse_google))
-            Result.failure(e)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            _authState.value = AuthState.Error(e.message ?: context.getString(R.string.auth_google_failed))
-            Result.failure(e)
-        }
-    }
-
-    /**
      * Sign out
      */
     suspend fun signOut() {
@@ -902,12 +582,6 @@ class AuthRepository @Inject constructor(
             severity = "warning"
         )
 
-        if (!Constants.USE_NETLIFY_CLOUD_SYNC) {
-            withTimeoutOrNull(2_000L) {
-                runCatching { supabase.auth.signOut() }
-            }
-        }
-
         runCatching { traktRepositoryProvider.get().logout() }
 
         // Clear ALL local data (auth + settings + user preferences)
@@ -916,66 +590,6 @@ class AuthRepository @Inject constructor(
 
         _userProfile.value = null
         _authState.value = AuthState.NotAuthenticated
-    }
-
-    /**
-     * Load user profile from Supabase
-     */
-    private suspend fun loadUserProfile(userId: String): UserProfile? {
-        return try {
-            val result = supabase.postgrest
-                .from("profiles")
-                .select {
-                    filter { eq("id", userId) }
-                }
-                .decodeSingleOrNull<UserProfile>()
-
-            if (result != null) {
-                // Set user ID in Trakt repo for Supabase sync
-                traktRepositoryProvider.get().setUserId(userId)
-
-                // Load tokens from profile or sync local tokens if profile is empty
-                if (result.trakt_token != null) {
-                    traktRepositoryProvider.get().loadTokensFromProfile(result.trakt_token)
-                } else {
-                    traktRepositoryProvider.get().syncLocalTokensToProfileIfNeeded()
-                }
-            }
-
-            result
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            null
-        }
-    }
-
-    /**
-     * Create default profile for new user
-     */
-    private suspend fun createDefaultProfile(userId: String, email: String): UserProfile {
-        try {
-            supabase.postgrest
-                .from("profiles")
-                .insert(
-                    mapOf(
-                        "id" to userId,
-                        "email" to email
-                    )
-                )
-
-            // Set user ID in Trakt repo for Supabase sync
-            traktRepositoryProvider.get().setUserId(userId)
-            traktRepositoryProvider.get().syncLocalTokensToProfileIfNeeded()
-        } catch (e: Exception) {
-        if (e is kotlinx.coroutines.CancellationException) throw e
-
-        }
-
-        return UserProfile(
-            id = userId,
-            email = email
-        )
     }
 
     private fun safeErrorMessage(error: Exception?, fallback: String): String {
@@ -999,24 +613,8 @@ class AuthRepository @Inject constructor(
      * Update user profile
      */
     suspend fun updateProfile(profile: UserProfile): Result<Unit> {
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            _userProfile.value = profile
-            return Result.success(Unit)
-        }
-        return try {
-            supabase.postgrest
-                .from("profiles")
-                .update(profile) {
-                    filter { eq("id", profile.id) }
-                }
-
-            _userProfile.value = profile
-            Result.success(Unit)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            Result.failure(e)
-        }
+        _userProfile.value = profile
+        return Result.success(Unit)
     }
 
     /**
@@ -1070,22 +668,6 @@ class AuthRepository @Inject constructor(
             }
         }
 
-        val session = ensureValidSession()
-        session?.user?.id?.takeIf { it.isNotBlank() }?.let { userId ->
-            val email = session.user?.email
-                ?: context.authDataStore.data.first()[PrefsKeys.USER_EMAIL]
-                ?: ""
-            val currentProfile = _userProfile.value
-            if (_authState.value !is AuthState.Authenticated) {
-                _authState.value = AuthState.Authenticated(
-                    userId = userId,
-                    email = email,
-                    profile = currentProfile ?: UserProfile(id = userId, email = email)
-                )
-            }
-            return userId
-        }
-
         return context.authDataStore.data.first()[PrefsKeys.USER_ID]?.takeIf { it.isNotBlank() }
     }
 
@@ -1093,21 +675,8 @@ class AuthRepository @Inject constructor(
         return !getAccessToken().isNullOrBlank()
     }
 
-    /**
-     * Get Supabase access token for API calls
-     */
+    /** Get the active account-backend access token for API calls. */
     suspend fun getAccessToken(): String? {
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            val prefs = context.authDataStore.data.first()
-            val cached = prefs[PrefsKeys.ACCESS_TOKEN]
-            return if (!cached.isNullOrBlank() && !isJwtExpired(cached)) cached else refreshAccessToken()
-        }
-
-        val session = ensureValidSession()
-        if (session != null && !isSessionExpired(session)) {
-            return session.accessToken
-        }
-
         val prefs = context.authDataStore.data.first()
         val cached = prefs[PrefsKeys.ACCESS_TOKEN]
         return if (!cached.isNullOrBlank() && !isJwtExpired(cached)) cached else refreshAccessToken()
@@ -1118,19 +687,7 @@ class AuthRepository @Inject constructor(
         val refreshToken = prefs[PrefsKeys.REFRESH_TOKEN]
         if (refreshToken.isNullOrBlank()) return null
 
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            refreshNetlifyAccessToken(refreshToken)?.let { return it }
-        }
-
-        return try {
-            val refreshed = supabase.auth.refreshSession(refreshToken)
-            storeSession(refreshed)
-            refreshed.accessToken
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            null
-        }
+        return refreshNetlifyAccessToken(refreshToken)
     }
 
     private suspend fun refreshNetlifyAccessToken(refreshToken: String): String? {
@@ -1178,48 +735,6 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    private suspend fun ensureValidSession(): UserSession? {
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            return null
-        }
-
-        var session = supabase.auth.currentSessionOrNull()
-        if (session == null) {
-            try {
-                supabase.auth.loadFromStorage(false)
-                session = supabase.auth.currentSessionOrNull()
-            } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            }
-        }
-        if (session != null && !isSessionExpired(session)) {
-            storeSession(session)
-            return session
-        }
-
-        val prefs = context.authDataStore.data.first()
-        val refreshToken = prefs[PrefsKeys.REFRESH_TOKEN]
-        if (refreshToken.isNullOrBlank()) {
-            return null
-        }
-
-        return try {
-            val refreshed = supabase.auth.refreshSession(refreshToken)
-            storeSession(refreshed)
-            refreshed
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            null
-        }
-    }
-
-    private fun isSessionExpired(session: UserSession, bufferSeconds: Long = 60): Boolean {
-        val now = Clock.System.now().epochSeconds
-        return session.expiresAt.epochSeconds <= now + bufferSeconds
-    }
-
     /**
      * Checks if a JWT token is expired.
      *
@@ -1253,29 +768,6 @@ class AuthRepository @Inject constructor(
             if (e is kotlinx.coroutines.CancellationException) throw e
 
             true
-        }
-    }
-
-    private suspend fun storeSession(session: UserSession) {
-        // 1. Explicitly save through session manager (for Supabase SDK auto-restore)
-        try {
-            sessionManager.saveSession(session)
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-        if (e is kotlinx.coroutines.CancellationException) throw e
-
-        }
-
-        // 2. Also save tokens directly (fallback for manual restoration)
-        context.authDataStore.edit { prefs ->
-            prefs[PrefsKeys.ACCESS_TOKEN] = session.accessToken
-            prefs[PrefsKeys.REFRESH_TOKEN] = session.refreshToken
-            val user = session.user
-            if (user != null) {
-                prefs[PrefsKeys.USER_ID] = user.id
-                user.email?.let { prefs[PrefsKeys.USER_EMAIL] = it }
-            }
         }
     }
 
@@ -1326,93 +818,25 @@ class AuthRepository @Inject constructor(
         return _userProfile.value?.addons
     }
 
-    /**
-     * Load addons directly from Supabase to avoid stale in-memory profile state.
-     */
+    /** Load the current profile addons from local account state. */
     suspend fun getAddonsFromProfileFresh(): Result<String?> {
-        val userId = getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            return Result.success(_userProfile.value?.addons)
-        }
-        return try {
-            val session = ensureValidSession()
-            if (session == null) return Result.failure(Exception("Session expired"))
-
-            @Serializable
-            data class AddonsProjection(val addons: String? = null, val email: String? = null)
-
-            val row = supabase.postgrest
-                .from("profiles")
-                .select {
-                    filter { eq("id", userId) }
-                }
-                .decodeSingleOrNull<AddonsProjection>()
-
-            val current = _userProfile.value
-            val resolvedEmail = current?.email
-                ?: (authState.value as? AuthState.Authenticated)?.email
-                ?: row?.email
-                ?: ""
-
-            _userProfile.value = (current ?: UserProfile(id = userId, email = resolvedEmail)).copy(
-                id = userId,
-                email = resolvedEmail,
-                addons = row?.addons
-            )
-
-            Result.success(row?.addons)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            Result.failure(e)
-        }
+        if (getCurrentUserId() == null) return Result.failure(Exception("Not logged in"))
+        return Result.success(_userProfile.value?.addons)
     }
 
-    /**
-     * Save addons to Supabase profile
-     */
+    /** Save addons to the local account profile state. */
     suspend fun saveAddonsToProfile(addonsJson: String): Result<Unit> {
         val userId = getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            val currentProfile = _userProfile.value
-            val resolvedEmail = currentProfile?.email
-                ?: (authState.value as? AuthState.Authenticated)?.email
-                ?: ""
-            _userProfile.value = (currentProfile ?: UserProfile(id = userId, email = resolvedEmail)).copy(
-                id = userId,
-                email = resolvedEmail,
-                addons = addonsJson
-            )
-            return Result.success(Unit)
-        }
-        return try {
-            val session = ensureValidSession()
-            if (session == null) return Result.failure(Exception("Session expired"))
-
-            @Serializable
-            data class AddonsUpdate(val addons: String)
-
-            supabase.postgrest
-                .from("profiles")
-                .update(AddonsUpdate(addons = addonsJson)) {
-                    filter { eq("id", userId) }
-                }
-
-            val currentProfile = _userProfile.value
-            val resolvedEmail = currentProfile?.email
-                ?: (authState.value as? AuthState.Authenticated)?.email
-                ?: ""
-            _userProfile.value = (currentProfile ?: UserProfile(id = userId, email = resolvedEmail)).copy(
-                id = userId,
-                email = resolvedEmail,
-                addons = addonsJson
-            )
-            Result.success(Unit)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            Result.failure(e)
-        }
+        val currentProfile = _userProfile.value
+        val resolvedEmail = currentProfile?.email
+            ?: (authState.value as? AuthState.Authenticated)?.email
+            ?: ""
+        _userProfile.value = (currentProfile ?: UserProfile(id = userId, email = resolvedEmail)).copy(
+            id = userId,
+            email = resolvedEmail,
+            addons = addonsJson
+        )
+        return Result.success(Unit)
     }
 
     /**
@@ -1422,36 +846,12 @@ class AuthRepository @Inject constructor(
         return _userProfile.value?.default_subtitle
     }
 
-    /**
-     * Save default subtitle to Supabase profile
-     */
+    /** Save default subtitle to the local account profile state. */
     suspend fun saveDefaultSubtitleToProfile(subtitle: String?): Result<Unit> {
-        val userId = getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
+        getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
         val currentProfile = _userProfile.value ?: return Result.failure(Exception("No profile"))
-
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            _userProfile.value = currentProfile.copy(default_subtitle = subtitle)
-            return Result.success(Unit)
-        }
-
-        return try {
-            ensureValidSession()
-            @Serializable
-            data class SubtitleUpdate(val default_subtitle: String?)
-
-            supabase.postgrest
-                .from("profiles")
-                .update(SubtitleUpdate(default_subtitle = subtitle)) {
-                    filter { eq("id", userId) }
-                }
-
-            _userProfile.value = currentProfile.copy(default_subtitle = subtitle)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            Result.failure(e)
-        }
+        _userProfile.value = currentProfile.copy(default_subtitle = subtitle)
+        return Result.success(Unit)
     }
 
     /**
@@ -1461,42 +861,25 @@ class AuthRepository @Inject constructor(
         return _userProfile.value?.auto_play_next
     }
 
-    /**
-     * Save auto play next to Supabase profile
-     */
+    /** Save auto play next to the local account profile state. */
     suspend fun saveAutoPlayNextToProfile(autoPlayNext: Boolean): Result<Unit> {
-        val userId = getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
+        getCurrentUserId() ?: return Result.failure(Exception("Not logged in"))
         val currentProfile = _userProfile.value ?: return Result.failure(Exception("No profile"))
-
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            _userProfile.value = currentProfile.copy(auto_play_next = autoPlayNext)
-            return Result.success(Unit)
-        }
-
-        return try {
-            ensureValidSession()
-            @Serializable
-            data class AutoPlayUpdate(val auto_play_next: Boolean)
-
-            supabase.postgrest
-                .from("profiles")
-                .update(AutoPlayUpdate(auto_play_next = autoPlayNext)) {
-                    filter { eq("id", userId) }
-                }
-
-            _userProfile.value = currentProfile.copy(auto_play_next = autoPlayNext)
-            Result.success(Unit)
-        } catch (e: Exception) {
-            if (e is kotlinx.coroutines.CancellationException) throw e
-
-            Result.failure(e)
-        }
+        _userProfile.value = currentProfile.copy(auto_play_next = autoPlayNext)
+        return Result.success(Unit)
     }
 
     suspend fun loadAccountSyncPayload(): Result<String?> = loadAccountSyncSnapshot().map { it.payload }
 
     internal suspend fun loadAccountSyncSnapshot(): Result<AccountSyncSnapshot> {
         val userId = getCurrentUserIdForSync() ?: return Result.failure(Exception("Not logged in"))
+        return loadAccountSyncPayloadFromNetlify().map { candidate ->
+            AccountSyncSnapshot(
+                payload = candidate?.payload,
+                revision = candidate?.revision ?: accountSyncRevision.takeIf { accountSyncRevisionUserId == userId }
+            )
+        }
+        /*
         val netlifyResult = if (Constants.USE_NETLIFY_CLOUD_SYNC) {
             loadAccountSyncPayloadFromNetlify()
         } else {
@@ -1596,6 +979,7 @@ class AuthRepository @Inject constructor(
                 ?: profileResult.exceptionOrNull()
                 ?: IllegalStateException("Cloud sync payload unavailable")
         )
+            */
     }
 
     private suspend fun loadAccountSyncPayloadFromNetlify(): Result<AccountSyncPayloadCandidate?> {
@@ -1655,12 +1039,11 @@ class AuthRepository @Inject constructor(
 
     internal suspend fun saveAccountSyncPayload(payload: String, expectedRevision: Long?): Result<Unit> {
         val userId = getCurrentUserIdForSync() ?: return Result.failure(Exception("Not logged in"))
+        return saveAccountSyncPayloadToNetlify(payload, expectedRevision)
+        /*
         if (Constants.USE_NETLIFY_CLOUD_SYNC) {
             val netlifyResult = saveAccountSyncPayloadToNetlify(payload, expectedRevision)
             if (netlifyResult.isSuccess) {
-                if (com.arflix.tv.BuildConfig.ENABLE_SUPABASE_SYNC_MIRROR) {
-                    runCatching { saveAccountSyncPayloadViaRpc(userId, payload) }
-                }
                 return Result.success(Unit)
             }
             val netlifyException = netlifyResult.exceptionOrNull()
@@ -1743,6 +1126,7 @@ class AuthRepository @Inject constructor(
                 ?: profileAddonsResult.exceptionOrNull()
                 ?: Exception("Cloud sync save failed")
         )
+            */
     }
 
     private suspend fun saveAccountSyncPayloadToNetlify(payload: String, expectedRevision: Long?): Result<Unit> {

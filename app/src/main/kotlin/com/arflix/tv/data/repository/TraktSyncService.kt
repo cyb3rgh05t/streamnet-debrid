@@ -34,14 +34,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * TraktSyncService - Manages synchronization between Trakt and Supabase
+ * TraktSyncService - Manages synchronization between Trakt and the account backend.
  *
- * This service ensures Supabase is the source of truth for watched state:
- * 1. Full sync: Imports all watched data from Trakt to Supabase
+ * The account backend is the source of truth for watched state:
+ * 1. Full sync: Imports all watched data from Trakt to the account backend
  * 2. Incremental sync: Uses Trakt's last_activities to sync only changes
  * 3. Two-way sync: Pushes local changes to Trakt
  *
- * Key tables in Supabase:
+ * Key backend state collections:
  * - watched_movies: Movies marked as watched
  * - watched_episodes: Episodes marked as watched
  * - episode_progress: In-progress playback state
@@ -51,7 +51,7 @@ import javax.inject.Singleton
 class TraktSyncService @Inject constructor(
     @ApplicationContext private val context: Context,
     private val traktApi: TraktApi,
-    private val supabaseApi: SupabaseApi,
+    private val supabaseApi: WatchStateApi,
     private val authRepository: AuthRepository,
     private val outboxRepository: TraktOutboxRepository,
     private val profileManager: ProfileManager,

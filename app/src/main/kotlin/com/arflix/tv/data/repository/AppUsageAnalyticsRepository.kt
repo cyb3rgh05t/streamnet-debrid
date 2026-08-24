@@ -36,10 +36,6 @@ class AppUsageAnalyticsRepository @Inject constructor(
 
     suspend fun recordAppOpen() = withContext(Dispatchers.IO) {
         if (!DiagnosticsManager.isReportingEnabled(context)) return@withContext
-        if (!Constants.USE_NETLIFY_CLOUD_SYNC &&
-            (Constants.SUPABASE_URL.isBlank() || Constants.SUPABASE_ANON_KEY.isBlank())
-        ) return@withContext
-
         try {
             val now = System.currentTimeMillis()
             val lastSentAt = context.settingsDataStore.data.first()[LAST_APP_OPEN_SENT_AT_KEY] ?: 0L
@@ -52,12 +48,6 @@ class AppUsageAnalyticsRepository @Inject constructor(
             }
 
             val installId = getOrCreateInstallId()
-            val accessToken = try {
-                authRepository.getAccessToken()
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                ""
-            }
             val profileId = try {
                 profileManager.getProfileId()
             } catch (e: Exception) {
@@ -93,19 +83,10 @@ class AppUsageAnalyticsRepository @Inject constructor(
                 .url(Constants.APP_USAGE_EVENT_URL)
                 .post(payload.toString().toRequestBody(jsonMediaType))
 
-            if (!Constants.USE_NETLIFY_CLOUD_SYNC) {
-                requestBuilder
-                    .header("apikey", Constants.SUPABASE_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.SUPABASE_ANON_KEY}")
-                if (!accessToken.isNullOrBlank()) {
-                    requestBuilder.header("x-user-token", accessToken)
-                }
-            } else {
-                requestBuilder
-                    .header("apikey", Constants.APP_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
-                    .header("Cache-Control", "no-cache, no-store")
-            }
+            requestBuilder
+                .header("apikey", Constants.APP_ANON_KEY)
+                .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
+                .header("Cache-Control", "no-cache, no-store")
 
             okHttpClient.newCall(requestBuilder.build()).execute().use { response ->
                 if (!response.isSuccessful) {

@@ -119,14 +119,7 @@ class ApiProxyInterceptor : Interceptor {
     }
 
     private fun hasProxyConfig(): Boolean {
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            return Constants.NETLIFY_BACKEND_URL.startsWith("https://") || Constants.NETLIFY_BACKEND_URL.startsWith("http://")
-        }
-        val supabaseUrl = Constants.SUPABASE_URL.trim()
-        val anonKey = Constants.SUPABASE_ANON_KEY.trim()
-        return (supabaseUrl.startsWith("https://") || supabaseUrl.startsWith("http://")) &&
-            !supabaseUrl.contains("your-project", ignoreCase = true) &&
-            anonKey.length > 40 &&
-            !anonKey.startsWith("your-", ignoreCase = true)
+        return Constants.NETLIFY_BACKEND_URL.startsWith("https://") ||
+            Constants.NETLIFY_BACKEND_URL.startsWith("http://")
     }
 }
