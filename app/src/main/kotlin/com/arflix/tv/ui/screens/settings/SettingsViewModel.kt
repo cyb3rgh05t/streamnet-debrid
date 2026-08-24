@@ -957,7 +957,7 @@ class SettingsViewModel @Inject constructor(
                         syncedMovies = result.moviesSynced,
                         syncedEpisodes = result.episodesSynced,
                         lastSyncTime = formatSyncTime(java.time.Instant.now().toString()),
-                        toastMessage = "Synced ${result.moviesSynced} movies and ${result.episodesSynced} episodes",
+                        toastMessage = "${result.moviesSynced} Filme und ${result.episodesSynced} Episoden synchronisiert",
                         toastType = ToastType.SUCCESS
                     )
                     // Invalidate repository cache to pick up new data
@@ -1757,7 +1757,7 @@ class SettingsViewModel @Inject constructor(
             // Prevent losing custom filters by cycling into a preset
             if (currentPreset == QualityFilterPreset.CUSTOM) {
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Custom filters detected — use manual editing to modify",
+                    toastMessage = "Benutzerdefinierte Filter erkannt - zum Aendern manuell bearbeiten",
                     toastType = ToastType.INFO
                 )
                 return@launch
@@ -1898,7 +1898,7 @@ class SettingsViewModel @Inject constructor(
                     if (restoreResult == CloudRestoreResult.FAILED) {
                         _uiState.value = _uiState.value.copy(
                             isRefreshingAddons = false,
-                            toastMessage = "Cloud restore failed; addons were not changed",
+                            toastMessage = "Cloud-Wiederherstellung fehlgeschlagen; Addons wurden nicht geaendert",
                             toastType = ToastType.ERROR
                         )
                         return@launch
@@ -1921,7 +1921,7 @@ class SettingsViewModel @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
                     isRefreshingAddons = false,
-                    toastMessage = "Failed to refresh addons",
+                    toastMessage = "Addons konnten nicht aktualisiert werden",
                     toastType = ToastType.ERROR
                 )
             }
@@ -2092,7 +2092,7 @@ class SettingsViewModel @Inject constructor(
                     isPackLoading = false,
                     pendingPackManifest = null,
                     pendingPackUrl = null,
-                    toastMessage = "Installed pack: ${installedManifest.name}",
+                    toastMessage = "Paket installiert: ${installedManifest.name}",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2110,7 +2110,7 @@ class SettingsViewModel @Inject constructor(
             val result = catalogRepository.removeCatalogPack(packId)
             result.onSuccess {
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Pack removed",
+                    toastMessage = "Paket entfernt",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2128,7 +2128,7 @@ class SettingsViewModel @Inject constructor(
             val result = catalogRepository.addCustomCatalog(url)
             result.onSuccess { catalog ->
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Added ${catalog.title}",
+                    toastMessage = "${catalog.title} hinzugefuegt",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2198,7 +2198,7 @@ class SettingsViewModel @Inject constructor(
             val addResult = catalogRepository.addCustomCatalog(result.sourceUrl)
             addResult.onSuccess { catalog ->
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Added ${catalog.title}",
+                    toastMessage = "${catalog.title} hinzugefuegt",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2216,7 +2216,7 @@ class SettingsViewModel @Inject constructor(
             val result = catalogRepository.updateCustomCatalog(catalogId, url)
             result.onSuccess { catalog ->
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Updated ${catalog.title}",
+                    toastMessage = "${catalog.title} aktualisiert",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2237,7 +2237,7 @@ class SettingsViewModel @Inject constructor(
                 val updatedCatalogs = visibleCatalogs(catalogRepository.getCatalogs())
                 _uiState.value = _uiState.value.copy(
                     catalogs = updatedCatalogs,
-                    toastMessage = "Catalog removed",
+                    toastMessage = "Katalog entfernt",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2258,7 +2258,7 @@ class SettingsViewModel @Inject constructor(
                 catalogRepository.syncAddonCatalogs(streamRepository.installedAddons.first())
                 syncLocalStateToCloud(silent = true)
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Hidden catalogs restored",
+                    toastMessage = "Ausgeblendete Kataloge wiederhergestellt",
                     toastType = ToastType.SUCCESS
                 )
             }.onFailure { error ->
@@ -2285,7 +2285,7 @@ class SettingsViewModel @Inject constructor(
                     val visible = visibleCatalogs(updated)
                     _uiState.value = _uiState.value.copy(
                         catalogs = visible,
-                        toastMessage = "Catalog row extracted from pack",
+                        toastMessage = "Katalogzeile aus Paket extrahiert",
                         toastType = ToastType.SUCCESS
                     )
                     syncLocalStateToCloud(silent = true)
@@ -2323,7 +2323,7 @@ class SettingsViewModel @Inject constructor(
             val trimmedEpg = epgUrl.trim()
             if (trimmedM3u.isBlank()) {
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "M3U URL is required",
+                        toastMessage = "M3U-URL ist erforderlich",
                     toastType = ToastType.ERROR
                 )
                 return@launch
@@ -2342,7 +2342,7 @@ class SettingsViewModel @Inject constructor(
     fun saveStalkerConfig(portalUrl: String, macAddress: String) {
         viewModelScope.launch {
             if (portalUrl.isBlank() || macAddress.isBlank()) {
-                _uiState.value = _uiState.value.copy(toastMessage = "Portal URL and MAC address are required", toastType = ToastType.ERROR)
+                _uiState.value = _uiState.value.copy(toastMessage = "Portal-URL und MAC-Adresse sind erforderlich", toastType = ToastType.ERROR)
                 return@launch
             }
             iptvRepository.saveStalkerConfig(portalUrl, macAddress)
@@ -2369,7 +2369,7 @@ class SettingsViewModel @Inject constructor(
         val usingXtream = user.isNotBlank() || pass.isNotBlank()
         if (usingXtream && (user.isBlank() || pass.isBlank())) {
             _uiState.value = _uiState.value.copy(
-                toastMessage = "Xtream requires both username and password",
+                toastMessage = "Xtream erfordert Benutzername und Passwort",
                 toastType = ToastType.ERROR
             )
             return
@@ -2391,7 +2391,7 @@ class SettingsViewModel @Inject constructor(
             iptvRepository.savePlaylists(playlists)
             _uiState.value = _uiState.value.copy(
                 iptvPlaylists = playlists.filter { it.m3uUrl.isNotBlank() },
-                toastMessage = "IPTV playlists updated",
+                toastMessage = "IPTV-Playlists aktualisiert",
                 toastType = ToastType.SUCCESS
             )
             syncLocalStateToCloud(silent = true)
@@ -2525,7 +2525,7 @@ class SettingsViewModel @Inject constructor(
                 iptvStatusType = ToastType.SUCCESS,
                 iptvProgressText = null,
                 iptvProgressPercent = 0,
-                toastMessage = "IPTV playlist removed",
+                toastMessage = "IPTV-Playlist entfernt",
                 toastType = ToastType.SUCCESS
             )
             syncLocalStateToCloud(silent = true)
@@ -2662,7 +2662,7 @@ class SettingsViewModel @Inject constructor(
         }
         if (password.isBlank()) {
             _uiState.value = _uiState.value.copy(
-                toastMessage = "Password is required",
+                toastMessage = "Passwort ist erforderlich",
                 toastType = ToastType.ERROR
             )
             return
@@ -2880,7 +2880,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isCloudAuthWorking = false,
                 cloudAuthStatusMessage = null,
-                toastMessage = "Sign-in did not complete. Try again.",
+                toastMessage = "Anmeldung nicht abgeschlossen. Bitte erneut versuchen.",
                 toastType = ToastType.ERROR
             )
             clearCloudAuthSession(cancelPolling = false)
@@ -2937,7 +2937,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isHomeServerConnecting = true,
                 homeServerError = null,
-                toastMessage = "Connecting Home Server...",
+                    toastMessage = "Verbinde mit Home-Server ...",
                 toastType = ToastType.INFO
             )
             val result = homeServerRepository.connect(serverUrl, username, password, displayName)
@@ -2949,7 +2949,7 @@ class SettingsViewModel @Inject constructor(
                     homeServerConnection = connection,
                     homeServerConnections = connections,
                     homeServerError = null,
-                    toastMessage = "Home Server connected",
+                    toastMessage = "Home-Server verbunden",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -2977,7 +2977,7 @@ class SettingsViewModel @Inject constructor(
                 homeServerError = null,
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
-                toastMessage = "Starting code sign in...",
+                    toastMessage = "Code-Anmeldung wird gestartet ...",
                 toastType = ToastType.INFO
             )
             val result = homeServerRepository.startHomeServerCodeAuth(trimmedUrl)
@@ -2987,7 +2987,7 @@ class SettingsViewModel @Inject constructor(
                     plexHomeServerAuth = session,
                     isPlexHomeServerPolling = true,
                     homeServerError = null,
-                    toastMessage = "Enter the code to connect",
+                    toastMessage = "Code zum Verbinden eingeben",
                     toastType = ToastType.INFO
                 )
                 startPlexHomeServerPolling(trimmedUrl, session)
@@ -3041,7 +3041,7 @@ class SettingsViewModel @Inject constructor(
 
                 _uiState.value = _uiState.value.copy(
                     isHomeServerConnecting = true,
-                    toastMessage = "Connecting server...",
+                    toastMessage = "Server wird verbunden ...",
                     toastType = ToastType.INFO
                 )
                 runCatching {
@@ -3056,7 +3056,7 @@ class SettingsViewModel @Inject constructor(
                         plexHomeServerAuth = null,
                         isPlexHomeServerPolling = false,
                         homeServerError = null,
-                        toastMessage = "Server connected",
+                        toastMessage = "Server verbunden",
                         toastType = ToastType.SUCCESS
                     )
                     syncLocalStateToCloud(silent = true)
@@ -3118,7 +3118,7 @@ class SettingsViewModel @Inject constructor(
                     homeServerConnection = connections.firstOrNull(),
                     homeServerConnections = connections,
                     homeServerError = null,
-                    toastMessage = "Home Server is reachable",
+                    toastMessage = "Home-Server ist erreichbar",
                     toastType = ToastType.SUCCESS
                 )
                 syncLocalStateToCloud(silent = true)
@@ -3144,7 +3144,7 @@ class SettingsViewModel @Inject constructor(
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
                 homeServerError = null,
-                toastMessage = "Home Server disconnected",
+                    toastMessage = "Home-Server getrennt",
                 toastType = ToastType.INFO
             )
             syncLocalStateToCloud(silent = true)
@@ -3176,7 +3176,7 @@ class SettingsViewModel @Inject constructor(
 
             if (!silent && result.isSuccess) {
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = "Cloud sync complete",
+                    toastMessage = "Cloud-Synchronisierung abgeschlossen",
                     toastType = ToastType.SUCCESS
                 )
             } else if (!silent && result.isFailure) {
@@ -3202,7 +3202,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isForceCloudSyncing = true,
                 lastCloudSyncStatus = "Starting cloud upload...",
-                toastMessage = "Forcing cloud sync...",
+                    toastMessage = "Cloud-Synchronisierung wird erzwungen ...",
                 toastType = ToastType.INFO
             )
 
@@ -3210,7 +3210,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
                     lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet TV Cloud, then sync again.",
-                    toastMessage = "Reconnect StreamNet TV Cloud to sync",
+                    toastMessage = "StreamNet TV Cloud zum Synchronisieren erneut verbinden",
                     toastType = ToastType.INFO
                 )
                 return@launch
@@ -3226,7 +3226,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
                     lastCloudSyncStatus = "Upload timed out before cloud confirmed it",
-                    toastMessage = "Cloud sync upload timed out - try again",
+                    toastMessage = "Cloud-Synchronisierung ist abgelaufen - bitte erneut versuchen",
                     toastType = ToastType.ERROR
                 )
                 return@launch
@@ -3404,7 +3404,7 @@ class SettingsViewModel @Inject constructor(
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 if (!silent) {
                     _uiState.value = _uiState.value.copy(
-                        toastMessage = "Cloud restore complete",
+                        toastMessage = "Cloud-Wiederherstellung abgeschlossen",
                         toastType = ToastType.SUCCESS
                     )
                 }
@@ -3413,7 +3413,7 @@ class SettingsViewModel @Inject constructor(
             CloudSyncRepository.RestoreResult.UNCHANGED -> {
                 if (!silent) {
                     _uiState.value = _uiState.value.copy(
-                        toastMessage = "Cloud data is already current",
+                        toastMessage = "Cloud-Daten sind bereits aktuell",
                         toastType = ToastType.SUCCESS
                     )
                 }
@@ -3422,7 +3422,7 @@ class SettingsViewModel @Inject constructor(
             CloudSyncRepository.RestoreResult.NO_BACKUP -> {
                 if (!silent) {
                     _uiState.value = _uiState.value.copy(
-                        toastMessage = "No cloud backup found",
+                        toastMessage = "Kein Cloud-Backup gefunden",
                         toastType = ToastType.INFO
                     )
                 }
@@ -3431,7 +3431,7 @@ class SettingsViewModel @Inject constructor(
             CloudSyncRepository.RestoreResult.FAILED -> {
                 if (!silent) {
                     _uiState.value = _uiState.value.copy(
-                        toastMessage = "Cloud restore failed",
+                        toastMessage = "Cloud-Wiederherstellung fehlgeschlagen",
                         toastType = ToastType.ERROR
                     )
                 }
@@ -3470,7 +3470,7 @@ class SettingsViewModel @Inject constructor(
                 } else {
                     if (showNoUpdateFeedback) {
                         _uiState.value = _uiState.value.copy(
-                            toastMessage = "You already have the latest version",
+                            toastMessage = "Du hast bereits die neueste Version",
                             toastType = ToastType.INFO
                         )
                     }
@@ -3702,7 +3702,7 @@ class SettingsViewModel @Inject constructor(
                         trackingWatchedReadMode = trackingPreferences.watchedReadMode,
                         trackingWriteToTrakt = trackingPreferences.writeToTrakt == true,
                         trackingWriteToSimkl = trackingPreferences.writeToSimkl == true,
-                        toastMessage = "Trakt connected successfully",
+                        toastMessage = "Trakt erfolgreich verbunden",
                         toastType = ToastType.SUCCESS
                     )
                     refreshIntegrationUsernames(
@@ -3796,7 +3796,7 @@ class SettingsViewModel @Inject constructor(
                 trackingWatchedReadMode = preferences.watchedReadMode,
                 trackingWriteToTrakt = false,
                 trackingWriteToSimkl = preferences.writeToSimkl == true,
-                toastMessage = "Trakt disconnected",
+                toastMessage = "Trakt getrennt",
                 toastType = ToastType.SUCCESS
             )
             syncLocalStateToCloud(silent = true, force = true)
@@ -3910,7 +3910,7 @@ class SettingsViewModel @Inject constructor(
                     isSimklPolling = false,
                     simklUserCode = null,
                     simklVerificationUrl = null,
-                    toastMessage = "Simkl Auth Error: ${e.message}",
+                    toastMessage = "Simkl-Anmeldefehler: ${e.message}",
                     toastType = ToastType.ERROR
                 )
             }
@@ -3944,7 +3944,7 @@ class SettingsViewModel @Inject constructor(
                             trackingWatchedReadMode = trackingPreferences.watchedReadMode,
                             trackingWriteToTrakt = trackingPreferences.writeToTrakt == true,
                             trackingWriteToSimkl = trackingPreferences.writeToSimkl == true,
-                            toastMessage = "Connected to Simkl!",
+                            toastMessage = "Mit Simkl verbunden!",
                             toastType = ToastType.SUCCESS
                         )
                         refreshIntegrationUsernames(
@@ -3966,7 +3966,7 @@ class SettingsViewModel @Inject constructor(
                 isSimklPolling = false,
                 simklUserCode = null,
                 simklVerificationUrl = null,
-                toastMessage = "Simkl authentication timed out",
+                toastMessage = "Simkl-Anmeldung ist abgelaufen",
                 toastType = ToastType.ERROR
             )
         }
@@ -3995,7 +3995,7 @@ class SettingsViewModel @Inject constructor(
                         trackingWatchedReadMode = trackingPreferences.watchedReadMode,
                         trackingWriteToTrakt = trackingPreferences.writeToTrakt == true,
                         trackingWriteToSimkl = trackingPreferences.writeToSimkl == true,
-                        toastMessage = "Connected to Simkl!",
+                        toastMessage = "Mit Simkl verbunden!",
                         toastType = ToastType.SUCCESS
                     )
                     refreshIntegrationUsernames(
@@ -4028,7 +4028,7 @@ class SettingsViewModel @Inject constructor(
                 trackingWatchedReadMode = preferences.watchedReadMode,
                 trackingWriteToTrakt = preferences.writeToTrakt == true,
                 trackingWriteToSimkl = false,
-                toastMessage = "Disconnected from Simkl",
+                toastMessage = "Von Simkl getrennt",
                 toastType = ToastType.SUCCESS
             )
         }
@@ -4070,12 +4070,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             cancelCloudAuth()
             _uiState.value = _uiState.value.copy(
-                toastMessage = "Signing out...",
+                toastMessage = "Abmeldung wird ausgefuehrt ...",
                 toastType = ToastType.INFO
             )
             authRepository.signOut()
             _uiState.value = _uiState.value.copy(
-                toastMessage = "Signed out",
+                toastMessage = "Abgemeldet",
                 toastType = ToastType.SUCCESS
             )
         }
