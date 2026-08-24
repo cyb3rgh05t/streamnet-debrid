@@ -2667,22 +2667,23 @@ class SettingsViewModel @Inject constructor(
         }
 
         if (usesSelfHostedDirectAuth) {
-            if (createAccount) {
-                _uiState.value = _uiState.value.copy(
-                    toastMessage = "Account creation is not available in the self-hosted test build",
-                    toastType = ToastType.ERROR
-                )
-                return
-            }
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
-                val result = authRepository.signIn(trimmedEmail, password)
+                val result = if (createAccount) {
+                    authRepository.signUp(trimmedEmail, password)
+                } else {
+                    authRepository.signIn(trimmedEmail, password)
+                }
                 _uiState.value = if (result.isSuccess) {
                     _uiState.value.copy(
                         showCloudEmailPasswordDialog = false,
                         isCloudAuthWorking = false,
                         shouldSwitchProfile = true,
-                        toastMessage = "Signed in to self-hosted cloud",
+                        toastMessage = if (createAccount) {
+                            "Self-hosted account created"
+                        } else {
+                            "Signed in to self-hosted cloud"
+                        },
                         toastType = ToastType.SUCCESS
                     )
                 } else {
