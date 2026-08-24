@@ -9328,6 +9328,7 @@ private fun MdbListConnectDialog(
     var apiKey by remember { mutableStateOf("") }
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     var focusedButton by remember { mutableIntStateOf(1) } // 0 cancel, 1 connect
+    var inputFocused by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
@@ -9403,17 +9404,20 @@ private fun MdbListConnectDialog(
                     colors = androidx.compose.material3.TextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = Color.White.copy(alpha = 0.1f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.06f),
-                        focusedIndicatorColor = accentColor,
+                        focusedContainerColor = accentColor.copy(alpha = 0.12f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                        focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
+                        focusedLabelColor = accentColor,
+                        unfocusedLabelColor = TextSecondary,
                         cursorColor = accentColor
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .onFocusChanged { inputFocused = it.isFocused }
                         .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.16f),
+                            width = if (inputFocused) 2.dp else 1.dp,
+                            color = if (inputFocused) accentColor else Color.White.copy(alpha = 0.16f),
                             shape = RoundedCornerShape(10.dp)
                         )
                 )
