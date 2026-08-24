@@ -2973,24 +2973,6 @@ private fun CloudEmailPasswordModal(
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .clip(RoundedCornerShape(100.dp))
-                        .background(
-                            Brush.horizontalGradient(
-                                colors = listOf(
-                                    accentColor.copy(alpha = 0.35f),
-                                    accentColor,
-                                    accentColor.copy(alpha = 0.35f)
-                                )
-                            )
-                        )
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Text(
                         text = stringResource(R.string.settings_label_email),
