@@ -2653,9 +2653,16 @@ private fun MobileHeroCarousel(
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit
 ) {
     val isTablet = LocalDeviceType.current == DeviceType.TABLET
-    val heroAspectRatio = if (isTablet) 2.5f else 3f / 4f
-    val tabletHeroMaxHeight = if (isTablet) 340.dp else Dp.Unspecified
-    val pagerHorizontalPadding = if (isTablet) 180.dp else 64.dp
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+    val heroAspectRatio = if (isTablet && isLandscape) 2.9f else if (isTablet) 2.5f else 3f / 4f
+    val tabletHeroMaxHeight = if (isTablet) {
+        val heightFraction = if (isLandscape) 0.50f else 0.42f
+        (configuration.screenHeightDp * heightFraction).dp.coerceIn(220.dp, if (isLandscape) 300.dp else 340.dp)
+    } else {
+        Dp.Unspecified
+    }
+    val pagerHorizontalPadding = if (isTablet && isLandscape) 132.dp else if (isTablet) 180.dp else 64.dp
     val pagerPageSpacing = if (isTablet) 24.dp else 18.dp
 
     val heroItems = remember(categories) { mobileHeroItems(categories) }
