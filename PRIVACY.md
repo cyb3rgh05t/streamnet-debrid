@@ -8,7 +8,7 @@ This policy explains how the StreamNet TV project processes personal data in the
 
 The StreamNet TV project owner is the data controller for StreamNet TV Cloud, the account portal, first-party usage measurements, and first-party website services. Third-party services that you connect may act as separate controllers under their own privacy policies.
 
-For privacy requests, use the secure account deletion page at [auth.streamnet.club/delete](https://auth.streamnet.club/delete) or contact the project through [GitHub](https://github.com/cyb3rgh05t/streamnet-debrid). Do not put passwords, tokens, identity documents, or other sensitive data in a public GitHub issue.
+For privacy requests, use the secure account deletion page at [auth.mystreamnet.club/delete-account](https://auth.mystreamnet.club/delete-account) or contact the project through [GitHub](https://github.com/cyb3rgh05t/streamnet-debrid). Do not put passwords, tokens, identity documents, or other sensitive data in a public GitHub issue.
 
 ## 2. Data Stored Only On Your Device
 
@@ -44,7 +44,7 @@ These activities are based on StreamNet TV's legitimate interests in finding cra
 
 ### Cloud analytics and optional membership events
 
-StreamNet may use Netlify's server-side traffic analytics to count account portal requests, approximate unique visitors, referrers, and countries from delivery logs. StreamNet does not add advertising trackers or cross-site profiling cookies.
+StreamNet may use first-party server-side logs from the self-hosted account portal to count account portal requests, approximate unique visitors, referrers, and countries from delivery logs. StreamNet does not add advertising trackers or cross-site profiling cookies.
 
 If you use optional membership or entitlement features exposed through StreamNet TV Cloud, StreamNet records a small set of service events such as viewing membership information, starting a trial, opening checkout, linking a membership, and completing the first successful playback. Account identifiers are converted into a keyed pseudonymous value before storage. Events can contain coarse campaign attribution and device or outcome labels, but not your email address, watched title, stream URL, addon URL, or payment details. Ko-fi separately handles payment details under its own privacy policy.
 
@@ -58,17 +58,17 @@ When you deliberately start a StreamNet TV Cloud trial, StreamNet sends only thr
 
 Data is also sent to services you deliberately use or connect:
 
-| Service                  | Purpose                                                                          | Privacy policy                                                                     |
-| ------------------------ | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Netlify infrastructure   | StreamNet TV websites, account functions, cloud sync, and storage                | [netlify.com/privacy](https://www.netlify.com/privacy/)                            |
-| Resend                   | Account verification and password-reset email delivery                           | [resend.com/legal/privacy-policy](https://resend.com/legal/privacy-policy)         |
-| Sentry                   | Crash reporting and diagnostics when enabled                                     | [sentry.io/privacy](https://sentry.io/privacy/)                                    |
-| Firebase Crashlytics     | Crash-reporting fallback in configured builds                                    | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
-| TMDB                     | Movie and TV metadata and images                                                 | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
-| Trakt.tv                 | Optional watch history, progress, ratings, and watchlist sync                    | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
-| Discord                  | Optional Rich Presence login and the title/playback status you choose to display | [discord.com/privacy](https://discord.com/privacy)                                 |
-| Ko-fi                    | Optional StreamNet TV Cloud membership verification                              | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
-| User-configured services | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add  | Governed by the provider you configure                                             |
+| Service                       | Purpose                                                                                    | Privacy policy                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| Self-hosted StreamNet backend | StreamNet TV account portal, cloud sync, TV pairing, Discord pairing, and account deletion | This policy                                                                        |
+| Resend                        | Account verification and password-reset email delivery                                     | [resend.com/legal/privacy-policy](https://resend.com/legal/privacy-policy)         |
+| Sentry                        | Crash reporting and diagnostics when enabled                                               | [sentry.io/privacy](https://sentry.io/privacy/)                                    |
+| Firebase Crashlytics          | Crash-reporting fallback in configured builds                                              | [firebase.google.com/support/privacy](https://firebase.google.com/support/privacy) |
+| TMDB                          | Movie and TV metadata and images                                                           | [themoviedb.org/privacy-policy](https://www.themoviedb.org/privacy-policy)         |
+| Trakt.tv                      | Optional watch history, progress, ratings, and watchlist sync                              | [trakt.tv/privacy](https://trakt.tv/privacy)                                       |
+| Discord                       | Optional Rich Presence login and the title/playback status you choose to display           | [discord.com/privacy](https://discord.com/privacy)                                 |
+| Ko-fi                         | Optional StreamNet TV Cloud membership verification                                        | [ko-fi.com/privacy](https://ko-fi.com/privacy)                                     |
+| User-configured services      | Addons, IPTV providers, Plex, Jellyfin, Emby, debrid services, and URLs you add            | Governed by the provider you configure                                             |
 
 StreamNet TV sends only the data needed for the requested integration. Third-party services may process data outside the European Economic Area under their own transfer mechanisms and terms.
 
@@ -98,7 +98,7 @@ Depending on where you live, you may have the right to access, correct, export, 
 - Disable diagnostics and usage reporting in app Settings
 - Disconnect Trakt and other optional services in app Settings
 - Revoke StreamNet TV from the relevant third-party account
-- Delete your StreamNet TV Cloud account and synced data at [auth.streamnet.club/delete](https://auth.streamnet.club/delete)
+- Delete your StreamNet TV Cloud account and synced data at [auth.mystreamnet.club/delete-account](https://auth.mystreamnet.club/delete-account)
 
 StreamNet TV may need to verify that a request concerns your account before acting on it.
 

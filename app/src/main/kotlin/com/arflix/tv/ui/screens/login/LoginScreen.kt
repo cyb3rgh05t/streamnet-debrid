@@ -423,7 +423,7 @@ fun LoginScreen(
                     GradientButton(
                         onClick = {
                             context.startActivity(
-                                Intent(Intent.ACTION_VIEW, Uri.parse("https://streamnet.club/privacy"))
+                                Intent(Intent.ACTION_VIEW, Uri.parse("https://auth.mystreamnet.club/privacy"))
                             )
                         },
                         text = stringResource(R.string.login_read_privacy_policy),

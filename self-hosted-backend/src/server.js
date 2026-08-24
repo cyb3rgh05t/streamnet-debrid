@@ -207,6 +207,12 @@ app.get("/delete-account", async (_request, reply) => {
     );
 });
 
+app.get("/privacy", async (_request, reply) =>
+  reply
+    .type("text/html; charset=utf-8")
+    .send(await readFile(path.join(publicDirectory, "privacy.html"), "utf8")),
+);
+
 app.get("/discord/", async (_request, reply) =>
   reply
     .type("text/html; charset=utf-8")

@@ -8,6 +8,7 @@ COPY self-hosted-backend/scripts ./scripts
 COPY self-hosted-backend/migrations ./migrations
 COPY netlify-auth-site/index.html ./public/index.html
 COPY netlify-auth-site/delete-account.html ./public/delete-account.html
+COPY netlify-auth-site/privacy.html ./public/privacy.html
 COPY netlify-auth-site/discord/index.html ./public/discord/index.html
 COPY netlify-auth-site/discord/callback.html ./public/discord/callback.html
 COPY netlify-auth-site/discord/callback.js ./public/discord/callback.js
