@@ -4,15 +4,19 @@ import pg from "pg";
 import { config } from "./config.js";
 import {
   hashToken,
+  hashLegacyScryptPassword,
   newRefreshToken,
   verifyLegacyScryptPassword,
 } from "./passwords.js";
+import { normalizeAndValidateEmail } from "./email.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
 const jwtKey = new TextEncoder().encode(config.jwtSecret);
 const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
+const signupAttemptsByEmail = new Map();
+const signupCooldownMs = 5 * 60_000;
 
 async function issueAccessToken(account) {
   return new SignJWT({ email: account.email_normalized, purpose: "access" })
@@ -90,6 +94,35 @@ app.post("/auth-login", async (request, reply) => {
     return reply.code(401).send({ error: "Invalid email or password" });
   }
   return issueSession(account);
+});
+
+app.post("/cloud-auth-email", async (request, reply) => {
+  const email = normalizeAndValidateEmail(request.body?.email);
+  const password = String(request.body?.password || "");
+  if (!email) return reply.code(400).send({ error: "Enter a valid email address" });
+  if (password.length < 6) {
+    return reply.code(400).send({ error: "Password must be at least 6 characters" });
+  }
+  const now = Date.now();
+  const previousAttempt = signupAttemptsByEmail.get(email) || 0;
+  if (now - previousAttempt < signupCooldownMs) {
+    return reply.code(429).send({ error: "Please wait before creating this account again" });
+  }
+  signupAttemptsByEmail.set(email, now);
+  try {
+    const result = await pool.query(
+      `insert into accounts (email, email_normalized, password_hash, password_hash_scheme)
+       values ($1, $2, $3, 'netlify_scrypt')
+       returning id, email, email_normalized`,
+      [email, email, await hashLegacyScryptPassword(password)],
+    );
+    return issueSession(result.rows[0]);
+  } catch (error) {
+    if (error?.code === "23505") {
+      return reply.code(409).send({ error: "Account already exists. Sign in instead." });
+    }
+    throw error;
+  }
 });
 
 app.post("/auth-refresh", async (request, reply) => {

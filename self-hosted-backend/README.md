@@ -6,12 +6,12 @@ This is a staging backend. It does not change the Android APK, Netlify, or Supab
 
 - PostgreSQL schema and repeatable migration runner.
 - Netlify-compatible `scrypt` password verification for imported Netlify accounts.
-- `auth-login`, `auth-refresh`, `account-sync-pull`, and `account-sync-push`.
+- `auth-login`, `auth-refresh`, `cloud-auth-email`, `account-sync-pull`, and `account-sync-push`.
 - Revision-based snapshot compare-and-set compatible with the Android conflict retry.
 - Supabase NDJSON account-snapshot importer.
 - Traefik-compatible Docker Compose configuration with domain, certificate resolver, and published container image from `.env`.
 
-TV pairing, password reset, Discord, account deletion, media proxies, and the APK switch are intentionally not included in this first staging step.
+TV pairing, password reset, Discord, account deletion, media proxies, and the APK switch are intentionally not included in this first staging step. Password reset will be added after SMTP delivery is configured.
 
 ## Local or Server Setup
 
@@ -53,6 +53,10 @@ curl -sS https://api.mystreamnet.club/account-sync-pull \
 ```
 
 Expected first response: `{"payload":null,"revision":0,...}`. Do not import Supabase or Netlify data until this login and pull test works.
+
+## Account Registration Test
+
+`POST /cloud-auth-email` now creates a new self-hosted account and returns a session immediately. The isolated Android test build can use its normal Sign Up action for this endpoint. It rejects malformed addresses, `.local`/`.test` domains, short passwords, duplicate accounts, and repeated registration attempts for the same email within five minutes.
 
 ## Android Test APK
 
