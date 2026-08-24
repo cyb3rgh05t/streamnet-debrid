@@ -1,4 +1,6 @@
 import Fastify from "fastify";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { SignJWT, jwtVerify } from "jose";
 import pg from "pg";
 import { config } from "./config.js";
@@ -18,6 +20,7 @@ const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
 const signupAttemptsByEmail = new Map();
 const signupCooldownMs = 5 * 60_000;
 const tvAuthTtlMs = 10 * 60_000;
+const publicDirectory = path.join(process.cwd(), "public");
 
 function randomCode(length) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -81,20 +84,29 @@ app.get("/health", async () => {
   return { ok: true };
 });
 
-app.get("/", async (request, reply) => {
-  const code = String(request.query?.code || "")
-    .trim()
-    .toUpperCase();
-  if (!code) {
-    return reply
-      .type("text/plain")
-      .send("StreamNet TV pairing requires a code.");
+app.get("/assets/:asset", async (request, reply) => {
+  const asset = String(request.params.asset || "");
+  if (!new Set(["streamnet-logo.svg", "streamnet-icon.svg"]).has(asset)) {
+    return reply.code(404).send({ error: "Asset not found" });
   }
-  return reply.type("text/html; charset=utf-8").send(`<!doctype html>
-<html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>StreamNet TV</title>
-<style>body{background:#141414;color:#f5f5f5;font:16px system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh}main{width:min(420px,calc(100% - 32px))}input,button{box-sizing:border-box;width:100%;padding:13px;margin-top:10px;border-radius:6px;border:1px solid #555;font:inherit}input{background:#222;color:#fff}button{background:#e5a209;color:#161616;border:0;font-weight:700;cursor:pointer}p{color:#bbb}#message{min-height:24px}</style></head>
-<body><main><h1>Link StreamNet TV</h1><p>Enter your account details to approve this TV.</p><form id="pair"><input id="email" type="email" autocomplete="email" placeholder="Email" required><input id="password" type="password" autocomplete="current-password" placeholder="Password" required><button type="submit">Sign in and link TV</button></form><p id="message"></p>
-<script>const form=document.querySelector('#pair'),message=document.querySelector('#message');form.addEventListener('submit',async event=>{event.preventDefault();message.textContent='Linking TV...';const response=await fetch('/tv-auth-complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:${JSON.stringify(code)},email:email.value,password:password.value,intent:'signin'})});const body=await response.json().catch(()=>({}));message.textContent=response.ok?'TV linked. You can return to the TV.':body.error||'Could not link TV.';});</script></main></body></html>`);
+  return reply
+    .type("image/svg+xml")
+    .send(await readFile(path.join(publicDirectory, "assets", asset)));
+});
+
+app.get("/", async (request, reply) => {
+  const page = await readFile(path.join(publicDirectory, "index.html"), "utf8");
+  const selfHostedPage = page
+    .replace('const FUNCTION_BASE = "/.netlify/functions";', 'const FUNCTION_BASE = "";')
+    .replaceAll('window.location.href = "https://streamnet-sync.netlify.app";', "window.location.href = window.location.origin;")
+    .replace(
+      "</body>",
+      `<script>
+        document.getElementById("forgot").style.display = "none";
+        document.querySelector(".privacy-link").style.display = "none";
+      </script></body>`,
+    );
+  return reply.type("text/html; charset=utf-8").send(selfHostedPage);
 });
 
 app.post("/auth-login", async (request, reply) => {
@@ -260,13 +272,13 @@ async function tvAuthStatus(request, reply) {
 app.post("/tv-auth-status", tvAuthStatus);
 app.post("/tv-auth-poll", tvAuthStatus);
 
-app.post("/tv-auth-complete", async (request, reply) => {
+async function completeTvAuth(request, reply) {
   const userCode = String(request.body?.code || "")
     .trim()
     .toUpperCase();
   const email = normalizeAndValidateEmail(request.body?.email);
   const password = String(request.body?.password || "");
-  const intent = String(request.body?.intent || "signin")
+  const intent = String(request.body?.intent || request.body?.action || "signin")
     .trim()
     .toLowerCase();
   if (!userCode || !email || !password)
@@ -331,7 +343,10 @@ app.post("/tv-auth-complete", async (request, reply) => {
     ],
   );
   return reply.send({ ok: true });
-});
+}
+
+app.post("/tv-auth-complete", completeTvAuth);
+app.post("/tv-auth-web", completeTvAuth);
 
 app.route({
   method: ["GET", "POST"],

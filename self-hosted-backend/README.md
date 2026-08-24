@@ -25,6 +25,12 @@ Do not point the production APK to this service yet.
 
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 
+## Self-Hosted Account Page
+
+`PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://api.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
+
+Password reset and account deletion remain unavailable on the self-hosted page until their server-side replacements are complete. They do not fall back to Netlify.
+
 ## First API Test
 
 Create a new staging-only account. This command never imports, changes, or overwrites existing account data.
@@ -78,7 +84,7 @@ Build the APK with:
 ./gradlew :app:assembleSideloadSelfHosted
 ```
 
-Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in or create a staging account, then use the normal Cloud Sync action to validate pull and push. TV pairing is available through the self-hosted QR page. Password reset and account deletion remain on the production Netlify service until their self-hosted replacements are implemented.
+Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in or create a staging account, then use the normal Cloud Sync action to validate pull and push. TV pairing is available through the self-hosted QR page. Password reset and account deletion are unavailable in the self-hosted test page until their own server-side replacements are implemented.
 
 ## Container Publishing
 

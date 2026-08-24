@@ -63,7 +63,8 @@ jobs:
       - name: Build and publish
         uses: docker/build-push-action@v6
         with:
-          context: self-hosted-backend
+          context: .
+          file: self-hosted-backend/Dockerfile
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
