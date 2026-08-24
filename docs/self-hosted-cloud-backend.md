@@ -35,7 +35,7 @@ Services should be deployed in one Docker Compose project or separate Compose pr
 | MinIO             | Optional object/blob storage                                | No                   |
 | SMTP provider     | Transactional email delivery                                | Outbound only        |
 
-A public domain such as `api.streamnet.club` is required for reliable sync outside the home network. The API needs a valid HTTPS certificate. Do not expose PostgreSQL or MinIO directly to the internet.
+A public domain such as `api.mystreamnet.club` is required for reliable sync outside the home network. The API needs a valid HTTPS certificate. Do not expose PostgreSQL or MinIO directly to the internet.
 
 ## Existing API Contract
 
@@ -161,7 +161,7 @@ services:
     image: ghcr.io/cyb3rgh05t/streamnet-backend:latest
     environment:
       DATABASE_URL: postgresql://streamnet:${POSTGRES_PASSWORD}@postgres:5432/streamnet
-      APP_BASE_URL: https://api.streamnet.club
+      APP_BASE_URL: https://api.mystreamnet.club
       JWT_SECRET: ${JWT_SECRET}
       SMTP_URL: ${SMTP_URL}
     networks:
@@ -169,7 +169,7 @@ services:
       - traefik_proxy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.streamnet-api.rule=Host(`api.streamnet.club`)
+      - traefik.http.routers.streamnet-api.rule=Host(`api.mystreamnet.club`)
       - traefik.http.routers.streamnet-api.entrypoints=websecure
       - traefik.http.routers.streamnet-api.tls.certresolver=letsencrypt
       - traefik.http.services.streamnet-api.loadbalancer.server.port=3000
@@ -246,7 +246,7 @@ Rollback is possible only while the old service remains available and before use
 - Implement PostgreSQL schema and migrations.
 - Port authentication and the two snapshot endpoints first.
 - Add tests for revision conflicts, profile creation, profile deletion tombstones, and token revocation.
-- Deploy to a staging domain such as `api-staging.streamnet.club`.
+- Deploy to a staging domain such as `api-staging.mystreamnet.club`.
 
 ### Phase 2: Validate without changing production users
 
@@ -274,7 +274,7 @@ Rollback is possible only while the old service remains available and before use
 
 ### Phase 4: Switch the APK
 
-- Build a separate test APK with `NETLIFY_BACKEND_URL=https://api.streamnet.club`; do not change the production APK URL yet.
+- Build a separate test APK with `NETLIFY_BACKEND_URL=https://api.mystreamnet.club`; do not change the production APK URL yet.
 - Keep the Supabase mirror enabled only during a limited rollback window.
 - Install the test APK on selected devices and monitor sync failures and HTTP `409` rates.
 - Change the production APK URL only after successful multi-device tests and a verified migration report.

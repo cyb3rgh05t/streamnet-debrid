@@ -125,7 +125,7 @@ fun CrashReportScreen(
     val webBridgeUrl = remember(crashId, crashVersion, crashMsg, crashTime) {
         val encodedErr = Uri.encode(crashMsg.take(300))
         val encodedV = Uri.encode(crashVersion)
-        "https://streamnet.club/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
+        "https://auth.mystreamnet.club/report?id=$crashId&v=$encodedV&err=$encodedErr&t=$crashTime"
     }
 
     Box(

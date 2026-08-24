@@ -7,6 +7,6 @@ WHERE id IN (
 AND author = 'ARVIO Team';
 
 UPDATE public.catalog_packs
-SET normalized_url = lower(rtrim('https://auth.streamnet.club' || url, '/'))
+SET normalized_url = lower(rtrim('https://auth.mystreamnet.club' || url, '/'))
 WHERE url LIKE '/%'
 AND normalized_url = lower(rtrim('https://arvio.app' || url, '/'));

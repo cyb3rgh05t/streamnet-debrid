@@ -34,8 +34,8 @@ The full upstream branch was not merged directly because this fork has intention
 
 - Netlify production deploy completed for project `streamnet-sync` / site ID `7fd089d5-0105-460e-9372-6ea2e101aa7a`.
   - Deploy ID: `6a89379760b367649ab5cf48`
-  - Production URL reported by Netlify: `https://streamnet.club`
-  - Auth-domain verification: `https://auth.streamnet.club/discord/callback.js` returned HTTP 200 and contained the new `mobile_` / `tv_` callback flow markers.
+  - Production URL reported by Netlify: `https://mystreamnet.club`
+  - Auth-domain verification: `https://auth.mystreamnet.club/discord/callback.js` returned HTTP 200 and contained the new `mobile_` / `tv_` callback flow markers.
 - Supabase deploy is not required for this integration. No Supabase migrations, Edge Functions, database policies, or Supabase config files were changed.
 - APK rebuild/release is required for the Android 16 KB page-size change and the current version bump to be included in an installed APK.
   - Debug APK built successfully: `app/build/outputs/apk/sideload/debug/app-sideload-debug.apk`
