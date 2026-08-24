@@ -97,8 +97,14 @@ app.get("/assets/:asset", async (request, reply) => {
 app.get("/", async (request, reply) => {
   const page = await readFile(path.join(publicDirectory, "index.html"), "utf8");
   const selfHostedPage = page
-    .replace('const FUNCTION_BASE = "/.netlify/functions";', 'const FUNCTION_BASE = "";')
-    .replaceAll('window.location.href = "https://streamnet-sync.netlify.app";', "window.location.href = window.location.origin;")
+    .replace(
+      'const FUNCTION_BASE = "/.netlify/functions";',
+      'const FUNCTION_BASE = "";',
+    )
+    .replaceAll(
+      'window.location.href = "https://streamnet-sync.netlify.app";',
+      "return;",
+    )
     .replace(
       "</body>",
       `<script>
@@ -278,7 +284,9 @@ async function completeTvAuth(request, reply) {
     .toUpperCase();
   const email = normalizeAndValidateEmail(request.body?.email);
   const password = String(request.body?.password || "");
-  const intent = String(request.body?.intent || request.body?.action || "signin")
+  const intent = String(
+    request.body?.intent || request.body?.action || "signin",
+  )
     .trim()
     .toLowerCase();
   if (!userCode || !email || !password)
