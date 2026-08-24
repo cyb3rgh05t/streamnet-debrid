@@ -1,0 +1,45 @@
+services:
+  streamnet-backend:
+    image: ${STREAMNET_BACKEND_IMAGE:-ghcr.io/cyb3rgh05t/streamnet-self-hosted-backend:latest}
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.streamnet-api.rule=Host(`${TRAEFIK_HOST}`)
+      - traefik.http.routers.streamnet-api.entrypoints=https
+      - traefik.http.routers.streamnet-api.tls=true
+      - traefik.http.routers.streamnet-api.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.streamnet-api.loadbalancer.server.port=3000
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+networks:
+  internal:
+    internal: true
+  proxy:
+    external: true
+
+volumes:
+  postgres_data:

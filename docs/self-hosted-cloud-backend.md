@@ -199,6 +199,46 @@ Keep secrets in an untracked `.env` file or a server-side secret manager. Never 
 
 ## Migration Plan
 
+## Existing Data Migration and Rollback
+
+Existing cloud data can be preserved. The account snapshot already contains the profiles, profile settings, addons, catalogs, IPTV configuration, watchlist, Continue Watching state, watched state, and deletion tombstones needed for normal restore.
+
+The repository already contains `netlify-auth-site/scripts/import-supabase-export.mjs`. It reads a Supabase export in NDJSON format and selects the strongest snapshot per account from these sources:
+
+- `public.account_sync_state.ndjson`
+- `public.user_settings.ndjson`
+- `public.profiles.ndjson` account-sync mirror
+
+The selection prefers the richer snapshot, then profile count, scoped profile coverage, and finally the newest payload timestamp. Optional legacy rows can also be retained from `watch_history`, `watchlist`, `sync_state`, `watched_movies`, and `watched_episodes` as an audit/archive import. Netlify has the same canonical snapshot in its PostgreSQL `account_sync_snapshots` table and an additional Blob mirror.
+
+Migration rules:
+
+1. Take read-only exports from Supabase and Netlify. Keep the original encrypted archives outside the application server.
+2. Import copies into a separate staging PostgreSQL database. Never import into the production database first.
+3. Generate a report for every account: email or account ID, selected source, profile count, restore rank, scoped coverage, payload timestamp, and payload checksum.
+4. Compare the staging report against the exported source counts and manually restore at least one multi-profile account on a test TV and phone.
+5. Keep Netlify and Supabase running unchanged while staging is tested. The APK URL is not changed in this phase.
+6. Before cutover, repeat the export/import to capture changes made during testing. Keep the old services read-only or active as a rollback target until the new service is verified.
+7. Change the APK backend URL only in a separate test build. Do not publish that build until login, pull, push, conflict retry, profile creation, and profile deletion have passed on multiple devices.
+
+### Credentials and Sessions
+
+Account data and sync snapshots can be migrated, but a login session should not be migrated: existing access and refresh tokens are deliberately revoked at cutover.
+
+Netlify's native account records use an application-controlled `scrypt` password hash. A self-hosted backend can retain those hashes temporarily by implementing compatible verification and can rehash the password to Argon2id after a successful login.
+
+Supabase authentication hashes and OAuth state should not be copied blindly into a new authentication system. A user who exists only in Supabase should receive a password-reset email on first login, while their already imported cloud snapshot remains intact. This is the safe path when hash formats, password policies, or identity-provider settings differ.
+
+### Rollback Boundary
+
+Rollback is possible only while the old service remains available and before users write new state exclusively to the new service. Therefore the first production transition should use a short, announced maintenance window:
+
+1. Take final exports and import them into the self-hosted database.
+2. Verify account and snapshot counts plus a sample of multi-profile restores.
+3. Route a test APK only to the new backend.
+4. If validation fails, keep the production APK pointed at the existing backend and investigate; no data needs to be deleted.
+5. Only after successful validation, publish an APK that uses the new URL and keep the old export archives for recovery.
+
 ### Phase 1: Build an API-compatible backend
 
 - Implement PostgreSQL schema and migrations.
@@ -223,10 +263,10 @@ Keep secrets in an untracked `.env` file or a server-side secret manager. Never 
 
 ### Phase 4: Switch the APK
 
-- Set `NETLIFY_BACKEND_URL=https://api.streamnet.club` in the release secrets.
+- Build a separate test APK with `NETLIFY_BACKEND_URL=https://api.streamnet.club`; do not change the production APK URL yet.
 - Keep the Supabase mirror enabled only during a limited rollback window.
-- Release a test APK to selected devices and monitor sync failures and HTTP `409` rates.
-- Release broadly after successful multi-device tests.
+- Install the test APK on selected devices and monitor sync failures and HTTP `409` rates.
+- Change the production APK URL only after successful multi-device tests and a verified migration report.
 
 ### Phase 5: Retire external dependencies
 

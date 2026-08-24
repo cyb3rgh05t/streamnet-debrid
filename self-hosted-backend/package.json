@@ -1,0 +1,21 @@
+{
+  "name": "streamnet-self-hosted-backend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "migrate": "node scripts/migrate.js",
+    "import:snapshots": "node scripts/import-snapshots.js"
+  },
+  "dependencies": {
+    "fastify": "^5.5.0",
+    "jose": "^6.0.12",
+    "pg": "^8.16.3"
+  }
+}
