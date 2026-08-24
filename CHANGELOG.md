@@ -4,6 +4,12 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Cloud migration and localization
+
+- Switched production Android release builds to the self-hosted StreamNet backend at `auth.mystreamnet.club`.
+- Documented the verified migration of 10 Netlify accounts and 5 self-hosted snapshots, including multi-profile data and zero orphaned snapshots.
+- Localized hardcoded Android toast notifications through English and German resource variants.
+
 ### Added
 
 - Added an IPTV setting to show or hide the Live TV special categories (All Channels and Recently Watched), including TV and mobile settings UI and persisted per-profile behavior.

@@ -10,6 +10,14 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
 
+## Cloud Migration Status
+
+The production Android release now uses the self-hosted backend at `https://auth.mystreamnet.club`. Netlify remains available as a rollback reference, but new production builds are blocked unless the GitHub Actions `NETLIFY_BACKEND_URL` secret also equals `https://auth.mystreamnet.club`.
+
+The verified migration imported 10 Netlify accounts and 5 total self-hosted snapshots, including multi-profile data. A consistency check found 5 snapshots with 0 orphaned account references. Login, cloud sync, TV pairing, and the bilingual success page were tested before the production endpoint change.
+
+The migration export contains sensitive account records and must remain outside Git. Existing access and refresh sessions were intentionally not migrated; users sign in again after installing the production build. Keep the original Netlify service available until the first production rollout has been verified on the required devices.
+
 ## Android Build
 
 Copy local secrets and fill real values:
