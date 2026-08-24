@@ -167,6 +167,48 @@ internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: Strin
     }.getOrDefault(localPayload)
 }
 
+internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): String {
+    return runCatching {
+        val local = JSONObject(localPayload)
+        val remote = JSONObject(remotePayload)
+        val gson = Gson()
+        val profileType = TypeToken.getParameterized(List::class.java, Profile::class.java).type
+        val localProfiles = gson.fromJson<List<Profile>>(
+            local.optJSONArray("profiles")?.toString() ?: "[]",
+            profileType
+        ).orEmpty()
+        val remoteProfiles = gson.fromJson<List<Profile>>(
+            remote.optJSONArray("profiles")?.toString() ?: "[]",
+            profileType
+        ).orEmpty()
+        if (localProfiles.isEmpty() && remoteProfiles.isEmpty()) return@runCatching localPayload
+
+        val deletedAtById = LinkedHashMap<String, Long>()
+        listOf(local, remote).forEach { root ->
+            root.optJSONObject("profileDeletedAtById")?.keys()?.forEachRemaining { profileId ->
+                val deletedAt = root.optJSONObject("profileDeletedAtById")?.optLong(profileId, 0L) ?: 0L
+                if (deletedAt > 0L) deletedAtById[profileId] = max(deletedAtById[profileId] ?: 0L, deletedAt)
+            }
+        }
+        val merged = LinkedHashMap<String, Profile>()
+        remoteProfiles.filter { it.id.isNotBlank() }.forEach { merged[it.id] = it }
+        localProfiles.filter { it.id.isNotBlank() }.forEach { localProfile ->
+            val remoteProfile = merged[localProfile.id]
+            if (remoteProfile == null || localProfile.lastUsedAt >= remoteProfile.lastUsedAt) {
+                merged[localProfile.id] = localProfile
+            }
+        }
+        val survivingProfiles = merged.values.filter { profile ->
+            profile.createdAt > (deletedAtById[profile.id] ?: 0L)
+        }
+        local.put("profiles", JSONArray(gson.toJson(survivingProfiles)))
+        if (deletedAtById.isNotEmpty()) {
+            local.put("profileDeletedAtById", JSONObject(deletedAtById))
+        }
+        local.toString()
+    }.getOrDefault(localPayload)
+}
+
 private fun copyProfileArray(sourceRoot: JSONObject, targetRoot: JSONObject, containerKey: String, profileId: String) {
     val sourceContainer = sourceRoot.optJSONObject(containerKey) ?: return
     val sourceArray = sourceContainer.optJSONArray(profileId) ?: return
@@ -1311,8 +1353,9 @@ class CloudSyncRepository @Inject constructor(
     }
 
     private fun mergePayloadForPush(localPayload: String, remotePayload: String): String {
+        val profilesMergedPayload = mergeProfilesForPush(localPayload, remotePayload)
         val groupPreferencesMerged = mergeRemoteIptvGroupPreferences(
-            localPayload,
+            profilesMergedPayload,
             remotePayload,
             iptvRepository.groupPreferencesLocallyDirtyProfiles(),
         )

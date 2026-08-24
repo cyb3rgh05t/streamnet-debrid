@@ -10,6 +10,33 @@ import org.json.JSONObject
 
 class CloudSyncRepositoryAddonMergeTest {
     @Test
+    fun `stale device push preserves profile created on another device`() {
+        val local = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100}]}"""
+        val remote = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100},{"id":"tv","name":"TV","lastUsedAt":200}]}"""
+
+        val profiles = JSONObject(mergeProfilesForPush(local, remote)).getJSONArray("profiles")
+
+        assertEquals(2, profiles.length())
+        assertEquals(setOf("main", "tv"), (0 until profiles.length()).map {
+            profiles.getJSONObject(it).getString("id")
+        }.toSet())
+    }
+
+    @Test
+    fun `profile deletion tombstone prevents a stale device from restoring it`() {
+        val local = """{"profiles":[{"id":"main","name":"Main","createdAt":100,"lastUsedAt":100},{"id":"old","name":"Old","createdAt":100,"lastUsedAt":100}]}"""
+        val remote = """{"profiles":[{"id":"main","name":"Main","createdAt":100,"lastUsedAt":100}],"profileDeletedAtById":{"old":200}}"""
+
+        val merged = JSONObject(mergeProfilesForPush(local, remote))
+        val profiles = merged.getJSONArray("profiles")
+
+        assertEquals(listOf("main"), (0 until profiles.length()).map {
+            profiles.getJSONObject(it).getString("id")
+        })
+        assertEquals(200L, merged.getJSONObject("profileDeletedAtById").getLong("old"))
+    }
+
+    @Test
     fun `remote IPTV group preferences win unless changed locally`() {
         val local = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Local Hidden"],"groupOrder":["list|Local First"],"groupOrderSchema":3}}}"""
         val remote = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Remote Hidden"],"groupOrder":["list|Remote First"],"groupOrderSchema":3}}}"""

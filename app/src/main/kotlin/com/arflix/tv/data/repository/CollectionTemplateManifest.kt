@@ -32,7 +32,7 @@ internal data class CollectionTemplateEntry(
 )
 
 internal object CollectionTemplateManifest {
-    private const val ASSET_COMMIT = "5ff8719c1aa82c403b7f4abe9425a9c4347fe97c"
+    private const val ASSET_COMMIT = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
     private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
     private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
     private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
@@ -299,7 +299,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "MGM+",
             group = CollectionGroupKind.SERVICE,
-            coverImageUrl = "https://www.mgmplus.com/_next/static/media/og-image.1p-ndvvwq3kwr.jpg",
+            coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}mgmplus.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}mgm.mp4",

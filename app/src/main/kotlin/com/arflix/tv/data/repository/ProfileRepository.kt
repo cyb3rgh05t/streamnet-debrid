@@ -130,7 +130,7 @@ class ProfileRepository @Inject constructor(
         }
         profileAvatarImageManager.clearLocalAvatar(profileId)
         invalidationBus.markDirty(CloudSyncScope.PROFILES, profileId, "delete profile")
-        pushProfilesStateToCloud()
+        pushProfilesStateToCloud(deletedProfileId = profileId)
     }
 
     /**
@@ -200,11 +200,16 @@ class ProfileRepository @Inject constructor(
         }
     }
 
-    private suspend fun pushProfilesStateToCloud() {
+    private suspend fun pushProfilesStateToCloud(deletedProfileId: String? = null) {
         val userId = authRepository.getCurrentUserIdForSync() ?: return
         val profiles = getProfiles()
         val activeProfileId = getActiveProfileId()
         authRepository.mutateAccountSyncPayload { root ->
+            if (!deletedProfileId.isNullOrBlank()) {
+                val deletedAtById = root.optJSONObject("profileDeletedAtById") ?: JSONObject()
+                deletedAtById.put(deletedProfileId, System.currentTimeMillis())
+                root.put("profileDeletedAtById", deletedAtById)
+            }
             root.put("activeProfileId", activeProfileId ?: JSONObject.NULL)
             root.put("profiles", JSONArray(gson.toJson(profiles)))
             root.put(
