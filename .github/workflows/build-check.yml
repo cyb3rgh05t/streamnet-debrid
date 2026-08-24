@@ -5,7 +5,10 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflows/build-check.yml"
       - "app/build.gradle.kts"
+      - "app/src/**"
+      - "app/libs/**"
       - "build.gradle.kts"
       - "settings.gradle.kts"
       - "gradle.properties"
@@ -126,10 +129,10 @@ jobs:
         run: |
           : "${APP_ANON_KEY:?Missing APP_ANON_KEY repository secret}"
           : "${NETLIFY_BACKEND_URL:?Missing NETLIFY_BACKEND_URL repository secret}"
-          case "$NETLIFY_BACKEND_URL" in
-            http://*|https://*) ;;
-            *) echo "NETLIFY_BACKEND_URL must be an HTTP(S) URL" >&2; exit 1 ;;
-          esac
+          test "$NETLIFY_BACKEND_URL" = "https://auth.mystreamnet.club" || {
+            echo "NETLIFY_BACKEND_URL must be https://auth.mystreamnet.club for production builds" >&2
+            exit 1
+          }
           : "${SUPABASE_URL:?Missing SUPABASE_URL repository secret}"
           case "$SUPABASE_URL" in
             http://*|https://*) ;;
@@ -148,7 +151,7 @@ jobs:
       - name: Prepare runtime configuration
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
-          NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
+          NETLIFY_BACKEND_URL: https://auth.mystreamnet.club
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
