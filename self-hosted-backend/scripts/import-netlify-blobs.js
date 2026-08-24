@@ -18,11 +18,16 @@ const { Pool } = pg;
 const pool = dryRun ? null : new Pool({ connectionString: config.databaseUrl });
 
 function normalizeEmail(email) {
-  return String(email || "").trim().toLowerCase();
+  return String(email || "")
+    .trim()
+    .toLowerCase();
 }
 
 function emailHash(email) {
-  return crypto.createHash("sha256").update(normalizeEmail(email)).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(normalizeEmail(email))
+    .digest("hex");
 }
 
 function isUuid(value) {
@@ -49,10 +54,15 @@ function newer(candidate, existing) {
   if (candidateMetrics.restoreRank !== existingMetrics.restoreRank)
     return candidateMetrics.restoreRank > existingMetrics.restoreRank;
   if (candidateMetrics.profileCount !== existingMetrics.profileCount)
-    return (candidateMetrics.profileCount || 0) > (existingMetrics.profileCount || 0);
+    return (
+      (candidateMetrics.profileCount || 0) > (existingMetrics.profileCount || 0)
+    );
   if (candidateMetrics.scopedCoverage !== existingMetrics.scopedCoverage)
     return candidateMetrics.scopedCoverage > existingMetrics.scopedCoverage;
-  return Date.parse(candidate.updatedAt || "") >= Date.parse(existing.updatedAt || "");
+  return (
+    Date.parse(candidate.updatedAt || "") >=
+    Date.parse(existing.updatedAt || "")
+  );
 }
 
 async function main() {
@@ -81,7 +91,8 @@ async function main() {
           (auth) => emailHash(auth.email) === fileName.slice(6, -5),
         );
     const resolvedEmail = email || normalizeEmail(matchedAccount?.email);
-    const resolvedAccountId = accountId || matchedAccount?.accountId?.toLowerCase();
+    const resolvedAccountId =
+      accountId || matchedAccount?.accountId?.toLowerCase();
     if (!resolvedEmail || !resolvedAccountId) continue;
     const candidate = {
       accountId: resolvedAccountId,
@@ -109,7 +120,13 @@ async function main() {
          legacy_supabase_user_id = excluded.legacy_supabase_user_id,
          updated_at = now()
        returning id`,
-      [account.accountId, account.email, email, account.passwordHash, account.createdAt || null],
+      [
+        account.accountId,
+        account.email,
+        email,
+        account.passwordHash,
+        account.createdAt || null,
+      ],
     );
     if (!snapshot) continue;
     await pool.query(
@@ -121,7 +138,11 @@ async function main() {
          source = excluded.source,
          revision = account_sync_snapshots.revision + 1,
          updated_at = now()`,
-      [account.accountId, JSON.stringify(snapshot.payload), snapshot.updatedAt || null],
+      [
+        account.accountId,
+        JSON.stringify(snapshot.payload),
+        snapshot.updatedAt || null,
+      ],
     );
   }
 

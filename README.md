@@ -75,7 +75,7 @@ Database migrations should be applied deliberately, not blindly on every Android
 
 ## CI Secrets
 
-The signed Android release workflow creates a temporary `secrets.properties` file from GitHub Actions encrypted secrets. Values are available only during the build and are not committed. The normal release APK continues to use the production `NETLIFY_BACKEND_URL`; `SELF_HOSTED_BACKEND_URL` is only used by the separate `selfHosted` test APK.
+The signed Android release workflow creates a temporary `secrets.properties` file from GitHub Actions encrypted secrets. Values are available only during the build and are not committed. The normal release APK now uses `NETLIFY_BACKEND_URL` with the production value `https://auth.mystreamnet.club`. The secret name is retained for Android compatibility; `SELF_HOSTED_BACKEND_URL` remains available for the separate test APK.
 
 The workflow expects these repository secrets as needed:
 
