@@ -13,7 +13,10 @@ test("ranks a populated multi-profile snapshot above a partial payload", () => {
 });
 
 test("normalizes valid payload timestamps for PostgreSQL", () => {
-  assert.equal(payloadUpdatedAtMillis({ updatedAt: 1787557021000 }), 1787557021000);
+  assert.equal(
+    payloadUpdatedAtMillis({ updatedAt: 1787557021000 }),
+    1787557021000,
+  );
   assert.equal(payloadUpdatedAtMillis({ updatedAt: 0 }), null);
   assert.equal(payloadUpdatedAtMillis({ updatedAt: "invalid" }), null);
 });

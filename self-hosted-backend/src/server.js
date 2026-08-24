@@ -17,6 +17,13 @@ const jwtKey = new TextEncoder().encode(config.jwtSecret);
 const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
 const signupAttemptsByEmail = new Map();
 const signupCooldownMs = 5 * 60_000;
+const tvAuthTtlMs = 10 * 60_000;
+
+function randomCode(length) {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (byte) => alphabet[byte % alphabet.length]).join("");
+}
 
 async function issueAccessToken(account) {
   return new SignJWT({ email: account.email_normalized, purpose: "access" })
@@ -74,6 +81,22 @@ app.get("/health", async () => {
   return { ok: true };
 });
 
+app.get("/", async (request, reply) => {
+  const code = String(request.query?.code || "")
+    .trim()
+    .toUpperCase();
+  if (!code) {
+    return reply
+      .type("text/plain")
+      .send("StreamNet TV pairing requires a code.");
+  }
+  return reply.type("text/html; charset=utf-8").send(`<!doctype html>
+<html lang="en"><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>StreamNet TV</title>
+<style>body{background:#141414;color:#f5f5f5;font:16px system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh}main{width:min(420px,calc(100% - 32px))}input,button{box-sizing:border-box;width:100%;padding:13px;margin-top:10px;border-radius:6px;border:1px solid #555;font:inherit}input{background:#222;color:#fff}button{background:#e5a209;color:#161616;border:0;font-weight:700;cursor:pointer}p{color:#bbb}#message{min-height:24px}</style></head>
+<body><main><h1>Link StreamNet TV</h1><p>Enter your account details to approve this TV.</p><form id="pair"><input id="email" type="email" autocomplete="email" placeholder="Email" required><input id="password" type="password" autocomplete="current-password" placeholder="Password" required><button type="submit">Sign in and link TV</button></form><p id="message"></p>
+<script>const form=document.querySelector('#pair'),message=document.querySelector('#message');form.addEventListener('submit',async event=>{event.preventDefault();message.textContent='Linking TV...';const response=await fetch('/tv-auth-complete',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:${JSON.stringify(code)},email:email.value,password:password.value,intent:'signin'})});const body=await response.json().catch(()=>({}));message.textContent=response.ok?'TV linked. You can return to the TV.':body.error||'Could not link TV.';});</script></main></body></html>`);
+});
+
 app.post("/auth-login", async (request, reply) => {
   const email = String(request.body?.email || "")
     .trim()
@@ -99,14 +122,19 @@ app.post("/auth-login", async (request, reply) => {
 app.post("/cloud-auth-email", async (request, reply) => {
   const email = normalizeAndValidateEmail(request.body?.email);
   const password = String(request.body?.password || "");
-  if (!email) return reply.code(400).send({ error: "Enter a valid email address" });
+  if (!email)
+    return reply.code(400).send({ error: "Enter a valid email address" });
   if (password.length < 6) {
-    return reply.code(400).send({ error: "Password must be at least 6 characters" });
+    return reply
+      .code(400)
+      .send({ error: "Password must be at least 6 characters" });
   }
   const now = Date.now();
   const previousAttempt = signupAttemptsByEmail.get(email) || 0;
   if (now - previousAttempt < signupCooldownMs) {
-    return reply.code(429).send({ error: "Please wait before creating this account again" });
+    return reply
+      .code(429)
+      .send({ error: "Please wait before creating this account again" });
   }
   signupAttemptsByEmail.set(email, now);
   try {
@@ -119,7 +147,9 @@ app.post("/cloud-auth-email", async (request, reply) => {
     return issueSession(result.rows[0]);
   } catch (error) {
     if (error?.code === "23505") {
-      return reply.code(409).send({ error: "Account already exists. Sign in instead." });
+      return reply
+        .code(409)
+        .send({ error: "Account already exists. Sign in instead." });
     }
     throw error;
   }
@@ -170,6 +200,137 @@ app.post("/auth-refresh", async (request, reply) => {
   } finally {
     client.release();
   }
+});
+
+app.post("/tv-auth-start", async (_request, reply) => {
+  const deviceCode = randomCode(32);
+  const userCode = `${randomCode(4)}-${randomCode(4)}`;
+  const expiresAt = new Date(Date.now() + tvAuthTtlMs);
+  await pool.query(
+    "insert into tv_device_auth_sessions (device_code, user_code, expires_at) values ($1, $2, $3)",
+    [deviceCode, userCode, expiresAt],
+  );
+  const verificationUrl = `${config.publicBaseUrl}/?code=${encodeURIComponent(userCode)}`;
+  return reply.send({
+    device_code: deviceCode,
+    user_code: userCode,
+    verification_url: verificationUrl,
+    verification_uri: verificationUrl,
+    expires_in: Math.floor(tvAuthTtlMs / 1000),
+    interval: 3,
+  });
+});
+
+async function tvAuthStatus(request, reply) {
+  const deviceCode = String(request.body?.device_code || "").trim();
+  if (!deviceCode)
+    return reply.code(400).send({ error: "device_code is required" });
+  const result = await pool.query(
+    "select status, access_token, refresh_token, user_email, expires_at from tv_device_auth_sessions where device_code = $1",
+    [deviceCode],
+  );
+  const session = result.rows[0];
+  if (!session || Date.now() > Date.parse(session.expires_at)) {
+    if (session)
+      await pool.query(
+        "delete from tv_device_auth_sessions where device_code = $1",
+        [deviceCode],
+      );
+    return reply.send({ status: "expired", message: "Code expired" });
+  }
+  if (
+    session.status === "approved" &&
+    session.access_token &&
+    session.refresh_token
+  ) {
+    await pool.query(
+      "update tv_device_auth_sessions set status = 'consumed', consumed_at = now(), access_token = null, refresh_token = null where device_code = $1",
+      [deviceCode],
+    );
+    return reply.send({
+      status: "approved",
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+      email: session.user_email,
+    });
+  }
+  return reply.send({ status: "pending" });
+}
+
+app.post("/tv-auth-status", tvAuthStatus);
+app.post("/tv-auth-poll", tvAuthStatus);
+
+app.post("/tv-auth-complete", async (request, reply) => {
+  const userCode = String(request.body?.code || "")
+    .trim()
+    .toUpperCase();
+  const email = normalizeAndValidateEmail(request.body?.email);
+  const password = String(request.body?.password || "");
+  const intent = String(request.body?.intent || "signin")
+    .trim()
+    .toLowerCase();
+  if (!userCode || !email || !password)
+    return reply.code(400).send({ error: "Missing required fields" });
+  const sessionResult = await pool.query(
+    "select device_code, status, expires_at from tv_device_auth_sessions where user_code = $1",
+    [userCode],
+  );
+  const pairing = sessionResult.rows[0];
+  if (
+    !pairing ||
+    pairing.status !== "pending" ||
+    Date.now() > Date.parse(pairing.expires_at)
+  ) {
+    return reply.code(400).send({ error: "Invalid or expired code" });
+  }
+  let account;
+  if (intent === "signup") {
+    if (password.length < 6)
+      return reply
+        .code(400)
+        .send({ error: "Password must be at least 6 characters" });
+    try {
+      const created = await pool.query(
+        `insert into accounts (email, email_normalized, password_hash, password_hash_scheme)
+         values ($1, $2, $3, 'netlify_scrypt') returning id, email, email_normalized`,
+        [email, email, await hashLegacyScryptPassword(password)],
+      );
+      account = created.rows[0];
+    } catch (error) {
+      if (error?.code === "23505")
+        return reply
+          .code(409)
+          .send({ error: "Account already exists. Sign in instead." });
+      throw error;
+    }
+  } else {
+    const existing = await pool.query(
+      "select id, email, email_normalized, password_hash, password_hash_scheme from accounts where email_normalized = $1",
+      [email],
+    );
+    account = existing.rows[0];
+    if (
+      !account?.password_hash ||
+      account.password_hash_scheme !== "netlify_scrypt" ||
+      !(await verifyLegacyScryptPassword(password, account.password_hash))
+    ) {
+      return reply.code(401).send({ error: "Invalid email or password" });
+    }
+  }
+  const tokens = await issueSession(account);
+  await pool.query(
+    `update tv_device_auth_sessions
+        set status = 'approved', approved_at = now(), account_id = $2, user_email = $3, access_token = $4, refresh_token = $5
+      where device_code = $1 and status = 'pending'`,
+    [
+      pairing.device_code,
+      account.id,
+      account.email,
+      tokens.access_token,
+      tokens.refresh_token,
+    ],
+  );
+  return reply.send({ ok: true });
 });
 
 app.route({

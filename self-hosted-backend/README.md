@@ -6,12 +6,12 @@ This is a staging backend. It does not change the Android APK, Netlify, or Supab
 
 - PostgreSQL schema and repeatable migration runner.
 - Netlify-compatible `scrypt` password verification for imported Netlify accounts.
-- `auth-login`, `auth-refresh`, `cloud-auth-email`, `account-sync-pull`, and `account-sync-push`.
+- `auth-login`, `auth-refresh`, `cloud-auth-email`, TV QR pairing, `account-sync-pull`, and `account-sync-push`.
 - Revision-based snapshot compare-and-set compatible with the Android conflict retry.
 - Supabase NDJSON account-snapshot importer.
 - Traefik-compatible Docker Compose configuration with domain, certificate resolver, and published container image from `.env`.
 
-TV pairing, password reset, Discord, account deletion, media proxies, and the APK switch are intentionally not included in this first staging step. Password reset will be added after SMTP delivery is configured.
+Password reset, Discord, account deletion, media proxies, and the APK switch are intentionally not included in this first staging step. Password reset will be added after SMTP delivery is configured.
 
 ## Local or Server Setup
 
@@ -58,6 +58,10 @@ Expected first response: `{"payload":null,"revision":0,...}`. Do not import Supa
 
 `POST /cloud-auth-email` now creates a new self-hosted account and returns a session immediately. The isolated Android test build can use its normal Sign Up action for this endpoint. It rejects malformed addresses, `.local`/`.test` domains, short passwords, duplicate accounts, and repeated registration attempts for the same email within five minutes.
 
+## TV Pairing Test
+
+The self-hosted API now serves the pairing page at `PUBLIC_BASE_URL/?code=...`. A TV starts `tv-auth-start`, displays its QR code, and polls `tv-auth-status`. Scan the QR code with a phone browser, sign in on the displayed page, and the TV receives the approved session. This page is intentionally hosted on the API domain so the QR code works without Netlify.
+
 ## Android Test APK
 
 The `selfHosted` build type is a separate debug-signed APK with package suffix `.selfhosted`. It does not change the existing debug, staging, or release app. It keeps snapshot sync enabled while disabling the Supabase mirror and Supabase Realtime connection.
@@ -74,7 +78,7 @@ Build the APK with:
 ./gradlew :app:assembleSideloadSelfHosted
 ```
 
-Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in only with the staging account, then use the normal Cloud Sync action to validate pull and push. Do not use Sign Up yet: account creation, TV pairing, password reset, and account deletion are still handled by Netlify in production and are not part of this first self-hosted test.
+Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in or create a staging account, then use the normal Cloud Sync action to validate pull and push. TV pairing is available through the self-hosted QR page. Password reset and account deletion remain on the production Netlify service until their self-hosted replacements are implemented.
 
 ## Container Publishing
 

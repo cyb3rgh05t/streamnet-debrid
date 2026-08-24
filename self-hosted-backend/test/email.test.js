@@ -3,7 +3,10 @@ import test from "node:test";
 import { normalizeAndValidateEmail } from "../src/email.js";
 
 test("normalizes valid signup emails", () => {
-  assert.equal(normalizeAndValidateEmail(" User@Example.DE "), "user@example.de");
+  assert.equal(
+    normalizeAndValidateEmail(" User@Example.DE "),
+    "user@example.de",
+  );
 });
 
 test("rejects malformed and local-only signup emails", () => {
