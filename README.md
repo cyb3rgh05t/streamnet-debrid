@@ -75,7 +75,9 @@ Database migrations should be applied deliberately, not blindly on every Android
 
 ## CI Secrets
 
-The Android release workflow expects these repository secrets as needed:
+The signed Android release workflow creates a temporary `secrets.properties` file from GitHub Actions encrypted secrets. Values are available only during the build and are not committed. The normal release APK continues to use the production `NETLIFY_BACKEND_URL`; `SELF_HOSTED_BACKEND_URL` is only used by the separate `selfHosted` test APK.
+
+The workflow expects these repository secrets as needed:
 
 - `APP_ANON_KEY`
 - `NETLIFY_BACKEND_URL`
@@ -92,3 +94,5 @@ The Android release workflow expects these repository secrets as needed:
 - `DISCORD_PARTNER_SDK_URL`
 - `DISCORD_PARTNER_SDK_BEARER_TOKEN` (if the SDK URL is private)
 - `DISCORD_PARTNER_SDK_AAR_SHA256` (optional integrity check)
+
+The local `secrets.properties` file is ignored by Git and should be used for local builds only. Do not upload it or put private API credentials into source code. Values that must be embedded in an APK should be treated as public, because APK users can extract them; keep signing passwords, SDK download tokens, and server-side secrets only in GitHub Actions secrets or the backend environment.
