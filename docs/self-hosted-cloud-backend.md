@@ -211,6 +211,8 @@ The repository already contains `netlify-auth-site/scripts/import-supabase-expor
 
 The selection prefers the richer snapshot, then profile count, scoped profile coverage, and finally the newest payload timestamp. Optional legacy rows can also be retained from `watch_history`, `watchlist`, `sync_state`, `watched_movies`, and `watched_episodes` as an audit/archive import. Netlify has the same canonical snapshot in its PostgreSQL `account_sync_snapshots` table and an additional Blob mirror.
 
+The verified production migration used Netlify Blob stores directly because the Supabase sync tables were empty. It imported 10 accounts and 5 self-hosted snapshots; a consistency check found 5 valid snapshot references and 0 orphaned snapshots. Account records included the existing Netlify-scrypt password hashes, while active sessions were intentionally excluded.
+
 Migration rules:
 
 1. Take read-only exports from Supabase and Netlify. Keep the original encrypted archives outside the application server.
@@ -258,6 +260,15 @@ Rollback is possible only while the old service remains available and before use
 
 - Port TV device pairing.
 - Port account deletion and its background cleanup job.
+
+### Completed Self-Hosted Scope
+
+- Production endpoint: `https://auth.mystreamnet.club`.
+- PostgreSQL is canonical for accounts, sessions, snapshots, TV pairing, Discord pairing sessions, and app usage events.
+- Account login, registration, refresh, snapshot pull/push, TV pairing, Discord pairing, analytics, and account deletion run through the self-hosted backend.
+- Supabase mirror and Supabase Realtime are disabled in production Android builds.
+- Password reset and optional media proxy routes remain future work and are not required for the current email/password and sync flow.
+- The Discord OAuth redirect URI must match exactly in the Android client, hosted callback page, and Discord Developer Portal.
 - Port Discord callbacks only if the feature remains enabled.
 - Decide whether each media proxy belongs in the self-hosted backend or should be removed.
 

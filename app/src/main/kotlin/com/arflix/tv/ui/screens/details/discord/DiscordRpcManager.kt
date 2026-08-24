@@ -44,11 +44,18 @@ object DiscordRpcManager {
     private const val KEY_CODE_VERIFIER = "code_verifier"
     private const val KEY_OAUTH_STATE = "oauth_state"
     private const val KEY_USERNAME = "username"
-    private const val REDIRECT_URI_WEB = "https://auth.streamnet.club/discord/callback"
+    private const val LEGACY_REDIRECT_URI_WEB = "https://auth.streamnet.club/discord/callback"
     private const val TOKEN_REFRESH_MARGIN_MS = 60_000L
 
     private val discordClientId: String
         get() = BuildConfig.DISCORD_APPLICATION_ID.trim()
+
+    private val discordRedirectUri: String
+        get() = if (Constants.NETLIFY_BACKEND_URL == "https://auth.mystreamnet.club") {
+            "https://auth.mystreamnet.club/discord/callback"
+        } else {
+            LEGACY_REDIRECT_URI_WEB
+        }
 
     private val coroutineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val tokenMutex = Mutex()
@@ -207,7 +214,7 @@ object DiscordRpcManager {
         return "https://discord.com/api/oauth2/authorize?" +
             "client_id=$discordClientId" +
             "&response_type=code" +
-            "&redirect_uri=${URLEncoder.encode(REDIRECT_URI_WEB, "UTF-8")}" +
+            "&redirect_uri=${URLEncoder.encode(discordRedirectUri, "UTF-8")}" +
             "&scope=${URLEncoder.encode("identify sdk.social_layer_presence", "UTF-8")}" +
             "&state=$state" +
             "&code_challenge=$challenge" +
@@ -570,7 +577,7 @@ object DiscordRpcManager {
                 "client_id" to discordClientId,
                 "grant_type" to "authorization_code",
                 "code" to code,
-                "redirect_uri" to REDIRECT_URI_WEB,
+                "redirect_uri" to discordRedirectUri,
                 "code_verifier" to verifier
             )
         )

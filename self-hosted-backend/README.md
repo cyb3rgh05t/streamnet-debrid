@@ -1,6 +1,6 @@
 # StreamNet Self-Hosted Backend
 
-This is a staging backend. It does not change the Android APK, Netlify, or Supabase configuration.
+This is the self-hosted StreamNet backend. The production Android build uses it at `https://auth.mystreamnet.club`.
 
 ## Included now
 
@@ -22,7 +22,7 @@ Password reset and media proxies are intentionally not included yet. Password re
 4. Run migrations with `docker compose exec streamnet-backend npm run migrate`.
 5. Check `https://your-domain/health` through Traefik.
 
-Do not point the production APK to this service yet.
+The production APK may use this service after the migration checks documented below have passed. Keep the old Netlify service available as a rollback reference until the rollout is fully verified.
 
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 
@@ -69,6 +69,8 @@ Expected first response: `{"payload":null,"revision":0,...}`. Do not import Supa
 
 The self-hosted API now serves the pairing page at `PUBLIC_BASE_URL/?code=...`. A TV starts `tv-auth-start`, displays its QR code, and polls `tv-auth-status`. Scan the QR code with a phone browser, sign in on the displayed page, and the TV receives the approved session. This page is intentionally hosted on the API domain so the QR code works without Netlify.
 
+Discord TV pairing is also served locally at `PUBLIC_BASE_URL/discord/`. The Discord Developer Portal must contain the exact redirect URI `https://auth.mystreamnet.club/discord/callback`. The Android client uses that same URI when exchanging the authorization code; mismatched redirect URIs cause Discord error `invalid_grant`.
+
 ## Android Test APK
 
 The `selfHosted` build type is a separate debug-signed APK with package suffix `.selfhosted`. It does not change the existing debug, staging, or release app. It keeps snapshot sync enabled while disabling the Supabase mirror and Supabase Realtime connection.
@@ -85,7 +87,7 @@ Build the APK with:
 ./gradlew :app:assembleSideloadSelfHosted
 ```
 
-Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in or create a staging account, then use the normal Cloud Sync action to validate pull and push. TV pairing is available through the self-hosted QR page. Password reset and account deletion are unavailable in the self-hosted test page until their own server-side replacements are implemented.
+Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in with a migrated account, validate Cloud Sync, profile restoration, TV pairing, Discord pairing, and account deletion. The production release uses the same backend endpoint. Password reset remains unavailable.
 
 ## Container Publishing
 
@@ -119,7 +121,7 @@ The importer preserves Netlify-scrypt password hashes, imports accounts without 
 
 ## Netlify Account Passwords
 
-The current Netlify account records use `scrypt`. The API can verify that format when a migrated account has `password_hash_scheme = 'netlify_scrypt'`. Importing the Netlify Blob account records is the next migration task; it must copy only `email`, `accountId`, and `passwordHash`, never active access or refresh tokens.
+The migrated Netlify account records use `scrypt`. The API verifies that format when an imported account has `password_hash_scheme = 'netlify_scrypt'`. Active access and refresh tokens are never imported.
 
 ## Safety
 
