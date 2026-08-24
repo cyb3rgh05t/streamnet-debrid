@@ -80,6 +80,7 @@ lint/tmp/
 secrets.properties
 *.secrets.properties
 keystore.properties
+migration-export/
 
 # Signing keys
 release.keystore

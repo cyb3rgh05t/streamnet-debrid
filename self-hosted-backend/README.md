@@ -105,6 +105,17 @@ docker compose exec streamnet-backend npm run import:snapshots -- /imports/supab
 
 Mount the export directory into the container only for the import. Run this on staging first, compare account and snapshot counts, and restore test accounts on a TV and phone before any APK change.
 
+## Import Netlify Blob Snapshots
+
+The production StreamNet account data is currently in the Netlify Blob stores `account-sync` and `arvio-auth`, not in the empty Supabase sync tables. Export those stores to one directory with an `auth/` subdirectory, then run the idempotent importer against the self-hosted PostgreSQL database:
+
+```sh
+docker compose exec streamnet-backend npm run import:netlify-blobs -- /imports/streamnet-migration-export --dry-run
+docker compose exec streamnet-backend npm run import:netlify-blobs -- /imports/streamnet-migration-export
+```
+
+The importer preserves Netlify-scrypt password hashes, imports accounts without snapshots, and imports the strongest snapshot once per account. Existing access and refresh sessions are not imported.
+
 ## Netlify Account Passwords
 
 The current Netlify account records use `scrypt`. The API can verify that format when a migrated account has `password_hash_scheme = 'netlify_scrypt'`. Importing the Netlify Blob account records is the next migration task; it must copy only `email`, `accountId`, and `passwordHash`, never active access or refresh tokens.
