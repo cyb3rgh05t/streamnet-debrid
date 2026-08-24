@@ -105,11 +105,48 @@ app.get("/", async (request, reply) => {
       'window.location.href = "https://streamnet-sync.netlify.app";',
       "return;",
     )
+    .replaceAll("Angemeldet. Weiterleitung...", "Angemeldet.")
+    .replaceAll("TV gekoppelt. Weiterleitung...", "TV gekoppelt.")
+    .replaceAll("Konto erstellt. Weiterleitung...", "Konto erstellt.")
+    .replaceAll(
+      "Konto erstellt und TV gekoppelt. Weiterleitung...",
+      "Konto erstellt und TV gekoppelt.",
+    )
+    .replaceAll("Signed in. Redirecting...", "Signed in.")
+    .replaceAll("TV paired. Redirecting...", "TV paired.")
+    .replaceAll("Account created. Redirecting...", "Account created.")
+    .replaceAll(
+      "Account created and TV paired. Redirecting...",
+      "Account created and TV paired.",
+    )
     .replace(
       "</body>",
       `<script>
         document.getElementById("forgot").style.display = "none";
         document.querySelector(".privacy-link").style.display = "none";
+        const statusNode = document.getElementById("status");
+        const pageLanguage = () => document.documentElement.lang === "de" ? "de" : "en";
+        const showSuccessPage = (pairing) => {
+          const german = pageLanguage() === "de";
+          const title = pairing
+            ? (german ? "TV erfolgreich gekoppelt" : "TV paired successfully")
+            : (german ? "Erfolgreich angemeldet" : "Signed in successfully");
+          const message = pairing
+            ? (german
+              ? "Dein Fernseher wurde mit diesem Konto verbunden. Du kannst dieses Fenster jetzt schliessen."
+              : "Your TV is now connected to this account. You can close this window.")
+            : (german
+              ? "Dein StreamNet-Konto ist bereit. Deine Daten bleiben auf deinen Geraeten synchron."
+              : "Your StreamNet account is ready. Your data will stay in sync across your devices.");
+          document.body.innerHTML = '<main style="min-height:calc(100vh - 56px);display:grid;place-items:center"><section style="width:min(560px,100%);padding:42px 34px;text-align:center;background:rgba(28,23,19,.94);border:1px solid rgba(229,162,9,.28);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.38)"><img src="/assets/streamnet-logo.svg" alt="StreamNet TV" style="width:min(260px,80%);height:auto;margin-bottom:34px"><div style="width:64px;height:64px;margin:0 auto 22px;border:2px solid #6ee7a3;border-radius:50%;display:grid;place-items:center;color:#6ee7a3;font-size:24px;font-weight:700">OK</div><h1 style="margin:0;color:#f4efe7;font-size:clamp(28px,5vw,42px);line-height:1.1">' + title + '</h1><p style="margin:18px auto 0;max-width:420px;color:#d6cabb;font-size:16px;line-height:1.6">' + message + '</p><div style="margin-top:30px;color:#e5a209;font-size:12px;letter-spacing:.16em;text-transform:uppercase">StreamNet TV - Cloud Auth</div></section></main>';
+        };
+        new MutationObserver(() => {
+          if (!statusNode || !statusNode.classList.contains("ok")) return;
+          const text = statusNode.textContent.toLowerCase();
+          const pairing = text.includes("gekoppelt") || text.includes("paired");
+          const success = pairing || text.includes("angemeldet") || text.includes("signed in") || text.includes("konto erstellt") || text.includes("account created");
+          if (success && document.body.contains(statusNode)) showSuccessPage(pairing);
+        }).observe(statusNode, { childList: true, characterData: true, attributes: true, subtree: true });
       </script></body>`,
     );
   return reply.type("text/html; charset=utf-8").send(selfHostedPage);
