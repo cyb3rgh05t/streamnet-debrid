@@ -139,24 +139,28 @@ app.post("/auth-refresh", async (request, reply) => {
   }
 });
 
-app.get("/account-sync-pull", async (request) => {
-  const account = await authenticatedAccount(request);
-  const result = await pool.query(
-    "select payload, revision, payload_updated_at, updated_at from account_sync_snapshots where account_id = $1",
-    [account.id],
-  );
-  const snapshot = result.rows[0];
-  if (!snapshot)
-    return { payload: null, source: null, updatedAt: null, revision: 0 };
-  const metrics = payloadMetrics(snapshot.payload);
-  return {
-    payload: snapshot.payload,
-    source: "self_hosted",
-    updatedAt: snapshot.updated_at,
-    payloadUpdatedAt: snapshot.payload_updated_at,
-    revision: Number(snapshot.revision),
-    ...metrics,
-  };
+app.route({
+  method: ["GET", "POST"],
+  url: "/account-sync-pull",
+  handler: async (request) => {
+    const account = await authenticatedAccount(request);
+    const result = await pool.query(
+      "select payload, revision, payload_updated_at, updated_at from account_sync_snapshots where account_id = $1",
+      [account.id],
+    );
+    const snapshot = result.rows[0];
+    if (!snapshot)
+      return { payload: null, source: null, updatedAt: null, revision: 0 };
+    const metrics = payloadMetrics(snapshot.payload);
+    return {
+      payload: snapshot.payload,
+      source: "self_hosted",
+      updatedAt: snapshot.updated_at,
+      payloadUpdatedAt: snapshot.payload_updated_at,
+      revision: Number(snapshot.revision),
+      ...metrics,
+    };
+  },
 });
 
 app.post("/account-sync-push", async (request, reply) => {
@@ -183,14 +187,12 @@ app.post("/account-sync-push", async (request, reply) => {
     const revision = Number(current?.revision || 0);
     if (expectedRevision !== undefined && expectedRevision !== revision) {
       await client.query("rollback");
-      return reply
-        .code(409)
-        .send({
-          accepted: false,
-          reason: "revision_conflict",
-          revision,
-          current: current ? { payload: current.payload, revision } : null,
-        });
+      return reply.code(409).send({
+        accepted: false,
+        reason: "revision_conflict",
+        revision,
+        current: current ? { payload: current.payload, revision } : null,
+      });
     }
     const nextRevision = revision + 1;
     await client.query(
