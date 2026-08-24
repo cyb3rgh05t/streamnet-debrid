@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.arflix.tv.BuildConfig
 import com.arflix.tv.R
 import com.arflix.tv.server.AiKeyConfigServer
 import com.arflix.tv.ui.screens.player.SubtitleAiModel
@@ -272,6 +273,9 @@ class SettingsViewModel @Inject constructor(
     private val watchHistoryRepository: com.arflix.tv.data.repository.WatchHistoryRepository,
     private val simklAuthManager: com.arflix.tv.data.repository.simkl.SimklAuthManager
 ) : ViewModel() {
+    private val usesSelfHostedDirectAuth: Boolean
+        get() = BuildConfig.BUILD_TYPE == "selfHosted"
+
     private fun visibleCatalogs(catalogs: List<CatalogConfig>): List<CatalogConfig> {
         return catalogs.filter { config ->
             when (config.kind) {
@@ -2546,6 +2550,15 @@ class SettingsViewModel @Inject constructor(
 
     fun startCloudAuth() {
         if (_uiState.value.isLoggedIn || _uiState.value.isCloudAuthWorking) return
+        if (usesSelfHostedDirectAuth) {
+            _uiState.value = _uiState.value.copy(
+                showCloudPairDialog = false,
+                showCloudEmailPasswordDialog = true,
+                cloudAuthStatusMessage = null,
+                isCloudAuthWorking = false
+            )
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isCloudAuthWorking = true,
@@ -2589,6 +2602,15 @@ class SettingsViewModel @Inject constructor(
 
     fun openCloudEmailPasswordDialog() {
         if (_uiState.value.isLoggedIn) return
+        if (usesSelfHostedDirectAuth) {
+            _uiState.value = _uiState.value.copy(
+                showCloudPairDialog = false,
+                showCloudEmailPasswordDialog = true,
+                cloudAuthStatusMessage = null,
+                isCloudAuthWorking = false
+            )
+            return
+        }
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 showCloudPairDialog = false,
@@ -2641,6 +2663,37 @@ class SettingsViewModel @Inject constructor(
                 toastMessage = "Password is required",
                 toastType = ToastType.ERROR
             )
+            return
+        }
+
+        if (usesSelfHostedDirectAuth) {
+            if (createAccount) {
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = "Account creation is not available in the self-hosted test build",
+                    toastType = ToastType.ERROR
+                )
+                return
+            }
+            viewModelScope.launch {
+                _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
+                val result = authRepository.signIn(trimmedEmail, password)
+                _uiState.value = if (result.isSuccess) {
+                    _uiState.value.copy(
+                        showCloudEmailPasswordDialog = false,
+                        isCloudAuthWorking = false,
+                        shouldSwitchProfile = true,
+                        toastMessage = "Signed in to self-hosted cloud",
+                        toastType = ToastType.SUCCESS
+                    )
+                } else {
+                    _uiState.value.copy(
+                        isCloudAuthWorking = false,
+                        toastMessage = result.exceptionOrNull()?.message
+                            ?: context.getString(R.string.auth_signin_failed),
+                        toastType = ToastType.ERROR
+                    )
+                }
+            }
             return
         }
 
