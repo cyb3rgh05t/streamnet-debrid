@@ -160,7 +160,12 @@ app.get("/delete-account", async (_request, reply) => {
   );
   return reply
     .type("text/html; charset=utf-8")
-    .send(page.replaceAll('const FUNCTIONS = "/.netlify/functions";', 'const FUNCTIONS = "";'));
+    .send(
+      page.replaceAll(
+        'const FUNCTIONS = "/.netlify/functions";',
+        'const FUNCTIONS = "";',
+      ),
+    );
 });
 
 app.post("/auth-login", async (request, reply) => {
