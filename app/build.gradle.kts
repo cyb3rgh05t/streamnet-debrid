@@ -176,6 +176,22 @@ android {
 
             buildConfigField("Boolean", "ENABLE_CRASH_REPORTING", "true")
         }
+
+        create("selfHosted") {
+            initWith(getByName("debug"))
+            applicationIdSuffix = ".selfhosted"
+            versionNameSuffix = "-selfhosted"
+
+            buildConfigField(
+                "String",
+                "NETLIFY_BACKEND_URL",
+                "\"${escapeBuildConfigString(localSecretValue("SELF_HOSTED_BACKEND_URL").ifBlank { "https://api.mystreamnet.club" })}\""
+            )
+            buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
+            buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")
+            buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
+            buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "false")
+        }
     }
 
     compileOptions {

@@ -54,6 +54,24 @@ curl -sS https://api.mystreamnet.club/account-sync-pull \
 
 Expected first response: `{"payload":null,"revision":0,...}`. Do not import Supabase or Netlify data until this login and pull test works.
 
+## Android Test APK
+
+The `selfHosted` build type is a separate debug-signed APK with package suffix `.selfhosted`. It does not change the existing debug, staging, or release app. It keeps snapshot sync enabled while disabling the Supabase mirror and Supabase Realtime connection.
+
+Set an optional custom test domain in the untracked `secrets.properties` file:
+
+```properties
+SELF_HOSTED_BACKEND_URL=https://api.mystreamnet.club
+```
+
+Build the APK with:
+
+```sh
+./gradlew :app:assembleSideloadSelfHosted
+```
+
+Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in only with the staging account, then use the normal Cloud Sync action to validate pull and push. Do not use Sign Up yet: account creation, TV pairing, password reset, and account deletion are still handled by Netlify in production and are not part of this first self-hosted test.
+
 ## Container Publishing
 
 The `Publish Self-Hosted Backend` GitHub Actions workflow runs for changes under `self-hosted-backend/` on `main`. It tests the service and publishes these GHCR tags:
