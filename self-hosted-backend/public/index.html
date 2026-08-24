@@ -1,0 +1,1603 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StreamNet TV – Cloud Account</title>
+    <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --bg-1: #0f0d0b;
+        --bg-2: #171311;
+        --bg-3: #221b16;
+        --card: #1c1713;
+        --panel: #15110e;
+        --field: #120f0c;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-strong: rgba(229, 162, 9, 0.26);
+        --text: #f4efe7;
+        --muted: #b4a798;
+        --muted-strong: #d6cabb;
+        --accent-1: #e5a209;
+        --accent-2: #ce8017;
+        --accent-soft: rgba(229, 162, 9, 0.12);
+        --field-focus: #1d1712;
+        --ok: #6ee7a3;
+        --danger: #ff8a76;
+        --shadow: rgba(0, 0, 0, 0.42);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+      }
+      body {
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(
+            circle at top left,
+            rgba(229, 162, 9, 0.06),
+            transparent 22%
+          ),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2) 62%, var(--bg-3));
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        letter-spacing: -0.01em;
+        padding: 28px;
+        min-height: 100vh;
+      }
+
+      .page {
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+        min-height: calc(100vh - 56px);
+        display: grid;
+        align-content: center;
+        gap: 12px;
+      }
+
+      .topbar {
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .lang-switch {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 4px;
+      }
+
+      .lang-btn {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        min-height: 34px;
+        min-width: 54px;
+        border-radius: 999px;
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        cursor: pointer;
+        padding: 0 12px;
+        transition:
+          color 0.2s ease,
+          background 0.2s ease;
+      }
+
+      .lang-btn[aria-pressed="true"] {
+        color: #17120f;
+        background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      }
+
+      .lang-btn:hover {
+        color: var(--text);
+      }
+
+      .shell {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1.08fr) minmax(360px, 440px);
+        border-radius: 28px;
+        background:
+          linear-gradient(
+            180deg,
+            rgba(255, 255, 255, 0.01),
+            rgba(255, 255, 255, 0.01)
+          ),
+          var(--card);
+        border: 1px solid var(--line);
+        box-shadow:
+          0 28px 70px -34px rgba(0, 0, 0, 0.86),
+          0 8px 18px -12px var(--shadow);
+        overflow: hidden;
+        min-height: 700px;
+      }
+
+      .info {
+        position: relative;
+        padding: 40px 40px 34px;
+        background:
+          linear-gradient(180deg, rgba(229, 162, 9, 0.06), transparent 26%),
+          linear-gradient(135deg, rgba(255, 255, 255, 0.02), transparent 40%);
+        border-right: 1px solid var(--line);
+        display: flex;
+        flex-direction: column;
+        gap: 26px;
+      }
+
+      .kicker {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--accent-1);
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .brand-logo {
+        width: min(290px, 100%);
+        height: auto;
+        display: block;
+      }
+
+      .hero-copy {
+        max-width: 520px;
+      }
+
+      .title {
+        margin: 0;
+        font-size: clamp(34px, 4vw, 48px);
+        line-height: 1.02;
+        font-weight: 800;
+        letter-spacing: -0.04em;
+        color: #fbf6ec;
+      }
+
+      .subtitle {
+        margin: 14px 0 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.65;
+      }
+
+      .summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .summary-card,
+      .pairing-card,
+      .help-card {
+        border: 1px solid var(--line);
+        background: var(--panel);
+        border-radius: 18px;
+      }
+
+      .summary-card {
+        padding: 16px 16px 14px;
+      }
+
+      .summary-card strong {
+        display: block;
+        font-size: 13px;
+        margin-bottom: 6px;
+        color: var(--muted-strong);
+      }
+
+      .summary-card span {
+        display: block;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .pairing-card {
+        padding: 22px;
+      }
+
+      .section-title {
+        margin: 0 0 8px;
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .section-copy {
+        margin: 0;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.65;
+      }
+
+      .pairing-steps {
+        margin: 16px 0 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 12px;
+      }
+
+      .pairing-steps li {
+        display: grid;
+        grid-template-columns: 26px minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
+      }
+
+      .step-index {
+        width: 26px;
+        height: 26px;
+        border-radius: 999px;
+        display: inline-grid;
+        place-items: center;
+        background: var(--accent-soft);
+        color: var(--accent-1);
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .step-copy {
+        color: var(--muted-strong);
+        font-size: 13px;
+        line-height: 1.55;
+      }
+
+      .pairing-card[data-mode="default"] .pairing-state,
+      .pairing-card[data-mode="pairing"] .pairing-default {
+        display: none;
+      }
+
+      .help-card {
+        padding: 18px 22px;
+      }
+
+      .help-list {
+        margin: 12px 0 0;
+        padding-left: 18px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.7;
+      }
+
+      .auth-panel {
+        display: flex;
+        align-items: stretch;
+        justify-content: center;
+        padding: 24px;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 255, 255, 0.02),
+          transparent 22%
+        );
+      }
+
+      .auth-card {
+        width: 100%;
+        background: #17120f;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .head {
+        padding: 28px 28px 20px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .pair {
+        display: none;
+        margin-top: 14px;
+        padding: 14px 15px;
+        border-radius: 12px;
+        border: 1px solid var(--line-strong);
+        background: rgba(229, 162, 9, 0.08);
+        color: var(--text);
+        font-size: 13px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .pair-label {
+        color: var(--muted);
+        font-weight: 500;
+      }
+      .pair b {
+        font-family: ui-monospace, "SF Mono", Menlo, monospace;
+        letter-spacing: 0.12em;
+        font-size: 15px;
+        color: #fbf6ec;
+      }
+
+      .body {
+        padding: 20px 28px 26px;
+      }
+
+      .status {
+        min-height: 19px;
+        margin: 4px 0 10px;
+        font-size: 13px;
+        color: var(--muted);
+        transition: color 0.2s ease;
+      }
+      .status.error {
+        color: var(--danger);
+      }
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .label {
+        display: block;
+        font-size: 12px;
+        font-weight: 600;
+        color: var(--muted);
+        margin: 14px 0 6px;
+        letter-spacing: 0.02em;
+      }
+
+      .input {
+        width: 100%;
+        padding: 13px 14px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        outline: none;
+        background: var(--field);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 14px;
+        transition:
+          border-color 0.18s ease,
+          background 0.18s ease,
+          box-shadow 0.18s ease;
+      }
+      .input::placeholder {
+        color: #7e7164;
+      }
+      .input:hover {
+        border-color: var(--line-strong);
+      }
+      .input:focus {
+        border-color: rgba(229, 162, 9, 0.58);
+        background: var(--field-focus);
+        box-shadow: inset 0 0 0 1px rgba(229, 162, 9, 0.16);
+      }
+
+      .actions {
+        display: grid;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .btn {
+        width: 100%;
+        border: 1px solid var(--line-strong);
+        background: rgba(255, 245, 230, 0.03);
+        color: var(--text);
+        border-radius: 12px;
+        padding: 13px;
+        font-weight: 600;
+        font-family: inherit;
+        font-size: 14px;
+        letter-spacing: -0.005em;
+        cursor: pointer;
+        transition:
+          transform 0.14s ease,
+          background 0.2s ease,
+          box-shadow 0.2s ease,
+          border-color 0.2s ease;
+      }
+      .btn:hover {
+        background: rgba(255, 245, 230, 0.07);
+        border-color: rgba(255, 245, 230, 0.28);
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .btn.primary {
+        background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+        color: #0d0e12;
+        border: 0;
+        box-shadow: none;
+      }
+      .btn.primary:hover {
+        background: linear-gradient(135deg, #efaf14, #d88419);
+      }
+
+      .small {
+        margin-top: 16px;
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.55;
+        text-align: center;
+      }
+
+      .linkrow {
+        margin-top: 10px;
+        display: flex;
+        justify-content: flex-end;
+      }
+
+      .linkbtn {
+        border: 0;
+        background: transparent;
+        color: var(--muted);
+        font-family: inherit;
+        font-size: 12px;
+        font-weight: 500;
+        cursor: pointer;
+        padding: 4px 2px;
+        transition: color 0.18s ease;
+      }
+      .linkbtn:hover {
+        color: var(--text);
+      }
+      .linkbtn:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+      }
+
+      .foot {
+        margin-top: 18px;
+        padding-top: 14px;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 11px;
+        text-align: center;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        font-weight: 500;
+      }
+
+      .privacy-link {
+        display: block;
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: center;
+        text-decoration: none;
+      }
+
+      .privacy-link:hover,
+      .privacy-link:focus-visible {
+        color: var(--text);
+      }
+
+      .mode-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--line);
+        color: var(--muted-strong);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      .mode-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--accent-1);
+      }
+
+      @media (max-width: 480px) {
+        body {
+          padding: 14px;
+        }
+        .page {
+          gap: 10px;
+          min-height: auto;
+        }
+        .shell {
+          border-radius: 18px;
+        }
+        .topbar {
+          justify-content: stretch;
+        }
+        .lang-switch {
+          width: 100%;
+          justify-content: center;
+        }
+        .head {
+          padding: 20px 16px 16px;
+        }
+        .body {
+          padding: 16px;
+        }
+        .info {
+          padding: 20px 16px 18px;
+          gap: 18px;
+        }
+        .pairing-card,
+        .help-card {
+          padding: 14px;
+          border-radius: 14px;
+        }
+        .summary-card {
+          padding: 12px;
+          border-radius: 14px;
+        }
+        .pair {
+          padding: 12px;
+        }
+        .pair b {
+          font-size: 13px;
+          letter-spacing: 0.08em;
+          word-break: break-all;
+        }
+        .title {
+          font-size: 30px;
+        }
+        .subtitle,
+        .section-copy,
+        .step-copy,
+        .help-list {
+          font-size: 13px;
+          line-height: 1.55;
+        }
+        .btn {
+          min-height: 46px;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .page {
+          align-content: start;
+        }
+
+        .shell {
+          grid-template-columns: 1fr;
+          min-height: auto;
+        }
+
+        .auth-panel {
+          order: 1;
+          padding: 16px;
+        }
+
+        .info {
+          order: 2;
+          padding: 26px 20px 22px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .summary {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          border-radius: 20px;
+        }
+        .auth-panel {
+          padding: 12px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <div class="topbar">
+        <div class="lang-switch" role="group" aria-label="Language switch">
+          <button
+            class="lang-btn"
+            id="langEn"
+            type="button"
+            aria-pressed="true"
+          >
+            EN
+          </button>
+          <button
+            class="lang-btn"
+            id="langDe"
+            type="button"
+            aria-pressed="false"
+          >
+            DE
+          </button>
+        </div>
+      </div>
+
+      <main class="shell">
+        <section class="info">
+          <div class="brand">
+            <img
+              class="brand-logo"
+              src="/assets/streamnet-logo.svg"
+              alt="StreamNet TV"
+            />
+          </div>
+
+          <div class="hero-copy">
+            <div class="kicker" data-i18n="hero.kicker"></div>
+            <h1 class="title" data-i18n="hero.title"></h1>
+            <p class="subtitle" id="subtitle"></p>
+          </div>
+
+          <div class="summary">
+            <div class="summary-card">
+              <strong data-i18n="summary.profiles.title"></strong>
+              <span data-i18n="summary.profiles.copy"></span>
+            </div>
+            <div class="summary-card">
+              <strong data-i18n="summary.playback.title"></strong>
+              <span data-i18n="summary.playback.copy"></span>
+            </div>
+            <div class="summary-card">
+              <strong data-i18n="summary.pairing.title"></strong>
+              <span data-i18n="summary.pairing.copy"></span>
+            </div>
+          </div>
+
+          <section class="pairing-card" id="pairingInfo" data-mode="default">
+            <div class="pairing-default">
+              <h2 class="section-title" data-i18n="pairing.defaultTitle"></h2>
+              <p class="section-copy" data-i18n="pairing.defaultCopy"></p>
+            </div>
+            <div class="pairing-state">
+              <div class="mode-tag">
+                <span class="mode-dot"></span>
+                <span data-i18n="pairing.activeTag"></span>
+              </div>
+              <h2
+                class="section-title"
+                style="margin-top: 14px"
+                data-i18n="pairing.stateTitle"
+              ></h2>
+              <p class="section-copy" data-i18n="pairing.stateCopy"></p>
+              <ol class="pairing-steps">
+                <li>
+                  <span class="step-index">1</span>
+                  <span class="step-copy" data-i18n="pairing.steps.one"></span>
+                </li>
+                <li>
+                  <span class="step-index">2</span>
+                  <span class="step-copy" data-i18n="pairing.steps.two"></span>
+                </li>
+                <li>
+                  <span class="step-index">3</span>
+                  <span
+                    class="step-copy"
+                    data-i18n="pairing.steps.three"
+                  ></span>
+                </li>
+              </ol>
+            </div>
+          </section>
+
+          <section class="help-card">
+            <h2 class="section-title" data-i18n="help.title"></h2>
+            <ul class="help-list">
+              <li data-i18n="help.items.one"></li>
+              <li data-i18n="help.items.two"></li>
+              <li data-i18n="help.items.three"></li>
+            </ul>
+          </section>
+        </section>
+
+        <section class="auth-panel">
+          <div class="auth-card">
+            <header class="head">
+              <div class="kicker" data-i18n="auth.kicker"></div>
+              <h2
+                class="section-title"
+                style="font-size: 28px; margin: 10px 0 0"
+              >
+                <span data-i18n="auth.title"></span>
+              </h2>
+              <div class="pair" id="pairBox">
+                <span class="pair-label" data-i18n="auth.pairCode"></span>
+                <b id="pairCode"></b>
+              </div>
+            </header>
+
+            <section class="body">
+              <div class="status" id="status"></div>
+
+              <label
+                class="label"
+                for="email"
+                id="emailLabel"
+                data-i18n="labels.email"
+              ></label>
+              <input
+                class="input"
+                id="email"
+                type="email"
+                autocomplete="email"
+                data-i18n-placeholder="placeholders.email"
+              />
+
+              <label
+                class="label"
+                for="password"
+                id="passwordLabel"
+                data-i18n="labels.password"
+              ></label>
+              <input
+                class="input"
+                id="password"
+                type="password"
+                autocomplete="current-password"
+                data-i18n-placeholder="placeholders.password"
+              />
+              <div class="linkrow">
+                <button
+                  class="linkbtn"
+                  id="forgot"
+                  type="button"
+                  data-i18n="actions.forgot"
+                ></button>
+              </div>
+
+              <div class="actions">
+                <button
+                  class="btn primary"
+                  id="signin"
+                  data-i18n="actions.signIn"
+                ></button>
+                <button
+                  class="btn"
+                  id="signup"
+                  data-i18n="actions.signUp"
+                ></button>
+                <button
+                  class="btn"
+                  id="savepass"
+                  style="display: none"
+                  data-i18n="actions.savePassword"
+                ></button>
+              </div>
+
+              <p class="small" id="helperText"></p>
+              <div class="foot" data-i18n="auth.foot"></div>
+              <a
+                class="privacy-link"
+                href="/delete-account"
+                data-i18n="auth.deleteAccount"
+              ></a>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script type="module">
+      const APP_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6aGd3eXBxemptb3l2cmtjanRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NzUxOTMsImV4cCI6MjEwMDI1MTE5M30.Pox6SjgVaEGB9ETs7gWyXsISde7PpsJJmyaaA-soIV4";
+
+      const FUNCTION_BASE = "/.netlify/functions";
+      const qs = new URLSearchParams(window.location.search);
+      const pairCode = (qs.get("code") || "").trim();
+
+      const statusEl = document.getElementById("status");
+      const subtitleEl = document.getElementById("subtitle");
+      const pairBox = document.getElementById("pairBox");
+      const pairCodeEl = document.getElementById("pairCode");
+      const pairingInfoEl = document.getElementById("pairingInfo");
+      const helperTextEl = document.getElementById("helperText");
+      const emailLabelEl = document.getElementById("emailLabel");
+      const passwordLabelEl = document.getElementById("passwordLabel");
+      const emailEl = document.getElementById("email");
+      const passEl = document.getElementById("password");
+      const signInBtn = document.getElementById("signin");
+      const signUpBtn = document.getElementById("signup");
+      const savePassBtn = document.getElementById("savepass");
+      const forgotBtn = document.getElementById("forgot");
+      const langEnBtn = document.getElementById("langEn");
+      const langDeBtn = document.getElementById("langDe");
+      const hashParams = new URLSearchParams(
+        (window.location.hash || "").replace(/^#/, ""),
+      );
+      const queryMode = (qs.get("mode") || "").trim().toLowerCase();
+      const setupToken = (qs.get("token") || "").trim();
+      const hashType = (hashParams.get("type") || "").trim().toLowerCase();
+      const isRecoveryMode =
+        queryMode === "recovery" || hashType === "recovery";
+      const isPasswordSetupMode = queryMode === "set-password" && !!setupToken;
+
+      const I18N = {
+        en: {
+          meta: { title: "StreamNet TV - Cloud Account" },
+          hero: {
+            kicker: "Cloud Account",
+            title: "Sign in once. Sync everything.",
+            subtitleDefault:
+              "Connect your StreamNet TV account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and web.",
+            subtitlePairing:
+              "Sign in here to approve the pairing request from your StreamNet TV device and restore your cloud account there.",
+            subtitleRecovery:
+              "Set a new password to regain access to your StreamNet TV Cloud account.",
+          },
+          summary: {
+            profiles: {
+              title: "Profiles",
+              copy: "Keep account profiles and personalized app behavior aligned across devices.",
+            },
+            playback: {
+              title: "Playback",
+              copy: "Bring watch progress, continue watching and linked services with you.",
+            },
+            pairing: {
+              title: "TV Pairing",
+              copy: "Sign in from your phone or browser and link the TV in the same step.",
+            },
+          },
+          pairing: {
+            defaultTitle: "What this page does",
+            defaultCopy:
+              "Use this page to sign in to your StreamNet TV Cloud account, create a new one, or reset your password. If you opened it from a TV QR code, the TV will be linked automatically after a successful sign-in.",
+            activeTag: "Pairing active",
+            stateTitle: "How TV pairing works",
+            stateCopy:
+              "This session was opened from a StreamNet TV device. After you sign in or create your account, the browser will confirm the pairing code and the TV can restore your cloud data.",
+            steps: {
+              one: "Use the same email address and password you want to use on your StreamNet TV account.",
+              two: "After sign-in, this browser will approve the pairing request for the TV that showed the QR code.",
+              three:
+                "Keep the TV screen open for a moment so it can finish cloud restore after approval.",
+            },
+          },
+          help: {
+            title: "Before you continue",
+            items: {
+              one: "Use your real email address so password recovery works later.",
+              two: "If you are pairing a TV, do not close the TV pairing screen until it confirms completion.",
+              three:
+                "If the pairing code expires, return to the TV and start a new cloud pairing session.",
+            },
+          },
+          auth: {
+            kicker: "Secure Access",
+            title: "Account access",
+            pairCode: "Pairing code",
+            foot: "StreamNet TV · Cloud Auth",
+            deleteAccount: "Delete account",
+            helperDefault:
+              "Sign in with your StreamNet TV Cloud account to continue.",
+            helperPairing:
+              "After sign-in, this browser will confirm the TV pairing code automatically.",
+            helperRecovery:
+              "Choose a new password with at least 6 characters, then return to sign in.",
+          },
+          labels: {
+            email: "Email",
+            password: "Password",
+            newPassword: "New password",
+          },
+          placeholders: {
+            email: "you@example.com",
+            password: "Your password",
+            newPassword: "New password (min 6 characters)",
+          },
+          actions: {
+            signIn: "Sign In",
+            signUp: "Create Account",
+            savePassword: "Save New Password",
+            forgot: "Forgot password?",
+          },
+          status: {
+            signingIn: "Signing in...",
+            tvPairedRedirecting: "TV paired. Redirecting...",
+            signedInRedirecting: "Signed in. Redirecting...",
+            creatingAccount: "Creating account...",
+            creatingAccountAndPairing: "Creating account and pairing TV...",
+            createdAndPairedRedirecting:
+              "Account created and TV paired. Redirecting...",
+            createdRedirecting: "Account created. Redirecting...",
+            createdCheckEmail:
+              "Account created. Check your email, then sign in.",
+            sendingReset: "Sending new password email...",
+            resetSent:
+              "New password email sent to {email}. Check your inbox and spam folder.",
+            savingPassword: "Saving new password...",
+            passwordUpdated: "Password updated. Redirecting to sign in...",
+          },
+          errors: {
+            emailRequired: "Email is required.",
+            emailInvalid: "Enter a valid email address.",
+            emailReal: "Use a real email address.",
+            passwordRequired: "Password is required.",
+            passwordMin: "Password must be at least 6 characters.",
+            waitCooldown:
+              "Please wait {seconds}s before requesting another email.",
+            tvPairingFailed: "TV pairing failed",
+            accountCreationPairingFailed:
+              "Account creation or TV pairing failed",
+            accountCreationFailed: "Account creation failed",
+            accountCreatedIncomplete:
+              "Account created but sign-in response was incomplete.",
+            signInFailed: "Sign in failed",
+            setupHintMailSent:
+              " We sent you an email to create your new StreamNet TV Cloud password.",
+            setupHintMailFailed:
+              " Password setup email could not be sent: {setupError}",
+            setupHintUseForgot:
+              " Use Forgot password to create your new StreamNet TV Cloud password.",
+            passwordResetFailed: "Password reset failed",
+            accountNotFound:
+              "No StreamNet TV account was found for this email.",
+            resetMailNotSent:
+              "Account found, but the password email could not be sent. Please try again in a minute.",
+            passwordSetupFailed: "Password setup failed",
+            passwordLinkInvalid:
+              "This password link is no longer valid. Request a new reset email.",
+          },
+        },
+        de: {
+          meta: { title: "StreamNet TV - Cloud Konto" },
+          hero: {
+            kicker: "Cloud Konto",
+            title: "Einmal anmelden. Alles synchron.",
+            subtitleDefault:
+              "Verbinde dein StreamNet TV Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Web zusammen bleiben.",
+            subtitlePairing:
+              "Melde dich hier an, um die Kopplungsanfrage deines StreamNet TV Geraets zu bestaetigen und dein Cloud Konto dort wiederherzustellen.",
+            subtitleRecovery:
+              "Lege ein neues Passwort fest, um wieder Zugriff auf dein StreamNet TV Cloud Konto zu erhalten.",
+          },
+          summary: {
+            profiles: {
+              title: "Profile",
+              copy: "Halte Kontoprofile und personalisiertes App-Verhalten auf allen Geraeten synchron.",
+            },
+            playback: {
+              title: "Wiedergabe",
+              copy: "Nimm Fortschritt, Weiterschauen und verbundene Dienste ueberall mit.",
+            },
+            pairing: {
+              title: "TV Kopplung",
+              copy: "Melde dich per Handy oder Browser an und verbinde den TV im gleichen Schritt.",
+            },
+          },
+          pairing: {
+            defaultTitle: "Was diese Seite macht",
+            defaultCopy:
+              "Nutze diese Seite, um dich in dein StreamNet TV Cloud Konto einzuloggen, ein neues Konto zu erstellen oder dein Passwort zurueckzusetzen. Wenn du von einem TV-QR-Code kommst, wird der TV nach erfolgreicher Anmeldung automatisch verknuepft.",
+            activeTag: "Kopplung aktiv",
+            stateTitle: "So funktioniert die TV-Kopplung",
+            stateCopy:
+              "Diese Sitzung wurde von einem StreamNet TV Geraet gestartet. Nach Anmeldung oder Kontoerstellung bestaetigt der Browser den Kopplungscode und der TV kann deine Cloud-Daten wiederherstellen.",
+            steps: {
+              one: "Verwende dieselbe E-Mail-Adresse und dasselbe Passwort, die du fuer dein StreamNet TV Konto nutzen moechtest.",
+              two: "Nach der Anmeldung bestaetigt dieser Browser die Kopplungsanfrage fuer den TV, der den QR-Code angezeigt hat.",
+              three:
+                "Lass den TV-Bildschirm noch kurz offen, damit die Cloud-Wiederherstellung nach der Freigabe abgeschlossen wird.",
+            },
+          },
+          help: {
+            title: "Bevor du weitermachst",
+            items: {
+              one: "Verwende deine echte E-Mail-Adresse, damit die Passwortwiederherstellung spaeter funktioniert.",
+              two: "Wenn du einen TV koppelst, schliesse den Kopplungsbildschirm am TV nicht, bis die Bestaetigung angezeigt wird.",
+              three:
+                "Wenn der Kopplungscode ablaeuft, gehe zum TV zurueck und starte eine neue Cloud-Kopplung.",
+            },
+          },
+          auth: {
+            kicker: "Sicherer Zugriff",
+            title: "Kontozugriff",
+            pairCode: "Kopplungscode",
+            foot: "StreamNet TV · Cloud Auth",
+            deleteAccount: "Konto loeschen",
+            helperDefault:
+              "Melde dich mit deinem StreamNet TV Cloud Konto an, um fortzufahren.",
+            helperPairing:
+              "Nach der Anmeldung bestaetigt dieser Browser den TV-Kopplungscode automatisch.",
+            helperRecovery:
+              "Waehle ein neues Passwort mit mindestens 6 Zeichen und kehre dann zur Anmeldung zurueck.",
+          },
+          labels: {
+            email: "E-Mail",
+            password: "Passwort",
+            newPassword: "Neues Passwort",
+          },
+          placeholders: {
+            email: "du@beispiel.de",
+            password: "Dein Passwort",
+            newPassword: "Neues Passwort (mind. 6 Zeichen)",
+          },
+          actions: {
+            signIn: "Anmelden",
+            signUp: "Konto erstellen",
+            savePassword: "Neues Passwort speichern",
+            forgot: "Passwort vergessen?",
+          },
+          status: {
+            signingIn: "Anmeldung laeuft...",
+            tvPairedRedirecting: "TV gekoppelt. Weiterleitung...",
+            signedInRedirecting: "Angemeldet. Weiterleitung...",
+            creatingAccount: "Konto wird erstellt...",
+            creatingAccountAndPairing:
+              "Konto wird erstellt und TV wird gekoppelt...",
+            createdAndPairedRedirecting:
+              "Konto erstellt und TV gekoppelt. Weiterleitung...",
+            createdRedirecting: "Konto erstellt. Weiterleitung...",
+            createdCheckEmail:
+              "Konto erstellt. Pruefe deine E-Mail und melde dich dann an.",
+            sendingReset: "E-Mail fuer neues Passwort wird gesendet...",
+            resetSent:
+              "E-Mail fuer neues Passwort an {email} gesendet. Bitte pruefe Posteingang und Spam.",
+            savingPassword: "Neues Passwort wird gespeichert...",
+            passwordUpdated:
+              "Passwort aktualisiert. Weiterleitung zur Anmeldung...",
+          },
+          errors: {
+            emailRequired: "E-Mail ist erforderlich.",
+            emailInvalid: "Gib eine gueltige E-Mail-Adresse ein.",
+            emailReal: "Verwende eine echte E-Mail-Adresse.",
+            passwordRequired: "Passwort ist erforderlich.",
+            passwordMin: "Passwort muss mindestens 6 Zeichen haben.",
+            waitCooldown:
+              "Bitte warte {seconds}s, bevor du eine weitere E-Mail anforderst.",
+            tvPairingFailed: "TV-Kopplung fehlgeschlagen",
+            accountCreationPairingFailed:
+              "Kontoerstellung oder TV-Kopplung fehlgeschlagen",
+            accountCreationFailed: "Kontoerstellung fehlgeschlagen",
+            accountCreatedIncomplete:
+              "Konto erstellt, aber die Anmeldeantwort war unvollstaendig.",
+            signInFailed: "Anmeldung fehlgeschlagen",
+            setupHintMailSent:
+              " Wir haben dir eine E-Mail geschickt, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+            setupHintMailFailed:
+              " E-Mail fuer Passwort-Setup konnte nicht gesendet werden: {setupError}",
+            setupHintUseForgot:
+              " Nutze Passwort vergessen, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+            passwordResetFailed: "Passwort-Reset fehlgeschlagen",
+            accountNotFound:
+              "Fuer diese E-Mail wurde kein StreamNet TV Konto gefunden.",
+            resetMailNotSent:
+              "Konto gefunden, aber die Passwort-E-Mail konnte nicht gesendet werden. Bitte versuche es in einer Minute erneut.",
+            passwordSetupFailed: "Passwort-Setup fehlgeschlagen",
+            passwordLinkInvalid:
+              "Dieser Passwort-Link ist nicht mehr gueltig. Fordere eine neue Reset-E-Mail an.",
+          },
+        },
+      };
+
+      const storedLang = window.localStorage.getItem("streamnet:lang");
+      let currentLang = storedLang
+        ? storedLang === "de"
+          ? "de"
+          : "en"
+        : (navigator.language || "en").toLowerCase().startsWith("de")
+          ? "de"
+          : "en";
+
+      function readKey(bundle, keyPath) {
+        return keyPath.split(".").reduce((acc, part) => acc?.[part], bundle);
+      }
+
+      function t(keyPath, vars = {}) {
+        const selected = I18N[currentLang] || I18N.en;
+        const fallback = I18N.en;
+        const raw =
+          readKey(selected, keyPath) || readKey(fallback, keyPath) || keyPath;
+        return String(raw).replace(/\{(\w+)\}/g, (_, name) =>
+          vars[name] == null ? `{${name}}` : String(vars[name]),
+        );
+      }
+
+      function renderStaticI18n() {
+        document.documentElement.lang = currentLang;
+        document.title = t("meta.title");
+        langEnBtn.setAttribute("aria-pressed", String(currentLang === "en"));
+        langDeBtn.setAttribute("aria-pressed", String(currentLang === "de"));
+
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+          const keyPath = el.getAttribute("data-i18n");
+          if (keyPath) el.textContent = t(keyPath);
+        });
+        document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+          const keyPath = el.getAttribute("data-i18n-placeholder");
+          if (keyPath) el.setAttribute("placeholder", t(keyPath));
+        });
+      }
+
+      function renderModeCopy() {
+        if (isRecoveryMode || isPasswordSetupMode) {
+          subtitleEl.textContent = t("hero.subtitleRecovery");
+          helperTextEl.textContent = t("auth.helperRecovery");
+          passwordLabelEl.textContent = t("labels.newPassword");
+          passEl.placeholder = t("placeholders.newPassword");
+          return;
+        }
+
+        subtitleEl.textContent = pairCode
+          ? t("hero.subtitlePairing")
+          : t("hero.subtitleDefault");
+        helperTextEl.textContent = pairCode
+          ? t("auth.helperPairing")
+          : t("auth.helperDefault");
+        passwordLabelEl.textContent = t("labels.password");
+        passEl.placeholder = t("placeholders.password");
+      }
+
+      function setLanguage(lang) {
+        currentLang = lang === "de" ? "de" : "en";
+        window.localStorage.setItem("streamnet:lang", currentLang);
+        renderStaticI18n();
+        renderModeCopy();
+      }
+
+      function setStatus(msg, type = "") {
+        statusEl.textContent = msg || "";
+        statusEl.className = `status ${type}`.trim();
+      }
+
+      function setBusy(on) {
+        signInBtn.disabled = on;
+        signUpBtn.disabled = on;
+        savePassBtn.disabled = on;
+        forgotBtn.disabled = on;
+      }
+
+      const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}$/i;
+      const BLOCKED_EMAIL_DOMAINS = new Set([
+        "10minutemail.com",
+        "20minutemail.com",
+        "dispostable.com",
+        "emailondeck.com",
+        "example.com",
+        "example.net",
+        "example.org",
+        "fakeinbox.com",
+        "getnada.com",
+        "grr.la",
+        "guerrillamail.biz",
+        "guerrillamail.de",
+        "guerrillamail.info",
+        "guerrillamail.org",
+        "maildrop.cc",
+        "moakt.com",
+        "sharklasers.com",
+        "tempmailo.com",
+        "trashmail.com",
+        "invalid",
+        "localhost",
+        "mailinator.com",
+        "guerrillamail.com",
+        "guerrillamail.net",
+        "10minutemail.com",
+        "tempmail.com",
+        "temp-mail.org",
+        "yopmail.com",
+      ]);
+      const BLOCKED_EMAIL_DOMAIN_FRAGMENTS = [
+        "10minutemail",
+        "disposable",
+        "fakeinbox",
+        "guerrillamail",
+        "maildrop",
+        "mailinator",
+        "tempmail",
+        "temp-mail",
+        "trashmail",
+        "yopmail",
+      ];
+      const BLOCKED_SIGNUP_LOCAL_PARTS = new Set([
+        "asdf",
+        "example",
+        "fake",
+        "invalid",
+        "no-reply",
+        "none",
+        "noreply",
+        "null",
+        "qwerty",
+        "test",
+      ]);
+      const EMAIL_SEND_COOLDOWN_MS = 5 * 60 * 1000;
+
+      function normalizeEmail(value) {
+        return String(value || "")
+          .trim()
+          .toLowerCase();
+      }
+
+      function validateEmail(value, rejectDisposable = true) {
+        const email = normalizeEmail(value);
+        if (!email) return t("errors.emailRequired");
+        if (email.length > 254 || !EMAIL_RE.test(email))
+          return t("errors.emailInvalid");
+        if ((email.match(/@/g) || []).length !== 1)
+          return t("errors.emailInvalid");
+
+        const [localPart, domain = ""] = email.split("@");
+        if (!localPart || !domain) return t("errors.emailReal");
+        if (
+          localPart.length > 64 ||
+          localPart.startsWith(".") ||
+          localPart.endsWith(".") ||
+          localPart.includes("..")
+        ) {
+          return t("errors.emailInvalid");
+        }
+
+        const domainLabels = domain.split(".");
+        if (
+          domainLabels.length < 2 ||
+          domainLabels.some((part) => !part || part.length > 63)
+        ) {
+          return t("errors.emailInvalid");
+        }
+        if (
+          domainLabels.some(
+            (part) => part.startsWith("-") || part.endsWith("-"),
+          )
+        ) {
+          return t("errors.emailInvalid");
+        }
+        if (/^\d+$/.test(domainLabels[domainLabels.length - 1])) {
+          return t("errors.emailInvalid");
+        }
+
+        const blockedDomain =
+          BLOCKED_EMAIL_DOMAINS.has(domain) ||
+          BLOCKED_EMAIL_DOMAIN_FRAGMENTS.some((fragment) =>
+            domain.includes(fragment),
+          );
+        if (rejectDisposable && BLOCKED_SIGNUP_LOCAL_PARTS.has(localPart))
+          return t("errors.emailReal");
+        if (rejectDisposable && blockedDomain) return t("errors.emailReal");
+        if (
+          rejectDisposable &&
+          (domain.endsWith(".example") ||
+            domain.endsWith(".invalid") ||
+            domain.endsWith(".localhost") ||
+            domain.endsWith(".local") ||
+            domain.endsWith(".test"))
+        ) {
+          return t("errors.emailReal");
+        }
+        return "";
+      }
+
+      function requireValidEmail(value, rejectDisposable = true) {
+        const message = validateEmail(value, rejectDisposable);
+        if (message) throw new Error(message);
+        return normalizeEmail(value);
+      }
+
+      function emailSendCooldownKey(action, email) {
+        return `streamnet:${action}:${normalizeEmail(email)}`;
+      }
+
+      function assertEmailSendCooldown(action, email) {
+        const key = emailSendCooldownKey(action, email);
+        const last = Number(window.localStorage.getItem(key) || "0");
+        const remaining = EMAIL_SEND_COOLDOWN_MS - (Date.now() - last);
+        if (remaining > 0) {
+          throw new Error(
+            t("errors.waitCooldown", { seconds: Math.ceil(remaining / 1000) }),
+          );
+        }
+      }
+
+      function markEmailSent(action, email) {
+        const key = emailSendCooldownKey(action, email);
+        window.localStorage.setItem(key, String(Date.now()));
+      }
+
+      function applyRecoveryModeUi() {
+        pairBox.style.display = "none";
+        signInBtn.style.display = "none";
+        signUpBtn.style.display = "none";
+        forgotBtn.style.display = "none";
+        savePassBtn.style.display = "block";
+        emailEl.style.display = "none";
+        emailLabelEl.style.display = "none";
+        passEl.autocomplete = "new-password";
+      }
+
+      if (pairCode) {
+        pairBox.style.display = "flex";
+        pairCodeEl.textContent = pairCode;
+        pairingInfoEl.dataset.mode = "pairing";
+      }
+      if (isRecoveryMode || isPasswordSetupMode) applyRecoveryModeUi();
+
+      langEnBtn.onclick = () => setLanguage("en");
+      langDeBtn.onclick = () => setLanguage("de");
+      renderStaticI18n();
+      renderModeCopy();
+
+      async function approveTvViaServer(email, password) {
+        if (!pairCode) return;
+        const normalizedEmail = requireValidEmail(email, false);
+        const resp = await fetch(`${FUNCTION_BASE}/tv-auth-web`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: APP_ANON_KEY,
+            Authorization: `Bearer ${APP_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            action: "signin",
+            code: pairCode,
+            email: normalizedEmail,
+            password,
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.tvPairingFailed"));
+      }
+
+      async function signUpAndPairViaServer(email, password) {
+        if (!pairCode) return;
+        const normalizedEmail = requireValidEmail(email);
+        assertEmailSendCooldown("signup", normalizedEmail);
+        const resp = await fetch(`${FUNCTION_BASE}/tv-auth-complete`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: APP_ANON_KEY,
+            Authorization: `Bearer ${APP_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            code: pairCode,
+            email: normalizedEmail,
+            password,
+            intent: "signup",
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok)
+          throw new Error(
+            json.error || t("errors.accountCreationPairingFailed"),
+          );
+        markEmailSent("signup", normalizedEmail);
+      }
+
+      async function createAccountViaServer(email, password) {
+        const normalizedEmail = requireValidEmail(email);
+        assertEmailSendCooldown("signup", normalizedEmail);
+        const resp = await fetch(`${FUNCTION_BASE}/cloud-auth-email`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: APP_ANON_KEY,
+            Authorization: `Bearer ${APP_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email: normalizedEmail,
+            password,
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.accountCreationFailed"));
+        if (!json.access_token || !json.refresh_token) {
+          throw new Error(t("errors.accountCreatedIncomplete"));
+        }
+        markEmailSent("signup", normalizedEmail);
+        return normalizedEmail;
+      }
+
+      async function signInEmail() {
+        const email = requireValidEmail(emailEl.value, false);
+        const password = passEl.value;
+        if (!password) throw new Error(t("errors.passwordRequired"));
+        const resp = await fetch(`${FUNCTION_BASE}/auth-login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: APP_ANON_KEY,
+            Authorization: `Bearer ${APP_ANON_KEY}`,
+          },
+          body: JSON.stringify({ email, password }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          let setupHint = "";
+          if (json.code === "password_setup_required") {
+            if (json.email_sent) {
+              setupHint = t("errors.setupHintMailSent");
+            } else if (json.setup_error) {
+              setupHint = t("errors.setupHintMailFailed", {
+                setupError: json.setup_error,
+              });
+            } else {
+              setupHint = t("errors.setupHintUseForgot");
+            }
+          }
+          throw new Error((json.error || t("errors.signInFailed")) + setupHint);
+        }
+        return { email, password };
+      }
+
+      async function signUpEmail() {
+        const email = requireValidEmail(emailEl.value);
+        const password = passEl.value;
+        if (!password) throw new Error(t("errors.passwordRequired"));
+        if (password.length < 6) throw new Error(t("errors.passwordMin"));
+        await createAccountViaServer(email, password);
+      }
+
+      async function sendPasswordReset() {
+        const email = requireValidEmail(emailEl.value, false);
+        assertEmailSendCooldown("reset", email);
+        const resp = await fetch(`${FUNCTION_BASE}/cloud-auth-reset`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: APP_ANON_KEY,
+            Authorization: `Bearer ${APP_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            email,
+          }),
+        });
+        const json = await resp.json().catch(() => ({}));
+        if (!resp.ok)
+          throw new Error(json.error || t("errors.passwordResetFailed"));
+        if (!json.account_exists) {
+          throw new Error(t("errors.accountNotFound"));
+        }
+        if (!json.email_sent) {
+          throw new Error(t("errors.resetMailNotSent"));
+        }
+        markEmailSent("reset", email);
+        return { ...json, email };
+      }
+
+      async function saveNewPassword() {
+        const password = passEl.value;
+        if (!password || password.length < 6)
+          throw new Error(t("errors.passwordMin"));
+        if (setupToken) {
+          const resp = await fetch(`${FUNCTION_BASE}/auth-password-complete`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: setupToken, password }),
+          });
+          const json = await resp.json().catch(() => ({}));
+          if (!resp.ok)
+            throw new Error(json.error || t("errors.passwordSetupFailed"));
+          return;
+        }
+        throw new Error(t("errors.passwordLinkInvalid"));
+      }
+
+      signInBtn.onclick = async () => {
+        try {
+          setBusy(true);
+          setStatus(t("status.signingIn"));
+          const creds = await signInEmail();
+          if (pairCode) {
+            await approveTvViaServer(creds.email, creds.password);
+          }
+          setStatus(
+            pairCode
+              ? t("status.tvPairedRedirecting")
+              : t("status.signedInRedirecting"),
+            "ok",
+          );
+          setTimeout(() => {
+            window.location.href = "https://streamnet-sync.netlify.app";
+          }, 900);
+        } catch (err) {
+          setStatus(err.message || String(err), "error");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      signUpBtn.onclick = async () => {
+        try {
+          setBusy(true);
+          const email = requireValidEmail(emailEl.value);
+          const password = passEl.value;
+          if (!password) throw new Error(t("errors.passwordRequired"));
+          if (password.length < 6) throw new Error(t("errors.passwordMin"));
+
+          if (pairCode) {
+            setStatus(t("status.creatingAccountAndPairing"));
+            await signUpAndPairViaServer(email, password);
+            setStatus(t("status.createdAndPairedRedirecting"), "ok");
+            setTimeout(() => {
+              window.location.href = "https://streamnet-sync.netlify.app";
+            }, 1200);
+            return;
+          }
+
+          setStatus(t("status.creatingAccount"));
+          await signUpEmail();
+          if (pairCode) {
+            await approveTvViaServer(email, password);
+          }
+          setStatus(
+            pairCode
+              ? t("status.createdAndPairedRedirecting")
+              : t("status.createdRedirecting"),
+            "ok",
+          );
+          setTimeout(() => {
+            window.location.href = "https://streamnet-sync.netlify.app";
+          }, 1200);
+        } catch (err) {
+          const msg = err.message || String(err);
+          if (
+            msg.toLowerCase().includes("email") &&
+            msg.toLowerCase().includes("confirm")
+          ) {
+            setStatus(t("status.createdCheckEmail"), "ok");
+          } else {
+            setStatus(msg, "error");
+          }
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      forgotBtn.onclick = async () => {
+        try {
+          setBusy(true);
+          setStatus(t("status.sendingReset"));
+          const result = await sendPasswordReset();
+          setStatus(t("status.resetSent", { email: result.email }), "ok");
+        } catch (err) {
+          setStatus(err.message || String(err), "error");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      savePassBtn.onclick = async () => {
+        try {
+          setBusy(true);
+          setStatus(t("status.savingPassword"));
+          await saveNewPassword();
+          setStatus(t("status.passwordUpdated"), "ok");
+          setTimeout(() => {
+            window.location.href = "https://streamnet-sync.netlify.app";
+          }, 1200);
+        } catch (err) {
+          setStatus(err.message || String(err), "error");
+        } finally {
+          setBusy(false);
+        }
+      };
+
+      // Keep first interaction explicit to avoid showing premature pairing errors.
+    </script>
+  </body>
+</html>

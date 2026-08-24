@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Connecting to Discord... | StreamNet TV</title>
+    <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
+    <style>
+      body {
+        margin: 0;
+        padding: 24px;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0a0806;
+        color: #f5efe5;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+      }
+      .spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid rgba(88, 101, 242, 0.2);
+        border-top-color: #5865f2;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        margin: 0 auto 16px;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div>
+      <div class="spinner"></div>
+      <h2>Redirecting to Discord...</h2>
+      <p style="color: #a59c8e; font-size: 14px">
+        Please wait while we open the authorization page.
+      </p>
+    </div>
+
+    <script>
+      (function () {
+        var params = new URLSearchParams(window.location.search);
+        var session = params.get("session") || params.get("state") || "";
+        var challenge =
+          params.get("challenge") || params.get("code_challenge") || "";
+        var clientId = params.get("client_id") || "";
+        var redirectUri = window.location.origin + "/discord/callback";
+
+        if (
+          !/^[A-Za-z0-9_-]{40,128}$/.test(session) ||
+          !/^[A-Za-z0-9_-]{43,128}$/.test(challenge) ||
+          !/^\d{17,20}$/.test(clientId)
+        ) {
+          document.body.innerHTML =
+            "<div style='color:#ff8a76;'><h3>Invalid Authorization Request</h3><p>Please scan the QR code on your TV again.</p></div>";
+          return;
+        }
+
+        var authorizeUrl =
+          "https://discord.com/api/oauth2/authorize?" +
+          "client_id=" +
+          encodeURIComponent(clientId) +
+          "&response_type=code" +
+          "&redirect_uri=" +
+          encodeURIComponent(redirectUri) +
+          "&scope=" +
+          encodeURIComponent("identify sdk.social_layer_presence") +
+          "&state=" +
+          encodeURIComponent("tv_" + session) +
+          "&code_challenge=" +
+          encodeURIComponent(challenge) +
+          "&code_challenge_method=S256";
+
+        window.location.href = authorizeUrl;
+      })();
+    </script>
+  </body>
+</html>

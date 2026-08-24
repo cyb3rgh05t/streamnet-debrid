@@ -5,8 +5,9 @@ StreamNet Debrid is a StreamNet-focused Android TV APK with its own cloud/auth b
 This repository intentionally keeps only the surfaces that are needed for the app runtime and account sync:
 
 - `app/` - Android TV/mobile APK source
-- `netlify-auth-site/` - StreamNet auth, cloud sync, Discord, premium/entitlement and account functions
-- `supabase/` - Supabase project config, migrations and edge functions still used by the backend
+- `self-hosted-backend/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
+- `netlify-auth-site/` - legacy Netlify reference implementation and migration source; not used by the self-hosted container runtime
+- `supabase/` - legacy Supabase schema/functions retained for rollback and migration reference
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
 
@@ -62,9 +63,9 @@ DISCORD_CLIENT_ID=<your Discord application id>
 Do not commit or redistribute the AAR unless your Discord SDK agreement explicitly permits it.
 Signed GitHub Actions builds download the AAR from `DISCORD_PARTNER_SDK_URL`. For private GitHub release assets, also set `DISCORD_PARTNER_SDK_BEARER_TOKEN`. `DISCORD_PARTNER_SDK_AAR_SHA256` is optional but recommended.
 
-## Netlify Auth Site
+## Legacy Netlify Auth Site
 
-`netlify-auth-site/` contains the app-facing account backend and static auth pages.
+`netlify-auth-site/` contains the previous app-facing account backend and static auth pages. Active self-hosted pages are copied into `self-hosted-backend/public/` and packaged from there.
 
 Useful commands:
 

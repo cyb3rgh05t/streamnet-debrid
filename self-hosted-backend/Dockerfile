@@ -6,14 +6,7 @@ RUN npm ci --omit=dev
 COPY self-hosted-backend/src ./src
 COPY self-hosted-backend/scripts ./scripts
 COPY self-hosted-backend/migrations ./migrations
-COPY netlify-auth-site/index.html ./public/index.html
-COPY netlify-auth-site/delete-account.html ./public/delete-account.html
-COPY netlify-auth-site/privacy.html ./public/privacy.html
-COPY netlify-auth-site/discord/index.html ./public/discord/index.html
-COPY netlify-auth-site/discord/callback.html ./public/discord/callback.html
-COPY netlify-auth-site/discord/callback.js ./public/discord/callback.js
-COPY netlify-auth-site/assets/streamnet-logo.svg ./public/assets/streamnet-logo.svg
-COPY netlify-auth-site/assets/streamnet-icon.svg ./public/assets/streamnet-icon.svg
+COPY self-hosted-backend/public ./public
 
 EXPOSE 3000
 CMD ["node", "src/server.js"]
