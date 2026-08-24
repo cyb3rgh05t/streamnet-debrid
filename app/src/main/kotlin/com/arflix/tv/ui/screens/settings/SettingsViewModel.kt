@@ -61,6 +61,7 @@ import com.arflix.tv.updater.AppUpdateRepository
 import com.arflix.tv.updater.UpdatePreferences
 import com.arflix.tv.updater.VersionUtils
 import com.arflix.tv.util.AuthEmailValidator
+import com.arflix.tv.util.detectDeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
@@ -274,7 +275,8 @@ class SettingsViewModel @Inject constructor(
     private val simklAuthManager: com.arflix.tv.data.repository.simkl.SimklAuthManager
 ) : ViewModel() {
     private val usesSelfHostedDirectAuth: Boolean
-        get() = BuildConfig.BUILD_TYPE == "selfHosted"
+        get() = BuildConfig.BUILD_TYPE == "selfHosted" &&
+            detectDeviceType(context).isTouchDevice()
 
     private fun visibleCatalogs(catalogs: List<CatalogConfig>): List<CatalogConfig> {
         return catalogs.filter { config ->
