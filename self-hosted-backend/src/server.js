@@ -85,6 +85,46 @@ app.get("/health", async () => {
   return { ok: true };
 });
 
+app.post("/app-usage-event", async (request, reply) => {
+  const body = request.body || {};
+  const eventName = String(body.event_name || "").trim();
+  const installId = String(body.install_id || "").trim();
+  if (!eventName || !installId)
+    return reply
+      .code(400)
+      .send({ error: "event_name and install_id are required" });
+  const rawAccountId = String(body.user_id || "").trim();
+  const accountId =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      rawAccountId,
+    )
+      ? rawAccountId
+      : "";
+  await pool.query(
+    `insert into app_usage_events
+       (event_name, install_id, account_id, email, profile_id, platform, device_type, app_version, app_version_code, distribution, metadata)
+     values ($1, $2, nullif($3, '')::uuid, nullif($4, ''), nullif($5, ''), nullif($6, ''), nullif($7, ''), nullif($8, ''), $9, nullif($10, ''), $11::jsonb)`,
+    [
+      eventName,
+      installId,
+      accountId,
+      String(body.email || "").trim(),
+      String(body.profile_id || "").trim(),
+      String(body.platform || "").trim(),
+      String(body.device_type || "").trim(),
+      String(body.app_version || "").trim(),
+      Number.isSafeInteger(body.app_version_code)
+        ? body.app_version_code
+        : null,
+      String(body.distribution || "").trim(),
+      JSON.stringify(
+        body.metadata && typeof body.metadata === "object" ? body.metadata : {},
+      ),
+    ],
+  );
+  return reply.send({ ok: true });
+});
+
 app.get("/assets/:asset", async (request, reply) => {
   const asset = String(request.params.asset || "");
   if (!new Set(["streamnet-logo.svg", "streamnet-icon.svg"]).has(asset)) {
@@ -163,6 +203,40 @@ app.get("/delete-account", async (_request, reply) => {
       page.replaceAll(
         'const FUNCTIONS = "/.netlify/functions";',
         'const FUNCTIONS = "";',
+      ),
+    );
+});
+
+app.get("/discord/", async (_request, reply) =>
+  reply
+    .type("text/html; charset=utf-8")
+    .send(
+      await readFile(
+        path.join(publicDirectory, "discord", "index.html"),
+        "utf8",
+      ),
+    ),
+);
+
+app.get("/discord/callback", async (_request, reply) => {
+  const page = await readFile(
+    path.join(publicDirectory, "discord", "callback.html"),
+    "utf8",
+  );
+  return reply.type("text/html; charset=utf-8").send(page);
+});
+
+app.get("/discord/callback.js", async (_request, reply) => {
+  const script = await readFile(
+    path.join(publicDirectory, "discord", "callback.js"),
+    "utf8",
+  );
+  return reply
+    .type("application/javascript; charset=utf-8")
+    .send(
+      script.replaceAll(
+        "/.netlify/functions/discord-auth-callback",
+        "/discord-auth-callback",
       ),
     );
 });
@@ -314,23 +388,76 @@ app.post("/account-delete-status", async (request, reply) => {
   return reply.send({ status: receipt.status });
 });
 
-app.post("/tv-auth-start", async (_request, reply) => {
-  const deviceCode = randomCode(32);
-  const userCode = `${randomCode(4)}-${randomCode(4)}`;
-  const expiresAt = new Date(Date.now() + tvAuthTtlMs);
+app.post("/discord-auth-start", async (request, reply) => {
+  const clientId = String(request.body?.client_id || "").trim();
+  const challenge = String(request.body?.code_challenge || "").trim();
+  if (
+    !/^\d{17,20}$/.test(clientId) ||
+    !/^[A-Za-z0-9_-]{43,128}$/.test(challenge)
+  )
+    return reply
+      .code(400)
+      .send({ error: "Invalid Discord authorization request" });
+  const deviceCode = randomCode(48);
   await pool.query(
-    "insert into tv_device_auth_sessions (device_code, user_code, expires_at) values ($1, $2, $3)",
-    [deviceCode, userCode, expiresAt],
+    `insert into discord_auth_sessions (device_code, client_id, code_challenge, expires_at)
+     values ($1, $2, $3, now() + interval '10 minutes')`,
+    [deviceCode, clientId, challenge],
   );
-  const verificationUrl = `${config.publicBaseUrl}/?code=${encodeURIComponent(userCode)}`;
+  const query = new URLSearchParams({
+    session: deviceCode,
+    challenge,
+    client_id: clientId,
+  });
+  const verificationUrl = `${config.publicBaseUrl}/discord/?${query}`;
   return reply.send({
     device_code: deviceCode,
-    user_code: userCode,
-    verification_url: verificationUrl,
-    verification_uri: verificationUrl,
-    expires_in: Math.floor(tvAuthTtlMs / 1000),
+    verification_uri_complete: verificationUrl,
+    expires_in: 600,
     interval: 3,
   });
+});
+
+app.post("/discord-auth-status", async (request, reply) => {
+  const deviceCode = String(request.body?.device_code || "").trim();
+  if (!/^[A-Za-z0-9_-]{48}$/.test(deviceCode))
+    return reply.code(400).send({ error: "Invalid device_code" });
+  const result = await pool.query(
+    "select status, authorization_code, expires_at from discord_auth_sessions where device_code = $1",
+    [deviceCode],
+  );
+  const session = result.rows[0];
+  if (!session || Date.now() > Date.parse(session.expires_at)) {
+    await pool.query(
+      "delete from discord_auth_sessions where device_code = $1",
+      [deviceCode],
+    );
+    return reply.send({ status: "expired" });
+  }
+  if (session.status === "approved" && session.authorization_code) {
+    await pool.query(
+      "delete from discord_auth_sessions where device_code = $1",
+      [deviceCode],
+    );
+    return reply.send({ status: "approved", code: session.authorization_code });
+  }
+  return reply.send({ status: "pending" });
+});
+
+app.post("/discord-auth-callback", async (request, reply) => {
+  const deviceCode = String(request.body?.device_code || "").trim();
+  const code = String(request.body?.code || "").trim();
+  if (!/^\w{48}$/.test(deviceCode) || !code || code.length > 2048)
+    return reply.code(400).send({ error: "Invalid Discord pairing request" });
+  const result = await pool.query(
+    "update discord_auth_sessions set status = 'approved', authorization_code = $2, approved_at = now() where device_code = $1 and status = 'pending' and expires_at > now() returning device_code",
+    [deviceCode, code],
+  );
+  if (!result.rows[0])
+    return reply
+      .code(400)
+      .send({ error: "Invalid or expired pairing session" });
+  return reply.send({ ok: true });
 });
 
 async function tvAuthStatus(request, reply) {

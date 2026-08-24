@@ -7,15 +7,16 @@ This is a staging backend. It does not change the Android APK, Netlify, or Supab
 - PostgreSQL schema and repeatable migration runner.
 - Netlify-compatible `scrypt` password verification for imported Netlify accounts.
 - `auth-login`, `auth-refresh`, `cloud-auth-email`, TV QR pairing, `account-sync-pull`, and `account-sync-push`.
+- Self-hosted app usage analytics and Discord device pairing with the existing StreamNet callback pages.
 - Revision-based snapshot compare-and-set compatible with the Android conflict retry.
 - Supabase NDJSON account-snapshot importer.
 - Traefik-compatible Docker Compose configuration with domain, certificate resolver, and published container image from `.env`.
 
-Password reset, Discord, account deletion, media proxies, and the APK switch are intentionally not included in this first staging step. Password reset will be added after SMTP delivery is configured.
+Password reset and media proxies are intentionally not included yet. Password reset will be added after SMTP delivery is configured.
 
 ## Local or Server Setup
 
-1. Copy `.env.example` to `.env` and set your real domain, passwords, and JWT secret.
+1. Copy `.env.example` to `.env` and set your real domain, passwords, JWT secret, and Google Web Client ID if Google sign-in is required.
 2. This Compose file is preconfigured for the existing Traefik network `proxy`, entrypoint `https`, and certificate resolver `dns-cloudflare`. Change those values only if your server uses different names.
 3. Pull the published backend image and start PostgreSQL and the API with `docker compose pull && docker compose up -d`.
 4. Run migrations with `docker compose exec streamnet-backend npm run migrate`.

@@ -42,11 +42,11 @@ android {
         // Supabase for auth, storage, and the backing account sync tables.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
-        buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "true")
+        buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_REALTIME_WATCH_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "true")
         buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
-        buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "true")
+        buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")
         buildConfigField("Boolean", "DISCORD_RICH_PRESENCE_AVAILABLE", hasDiscordSdk.toString())
         buildConfigField(
             "String",
