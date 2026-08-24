@@ -14,7 +14,11 @@ object Constants {
     val SUPABASE_ANON_KEY: String get() = BuildConfig.SUPABASE_ANON_KEY
     val APP_ANON_KEY: String get() = BuildConfig.APP_ANON_KEY
     val NETLIFY_BACKEND_URL: String
-        get() = BuildConfig.NETLIFY_BACKEND_URL.trim().trimEnd('/')
+        get() = if (BuildConfig.BUILD_TYPE == "selfHosted") {
+            BuildConfig.SELF_HOSTED_BACKEND_URL.trim().trimEnd('/')
+        } else {
+            BuildConfig.NETLIFY_BACKEND_URL.trim().trimEnd('/')
+        }
     val USE_NETLIFY_CLOUD_SYNC: Boolean
         get() = BuildConfig.ENABLE_NETLIFY_CLOUD_SYNC && (NETLIFY_BACKEND_URL.startsWith("https://") || NETLIFY_BACKEND_URL.startsWith("http://"))
 
