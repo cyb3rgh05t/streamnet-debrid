@@ -162,7 +162,6 @@ class ProfileAvatarImageManager @Inject constructor(
         withContext(Dispatchers.IO) {
             Result.failure(IllegalStateException("Remote avatar storage is disabled; use inline account sync"))
         }
-        }
 
     private suspend fun downloadAvatar(storagePath: String, destination: File): Result<Unit> =
         withContext(Dispatchers.IO) {

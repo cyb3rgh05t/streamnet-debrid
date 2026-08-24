@@ -7,7 +7,7 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 - `app/` - Android TV/mobile APK source
 - `self-hosted-backend/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
 - `legacy/netlify-auth-site/` - legacy Netlify reference implementation and migration source; not used by the self-hosted container runtime
-- `supabase/` - legacy Supabase schema/functions retained for rollback and migration reference
+- `legacy/supabase/` - legacy Supabase schema/functions retained for rollback and migration reference
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
 
@@ -76,9 +76,9 @@ netlify deploy --dir legacy/netlify-auth-site --prod
 
 The linked production site should be the StreamNet auth/sync project, not upstream ARVIO infrastructure.
 
-## Supabase
+## Legacy Supabase
 
-`supabase/` contains local Supabase configuration, migrations and functions that remain part of the StreamNet cloud backend.
+`legacy/supabase/` contains the old Supabase configuration, migrations and functions. It is no longer part of the active StreamNet runtime.
 
 Database migrations should be applied deliberately, not blindly on every Android change.
 
@@ -90,8 +90,6 @@ The workflow expects these repository secrets as needed:
 
 - `APP_ANON_KEY`
 - `NETLIFY_BACKEND_URL`
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
 - `TMDB_API_KEY`
 - `TRAKT_CLIENT_ID`
 - `TRAKT_CLIENT_SECRET`

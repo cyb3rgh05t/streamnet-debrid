@@ -33,13 +33,12 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 354
-        versionName = "2.1.006"
+        versionCode = 355
+        versionName = "2.1.007"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
         // Cloud sync uses a Netlify function layer for app-facing endpoints and
-        // Supabase for auth, storage, and the backing account sync tables.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
@@ -60,7 +59,7 @@ android {
         buildConfigField(
             "String",
             "APP_ANON_KEY",
-            "\"${escapeBuildConfigString(localSecretValue("APP_ANON_KEY").ifBlank { localSecretValue("SUPABASE_ANON_KEY") })}\""
+            "\"${escapeBuildConfigString(localSecretValue("APP_ANON_KEY"))}\""
         )
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
@@ -381,6 +380,8 @@ ksp {
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
     // Image loading - Coil
     implementation("io.coil-kt:coil-compose:2.5.0")
@@ -492,23 +493,11 @@ fun escapeBuildConfigString(value: String): String =
 
 val validateReleaseCloudSecrets = tasks.register("validateReleaseCloudSecrets") {
     doLast {
-        val appAnonKey = localSecretValue("APP_ANON_KEY").ifBlank { localSecretValue("SUPABASE_ANON_KEY") }
-        val supabaseUrl = localSecretValue("SUPABASE_URL")
+        val appAnonKey = localSecretValue("APP_ANON_KEY")
         val traktClientId = localSecretValue("TRAKT_CLIENT_ID")
         val traktClientSecret = localSecretValue("TRAKT_CLIENT_SECRET")
-        val supabaseHost = supabaseUrl.substringAfter("://", missingDelimiterValue = "").substringBefore('/')
-        val hasValidSupabaseUrl =
-            (supabaseUrl.startsWith("https://") || supabaseUrl.startsWith("http://")) &&
-                supabaseHost.contains('.') &&
-                '*' !in supabaseUrl
-        require(hasValidSupabaseUrl) {
-            "Release builds require a valid HTTP(S) SUPABASE_URL " +
-                "(length=${supabaseUrl.length}, http=${supabaseUrl.startsWith("http")}, " +
-                "hostPresent=${supabaseHost.isNotBlank()}, hostHasDot=${supabaseHost.contains('.')}, redacted=${'*' in supabaseUrl})."
-        }
         require(
             appAnonKey.length > 40 &&
-                !appAnonKey.equals("your-supabase-anon-key", ignoreCase = true) &&
                 !appAnonKey.startsWith("your-", ignoreCase = true)
         ) {
             "Release builds require a real APP_ANON_KEY in secrets.properties, Gradle properties, or the environment."

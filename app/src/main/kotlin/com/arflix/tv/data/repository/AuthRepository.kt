@@ -34,8 +34,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.datetime.Clock
-import kotlinx.datetime.Instant
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -78,6 +76,79 @@ private data class UserSettingsAccountSyncRow(
 @Serializable
 private data class UserSettingsAccountSyncUpdate(
     val user_id: String,
+    val settings: JsonObject
+)
+
+@Serializable
+private data class UserSettingsSettingsUpdate(
+    val settings: JsonObject
+)
+
+@Serializable
+private data class ProfileAccountSyncRow(
+    val addons: String? = null
+)
+
+@Serializable
+private data class ProfileAccountSyncUpdate(
+    val addons: String
+)
+
+private data class AccountSyncPayloadCandidate(
+    val source: String,
+    val payload: String,
+    val updatedAtMillis: Long,
+    val revision: Long? = null
+)
+
+internal data class AccountSyncSnapshot(
+    val payload: String?,
+    val revision: Long?
+)
+
+private class AccountSyncPayloadRejectedException(message: String) : Exception(message)
+
+private class NetlifyCloudSyncHttpException(
+    val statusCode: Int,
+    val responseBody: String
+) : Exception("Account backend request failed: HTTP $statusCode")
+
+internal class AccountSyncRevisionConflictException(
+    val currentPayload: String?,
+    val currentRevision: Long
+) : Exception("Account sync revision conflict")
+
+private fun parseJsonObject(payload: String): com.google.gson.JsonObject? {
+    return runCatching { JsonParser().parse(payload).asJsonObject }.getOrNull()
+}
+
+internal fun accountSyncPayloadProfileCount(payload: String): Int? {
+    val root = parseJsonObject(payload) ?: return null
+    if (!root.has("profiles")) return null
+    return root.get("profiles")
+        ?.takeIf { !it.isJsonNull && it.isJsonArray }
+        ?.asJsonArray
+        ?.size()
+        ?: 0
+}
+
+internal fun accountSyncPayloadScopedCoverage(payload: String): Int {
+    val root = parseJsonObject(payload) ?: return 0
+    val profileIds = root.get("profiles")
+        ?.takeIf { !it.isJsonNull && it.isJsonArray }
+        ?.asJsonArray
+        ?.mapNotNull { profile ->
+            profile
+                ?.takeIf { !it.isJsonNull && it.isJsonObject }
+                ?.asJsonObject
+                ?.stringValue("id")
+                ?.takeIf { it.isNotBlank() }
+        }
+        ?.toSet()
+        .orEmpty()
+    if (profileIds.isEmpty()) return 0
+
+    val scopedKeys = listOf(
         "profileSettingsById",
         "addonsByProfile",
         "catalogsByProfile",
@@ -762,7 +833,7 @@ class AuthRepository @Inject constructor(
             if (exp <= 0L) {
                 return true
             }
-            val now = Clock.System.now().epochSeconds
+            val now = java.lang.System.currentTimeMillis() / 1000L
             exp <= now + bufferSeconds
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
@@ -1013,24 +1084,6 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    private suspend fun loadAccountSyncPayloadFromAccountSyncState(userId: String): Result<AccountSyncPayloadCandidate?> {
-        return runCatching {
-            ensureValidSession()
-            val row = supabase.postgrest
-                .from("account_sync_state")
-                .select {
-                    filter { eq("user_id", userId) }
-                }
-                .decodeSingleOrNull<AccountSyncStateRow>()
-            val payload = row?.payload?.takeIf { it.isNotBlank() } ?: return@runCatching null
-            AccountSyncPayloadCandidate(
-                source = ACCOUNT_SYNC_SOURCE_PRIMARY,
-                payload = payload,
-                updatedAtMillis = maxOf(payloadUpdatedAtMillis(payload), parseInstantMillis(row.updated_at))
-            )
-        }
-    }
-
     suspend fun saveAccountSyncPayload(payload: String): Result<Unit> {
         val userId = getCurrentUserIdForSync()
         val expectedRevision = accountSyncRevision.takeIf { accountSyncRevisionUserId == userId }
@@ -1038,95 +1091,8 @@ class AuthRepository @Inject constructor(
     }
 
     internal suspend fun saveAccountSyncPayload(payload: String, expectedRevision: Long?): Result<Unit> {
-        val userId = getCurrentUserIdForSync() ?: return Result.failure(Exception("Not logged in"))
+        getCurrentUserIdForSync() ?: return Result.failure(Exception("Not logged in"))
         return saveAccountSyncPayloadToNetlify(payload, expectedRevision)
-        /*
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-            val netlifyResult = saveAccountSyncPayloadToNetlify(payload, expectedRevision)
-            if (netlifyResult.isSuccess) {
-                return Result.success(Unit)
-            }
-            val netlifyException = netlifyResult.exceptionOrNull()
-            if (netlifyException is AccountSyncPayloadRejectedException) {
-                return Result.failure(netlifyException)
-            }
-            if (Constants.USE_NETLIFY_CLOUD_SYNC) {
-                return Result.failure(netlifyException ?: Exception("Netlify cloud sync upload failed"))
-            }
-            AppLogger.breadcrumb(
-                tag = "CloudSync",
-                message = "netlify_save_failed_falling_back_to_supabase",
-                severity = "warning"
-            )
-        }
-
-        val rpcResult = saveAccountSyncPayloadViaRpc(userId, payload)
-        if (rpcResult.isSuccess) {
-            val profileAddonsResult = saveAccountSyncPayloadToProfileAddons(userId, payload)
-            if (profileAddonsResult.isFailure) {
-                AppLogger.breadcrumb(
-                    tag = "CloudSync",
-                    message = "rpc_saved_profile_addons_mirror_failed",
-                    severity = "warning"
-                )
-            }
-            return Result.success(Unit)
-        }
-
-        val rpcException = rpcResult.exceptionOrNull()
-        if (rpcException is AccountSyncPayloadRejectedException) {
-            AppLogger.breadcrumb(
-                tag = "CloudSync",
-                message = "rpc_rejected_weaker_snapshot_no_fallback",
-                severity = "warning"
-            )
-            return Result.failure(rpcException)
-        }
-
-        val accountSyncResult = saveAccountSyncPayloadToAccountSyncState(userId, payload)
-        val userSettingsResult = saveAccountSyncPayloadToUserSettings(userId, payload)
-        val profileAddonsResult = saveAccountSyncPayloadToProfileAddons(userId, payload)
-
-        if (accountSyncResult.isSuccess) {
-            if (userSettingsResult.isFailure || profileAddonsResult.isFailure) {
-                AppLogger.breadcrumb(
-                    tag = "CloudSync",
-                    message = "primary_saved_mirror_failed user_settings=${userSettingsResult.isFailure} profile_addons=${profileAddonsResult.isFailure}",
-                    severity = "warning"
-                )
-            }
-            return Result.success(Unit)
-        }
-        AppLogger.breadcrumb(
-            tag = "CloudSync",
-            message = "primary_save_failed fallback_user_settings=${userSettingsResult.isSuccess} fallback_profile_addons=${profileAddonsResult.isSuccess}",
-            severity = "warning"
-        )
-        Log.w(
-            TAG,
-            "Primary account sync save failed; fallback_user_settings=${userSettingsResult.isSuccess} " +
-                "fallback_profile_addons=${profileAddonsResult.isSuccess}",
-            accountSyncResult.exceptionOrNull()
-        )
-
-        if (
-            accountSyncPayloadSaveSucceeded(
-                accountSyncSaved = false,
-                userSettingsSaved = userSettingsResult.isSuccess,
-                profileAddonsSaved = profileAddonsResult.isSuccess
-            )
-        ) {
-            return Result.success(Unit)
-        }
-
-        return Result.failure(
-            rpcResult.exceptionOrNull()
-                ?: accountSyncResult.exceptionOrNull()
-                ?: userSettingsResult.exceptionOrNull()
-                ?: profileAddonsResult.exceptionOrNull()
-                ?: Exception("Cloud sync save failed")
-        )
-            */
     }
 
     private suspend fun saveAccountSyncPayloadToNetlify(payload: String, expectedRevision: Long?): Result<Unit> {
@@ -1173,7 +1139,7 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    private suspend fun saveAccountSyncPayloadViaRpc(userId: String, payload: String): Result<Unit> {
+    /* private suspend fun saveAccountSyncPayloadViaRpc(userId: String, payload: String): Result<Unit> {
         return try {
             val session = ensureValidSession() ?: return Result.failure(Exception("Session expired"))
             withContext(Dispatchers.IO) {
@@ -1288,6 +1254,8 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    */
+
     private suspend fun callNetlifyFunction(url: String, body: String): String {
         val accessToken = getAccessToken()?.takeIf { it.isNotBlank() }
             ?: throw IllegalStateException("Session expired")
@@ -1332,6 +1300,7 @@ class AuthRepository @Inject constructor(
         replace("ARVIO", "StreamNet TV", ignoreCase = true)
             .replace("ARFLIX", "StreamNet TV", ignoreCase = true)
 
+            /*
     private suspend fun callSupabaseRpc(functionName: String, body: String): String {
         val session = ensureValidSession() ?: throw IllegalStateException("Session expired")
         return withContext(Dispatchers.IO) {
@@ -1358,7 +1327,7 @@ class AuthRepository @Inject constructor(
     private suspend fun saveAccountSyncPayloadToAccountSyncState(userId: String, payload: String): Result<Unit> {
         return try {
             ensureValidSession()
-            val updatedAt = Clock.System.now().toString()
+            val updatedAt = java.time.Instant.now().toString()
             val existing = supabase.postgrest
                 .from("account_sync_state")
                 .select {
@@ -1447,7 +1416,7 @@ class AuthRepository @Inject constructor(
             val updatedSettings = buildJsonObject {
                 existingSettings?.forEach { (key, value) -> put(key, value) }
                 put(ACCOUNT_SYNC_PAYLOAD_KEY, JsonPrimitive(payload))
-                put(ACCOUNT_SYNC_UPDATED_AT_KEY, JsonPrimitive(Clock.System.now().toString()))
+                put(ACCOUNT_SYNC_UPDATED_AT_KEY, JsonPrimitive(java.time.Instant.now().toString()))
             }
 
             if (existingSettings != null) {
@@ -1533,6 +1502,8 @@ class AuthRepository @Inject constructor(
         }
     }
 
+    */
+
     private fun decodeProfileAccountSyncPayload(raw: String?): String? {
         if (raw.isNullOrBlank()) return null
         return runCatching {
@@ -1559,7 +1530,7 @@ class AuthRepository @Inject constructor(
     private fun parseInstantMillis(value: String?): Long {
         if (value.isNullOrBlank()) return 0L
         return try {
-            Instant.parse(value).toEpochMilliseconds()
+            java.time.Instant.parse(value).toEpochMilli()
         } catch (e: IllegalArgumentException) {
             0L
         } catch (e: java.time.format.DateTimeParseException) {
@@ -1581,7 +1552,7 @@ class AuthRepository @Inject constructor(
         }
         return JSONObject().apply {
             put(PROFILE_SYNC_PAYLOAD_KEY, payload)
-            put(PROFILE_SYNC_UPDATED_AT_KEY, Clock.System.now().toString())
+            put(PROFILE_SYNC_UPDATED_AT_KEY, java.time.Instant.now().toString())
             if (legacyAddons.isNotBlank()) put(PROFILE_SYNC_LEGACY_ADDONS_KEY, legacyAddons)
         }.toString()
     }

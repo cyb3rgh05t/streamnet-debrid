@@ -117,7 +117,6 @@ jobs:
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
           NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
@@ -133,11 +132,6 @@ jobs:
             echo "NETLIFY_BACKEND_URL must be https://auth.mystreamnet.club for production builds" >&2
             exit 1
           }
-          : "${SUPABASE_URL:?Missing SUPABASE_URL repository secret}"
-          case "$SUPABASE_URL" in
-            http://*|https://*) ;;
-            *) echo "SUPABASE_URL must be an HTTP(S) URL" >&2; exit 1 ;;
-          esac
           : "${TMDB_API_KEY:?Missing TMDB_API_KEY repository secret}"
           : "${TRAKT_CLIENT_ID:?Missing TRAKT_CLIENT_ID repository secret}"
           : "${TRAKT_CLIENT_SECRET:?Missing TRAKT_CLIENT_SECRET repository secret}"
@@ -152,8 +146,6 @@ jobs:
         env:
           APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
           NETLIFY_BACKEND_URL: https://auth.mystreamnet.club
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
@@ -168,8 +160,6 @@ jobs:
           printf '%s\n' \
             "APP_ANON_KEY=$APP_ANON_KEY" \
             "NETLIFY_BACKEND_URL=$NETLIFY_BACKEND_URL" \
-            "SUPABASE_URL=$SUPABASE_URL" \
-            "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY" \
             "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
             "SENTRY_DSN=${SENTRY_DSN:-disabled}" \
             "TMDB_API_KEY=$TMDB_API_KEY" \

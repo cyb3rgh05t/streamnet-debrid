@@ -15,7 +15,7 @@
 "area: backend":
   - changed-files:
       - any-glob-to-any-file:
-          - "supabase/**"
+          - "legacy/supabase/**"
 
 "area: ci":
   - changed-files:

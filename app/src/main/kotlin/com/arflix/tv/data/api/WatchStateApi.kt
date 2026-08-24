@@ -26,7 +26,7 @@ interface WatchStateApi {
     @GET("watch-history")
     suspend fun getWatchHistory(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("source") source: String? = null,
@@ -40,7 +40,7 @@ interface WatchStateApi {
     @POST("watch-history")
     suspend fun upsertWatchHistory(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body item: WatchHistoryRecord
     )
@@ -48,7 +48,7 @@ interface WatchStateApi {
     @GET("watch-history")
     suspend fun getWatchHistoryItem(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("show_tmdb_id") showTmdbId: String,
@@ -64,7 +64,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "watch-history", hasBody = false)
     suspend fun deleteWatchHistory(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("show_tmdb_id") showTmdbId: String? = null,
@@ -77,7 +77,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "watch-history", hasBody = false)
     suspend fun deleteWatchHistoryByIds(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("id") idIn: String
     )
 
@@ -86,7 +86,7 @@ interface WatchStateApi {
     @GET("rest/v1/profiles")
     suspend fun getProfile(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("id") userId: String,
         @Query("select") select: String = "*"
     ): List<UserProfile>
@@ -94,7 +94,7 @@ interface WatchStateApi {
     @PATCH("rest/v1/profiles")
     suspend fun updateProfile(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("id") userId: String,
         @Body profile: UserProfileUpdate
     )
@@ -104,7 +104,7 @@ interface WatchStateApi {
     @GET("rest/v1/watchlist")
     suspend fun getWatchlist(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("media_type") mediaType: String? = null,
         @Query("tmdb_id") tmdbId: String? = null,
@@ -115,7 +115,7 @@ interface WatchStateApi {
     @POST("rest/v1/watchlist")
     suspend fun upsertWatchlist(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body record: WatchlistRecord
     )
@@ -123,7 +123,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/watchlist", hasBody = false)
     suspend fun deleteWatchlist(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("tmdb_id") tmdbId: String,
         @Query("media_type") mediaType: String
@@ -134,7 +134,7 @@ interface WatchStateApi {
     @GET("watch-state/watched-movies")
     suspend fun getWatchedMovies(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("select") select: String = "user_id,profile_id,tmdb_id,trakt_id,watched_at",
@@ -146,7 +146,7 @@ interface WatchStateApi {
     @GET("watch-state/watched-episodes")
     suspend fun getWatchedEpisodes(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("select") select: String = "user_id,profile_id,tmdb_id,show_trakt_id,season,episode,trakt_episode_id,tmdb_episode_id,watched_at,updated_at,source",
@@ -159,7 +159,7 @@ interface WatchStateApi {
     @GET("watch-state/watched-episodes")
     suspend fun getWatchedEpisodesForShow(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("tmdb_id") tmdbId: String,
@@ -169,7 +169,7 @@ interface WatchStateApi {
     @POST("watch-state/watched-movies")
     suspend fun markMovieWatched(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body record: WatchedMovieRecord
     )
@@ -177,7 +177,7 @@ interface WatchStateApi {
     @POST("watch-state/watched-episodes")
     suspend fun markEpisodeWatched(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body record: WatchedEpisodeRecord
     )
@@ -186,7 +186,7 @@ interface WatchStateApi {
     @POST("watch-state/watched-episodes")
     suspend fun markEpisodeWatchedRpc(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Cache-Control") cacheControl: String = "no-cache, no-store",
         @Body params: MarkEpisodeWatchedParams
     )
@@ -194,7 +194,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "watch-state/watched-movies", hasBody = false)
     suspend fun deleteWatchedMovie(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("tmdb_id") tmdbId: String
@@ -203,7 +203,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "watch-state/watched-episodes", hasBody = false)
     suspend fun deleteWatchedEpisode(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("tmdb_id") tmdbId: String,
@@ -216,7 +216,7 @@ interface WatchStateApi {
     @GET("rest/v1/episode_progress")
     suspend fun getEpisodeProgress(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("select") select: String = "*",
         @Query("order") order: String = "last_updated_at.desc"
@@ -225,7 +225,7 @@ interface WatchStateApi {
     @POST("rest/v1/episode_progress")
     suspend fun upsertEpisodeProgress(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body record: EpisodeProgressRecord
     )
@@ -233,7 +233,7 @@ interface WatchStateApi {
     @retrofit2.http.HTTP(method = "DELETE", path = "rest/v1/episode_progress", hasBody = false)
     suspend fun deleteEpisodeProgress(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("tmdb_id") tmdbId: String,
         @Query("season") season: String,
@@ -245,7 +245,7 @@ interface WatchStateApi {
     @GET("watch-state/sync-state")
     suspend fun getSyncState(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Query("user_id") userId: String,
         @Query("profile_id") profileId: String? = null,
         @Query("select") select: String = "*"
@@ -254,7 +254,7 @@ interface WatchStateApi {
     @POST("watch-state/sync-state")
     suspend fun upsertSyncState(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body record: SyncStateRecord
     )
@@ -264,7 +264,7 @@ interface WatchStateApi {
     @POST("watch-state/watched-episodes")
     suspend fun bulkUpsertWatchedEpisodes(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body records: List<WatchedEpisodeRecord>
     )
@@ -272,7 +272,7 @@ interface WatchStateApi {
     @POST("watch-state/watched-movies")
     suspend fun bulkUpsertWatchedMovies(
         @Header("Authorization") auth: String,
-        @Header("apikey") apiKey: String = Constants.SUPABASE_ANON_KEY,
+        @Header("apikey") apiKey: String = Constants.APP_ANON_KEY,
         @Header("Prefer") prefer: String = "resolution=merge-duplicates",
         @Body records: List<WatchedMovieRecord>
     )

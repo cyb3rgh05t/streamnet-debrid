@@ -9,10 +9,8 @@ import com.arflix.tv.BuildConfig
  * committed source.
  */
 object Constants {
-    // Supabase - keys from BuildConfig (secrets.properties).
-    val SUPABASE_URL: String get() = BuildConfig.SUPABASE_URL
-    val SUPABASE_ANON_KEY: String get() = BuildConfig.SUPABASE_ANON_KEY
     val APP_ANON_KEY: String get() = BuildConfig.APP_ANON_KEY
+    // Compatibility alias for the renamed watched-state API header.
     val NETLIFY_BACKEND_URL: String
         get() = if (BuildConfig.BUILD_TYPE == "selfHosted") {
             BuildConfig.SELF_HOSTED_BACKEND_URL.trim().trimEnd('/')
