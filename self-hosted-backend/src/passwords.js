@@ -9,6 +9,14 @@ function scrypt(password, salt, n, r, p) {
   });
 }
 
+export async function hashLegacyScryptPassword(password) {
+  const salt = crypto.randomBytes(16).toString("base64url");
+  const n = 16384;
+  const r = 8;
+  const p = 1;
+  return `scrypt:${n}:${r}:${p}:${salt}:${await scrypt(password, salt, n, r, p)}`;
+}
+
 export async function verifyLegacyScryptPassword(password, encoded) {
   const parts = String(encoded || "").split(":");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;

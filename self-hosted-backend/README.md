@@ -25,6 +25,35 @@ Do not point the production APK to this service yet.
 
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 
+## First API Test
+
+Create a new staging-only account. This command never imports, changes, or overwrites existing account data.
+
+```sh
+read -rp "Test email: " TEST_ACCOUNT_EMAIL
+read -rsp "Test password: " TEST_ACCOUNT_PASSWORD; echo
+export TEST_ACCOUNT_EMAIL TEST_ACCOUNT_PASSWORD
+docker compose exec -e TEST_ACCOUNT_EMAIL -e TEST_ACCOUNT_PASSWORD streamnet-backend npm run create:test-account
+unset TEST_ACCOUNT_EMAIL TEST_ACCOUNT_PASSWORD
+```
+
+Then sign in from the server, replacing the placeholders:
+
+```sh
+curl -sS https://api.mystreamnet.club/auth-login \
+  -H 'content-type: application/json' \
+  --data '{"email":"TEST_EMAIL","password":"TEST_PASSWORD"}'
+```
+
+The result contains `access_token`. Use it to confirm the empty snapshot state:
+
+```sh
+curl -sS https://api.mystreamnet.club/account-sync-pull \
+  -H "authorization: Bearer ACCESS_TOKEN"
+```
+
+Expected first response: `{"payload":null,"revision":0,...}`. Do not import Supabase or Netlify data until this login and pull test works.
+
 ## Container Publishing
 
 The `Publish Self-Hosted Backend` GitHub Actions workflow runs for changes under `self-hosted-backend/` on `main`. It tests the service and publishes these GHCR tags:

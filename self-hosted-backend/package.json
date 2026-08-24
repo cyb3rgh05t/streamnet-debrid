@@ -11,6 +11,7 @@
     "start": "node src/server.js",
     "test": "node --test test/*.test.js",
     "migrate": "node scripts/migrate.js",
+    "create:test-account": "node scripts/create-test-account.js",
     "import:snapshots": "node scripts/import-snapshots.js"
   },
   "dependencies": {

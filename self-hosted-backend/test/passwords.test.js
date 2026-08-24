@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-import { verifyLegacyScryptPassword } from "../src/passwords.js";
+import {
+  hashLegacyScryptPassword,
+  verifyLegacyScryptPassword,
+} from "../src/passwords.js";
 
 function scrypt(password, salt) {
   return new Promise((resolve, reject) => {
@@ -35,4 +38,11 @@ test("verifies the Netlify scrypt password format", async () => {
     ),
     false,
   );
+});
+
+test("creates hashes compatible with Netlify scrypt verification", async () => {
+  const password = "staging test account password";
+  const encoded = await hashLegacyScryptPassword(password);
+
+  assert.equal(await verifyLegacyScryptPassword(password, encoded), true);
 });
