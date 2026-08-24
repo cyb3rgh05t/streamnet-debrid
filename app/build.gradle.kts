@@ -185,7 +185,7 @@ android {
             buildConfigField(
                 "String",
                 "NETLIFY_BACKEND_URL",
-                "\"${escapeBuildConfigString(localSecretValue("SELF_HOSTED_BACKEND_URL").ifBlank { "https://api.mystreamnet.club" })}\""
+                "\"${escapeBuildConfigString(localSecretValue("SELF_HOSTED_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
             )
             buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
             buildConfigField("Boolean", "ENABLE_SUPABASE_SYNC_MIRROR", "false")

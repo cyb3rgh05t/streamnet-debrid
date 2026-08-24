@@ -27,7 +27,7 @@ The API router deliberately has no Authelia middleware. Android TV and mobile ca
 
 ## Self-Hosted Account Page
 
-`PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://api.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
+`PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://auth.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
 
 Password reset and account deletion remain unavailable on the self-hosted page until their server-side replacements are complete. They do not fall back to Netlify.
 
@@ -46,7 +46,7 @@ unset TEST_ACCOUNT_EMAIL TEST_ACCOUNT_PASSWORD
 Then sign in from the server, replacing the placeholders:
 
 ```sh
-curl -sS https://api.mystreamnet.club/auth-login \
+curl -sS https://auth.mystreamnet.club/auth-login \
   -H 'content-type: application/json' \
   --data '{"email":"TEST_EMAIL","password":"TEST_PASSWORD"}'
 ```
@@ -54,7 +54,7 @@ curl -sS https://api.mystreamnet.club/auth-login \
 The result contains `access_token`. Use it to confirm the empty snapshot state:
 
 ```sh
-curl -sS https://api.mystreamnet.club/account-sync-pull \
+curl -sS https://auth.mystreamnet.club/account-sync-pull \
   -H "authorization: Bearer ACCESS_TOKEN"
 ```
 
@@ -75,7 +75,7 @@ The `selfHosted` build type is a separate debug-signed APK with package suffix `
 Set an optional custom test domain in the untracked `secrets.properties` file:
 
 ```properties
-SELF_HOSTED_BACKEND_URL=https://api.mystreamnet.club
+SELF_HOSTED_BACKEND_URL=https://auth.mystreamnet.club
 ```
 
 Build the APK with:
