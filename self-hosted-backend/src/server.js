@@ -460,6 +460,25 @@ app.post("/discord-auth-callback", async (request, reply) => {
   return reply.send({ ok: true });
 });
 
+app.post("/tv-auth-start", async (_request, reply) => {
+  const deviceCode = randomCode(32);
+  const userCode = `${randomCode(4)}-${randomCode(4)}`;
+  const expiresAt = new Date(Date.now() + tvAuthTtlMs);
+  await pool.query(
+    "insert into tv_device_auth_sessions (device_code, user_code, expires_at) values ($1, $2, $3)",
+    [deviceCode, userCode, expiresAt],
+  );
+  const verificationUrl = `${config.publicBaseUrl}/?code=${encodeURIComponent(userCode)}`;
+  return reply.send({
+    device_code: deviceCode,
+    user_code: userCode,
+    verification_url: verificationUrl,
+    verification_uri: verificationUrl,
+    expires_in: Math.floor(tvAuthTtlMs / 1000),
+    interval: 3,
+  });
+});
+
 async function tvAuthStatus(request, reply) {
   const deviceCode = String(request.body?.device_code || "").trim();
   if (!deviceCode)
