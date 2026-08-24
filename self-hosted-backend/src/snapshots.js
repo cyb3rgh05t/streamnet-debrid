@@ -48,3 +48,8 @@ export function payloadMetrics(payload) {
                 : 10;
   return { profileCount, scopedCoverage, restoreRank };
 }
+
+export function payloadUpdatedAtMillis(payload) {
+  const updatedAt = Number(payload?.updatedAt || 0);
+  return Number.isSafeInteger(updatedAt) && updatedAt > 0 ? updatedAt : null;
+}

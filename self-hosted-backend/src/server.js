@@ -7,7 +7,7 @@ import {
   newRefreshToken,
   verifyLegacyScryptPassword,
 } from "./passwords.js";
-import { payloadMetrics } from "./snapshots.js";
+import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -195,13 +195,13 @@ app.post("/account-sync-push", async (request, reply) => {
     const nextRevision = revision + 1;
     await client.query(
       `insert into account_sync_snapshots (account_id, payload, revision, payload_updated_at, source)
-       values ($1, $2::jsonb, $3, to_timestamp(nullif($4, 0) / 1000.0), 'self_hosted')
+       values ($1, $2::jsonb, $3, to_timestamp($4::double precision / 1000.0), 'self_hosted')
        on conflict (account_id) do update set payload = excluded.payload, revision = excluded.revision, payload_updated_at = excluded.payload_updated_at, source = excluded.source, updated_at = now()`,
       [
         account.id,
         JSON.stringify(payload),
         nextRevision,
-        Number(payload.updatedAt || 0),
+        payloadUpdatedAtMillis(payload),
       ],
     );
     await client.query("commit");
