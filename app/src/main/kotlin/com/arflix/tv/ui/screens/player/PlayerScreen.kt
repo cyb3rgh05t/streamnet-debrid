@@ -419,8 +419,25 @@ fun PlayerScreen(
     var pendingNextSourceName by remember { mutableStateOf<String?>(null) }
     var pendingNextBingeGroup by remember { mutableStateOf<String?>(null) }
     var nextEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
+    var nextEpisodeAirDateSource by remember { mutableStateOf<PlaybackEpisodeKey?>(null) }
+    var nextEpisodeAirDateResolution by remember {
+        mutableStateOf<NextEpisodeAirDateResolution>(NextEpisodeAirDateResolution.Pending)
+    }
     var previousEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
-    LaunchedEffect(mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber) {
+    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber) {
+        nextEpisodeIdentity = null
+        nextEpisodeAirDateSource = if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
+            PlaybackEpisodeKey(
+                mediaId = mediaId,
+                seasonNumber = seasonNumber,
+                episodeNumber = episodeNumber,
+                tmdbSeasonNumber = tmdbSeasonNumber ?: seasonNumber,
+                tmdbEpisodeNumber = tmdbEpisodeNumber ?: episodeNumber,
+                kitsuId = kitsuId,
+                kitsuEpisodeNumber = kitsuEpisodeNumber,
+            )
+        } else null
+        nextEpisodeAirDateResolution = NextEpisodeAirDateResolution.Pending
         if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
             val current = EpisodeIdentity(
                 displaySeason = seasonNumber,
@@ -430,10 +447,16 @@ fun PlayerScreen(
                 kitsuId = kitsuId,
                 kitsuEpisode = kitsuEpisodeNumber
             )
-            nextEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = true)
+            val next = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = true)
+            nextEpisodeIdentity = next
             previousEpisodeIdentity = viewModel.adjacentEpisodeIdentity(mediaId, current, forward = false)
+            nextEpisodeAirDateResolution = if (next == null) {
+                NextEpisodeAirDateResolution.Blocked(NextEpisodeAirDateBlockReason.MissingEpisode)
+            } else {
+                viewModel.resolveNextEpisodeAirDate(mediaId, next)
+            }
         } else {
-            nextEpisodeIdentity = null
+            nextEpisodeAirDateResolution = NextEpisodeAirDateResolution.Blocked(NextEpisodeAirDateBlockReason.MissingEpisode)
             previousEpisodeIdentity = null
         }
     }
@@ -2461,7 +2484,15 @@ fun PlayerScreen(
                 seasonNumber != null &&
                 episodeNumber != null
             ) {
-                PlaybackEpisodeKey(mediaId, seasonNumber, episodeNumber)
+                PlaybackEpisodeKey(
+                    mediaId = mediaId,
+                    seasonNumber = seasonNumber,
+                    episodeNumber = episodeNumber,
+                    tmdbSeasonNumber = tmdbSeasonNumber ?: seasonNumber,
+                    tmdbEpisodeNumber = tmdbEpisodeNumber ?: episodeNumber,
+                    kitsuId = kitsuId,
+                    kitsuEpisodeNumber = kitsuEpisodeNumber,
+                )
             } else {
                 null
             }
@@ -2473,19 +2504,19 @@ fun PlayerScreen(
                         !showSubtitleMenu &&
                         uiState.error == null &&
                         uiState.autoPlayNext,
+                    airDateResolution = nextEpisodeAirDateResolution,
                 )
             ) {
                 val selected = uiState.selectedStream
-                val next = nextEpisodeIdentity ?: EpisodeIdentity.canonical(
-                    tmdbSeasonNumber ?: endedEpisodeKey.seasonNumber,
-                    (tmdbEpisodeNumber ?: endedEpisodeKey.episodeNumber) + 1
-                )
-                pendingNextIdentity = next
-                pendingNextAddonId = selected?.addonId?.takeIf { it.isNotBlank() }
-                pendingNextSourceName = selected?.source?.takeIf { it.isNotBlank() }
-                pendingNextBingeGroup = selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
-                nextEpisodePromptButton = 0
-                showNextEpisodePrompt = true
+                val next = nextEpisodeIdentity
+                if (next != null) {
+                    pendingNextIdentity = next
+                    pendingNextAddonId = selected?.addonId?.takeIf { it.isNotBlank() }
+                    pendingNextSourceName = selected?.source?.takeIf { it.isNotBlank() }
+                    pendingNextBingeGroup = selected?.behaviorHints?.bingeGroup?.takeIf { it.isNotBlank() }
+                    nextEpisodePromptButton = 0
+                    showNextEpisodePrompt = true
+                }
             }
 
             val tickDelayMs = when {

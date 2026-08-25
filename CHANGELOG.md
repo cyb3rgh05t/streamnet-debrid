@@ -47,6 +47,15 @@ All notable changes to this project are documented in this file.
 - Added new IPTV sort/special-category labels to string resources and added German translations for the new settings text.
 - Added German Continue Watching remaining-time and episode resume labels.
 
+### Device startup, playback, and launcher integration
+
+- Hardened the Android TV boot-start setting for Android boxes, Google TV, and Shield devices by keeping the boot broadcast alive through the preference read and using a single-top activity launch.
+- Prevented automatic next-episode playback when the next episode is unaired or its TMDB air-date metadata is unavailable; manual episode navigation remains available.
+- Added original-title matching to Telegram movie and series searches so foreign-language filenames and captions resolve reliably alongside English and localized titles.
+- Added compact landscape layouts for small touch phones: the bottom navigation and Live TV mini-player now use fixed responsive dimensions while portrait, tablet, and TV layouts remain unchanged.
+- Aligned Google TV Continue Watching subtitles with the in-app card, including the localized S1E1 start label; launcher artwork, progress, ordering, and deep links remain profile-scoped.
+- Kept Media3/ExoPlayer pinned to `1.9.0`; updates require a new APK build because the vendored Dolby Vision Matroska extractor must be reviewed with every Media3 bump.
+
 ## [1.9.983] - 2026-07-30
 
 ### Player, subtitles, and playback

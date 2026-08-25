@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import kotlinx.coroutines.CancellationException
 import com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY
 import com.arflix.tv.util.isTvUi
 import com.arflix.tv.util.settingsDataStore
@@ -24,20 +25,28 @@ class BootCompletedReceiver : BroadcastReceiver() {
 
         if (context.packageName.isBlank() || !isTvUi(context)) return
 
+        val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
-            val enabled = runCatching {
-                context.settingsDataStore.data.first()[START_ON_DEVICE_BOOT_KEY] == true
-            }.getOrDefault(false)
+            try {
+                val enabled = runCatching {
+                    context.settingsDataStore.data.first()[START_ON_DEVICE_BOOT_KEY] == true
+                }.getOrDefault(false)
 
-            if (!enabled) return@launch
+                if (!enabled) return@launch
 
-            val launchIntent = Intent(context, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val launchIntent = Intent(context, MainActivity::class.java).apply {
+                    addFlags(
+                        Intent.FLAG_ACTIVITY_NEW_TASK or
+                            Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                            Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
                 }
+                context.startActivity(launchIntent)
+            } catch (e: CancellationException) {
+                throw e
+            } finally {
+                pendingResult.finish()
             }
-            context.startActivity(launchIntent)
         }
     }
 }

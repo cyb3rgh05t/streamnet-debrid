@@ -419,6 +419,8 @@ class LauncherContinueWatchingRepository @Inject constructor(
         return when {
             !resumeClock.isNullOrBlank() ->
                 context.getString(R.string.launcher_continue_from, episodeLabel, resumeClock)
+            mediaType == MediaType.TV && progress <= 0 && resumePositionSeconds <= 0L && season == 1 && episode == 1 ->
+                context.getString(R.string.play_start_s1e1)
             !episodeTitle.isNullOrBlank() ->
                 context.getString(R.string.launcher_continue_dash, episodeLabel, episodeTitle)
             else -> episodeLabel

@@ -440,6 +440,13 @@ fun LiveTvScreen(
         context.settingsDataStore.data.map { preferences -> preferences[clockFormatKey] ?: "24h" }
     }.collectAsStateWithLifecycle(initialValue = "24h")
     val useTouchRail = isTouchDevice
+    val miniPlayerLayout = liveTvMiniPlayerLayout(
+        isTouchDevice = isTouchDevice,
+        smallestScreenWidthDp = configuration.smallestScreenWidthDp,
+        screenWidthDp = configuration.screenWidthDp,
+        screenHeightDp = configuration.screenHeightDp,
+    )
+    val landscapeCompactMiniPlayer = miniPlayerLayout == LiveTvMiniPlayerLayout.LANDSCAPE_COMPACT
     val compactTouchLayout = isTouchDevice && configuration.screenWidthDp < 900
     val showTopBar = !isTouchDevice
     val contentTopPadding = if (showTopBar) AppTopBarHeight else 0.dp
@@ -2701,6 +2708,7 @@ fun LiveTvScreen(
                         variantCount = previewInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
                         onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
+                        landscapeCompact = landscapeCompactMiniPlayer,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(
