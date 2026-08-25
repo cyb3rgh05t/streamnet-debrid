@@ -11314,6 +11314,8 @@ private fun UiModeWarningDialog(
 ) {
     var focusedIndex by remember { mutableIntStateOf(0) } // 0 = Confirm, 1 = Cancel
     val focusRequester = remember { FocusRequester() }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val accentContentColor = contrastingContentColor(accentColor)
 
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
@@ -11337,7 +11339,8 @@ private fun UiModeWarningDialog(
                         if (LocalDeviceType.current.isTouchDevice()) Modifier.fillMaxWidth(0.92f).widthIn(max = 400.dp)
                         else Modifier.width(400.dp)
                     )
-                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
+                    .background(BackgroundElevated.copy(alpha = 0.96f), RoundedCornerShape(18.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
@@ -11398,12 +11401,12 @@ private fun UiModeWarningDialog(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                color = if (isConfirmFocused) SuccessGreen else SuccessGreen.copy(alpha = 0.6f)
+                                color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.14f)
                             )
                             .clickable { onConfirm() }
                             .border(
                                 width = if (isConfirmFocused) 2.dp else 0.dp,
-                                color = if (isConfirmFocused) Color.White else Color.Transparent,
+                                color = if (isConfirmFocused) accentColor.copy(alpha = 0.9f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(vertical = 14.dp),
@@ -11412,7 +11415,7 @@ private fun UiModeWarningDialog(
                         Text(
                             text = tr("Confirm"),
                             style = ArflixTypography.button,
-                            color = Color.White
+                            color = accentContentColor
                         )
                     }
 
@@ -11422,12 +11425,12 @@ private fun UiModeWarningDialog(
                             .weight(1f)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                color = if (isCancelFocused) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f)
+                                color = if (isCancelFocused) accentColor.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.06f)
                             )
                             .clickable { onDismiss() }
                             .border(
                                 width = if (isCancelFocused) 2.dp else 0.dp,
-                                color = if (isCancelFocused) Pink else Color.Transparent,
+                                color = if (isCancelFocused) accentColor.copy(alpha = 0.8f) else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(vertical = 14.dp),
@@ -11436,7 +11439,7 @@ private fun UiModeWarningDialog(
                         Text(
                             text = tr("Cancel"),
                             style = ArflixTypography.button,
-                            color = if (isCancelFocused) TextPrimary else TextSecondary
+                            color = if (isCancelFocused) accentContentColor else TextSecondary
                         )
                     }
                 }

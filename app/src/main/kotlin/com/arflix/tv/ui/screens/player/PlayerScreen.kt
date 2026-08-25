@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import com.arflix.tv.BuildConfig
 import androidx.activity.compose.BackHandler
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -4722,10 +4723,8 @@ private fun rememberPlayerClockFormat(): String {
     LaunchedEffect(context) {
         runCatching {
             val prefs = context.settingsDataStore.data.first()
-            val saved = prefs.asMap().entries
-                .firstOrNull { (key, _) -> key.name.endsWith("_clock_format") }
-                ?.value as? String
-            resolvedFormat = saved ?: "24h"
+            val activeProfileId = prefs[stringPreferencesKey("active_profile_id")].orEmpty().ifBlank { "default" }
+            resolvedFormat = prefs[stringPreferencesKey("profile_${activeProfileId}_clock_format")] ?: "24h"
         }
     }
 

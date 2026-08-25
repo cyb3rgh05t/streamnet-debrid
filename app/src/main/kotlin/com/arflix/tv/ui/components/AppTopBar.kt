@@ -45,6 +45,7 @@ import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
 import androidx.compose.ui.res.stringResource
+import androidx.datastore.preferences.core.stringPreferencesKey
 import com.arflix.tv.R
 import com.arflix.tv.util.settingsDataStore
 import java.text.SimpleDateFormat
@@ -106,7 +107,7 @@ fun AppTopBar(
     // (avatar-only, no label).
     val showProfile = profile != null
     val hasProfile = showProfile
-    val currentTime = rememberTopBarTime(clockFormat)
+    val currentTime = rememberTopBarTime(clockFormat, profile?.id)
     val selectedIndex = remember(selectedItem, hasProfile) { topBarSelectedIndex(selectedItem, hasProfile) }
     // Settings gear is always the last focusable index
     val settingsIndex = topBarMaxIndex(hasProfile)
@@ -381,20 +382,19 @@ private fun TopBarProfileAvatar(
 }
 
 @Composable
-private fun rememberTopBarTime(clockFormat: String): String {
+private fun rememberTopBarTime(clockFormat: String, profileId: String?): String {
     val context = LocalContext.current
-    var resolvedFormat by remember(clockFormat) { mutableStateOf(clockFormat) }
+    val activeProfileId = profileId?.takeIf { it.isNotBlank() } ?: "default"
+    var resolvedFormat by remember(clockFormat, activeProfileId) { mutableStateOf(clockFormat) }
     var currentTime by remember(resolvedFormat) { mutableStateOf(topBarCurrentTime(resolvedFormat)) }
 
-    // AppTopBar is used on multiple screens that don't all have SettingsUiState.
-    // Read the persisted clock format directly so the clock updates app-wide.
-    LaunchedEffect(context, clockFormat) {
+    // AppTopBar is used on multiple screens, and the persisted clock format is profile-scoped.
+    // Read the exact key for the active profile so 12h/24h toggles apply immediately.
+    LaunchedEffect(context, clockFormat, activeProfileId) {
         runCatching {
             val prefs = context.settingsDataStore.data.first()
-            val saved = prefs.asMap().entries
-                .firstOrNull { (key, _) -> key.name.endsWith("_clock_format") }
-                ?.value as? String
-            resolvedFormat = saved ?: clockFormat
+            val saved = prefs[stringPreferencesKey("profile_${activeProfileId}_clock_format")] ?: clockFormat
+            resolvedFormat = saved
         }
     }
 

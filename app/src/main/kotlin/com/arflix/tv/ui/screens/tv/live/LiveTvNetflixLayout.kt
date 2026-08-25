@@ -48,7 +48,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -261,7 +260,6 @@ private fun HeroVideoCard(
 ) {
     val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
     var focused by remember { mutableStateOf(false) }
-    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(isFullScreen) {
         if (!isFullScreen) {
@@ -294,7 +292,6 @@ private fun HeroVideoCard(
                 if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                 when (event.key) {
                     Key.DirectionUp -> {
-                        focusManager.clearFocus()
                         onMoveUp()
                         true
                     }
