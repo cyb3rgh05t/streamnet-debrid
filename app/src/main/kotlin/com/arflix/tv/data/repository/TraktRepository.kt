@@ -4630,6 +4630,8 @@ data class ContinueWatchingItem(
                     shownEpisode,
                     resumeLabel
                 ) ?: "Continue S${shownSeason}E${shownEpisode} from $resumeLabel"
+            } else if (progress <= 0 && resumePositionSeconds <= 0L && shownSeason == 1 && shownEpisode == 1) {
+                context?.getString(R.string.play_start_s1e1) ?: "Start S1E1"
             } else {
                 context?.getString(R.string.continue_season_episode, shownSeason, shownEpisode)
                     ?: "Continue S${shownSeason}E${shownEpisode}"
