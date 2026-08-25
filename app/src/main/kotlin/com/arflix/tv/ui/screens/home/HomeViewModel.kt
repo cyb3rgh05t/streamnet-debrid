@@ -2239,8 +2239,6 @@ class HomeViewModel @Inject constructor(
                     catalogs.joinToString("|") { "${it.id}:${it.title}:${it.sourceUrl.orEmpty()}" }
                 }
                 .distinctUntilChanged()
-                .drop(2) // Skip first two emissions to avoid re-triggering loadHomeData during
-                         // initial startup and ensurePreinstalledDefaults DataStore write.
                 .collect {
                     // Apply catalog reorder/add/remove immediately on Home.
                     loadHomeData()

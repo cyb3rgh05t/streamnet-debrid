@@ -168,3 +168,6 @@ _tmp_tv_perf/
 
 # Agent skills & customizations
 .agents/
+streamnet-before-netlify-import.sql
+streamnet-payload.json
+streamnet-payload.txt
