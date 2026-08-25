@@ -55,8 +55,6 @@ class TvDeviceAuthRepository @Inject constructor(
             try {
                 val request = Request.Builder()
                     .url(Constants.TV_AUTH_START_URL)
-                    .header("apikey", Constants.APP_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                     .post("{}".toRequestBody(jsonMediaType))
                     .build()
 
@@ -96,8 +94,6 @@ class TvDeviceAuthRepository @Inject constructor(
                 val payload = JSONObject().put("device_code", deviceCode).toString()
                 val statusRequest = Request.Builder()
                     .url(Constants.TV_AUTH_STATUS_URL)
-                    .header("apikey", Constants.APP_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                     .post(payload.toRequestBody(jsonMediaType))
                     .build()
 
@@ -107,8 +103,6 @@ class TvDeviceAuthRepository @Inject constructor(
                         // Backward compatibility for older deployments still using /tv-auth-poll
                         val pollRequest = Request.Builder()
                             .url(Constants.TV_AUTH_POLL_URL)
-                            .header("apikey", Constants.APP_ANON_KEY)
-                            .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                             .post(payload.toRequestBody(jsonMediaType))
                             .build()
                         okHttpClient.newCall(pollRequest).execute().use { fallback ->
@@ -159,8 +153,6 @@ class TvDeviceAuthRepository @Inject constructor(
 
                 val request = Request.Builder()
                     .url(Constants.TV_AUTH_COMPLETE_URL)
-                    .header("apikey", Constants.APP_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                     .post(payload.toRequestBody(jsonMediaType))
                     .build()
 

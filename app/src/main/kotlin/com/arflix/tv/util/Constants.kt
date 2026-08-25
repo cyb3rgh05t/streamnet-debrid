@@ -9,7 +9,6 @@ import com.arflix.tv.BuildConfig
  * committed source.
  */
 object Constants {
-    val APP_ANON_KEY: String get() = BuildConfig.APP_ANON_KEY
     // Compatibility alias for the renamed watched-state API header.
     val NETLIFY_BACKEND_URL: String
         get() = if (BuildConfig.BUILD_TYPE == "selfHosted") {
@@ -75,8 +74,6 @@ object Constants {
     const val LOGO_BASE = "https://image.tmdb.org/t/p/w500"
     const val LOGO_BASE_LARGE = "https://image.tmdb.org/t/p/original"
 
-    // Google Sign-In - key from BuildConfig (secrets.properties).
-    val GOOGLE_WEB_CLIENT_ID: String get() = BuildConfig.GOOGLE_WEB_CLIENT_ID
 
     // Progress thresholds.
     const val WATCHED_THRESHOLD = 90

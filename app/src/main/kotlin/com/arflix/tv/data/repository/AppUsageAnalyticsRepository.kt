@@ -84,8 +84,6 @@ class AppUsageAnalyticsRepository @Inject constructor(
                 .post(payload.toString().toRequestBody(jsonMediaType))
 
             requestBuilder
-                .header("apikey", Constants.APP_ANON_KEY)
-                .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                 .header("Cache-Control", "no-cache, no-store")
 
             okHttpClient.newCall(requestBuilder.build()).execute().use { response ->

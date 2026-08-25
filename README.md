@@ -74,7 +74,7 @@ npm --prefix legacy/netlify-auth-site test
 netlify deploy --dir legacy/netlify-auth-site --prod
 ```
 
-The linked production site should be the StreamNet auth/sync project, not upstream ARVIO infrastructure.
+The linked production site should be the StreamNet auth/sync project, not upstream StreamNet infrastructure.
 
 ## Legacy Supabase
 
@@ -88,7 +88,6 @@ The signed Android release workflow creates a temporary `secrets.properties` fil
 
 The workflow expects these repository secrets as needed:
 
-- `APP_ANON_KEY`
 - `NETLIFY_BACKEND_URL`
 - `TMDB_API_KEY`
 - `TRAKT_CLIENT_ID`

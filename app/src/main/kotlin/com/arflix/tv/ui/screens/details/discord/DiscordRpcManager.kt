@@ -406,8 +406,6 @@ object DiscordRpcManager {
         (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             setRequestProperty("Content-Type", "application/json; charset=utf-8")
-            setRequestProperty("apikey", Constants.APP_ANON_KEY)
-            setRequestProperty("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
             doOutput = true
             connectTimeout = 5_000
             readTimeout = 5_000

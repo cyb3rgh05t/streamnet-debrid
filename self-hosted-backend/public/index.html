@@ -800,10 +800,7 @@
     </div>
 
     <script type="module">
-      const APP_ANON_KEY =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6aGd3eXBxemptb3l2cmtjanRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NzUxOTMsImV4cCI6MjEwMDI1MTE5M30.Pox6SjgVaEGB9ETs7gWyXsISde7PpsJJmyaaA-soIV4";
-
-      const FUNCTION_BASE = "/.netlify/functions";
+const FUNCTION_BASE = "/.netlify/functions";
       const qs = new URLSearchParams(window.location.search);
       const pairCode = (qs.get("code") || "").trim();
 
@@ -1346,8 +1343,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: APP_ANON_KEY,
-            Authorization: `Bearer ${APP_ANON_KEY}`,
           },
           body: JSON.stringify({
             action: "signin",
@@ -1369,8 +1364,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: APP_ANON_KEY,
-            Authorization: `Bearer ${APP_ANON_KEY}`,
           },
           body: JSON.stringify({
             code: pairCode,
@@ -1394,8 +1387,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: APP_ANON_KEY,
-            Authorization: `Bearer ${APP_ANON_KEY}`,
           },
           body: JSON.stringify({
             email: normalizedEmail,
@@ -1420,8 +1411,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: APP_ANON_KEY,
-            Authorization: `Bearer ${APP_ANON_KEY}`,
           },
           body: JSON.stringify({ email, password }),
         });
@@ -1459,8 +1448,6 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: APP_ANON_KEY,
-            Authorization: `Bearer ${APP_ANON_KEY}`,
           },
           body: JSON.stringify({
             email,

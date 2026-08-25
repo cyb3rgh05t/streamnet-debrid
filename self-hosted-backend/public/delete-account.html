@@ -590,8 +590,6 @@
     </main>
 
     <script>
-      const APP_ANON_KEY =
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6aGd3eXBxemptb3l2cmtjanRvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NzUxOTMsImV4cCI6MjEwMDI1MTE5M30.Pox6SjgVaEGB9ETs7gWyXsISde7PpsJJmyaaA-soIV4";
       const FUNCTIONS = "/.netlify/functions";
 
       const loginStage = document.getElementById("login-stage");
@@ -785,10 +783,9 @@
       let jobId = "";
       let receiptToken = "";
 
-      function appHeaders(token = APP_ANON_KEY) {
+      function appHeaders(token = "") {
         return {
           "content-type": "application/json",
-          apikey: APP_ANON_KEY,
           authorization: `Bearer ${token}`,
         };
       }
@@ -832,11 +829,7 @@
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
         try {
-          const session = await request(
-            "auth-login",
-            { email, password },
-            APP_ANON_KEY,
-          );
+          const session = await request("auth-login", { email, password });
           if (!session.access_token || !session.user?.email)
             throw new Error(t("messages.incompleteSignin"));
           accessToken = session.access_token;
@@ -895,14 +888,10 @@
       async function pollDeletion() {
         for (let attempt = 0; attempt < 120; attempt++) {
           try {
-            const status = await request(
-              "account-delete-status",
-              {
-                job_id: jobId,
-                receipt_token: receiptToken,
-              },
-              APP_ANON_KEY,
-            );
+            const status = await request("account-delete-status", {
+              job_id: jobId,
+              receipt_token: receiptToken,
+            });
             if (status.status === "complete") {
               workingState.hidden = true;
               successState.hidden = false;

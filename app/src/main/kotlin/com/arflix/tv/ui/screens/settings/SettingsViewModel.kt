@@ -134,6 +134,7 @@ data class SettingsUiState(
     val cloudAuthStatusMessage: String? = null,
     val showCloudEmailPasswordDialog: Boolean = false,
     val isCloudAuthWorking: Boolean = false,
+    val cloudEmailPasswordError: String? = null,
     val isForceCloudSyncing: Boolean = false,
     val lastCloudSyncStatus: String? = null,
     val shouldSwitchProfile: Boolean = false,
@@ -2557,7 +2558,8 @@ class SettingsViewModel @Inject constructor(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = true,
                 cloudAuthStatusMessage = null,
-                isCloudAuthWorking = false
+                isCloudAuthWorking = false,
+                cloudEmailPasswordError = null
             )
             return
         }
@@ -2598,7 +2600,8 @@ class SettingsViewModel @Inject constructor(
             cloudVerificationUrl = null,
             cloudAuthStatusMessage = null,
             showCloudEmailPasswordDialog = false,
-            isCloudAuthWorking = false
+            isCloudAuthWorking = false,
+            cloudEmailPasswordError = null
         )
     }
 
@@ -2609,7 +2612,8 @@ class SettingsViewModel @Inject constructor(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = true,
                 cloudAuthStatusMessage = null,
-                isCloudAuthWorking = false
+                isCloudAuthWorking = false,
+                cloudEmailPasswordError = null
             )
             return
         }
@@ -2643,7 +2647,10 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun closeCloudEmailPasswordDialog() {
-        _uiState.value = _uiState.value.copy(showCloudEmailPasswordDialog = false)
+        _uiState.value = _uiState.value.copy(
+            showCloudEmailPasswordDialog = false,
+            cloudEmailPasswordError = null
+        )
     }
 
     fun completeCloudAuthWithEmailPassword(
@@ -2655,6 +2662,7 @@ class SettingsViewModel @Inject constructor(
         AuthEmailValidator.validate(trimmedEmail, rejectDisposable = createAccount)?.let { messageRes ->
             val message = context.getString(messageRes)
             _uiState.value = _uiState.value.copy(
+                cloudEmailPasswordError = message,
                 toastMessage = message,
                 toastType = ToastType.ERROR
             )
@@ -2662,6 +2670,7 @@ class SettingsViewModel @Inject constructor(
         }
         if (password.isBlank()) {
             _uiState.value = _uiState.value.copy(
+                cloudEmailPasswordError = context.getString(R.string.toast_password_required),
                 toastMessage = context.getString(R.string.toast_password_required),
                 toastType = ToastType.ERROR
             )
@@ -2680,6 +2689,7 @@ class SettingsViewModel @Inject constructor(
                     _uiState.value.copy(
                         showCloudEmailPasswordDialog = false,
                         isCloudAuthWorking = false,
+                        cloudEmailPasswordError = null,
                         shouldSwitchProfile = true,
                         toastMessage = if (createAccount) {
                             "Self-hosted account created"
@@ -2691,6 +2701,8 @@ class SettingsViewModel @Inject constructor(
                 } else {
                     _uiState.value.copy(
                         isCloudAuthWorking = false,
+                        cloudEmailPasswordError = result.exceptionOrNull()?.message
+                            ?: context.getString(R.string.auth_signin_failed),
                         toastMessage = result.exceptionOrNull()?.message
                             ?: context.getString(R.string.auth_signin_failed),
                         toastType = ToastType.ERROR

@@ -33,8 +33,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 355
-        versionName = "2.1.007"
+        versionCode = 356
+        versionName = "2.1.010"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -55,11 +55,6 @@ android {
             "String",
             "NETLIFY_BACKEND_URL",
             "\"${escapeBuildConfigString(localSecretValue("NETLIFY_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
-        )
-        buildConfigField(
-            "String",
-            "APP_ANON_KEY",
-            "\"${escapeBuildConfigString(localSecretValue("APP_ANON_KEY"))}\""
         )
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
@@ -470,7 +465,6 @@ secrets {
 
     // Ignore missing keys to allow builds without secrets file
     ignoreList.add("sdk.*")
-    ignoreList.add("APP_ANON_KEY")
     ignoreList.add("SIMKL_CLIENT_SECRET")
 }
 
@@ -493,15 +487,8 @@ fun escapeBuildConfigString(value: String): String =
 
 val validateReleaseCloudSecrets = tasks.register("validateReleaseCloudSecrets") {
     doLast {
-        val appAnonKey = localSecretValue("APP_ANON_KEY")
         val traktClientId = localSecretValue("TRAKT_CLIENT_ID")
         val traktClientSecret = localSecretValue("TRAKT_CLIENT_SECRET")
-        require(
-            appAnonKey.length > 40 &&
-                !appAnonKey.startsWith("your-", ignoreCase = true)
-        ) {
-            "Release builds require a real APP_ANON_KEY in secrets.properties, Gradle properties, or the environment."
-        }
         require(
             traktClientId.length > 20 &&
                 !traktClientId.startsWith("your-", ignoreCase = true) &&

@@ -80,8 +80,6 @@ class ApiProxyInterceptor : Interceptor {
         val userToken = originalRequest.header("Authorization")?.removePrefix("Bearer ")
         val builder = originalRequest.newBuilder()
             .url(proxyUrlBuilder.build())
-            .header("apikey", Constants.APP_ANON_KEY)
-            .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
 
         if (!userToken.isNullOrBlank()) {
             builder.header("x-user-token", userToken)
@@ -113,8 +111,6 @@ class ApiProxyInterceptor : Interceptor {
 
         return originalRequest.newBuilder()
             .url(proxyUrlBuilder.build())
-            .header("apikey", Constants.APP_ANON_KEY)
-            .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
             .build()
     }
 

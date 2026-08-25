@@ -144,7 +144,11 @@ fun ProfileSelectionScreen(
         contentAlignment = Alignment.Center
     ) {
         Column(
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(max = 980.dp)
+                .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
             // Brand logo
             Image(
@@ -153,31 +157,34 @@ fun ProfileSelectionScreen(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                    .widthIn(max = if (isTouchDevice) 300.dp else 360.dp)
+                        .widthIn(max = if (isTouchDevice) 260.dp else 300.dp)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = if (uiState.isManageMode) stringResource(R.string.manage_profiles) else stringResource(R.string.whos_watching),
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Normal,
+                fontSize = 22.sp,
+                fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.8f)
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Profile avatars row
             val avatarSize = if (isTouchDevice) 90.dp else 120.dp
             val avatarSpacing = if (isTouchDevice) 16.dp else 24.dp
 
-            if (uiState.isLoading) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(avatarSize),
-                    contentAlignment = Alignment.Center
-                ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 820.dp)
+                    .background(Color.White.copy(alpha = 0.025f), RoundedCornerShape(16.dp))
+                    .border(1.dp, Color(0xFFE5A209).copy(alpha = 0.18f), RoundedCornerShape(16.dp))
+                    .padding(horizontal = 24.dp, vertical = 22.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                if (uiState.isLoading) {
                     Text(
                         text = stringResource(R.string.loading_profile),
                         fontSize = 15.sp,
@@ -185,8 +192,7 @@ fun ProfileSelectionScreen(
                         color = Color.White.copy(alpha = 0.72f),
                         textAlign = TextAlign.Center
                     )
-                }
-            } else if (isTouchDevice) {
+                } else if (isTouchDevice) {
                 // Mobile: use LazyRow so profiles scroll horizontally on small screens
                 LazyRow(
                     modifier = Modifier.fillMaxWidth(),
@@ -225,7 +231,7 @@ fun ProfileSelectionScreen(
                         }
                     }
                 }
-            } else {
+                } else {
                 // TV: original Row layout with fixed spacing
                 Row(
                     horizontalArrangement = Arrangement.Center,
@@ -266,9 +272,10 @@ fun ProfileSelectionScreen(
                         )
                     }
                 }
+                }
             }
 
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             // Manage Profiles button
             ManageProfilesButton(
@@ -281,7 +288,7 @@ fun ProfileSelectionScreen(
             )
 
             if (!isCloudConnected) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 // Cloud connect button — focusable on TV, tappable on mobile
                 CloudConnectButton(

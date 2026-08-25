@@ -2318,6 +2318,7 @@ fun SettingsScreen(
                 onEmailChange = { cloudDialogEmail = it },
                 onPasswordChange = { cloudDialogPassword = it },
                 onDismiss = { viewModel.closeCloudEmailPasswordDialog() },
+                errorMessage = uiState.cloudEmailPasswordError,
                 onSignIn = { viewModel.completeCloudAuthWithEmailPassword(cloudDialogEmail, cloudDialogPassword, createAccount = false) },
                 onCreateAccount = { viewModel.completeCloudAuthWithEmailPassword(cloudDialogEmail, cloudDialogPassword, createAccount = true) },
                 onOpenPrivacy = { openExternalUrl(context, PRIVACY_POLICY_URL) }
@@ -2875,6 +2876,7 @@ private fun CloudEmailPasswordModal(
     onEmailChange: (String) -> Unit,
     onPasswordChange: (String) -> Unit,
     onDismiss: () -> Unit,
+    errorMessage: String?,
     onSignIn: () -> Unit,
     onCreateAccount: () -> Unit,
     onOpenPrivacy: () -> Unit
@@ -2990,7 +2992,7 @@ private fun CloudEmailPasswordModal(
                             unfocusedTextColor = TextPrimary,
                             focusedContainerColor = Color.White.copy(alpha = 0.1f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                            focusedIndicatorColor = accentColor,
+                            focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             cursorColor = accentColor
                         ),
@@ -3025,7 +3027,7 @@ private fun CloudEmailPasswordModal(
                             unfocusedTextColor = TextPrimary,
                             focusedContainerColor = Color.White.copy(alpha = 0.1f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
-                            focusedIndicatorColor = accentColor,
+                            focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
                             cursorColor = accentColor
                         ),
@@ -3041,6 +3043,18 @@ private fun CloudEmailPasswordModal(
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
+                if (!errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = errorMessage,
+                        style = ArflixTypography.caption,
+                        color = Color(0xFFFF8A80),
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 16.dp)
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -9329,9 +9343,10 @@ private fun MdbListConnectDialog(
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     var focusedButton by remember { mutableIntStateOf(1) } // 0 cancel, 1 connect
     var inputFocused by remember { mutableStateOf(false) }
-    val focusRequester = remember { FocusRequester() }
+    val dialogFocusRequester = remember { FocusRequester() }
+    val inputFocusRequester = remember { FocusRequester() }
 
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    LaunchedEffect(Unit) { runCatching { inputFocusRequester.requestFocus() } }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -9349,7 +9364,7 @@ private fun MdbListConnectDialog(
                     .background(BackgroundElevated, RoundedCornerShape(16.dp))
                     .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 24.dp)
-                    .focusRequester(focusRequester)
+                    .focusRequester(dialogFocusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -9400,7 +9415,12 @@ private fun MdbListConnectDialog(
                     onValueChange = { apiKey = it },
                     singleLine = true,
                     enabled = !connecting,
-                    label = { Text(stringResource(R.string.mdblist_key_hint)) },
+                    label = {
+                        Text(
+                            text = stringResource(R.string.mdblist_key_hint),
+                            color = if (inputFocused) accentColor else TextPrimary
+                        )
+                    },
                     colors = androidx.compose.material3.TextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
@@ -9414,6 +9434,7 @@ private fun MdbListConnectDialog(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
+                        .focusRequester(inputFocusRequester)
                         .onFocusChanged { inputFocused = it.isFocused }
                         .border(
                             width = if (inputFocused) 2.dp else 1.dp,

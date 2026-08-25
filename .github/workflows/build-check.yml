@@ -115,7 +115,6 @@ jobs:
 
       - name: Validate required credentials
         env:
-          APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
           NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -126,7 +125,6 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          : "${APP_ANON_KEY:?Missing APP_ANON_KEY repository secret}"
           : "${NETLIFY_BACKEND_URL:?Missing NETLIFY_BACKEND_URL repository secret}"
           test "$NETLIFY_BACKEND_URL" = "https://auth.mystreamnet.club" || {
             echo "NETLIFY_BACKEND_URL must be https://auth.mystreamnet.club for production builds" >&2
@@ -144,9 +142,7 @@ jobs:
 
       - name: Prepare runtime configuration
         env:
-          APP_ANON_KEY: ${{ secrets.APP_ANON_KEY }}
           NETLIFY_BACKEND_URL: https://auth.mystreamnet.club
-          GOOGLE_WEB_CLIENT_ID: ${{ secrets.GOOGLE_WEB_CLIENT_ID }}
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -158,9 +154,7 @@ jobs:
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
         run: |
           printf '%s\n' \
-            "APP_ANON_KEY=$APP_ANON_KEY" \
             "NETLIFY_BACKEND_URL=$NETLIFY_BACKEND_URL" \
-            "GOOGLE_WEB_CLIENT_ID=$GOOGLE_WEB_CLIENT_ID" \
             "SENTRY_DSN=${SENTRY_DSN:-disabled}" \
             "TMDB_API_KEY=$TMDB_API_KEY" \
             "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID" \
@@ -179,9 +173,9 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/arvio-release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$GITHUB_WORKSPACE/streamnet-release.keystore"
           printf '%s\n' \
-            "storeFile=$GITHUB_WORKSPACE/arvio-release.keystore" \
+            "storeFile=$GITHUB_WORKSPACE/streamnet-release.keystore" \
             "storePassword=$KEYSTORE_PASSWORD" \
             "keyAlias=$KEY_ALIAS" \
             "keyPassword=$KEY_PASSWORD" \

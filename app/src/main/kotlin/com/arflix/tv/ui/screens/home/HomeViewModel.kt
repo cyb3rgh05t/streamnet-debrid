@@ -587,7 +587,10 @@ class HomeViewModel @Inject constructor(
                 )
             }
 
-        return traktItems.map { traktItem ->
+        val traktKeys = traktItems.mapTo(mutableSetOf()) { item ->
+            "${item.mediaType}:${item.id}:${item.season ?: -1}:${item.episode ?: -1}"
+        }
+        val mergedTraktItems = traktItems.map { traktItem ->
             val exactKey = "${traktItem.mediaType}:${traktItem.id}:${traktItem.season ?: -1}:${traktItem.episode ?: -1}"
             val local = freshestLocalByExactEpisode[exactKey]
             if (local == null) {
@@ -603,6 +606,22 @@ class HomeViewModel @Inject constructor(
                 )
             }
         }
+        val missingLocalItems = (localItems + historyItems)
+            .filter { item ->
+                val exactKey = "${item.mediaType}:${item.id}:${item.season ?: -1}:${item.episode ?: -1}"
+                exactKey !in traktKeys
+            }
+            .groupBy { item -> "${item.mediaType}:${item.id}" }
+            .mapNotNull { (_, candidates) ->
+                candidates.maxWithOrNull(
+                    compareBy<ContinueWatchingItem> { it.updatedAtMs }
+                        .thenBy { it.resumePositionSeconds }
+                        .thenBy { it.progress }
+                )
+            }
+        return (mergedTraktItems + missingLocalItems)
+            .distinctBy { item -> "${item.mediaType}:${item.id}" }
+            .sortedByDescending { it.updatedAtMs }
     }
 
     private fun overviewLooksTruncated(overview: String): Boolean {
@@ -2597,6 +2616,9 @@ class HomeViewModel @Inject constructor(
             }
             if (requestId != loadHomeRequestId) return@loadHome
             applyContentLanguageFromPrefs()
+            // Continue Watching must begin immediately and must not delay the first
+            // catalog rail while the backend or a remote provider is loading.
+            launchContinueWatchingFetch()
 
             try {
                 if (_uiState.value.categories.isEmpty()) {
@@ -3032,8 +3054,7 @@ class HomeViewModel @Inject constructor(
                     )
                     categories.add(0, cwCat)
                 }
-                // Launch the independent CW fetch
-                launchContinueWatchingFetch()
+                // The independent CW fetch was started before catalog loading.
 
                 // During catalog-triggered reloads, chooseInitialHero can pick
                 // the first Continue Watching item and overwrite the currently
@@ -4202,17 +4223,12 @@ class HomeViewModel @Inject constructor(
             if (traktCache.isNotEmpty()) {
                 traktCache
             } else {
-                val historyItems = loadContinueWatchingFromHistoryStable()
-                if (historyItems.isNotEmpty()) {
-                    historyItems
-                } else {
-                    try {
-                        traktRepository.getLocalContinueWatching()
-                    } catch (e: kotlinx.coroutines.CancellationException) {
-                        throw e
-                    } catch (_: Exception) {
-                        emptyList()
-                    }
+                try {
+                    traktRepository.getLocalContinueWatching()
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptyList()
                 }
             }
         }

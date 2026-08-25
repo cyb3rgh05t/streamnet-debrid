@@ -554,8 +554,6 @@ class AuthRepository @Inject constructor(
 
             val request = Request.Builder()
                 .url(url)
-                .header("apikey", Constants.APP_ANON_KEY)
-                .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                 .post(payload.toRequestBody(jsonMediaType))
                 .build()
 
@@ -766,8 +764,6 @@ class AuthRepository @Inject constructor(
             try {
                 val request = Request.Builder()
                     .url(Constants.AUTH_REFRESH_URL)
-                    .header("apikey", Constants.APP_ANON_KEY)
-                    .header("Authorization", "Bearer ${Constants.APP_ANON_KEY}")
                     .post(
                         JSONObject()
                             .put("refresh_token", refreshToken)
