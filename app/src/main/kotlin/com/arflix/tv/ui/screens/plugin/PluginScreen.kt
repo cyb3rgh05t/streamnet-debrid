@@ -124,7 +124,14 @@ fun PluginScreen(
         }
     }
 
-    BackHandler {
+    BackHandler(enabled = modalOpen) {
+        if (showAddDialog) showAddDialog = false
+        else if (showResetDialog) showResetDialog = false
+        else if (repoToDelete != null) repoToDelete = null
+    }
+
+    // Leaving back unhandled on touch lets the system run its predictive back animation.
+    BackHandler(enabled = !isMobile && !modalOpen) {
         onBackPressed()
     }
 

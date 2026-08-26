@@ -595,6 +595,12 @@ class MediaRepository @Inject constructor(
         detailsCache[cacheKey] = CacheEntry(item, System.currentTimeMillis())
     }
 
+    fun cacheLogoUrl(mediaType: MediaType, mediaId: Int, logoUrl: String) {
+        if (logoUrl.isBlank()) return
+        val cacheKey = "${mediaType}_logo_$mediaId"
+        logoCache[cacheKey] = CacheEntry(logoUrl, System.currentTimeMillis())
+    }
+
     private fun cacheFullDetailsItem(item: MediaItem) {
         val cacheKey = detailsCacheKey(item.mediaType, item.id)
         detailsCache[cacheKey] = CacheEntry(item, System.currentTimeMillis())

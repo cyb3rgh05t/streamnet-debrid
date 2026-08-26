@@ -962,7 +962,7 @@ private fun RowsLayer(
                     if (isPortrait) 105.dp else 210.dp
                 }
                 val baseRowHeight = if (isTouchDevice) {
-                    if (isPortrait) 260.dp else 190.dp
+                    if (isPortrait) 275.dp else 225.dp
                 } else if (isPortrait) {
                     // Poster cards (2:3) need extra vertical room for title + date below the image
                     if (screenHeight <= 640) 271.dp else 309.dp
@@ -1045,7 +1045,7 @@ private fun RowsLayer(
                                 start = focusBleedPadding,
                                 end = itemWidth + 56.dp,
                                 top = 8.dp,
-                                bottom = focusBleedPadding + 12.dp
+                                bottom = if (isTouchDevice) 8.dp else (focusBleedPadding + 12.dp)
                             ),
                             horizontalArrangement = Arrangement.spacedBy(18.dp)
                         ) {
@@ -1062,7 +1062,7 @@ private fun RowsLayer(
                                     isLandscape = !isPortrait,
                                     logoImageUrl = cardLogoUrls["${item.mediaType}_${item.id}"],
                                     showProgress = false,
-                                    titleMaxLines = 2,
+                                    titleMaxLines = 1,
                                     subtitleMaxLines = 1,
                                     isFocusedOverride = itemIsFocused,
                                     enableSystemFocus = false,

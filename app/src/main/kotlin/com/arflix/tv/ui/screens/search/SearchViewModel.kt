@@ -146,6 +146,7 @@ class SearchViewModel @Inject constructor(
                     }
                 }
                 _uiState.value = _uiState.value.copy(discoverCategories = categories, isDiscoverLoading = false)
+                categories.forEach { cat -> cat.items.forEach { mediaRepository.cacheItem(it) } }
                 // Fetch logos for top items in each row (background, non-blocking)
                 launch(Dispatchers.IO) {
                     val allItems = categories.flatMap { it.items }.distinctBy { "${it.mediaType}_${it.id}" }.take(60)
@@ -153,7 +154,10 @@ class SearchViewModel @Inject constructor(
                         async {
                             val key = "${item.mediaType}_${item.id}"
                             val logo = runCatching { mediaRepository.getLogoUrl(item.mediaType, item.id) }.getOrNull()
-                            if (logo.isNullOrBlank()) null else key to logo
+                            if (!logo.isNullOrBlank()) {
+                                mediaRepository.cacheLogoUrl(item.mediaType, item.id, logo)
+                                key to logo
+                            } else null
                         }
                     }.awaitAll().filterNotNull().toMap()
                     _uiState.value = _uiState.value.copy(discoverLogoUrls = _uiState.value.discoverLogoUrls + logos)
@@ -303,7 +307,20 @@ class SearchViewModel @Inject constructor(
                 val movies = sorted.filter { it.mediaType == MediaType.MOVIE }; val tv = sorted.filter { it.mediaType == MediaType.TV }
                 val personItems = peopleRows.flatMap { it.items }
                 val top = (personItems.take(24) + movies.take(16) + tv.take(16)).distinctBy { "${it.mediaType}_${it.id}" }
-                val logos = withContext(Dispatchers.IO) { top.map { item -> async { val k = "${item.mediaType}_${item.id}"; val l = runCatching { mediaRepository.getLogoUrl(item.mediaType, item.id) }.getOrNull(); if (l.isNullOrBlank()) null else k to l } }.awaitAll().filterNotNull().toMap() }
+                sorted.forEach { mediaRepository.cacheItem(it) }
+                personItems.forEach { mediaRepository.cacheItem(it) }
+                val logos = withContext(Dispatchers.IO) {
+                    top.map { item ->
+                        async {
+                            val k = "${item.mediaType}_${item.id}"
+                            val l = runCatching { mediaRepository.getLogoUrl(item.mediaType, item.id) }.getOrNull()
+                            if (!l.isNullOrBlank()) {
+                                mediaRepository.cacheLogoUrl(item.mediaType, item.id, l)
+                                k to l
+                            } else null
+                        }
+                    }.awaitAll().filterNotNull().toMap()
+                }
                 _uiState.value = _uiState.value.copy(isLoading = false, results = sorted, movieResults = movies, tvResults = tv, personResults = peopleRows, cardLogoUrls = logos)
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e
  _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
@@ -352,6 +369,7 @@ class SearchViewModel @Inject constructor(
                     }
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false, aiResults = if (sq.limit != null) items.take(sq.limit) else items)
+                items.forEach { mediaRepository.cacheItem(it) }
             } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e
  _uiState.value = _uiState.value.copy(isLoading = false, error = e.message) }
         }
