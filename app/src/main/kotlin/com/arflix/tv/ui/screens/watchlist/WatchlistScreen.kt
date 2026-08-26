@@ -1436,10 +1436,15 @@ private fun WatchlistItemsSection(
         LaunchedEffect(focusedItemIndex) {
             if (focusedItemIndex < 0) return@LaunchedEffect
             val safe = focusedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+            // A prior scroll animation cancelled mid-flight (fast D-pad navigation) can leave
+            // firstVisibleItemIndex already correct while its pixel offset is still nonzero,
+            // which renders that item half-cut-off. Guard on the offset too, not just the index.
+            if (safe == lazyListState.firstVisibleItemIndex && lazyListState.firstVisibleItemScrollOffset == 0) {
+                return@LaunchedEffect
+            }
             val first = lazyListState.firstVisibleItemIndex
             val last = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: first
-            if (safe < first || safe > last) lazyListState.scrollToItem(safe)
-            else if (safe != first) lazyListState.animateScrollToItem(safe)
+            if (safe < first || safe > last) lazyListState.scrollToItem(safe) else lazyListState.animateScrollToItem(safe)
         }
 
         LazyRow(

@@ -694,7 +694,7 @@ class WatchlistRepository @Inject constructor(
             subtitle = context.getString(R.string.component_label_tv_series),
             overview = details.overview ?: "",
             year = details.firstAirDate?.take(4) ?: "",
-            releaseDate = details.firstAirDate ?: "",
+            releaseDate = formatWatchlistReleaseDate(details.firstAirDate),
             tmdbRating = details.voteAverage?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "",
             duration = details.episodeRunTime?.firstOrNull()?.let { "${it}m" } ?: "",
             mediaType = MediaType.TV,
@@ -713,7 +713,7 @@ class WatchlistRepository @Inject constructor(
             subtitle = context.getString(R.string.movie),
             overview = details.overview ?: "",
             year = details.releaseDate?.take(4) ?: "",
-            releaseDate = details.releaseDate ?: "",
+            releaseDate = formatWatchlistReleaseDate(details.releaseDate),
             tmdbRating = details.voteAverage?.let { String.format(java.util.Locale.US, "%.1f", it) } ?: "",
             duration = details.runtime?.let { formatRuntime(it) } ?: "",
             mediaType = MediaType.MOVIE,
@@ -728,6 +728,21 @@ class WatchlistRepository @Inject constructor(
         val hours = runtime / 60
         val mins = runtime % 60
         return if (hours > 0) "${hours}h ${mins}m" else "${mins}m"
+    }
+
+    /** TMDB dates arrive as "yyyy-MM-dd"; the watchlist displays them as "dd.MM.yyyy". */
+    private fun formatWatchlistReleaseDate(rawDate: String?): String {
+        val trimmed = rawDate?.trim().orEmpty()
+        if (trimmed.isEmpty()) return ""
+        return try {
+            val inputFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+            val outputFormat = java.text.SimpleDateFormat("dd.MM.yyyy", java.util.Locale.US)
+            inputFormat.parse(trimmed)?.let { outputFormat.format(it) } ?: trimmed
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            trimmed
+        }
     }
 
     private fun LocalWatchlistItem.toBasicMediaItem(): MediaItem {
