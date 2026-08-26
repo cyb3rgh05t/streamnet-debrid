@@ -255,11 +255,27 @@ class IptvRepositoryOptimizationTest {
         io.mockk.every { customClient.newCall(any()) } returns call
 
         val repository = IptvRepository(context, okHttpClient, profileManager, invalidationBus)
-        val method = IptvRepository::class.java.getDeclaredMethod("fetchAndParseEpg", String::class.java, List::class.java)
+        val method = IptvRepository::class.java.getDeclaredMethod(
+            "fetchAndParseEpg",
+            String::class.java,
+            List::class.java,
+            okhttp3.OkHttpClient::class.java,
+            java.lang.Boolean.TYPE,
+            java.lang.Boolean.TYPE,
+            java.lang.Long::class.java,
+        )
         method.isAccessible = true
 
         try {
-            method.invoke(repository, "http://example.com/epg.xml", emptyList<com.arflix.tv.data.model.IptvChannel>())
+            method.invoke(
+                repository,
+                "http://example.com/epg.xml",
+                emptyList<com.arflix.tv.data.model.IptvChannel>(),
+                customClient,
+                true,
+                false,
+                null,
+            )
             fail("Expected EpgNotModifiedException to be thrown")
         } catch (e: java.lang.reflect.InvocationTargetException) {
             val cause = e.cause

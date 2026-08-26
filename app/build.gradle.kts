@@ -33,8 +33,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 359
-        versionName = "2.1.013"
+        versionCode = 360
+        versionName = "2.1.014"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -242,9 +242,19 @@ android {
 // VS Code Gradle tooling currently crashes while syncing unit-test ASM transform tasks
 // (`transform*UnitTestClassesWithAsm` -> `jarsOutputDir` read-before-complete).
 // Disabling unit test variants avoids creating those tasks and unblocks project import.
+// Run with `-PenableUnitTests` to execute the JVM unit tests locally or in CI.
+val unitTestsEnabled = providers.gradleProperty("enableUnitTests").isPresent
+
 androidComponents {
     beforeVariants(selector().all()) {
-        it.enableUnitTest = false
+        it.enableUnitTest = unitTestsEnabled
+    }
+}
+
+// conscrypt-android ships no desktop JNI and shadows Robolectric's bundled Conscrypt.
+configurations.configureEach {
+    if (name.contains("UnitTest") && name.endsWith("RuntimeClasspath")) {
+        exclude(group = "org.conscrypt", module = "conscrypt-android")
     }
 }
 
@@ -432,9 +442,14 @@ ksp {
     add("sideloadImplementation", "com.github.recloudstream.cloudstream:library-android:v4.7.0") {
         exclude(group = "org.mozilla", module = "rhino")
     }
+    // Runtime helpers used by the sideload plugin extractor stack.
     add("sideloadImplementation", "org.mozilla:rhino:1.8.1")
     add("sideloadImplementation", "com.google.re2j:re2j:1.8")
     add("sideloadImplementation", "org.webjars.npm:crypto-js:4.2.0")
+
+    // Lets Hilt 2.57's annotation processor read Kotlin 2.3.0 class metadata.
+    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
+    annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
 
     // Unit Testing
     testImplementation("junit:junit:4.13.2")
@@ -542,26 +557,6 @@ kotlin {
     compilerOptions {
         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
-}
-
-dependencies {
-    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
-    annotationProcessor("org.jetbrains.kotlin:kotlin-metadata-jvm:2.3.0")
-
-    // Plugin system dependencies (Sideload flavor only)
-    add("sideloadImplementation", files("libs/quickjs-kt-android-1.0.5-nuvio.aar"))
-    add("sideloadImplementation", "com.fasterxml.jackson.core:jackson-databind:2.17.0")
-    add("sideloadImplementation", "com.fasterxml.jackson.module:jackson-module-kotlin:2.17.0")
-    add("sideloadImplementation", "com.github.Blatzar:NiceHttp:0.4.11")
-    add("sideloadImplementation", "org.conscrypt:conscrypt-android:2.5.3")
-    add("sideloadImplementation", "com.github.recloudstream.cloudstream:library-android:v4.7.0") {
-        exclude(group = "org.mozilla", module = "rhino")
-    }
-    add("sideloadImplementation", "org.webjars.npm:crypto-js:4.2.0")
-    
-    // Runtime helpers used by the sideload plugin extractor stack.
-    add("sideloadImplementation", "org.mozilla:rhino:1.8.1")
-    add("sideloadImplementation", "com.google.re2j:re2j:1.8")
 }
 
 

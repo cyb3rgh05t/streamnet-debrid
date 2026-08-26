@@ -9,9 +9,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 import java.util.Locale
 
+// Robolectric 4.11 ships no SDK 36 sandbox; pin to its highest supported image.
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class ContinueWatchingItemTest {
 
     @Test

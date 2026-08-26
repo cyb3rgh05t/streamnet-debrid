@@ -135,6 +135,89 @@ internal fun mergeLocalHistoryByTimestamp(
     }.getOrDefault(localPayload)
 }
 
+internal fun mergeWatchlistPayloads(localPayload: String, remotePayload: String): String {
+    return runCatching {
+        val localRoot = JSONObject(localPayload)
+        val remoteRoot = JSONObject(remotePayload)
+
+        val localLists = localRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
+        val remoteLists = remoteRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
+        val localTs = localRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
+        val remoteTs = remoteRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
+        val localRemoved = localRoot.optJSONObject("watchlistRemovedByProfile") ?: JSONObject()
+        val remoteRemoved = remoteRoot.optJSONObject("watchlistRemovedByProfile") ?: JSONObject()
+
+        val mergedLists = JSONObject()
+        val mergedTs = JSONObject()
+        val mergedRemoved = JSONObject()
+        val profileIds = LinkedHashSet<String>().apply {
+            localLists.keys().forEachRemaining { add(it) }
+            remoteLists.keys().forEachRemaining { add(it) }
+            localTs.keys().forEachRemaining { add(it) }
+            remoteTs.keys().forEachRemaining { add(it) }
+            localRemoved.keys().forEachRemaining { add(it) }
+            remoteRemoved.keys().forEachRemaining { add(it) }
+        }
+
+        profileIds.forEach { profileId ->
+            val localUpdatedAt = localTs.optLong(profileId, 0L)
+            val remoteUpdatedAt = remoteTs.optLong(profileId, 0L)
+            val useRemote = remoteUpdatedAt >= localUpdatedAt
+            val removals = mergeWatchlistRemovals(
+                decodeWatchlistRemovals(localRemoved.optString(profileId)),
+                decodeWatchlistRemovals(remoteRemoved.optString(profileId)),
+            )
+            val localArray = localLists.optJSONArray(profileId) ?: JSONArray()
+            val remoteArray = remoteLists.optJSONArray(profileId) ?: JSONArray()
+            val chosenArray = if (localArray.length() > 0 && remoteArray.length() > 0) {
+                // Watchlist updates historically used one profile-level timestamp. A device
+                // with a partial list could therefore erase older items from another device.
+                // Merge distinct entries when both sides have data; an empty newer side still
+                // represents an explicit clear and is handled by the branches below.
+                val merged = LinkedHashMap<String, JSONObject>()
+                listOf(localArray, remoteArray).forEach { array ->
+                    for (index in 0 until array.length()) {
+                        val item = array.optJSONObject(index) ?: continue
+                        val key = watchlistItemKey(item.optString("mediaType"), item.optInt("tmdbId"))
+                        val existing = merged[key]
+                        if (existing == null || item.optLong("addedAt") >= existing.optLong("addedAt")) {
+                            merged[key] = item
+                        }
+                    }
+                }
+                JSONArray().also { array -> merged.values.forEach(array::put) }
+            } else if (useRemote) {
+                remoteArray
+            } else {
+                localArray
+            }
+
+            // Without this the union merge above resurrects every item that another
+            // device still holds, which is what made removals reappear after a pull.
+            val survivingArray = JSONArray()
+            for (index in 0 until chosenArray.length()) {
+                val item = chosenArray.optJSONObject(index) ?: continue
+                val key = watchlistItemKey(item.optString("mediaType"), item.optInt("tmdbId"))
+                if (isWatchlistItemRemoved(removals, key, item.optLong("addedAt"))) continue
+                survivingArray.put(item)
+            }
+
+            mergedLists.put(profileId, survivingArray)
+            mergedTs.put(profileId, max(localUpdatedAt, remoteUpdatedAt))
+            if (removals.isNotEmpty()) {
+                mergedRemoved.put(profileId, encodeWatchlistRemovals(removals))
+            }
+        }
+
+        localRoot.put("watchlistByProfile", mergedLists)
+        localRoot.put("watchlistUpdatedAtByProfile", mergedTs)
+        if (mergedRemoved.length() > 0) {
+            localRoot.put("watchlistRemovedByProfile", mergedRemoved)
+        }
+        localRoot.toString()
+    }.getOrDefault(localPayload)
+}
+
 internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: String): String {
     return runCatching {
         val local = JSONObject(localPayload)
@@ -199,7 +282,10 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
             }
         }
         val survivingProfiles = merged.values.filter { profile ->
-            profile.createdAt > (deletedAtById[profile.id] ?: 0L)
+            // Only a real tombstone may drop a profile; payloads without `createdAt`
+            // deserialize to 0 and would otherwise delete every profile.
+            val deletedAt = deletedAtById[profile.id] ?: return@filter true
+            profile.createdAt > deletedAt
         }
         local.put("profiles", JSONArray(gson.toJson(survivingProfiles)))
         if (deletedAtById.isNotEmpty()) {
@@ -1114,6 +1200,13 @@ class CloudSyncRepository @Inject constructor(
             }
         }
         root.put("watchlistUpdatedAtByProfile", JSONObject(gson.toJson(watchlistUpdatedAtByProfile)))
+        val watchlistRemovedByProfile = buildMap<String, String> {
+            profiles.forEach { profile ->
+                val removals = watchlistRepository.exportWatchlistRemovedForProfile(profile.id)
+                if (removals.isNotBlank()) put(profile.id, removals)
+            }
+        }
+        root.put("watchlistRemovedByProfile", JSONObject(gson.toJson(watchlistRemovedByProfile)))
 
         // Backward compatibility fields (legacy single-profile clients)
         root.put("addons", JSONArray(gson.toJson(sharedAddons)))
@@ -1379,60 +1472,7 @@ class CloudSyncRepository @Inject constructor(
     }
 
     private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {
-        return runCatching {
-            val localRoot = JSONObject(localPayload)
-            val remoteRoot = JSONObject(remotePayload)
-
-            val localLists = localRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
-            val remoteLists = remoteRoot.optJSONObject("watchlistByProfile") ?: JSONObject()
-            val localTs = localRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
-            val remoteTs = remoteRoot.optJSONObject("watchlistUpdatedAtByProfile") ?: JSONObject()
-
-            val mergedLists = JSONObject()
-            val mergedTs = JSONObject()
-            val profileIds = LinkedHashSet<String>().apply {
-                localLists.keys().forEachRemaining { add(it) }
-                remoteLists.keys().forEachRemaining { add(it) }
-                localTs.keys().forEachRemaining { add(it) }
-                remoteTs.keys().forEachRemaining { add(it) }
-            }
-
-            profileIds.forEach { profileId ->
-                val localUpdatedAt = localTs.optLong(profileId, 0L)
-                val remoteUpdatedAt = remoteTs.optLong(profileId, 0L)
-                val useRemote = remoteUpdatedAt >= localUpdatedAt
-                val localArray = localLists.optJSONArray(profileId) ?: JSONArray()
-                val remoteArray = remoteLists.optJSONArray(profileId) ?: JSONArray()
-                val chosenArray = if (localArray.length() > 0 && remoteArray.length() > 0) {
-                    // Watchlist updates historically used one profile-level timestamp. A device
-                    // with a partial list could therefore erase older items from another device.
-                    // Merge distinct entries when both sides have data; an empty newer side still
-                    // represents an explicit clear and is handled by the branches below.
-                    val merged = LinkedHashMap<String, JSONObject>()
-                    listOf(localArray, remoteArray).forEach { array ->
-                        for (index in 0 until array.length()) {
-                            val item = array.optJSONObject(index) ?: continue
-                            val key = "${item.optString("mediaType")}:${item.optInt("tmdbId")}"
-                            val existing = merged[key]
-                            if (existing == null || item.optLong("addedAt") >= existing.optLong("addedAt")) {
-                                merged[key] = item
-                            }
-                        }
-                    }
-                    JSONArray().also { array -> merged.values.forEach(array::put) }
-                } else if (useRemote) {
-                    remoteArray
-                } else {
-                    localArray
-                }
-                mergedLists.put(profileId, chosenArray)
-                mergedTs.put(profileId, max(localUpdatedAt, remoteUpdatedAt))
-            }
-
-            localRoot.put("watchlistByProfile", mergedLists)
-            localRoot.put("watchlistUpdatedAtByProfile", mergedTs)
-            localRoot.toString()
-        }.getOrDefault(localPayload)
+        return mergeWatchlistPayloads(localPayload, remotePayload)
     }
 
     // ══════════════════════════════════════════════════════════
@@ -2134,6 +2174,7 @@ class CloudSyncRepository @Inject constructor(
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, LocalWatchlistItem::class.java).type).type
                 val map: Map<String, List<LocalWatchlistItem>> = gson.fromJson(json, type) ?: emptyMap()
                 val watchlistUpdatedAt = root.optJSONObject("watchlistUpdatedAtByProfile")
+                val watchlistRemoved = root.optJSONObject("watchlistRemovedByProfile")
                 map.forEach { (profileId, items) ->
                     // Restore the cloud mirror for every profile, including Trakt profiles.
                     // Trakt remains the source of truth after a successful live sync, but
@@ -2145,7 +2186,8 @@ class CloudSyncRepository @Inject constructor(
                     watchlistRepository.importWatchlistForProfile(
                         profileId = profileId,
                         cloudItems = items,
-                        cloudUpdatedAtMs = cloudUpdatedAt
+                        cloudUpdatedAtMs = cloudUpdatedAt,
+                        cloudRemovals = decodeWatchlistRemovals(watchlistRemoved?.optString(profileId))
                     )
                 }
             }

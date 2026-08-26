@@ -41,6 +41,45 @@ data class LocalWatchlistItem(
     val sourceOrder: Int = Int.MAX_VALUE
 )
 
+/** Cap on persisted removal tombstones so the synced payload cannot grow without bound. */
+private const val MAX_WATCHLIST_REMOVALS = 300
+
+internal fun watchlistItemKey(mediaType: String, tmdbId: Int): String = "$mediaType:$tmdbId"
+
+internal fun decodeWatchlistRemovals(raw: String?): Map<String, Long> {
+    if (raw.isNullOrBlank()) return emptyMap()
+    return raw.split('|').mapNotNull { entry ->
+        val separator = entry.lastIndexOf(',')
+        if (separator <= 0 || separator >= entry.lastIndex) return@mapNotNull null
+        val timestamp = entry.substring(separator + 1).toLongOrNull() ?: return@mapNotNull null
+        entry.substring(0, separator) to timestamp
+    }.toMap()
+}
+
+internal fun encodeWatchlistRemovals(removals: Map<String, Long>): String {
+    return removals.entries
+        .sortedByDescending { it.value }
+        .take(MAX_WATCHLIST_REMOVALS)
+        .joinToString("|") { (key, timestamp) -> "$key,$timestamp" }
+}
+
+internal fun mergeWatchlistRemovals(first: Map<String, Long>, second: Map<String, Long>): Map<String, Long> {
+    if (first.isEmpty() && second.isEmpty()) return emptyMap()
+    val merged = LinkedHashMap<String, Long>(first)
+    second.forEach { (key, timestamp) ->
+        merged[key] = maxOf(merged[key] ?: 0L, timestamp)
+    }
+    return merged.entries
+        .sortedByDescending { it.value }
+        .take(MAX_WATCHLIST_REMOVALS)
+        .associate { it.key to it.value }
+}
+
+/** An item is gone when it was removed at or after the timestamp it was last added. */
+internal fun isWatchlistItemRemoved(removals: Map<String, Long>, key: String, addedAt: Long): Boolean {
+    return (removals[key] ?: 0L) >= addedAt
+}
+
 internal fun normalizeWatchlistArtworkUrl(rawValue: String?, isBackdrop: Boolean): String? {
     val value = rawValue?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (
@@ -81,6 +120,9 @@ class WatchlistRepository @Inject constructor(
     private fun watchlistUpdatedAtKey() = profileManager.profileStringKey("local_watchlist_updated_at_v1")
     private fun watchlistUpdatedAtKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "local_watchlist_updated_at_v1")
+    private fun watchlistRemovedKey() = profileManager.profileStringKey("local_watchlist_removed_v1")
+    private fun watchlistRemovedKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "local_watchlist_removed_v1")
 
     // In-memory cache for quick lookups
     private val keyCache = mutableSetOf<String>()
@@ -220,12 +262,36 @@ class WatchlistRepository @Inject constructor(
 
         // Save to DataStore
         saveWatchlist(existingItems)
+        recordRemovalTombstone(watchlistItemKey(typeStr, tmdbId))
 
         // Update in-memory cache
         cacheMutex.withLock {
             keyCache.remove(key)
             itemsCache.removeAll { it.id == tmdbId && it.mediaType == mediaType }
             _watchlistItems.value = itemsCache.toList()
+        }
+    }
+
+    /**
+     * Without a tombstone a device that still holds the item re-adds it during the
+     * next snapshot merge, which looks like the old watchlist being pulled back.
+     */
+    private suspend fun recordRemovalTombstone(itemKey: String) {
+        runCatching {
+            context.traktDataStore.edit { prefs ->
+                val removals = decodeWatchlistRemovals(prefs[watchlistRemovedKey()]) +
+                    (itemKey to System.currentTimeMillis())
+                prefs[watchlistRemovedKey()] = encodeWatchlistRemovals(removals)
+            }
+        }.onFailure { error ->
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            AppLogger.recordException(
+                throwable = error,
+                context = mapOf(
+                    "error_area" to "WatchlistRepository",
+                    "watchlist_phase" to "record_removal"
+                )
+            )
         }
     }
 
@@ -407,27 +473,50 @@ class WatchlistRepository @Inject constructor(
         }.getOrDefault(0L)
     }
 
+    suspend fun exportWatchlistRemovedForProfile(profileId: String): String {
+        val safeProfileId = profileId.trim().ifBlank { "default" }
+        return runCatching {
+            context.traktDataStore.data.first()[watchlistRemovedKeyFor(safeProfileId)].orEmpty()
+        }.getOrDefault("")
+    }
+
     suspend fun importWatchlistForProfile(
         profileId: String,
         cloudItems: List<LocalWatchlistItem>,
-        cloudUpdatedAtMs: Long? = null
+        cloudUpdatedAtMs: Long? = null,
+        cloudRemovals: Map<String, Long> = emptyMap()
     ) {
         val safeProfileId = profileId.trim().ifBlank { "default" }
 
-        val localUpdatedAt = runCatching {
-            context.traktDataStore.data.first()[watchlistUpdatedAtKeyFor(safeProfileId)]
-                ?.toLongOrNull()
-                ?: 0L
-        }.getOrDefault(0L)
+        val localPrefs = runCatching { context.traktDataStore.data.first() }.getOrNull()
+        val localUpdatedAt = localPrefs?.get(watchlistUpdatedAtKeyFor(safeProfileId))
+            ?.toLongOrNull()
+            ?: 0L
+        val localRemovals = decodeWatchlistRemovals(localPrefs?.get(watchlistRemovedKeyFor(safeProfileId)))
+        val mergedRemovals = mergeWatchlistRemovals(localRemovals, cloudRemovals)
         val cloudUpdatedAt = cloudUpdatedAtMs ?: 0L
 
         // If local is newer than cloud, keep local state to avoid stale remote pull rollbacks.
         if (cloudUpdatedAtMs != null && localUpdatedAt > cloudUpdatedAt) {
+            if (mergedRemovals != localRemovals) {
+                runCatching {
+                    context.traktDataStore.edit { prefs ->
+                        prefs[watchlistRemovedKeyFor(safeProfileId)] = encodeWatchlistRemovals(mergedRemovals)
+                    }
+                }
+            }
             return
         }
 
         val replacedList = cloudItems
             .distinctBy { "${it.mediaType}:${it.tmdbId}" }
+            .filterNot { item ->
+                isWatchlistItemRemoved(
+                    removals = mergedRemovals,
+                    key = watchlistItemKey(item.mediaType, item.tmdbId),
+                    addedAt = item.addedAt
+                )
+            }
             .sortedWith(compareBy<LocalWatchlistItem> { it.sourceOrder }.thenByDescending { it.addedAt })
         val json = try {
             gson.toJson(replacedList)
@@ -454,6 +543,7 @@ class WatchlistRepository @Inject constructor(
                     else -> System.currentTimeMillis()
                 }
                 prefs[watchlistUpdatedAtKeyFor(safeProfileId)] = effectiveUpdatedAt.toString()
+                prefs[watchlistRemovedKeyFor(safeProfileId)] = encodeWatchlistRemovals(mergedRemovals)
             }
             invalidationBus.markDirty(CloudSyncScope.WATCHLIST, safeProfileId, "import watchlist")
             if (profileManager.getProfileIdSync() == safeProfileId) {
@@ -506,9 +596,14 @@ class WatchlistRepository @Inject constructor(
     private suspend fun saveWatchlist(items: List<LocalWatchlistItem>) {
         val json = gson.toJson(items)
         val now = System.currentTimeMillis()
+        val presentKeys = items.map { watchlistItemKey(it.mediaType, it.tmdbId) }.toSet()
         context.traktDataStore.edit { prefs ->
             prefs[watchlistKey()] = json
             prefs[watchlistUpdatedAtKey()] = now.toString()
+            // A present item supersedes its own tombstone (re-add, Trakt reorder, restore).
+            val removals = decodeWatchlistRemovals(prefs[watchlistRemovedKey()])
+                .filterKeys { it !in presentKeys }
+            prefs[watchlistRemovedKey()] = encodeWatchlistRemovals(removals)
         }
         invalidationBus.markDirty(CloudSyncScope.WATCHLIST, profileManager.getProfileIdSync(), "save watchlist")
     }

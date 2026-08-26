@@ -1,6 +1,6 @@
 package com.arflix.tv.data.repository
 
-import com.arflix.tv.data.api.SupabaseApi
+import com.arflix.tv.data.api.WatchStateApi
 import com.arflix.tv.data.api.WatchHistoryRecord
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -20,7 +20,7 @@ class TraktSyncServiceBenchmarkTest {
 
     @Test
     fun benchmarkStalePlaybackDeletion() = runBlocking {
-        val supabaseApi = mockk<SupabaseApi>()
+        val supabaseApi = mockk<WatchStateApi>()
 
         // Simulate 100ms network latency
         val networkDelay = 100L
@@ -29,7 +29,7 @@ class TraktSyncServiceBenchmarkTest {
             delay(networkDelay)
         }
 
-        coEvery { supabaseApi.deleteWatchHistoryByIds(any(), any(), any()) } coAnswers {
+        coEvery { supabaseApi.deleteWatchHistoryByIds(any(), any()) } coAnswers {
             delay(networkDelay)
         }
 
@@ -90,6 +90,6 @@ class TraktSyncServiceBenchmarkTest {
         println("--------------------------------------------------")
 
         // Verify that the new method actually made the right number of calls
-        coVerify(exactly = 4) { supabaseApi.deleteWatchHistoryByIds(any(), any(), any()) }
+        coVerify(exactly = 4) { supabaseApi.deleteWatchHistoryByIds(any(), any()) }
     }
 }

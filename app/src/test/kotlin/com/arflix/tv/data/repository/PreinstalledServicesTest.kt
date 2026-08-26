@@ -16,7 +16,7 @@ import org.junit.Test
  * catalogs.
  */
 class PreinstalledServicesTest {
-    private val introVideoCommit = "5ff8719c1aa82c403b7f4abe9425a9c4347fe97c"
+    private val introVideoCommit = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
 
     @Test
     fun `fresh profile starts with trending before collections and IPTV rows`() {
@@ -43,18 +43,21 @@ class PreinstalledServicesTest {
         "collection_service_crunchyroll"
     )
 
-    private val serviceVideoIds = setOf(
-        "collection_service_netflix",
-        "collection_service_disneyplus",
-        "collection_service_apple_tvplus",
-        "collection_service_prime_video",
-        "collection_service_hbo_max",
-        "collection_service_hulu",
-        "collection_service_paramountplus",
-        "collection_service_crunchyroll"
+    private val serviceVideoFiles = mapOf(
+        "collection_service_netflix" to "networks%20videos/netflix.mp4",
+        "collection_service_disneyplus" to "networks%20videos/disneyplus.mp4",
+        "collection_service_apple_tvplus" to "networks%20videos/appletv.mp4",
+        "collection_service_prime_video" to "networks%20videos/amazonprime.mp4",
+        "collection_service_hbo_max" to "networks%20videos/hbomax.mp4",
+        "collection_service_hulu" to "networks%20videos/hulu.mp4",
+        "collection_service_paramountplus" to "networks%20videos/paramount.mp4",
+        "collection_service_peacock" to "networks%20videos/peacock.mp4",
+        "collection_service_starz" to "networks%20videos/starz.mp4",
+        "collection_service_shudder" to "networks%20videos/shudder.mp4",
+        "collection_service_mgmplus" to "networks%20videos/mgm.mp4",
+        "collection_service_discoveryplus" to "networks%20videos/discovery.mp4",
+        "collection_service_crunchyroll" to "networks%20videos/crunchyroll.mp4"
     )
-
-    private val servicesWithoutHeroVideo = serviceOrder.toSet() - serviceVideoIds
 
     private fun loadServices() =
         MediaRepository.buildPreinstalledDefaults()
@@ -94,18 +97,9 @@ class PreinstalledServicesTest {
     }
 
     @Test
-    fun `primary services have heroVideo URLs`() {
-        val services = loadServices().filter { it.id in serviceVideoIds }
-        val expectedVideos = mapOf(
-            "collection_service_netflix" to "networks%20videos/netflix.mp4",
-            "collection_service_disneyplus" to "networks%20videos/disneyplus.mp4",
-            "collection_service_apple_tvplus" to "networks%20videos/appletv.mp4",
-            "collection_service_prime_video" to "networks%20videos/amazonprime.mp4",
-            "collection_service_hbo_max" to "networks%20videos/hbomax.mp4",
-            "collection_service_hulu" to "networks%20videos/hulu.mp4",
-            "collection_service_paramountplus" to "networks%20videos/paramount.mp4",
-            "collection_service_crunchyroll" to "networks%20videos/crunchyroll.mp4"
-        )
+    fun `services have heroVideo URLs pinned to the fork asset commit`() {
+        val services = loadServices()
+        assertEquals(serviceVideoFiles.keys, services.map { it.id }.toSet())
         services.forEach { cfg ->
             val video = cfg.collectionHeroVideoUrl
             assertNotNull("${cfg.id} heroVideo", video)
@@ -113,17 +107,8 @@ class PreinstalledServicesTest {
                 "${cfg.id} heroVideo must use the StreamNet fork, was $video",
                 video!!.contains("raw.githubusercontent.com/cyb3rgh05t/networks-video-collection") &&
                     video.contains(introVideoCommit) &&
-                    video.endsWith(expectedVideos[cfg.id]!!)
+                    video.endsWith(serviceVideoFiles[cfg.id]!!)
             )
-        }
-    }
-
-    @Test
-    fun `secondary services have no heroVideo`() {
-        val services = loadServices().filter { it.id in servicesWithoutHeroVideo }
-        assertEquals(servicesWithoutHeroVideo.size, services.size)
-        services.forEach { cfg ->
-            assertNull("${cfg.id} should not have heroVideo", cfg.collectionHeroVideoUrl)
         }
     }
 
@@ -229,14 +214,14 @@ class PreinstalledServicesTest {
             it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.NETWORK
         })
         assertTrue(studios.all { catalog ->
-            catalog.collectionSources.single().let { source ->
+            catalog.collectionSources.first().let { source ->
                 source.kind == CollectionSourceKind.VODWISHARR_STUDIO &&
                     source.mediaType == "movie" && source.tmdbStudioId != null &&
                     source.tmdbNetworkId == null
             }
         })
         assertTrue(networks.all { catalog ->
-            catalog.collectionSources.single().let { source ->
+            catalog.collectionSources.first().let { source ->
                 source.kind == CollectionSourceKind.VODWISHARR_NETWORK &&
                     source.mediaType == "series" && source.tmdbNetworkId != null &&
                     source.tmdbStudioId == null
@@ -244,9 +229,9 @@ class PreinstalledServicesTest {
         })
 
         assertEquals(174, studios.first { it.title == "Warner Bros. Pictures" }
-            .collectionSources.single().tmdbStudioId)
+            .collectionSources.first().tmdbStudioId)
         assertEquals(174, networks.first { it.title == "AMC" }
-            .collectionSources.single().tmdbNetworkId)
+            .collectionSources.first().tmdbNetworkId)
     }
 
 }

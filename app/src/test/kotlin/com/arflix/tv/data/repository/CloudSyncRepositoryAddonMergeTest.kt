@@ -166,6 +166,50 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `removed watchlist item is not resurrected by a device that still holds it`() {
+        val local = JSONObject()
+            .put("watchlistByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("mediaType", "movie").put("tmdbId", 2).put("addedAt", 150L))))
+            .put("watchlistUpdatedAtByProfile", JSONObject().put("main", 300L))
+            .put("watchlistRemovedByProfile", JSONObject().put("main", "movie:1,200"))
+            .toString()
+        val remote = JSONObject()
+            .put("watchlistByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("mediaType", "movie").put("tmdbId", 1).put("addedAt", 100L))
+                .put(JSONObject().put("mediaType", "movie").put("tmdbId", 2).put("addedAt", 150L))))
+            .put("watchlistUpdatedAtByProfile", JSONObject().put("main", 100L))
+            .toString()
+
+        val merged = JSONObject(mergeWatchlistPayloads(local, remote))
+        val items = merged.getJSONObject("watchlistByProfile").getJSONArray("main")
+
+        assertEquals(listOf(2), (0 until items.length()).map { items.getJSONObject(it).getInt("tmdbId") })
+        assertEquals("movie:1,200", merged.getJSONObject("watchlistRemovedByProfile").getString("main"))
+    }
+
+    @Test
+    fun `re-added watchlist item survives its older removal tombstone`() {
+        val local = JSONObject()
+            .put("watchlistByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("mediaType", "tv").put("tmdbId", 7).put("addedAt", 500L))))
+            .put("watchlistUpdatedAtByProfile", JSONObject().put("main", 500L))
+            .toString()
+        val remote = JSONObject()
+            .put("watchlistByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("mediaType", "tv").put("tmdbId", 7).put("addedAt", 100L))))
+            .put("watchlistUpdatedAtByProfile", JSONObject().put("main", 200L))
+            .put("watchlistRemovedByProfile", JSONObject().put("main", "tv:7,200"))
+            .toString()
+
+        val items = JSONObject(mergeWatchlistPayloads(local, remote))
+            .getJSONObject("watchlistByProfile")
+            .getJSONArray("main")
+
+        assertEquals(1, items.length())
+        assertEquals(500L, items.getJSONObject(0).getLong("addedAt"))
+    }
+
+    @Test
     fun `stale local catalog push keeps newer remote catalog profile state`() {
         val local = JSONObject()
             .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray().put(JSONObject().put("id", "old"))))
@@ -288,13 +332,17 @@ class CloudSyncRepositoryAddonMergeTest {
         url = "https://example.com/$id/manifest.json"
     )
 
-    private fun continueWatchingItem(progress: Int, updatedAtMs: Long) = ContinueWatchingItem(
+    private fun continueWatchingItem(
+        progress: Int,
+        updatedAtMs: Long,
+        mediaType: MediaType = MediaType.TV
+    ) = ContinueWatchingItem(
         id = 42,
         title = "Show",
-        mediaType = MediaType.TV,
+        mediaType = mediaType,
         progress = progress,
-        season = 1,
-        episode = 1,
+        season = if (mediaType == MediaType.TV) 1 else null,
+        episode = if (mediaType == MediaType.TV) 1 else null,
         updatedAtMs = updatedAtMs
     )
 }

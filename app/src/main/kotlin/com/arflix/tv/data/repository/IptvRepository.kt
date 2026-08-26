@@ -180,50 +180,36 @@ internal fun reorderIptvPlaylistGroup(
 
     val normalizedSaved = savedOrder.map(String::trim).filter(String::isNotBlank).distinct()
     val currentSet = currentKeys.toHashSet()
-    val targetOrder = normalizedSaved
-        .filter { key -> PlaylistGroupKey(key).playlistId == normalizedPlaylistId && key in currentSet }
-        .toMutableList()
-    currentKeys.forEach { key -> if (key !in targetOrder) targetOrder.add(key) }
 
-    val firstTargetIndex = normalizedSaved.indexOfFirst {
-        PlaylistGroupKey(it).playlistId == normalizedPlaylistId
-    }
+    // Foreign playlists keep their exact slots; only the selected playlist's entries move.
     val merged = normalizedSaved
-        .filterNot { PlaylistGroupKey(it).playlistId == normalizedPlaylistId }
+        .filter { key ->
+            PlaylistGroupKey(key).playlistId != normalizedPlaylistId || key in currentSet
+        }
         .toMutableList()
-    val insertionIndex = if (firstTargetIndex < 0) merged.size else {
-        normalizedSaved.take(firstTargetIndex)
-            .count { PlaylistGroupKey(it).playlistId != normalizedPlaylistId }
-            .coerceAtMost(merged.size)
-    }
-    merged.addAll(insertionIndex, targetOrder)
+    val known = merged.toHashSet()
+    currentKeys.forEach { key -> if (key !in known) merged.add(key) }
 
     val playlistSlots = merged.indices.filter {
         PlaylistGroupKey(merged[it]).playlistId == normalizedPlaylistId
     }
-    val targetPosition = playlistSlots.indexOfFirst { merged[it] == target }
+    val ordered = playlistSlots.map(merged::get).toMutableList()
+    val targetPosition = ordered.indexOf(target)
     when (move) {
         IptvGroupOrderMove.UP -> if (targetPosition > 0) {
-            val previousSlot = playlistSlots[targetPosition - 1]
-            val targetSlot = playlistSlots[targetPosition]
-            val previous = merged[previousSlot]
-            merged[previousSlot] = merged[targetSlot]
-            merged[targetSlot] = previous
+            ordered[targetPosition] = ordered[targetPosition - 1]
+            ordered[targetPosition - 1] = target
         }
-        IptvGroupOrderMove.DOWN -> if (targetPosition in 0 until playlistSlots.lastIndex) {
-            val targetSlot = playlistSlots[targetPosition]
-            val nextSlot = playlistSlots[targetPosition + 1]
-            val next = merged[nextSlot]
-            merged[nextSlot] = merged[targetSlot]
-            merged[targetSlot] = next
+        IptvGroupOrderMove.DOWN -> if (targetPosition in 0 until ordered.lastIndex) {
+            ordered[targetPosition] = ordered[targetPosition + 1]
+            ordered[targetPosition + 1] = target
         }
         IptvGroupOrderMove.TOP -> if (targetPosition > 0) {
-            val reordered = playlistSlots.map(merged::get).toMutableList()
-            reordered.removeAt(targetPosition)
-            reordered.add(0, target)
-            playlistSlots.forEachIndexed { index, slot -> merged[slot] = reordered[index] }
+            ordered.removeAt(targetPosition)
+            ordered.add(0, target)
         }
     }
+    playlistSlots.forEachIndexed { index, slot -> merged[slot] = ordered[index] }
     return merged
 }
 
