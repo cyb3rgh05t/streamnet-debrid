@@ -23,6 +23,28 @@ Password reset and media proxies are intentionally not included yet. Password re
 
 The production APK uses this service as its account and synchronization backend.
 
+## Logging
+
+Backend requests are printed as colored, human-readable one-line summaries with
+the HTTP method, route, status, duration, and action. Query values, bearer tokens,
+and request bodies are not included.
+
+- `LOG_LEVEL=info` controls the minimum Pino log level.
+- `LOG_PRETTY=true` enables readable output. Set it to `false` for JSON logs.
+- `LOG_COLOR=true` enables ANSI colors. Disable it when the log viewer does not
+  support colors.
+- Compose also writes structured logs to the persistent `backend_logs` volume.
+  `LOG_FILE=/app/logs/backend.log` enables the file target, which rotates daily
+  or at 10 MB and retains 14 older files. Override this with
+  `LOG_FILE_FREQUENCY`, `LOG_FILE_MAX_SIZE`, and `LOG_FILE_RETAINED_COUNT`.
+
+Inspect or export the current file from the running container:
+
+```sh
+docker compose exec streamnet-backend sh -c 'ls -lh /app/logs && tail -n 100 "$(ls -1t /app/logs/backend*.log | head -n 1)"'
+docker compose cp streamnet-backend:/app/logs ./streamnet-backend-logs
+```
+
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 
 ## Self-Hosted Account Page

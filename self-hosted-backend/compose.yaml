@@ -2,6 +2,10 @@ services:
   streamnet-backend:
     image: ${STREAMNET_BACKEND_IMAGE:-ghcr.io/cyb3rgh05t/streamnet-self-hosted-backend:latest}
     env_file: .env
+    environment:
+      LOG_FILE: /app/logs/backend.log
+    volumes:
+      - backend_logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -43,3 +47,4 @@ networks:
 
 volumes:
   postgres_data:
+  backend_logs:

@@ -12,11 +12,17 @@ import {
 } from "./passwords.js";
 import { normalizeAndValidateEmail } from "./email.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
+import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
 const jwtKey = new TextEncoder().encode(config.jwtSecret);
-const app = Fastify({ logger: true, bodyLimit: 2 * 1024 * 1024 });
+const app = Fastify({
+  logger: backendLoggerOptions(),
+  disableRequestLogging: true,
+  bodyLimit: 2 * 1024 * 1024,
+});
+registerRequestLogging(app);
 const signupAttemptsByEmail = new Map();
 const signupCooldownMs = 5 * 60_000;
 const tvAuthTtlMs = 10 * 60_000;
