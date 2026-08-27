@@ -12,8 +12,11 @@ export const preferredCatalogOrder = [
   "top10_shows_today",
   "collection_rail_tv_genre",
   "trending_anime",
+  "new_kdramas",
   "coming_soon",
   "just_added",
+  "collection_rail_studio",
+  "collection_rail_network",
 ];
 
 const preferredRank = new Map(
@@ -33,10 +36,13 @@ export function reorderCatalogs(catalogs) {
     .sort((left, right) => {
       const leftRank = preferredRank.get(left.catalog?.id);
       const rightRank = preferredRank.get(right.catalog?.id);
-      const leftGroup = leftRank !== undefined ? 0 : isAddonCatalog(left.catalog) ? 2 : 1;
-      const rightGroup = rightRank !== undefined ? 0 : isAddonCatalog(right.catalog) ? 2 : 1;
+      const leftGroup =
+        leftRank !== undefined ? 0 : isAddonCatalog(left.catalog) ? 2 : 1;
+      const rightGroup =
+        rightRank !== undefined ? 0 : isAddonCatalog(right.catalog) ? 2 : 1;
       if (leftGroup !== rightGroup) return leftGroup - rightGroup;
-      if (leftGroup === 0 && leftRank !== rightRank) return leftRank - rightRank;
+      if (leftGroup === 0 && leftRank !== rightRank)
+        return leftRank - rightRank;
       return left.index - right.index;
     })
     .map(({ catalog }) => catalog);
@@ -58,7 +64,8 @@ export function reorderCatalogsByProfile(payload, updatedAtMillis) {
     const reordered = reorderCatalogs(catalogs);
     const before = catalogs.map((catalog) => String(catalog?.id || ""));
     const after = reordered.map((catalog) => String(catalog?.id || ""));
-    if (before.every((catalogId, index) => catalogId === after[index])) continue;
+    if (before.every((catalogId, index) => catalogId === after[index]))
+      continue;
     catalogsByProfile[profileId] = reordered;
     timestamps[profileId] = updatedAtMillis;
     changes.push({ profileId, before, after });

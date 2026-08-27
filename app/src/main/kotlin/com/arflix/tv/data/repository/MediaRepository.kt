@@ -1695,8 +1695,11 @@ class MediaRepository @Inject constructor(
                 topLevelCatalogs.find { it.id == "top10_shows_today" },
                 railsByGroup[CollectionGroupKind.TV_GENRE],
                 topLevelCatalogs.find { it.id == "trending_anime" },
+                topLevelCatalogs.find { it.id == "new_kdramas" },
                 topLevelCatalogs.find { it.id == "coming_soon" },
-                topLevelCatalogs.find { it.id == "just_added" }
+                topLevelCatalogs.find { it.id == "just_added" },
+                railsByGroup[CollectionGroupKind.STUDIO],
+                railsByGroup[CollectionGroupKind.NETWORK]
             )
             val requestedIds = requestedRows.mapTo(mutableSetOf()) { it.id }
             val remainingRows = (topLevelCatalogs + collectionRails).filterNot { it.id in requestedIds }

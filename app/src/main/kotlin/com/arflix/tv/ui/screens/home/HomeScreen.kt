@@ -161,6 +161,7 @@ import com.arflix.tv.ui.components.ToastType as ComponentToastType
 import com.arflix.tv.ui.components.SidebarItem
 import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
+import com.arflix.tv.ui.components.topBarSelectedIndex
 import com.arflix.tv.ui.focus.arvioManualBringIntoViewBoundary
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.focus.isArvioDpadNavigationKey
@@ -2864,6 +2865,10 @@ private fun HomeInputLayer(
     val maxSidebarIndex = topBarMaxIndex(hasProfile)
 
     LaunchedEffect(Unit) {
+        if (!isMobile && !focusState.userHasNavigated) {
+            focusState.isSidebarFocused = true
+            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile)
+        }
         focusRequester.requestFocus()
     }
     LaunchedEffect(rootHasFocus, isContextMenuOpen, isMobile) {
@@ -2874,7 +2879,9 @@ private fun HomeInputLayer(
         }
     }
     LaunchedEffect(hasProfile) {
-        if (hasProfile) focusState.sidebarFocusIndex = 2
+        if (!focusState.userHasNavigated && focusState.isSidebarFocused) {
+            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile)
+        }
     }
 
     // Row insertion/reordering must not replace the focused catalog identity.
@@ -2901,7 +2908,7 @@ private fun HomeInputLayer(
     LaunchedEffect(categoryIds, preferredStartRow) {
         if (categories.isEmpty()) return@LaunchedEffect
 
-        if (!focusState.userHasNavigated && !focusState.isSidebarFocused) {
+        if (!focusState.userHasNavigated) {
             if (focusState.currentRowIndex != preferredStartRow) {
                 focusState.currentRowIndex = preferredStartRow
                 focusState.currentItemIndex = 0

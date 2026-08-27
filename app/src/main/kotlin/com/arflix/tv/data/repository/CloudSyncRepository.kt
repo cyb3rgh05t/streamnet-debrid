@@ -266,6 +266,12 @@ internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: Strin
     }.getOrDefault(localPayload)
 }
 
+internal fun shouldApplyCloudCatalogState(
+    cloudUpdatedAt: Long,
+    localUpdatedAt: Long,
+    forceApplyRemote: Boolean,
+): Boolean = forceApplyRemote || cloudUpdatedAt <= 0L || cloudUpdatedAt >= localUpdatedAt
+
 internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): String {
     return runCatching {
         val local = JSONObject(localPayload)
@@ -1702,7 +1708,7 @@ class CloudSyncRepository @Inject constructor(
                 if (!pushPendingLocalFirst) {
                     clearStaleLocalDirtyBeforeRemoteRestore()
                 }
-                applyCloudPayload(payload)
+                applyCloudPayload(payload, forceApplyRemote = forceApplyRemote)
             }
             markCloudPayloadApplied(payload, payloadHash)
         }.fold(
@@ -1735,7 +1741,10 @@ class CloudSyncRepository @Inject constructor(
     /**
      * Applies a cloud JSON payload to all local repositories.
      */
-    private suspend fun applyCloudPayload(payload: String) {
+    private suspend fun applyCloudPayload(
+        payload: String,
+        forceApplyRemote: Boolean = false,
+    ) {
         // Field-level merge BEFORE applying: overlay any local scalar setting that is NEWER than the
         // remote's onto the incoming payload, so a pull can't overwrite a not-yet-pushed local
         // change. `defaultSubtitle` is excluded (kept by its own subtitleSettingsUpdatedAt logic
@@ -1755,9 +1764,6 @@ class CloudSyncRepository @Inject constructor(
         }
         val preservedLocalSettings = settingsMerge?.otherWonKeys?.isNotEmpty() == true
         val root = JSONObject(settingsMerge?.json ?: payload)
-
-        fun shouldApplyCatalogState(cloudUpdatedAt: Long, localUpdatedAt: Long): Boolean =
-            cloudUpdatedAt <= 0L || cloudUpdatedAt >= localUpdatedAt
 
         val fallbackDefaultSubtitle = root.optString("defaultSubtitle", "Off")
         val fallbackDefaultAudioLanguage = root.optString("defaultAudioLanguage", "Auto (Original)")
@@ -2106,7 +2112,7 @@ class CloudSyncRepository @Inject constructor(
                 map.forEach { (profileId, catalogs) ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
-                    if (shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.replaceCatalogsForProfile(profileId, catalogs, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2118,7 +2124,7 @@ class CloudSyncRepository @Inject constructor(
                     val catalogs: List<CatalogConfig> = gson.fromJson(json, type) ?: emptyList()
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(activeProfileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(activeProfileId)
-                    if (catalogs.isNotEmpty() && shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (catalogs.isNotEmpty() && shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.replaceCatalogsForProfile(activeProfileId, catalogs, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(activeProfileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2135,7 +2141,7 @@ class CloudSyncRepository @Inject constructor(
                 map.forEach { (profileId, hidden) ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
-                    if (shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(profileId, hidden, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2151,7 +2157,7 @@ class CloudSyncRepository @Inject constructor(
                     }
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(activeProfileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(activeProfileId)
-                    if (shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.setHiddenPreinstalledCatalogIdsForProfile(activeProfileId, hidden, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(activeProfileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2168,7 +2174,7 @@ class CloudSyncRepository @Inject constructor(
                 map.forEach { (profileId, hidden) ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
-                    if (shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.setHiddenAddonCatalogIdsForProfile(profileId, hidden, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2185,7 +2191,7 @@ class CloudSyncRepository @Inject constructor(
                 map.forEach { (profileId, hidden) ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
-                    if (shouldApplyCatalogState(cloudUpdatedAt, localUpdatedAt)) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.setHiddenHomeServerCatalogIdsForProfile(profileId, hidden, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2202,7 +2208,7 @@ class CloudSyncRepository @Inject constructor(
                 map.forEach { (profileId, hidden) ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
-                    if (cloudUpdatedAt >= localUpdatedAt) {
+                    if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
                         catalogRepository.setHiddenCustomCatalogIdsForProfile(profileId, hidden, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }

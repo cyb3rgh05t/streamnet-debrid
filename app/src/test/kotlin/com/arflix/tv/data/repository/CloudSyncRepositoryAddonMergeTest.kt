@@ -5,6 +5,7 @@ import com.arflix.tv.data.model.AddonType
 import com.arflix.tv.data.model.MediaType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.json.JSONObject
 
@@ -283,6 +284,24 @@ class CloudSyncRepositoryAddonMergeTest {
             merged.getJSONObject("hiddenCustomByProfile").getJSONArray("main").getString(0)
         )
         assertEquals(200L, merged.getJSONObject("catalogsUpdatedAtByProfile").getLong("main"))
+    }
+
+    @Test
+    fun `explicit restore applies cloud catalogs despite newer local startup timestamp`() {
+        assertFalse(
+            shouldApplyCloudCatalogState(
+                cloudUpdatedAt = 100L,
+                localUpdatedAt = 200L,
+                forceApplyRemote = false,
+            )
+        )
+        assertTrue(
+            shouldApplyCloudCatalogState(
+                cloudUpdatedAt = 100L,
+                localUpdatedAt = 200L,
+                forceApplyRemote = true,
+            )
+        )
     }
 
     @Test

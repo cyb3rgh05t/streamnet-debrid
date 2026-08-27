@@ -38,10 +38,13 @@ class PreinstalledServicesTest {
                 "top10_shows_today",
                 "collection_rail_tv_genre",
                 "trending_anime",
+                "new_kdramas",
                 "coming_soon",
-                "just_added"
+                "just_added",
+                "collection_rail_studio",
+                "collection_rail_network"
             ),
-            ids.take(14)
+            ids.take(17)
         )
     }
 

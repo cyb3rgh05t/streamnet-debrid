@@ -141,14 +141,20 @@ class ProfileViewModel @Inject constructor(
 
                 var restoreResult = withContext(Dispatchers.IO) {
                     withTimeoutOrNull(18_000L) {
-                        cloudSyncRepository.pullFromCloud(pushPendingLocalFirst = false)
+                        cloudSyncRepository.pullFromCloud(
+                            pushPendingLocalFirst = false,
+                            forceApplyRemote = true,
+                        )
                     } ?: CloudSyncRepository.RestoreResult.FAILED
                 }
                 if (restoreResult == CloudSyncRepository.RestoreResult.FAILED) {
                     delay(1_200L)
                     restoreResult = withContext(Dispatchers.IO) {
                         withTimeoutOrNull(18_000L) {
-                            cloudSyncRepository.pullFromCloud(pushPendingLocalFirst = false)
+                            cloudSyncRepository.pullFromCloud(
+                                pushPendingLocalFirst = false,
+                                forceApplyRemote = true,
+                            )
                         } ?: CloudSyncRepository.RestoreResult.FAILED
                     }
                 }
