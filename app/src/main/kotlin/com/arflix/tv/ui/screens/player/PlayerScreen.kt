@@ -2677,8 +2677,8 @@ fun PlayerScreen(
     val subtitleSizePref = uiState.subtitleSize
     val subtitleColorPref = uiState.subtitleColor
     val subtitleStylePref = uiState.subtitleStyle
+    val subtitleFontPref = uiState.subtitleFont
     val subtitleStylizedPref = uiState.subtitleStylized
-    val subtitleOffsetPref = uiState.subtitleOffset
     val aspectModeLabel = when (playerResizeMode) {
         AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Zoom"
         AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Fill"
@@ -3170,61 +3170,17 @@ fun PlayerScreen(
 
                         // Enable subtitle view with styling based on user preference
                         subtitleView?.apply {
-                            val subSizeSp = when (subtitleSizePref) {
-                                "Small" -> 18f; "Large" -> 30f; "Extra Large" -> 36f; else -> 24f
-                            }
-                            val subFgColor = when (subtitleColorPref) {
-                                "Yellow" -> android.graphics.Color.YELLOW
-                                "Green" -> android.graphics.Color.GREEN
-                                "Cyan" -> android.graphics.Color.CYAN
-                                else -> android.graphics.Color.WHITE
-                            }
-                            val subTypeface = when (subtitleStylePref) {
-                                "Normal" -> android.graphics.Typeface.DEFAULT
-                                "Background" -> android.graphics.Typeface.DEFAULT_BOLD
-                                else -> android.graphics.Typeface.DEFAULT_BOLD
-                            }
-                            val subEdgeType = when (subtitleStylePref) {
-                                "Normal" -> androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE
-                                "Background" -> androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_NONE
-                                else -> androidx.media3.ui.CaptionStyleCompat.EDGE_TYPE_OUTLINE
-                            }
-                            val subBgColor = when (subtitleStylePref) {
-                                "Background" -> android.graphics.Color.argb(180, 0, 0, 0)
-                                else -> android.graphics.Color.TRANSPARENT
-                            }
-                            setStyle(
-                                androidx.media3.ui.CaptionStyleCompat(
-                                    subFgColor,
-                                    android.graphics.Color.TRANSPARENT,
-                                    subBgColor,
-                                    subEdgeType,
-                                    android.graphics.Color.BLACK,
-                                    subTypeface
-                                )
+                            applySubtitleAppearance(
+                                context = ctx,
+                                sizePreference = subtitleSizePref,
+                                sizePercent = subtitleSizePct,
+                                verticalPercent = subtitleVerticalPct,
+                                colorPreference = subtitleColorPref,
+                                stylePreference = subtitleStylePref,
+                                fontPreference = subtitleFontPref,
+                                preserveEmbeddedStyles = subtitleStylizedPref,
+                                inPictureInPicture = isInPipMode,
                             )
-                            val pipSubScale = if (isInPipMode) 0.4f else 1f
-                            setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, subSizeSp * pipSubScale)
-                            val bottomPaddingFraction = when (subtitleOffsetPref) {
-                                "Bottom" -> 0.02f
-                                "Low" -> 0.08f
-                                "Medium" -> 0.15f
-                                "High" -> 0.25f
-                                else -> 0.02f
-                            }
-                            setBottomPaddingFraction(bottomPaddingFraction)
-
-                            if (subtitleStylizedPref) {
-                                // Stylized mode: let Media3 render embedded ASS/SSA styles
-                                // (colors, fonts, positioning, z-order). User prefs are
-                                // only used as a fallback CaptionStyle for plain SRT/VTT.
-                                setApplyEmbeddedStyles(true)
-                                setApplyEmbeddedFontSizes(true)
-                            } else {
-                                // Uniform mode: override everything with user preferences
-                                setApplyEmbeddedStyles(false)
-                                setApplyEmbeddedFontSizes(false)
-                            }
                         }
                     }
                 },
@@ -3234,12 +3190,17 @@ fun PlayerScreen(
                     playerView.resizeMode = playerResizeMode
                     playerView.setUseVideoFrameForSubtitles(useVideoFrameSubtitleViewport)
                     playerView.subtitleView?.apply {
-                        val baseSizeSp = when (subtitleSizePref) {
-                            "Small" -> 18f; "Large" -> 30f; "Extra Large" -> 36f; else -> 24f
-                        }
-                        val pipSubScale = if (isInPipMode) 0.4f else 1f
-                        setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, baseSizeSp * (subtitleSizePct / 100f) * pipSubScale)
-                        setBottomPaddingFraction((subtitleVerticalPct / 100f).coerceIn(0f, 0.5f))
+                        applySubtitleAppearance(
+                            context = playerView.context,
+                            sizePreference = subtitleSizePref,
+                            sizePercent = subtitleSizePct,
+                            verticalPercent = subtitleVerticalPct,
+                            colorPreference = subtitleColorPref,
+                            stylePreference = subtitleStylePref,
+                            fontPreference = subtitleFontPref,
+                            preserveEmbeddedStyles = subtitleStylizedPref,
+                            inPictureInPicture = isInPipMode,
+                        )
                         // "Find best match" without AI showing selects the built-in reference
                         // track under the hood to read its timing — hide its raw (e.g. English)
                         // cues while the scan runs. Display-only: the scan's cue collection

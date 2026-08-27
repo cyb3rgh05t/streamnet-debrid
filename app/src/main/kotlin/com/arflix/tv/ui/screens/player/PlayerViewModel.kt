@@ -122,6 +122,7 @@ data class PlayerUiState(
     val subtitleSize: String = "Medium",
     val subtitleColor: String = "White",
     val subtitleStyle: String = "Bold",
+    val subtitleFont: String = SubtitleFontOption.DEFAULT_PREFERENCE,
     val subtitleStylized: Boolean = true,
     val subtitleOffset: String = "Bottom",
     val error: String? = null,
@@ -579,6 +580,8 @@ class PlayerViewModel @Inject constructor(
             val subSize = prefs[profileManager.profileStringKey("subtitle_size")] ?: "Medium"
             val subColor = prefs[profileManager.profileStringKey("subtitle_color")] ?: "White"
             val subStyle = prefs[profileManager.profileStringKey("subtitle_style")] ?: "Bold"
+            val subFont = prefs[profileManager.profileStringKey("subtitle_font")]
+                ?: SubtitleFontOption.DEFAULT_PREFERENCE
             val subStylized = prefs[profileManager.profileBooleanKey("subtitle_stylized")] ?: true
             val subOffset = prefs[profileManager.profileStringKey("subtitle_offset")] ?: "Bottom"
             val autoPlayNext = prefs[autoPlayNextKey()] ?: true
@@ -629,6 +632,7 @@ class PlayerViewModel @Inject constructor(
                 subtitleSize = subSize,
                 subtitleColor = subColor,
                 subtitleStyle = subStyle,
+                subtitleFont = subFont,
                 subtitleStylized = subStylized,
                 subtitleOffset = subOffset,
                 autoPlayNext = autoPlayNext,

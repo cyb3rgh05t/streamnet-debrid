@@ -6,7 +6,6 @@ create table if not exists accounts (
   email_normalized text not null unique,
   password_hash text,
   password_hash_scheme text not null default 'none',
-  legacy_supabase_user_id uuid unique,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

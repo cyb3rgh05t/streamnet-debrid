@@ -33,18 +33,18 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 362
-        versionName = "2.1.016"
+        versionCode = 363
+        versionName = "2.1.017"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
-        // Cloud sync uses a Netlify function layer for app-facing endpoints and
+        // Cloud sync uses the self-hosted account backend.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_REALTIME_WATCH_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "true")
-        buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
+        buildConfigField("Boolean", "ENABLE_CLOUD_SYNC", "true")
         buildConfigField("Boolean", "DISCORD_RICH_PRESENCE_AVAILABLE", hasDiscordSdk.toString())
         buildConfigField(
             "String",
@@ -53,8 +53,8 @@ android {
         )
         buildConfigField(
             "String",
-            "NETLIFY_BACKEND_URL",
-            "\"${escapeBuildConfigString(localSecretValue("NETLIFY_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
+            "CLOUD_BACKEND_URL",
+            "\"${escapeBuildConfigString(localSecretValue("CLOUD_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
         )
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
@@ -175,12 +175,7 @@ android {
             applicationIdSuffix = ".selfhosted"
             versionNameSuffix = "-selfhosted"
 
-            buildConfigField(
-                "String",
-                "NETLIFY_BACKEND_URL",
-                "\"${escapeBuildConfigString(localSecretValue("SELF_HOSTED_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
-            )
-            buildConfigField("Boolean", "ENABLE_NETLIFY_CLOUD_SYNC", "true")
+            buildConfigField("Boolean", "ENABLE_CLOUD_SYNC", "true")
             buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
             buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "false")
         }

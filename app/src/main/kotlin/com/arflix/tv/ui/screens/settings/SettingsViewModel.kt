@@ -12,6 +12,7 @@ import com.arflix.tv.BuildConfig
 import com.arflix.tv.R
 import com.arflix.tv.server.AiKeyConfigServer
 import com.arflix.tv.ui.screens.player.SubtitleAiModel
+import com.arflix.tv.ui.screens.player.SubtitleFontOption
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.DeviceIpAddress
 import com.arflix.tv.util.DiagnosticsManager
@@ -110,6 +111,7 @@ data class SettingsUiState(
     val subtitleSize: String = "Medium",
     val subtitleColor: String = "White",
     val subtitleStyle: String = "Bold",
+    val subtitleFont: String = SubtitleFontOption.DEFAULT_PREFERENCE,
     val subtitleOffset: String = "Bottom",
     val subtitleStylized: Boolean = true,
     val filterSubtitlesByLanguage: Boolean = true,
@@ -329,6 +331,7 @@ class SettingsViewModel @Inject constructor(
     private fun subtitleColorKey() = profileManager.profileStringKey("subtitle_color")
     private fun subtitleOffsetKey() = profileManager.profileStringKey("subtitle_offset")
     private fun subtitleStyleKey() = profileManager.profileStringKey("subtitle_style")
+    private fun subtitleFontKey() = profileManager.profileStringKey("subtitle_font")
     private fun subtitleStylizedKey() = profileManager.profileBooleanKey("subtitle_stylized")
     private fun filterSubtitlesByLanguageKey() = profileManager.profileBooleanKey("filter_subtitles_by_lang")
     private fun secondarySubtitleKey() = profileManager.profileStringKey("secondary_subtitle")
@@ -545,6 +548,7 @@ class SettingsViewModel @Inject constructor(
             val subtitleSize = prefs[subtitleSizeKey()] ?: "Medium"
             val subtitleColor = prefs[subtitleColorKey()] ?: "White"
             val subtitleStyle = prefs[subtitleStyleKey()] ?: "Bold"
+            val subtitleFont = prefs[subtitleFontKey()] ?: SubtitleFontOption.DEFAULT_PREFERENCE
             val subtitleOffset = prefs[subtitleOffsetKey()] ?: "Bottom"
             val subtitleStylized = prefs[subtitleStylizedKey()] ?: true
             val filterSubtitlesByLanguage = prefs[filterSubtitlesByLanguageKey()] ?: true
@@ -636,6 +640,7 @@ class SettingsViewModel @Inject constructor(
                 subtitleSize = subtitleSize,
                 subtitleColor = subtitleColor,
                 subtitleStyle = subtitleStyle,
+                subtitleFont = subtitleFont,
                 subtitleOffset = subtitleOffset,
                 subtitleStylized = subtitleStylized,
                 filterSubtitlesByLanguage = filterSubtitlesByLanguage,
@@ -1500,6 +1505,15 @@ class SettingsViewModel @Inject constructor(
     fun cycleSubtitleStyle() {
         val next = when (_uiState.value.subtitleStyle) { "Bold" -> "Normal"; "Normal" -> "Background"; else -> "Bold" }
         viewModelScope.launch { context.settingsDataStore.edit { it[subtitleStyleKey()] = next }; _uiState.value = _uiState.value.copy(subtitleStyle = next); syncLocalStateToCloud(silent = true) }
+    }
+
+    fun cycleSubtitleFont() {
+        val next = SubtitleFontOption.nextPreference(_uiState.value.subtitleFont)
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[subtitleFontKey()] = next }
+            _uiState.value = _uiState.value.copy(subtitleFont = next)
+            syncLocalStateToCloud(silent = true)
+        }
     }
 
     fun toggleSubtitleStylized() {

@@ -1,6 +1,6 @@
 import pg from "pg";
 import { config } from "../src/config.js";
-import { hashLegacyScryptPassword } from "../src/passwords.js";
+import { hashScryptPassword } from "../src/passwords.js";
 
 const email = String(process.env.TEST_ACCOUNT_EMAIL || "")
   .trim()
@@ -19,10 +19,10 @@ const pool = new Pool({ connectionString: config.databaseUrl });
 try {
   const result = await pool.query(
     `insert into accounts (email, email_normalized, password_hash, password_hash_scheme)
-     values ($1, $2, $3, 'netlify_scrypt')
+     values ($1, $2, $3, 'scrypt_v1')
      on conflict (email_normalized) do nothing
      returning id, email`,
-    [email, email, await hashLegacyScryptPassword(password)],
+    [email, email, await hashScryptPassword(password)],
   );
   if (!result.rows[0]) {
     throw new Error(

@@ -38,6 +38,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -247,7 +248,32 @@ class WatchlistViewModel @Inject constructor(
         observeWatchlistChanges()
         observeCatalogsAndHomeServers()
         observeTrackerLibraries()
+        observeProfileChanges()
         loadWatchlistInstant()
+    }
+
+    private fun observeProfileChanges() {
+        viewModelScope.launch {
+            profileManager.activeProfileId
+                .distinctUntilChanged()
+                .drop(1)
+                .collectLatest {
+                    sourceLoadJob?.cancel()
+                    sourceLoadMoreJob?.cancel()
+                    sourceItemsCache.clear()
+                    sourcePageStates.clear()
+                    initialLoadComplete = false
+                    watchlistRepository.clearWatchlistCache()
+                    _uiState.value = _uiState.value.copy(
+                        selectedSourceId = WatchlistSourceItem.MyWatchlist.id,
+                        isLoading = true,
+                        movies = emptyList(),
+                        series = emptyList(),
+                        error = null,
+                    )
+                    loadWatchlistInstant()
+                }
+        }
     }
 
     private fun observeWatchlistChanges() {

@@ -1,10 +1,7 @@
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import test from "node:test";
-import {
-  hashLegacyScryptPassword,
-  verifyLegacyScryptPassword,
-} from "../src/passwords.js";
+import { hashScryptPassword, verifyScryptPassword } from "../src/passwords.js";
 
 function scrypt(password, salt) {
   return new Promise((resolve, reject) => {
@@ -21,18 +18,15 @@ function scrypt(password, salt) {
   });
 }
 
-test("verifies the Netlify scrypt password format", async () => {
+test("verifies existing scrypt password hashes", async () => {
   const salt = "streamnet-test-salt";
   const password = "correct horse battery staple";
   const encoded = `scrypt:16384:8:1:${salt}:${await scrypt(password, salt)}`;
 
-  assert.equal(await verifyLegacyScryptPassword(password, encoded), true);
+  assert.equal(await verifyScryptPassword(password, encoded), true);
+  assert.equal(await verifyScryptPassword("wrong password", encoded), false);
   assert.equal(
-    await verifyLegacyScryptPassword("wrong password", encoded),
-    false,
-  );
-  assert.equal(
-    await verifyLegacyScryptPassword(
+    await verifyScryptPassword(
       "password",
       "scrypt:16384:8:1:c2FsdA:ZGVsaWJlcmF0ZWx5LW5vdC1hLXJlYWwtaGFzaA",
     ),
@@ -40,9 +34,9 @@ test("verifies the Netlify scrypt password format", async () => {
   );
 });
 
-test("creates hashes compatible with Netlify scrypt verification", async () => {
+test("creates verifiable scrypt password hashes", async () => {
   const password = "staging test account password";
-  const encoded = await hashLegacyScryptPassword(password);
+  const encoded = await hashScryptPassword(password);
 
-  assert.equal(await verifyLegacyScryptPassword(password, encoded), true);
+  assert.equal(await verifyScryptPassword(password, encoded), true);
 });

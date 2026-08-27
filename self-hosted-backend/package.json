@@ -12,8 +12,7 @@
     "test": "node --test test/*.test.js",
     "migrate": "node scripts/migrate.js",
     "create:test-account": "node scripts/create-test-account.js",
-    "import:netlify-blobs": "node scripts/import-netlify-blobs.js",
-    "import:snapshots": "node scripts/import-snapshots.js"
+    "catalog-order:preview": "node scripts/reorder-catalog-snapshots.js"
   },
   "dependencies": {
     "fastify": "^5.5.0",

@@ -115,7 +115,6 @@ jobs:
 
       - name: Validate required credentials
         env:
-          NETLIFY_BACKEND_URL: ${{ secrets.NETLIFY_BACKEND_URL }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
@@ -125,11 +124,6 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          : "${NETLIFY_BACKEND_URL:?Missing NETLIFY_BACKEND_URL repository secret}"
-          test "$NETLIFY_BACKEND_URL" = "https://auth.mystreamnet.club" || {
-            echo "NETLIFY_BACKEND_URL must be https://auth.mystreamnet.club for production builds" >&2
-            exit 1
-          }
           : "${TMDB_API_KEY:?Missing TMDB_API_KEY repository secret}"
           : "${TRAKT_CLIENT_ID:?Missing TRAKT_CLIENT_ID repository secret}"
           : "${TRAKT_CLIENT_SECRET:?Missing TRAKT_CLIENT_SECRET repository secret}"
@@ -142,7 +136,7 @@ jobs:
 
       - name: Prepare runtime configuration
         env:
-          NETLIFY_BACKEND_URL: https://auth.mystreamnet.club
+          CLOUD_BACKEND_URL: https://auth.mystreamnet.club
           SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
           TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
@@ -154,7 +148,7 @@ jobs:
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
         run: |
           printf '%s\n' \
-            "NETLIFY_BACKEND_URL=$NETLIFY_BACKEND_URL" \
+            "CLOUD_BACKEND_URL=$CLOUD_BACKEND_URL" \
             "SENTRY_DSN=${SENTRY_DSN:-disabled}" \
             "TMDB_API_KEY=$TMDB_API_KEY" \
             "TRAKT_CLIENT_ID=$TRAKT_CLIENT_ID" \

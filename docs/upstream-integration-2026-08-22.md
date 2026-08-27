@@ -27,7 +27,7 @@ The full upstream branch was not merged directly because this fork has intention
   - Mobile callbacks use `mobile_` state and return to the app deeplink.
   - TV callbacks use `tv_` state and notify `/.netlify/functions/discord-auth-callback` with the unprefixed device code.
   - Unmarked states are rejected instead of guessing the flow.
-- Shared callback logic now lives in `legacy/netlify-auth-site/discord/callback.js` and is loaded by both callback HTML entry points.
+- Shared callback logic was later migrated to `self-hosted-backend/public/discord/callback.js`; the former Netlify copy has been removed.
 - Duplicate Android Discord string resources were removed from `app/src/main/res/values/strings.xml` to fix resource merging.
 
 ## Deployment Notes
@@ -43,7 +43,7 @@ The full upstream branch was not merged directly because this fork has intention
 
 ## Validation
 
-- `npm --prefix legacy/netlify-auth-site test` passed: 35 tests.
+- The former Netlify test suite passed 35 tests before the legacy implementation was retired.
 - `./gradlew.bat :app:test :app:compileSideloadDebugKotlin --no-daemon --stacktrace` passed.
 - `./gradlew.bat :app:assembleSideloadDebug --no-daemon --stacktrace` passed.
 - `git diff --check` passed.

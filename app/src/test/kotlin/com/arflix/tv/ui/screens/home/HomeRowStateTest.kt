@@ -123,6 +123,27 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `continue watching cards keep progress renderer when trailer is available`() {
+        assertThat(
+            canExpandHomeCardToFeatured(
+                categoryId = "continue_watching",
+                isIptvCategory = false,
+                usesPosterCards = false,
+                trailerKey = "trailer-key",
+            )
+        ).isFalse()
+
+        assertThat(
+            canExpandHomeCardToFeatured(
+                categoryId = "trending_movies",
+                isIptvCategory = false,
+                usesPosterCards = false,
+                trailerKey = "trailer-key",
+            )
+        ).isTrue()
+    }
+
+    @Test
     fun `cached first collection item resolves intro without transient map`() {
         val defaults = MediaRepository.buildPreinstalledDefaults().associateBy { it.id }
         val cachedItem = MediaItem(

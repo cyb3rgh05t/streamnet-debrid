@@ -19,12 +19,30 @@ class PreinstalledServicesTest {
     private val introVideoCommit = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
 
     @Test
-    fun `fresh profile starts with trending before collections and IPTV rows`() {
-        val ids = MediaRepository.buildPreinstalledDefaults().map { it.id }
+    fun `fresh profile starts with requested home row order`() {
+        val ids = MediaRepository.buildPreinstalledDefaults()
+            .filter { it.kind != CatalogKind.COLLECTION }
+            .map { it.id }
 
-        assertEquals(listOf("trending_movies", "trending_tv"), ids.take(2))
-        assertTrue(ids.indexOf("favorite_tv") > ids.indexOf("collection_rail_franchise"))
-        assertTrue(ids.indexOf("recent_tv") > ids.indexOf("favorite_tv"))
+        assertEquals(
+            listOf(
+                "recent_tv",
+                "favorite_tv",
+                "collection_rail_service",
+                "collection_rail_franchise",
+                "trending_movies",
+                "top10_movies_today",
+                "top_movies_week",
+                "collection_rail_movie_genre",
+                "trending_tv",
+                "top10_shows_today",
+                "collection_rail_tv_genre",
+                "trending_anime",
+                "coming_soon",
+                "just_added"
+            ),
+            ids.take(14)
+        )
     }
 
     private val serviceOrder = listOf(

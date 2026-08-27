@@ -80,6 +80,13 @@ data class PersonMediaSearchResult(
     val items: List<MediaItem>
 )
 
+internal fun mergeEnrichedItemIntoFullDetails(
+    fullDetails: MediaItem,
+    enrichedItem: MediaItem,
+): MediaItem = fullDetails.copy(
+    overview = fullDetails.overview.ifBlank { enrichedItem.overview },
+)
+
 internal object HomeServerLibraryIdentity {
     fun stableNativeId(sourceRef: String, itemId: String): Int {
         return -("$sourceRef:$itemId".hashCode() and Int.MAX_VALUE).coerceAtLeast(1)
@@ -337,6 +344,60 @@ class MediaRepository @Inject constructor(
         return getFromCache(detailsCache, cacheKey)
     }
 
+    suspend fun getCachedItemFromDisk(mediaType: MediaType, mediaId: Int): MediaItem? =
+        withContext(Dispatchers.IO) {
+            peekItemFromDiskCache(mediaType, mediaId)
+        }
+
+    private fun peekItemFromDiskCache(mediaType: MediaType, mediaId: Int): MediaItem? = try {
+        val cacheFiles = mutableListOf<java.io.File>()
+        context.cacheDir.listFiles { _, name ->
+            name.startsWith("home_categories_cache_") && name.endsWith(".json")
+        }?.let { cacheFiles.addAll(it) }
+        context.filesDir.listFiles { _, name ->
+            name.startsWith("home_continue_watching_") && name.endsWith(".json")
+        }?.let { cacheFiles.addAll(it) }
+
+        for (file in cacheFiles) {
+            if (!file.exists() || file.length() > 12_000_000L) continue
+            val json = file.readText()
+            if (json.isBlank()) continue
+            if (!json.contains("\"id\":$mediaId") && !json.contains("\"id\": $mediaId")) continue
+
+            val categoryType = com.google.gson.reflect.TypeToken
+                .getParameterized(MutableList::class.java, Category::class.java)
+                .type
+            val categories: List<Category>? = runCatching {
+                gson.fromJson<List<Category>>(json, categoryType)
+            }.getOrNull()
+            categories?.forEach { category ->
+                category.items.firstOrNull { item ->
+                    item.id == mediaId && item.mediaType == mediaType
+                }?.let { item ->
+                    cacheItem(item)
+                    return item
+                }
+            }
+
+            val continueWatchingType = com.google.gson.reflect.TypeToken
+                .getParameterized(MutableList::class.java, ContinueWatchingItem::class.java)
+                .type
+            val continueWatchingItems: List<ContinueWatchingItem>? = runCatching {
+                gson.fromJson<List<ContinueWatchingItem>>(json, continueWatchingType)
+            }.getOrNull()
+            continueWatchingItems?.firstOrNull { item ->
+                item.id == mediaId && item.mediaType == mediaType
+            }?.let { cachedItem ->
+                val item = cachedItem.toMediaItem()
+                cacheItem(item)
+                return item
+            }
+        }
+        null
+    } catch (_: Throwable) {
+        null
+    }
+
     fun getCachedFullItem(mediaType: MediaType, mediaId: Int): MediaItem? {
         val cacheKey = detailsCacheKey(mediaType, mediaId)
         if (cacheKey !in fullDetailsCacheKeys) return null
@@ -589,7 +650,13 @@ class MediaRepository @Inject constructor(
         val cacheKey = detailsCacheKey(item.mediaType, item.id)
         if (cacheKey in fullDetailsCacheKeys) {
             val existingFullDetails = getFromCache(detailsCache, cacheKey)
-            if (existingFullDetails != null) return
+            if (existingFullDetails != null) {
+                val merged = mergeEnrichedItemIntoFullDetails(existingFullDetails, item)
+                if (merged != existingFullDetails) {
+                    detailsCache[cacheKey] = CacheEntry(merged, System.currentTimeMillis())
+                }
+                return
+            }
             fullDetailsCacheKeys.remove(cacheKey)
         }
         detailsCache[cacheKey] = CacheEntry(item, System.currentTimeMillis())
@@ -629,17 +696,17 @@ class MediaRepository @Inject constructor(
          */
         internal fun buildPreinstalledDefaults(): List<CatalogConfig> {
             val topLevelCatalogs = listOf(
-                CatalogConfig("trending_movies", "Trending in Movies", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-movies"),
-                CatalogConfig("trending_tv", "Trending in Shows", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trakt-s-trending-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trakt-s-trending-shows"),
-                CatalogConfig("favorite_tv", "Favorite TV", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
                 CatalogConfig("recent_tv", "Recently Watched TV", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
-                CatalogConfig("trending_anime", "Trending in Anime", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-anime-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-anime-shows"),
+                CatalogConfig("favorite_tv", "Favorite TV", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
+                CatalogConfig("trending_movies", "Trending in Movies", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-movies"),
                 CatalogConfig("top10_movies_today", "Top 10 Movies Today", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/top-10-movies-of-the-day", sourceRef = "mdblist:https://mdblist.com/lists/snoak/top-10-movies-of-the-day"),
-                CatalogConfig("top10_shows_today", "Top 10 Shows Today", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/top-10-shows-of-the-day", sourceRef = "mdblist:https://mdblist.com/lists/snoak/top-10-shows-of-the-day"),
-                CatalogConfig("just_added", "Just Added", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-movies-digital-release", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-movies-digital-release"),
                 CatalogConfig("top_movies_week", "Top Movies This Week", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/linaspurinis/top-watched-movies-of-the-week", sourceRef = "mdblist:https://mdblist.com/lists/linaspurinis/top-watched-movies-of-the-week"),
-                CatalogConfig("new_kdramas", "New in K-Dramas", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-kdrama-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-kdrama-shows"),
-                CatalogConfig("coming_soon", "Coming Soon", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/upcoming-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/upcoming-movies")
+                CatalogConfig("trending_tv", "Trending in Shows", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trakt-s-trending-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trakt-s-trending-shows"),
+                CatalogConfig("top10_shows_today", "Top 10 Shows Today", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/top-10-shows-of-the-day", sourceRef = "mdblist:https://mdblist.com/lists/snoak/top-10-shows-of-the-day"),
+                CatalogConfig("trending_anime", "Trending in Anime", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-anime-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-anime-shows"),
+                CatalogConfig("coming_soon", "Coming Soon", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/upcoming-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/upcoming-movies"),
+                CatalogConfig("just_added", "Just Added", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-movies-digital-release", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-movies-digital-release"),
+                CatalogConfig("new_kdramas", "New in K-Dramas", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-kdrama-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-kdrama-shows")
             )
 
             fun addonCollectionSource(addonId: String?, type: String, id: String) = CollectionSourceConfig(
@@ -1614,7 +1681,26 @@ class MediaRepository @Inject constructor(
                 )
             }
 
-            return topLevelCatalogs.take(2) + collectionRails + templateCollections + topLevelCatalogs.drop(2)
+            val railsByGroup = collectionRails.associateBy { it.collectionGroup }
+            val requestedRows = listOfNotNull(
+                topLevelCatalogs.find { it.id == "recent_tv" },
+                topLevelCatalogs.find { it.id == "favorite_tv" },
+                railsByGroup[CollectionGroupKind.SERVICE],
+                railsByGroup[CollectionGroupKind.FRANCHISE],
+                topLevelCatalogs.find { it.id == "trending_movies" },
+                topLevelCatalogs.find { it.id == "top10_movies_today" },
+                topLevelCatalogs.find { it.id == "top_movies_week" },
+                railsByGroup[CollectionGroupKind.MOVIE_GENRE],
+                topLevelCatalogs.find { it.id == "trending_tv" },
+                topLevelCatalogs.find { it.id == "top10_shows_today" },
+                railsByGroup[CollectionGroupKind.TV_GENRE],
+                topLevelCatalogs.find { it.id == "trending_anime" },
+                topLevelCatalogs.find { it.id == "coming_soon" },
+                topLevelCatalogs.find { it.id == "just_added" }
+            )
+            val requestedIds = requestedRows.mapTo(mutableSetOf()) { it.id }
+            val remainingRows = (topLevelCatalogs + collectionRails).filterNot { it.id in requestedIds }
+            return requestedRows + remainingRows + templateCollections
         }
     }
 

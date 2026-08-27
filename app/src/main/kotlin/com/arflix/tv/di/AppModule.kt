@@ -207,7 +207,7 @@ object AppModule {
             .cache(null)
             .build()
         return Retrofit.Builder()
-            .baseUrl(Constants.NETLIFY_BACKEND_URL + "/")
+            .baseUrl(Constants.CLOUD_BACKEND_URL + "/")
             .client(noCacheClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
@@ -219,7 +219,7 @@ object AppModule {
     @JvmStatic
     fun provideWatchHistoryApi(okHttpClient: OkHttpClient): WatchHistoryApi {
         return Retrofit.Builder()
-            .baseUrl(Constants.NETLIFY_BACKEND_URL + "/")
+            .baseUrl(Constants.CLOUD_BACKEND_URL + "/")
             .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

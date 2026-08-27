@@ -6,9 +6,9 @@ import pg from "pg";
 import { config } from "./config.js";
 import {
   hashToken,
-  hashLegacyScryptPassword,
+  hashScryptPassword,
   newRefreshToken,
-  verifyLegacyScryptPassword,
+  verifyScryptPassword,
 } from "./passwords.js";
 import { normalizeAndValidateEmail } from "./email.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
@@ -513,8 +513,8 @@ app.post("/auth-login", async (request, reply) => {
   const account = result.rows[0];
   if (
     !account?.password_hash ||
-    account.password_hash_scheme !== "netlify_scrypt" ||
-    !(await verifyLegacyScryptPassword(password, account.password_hash))
+    !account.password_hash.startsWith("scrypt:") ||
+    !(await verifyScryptPassword(password, account.password_hash))
   ) {
     return reply.code(401).send({ error: "Invalid email or password" });
   }
@@ -542,9 +542,9 @@ app.post("/cloud-auth-email", async (request, reply) => {
   try {
     const result = await pool.query(
       `insert into accounts (email, email_normalized, password_hash, password_hash_scheme)
-       values ($1, $2, $3, 'netlify_scrypt')
+       values ($1, $2, $3, 'scrypt_v1')
        returning id, email, email_normalized`,
-      [email, email, await hashLegacyScryptPassword(password)],
+      [email, email, await hashScryptPassword(password)],
     );
     return issueSession(result.rows[0]);
   } catch (error) {
@@ -810,8 +810,8 @@ async function completeTvAuth(request, reply) {
     try {
       const created = await pool.query(
         `insert into accounts (email, email_normalized, password_hash, password_hash_scheme)
-         values ($1, $2, $3, 'netlify_scrypt') returning id, email, email_normalized`,
-        [email, email, await hashLegacyScryptPassword(password)],
+         values ($1, $2, $3, 'scrypt_v1') returning id, email, email_normalized`,
+        [email, email, await hashScryptPassword(password)],
       );
       account = created.rows[0];
     } catch (error) {
@@ -829,8 +829,8 @@ async function completeTvAuth(request, reply) {
     account = existing.rows[0];
     if (
       !account?.password_hash ||
-      account.password_hash_scheme !== "netlify_scrypt" ||
-      !(await verifyLegacyScryptPassword(password, account.password_hash))
+      !account.password_hash.startsWith("scrypt:") ||
+      !(await verifyScryptPassword(password, account.password_hash))
     ) {
       return reply.code(401).send({ error: "Invalid email or password" });
     }

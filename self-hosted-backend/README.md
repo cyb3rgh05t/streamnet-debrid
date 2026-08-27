@@ -5,11 +5,10 @@ This is the self-hosted StreamNet backend. The production Android build uses it 
 ## Included now
 
 - PostgreSQL schema and repeatable migration runner.
-- Netlify-compatible `scrypt` password verification for imported Netlify accounts.
+- StreamNet `scrypt` password hashing and verification.
 - `auth-login`, `auth-refresh`, `cloud-auth-email`, TV QR pairing, `account-sync-pull`, and `account-sync-push`.
 - Self-hosted app usage analytics and Discord device pairing with the existing StreamNet callback pages.
 - Revision-based snapshot compare-and-set compatible with the Android conflict retry.
-- Supabase NDJSON account-snapshot importer.
 - Traefik-compatible Docker Compose configuration with domain, certificate resolver, and published container image from `.env`.
 
 Password reset and media proxies are intentionally not included yet. Password reset will be added after SMTP delivery is configured.
@@ -22,7 +21,7 @@ Password reset and media proxies are intentionally not included yet. Password re
 4. Run migrations with `docker compose exec streamnet-backend npm run migrate`.
 5. Check `https://your-domain/health` through Traefik.
 
-The production APK may use this service after the migration checks documented below have passed. Keep the old Netlify service available as a rollback reference until the rollout is fully verified.
+The production APK uses this service as its account and synchronization backend.
 
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 
@@ -30,7 +29,7 @@ The API router deliberately has no Authelia middleware. Android TV and mobile ca
 
 `PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://auth.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
 
-The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory. `legacy/netlify-auth-site/` is no longer a runtime dependency for the self-hosted container.
+The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory.
 
 Password reset remains unavailable on the self-hosted page until its server-side replacement is complete. Account deletion is available at `https://auth.mystreamnet.club/delete-account`; it requires a fresh sign-in and an exact `DELETE` confirmation, revokes the account sessions, removes the cloud snapshot, and removes pending TV pairing sessions. It does not fall back to Netlify.
 
@@ -80,7 +79,7 @@ The `selfHosted` build type is a separate debug-signed APK with package suffix `
 Set an optional custom test domain in the untracked `secrets.properties` file:
 
 ```properties
-SELF_HOSTED_BACKEND_URL=https://auth.mystreamnet.club
+CLOUD_BACKEND_URL=https://auth.mystreamnet.club
 ```
 
 Build the APK with:
@@ -100,33 +99,78 @@ The `Publish Self-Hosted Backend` GitHub Actions workflow runs for changes under
 
 Use the `sha-<commit>` tag in `STREAMNET_BACKEND_IMAGE` when testing or rolling back a server deployment. The container package must be public, or the server must use a GitHub personal access token with `read:packages` before `docker compose pull`.
 
-## Import Existing Supabase Snapshots
+## Migrated Account Passwords
 
-Export the Supabase tables into an offline NDJSON directory. The importer reads `auth.users.ndjson`, `public.account_sync_state.ndjson`, and `public.user_settings.ndjson`.
+Existing account password hashes retain their `scrypt:` encoding. Migration `007_provider_neutral_accounts.sql` changes their scheme marker to `scrypt_v1` and removes the obsolete source-account column without rehashing passwords. Active access and refresh tokens are unaffected.
 
-```sh
-docker compose exec streamnet-backend npm run import:snapshots -- /imports/supabase-export
-```
+Keep encrypted migration exports and PostgreSQL backups outside the server.
 
-Mount the export directory into the container only for the import. Run this on staging first, compare account and snapshot counts, and restore test accounts on a TV and phone before any APK change.
+## Catalog Order Migration
 
-## Import Netlify Blob Snapshots
+The Android defaults apply the preferred catalog order only to fresh profiles. Existing cloud profiles can be reordered once without changing any hidden-catalog maps or removing custom catalogs.
 
-The production StreamNet account data is currently in the Netlify Blob stores `account-sync` and `arvio-auth`, not in the empty Supabase sync tables. Export those stores to one directory with an `auth/` subdirectory, then run the idempotent importer against the self-hosted PostgreSQL database:
+Create a backup first:
 
 ```sh
-docker compose exec streamnet-backend npm run import:netlify-blobs -- /imports/streamnet-migration-export --dry-run
-docker compose exec streamnet-backend npm run import:netlify-blobs -- /imports/streamnet-migration-export
+docker compose exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > streamnet-before-catalog-order.dump
 ```
 
-The importer preserves Netlify-scrypt password hashes, imports accounts without snapshots, and imports the strongest snapshot once per account. Existing access and refresh sessions are not imported.
+Apply the provider-neutral account schema migration, then preview every catalog change. The preview is read-only and prints before/after IDs per changed profile:
 
-## Netlify Account Passwords
+```sh
+docker compose exec streamnet-backend npm run migrate
+docker compose exec streamnet-backend npm run catalog-order:preview
+```
 
-The migrated Netlify account records use `scrypt`. The API verifies that format when an imported account has `password_hash_scheme = 'netlify_scrypt'`. Active access and refresh tokens are never imported.
+After reviewing the preview, explicitly apply the snapshot rewrite:
 
-## Safety
+```sh
+docker compose exec \
+  -e CATALOG_ORDER_APPLY=1 \
+  -e CATALOG_ORDER_BACKUP_CONFIRMED=1 \
+  streamnet-backend node scripts/reorder-catalog-snapshots.js --apply
+```
 
-- Keep Netlify and Supabase live while testing.
-- Keep encrypted source exports and PostgreSQL backups outside the server.
-- Treat the first APK pointed at this API as a test build only.
+The write runs in one transaction, increments each changed snapshot revision, updates only changed profiles' catalog timestamps, and leaves all hidden-catalog maps untouched.
+
+## Reset Cloud Data
+
+The commands below use the Compose service name `postgres` from `compose.yaml`.
+They do not depend on Docker's generated container name (for example,
+`self-hosted-backend-postgres-1`). Run them from the directory containing
+`compose.yaml`.
+
+Create a database backup before either reset:
+
+```sh
+docker compose exec -T postgres sh -lc 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' > streamnet-before-reset.dump
+```
+
+### Complete Reset
+
+This permanently deletes all accounts, password hashes, login sessions, cloud
+snapshots and profiles, watch data, pairing sessions, and analytics. The schema
+and `schema_migrations` records remain. Every account must be created again
+afterward.
+
+```sh
+docker compose exec -T postgres sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "BEGIN; TRUNCATE TABLE account_sync_snapshots, account_sessions, tv_device_auth_sessions, app_usage_events, discord_auth_sessions, watch_history, watch_state, accounts RESTART IDENTITY CASCADE; COMMIT;"'
+```
+
+After a complete reset, clear the StreamNet app data or reinstall the app on
+every device before creating the new account. Otherwise, a device can upload
+its old locally stored profiles and settings again.
+
+### Reset Synced Data but Keep Accounts
+
+This permanently deletes cloud snapshots and profiles, watch data, and pairing
+sessions while preserving accounts, password hashes, existing login sessions,
+and analytics.
+
+```sh
+docker compose exec -T postgres sh -lc 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "BEGIN; TRUNCATE TABLE account_sync_snapshots, watch_history, watch_state, tv_device_auth_sessions, discord_auth_sessions RESTART IDENTITY CASCADE; COMMIT;"'
+```
+
+Clear app data on every device before using the retained account again if the
+goal is a genuinely empty cloud state. A device with old local data can seed a
+new account snapshot on its next push.

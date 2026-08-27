@@ -9,34 +9,29 @@ import com.arflix.tv.BuildConfig
  * committed source.
  */
 object Constants {
-    // Compatibility alias for the renamed watched-state API header.
-    val NETLIFY_BACKEND_URL: String
-        get() = if (BuildConfig.BUILD_TYPE == "selfHosted") {
-            BuildConfig.SELF_HOSTED_BACKEND_URL.trim().trimEnd('/')
-        } else {
-            BuildConfig.NETLIFY_BACKEND_URL.trim().trimEnd('/')
-        }
-    val USE_NETLIFY_CLOUD_SYNC: Boolean
-        get() = BuildConfig.ENABLE_NETLIFY_CLOUD_SYNC && (NETLIFY_BACKEND_URL.startsWith("https://") || NETLIFY_BACKEND_URL.startsWith("http://"))
+    val CLOUD_BACKEND_URL: String
+        get() = BuildConfig.CLOUD_BACKEND_URL.trim().trimEnd('/')
+    val CLOUD_SYNC_ENABLED: Boolean
+        get() = BuildConfig.ENABLE_CLOUD_SYNC && (CLOUD_BACKEND_URL.startsWith("https://") || CLOUD_BACKEND_URL.startsWith("http://"))
 
-    // Edge Function proxy URLs used by backend/proxy-capable flows.
-    val TMDB_PROXY_URL: String get() = "$NETLIFY_BACKEND_URL/tmdb-proxy"
-    val SIMKL_PROXY_URL: String get() = "$NETLIFY_BACKEND_URL/simkl-proxy"
-    val TV_AUTH_START_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-start"
-    val TV_AUTH_STATUS_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-status"
-    val TV_AUTH_POLL_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-poll"
-    val TV_AUTH_COMPLETE_URL: String get() = "$NETLIFY_BACKEND_URL/tv-auth-complete"
-    val DISCORD_AUTH_START_URL: String get() = "$NETLIFY_BACKEND_URL/discord-auth-start"
-    val DISCORD_AUTH_STATUS_URL: String get() = "$NETLIFY_BACKEND_URL/discord-auth-status"
-    val AUTH_LOGIN_URL: String get() = "$NETLIFY_BACKEND_URL/auth-login"
-    val AUTH_REFRESH_URL: String get() = "$NETLIFY_BACKEND_URL/auth-refresh"
-    val AUTH_PASSWORD_START_URL: String get() = "$NETLIFY_BACKEND_URL/auth-password-start"
-    val CLOUD_AUTH_EMAIL_URL: String get() = "$NETLIFY_BACKEND_URL/cloud-auth-email"
-    val NETLIFY_ACCOUNT_SYNC_PULL_URL: String get() = "$NETLIFY_BACKEND_URL/account-sync-pull"
-    val NETLIFY_ACCOUNT_SYNC_PUSH_URL: String get() = "$NETLIFY_BACKEND_URL/account-sync-push"
-    val NETLIFY_ACCOUNT_SYNC_CURSOR_URL: String get() = "$NETLIFY_BACKEND_URL/account-sync-cursor"
-    val NETLIFY_ACCOUNT_SYNC_DELTA_URL: String get() = "$NETLIFY_BACKEND_URL/account-sync-delta"
-    val APP_USAGE_EVENT_URL: String get() = "$NETLIFY_BACKEND_URL/app-usage-event"
+    // Proxy URLs used by backend-capable flows.
+    val TMDB_PROXY_URL: String get() = "$CLOUD_BACKEND_URL/tmdb-proxy"
+    val SIMKL_PROXY_URL: String get() = "$CLOUD_BACKEND_URL/simkl-proxy"
+    val TV_AUTH_START_URL: String get() = "$CLOUD_BACKEND_URL/tv-auth-start"
+    val TV_AUTH_STATUS_URL: String get() = "$CLOUD_BACKEND_URL/tv-auth-status"
+    val TV_AUTH_POLL_URL: String get() = "$CLOUD_BACKEND_URL/tv-auth-poll"
+    val TV_AUTH_COMPLETE_URL: String get() = "$CLOUD_BACKEND_URL/tv-auth-complete"
+    val DISCORD_AUTH_START_URL: String get() = "$CLOUD_BACKEND_URL/discord-auth-start"
+    val DISCORD_AUTH_STATUS_URL: String get() = "$CLOUD_BACKEND_URL/discord-auth-status"
+    val AUTH_LOGIN_URL: String get() = "$CLOUD_BACKEND_URL/auth-login"
+    val AUTH_REFRESH_URL: String get() = "$CLOUD_BACKEND_URL/auth-refresh"
+    val AUTH_PASSWORD_START_URL: String get() = "$CLOUD_BACKEND_URL/auth-password-start"
+    val CLOUD_AUTH_EMAIL_URL: String get() = "$CLOUD_BACKEND_URL/cloud-auth-email"
+    val ACCOUNT_SYNC_PULL_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-pull"
+    val ACCOUNT_SYNC_PUSH_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-push"
+    val ACCOUNT_SYNC_CURSOR_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-cursor"
+    val ACCOUNT_SYNC_DELTA_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-delta"
+    val APP_USAGE_EVENT_URL: String get() = "$CLOUD_BACKEND_URL/app-usage-event"
 
     // API base URLs.
     const val TMDB_BASE_URL = "https://api.themoviedb.org/3/"

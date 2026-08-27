@@ -303,6 +303,8 @@ data class IptvLoadProgress(
 data class IptvCloudProfileState(
     val m3uUrl: String = "",
     val epgUrl: String = "",
+    val stalkerPortalUrl: String? = null,
+    val stalkerMacAddress: String? = null,
     val favoriteGroups: List<String> = emptyList(),
     val favoriteChannels: List<String> = emptyList(),
     val hiddenGroups: List<String> = emptyList(),
@@ -3099,7 +3101,11 @@ class IptvRepository @Inject constructor(
     private fun epgUrlKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_epg_url")
     private fun playlistsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_playlists_json")
     private fun stalkerPortalUrlKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_portal_url")
+    private fun stalkerPortalUrlKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_stalker_portal_url")
     private fun stalkerMacAddressKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_stalker_mac_address")
+    private fun stalkerMacAddressKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_stalker_mac_address")
     private fun showSpecialCategoriesKey(): Preferences.Key<Boolean> = booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_show_special_categories")
     private fun showSpecialCategoriesKeyFor(profileId: String): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileId}_iptv_show_special_categories")
@@ -3289,6 +3295,8 @@ class IptvRepository @Inject constructor(
         return IptvCloudProfileState(
             m3uUrl = primary?.m3uUrl ?: legacyM3uUrl,
             epgUrl = primary?.epgUrl ?: legacyEpgUrls.firstOrNull().orEmpty(),
+            stalkerPortalUrl = decryptConfigValue(prefs[stalkerPortalUrlKeyFor(safeProfileId)].orEmpty()),
+            stalkerMacAddress = prefs[stalkerMacAddressKeyFor(safeProfileId)].orEmpty(),
             favoriteGroups = decodeFavoriteGroups(prefs[favoriteGroupsKeyFor(safeProfileId)].orEmpty()),
             favoriteChannels = decodeFavoriteChannels(prefs[favoriteChannelsKeyFor(safeProfileId)].orEmpty()),
             hiddenGroups = if (hiddenRaw.isNotBlank()) {
@@ -3348,6 +3356,12 @@ class IptvRepository @Inject constructor(
             }
             prefs[m3uUrlKeyFor(safeProfileId)] = encryptConfigValue(normalizedM3u)
             prefs[epgUrlKeyFor(safeProfileId)] = encryptConfigValue(normalizedEpg)
+            state.stalkerPortalUrl?.let {
+                prefs[stalkerPortalUrlKeyFor(safeProfileId)] = encryptConfigValue(it.trim().trimEnd('/'))
+            }
+            state.stalkerMacAddress?.let {
+                prefs[stalkerMacAddressKeyFor(safeProfileId)] = it.trim().uppercase()
+            }
             prefs[favoriteGroupsKeyFor(safeProfileId)] = gson.toJson(state.favoriteGroups.distinct())
             prefs[favoriteChannelsKeyFor(safeProfileId)] = gson.toJson(state.favoriteChannels.distinct())
             if (applyRemoteGroupPreferences) {

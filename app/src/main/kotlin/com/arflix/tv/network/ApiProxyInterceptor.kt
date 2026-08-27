@@ -115,7 +115,7 @@ class ApiProxyInterceptor : Interceptor {
     }
 
     private fun hasProxyConfig(): Boolean {
-        return Constants.NETLIFY_BACKEND_URL.startsWith("https://") ||
-            Constants.NETLIFY_BACKEND_URL.startsWith("http://")
+        return Constants.CLOUD_BACKEND_URL.startsWith("https://") ||
+            Constants.CLOUD_BACKEND_URL.startsWith("http://")
     }
 }

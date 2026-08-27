@@ -1,0 +1,39 @@
+Bundled subtitle fonts
+Source repository: https://github.com/google/fonts
+Retrieved from the google/fonts main branch for this build.
+
+Noto Sans
+  https://raw.githubusercontent.com/google/fonts/main/ofl/notosans/NotoSans%5Bwdth%2Cwght%5D.ttf
+  SHA-256: bfb7bb691513f12e734dc346c03a03f784912432d7e3fa8e56efcf906fe86b3d
+
+Atkinson Hyperlegible Regular
+  https://raw.githubusercontent.com/google/fonts/main/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Regular.ttf
+  SHA-256: 7fb917c89019896d0b52ee84b7cbb3304c18cb90b19a62f5e32712bd23e97669
+
+Atkinson Hyperlegible Bold
+  https://raw.githubusercontent.com/google/fonts/main/ofl/atkinsonhyperlegible/AtkinsonHyperlegible-Bold.ttf
+  SHA-256: 5a3b0c8cc8ca545155150b4512a1fa248298df121c50d6557e651e61fbdab92f
+
+Lexend
+  https://raw.githubusercontent.com/google/fonts/main/ofl/lexend/Lexend%5Bwght%5D.ttf
+  SHA-256: 3add53e641fbc81da64da4bb254285e2831b52b029527bc0714e2b9610832ee6
+
+Roboto Condensed
+  https://raw.githubusercontent.com/google/fonts/main/ofl/robotocondensed/RobotoCondensed%5Bwght%5D.ttf
+  SHA-256: dace262afcee68a5276f200d8026c57221735c0118ab5fda8c2c0d3dc409a8d0
+
+Nunito Sans
+  https://raw.githubusercontent.com/google/fonts/main/ofl/nunitosans/NunitoSans%5BYTLC%2Copsz%2Cwdth%2Cwght%5D.ttf
+  SHA-256: f934d7142fb4784bf828da485b7dcbd90c0c80d514e9d49a5da0ed3a1ae2491d
+
+Quicksand
+  https://raw.githubusercontent.com/google/fonts/main/ofl/quicksand/Quicksand%5Bwght%5D.ttf
+  SHA-256: 39c9b64223561f56aaff6062a6f04063c4fc86809ad6768722c06614d977e1cc
+
+Rubik
+  https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/Rubik%5Bwght%5D.ttf
+  SHA-256: 1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88
+
+Varela Round
+  https://raw.githubusercontent.com/google/fonts/main/ofl/varelaround/VarelaRound-Regular.ttf
+  SHA-256: e1e47eb66dbc2ddc106661338e712d9176c9e83c669a82fde155324823d03aa2

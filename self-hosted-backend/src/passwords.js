@@ -9,7 +9,7 @@ function scrypt(password, salt, n, r, p) {
   });
 }
 
-export async function hashLegacyScryptPassword(password) {
+export async function hashScryptPassword(password) {
   const salt = crypto.randomBytes(16).toString("base64url");
   const n = 16384;
   const r = 8;
@@ -17,7 +17,7 @@ export async function hashLegacyScryptPassword(password) {
   return `scrypt:${n}:${r}:${p}:${salt}:${await scrypt(password, salt, n, r, p)}`;
 }
 
-export async function verifyLegacyScryptPassword(password, encoded) {
+export async function verifyScryptPassword(password, encoded) {
   const parts = String(encoded || "").split(":");
   if (parts.length !== 6 || parts[0] !== "scrypt") return false;
   const [, nRaw, rRaw, pRaw, salt, expected] = parts;

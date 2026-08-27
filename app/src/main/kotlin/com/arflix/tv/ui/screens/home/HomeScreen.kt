@@ -490,6 +490,16 @@ internal fun shouldPlayIptvHomeHero(
 internal fun canPaginateHomeCategory(categoryId: String, hasMore: Boolean): Boolean =
     hasMore && !categoryId.startsWith("collection_row_")
 
+internal fun canExpandHomeCardToFeatured(
+    categoryId: String,
+    isIptvCategory: Boolean,
+    usesPosterCards: Boolean,
+    trailerKey: String?,
+): Boolean = categoryId != "continue_watching" &&
+    !isIptvCategory &&
+    !usesPosterCards &&
+    trailerKey != null
+
 @androidx.compose.runtime.Immutable
 private data class HomeHeroPlaybackHandles(
     val player: ExoPlayer,
@@ -4098,7 +4108,12 @@ private fun ContentRow(
     }
     val isIptvCategory = category.id == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
         category.id == HomeViewModel.RECENT_TV_CATEGORY_ID
-    val hasFeaturedCard = !isIptvCategory && !effectivePosterMode && featuredTrailerKey != null
+    val hasFeaturedCard = canExpandHomeCardToFeatured(
+        categoryId = category.id,
+        isIptvCategory = isIptvCategory,
+        usesPosterCards = effectivePosterMode,
+        trailerKey = featuredTrailerKey,
+    )
     // Tracks which item index has held focus long enough to expand.
     // Using an index (not a boolean) means the derived `featuredExpanded`
     // evaluates to false immediately in the same composition frame when

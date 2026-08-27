@@ -24,7 +24,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -131,7 +130,6 @@ fun MediaCard(
     // hovered tile animates its GIF. Regular media items keep the existing
     // behavior (landscape uses backdrop art, poster uses image).
     val isCollectionTile = item.status?.startsWith("collection:") == true
-    val isMgmServiceTile = item.status == "collection:collection_service_mgmplus"
     val baseImageUrl = if (isCollectionTile) {
         item.image.takeIf { it.isNotBlank() } ?: item.backdrop?.takeIf { it.isNotBlank() }
     } else if (isLandscape) {
@@ -260,13 +258,7 @@ fun MediaCard(
                                 } else {
                                     Modifier
                                 }
-                            )
-                            .graphicsLayer {
-                                if (isMgmServiceTile) {
-                                    scaleX = 1.5f
-                                    scaleY = 1.5f
-                                }
-                            },
+                            ),
                     )
                 } else {
                     Box(

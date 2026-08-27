@@ -70,7 +70,7 @@ class AppUsageAnalyticsRepository @Inject constructor(
                 .put("distribution", if (BuildConfig.SELF_UPDATE_ENABLED) "sideload" else "play")
                 .put("metadata", metadata)
 
-            if (Constants.USE_NETLIFY_CLOUD_SYNC) {
+            if (Constants.CLOUD_SYNC_ENABLED) {
                 authRepository.getCurrentUserIdForSync()?.takeIf { it.isNotBlank() }?.let { userId ->
                     payload.put("user_id", userId)
                 }

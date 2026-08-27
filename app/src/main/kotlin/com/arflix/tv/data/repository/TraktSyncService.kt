@@ -1980,7 +1980,7 @@ class TraktSyncService @Inject constructor(
         operation: String,
         block: suspend (String) -> T
     ): T {
-        if (Constants.USE_NETLIFY_CLOUD_SYNC) {
+        if (Constants.CLOUD_SYNC_ENABLED) {
             throw IllegalStateException("Legacy Supabase Trakt sync is disabled in Netlify mode")
         }
         // Try getting auth, force-refresh if initial attempt fails

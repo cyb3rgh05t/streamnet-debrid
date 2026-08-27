@@ -11,15 +11,32 @@ import org.json.JSONObject
 class CloudSyncRepositoryAddonMergeTest {
     @Test
     fun `stale device push preserves profile created on another device`() {
-        val local = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100}]}"""
-        val remote = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100},{"id":"tv","name":"TV","lastUsedAt":200}]}"""
+        val local = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100}],"profileSettingsById":{"main":{"accentColor":"Orange"}},"iptvByProfile":{"main":{"playlists":[]}}}"""
+        val remote = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100},{"id":"tv","name":"TV","lastUsedAt":200}],"profileSettingsById":{"main":{"accentColor":"Orange"},"tv":{"accentColor":"Gold"}},"iptvByProfile":{"main":{"playlists":[]},"tv":{"playlists":[{"id":"list_1","name":"TV","m3uUrl":"https://tv.example/list.m3u"}],"tvSession":{"lastChannelId":"channel-7"}}},"traktTokens":{"tv":{"accessToken":"remote-token"}},"mdbListSyncByProfile":{"tv":{"provider":"MDBLIST"}},"catalogsByProfile":{"tv":[{"id":"remote-catalog"}]},"catalogsUpdatedAtByProfile":{"tv":200},"watchlistByProfile":{"tv":[{"mediaType":"movie","tmdbId":7,"addedAt":200}]},"watchlistUpdatedAtByProfile":{"tv":200},"localContinueWatchingByProfile":{"tv":[{"id":7,"mediaType":"MOVIE","progress":50,"updatedAtMs":200}]}}"""
 
-        val profiles = JSONObject(mergeProfilesForPush(local, remote)).getJSONArray("profiles")
+        val merged = JSONObject(mergeProfilesForPush(local, remote))
+        val profiles = merged.getJSONArray("profiles")
 
         assertEquals(2, profiles.length())
         assertEquals(setOf("main", "tv"), (0 until profiles.length()).map {
             profiles.getJSONObject(it).getString("id")
         }.toSet())
+        assertEquals("Gold", merged.getJSONObject("profileSettingsById").getJSONObject("tv").getString("accentColor"))
+        assertEquals(
+            "https://tv.example/list.m3u",
+            merged.getJSONObject("iptvByProfile").getJSONObject("tv")
+                .getJSONArray("playlists").getJSONObject(0).getString("m3uUrl")
+        )
+        assertEquals(
+            "channel-7",
+            merged.getJSONObject("iptvByProfile").getJSONObject("tv")
+                .getJSONObject("tvSession").getString("lastChannelId")
+        )
+        assertEquals("remote-token", merged.getJSONObject("traktTokens").getJSONObject("tv").getString("accessToken"))
+        assertEquals("MDBLIST", merged.getJSONObject("mdbListSyncByProfile").getJSONObject("tv").getString("provider"))
+        assertEquals("remote-catalog", merged.getJSONObject("catalogsByProfile").getJSONArray("tv").getJSONObject(0).getString("id"))
+        assertEquals(7, merged.getJSONObject("watchlistByProfile").getJSONArray("tv").getJSONObject(0).getInt("tmdbId"))
+        assertEquals(50, merged.getJSONObject("localContinueWatchingByProfile").getJSONArray("tv").getJSONObject(0).getInt("progress"))
     }
 
     @Test
@@ -52,6 +69,33 @@ class CloudSyncRepositoryAddonMergeTest {
         assertEquals("list|Remote First", merged.getJSONArray("groupOrder").getString(0))
         assertEquals("list|Local Hidden", locallyDirty.getJSONArray("hiddenGroups").getString(0))
         assertEquals("list|Local First", locallyDirty.getJSONArray("groupOrder").getString(0))
+    }
+
+    @Test
+    fun `newer remote addon order wins during stale device push`() {
+        val local = """{"addonsByProfile":{"main":[{"id":"first"},{"id":"second"}]},"addonsUpdatedAt":100}"""
+        val remote = """{"addonsByProfile":{"main":[{"id":"second"},{"id":"first"}]},"addonsUpdatedAt":200}"""
+
+        val merged = JSONObject(mergeAddonsByTimestamp(local, remote))
+        val addons = merged.getJSONObject("addonsByProfile").getJSONArray("main")
+
+        assertEquals(listOf("second", "first"), (0 until addons.length()).map {
+            addons.getJSONObject(it).getString("id")
+        })
+        assertEquals(200L, merged.getLong("addonsUpdatedAt"))
+    }
+
+    @Test
+    fun `newer local addon order survives older remote snapshot`() {
+        val local = """{"addonsByProfile":{"main":[{"id":"second"},{"id":"first"}]},"addonsUpdatedAt":300}"""
+        val remote = """{"addonsByProfile":{"main":[{"id":"first"},{"id":"second"}]},"addonsUpdatedAt":200}"""
+
+        val addons = JSONObject(mergeAddonsByTimestamp(local, remote))
+            .getJSONObject("addonsByProfile").getJSONArray("main")
+
+        assertEquals(listOf("second", "first"), (0 until addons.length()).map {
+            addons.getJSONObject(it).getString("id")
+        })
     }
 
     @Test

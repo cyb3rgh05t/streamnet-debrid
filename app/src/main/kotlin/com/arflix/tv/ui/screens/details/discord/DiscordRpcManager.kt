@@ -51,7 +51,7 @@ object DiscordRpcManager {
         get() = BuildConfig.DISCORD_APPLICATION_ID.trim()
 
     private val discordRedirectUri: String
-        get() = if (Constants.NETLIFY_BACKEND_URL == "https://auth.mystreamnet.club") {
+        get() = if (Constants.CLOUD_BACKEND_URL == "https://auth.mystreamnet.club") {
             "https://auth.mystreamnet.club/discord/callback"
         } else {
             LEGACY_REDIRECT_URI_WEB

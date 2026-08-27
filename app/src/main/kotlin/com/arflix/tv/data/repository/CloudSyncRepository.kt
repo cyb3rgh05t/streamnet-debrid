@@ -81,6 +81,22 @@ internal fun reconcileAddonsWithCloud(
     return reconciled.values.toList() to false
 }
 
+internal fun mergeAddonsByTimestamp(localPayload: String, remotePayload: String): String {
+    return runCatching {
+        val local = JSONObject(localPayload)
+        val remote = JSONObject(remotePayload)
+        val localUpdatedAt = local.optLong("addonsUpdatedAt", 0L)
+        val remoteUpdatedAt = remote.optLong("addonsUpdatedAt", 0L)
+        if (remoteUpdatedAt <= localUpdatedAt) return@runCatching localPayload
+
+        listOf("addonsByProfile", "addons").forEach { key ->
+            if (remote.has(key)) local.put(key, remote.get(key)) else local.remove(key)
+        }
+        local.put("addonsUpdatedAt", remoteUpdatedAt)
+        local.toString()
+    }.getOrDefault(localPayload)
+}
+
 internal fun mergeRemoteIptvGroupPreferences(
     localPayload: String,
     remotePayload: String,
@@ -288,11 +304,59 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
             profile.createdAt > deletedAt
         }
         local.put("profiles", JSONArray(gson.toJson(survivingProfiles)))
+        preserveRemoteOnlyProfileState(
+            local = local,
+            remote = remote,
+            localProfileIds = localProfiles.mapTo(HashSet()) { it.id },
+            survivingProfileIds = survivingProfiles.mapTo(HashSet()) { it.id },
+        )
         if (deletedAtById.isNotEmpty()) {
             local.put("profileDeletedAtById", JSONObject(deletedAtById))
         }
         local.toString()
     }.getOrDefault(localPayload)
+}
+
+private fun preserveRemoteOnlyProfileState(
+    local: JSONObject,
+    remote: JSONObject,
+    localProfileIds: Set<String>,
+    survivingProfileIds: Set<String>,
+) {
+    val remoteOnlyProfileIds = survivingProfileIds - localProfileIds
+    if (remoteOnlyProfileIds.isEmpty()) return
+
+    val profileScopedObjectKeys = listOf(
+        "profileAvatarImagesById",
+        "profileSettingsById",
+        "traktTokens",
+        "mdbListSyncByProfile",
+        "dismissedContinueWatchingByProfile",
+        "localContinueWatchingByProfile",
+        "localWatchedMoviesByProfile",
+        "localWatchedEpisodesByProfile",
+        "addonsByProfile",
+        "catalogsByProfile",
+        "hiddenPreinstalledByProfile",
+        "hiddenAddonByProfile",
+        "hiddenHomeServerByProfile",
+        "hiddenCustomByProfile",
+        "catalogsUpdatedAtByProfile",
+        "iptvByProfile",
+        "watchlistByProfile",
+        "watchlistUpdatedAtByProfile",
+        "watchlistRemovedByProfile",
+    )
+    profileScopedObjectKeys.forEach { containerKey ->
+        val remoteContainer = remote.optJSONObject(containerKey) ?: return@forEach
+        val localContainer = local.optJSONObject(containerKey)
+            ?: JSONObject().also { local.put(containerKey, it) }
+        remoteOnlyProfileIds.forEach { profileId ->
+            if (remoteContainer.has(profileId)) {
+                localContainer.put(profileId, remoteContainer.get(profileId))
+            }
+        }
+    }
 }
 
 private fun copyProfileArray(sourceRoot: JSONObject, targetRoot: JSONObject, containerKey: String, profileId: String) {
@@ -632,6 +696,7 @@ class CloudSyncRepository @Inject constructor(
         val subtitleSize: String = "Medium",
         val subtitleColor: String = "White",
         val subtitleStyle: String = "Bold",
+        val subtitleFont: String? = null,
         val subtitleOffset: String = "Bottom",
         val subtitleStylized: Boolean = true,
         val cardLayoutMode: String = CARD_LAYOUT_MODE_LANDSCAPE,
@@ -646,7 +711,9 @@ class CloudSyncRepository @Inject constructor(
         val clockFormat: String = "24h",
         val accentColor: String? = null,
         val showBudget: Boolean = true,
+        val showEpisodeRatings: Boolean? = null,
         val showLoadingStats: Boolean? = null,
+        val smoothScrolling: Boolean? = null,
         val spoilerBlurEnabled: Boolean = false,
         val volumeBoostDb: Int = 0,
         val includeSpecials: Boolean = false,
@@ -677,8 +744,12 @@ class CloudSyncRepository @Inject constructor(
     private fun accentColorKeyFor(profileId: String) = profileAccentColorKey(profileId)
     private fun showBudgetKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_budget_on_home")
+    private fun showEpisodeRatingsKeyFor(profileId: String) =
+        profileManager.profileBooleanKeyFor(profileId, "show_episode_ratings")
     private fun showLoadingStatsKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_loading_stats")
+    private fun smoothScrollingKeyFor(profileId: String) =
+        profileManager.profileBooleanKeyFor(profileId, "smooth_scrolling")
     private fun spoilerBlurKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "spoiler_blur")
     private fun volumeBoostDbKeyFor(profileId: String) =
@@ -698,6 +769,8 @@ class CloudSyncRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "subtitle_offset")
     private fun subtitleStyleKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "subtitle_style")
+    private fun subtitleFontKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "subtitle_font")
     private fun subtitleStylizedKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "subtitle_stylized")
     private fun iptvHiddenGroupsKeyFor(profileId: String) =
@@ -803,6 +876,12 @@ class CloudSyncRepository @Inject constructor(
     )
     // Per-profile fields excluded from the generic merge (handled by their own logic / not values).
     private val profileMergeExclude = setOf("defaultSubtitle", "subtitleSettingsUpdatedAt")
+    private val iptvMergeExclude = setOf(
+        "hiddenGroups",
+        "groupOrder",
+        "groupOrderSchema",
+        "groupPreferencesUpdatedAt",
+    )
 
     /** Canonical field keys present in [root]: "g:<globalKey>" and "p:<profileId>:<field>". */
     private fun mergeKeysOf(root: JSONObject): List<String> {
@@ -818,8 +897,8 @@ class CloudSyncRepository @Inject constructor(
         root.optJSONObject("iptvByProfile")?.let { iptv ->
             for (pid in iptv.keys()) {
                 val profile = iptv.optJSONObject(pid) ?: continue
-                if (profile.has("showSpecialCategories")) {
-                    keys.add("i:$pid:showSpecialCategories")
+                for (field in profile.keys()) {
+                    if (field !in iptvMergeExclude) keys.add("i:$pid:$field")
                 }
             }
         }
@@ -998,7 +1077,9 @@ class CloudSyncRepository @Inject constructor(
                             ?: prefs[ACCENT_COLOR_KEY]
                             ?: "Orange",
                         showBudget = prefs[showBudgetKeyFor(profile.id)] ?: true,
+                        showEpisodeRatings = prefs[showEpisodeRatingsKeyFor(profile.id)] ?: true,
                         showLoadingStats = prefs[showLoadingStatsKeyFor(profile.id)] ?: true,
+                        smoothScrolling = prefs[smoothScrollingKeyFor(profile.id)] ?: true,
                         spoilerBlurEnabled = prefs[spoilerBlurKeyFor(profile.id)] ?: false,
                         volumeBoostDb = prefs[volumeBoostDbKeyFor(profile.id)]?.toIntOrNull()?.coerceIn(0, 15) ?: 0,
                         dnsProvider = prefs[dnsProviderKeyFor(profile.id)] ?: globalDnsProvider,
@@ -1008,6 +1089,7 @@ class CloudSyncRepository @Inject constructor(
                         subtitleColor = prefs[subtitleColorKeyFor(profile.id)] ?: "White",
                         subtitleOffset = prefs[subtitleOffsetKeyFor(profile.id)] ?: "Bottom",
                         subtitleStyle = prefs[subtitleStyleKeyFor(profile.id)] ?: "Bold",
+                        subtitleFont = prefs[subtitleFontKeyFor(profile.id)] ?: "System",
                         subtitleStylized = prefs[subtitleStylizedKeyFor(profile.id)] ?: true,
                         secondarySubtitle = prefs[secondarySubtitleKeyFor(profile.id)] ?: "Off",
                         filterSubtitlesByLanguage = prefs[filterSubtitlesByLanguageKeyFor(profile.id)] ?: true,
@@ -1456,8 +1538,12 @@ class CloudSyncRepository @Inject constructor(
             baseStr = groupPreferencesMerged,
             otherStr = remotePayload,
         ).json
-        val watchlistMergedPayload = mergeWatchlistByTimestamp(
+        val addonsMergedPayload = mergeAddonsByTimestamp(
             localPayload = settingsMergedPayload,
+            remotePayload = remotePayload,
+        )
+        val watchlistMergedPayload = mergeWatchlistByTimestamp(
+            localPayload = addonsMergedPayload,
             remotePayload = remotePayload,
         )
         val catalogsMergedPayload = mergeCatalogsByTimestamp(
@@ -1789,7 +1875,9 @@ class CloudSyncRepository @Inject constructor(
                             prefs[accentColorKeyFor(profileId)] = it
                         }
                         prefs[showBudgetKeyFor(profileId)] = state.showBudget
+                        state.showEpisodeRatings?.let { prefs[showEpisodeRatingsKeyFor(profileId)] = it }
                         state.showLoadingStats?.let { prefs[showLoadingStatsKeyFor(profileId)] = it }
+                        state.smoothScrolling?.let { prefs[smoothScrollingKeyFor(profileId)] = it }
                         prefs[spoilerBlurKeyFor(profileId)] = state.spoilerBlurEnabled
                         prefs[volumeBoostDbKeyFor(profileId)] = state.volumeBoostDb.coerceIn(0, 15).toString()
                         prefs[dnsProviderKeyFor(profileId)] = state.dnsProvider.ifBlank { "system" }
@@ -1802,6 +1890,7 @@ class CloudSyncRepository @Inject constructor(
                         prefs[subtitleColorKeyFor(profileId)] = state.subtitleColor
                         prefs[subtitleOffsetKeyFor(profileId)] = state.subtitleOffset
                         prefs[subtitleStyleKeyFor(profileId)] = state.subtitleStyle
+                        state.subtitleFont?.let { prefs[subtitleFontKeyFor(profileId)] = it }
                         prefs[subtitleStylizedKeyFor(profileId)] = state.subtitleStylized
                         prefs[secondarySubtitleKeyFor(profileId)] = state.secondarySubtitle.ifBlank { "Off" }
                         prefs[filterSubtitlesByLanguageKeyFor(profileId)] = state.filterSubtitlesByLanguage

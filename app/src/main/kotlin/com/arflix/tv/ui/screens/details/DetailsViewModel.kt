@@ -335,7 +335,9 @@ class DetailsViewModel @Inject constructor(
                     it.id == mediaId && it.mediaType == mediaType
                 }
                 val cachedFullItem = mediaRepository.getCachedFullItem(mediaType, mediaId)
-                val cachedItem = cachedFullItem ?: mediaRepository.getCachedItem(mediaType, mediaId)
+                val cachedItem = cachedFullItem
+                    ?: mediaRepository.getCachedItem(mediaType, mediaId)
+                    ?: mediaRepository.getCachedItemFromDisk(mediaType, mediaId)
                 val initialItem = cachedItem ?: previousItem
                 val cachedLogoUrl = mediaRepository.peekCachedLogoUrl(mediaType, mediaId)
                     ?: previousState.logoUrl?.takeIf { previousMatches }

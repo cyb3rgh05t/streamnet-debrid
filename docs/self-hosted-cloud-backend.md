@@ -39,7 +39,7 @@ A public domain such as `api.mystreamnet.club` is required for reliable sync out
 
 ## Existing API Contract
 
-The Android app currently builds endpoint URLs from `NETLIFY_BACKEND_URL` in `app/src/main/kotlin/com/arflix/tv/util/Constants.kt`. The self-hosted backend should initially preserve these paths and response shapes:
+The Android app builds endpoint URLs from `CLOUD_BACKEND_URL` in `app/src/main/kotlin/com/arflix/tv/util/Constants.kt`:
 
 | Endpoint                                                              | Purpose                                                     |
 | --------------------------------------------------------------------- | ----------------------------------------------------------- |
@@ -56,7 +56,7 @@ The Android app currently builds endpoint URLs from `NETLIFY_BACKEND_URL` in `ap
 | `discord-*`                                                           | Discord pairing/callback support, if retained               |
 | `tmdb-proxy`, `trakt-proxy`, `simkl-proxy`                            | Optional protected API proxy endpoints                      |
 
-Keep `account-sync-pull` and `account-sync-push` behavior compatible during migration. This allows the Android app to point at the new service by changing only `NETLIFY_BACKEND_URL` in `secrets.properties` or CI secrets.
+`account-sync-pull` and `account-sync-push` preserve the established response contract while running on the self-hosted service.
 
 ## Authentication
 
@@ -203,7 +203,7 @@ Keep secrets in an untracked `.env` file or a server-side secret manager. Never 
 
 Existing cloud data can be preserved. The account snapshot already contains the profiles, profile settings, addons, catalogs, IPTV configuration, watchlist, Continue Watching state, watched state, and deletion tombstones needed for normal restore.
 
-The repository already contains `legacy/netlify-auth-site/scripts/import-supabase-export.mjs`. It reads a Supabase export in NDJSON format and selects the strongest snapshot per account from these sources:
+Historical snapshot imports were completed before the legacy migration tooling was removed. The import selected the strongest snapshot per account from these sources:
 
 - `public.account_sync_state.ndjson`
 - `public.user_settings.ndjson`
@@ -274,7 +274,7 @@ Rollback is possible only while the old service remains available and before use
 
 ### Phase 4: Switch the APK
 
-- Build a separate test APK with `NETLIFY_BACKEND_URL=https://api.mystreamnet.club`; do not change the production APK URL yet.
+- Build a separate test APK with `CLOUD_BACKEND_URL=https://auth.mystreamnet.club` when validating backend changes.
 - Keep the Supabase mirror enabled only during a limited rollback window.
 - Install the test APK on selected devices and monitor sync failures and HTTP `409` rates.
 - Change the production APK URL only after successful multi-device tests and a verified migration report.

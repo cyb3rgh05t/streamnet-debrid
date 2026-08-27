@@ -10,12 +10,12 @@
 "area: auth-site":
   - changed-files:
       - any-glob-to-any-file:
-          - "legacy/netlify-auth-site/**"
+          - "self-hosted-backend/public/**"
 
 "area: backend":
   - changed-files:
       - any-glob-to-any-file:
-          - "legacy/supabase/**"
+          - "self-hosted-backend/**"
 
 "area: ci":
   - changed-files:
