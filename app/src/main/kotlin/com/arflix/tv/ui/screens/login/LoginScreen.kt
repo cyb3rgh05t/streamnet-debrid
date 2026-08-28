@@ -44,6 +44,7 @@ import com.arflix.tv.data.repository.AuthState
 import com.arflix.tv.ui.components.*
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.*
+import com.arflix.tv.util.LocalDeviceType
 
 /**
  * Login Screen with Email/Password - Optimized for TV
@@ -69,6 +70,7 @@ fun LoginScreen(
     val privacyFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
     // Handle successful login
     LaunchedEffect(uiState.loginReady) {
@@ -317,26 +319,11 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                // Error message
-                if (uiState.error != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(ErrorRed.copy(alpha = 0.12f))
-                            .border(
-                                width = 1.dp,
-                                color = ErrorRed.copy(alpha = 0.42f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .padding(12.dp)
-                    ) {
-                        Text(
-                            text = uiState.error!!,
-                            fontSize = 13.sp,
-                            color = ErrorRed
-                        )
-                    }
+                if (!isTouchDevice && uiState.error != null) {
+                    LoginErrorBanner(
+                        message = uiState.error!!,
+                        modifier = Modifier.fillMaxWidth()
+                    )
                     Spacer(modifier = Modifier.height(20.dp))
                 }
 
@@ -463,6 +450,44 @@ fun LoginScreen(
                 }
             }
         }
+
+        if (isTouchDevice && uiState.error != null) {
+            LoginErrorBanner(
+                message = uiState.error!!,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun LoginErrorBanner(
+    message: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(BackgroundCard)
+            .border(
+                width = 1.dp,
+                color = ErrorRed.copy(alpha = 0.72f),
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp)
+    ) {
+        Text(
+            text = message,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = ErrorRed
+        )
     }
 }
 

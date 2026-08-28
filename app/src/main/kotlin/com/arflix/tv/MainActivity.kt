@@ -17,6 +17,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -36,6 +37,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -116,6 +118,7 @@ import com.arflix.tv.updater.UpdateStatusManager
 import com.arflix.tv.updater.VersionUtils
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arflix.tv.ui.theme.appBackgroundDark
+import coil.compose.AsyncImage
 import com.arflix.tv.worker.TraktSyncWorker
 import dagger.hilt.android.AndroidEntryPoint
 import dagger.Lazy
@@ -403,6 +406,7 @@ class MainActivity : ComponentActivity() {
                         preloadedHeroItem = startupState.heroItem,
                         preloadedHeroLogoUrl = startupState.heroLogoUrl,
                         preloadedLogoCache = startupState.logoCache,
+                        preloadedTrendingBackdropUrls = startupState.trendingBackdropUrls,
                         onExitApp = { finish() }
                     )
                 }
@@ -536,16 +540,27 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun ArvioLoadingScreen() {
+fun ArvioLoadingScreen(
+    trendingBackdropUrls: List<String> = emptyList(),
+) {
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
     val reveal = remember { Animatable(0f) }
     val accentColor = Color(0xFFFF8800)
+    var backdropIndex by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(Unit) {
         reveal.animateTo(
             targetValue = 1f,
             animationSpec = tween(durationMillis = 920, easing = FastOutSlowInEasing)
         )
+    }
+
+    LaunchedEffect(trendingBackdropUrls) {
+        backdropIndex = 0
+        while (trendingBackdropUrls.size > 1) {
+            delay(5_000L)
+            backdropIndex = (backdropIndex + 1) % trendingBackdropUrls.size
+        }
     }
 
     val logoAlpha by infiniteTransition.animateFloat(
@@ -564,6 +579,31 @@ fun ArvioLoadingScreen() {
             .background(Color.Black),
         contentAlignment = Alignment.Center
     ) {
+        trendingBackdropUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
+            Crossfade(
+                targetState = backdropUrl,
+                animationSpec = tween(durationMillis = 1_200),
+                label = "loading_trending_backdrop",
+            ) { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.64f),
+                            0.5f to Color.Black.copy(alpha = 0.42f),
+                            1f to Color.Black.copy(alpha = 0.82f),
+                        )
+                    )
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -619,6 +659,7 @@ fun ArflixApp(
     preloadedHeroItem: com.arflix.tv.data.model.MediaItem? = null,
     preloadedHeroLogoUrl: String? = null,
     preloadedLogoCache: Map<String, String> = emptyMap(),
+    preloadedTrendingBackdropUrls: List<String> = emptyList(),
     onExitApp: () -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -639,7 +680,7 @@ fun ArflixApp(
         authState !is AuthState.Loading
 
     if (!startupReady || !startupIntroComplete) {
-        ArvioLoadingScreen()
+        ArvioLoadingScreen(trendingBackdropUrls = preloadedTrendingBackdropUrls)
         return
     }
 
@@ -715,6 +756,7 @@ fun ArflixApp(
                 preloadedHeroItem = preloadedHeroItem,
                 preloadedHeroLogoUrl = preloadedHeroLogoUrl,
                 preloadedLogoCache = preloadedLogoCache,
+                preloadedTrendingBackdropUrls = preloadedTrendingBackdropUrls,
                 currentProfile = activeProfile,
                 isCloudConnected = authState is AuthState.Authenticated,
                 onSwitchProfile = {

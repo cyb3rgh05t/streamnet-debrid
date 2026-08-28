@@ -130,6 +130,7 @@ fun AppNavigation(
     preloadedHeroItem: MediaItem? = null,
     preloadedHeroLogoUrl: String? = null,
     preloadedLogoCache: Map<String, String> = emptyMap(),
+    preloadedTrendingBackdropUrls: List<String> = emptyList(),
     currentProfile: Profile? = null,
     isCloudConnected: Boolean = false,
     onSwitchProfile: () -> Unit = {},
@@ -352,6 +353,7 @@ fun AppNavigation(
         // Profile selection screen
         composable(Screen.ProfileSelection.route) {
             ProfileSelectionScreen(
+                trendingBackdropUrls = preloadedTrendingBackdropUrls,
                 onProfileSelected = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.ProfileSelection.route) { inclusive = true }

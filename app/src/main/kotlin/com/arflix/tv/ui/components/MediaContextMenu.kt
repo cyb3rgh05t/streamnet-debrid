@@ -32,6 +32,8 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarOutline
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -80,10 +82,13 @@ fun MediaContextMenu(
     isInWatchlist: Boolean,
     isWatched: Boolean,
     isContinueWatching: Boolean = false,
+    isIptvChannel: Boolean = false,
+    isFavoriteChannel: Boolean = false,
     onPlay: () -> Unit,
     onViewDetails: () -> Unit,
     onToggleWatchlist: () -> Unit,
     onToggleWatched: () -> Unit,
+    onToggleFavoriteChannel: () -> Unit = {},
     onRemoveFromContinueWatching: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
@@ -100,26 +105,33 @@ fun MediaContextMenu(
         ))
         add(MenuItem(
             icon = Icons.Default.Info,
-            labelRes = R.string.details,
+            labelRes = if (isIptvChannel) R.string.program_info else R.string.details,
             action = onViewDetails
         ))
-        add(MenuItem(
-            icon = if (isInWatchlist) Icons.Default.Remove else Icons.Default.Add,
-            labelRes = if (isInWatchlist) R.string.remove_from_watchlist else R.string.add_to_watchlist,
-            action = onToggleWatchlist
-        ))
-        add(MenuItem(
-            icon = if (isWatched) Icons.Default.Visibility else Icons.Default.Check,
-            labelRes = if (isWatched) R.string.unwatched else R.string.watched,
-            action = onToggleWatched
-        ))
-        // Add "Remove from Continue Watching" only when applicable
-        if (isContinueWatching && onRemoveFromContinueWatching != null) {
+        if (isIptvChannel) {
             add(MenuItem(
-                icon = Icons.Default.Close,
-                labelRes = R.string.delete,
-                action = onRemoveFromContinueWatching
+                icon = if (isFavoriteChannel) Icons.Default.Star else Icons.Default.StarOutline,
+                labelRes = if (isFavoriteChannel) R.string.remove_from_favorites else R.string.add_to_favorites,
+                action = onToggleFavoriteChannel
             ))
+        } else {
+            add(MenuItem(
+                icon = if (isInWatchlist) Icons.Default.Remove else Icons.Default.Add,
+                labelRes = if (isInWatchlist) R.string.remove_from_watchlist else R.string.add_to_watchlist,
+                action = onToggleWatchlist
+            ))
+            add(MenuItem(
+                icon = if (isWatched) Icons.Default.Visibility else Icons.Default.Check,
+                labelRes = if (isWatched) R.string.unwatched else R.string.watched,
+                action = onToggleWatched
+            ))
+            if (isContinueWatching && onRemoveFromContinueWatching != null) {
+                add(MenuItem(
+                    icon = Icons.Default.Close,
+                    labelRes = R.string.delete,
+                    action = onRemoveFromContinueWatching
+                ))
+            }
         }
     }
 

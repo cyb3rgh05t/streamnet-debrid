@@ -3235,7 +3235,7 @@ class SettingsViewModel @Inject constructor(
             if (!ensureCloudSyncSession()) {
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet TV Cloud, then sync again.",
+                    lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet Cloud, then sync again.",
                     toastMessage = context.getString(R.string.toast_reconnect_cloud_sync),
                     toastType = ToastType.INFO
                 )
@@ -3412,6 +3412,13 @@ class SettingsViewModel @Inject constructor(
             authRepository.checkAuthState()
         }
         return authRepository.hasValidCloudSyncSession()
+    }
+
+    fun validateCloudSession() {
+        if (!_uiState.value.isLoggedIn) return
+        viewModelScope.launch {
+            authRepository.refreshAccessToken()
+        }
     }
 
     private suspend fun restoreCloudStateToLocalInternal(

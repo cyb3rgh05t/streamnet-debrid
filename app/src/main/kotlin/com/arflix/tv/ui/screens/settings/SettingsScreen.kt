@@ -132,6 +132,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -342,6 +345,7 @@ fun SettingsScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val isRtlLayoutDirection = LocalLayoutDirection.current == LayoutDirection.Rtl
 
@@ -378,6 +382,16 @@ fun SettingsScreen(
                 viewModel.startCloudAuth()
             }
         }
+    }
+
+    DisposableEffect(lifecycleOwner, uiState.isLoggedIn) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && uiState.isLoggedIn) {
+                viewModel.validateCloudSession()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     var isSidebarFocused by remember { mutableStateOf(false) }

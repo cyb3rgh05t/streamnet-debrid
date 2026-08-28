@@ -2,6 +2,7 @@ package com.arflix.tv.ui.screens.profile
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.Crossfade
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,6 +46,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -72,11 +74,13 @@ import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.ui.res.painterResource
 import com.arflix.tv.R
+import coil.compose.AsyncImage
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ProfileSelectionScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
+    trendingBackdropUrls: List<String> = emptyList(),
     onProfileSelected: () -> Unit,
     onShowAddProfile: () -> Unit,
     onConnectCloud: () -> Unit = {},
@@ -89,8 +93,17 @@ fun ProfileSelectionScreen(
 
     // Track if profile was selected in this session to trigger navigation
     var navigateTriggered by remember { mutableStateOf(false) }
+    var backdropIndex by remember { mutableIntStateOf(0) }
 
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+
+    LaunchedEffect(trendingBackdropUrls) {
+        backdropIndex = 0
+        while (trendingBackdropUrls.size > 1) {
+            delay(5_000L)
+            backdropIndex = (backdropIndex + 1) % trendingBackdropUrls.size
+        }
+    }
 
     // Navigate after the user picks a profile.
     // `navigateTriggered` MUST be a key. Keying only on the uiState values meant the tap itself
@@ -143,6 +156,39 @@ fun ProfileSelectionScreen(
             .background(appBackgroundDark()),
         contentAlignment = Alignment.Center
     ) {
+        trendingBackdropUrls.getOrNull(backdropIndex)?.let { backdropUrl ->
+            Crossfade(
+                targetState = backdropUrl,
+                animationSpec = tween(durationMillis = 1_200),
+                label = "profile_trending_backdrop",
+            ) { url ->
+                AsyncImage(
+                    model = url,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to Color.Black.copy(alpha = 0.8f),
+                            0.5f to Color.Black.copy(alpha = 0.48f),
+                            1f to Color.Black.copy(alpha = 0.8f),
+                        )
+                    )
+                    .background(
+                        Brush.verticalGradient(
+                            0f to Color.Black.copy(alpha = 0.55f),
+                            0.5f to Color.Black.copy(alpha = 0.3f),
+                            1f to appBackgroundDark().copy(alpha = 0.92f),
+                        )
+                    )
+            )
+        }
+
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -157,19 +203,22 @@ fun ProfileSelectionScreen(
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .padding(horizontal = 24.dp)
-                        .widthIn(max = if (isTouchDevice) 260.dp else 300.dp)
+                    .widthIn(max = if (isTouchDevice) 260.dp else 300.dp)
             )
 
-                    Spacer(modifier = Modifier.height(14.dp))
+            if (!isCloudConnected) {
+                Spacer(modifier = Modifier.height(28.dp))
 
-            Text(
-                text = if (uiState.isManageMode) stringResource(R.string.manage_profiles) else stringResource(R.string.whos_watching),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.White.copy(alpha = 0.8f)
-            )
+                CloudConnectButton(
+                    onClick = {
+                        if (!uiState.isSwitchingProfile) {
+                            onConnectCloud()
+                        }
+                    }
+                )
+            }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(if (isCloudConnected) 18.dp else 16.dp))
 
             // Profile avatars row
             val avatarSize = if (isTouchDevice) 90.dp else 120.dp
@@ -179,8 +228,6 @@ fun ProfileSelectionScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .widthIn(max = 820.dp)
-                    .background(Color.White.copy(alpha = 0.025f), RoundedCornerShape(16.dp))
-                    .border(1.dp, Color(0xFFE5A209).copy(alpha = 0.18f), RoundedCornerShape(16.dp))
                     .padding(horizontal = 24.dp, vertical = 22.dp),
                 contentAlignment = Alignment.Center
             ) {
@@ -275,7 +322,7 @@ fun ProfileSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Manage Profiles button
             ManageProfilesButton(
@@ -286,19 +333,6 @@ fun ProfileSelectionScreen(
                     }
                 }
             )
-
-            if (!isCloudConnected) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Cloud connect button — focusable on TV, tappable on mobile
-                CloudConnectButton(
-                    onClick = {
-                        if (!uiState.isSwitchingProfile) {
-                            onConnectCloud()
-                        }
-                    }
-                )
-            }
 
             if (uiState.isSwitchingProfile) {
                 Spacer(modifier = Modifier.height(18.dp))
@@ -648,40 +682,56 @@ private fun CloudConnectButton(
     Surface(
         onClick = if (isTouchDevice) ({}) else onClick,
         modifier = Modifier
+            .widthIn(max = 220.dp)
             .then(if (isTouchDevice) Modifier.clickable { onClick() } else Modifier)
             .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(4.dp)),
+        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(6.dp)),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color.Transparent,
-            focusedContainerColor = accentColor.copy(alpha = 0.12f)
+            containerColor = Color.Black.copy(alpha = 0.38f),
+            focusedContainerColor = accentFocused
+        ),
+        scale = ClickableSurfaceDefaults.scale(
+            focusedScale = 1.04f,
+            pressedScale = 0.98f
         ),
         border = ClickableSurfaceDefaults.border(
             border = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.6f)),
-                shape = RoundedCornerShape(4.dp)
+                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.72f)),
+                shape = RoundedCornerShape(6.dp)
             ),
             focusedBorder = androidx.tv.material3.Border(
                 border = androidx.compose.foundation.BorderStroke(2.dp, accentFocused),
-                shape = RoundedCornerShape(4.dp)
+                shape = RoundedCornerShape(6.dp)
             )
         )
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier
+                .background(
+                    Brush.horizontalGradient(
+                        if (isFocused > 0) {
+                            listOf(Color.Transparent, Color.White.copy(alpha = 0.12f), Color.Transparent)
+                        } else {
+                            listOf(accentColor.copy(alpha = 0.08f), Color.Transparent, accentColor.copy(alpha = 0.04f))
+                        }
+                    )
+                )
+                .padding(horizontal = 16.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.Center
         ) {
             Icon(
                 imageVector = Icons.Default.Cloud,
                 contentDescription = null,
-                tint = if (isFocused > 0) accentFocused else accentColor,
+                tint = if (isFocused > 0) Color(0xFF18120A) else accentColor,
                 modifier = Modifier.size(18.dp)
             )
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = stringResource(R.string.connect_to_cloud),
+                text = stringResource(R.string.profile_cloud_button),
                 fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (isFocused > 0) accentFocused else accentColor
+                fontWeight = FontWeight.Bold,
+                color = if (isFocused > 0) Color(0xFF18120A) else accentColor
             )
         }
     }

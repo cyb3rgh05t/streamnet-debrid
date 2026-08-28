@@ -562,7 +562,14 @@ class AuthRepository @Inject constructor(
                 val body = response.body?.string().orEmpty()
                 val json = try { JSONObject(body) } catch (e: org.json.JSONException) { null }
                 if (!response.isSuccessful) {
-                    val message = cloudAuthErrorMessage(json, defaultError)
+                    val message = if (
+                        response.code == 401 &&
+                        json?.optString("code") != "password_setup_required"
+                    ) {
+                        context.getString(R.string.auth_invalid_credentials_with_signup)
+                    } else {
+                        cloudAuthErrorMessage(json, defaultError)
+                    }
                     throw IllegalStateException(message)
                 }
 
@@ -666,9 +673,9 @@ class AuthRepository @Inject constructor(
         val rawMessage = error?.message?.streamNetBranded() ?: return fallback
         val message = rawMessage.lowercase()
         val cloudPasswordHelp =
-            "Invalid email or password. If this is an existing StreamNet TV Cloud account, create a new password on the StreamNet TV authentication page and then sign in again."
+            "Invalid email or password. If this is an existing StreamNet Cloud account, create a new password on the StreamNet TV authentication page and then sign in again."
         return when {
-            "arvio cloud moved" in message || "streamnet tv cloud moved" in message || "password setup" in message -> rawMessage
+            "arvio cloud moved" in message || "StreamNet Cloud moved" in message || "password setup" in message -> rawMessage
             Constants.CLOUD_SYNC_ENABLED && "invalid email or password" in message -> cloudPasswordHelp
             "database error saving new user" in message -> context.getString(R.string.auth_account_exists)
             "settingssessionmanager" in message -> context.getString(R.string.auth_signin_retry)
@@ -792,7 +799,12 @@ class AuthRepository @Inject constructor(
 
                 okHttpClient.newCall(request).execute().use { response ->
                     val body = response.body?.string().orEmpty()
-                    if (!response.isSuccessful) return@withContext null
+                    if (!response.isSuccessful) {
+                        if (response.code == 401 || response.code == 403) {
+                            clearInvalidCloudSession()
+                        }
+                        return@withContext null
+                    }
                     val json = JSONObject(body)
                     val accessToken = json.optString("access_token")
                     val newRefreshToken = json.optString("refresh_token")
@@ -818,6 +830,13 @@ class AuthRepository @Inject constructor(
                 null
             }
         }
+    }
+
+    private suspend fun clearInvalidCloudSession() {
+        context.authDataStore.edit { prefs -> prefs.clear() }
+        _userProfile.value = null
+        _authState.value = AuthState.NotAuthenticated
+        AppLogger.breadcrumb("Auth", "cloud_session_revoked", severity = "warning")
     }
 
     /**

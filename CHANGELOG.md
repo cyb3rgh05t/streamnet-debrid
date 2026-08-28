@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### StreamNet Cloud, profiles, and account safety
+
+- Added rotating mixed movie and series artwork to the startup loading screen and profile selection, changing every five seconds from one shared preload pool.
+- Simplified profile selection by removing the heading and outer profile container, and added a compact, D-pad-focused `myStreamNet Cloud` action beneath the StreamNet TV logo.
+- Rebranded visible cloud-service references as StreamNet Cloud and introduced the StreamNet Club logo across the self-hosted sign-in, privacy, deletion, and success pages.
+- Improved sign-in and expired-session handling so invalid StreamNet Cloud credentials and revoked sessions produce clearer errors and stale local authentication is removed.
+- Hardened permanent account deletion so account sessions, snapshots, pairing sessions, usage events, watch history, and watch state are removed transactionally; added PostgreSQL cascade constraints and regression tests.
+
+### Home and IPTV interaction
+
+- Added a themed, D-pad-isolated IPTV program information dialog with backdrop, logo, metadata, current-program details, playback, and favorite actions.
+- Added IPTV program details and favorite toggling to media context menus and kept Home row state stable when guide data changes.
+- Refined mobile error presentation and updated Home startup selection to prefer the first visible configured rail.
+
 ### Cloud migration and localization
 
 - Switched production Android release builds to the self-hosted StreamNet backend at `auth.mystreamnet.club`.
@@ -95,9 +109,9 @@ All notable changes to this project are documented in this file.
 - Fixed sideload production-plugin routing, extractor unloading, mobile routing, and TV focus limits. Contributor: @Himanth-reddy via #466.
 - Fixed analytics compilation and logging consistency introduced by the broader reliability work. Contributor: @Himanth-reddy via #476.
 
-### StreamNet TV Cloud, security, and accounts
+### StreamNet Cloud, security, and accounts
 
-- Centralized web and TV-pairing authentication through `auth.mystreamnet.club` for a consistent StreamNet TV Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
+- Centralized web and TV-pairing authentication through `auth.mystreamnet.club` for a consistent StreamNet Cloud sign-in flow. Contributor: @Himanth-reddy via #472.
 - Hardened Catalog Pack submissions with URL validation, SSRF protection, rate limiting, and safer manifest handling. Contributor: @Himanth-reddy via #463.
 - Expanded disposable-email blocking for cloud account registration. Contributor: @mvanhorn via #496.
 - Fixed web login redirect loops, stale-account profile leakage, signup routing, and login wordmark overlap. Contributor: @Himanth-reddy via #475.
@@ -314,7 +328,7 @@ Thank you to everyone who helped with this release, including:
 ### Sources
 
 - Metadata and discovery: TMDB, IMDb metadata/logo assets, Trakt.
-- Sync/auth: Supabase and StreamNet TV Cloud.
+- Sync/auth: Supabase and StreamNet Cloud.
 - Playback/addons: IPTV M3U/Xtream/Stalker sources, Stremio-compatible addons, and community HTTP sources.
 - Smoothness references: Android TV device traces and public Android TV performance research.
 
@@ -503,7 +517,7 @@ Thank you to everyone who helped with this release, including:
 - Continue Watching now refreshes more reliably across Trakt and non-Trakt profiles, including remove/dismiss persistence and next-episode advancement.
 - Details now keeps the correct Continue Watching target and watched markers when opening into a resumed episode/season path.
 - Home context menu focus, overlay layering, and back handling regressions.
-- StreamNet TV Cloud TV pairing fallback/verification flow and missing release-build Supabase host configuration.
+- StreamNet Cloud TV pairing fallback/verification flow and missing release-build Supabase host configuration.
 - Live TV guide viewport/focus polish, including more visible channels and cleaner spacing.
 - Startup crash caused by restricted TV provider channel selection query in launcher integration.
 
@@ -547,12 +561,12 @@ Thank you to everyone who helped with this release, including:
 - Continue Watching no longer shows a 60-second empty gap when auto-playing the next episode.
 - "Mark as Watched" from the context menu now correctly removes the item from Continue Watching.
 - "Mark as Watched" now automatically adds the next episode to Continue Watching.
-- Watched status now loads from StreamNet TV Cloud for non-Trakt profiles, so badges appear without a Trakt account.
+- Watched status now loads from StreamNet Cloud for non-Trakt profiles, so badges appear without a Trakt account.
 - Continue Watching now syncs across devices for non-Trakt profiles using profile name instead of device-local UUID.
 - Legacy Continue Watching entries no longer leak across profiles.
 - Fixed duplicate key crash ("Key was already used") in Continue Watching row when the same show appeared twice.
 - Watched badges now appear on initial Details page load without needing to navigate away and back.
-- StreamNet TV Cloud watched data queries now paginate correctly for large libraries (previously capped at 1,000 rows).
+- StreamNet Cloud watched data queries now paginate correctly for large libraries (previously capped at 1,000 rows).
 - Hero clear logo now loads immediately on startup when selecting a profile, instead of requiring a focus change.
 - When no streaming addons are configured, the app now shows a friendly setup guide instead of a playback error.
 - Source selector shows setup instructions instead of generic "No sources found" when no addons are installed.
@@ -593,7 +607,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Added
 
-- StreamNet TV Cloud TV pairing flow via QR sign-in/register and direct account linking.
+- StreamNet Cloud TV pairing flow via QR sign-in/register and direct account linking.
 - VOD sources available inside source selection for playback.
 - Skip Intro integration in player with dedicated button and backend wiring.
 - QR rendering component for in-app pairing.
@@ -618,7 +632,7 @@ Thank you to everyone who helped with this release, including:
 - Large 4K stream handling and retention so high-size sources are given a fair start window.
 - VOD source visibility and matching reliability, including TV-show catalog flow improvements.
 - Subtitle menu back-navigation behavior (back now closes subtitle layer correctly instead of exiting playback flow).
-- StreamNet TV Cloud account pairing reliability between app and web sign-in path.
+- StreamNet Cloud account pairing reliability between app and web sign-in path.
 - TV remote navigation issues in settings forms/addon-list sections.
 - EPG reliability and parser flow issues affecting guide behavior.
 
@@ -626,7 +640,7 @@ Thank you to everyone who helped with this release, including:
 
 ### Added
 
-- Optional `StreamNet TV Cloud` account connection in Settings for syncing profiles, addons, catalogs, and IPTV settings.
+- Optional `StreamNet Cloud` account connection in Settings for syncing profiles, addons, catalogs, and IPTV settings.
 - Supabase migration and edge functions for TV device auth flow: `tv-auth-start`, `tv-auth-status`, `tv-auth-complete`.
 
 ### Fixed

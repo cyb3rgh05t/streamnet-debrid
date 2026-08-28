@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>StreamNet TV – Cloud Account</title>
+    <title>StreamNet Cloud</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
     <style>
       :root {
@@ -640,8 +640,8 @@
           <div class="brand">
             <img
               class="brand-logo"
-              src="/assets/streamnet-logo.svg"
-              alt="StreamNet TV"
+              src="/assets/streamnet-club-logo.svg"
+              alt="StreamNet Club"
             />
           </div>
 
@@ -800,7 +800,7 @@
     </div>
 
     <script type="module">
-const FUNCTION_BASE = "/.netlify/functions";
+      const FUNCTION_BASE = "/.netlify/functions";
       const qs = new URLSearchParams(window.location.search);
       const pairCode = (qs.get("code") || "").trim();
 
@@ -832,16 +832,16 @@ const FUNCTION_BASE = "/.netlify/functions";
 
       const I18N = {
         en: {
-          meta: { title: "StreamNet TV - Cloud Account" },
+          meta: { title: "StreamNet Cloud" },
           hero: {
             kicker: "Cloud Account",
             title: "Sign in once. Sync everything.",
             subtitleDefault:
-              "Connect your StreamNet TV account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and web.",
+              "Connect your StreamNet Cloud account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and web.",
             subtitlePairing:
               "Sign in here to approve the pairing request from your StreamNet TV device and restore your cloud account there.",
             subtitleRecovery:
-              "Set a new password to regain access to your StreamNet TV Cloud account.",
+              "Set a new password to regain access to your StreamNet Cloud account.",
           },
           summary: {
             profiles: {
@@ -860,13 +860,13 @@ const FUNCTION_BASE = "/.netlify/functions";
           pairing: {
             defaultTitle: "What this page does",
             defaultCopy:
-              "Use this page to sign in to your StreamNet TV Cloud account, create a new one, or reset your password. If you opened it from a TV QR code, the TV will be linked automatically after a successful sign-in.",
+              "Use this page to sign in to your StreamNet Cloud account, create a new one, or reset your password. If you opened it from a TV QR code, the TV will be linked automatically after a successful sign-in.",
             activeTag: "Pairing active",
             stateTitle: "How TV pairing works",
             stateCopy:
               "This session was opened from a StreamNet TV device. After you sign in or create your account, the browser will confirm the pairing code and the TV can restore your cloud data.",
             steps: {
-              one: "Use the same email address and password you want to use on your StreamNet TV account.",
+              one: "Use the same email address and password you want to use for StreamNet Cloud.",
               two: "After sign-in, this browser will approve the pairing request for the TV that showed the QR code.",
               three:
                 "Keep the TV screen open for a moment so it can finish cloud restore after approval.",
@@ -885,10 +885,10 @@ const FUNCTION_BASE = "/.netlify/functions";
             kicker: "Secure Access",
             title: "Account access",
             pairCode: "Pairing code",
-            foot: "StreamNet TV · Cloud Auth",
+            foot: "StreamNet Cloud",
             deleteAccount: "Delete account",
             helperDefault:
-              "Sign in with your StreamNet TV Cloud account to continue.",
+              "Sign in with your StreamNet Cloud account to continue.",
             helperPairing:
               "After sign-in, this browser will confirm the TV pairing code automatically.",
             helperRecovery:
@@ -943,14 +943,14 @@ const FUNCTION_BASE = "/.netlify/functions";
               "Account created but sign-in response was incomplete.",
             signInFailed: "Sign in failed",
             setupHintMailSent:
-              " We sent you an email to create your new StreamNet TV Cloud password.",
+              " We sent you an email to create your new StreamNet Cloud password.",
             setupHintMailFailed:
               " Password setup email could not be sent: {setupError}",
             setupHintUseForgot:
-              " Use Forgot password to create your new StreamNet TV Cloud password.",
+              " Use Forgot password to create your new StreamNet Cloud password.",
             passwordResetFailed: "Password reset failed",
             accountNotFound:
-              "No StreamNet TV account was found for this email.",
+              "No StreamNet Cloud account was found for this email.",
             resetMailNotSent:
               "Account found, but the password email could not be sent. Please try again in a minute.",
             passwordSetupFailed: "Password setup failed",
@@ -959,16 +959,16 @@ const FUNCTION_BASE = "/.netlify/functions";
           },
         },
         de: {
-          meta: { title: "StreamNet TV - Cloud Konto" },
+          meta: { title: "StreamNet Cloud" },
           hero: {
             kicker: "Cloud Konto",
             title: "Einmal anmelden. Alles synchron.",
             subtitleDefault:
-              "Verbinde dein StreamNet TV Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Web zusammen bleiben.",
+              "Verbinde dein StreamNet Cloud Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Web zusammen bleiben.",
             subtitlePairing:
               "Melde dich hier an, um die Kopplungsanfrage deines StreamNet TV Geraets zu bestaetigen und dein Cloud Konto dort wiederherzustellen.",
             subtitleRecovery:
-              "Lege ein neues Passwort fest, um wieder Zugriff auf dein StreamNet TV Cloud Konto zu erhalten.",
+              "Lege ein neues Passwort fest, um wieder Zugriff auf dein StreamNet Cloud Konto zu erhalten.",
           },
           summary: {
             profiles: {
@@ -987,13 +987,13 @@ const FUNCTION_BASE = "/.netlify/functions";
           pairing: {
             defaultTitle: "Was diese Seite macht",
             defaultCopy:
-              "Nutze diese Seite, um dich in dein StreamNet TV Cloud Konto einzuloggen, ein neues Konto zu erstellen oder dein Passwort zurueckzusetzen. Wenn du von einem TV-QR-Code kommst, wird der TV nach erfolgreicher Anmeldung automatisch verknuepft.",
+              "Nutze diese Seite, um dich in dein StreamNet Cloud Konto einzuloggen, ein neues Konto zu erstellen oder dein Passwort zurueckzusetzen. Wenn du von einem TV-QR-Code kommst, wird der TV nach erfolgreicher Anmeldung automatisch verknuepft.",
             activeTag: "Kopplung aktiv",
             stateTitle: "So funktioniert die TV-Kopplung",
             stateCopy:
               "Diese Sitzung wurde von einem StreamNet TV Geraet gestartet. Nach Anmeldung oder Kontoerstellung bestaetigt der Browser den Kopplungscode und der TV kann deine Cloud-Daten wiederherstellen.",
             steps: {
-              one: "Verwende dieselbe E-Mail-Adresse und dasselbe Passwort, die du fuer dein StreamNet TV Konto nutzen moechtest.",
+              one: "Verwende dieselbe E-Mail-Adresse und dasselbe Passwort, die du fuer StreamNet Cloud nutzen moechtest.",
               two: "Nach der Anmeldung bestaetigt dieser Browser die Kopplungsanfrage fuer den TV, der den QR-Code angezeigt hat.",
               three:
                 "Lass den TV-Bildschirm noch kurz offen, damit die Cloud-Wiederherstellung nach der Freigabe abgeschlossen wird.",
@@ -1012,10 +1012,10 @@ const FUNCTION_BASE = "/.netlify/functions";
             kicker: "Sicherer Zugriff",
             title: "Kontozugriff",
             pairCode: "Kopplungscode",
-            foot: "StreamNet TV · Cloud Auth",
+            foot: "StreamNet Cloud",
             deleteAccount: "Konto loeschen",
             helperDefault:
-              "Melde dich mit deinem StreamNet TV Cloud Konto an, um fortzufahren.",
+              "Melde dich mit deinem StreamNet Cloud Konto an, um fortzufahren.",
             helperPairing:
               "Nach der Anmeldung bestaetigt dieser Browser den TV-Kopplungscode automatisch.",
             helperRecovery:
@@ -1072,11 +1072,11 @@ const FUNCTION_BASE = "/.netlify/functions";
               "Konto erstellt, aber die Anmeldeantwort war unvollstaendig.",
             signInFailed: "Anmeldung fehlgeschlagen",
             setupHintMailSent:
-              " Wir haben dir eine E-Mail geschickt, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+              " Wir haben dir eine E-Mail geschickt, um ein neues StreamNet Cloud Passwort zu erstellen.",
             setupHintMailFailed:
               " E-Mail fuer Passwort-Setup konnte nicht gesendet werden: {setupError}",
             setupHintUseForgot:
-              " Nutze Passwort vergessen, um ein neues StreamNet TV Cloud Passwort zu erstellen.",
+              " Nutze Passwort vergessen, um ein neues StreamNet Cloud Passwort zu erstellen.",
             passwordResetFailed: "Passwort-Reset fehlgeschlagen",
             accountNotFound:
               "Fuer diese E-Mail wurde kein StreamNet TV Konto gefunden.",

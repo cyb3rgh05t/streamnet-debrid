@@ -23,6 +23,45 @@ Password reset and media proxies are intentionally not included yet. Password re
 
 The production APK uses this service as its account and synchronization backend.
 
+## Upgrade Existing Production Server
+
+The account-deletion and StreamNet Club branding update requires both a new
+backend image and database migration `008_account_deletion_cascades.sql`.
+Container startup does not apply migrations automatically.
+
+From the server directory containing `compose.yaml` and `.env`:
+
+```sh
+# 1. Back up PostgreSQL outside the container.
+docker compose exec -T postgres sh -lc \
+  'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom' \
+  > "streamnet-before-2.1.019-$(date +%Y%m%d-%H%M%S).dump"
+
+# 2. Pull the image produced by the main-branch workflow and restart the API.
+docker compose pull streamnet-backend
+docker compose up -d streamnet-backend
+
+# 3. Apply all pending repeatable migrations, including migration 008.
+docker compose exec streamnet-backend npm run migrate
+
+# 4. Verify service health and inspect startup/migration logs.
+curl -fsS https://auth.mystreamnet.club/health
+docker compose ps
+docker compose logs --tail=100 streamnet-backend
+```
+
+For deterministic rollout and rollback, set `STREAMNET_BACKEND_IMAGE` in `.env`
+to the workflow-produced `sha-<commit>` GHCR tag instead of `latest`, then run
+the pull and restart commands above. The web account pages and
+`streamnet-club-logo.svg` are included in that same image; no separate Netlify
+deployment is required.
+
+After deployment, verify the account page, email/password login, TV pairing,
+snapshot pull/push, and account deletion with a disposable test account. Do not
+test deletion with a production account. Migration 008 adds `ON DELETE CASCADE`
+to TV pairing and usage-event account references and is compatible with rolling
+the application container back if necessary.
+
 ## Logging
 
 Backend requests are printed as colored, human-readable one-line summaries with

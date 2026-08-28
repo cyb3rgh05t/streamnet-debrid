@@ -59,11 +59,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Circle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.tv.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -181,6 +183,7 @@ import com.arflix.tv.ui.theme.PrimeBlue
 import com.arflix.tv.ui.theme.PrimeGreen
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.ui.theme.BackgroundGradientCenter
 import com.arflix.tv.ui.theme.BackgroundGradientEnd
 import com.arflix.tv.ui.theme.BackgroundGradientStart
@@ -454,28 +457,7 @@ private data class HomeFocusedHeroSnapshot(
 )
 
 internal fun preferredHomeStartRowIndex(categories: List<Category>): Int {
-    val continueWatchingIndex = categories.indexOfFirst { category ->
-        category.id == "continue_watching" && category.items.any { !it.isPlaceholder }
-    }
-    if (continueWatchingIndex >= 0) return continueWatchingIndex
-
-    val trendingMoviesIndex = categories.indexOfFirst { it.id == "trending_movies" }
-    if (trendingMoviesIndex >= 0) return trendingMoviesIndex
-
-    fun Category.isVodHomeRow(): Boolean =
-        id != HomeViewModel.FAVORITE_TV_CATEGORY_ID &&
-            id != HomeViewModel.RECENT_TV_CATEGORY_ID &&
-            !id.startsWith("collection_row_")
-
-    val realContentIndex = categories.indexOfFirst { category ->
-        category.isVodHomeRow() && category.items.any { !it.isPlaceholder }
-    }
-    if (realContentIndex >= 0) return realContentIndex
-
-    val vodIndex = categories.indexOfFirst { it.isVodHomeRow() }
-    if (vodIndex >= 0) return vodIndex
-
-    return 0
+    return categories.indexOfFirst(::shouldDisplayHomeCategory).coerceAtLeast(0)
 }
 
 private fun isActionableHomeItem(item: MediaItem?): Boolean {
@@ -965,6 +947,7 @@ fun HomeScreen(
     // Context menu state (Menu button only, no long-press)
     var showContextMenu by remember { mutableStateOf(false) }
     var contextMenuItem by remember { mutableStateOf<MediaItem?>(null) }
+    var programDetailsItem by remember { mutableStateOf<MediaItem?>(null) }
     var contextMenuIsContinueWatching by remember { mutableStateOf(false) }
     var contextMenuIsInWatchlist by remember { mutableStateOf(false) }
 
@@ -1547,6 +1530,12 @@ fun HomeScreen(
 
         // Context menu
         contextMenuItem?.let { item ->
+            val isIptvChannel = viewModel.isIptvItem(item)
+            val iptvChannelId = viewModel.getIptvChannelId(item)
+            val isFavoriteChannel = (displayCategories
+                .firstOrNull { it.id == HomeViewModel.FAVORITE_TV_CATEGORY_ID }
+                ?.items
+                ?.any { favorite -> viewModel.getIptvChannelId(favorite) == iptvChannelId }) == true
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -1558,6 +1547,8 @@ fun HomeScreen(
                     isInWatchlist = contextMenuIsInWatchlist,
                     isWatched = item.isWatched,
                     isContinueWatching = contextMenuIsContinueWatching,
+                    isIptvChannel = isIptvChannel,
+                    isFavoriteChannel = isFavoriteChannel,
                     onPlay = {
                         if (viewModel.isSportsHomeItem(item)) {
                             openSportsHomeItem(item)
@@ -1571,7 +1562,7 @@ fun HomeScreen(
                         if (viewModel.isSportsHomeItem(item)) {
                             openSportsHomeItem(item)
                         } else if (viewModel.isIptvItem(item)) {
-                            onNavigateToTv(viewModel.getIptvChannelId(item), viewModel.getIptvStreamUrl(item.id))
+                            programDetailsItem = item
                         } else {
                             onNavigateToDetails(item.mediaType, item.id, item.nextEpisode?.seasonNumber, item.nextEpisode?.episodeNumber)
                         }
@@ -1581,6 +1572,9 @@ fun HomeScreen(
                     },
                     onToggleWatched = {
                         viewModel.toggleWatched(item)
+                    },
+                    onToggleFavoriteChannel = {
+                        viewModel.toggleIptvFavorite(item)
                     },
                     onRemoveFromContinueWatching = if (contextMenuIsContinueWatching) {
                         { viewModel.removeFromContinueWatching(item) }
@@ -1592,6 +1586,19 @@ fun HomeScreen(
                     }
                 )
             }
+        }
+
+        programDetailsItem?.let { item ->
+            IptvProgramDetailsDialog(
+                item = item,
+                lookupBackdrop = viewModel::lookupIptvProgramBackdrop,
+                lookupLogo = viewModel::lookupIptvProgramLogo,
+                onPlay = {
+                    programDetailsItem = null
+                    onNavigateToTv(viewModel.getIptvChannelId(item), viewModel.getIptvStreamUrl(item.id))
+                },
+                onDismiss = { programDetailsItem = null }
+            )
         }
 
 
@@ -1626,6 +1633,180 @@ fun HomeScreen(
                 onDismiss = { viewModel.dismissAppUpdateDialog() },
                 onOpenSettings = { viewModel.openUnknownSourcesSettings() }
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun IptvProgramDetailsDialog(
+    item: MediaItem,
+    lookupBackdrop: suspend (String) -> String?,
+    lookupLogo: suspend (String) -> String?,
+    onPlay: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accent = resolveAccentColor(fallback = AccentRed)
+    val dialogFocusRequester = remember { FocusRequester() }
+    var focusedButton by remember(item.id) { mutableIntStateOf(1) }
+    var interactionsArmed by remember(item.id) { mutableStateOf(isMobile) }
+    val programTitle = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title
+    val programBackdrop by produceState<String?>(null, programTitle) {
+        value = lookupBackdrop(programTitle)
+    }
+    val programLogo by produceState<String?>(null, programTitle) {
+        value = lookupLogo(programTitle)
+    }
+    val fallbackBackdrop = "android.resource://${LocalContext.current.packageName}/${R.drawable.live_tv_theatre_fanart}"
+
+    LaunchedEffect(item.id, isMobile) {
+        if (!isMobile) {
+            dialogFocusRequester.requestFocus()
+            delay(250L)
+            interactionsArmed = true
+        }
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.78f))
+                .clickable(onClick = onDismiss),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier
+                    .padding(horizontal = 20.dp)
+                    .widthIn(max = if (isMobile) 520.dp else 820.dp)
+                    .fillMaxWidth(if (isMobile) 0.92f else 0.76f)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(BackgroundCard)
+                    .border(
+                        width = 1.dp,
+                        color = accent.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(14.dp),
+                    )
+                    .clickable(enabled = false, onClick = {})
+                    .then(
+                        if (isMobile) Modifier else Modifier
+                            .focusRequester(dialogFocusRequester)
+                            .focusable()
+                            .onPreviewKeyEvent { event ->
+                                if (!interactionsArmed || event.type != KeyEventType.KeyDown) {
+                                    return@onPreviewKeyEvent !interactionsArmed &&
+                                        event.key in setOf(Key.Enter, Key.DirectionCenter)
+                                }
+                                when (event.key) {
+                                    Key.DirectionLeft -> {
+                                        focusedButton = 0
+                                        true
+                                    }
+                                    Key.DirectionRight -> {
+                                        focusedButton = 1
+                                        true
+                                    }
+                                    Key.Enter, Key.DirectionCenter -> {
+                                        if (focusedButton == 0) onPlay() else onDismiss()
+                                        true
+                                    }
+                                    else -> false
+                                }
+                            }
+                    ),
+            ) {
+                if (!isMobile) {
+                    AsyncImage(
+                        model = programBackdrop ?: fallbackBackdrop,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                    Box(
+                        modifier = Modifier
+                            .matchParentSize()
+                            .background(
+                                Brush.horizontalGradient(
+                                    0f to Color.Black.copy(alpha = 0.9f),
+                                    0.68f to Color.Black.copy(alpha = 0.62f),
+                                    1f to Color.Black.copy(alpha = 0.34f),
+                                )
+                            )
+                            .background(
+                                Brush.verticalGradient(
+                                    0f to Color.Black.copy(alpha = 0.18f),
+                                    0.72f to Color.Black.copy(alpha = 0.55f),
+                                    1f to Color.Black.copy(alpha = 0.9f),
+                                )
+                            ),
+                    )
+                }
+                Column(
+                    modifier = Modifier.padding(
+                        horizontal = if (isMobile) 24.dp else 34.dp,
+                        vertical = if (isMobile) 20.dp else 30.dp,
+                    ),
+                    horizontalAlignment = Alignment.Start,
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
+                    IptvHeroSection(
+                        item = item,
+                        programLogoUrl = programLogo,
+                        scrollFallbackTitle = false,
+                        compact = true,
+                        modifier = Modifier.fillMaxWidth(if (isMobile) 1f else 0.68f),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.End),
+                    ) {
+                        androidx.tv.material3.Button(
+                            onClick = onPlay,
+                            colors = ButtonDefaults.colors(
+                                containerColor = if (isMobile || focusedButton == 0) accent else Color.Black.copy(alpha = 0.54f),
+                                focusedContainerColor = accent,
+                                contentColor = if (isMobile || focusedButton == 0) contrastingContentColor(accent) else Color.White,
+                                focusedContentColor = contrastingContentColor(accent),
+                            ),
+                            modifier = Modifier.widthIn(min = 140.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PlayArrow,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.play))
+                        }
+                        androidx.tv.material3.Button(
+                            onClick = onDismiss,
+                            colors = ButtonDefaults.colors(
+                                containerColor = if (!isMobile && focusedButton == 1) accent else Color.Black.copy(alpha = 0.54f),
+                                focusedContainerColor = accent,
+                                contentColor = if (!isMobile && focusedButton == 1) contrastingContentColor(accent) else Color.White,
+                                focusedContentColor = contrastingContentColor(accent),
+                            ),
+                            modifier = Modifier.widthIn(min = 140.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(stringResource(R.string.close))
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1694,6 +1875,7 @@ private fun IptvHeroSection(
     item: MediaItem,
     programLogoUrl: String?,
     scrollFallbackTitle: Boolean,
+    compact: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val accent = resolveAccentColor(fallback = AccentRed)
@@ -1721,12 +1903,12 @@ private fun IptvHeroSection(
     )
 
     Column(
-        modifier = modifier.width(360.dp),
+        modifier = if (compact) modifier.fillMaxWidth() else modifier.width(360.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         val hasProgramLogo = !programLogoUrl.isNullOrBlank()
         Box(
-            modifier = Modifier.height(72.dp),
+            modifier = Modifier.height(if (compact) 52.dp else 72.dp),
             contentAlignment = Alignment.CenterStart,
         ) {
             if (hasProgramLogo) {
@@ -1735,15 +1917,17 @@ private fun IptvHeroSection(
                     contentDescription = item.liveProgramTitle,
                     contentScale = ContentScale.Fit,
                     alignment = Alignment.CenterStart,
-                    modifier = Modifier.width(320.dp).height(72.dp),
+                    modifier = Modifier
+                        .width(if (compact) 260.dp else 320.dp)
+                        .height(if (compact) 52.dp else 72.dp),
                 )
             } else {
                 val fallbackTitle = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title
                 HomeHeroMarqueeTitle(
                     text = fallbackTitle,
                     style = ArflixTypography.heroTitle.copy(
-                        fontSize = 38.sp,
-                        lineHeight = 40.sp,
+                        fontSize = if (compact) 28.sp else 38.sp,
+                        lineHeight = if (compact) 32.sp else 40.sp,
                         fontWeight = FontWeight.Black,
                         letterSpacing = 0.sp,
                         shadow = textShadow,
@@ -1753,7 +1937,7 @@ private fun IptvHeroSection(
                     slowScroll = scrollFallbackTitle,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(72.dp)
+                        .height(if (compact) 52.dp else 72.dp)
                 )
             }
         }

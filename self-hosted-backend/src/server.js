@@ -13,6 +13,7 @@ import {
 import { normalizeAndValidateEmail } from "./email.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
+import { deleteAccountData } from "./account-deletion.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -385,12 +386,20 @@ app.post("/app-usage-event", async (request, reply) => {
 
 app.get("/assets/:asset", async (request, reply) => {
   const asset = String(request.params.asset || "");
-  if (!new Set(["streamnet-logo.svg", "streamnet-icon.svg"]).has(asset)) {
+  if (
+    !new Set([
+      "streamnet-logo.svg",
+      "streamnet-club-logo.svg",
+      "streamnet-icon.svg",
+    ]).has(asset)
+  ) {
     return reply.code(404).send({ error: "Asset not found" });
   }
+  const servedAsset =
+    asset === "streamnet-logo.svg" ? "streamnet-club-logo.svg" : asset;
   return reply
     .type("image/svg+xml")
-    .send(await readFile(path.join(publicDirectory, "assets", asset)));
+    .send(await readFile(path.join(publicDirectory, "assets", servedAsset)));
 });
 
 app.get("/", async (request, reply) => {
@@ -434,9 +443,9 @@ app.get("/", async (request, reply) => {
               ? "Dein Fernseher wurde mit diesem Konto verbunden. Du kannst dieses Fenster jetzt schliessen."
               : "Your TV is now connected to this account. You can close this window.")
             : (german
-              ? "Dein StreamNet-Konto ist bereit. Deine Daten bleiben auf deinen Geraeten synchron."
-              : "Your StreamNet account is ready. Your data will stay in sync across your devices.");
-          document.body.innerHTML = '<style>@keyframes success-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}@keyframes success-draw{0%{width:0;height:0}45%{width:10px;height:0}100%{width:10px;height:22px}}.success-mark{width:64px;height:64px;margin:0 auto 22px;border:2px solid #6ee7a3;border-radius:50%;display:grid;place-items:center;color:#6ee7a3;animation:success-pop .55s ease-out both}.success-mark span{display:block;width:10px;height:22px;border-right:4px solid #6ee7a3;border-bottom:4px solid #6ee7a3;transform:rotate(45deg) translate(-2px,-2px);transform-origin:center;animation:success-draw .55s .25s ease-out both}</style><main style="min-height:calc(100vh - 56px);display:grid;place-items:center"><section style="width:min(560px,100%);padding:42px 34px;text-align:center;background:rgba(28,23,19,.94);border:1px solid rgba(229,162,9,.28);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.38)"><img src="/assets/streamnet-logo.svg" alt="StreamNet TV" style="width:min(260px,80%);height:auto;margin-bottom:34px"><div class="success-mark" aria-label="Success"><span></span></div><h1 style="margin:0;color:#f4efe7;font-size:clamp(28px,5vw,42px);line-height:1.1">' + title + '</h1><p style="margin:18px auto 0;max-width:420px;color:#d6cabb;font-size:16px;line-height:1.6">' + message + '</p><div style="margin-top:30px;color:#e5a209;font-size:12px;letter-spacing:.16em;text-transform:uppercase">StreamNet TV - Cloud Auth</div></section></main>';
+              ? "Dein StreamNet Cloud Konto ist bereit. Deine Daten bleiben auf deinen Geraeten synchron."
+              : "Your StreamNet Cloud account is ready. Your data will stay in sync across your devices.");
+          document.body.innerHTML = '<style>@keyframes success-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}@keyframes success-draw{0%{width:0;height:0}45%{width:10px;height:0}100%{width:10px;height:22px}}.success-mark{width:64px;height:64px;margin:0 auto 22px;border:2px solid #6ee7a3;border-radius:50%;display:grid;place-items:center;color:#6ee7a3;animation:success-pop .55s ease-out both}.success-mark span{display:block;width:10px;height:22px;border-right:4px solid #6ee7a3;border-bottom:4px solid #6ee7a3;transform:rotate(45deg) translate(-2px,-2px);transform-origin:center;animation:success-draw .55s .25s ease-out both}</style><main style="min-height:calc(100vh - 56px);display:grid;place-items:center"><section style="width:min(560px,100%);padding:42px 34px;text-align:center;background:rgba(28,23,19,.94);border:1px solid rgba(229,162,9,.28);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.38)"><img src="/assets/streamnet-logo.svg" alt="StreamNet TV" style="width:min(260px,80%);height:auto;margin-bottom:34px"><div class="success-mark" aria-label="Success"><span></span></div><h1 style="margin:0;color:#f4efe7;font-size:clamp(28px,5vw,42px);line-height:1.1">' + title + '</h1><p style="margin:18px auto 0;max-width:420px;color:#d6cabb;font-size:16px;line-height:1.6">' + message + '</p><div style="margin-top:30px;color:#e5a209;font-size:12px;letter-spacing:.16em;text-transform:uppercase">StreamNet Cloud</div></section></main>';
         };
         new MutationObserver(() => {
           if (!statusNode || !statusNode.classList.contains("ok")) return;
@@ -620,11 +629,7 @@ app.post("/account-delete-start", async (request, reply) => {
   const client = await pool.connect();
   try {
     await client.query("begin");
-    await client.query(
-      "delete from tv_device_auth_sessions where account_id = $1",
-      [account.id],
-    );
-    await client.query("delete from accounts where id = $1", [account.id]);
+    await deleteAccountData(client, account);
     await client.query("commit");
     deletionReceipts.set(`${jobId}:${hashToken(receiptToken)}`, {
       status: "complete",

@@ -17,6 +17,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -33,6 +36,7 @@ data class StartupState(
     val heroItem: MediaItem? = null,
     val heroLogoUrl: String? = null,
     val logoCache: Map<String, String> = emptyMap(),
+    val trendingBackdropUrls: List<String> = emptyList(),
     val isAuthenticated: Boolean = false,
     val error: String? = null
 )
@@ -58,6 +62,27 @@ class StartupViewModel @Inject constructor(
 
     init {
         startParallelLoading()
+        loadTrendingBackdrops()
+    }
+
+    private fun loadTrendingBackdrops() {
+        viewModelScope.launch {
+            val categories = coroutineScope {
+                listOf("trending_movies", "trending_tv").map { categoryId ->
+                    async(networkDispatcher) {
+                        mediaRepository.loadHomeCategoryPage(categoryId, page = 1).items
+                    }
+                }.awaitAll()
+            }
+            val movies = categories.getOrNull(0).orEmpty().mapNotNull { it.backdrop }.take(5)
+            val series = categories.getOrNull(1).orEmpty().mapNotNull { it.backdrop }.take(5)
+            val mixed = (0 until maxOf(movies.size, series.size)).flatMap { index ->
+                listOfNotNull(movies.getOrNull(index), series.getOrNull(index))
+            }.distinct()
+            if (mixed.isNotEmpty()) {
+                _state.value = _state.value.copy(trendingBackdropUrls = mixed)
+            }
+        }
     }
 
     private fun startParallelLoading() {
