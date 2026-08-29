@@ -19,6 +19,9 @@ plugins {
 
 val discordSdkAar = layout.projectDirectory.file("libs/discord_partner_sdk.aar").asFile
 val hasDiscordSdk = discordSdkAar.isFile
+val includeX86Abis = providers.gradleProperty("includeX86Abis")
+    .orNull
+    ?.toBooleanStrictOrNull() == true
 
 android {
     namespace = "com.arflix.tv"
@@ -33,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 365
-        versionName = "2.1.019"
+        versionCode = 366
+        versionName = "2.1.020"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -61,9 +64,15 @@ android {
         buildConfigField("String", "VODWISHARR_API_KEY", "\"${escapeBuildConfigString(localSecretValue("VODWISHARR_API_KEY"))}\"")
 
 
-        // Support both 32-bit and 64-bit devices (required for Google Play since 2019)
+        // Keep installable APKs ARM-universal by default. Emulator builds can add
+        // x86/x86_64 with -PincludeX86Abis=true.
         ndk {
-            abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            abiFilters += buildList {
+                addAll(listOf("armeabi-v7a", "arm64-v8a"))
+                if (includeX86Abis) {
+                    addAll(listOf("x86", "x86_64"))
+                }
+            }
         }
 
         if (hasDiscordSdk) {
@@ -120,7 +129,7 @@ android {
         release {
             // Full release optimization for TV smoothness.
             isMinifyEnabled = true
-            isShrinkResources = false
+            isShrinkResources = true
             // Use release signing if configured, otherwise fall back to debug
             val releaseSigningConfig = signingConfigs.findByName("release")
             signingConfig = if (releaseSigningConfig?.storeFile != null) {

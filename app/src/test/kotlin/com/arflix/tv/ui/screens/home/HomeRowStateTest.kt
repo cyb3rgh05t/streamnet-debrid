@@ -103,6 +103,7 @@ class HomeRowStateTest {
                 isTouchDevice = true,
                 userHasNavigated = true,
                 suppressPlayback = false,
+                categoryId = "other_iptv",
             )
         ).isFalse()
         assertThat(
@@ -110,8 +111,26 @@ class HomeRowStateTest {
                 isTouchDevice = false,
                 userHasNavigated = true,
                 suppressPlayback = false,
+                categoryId = "other_iptv",
             )
         ).isTrue()
+    }
+
+    @Test
+    fun `IPTV hero does not auto play in favorite or recent TV rails`() {
+        listOf(
+            HomeViewModel.FAVORITE_TV_CATEGORY_ID,
+            HomeViewModel.RECENT_TV_CATEGORY_ID,
+        ).forEach { categoryId ->
+            assertThat(
+                shouldPlayIptvHomeHero(
+                    isTouchDevice = false,
+                    userHasNavigated = true,
+                    suppressPlayback = false,
+                    categoryId = categoryId,
+                )
+            ).isFalse()
+        }
     }
 
     @Test

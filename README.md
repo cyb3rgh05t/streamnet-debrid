@@ -31,6 +31,9 @@ Build a sideload debug APK:
 ./gradlew :app:assembleSideloadDebug
 ```
 
+APK builds include 32-bit and 64-bit ARM by default. For an x86/x86_64 emulator,
+add `-PincludeX86Abis=true` to the Gradle command.
+
 Useful validation:
 
 ```bash

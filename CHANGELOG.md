@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### APK size and build compatibility
+
+- Reduced the default universal APK from 206.58 MB to 115.25 MB by packaging 32-bit and 64-bit ARM libraries while retaining optional x86/x86_64 emulator builds through `-PincludeX86Abis=true`.
+- Converted 109 unchanged avatar, ranking, and sports images to WebP while preserving both custom StreamNet launcher banners byte-for-byte.
+- Enabled release resource shrinking; the validated ARM sideload release is 90.73 MB and retains the StreamNet banners and referenced avatar, ranking, and sports resources.
+
+### Settings, updates, and feedback
+
+- Split TV settings into dedicated `Profile > Cloud Sync` and `System > Info & Updates` sections while keeping tracking providers under Accounts.
+- Made update indicators reflect the actual GitHub release check instead of merely showing that self-updates are supported.
+- Added visible Home Server code-pairing phases for approval, server discovery, connection, library loading, and final setup.
+- Moved app toast notifications into a non-interactive overlay window so status and error messages remain visible above open dialogs without blocking touch or D-pad input.
+- Removed the unreliable launch-after-device-start setting, receiver, permission, persisted preference, and cloud-sync field.
+
 ### StreamNet Cloud, profiles, and account safety
 
 - Added rotating mixed movie and series artwork to the startup loading screen and profile selection, changing every five seconds from one shared preload pool.
@@ -41,6 +55,7 @@ All notable changes to this project are documented in this file.
 
 ### Home and watchlist
 
+- Disabled Live TV hero autoplay for Favorites and Recently Watched TV rails while preserving artwork, guide information, and manual playback.
 - Matched Home IPTV cards to the Live TV artwork treatment and restored MGM+ service artwork with a valid landscape source.
 - Fixed removing the final watchlist item leaving a stale card visible until navigating away.
 - Synchronized watchlist additions and removals from Home, Details, and Watchlist as authoritative local cloud snapshots, with retryable failure reporting.
@@ -63,7 +78,6 @@ All notable changes to this project are documented in this file.
 
 ### Device startup, playback, and launcher integration
 
-- Hardened the Android TV boot-start setting for Android boxes, Google TV, and Shield devices by keeping the boot broadcast alive through the preference read and using a single-top activity launch.
 - Prevented automatic next-episode playback when the next episode is unaired or its TMDB air-date metadata is unavailable; manual episode navigation remains available.
 - Added original-title matching to Telegram movie and series searches so foreign-language filenames and captions resolve reliably alongside English and localized titles.
 - Added compact landscape layouts for small touch phones: the bottom navigation and Live TV mini-player now use fixed responsive dimensions while portrait, tablet, and TV layouts remain unchanged.

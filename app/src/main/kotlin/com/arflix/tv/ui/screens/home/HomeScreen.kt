@@ -468,7 +468,12 @@ internal fun shouldPlayIptvHomeHero(
     isTouchDevice: Boolean,
     userHasNavigated: Boolean,
     suppressPlayback: Boolean,
-): Boolean = !isTouchDevice && userHasNavigated && !suppressPlayback
+    categoryId: String?,
+): Boolean = !isTouchDevice &&
+    userHasNavigated &&
+    !suppressPlayback &&
+    categoryId != HomeViewModel.FAVORITE_TV_CATEGORY_ID &&
+    categoryId != HomeViewModel.RECENT_TV_CATEGORY_ID
 
 internal fun canPaginateHomeCategory(categoryId: String, hasMore: Boolean): Boolean =
     hasMore && !categoryId.startsWith("collection_row_")
@@ -1087,6 +1092,9 @@ fun HomeScreen(
     val serviceHeroVideoUrl = displayHeroItem
         ?.takeIf { heroVideoAllowed && isHeroCollection && collectionVideoFinishedId != it.id }
         ?.let { viewModel.getCollectionHeroVideoUrl(it) }
+    val focusedHeroCategoryId = latestDisplayCategories
+        .getOrNull(focusState.currentRowIndex)
+        ?.id
     val heroVideoUrl = when {
         !heroVideoAllowed -> null
         // Service collection MP4s should start as soon as the card becomes the hero.
@@ -1096,6 +1104,7 @@ fun HomeScreen(
             isTouchDevice = isMobile,
             userHasNavigated = focusState.userHasNavigated,
             suppressPlayback = suppressHeroVideoPlayback,
+            categoryId = focusedHeroCategoryId,
         ) -> displayHeroItem?.let { viewModel.getIptvStreamUrl(it.id) }
         else -> null
     }

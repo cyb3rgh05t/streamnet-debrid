@@ -52,6 +52,18 @@ enum class HomeServerKind {
     EMBY,
     PLEX
 }
+
+enum class HomeServerCodeAuthPhase {
+    STARTING_CODE,
+    WAITING_FOR_APPROVAL,
+    CHECKING_APPROVAL,
+    AUTHORIZATION_CONFIRMED,
+    LOCATING_SERVER,
+    CONNECTING_SERVER,
+    LOADING_LIBRARIES,
+    FINALIZING
+}
+
 data class HomeServerCollection(
     val id: String = "",
     val name: String = "",
@@ -382,7 +394,8 @@ class HomeServerRepository @Inject constructor(
     suspend fun connectPlexAccount(
         accountToken: String,
         preferredServerUrl: String = "",
-        displayName: String = ""
+        displayName: String = "",
+        onProgress: (HomeServerCodeAuthPhase) -> Unit = {}
     ): Result<HomeServerConnection> =
         withContext(Dispatchers.IO) {
             runCatching {
@@ -391,7 +404,8 @@ class HomeServerRepository @Inject constructor(
                     preferredServerUrl = preferredServerUrl,
                     preferredUsername = "",
                     preferredInfo = null,
-                    displayName = displayName.trim()
+                    displayName = displayName.trim(),
+                    onProgress = onProgress
                 )
                 saveConnection(connection)
                 connection
@@ -524,7 +538,8 @@ class HomeServerRepository @Inject constructor(
     suspend fun pollHomeServerCodeAuth(
         session: PlexPinAuthSession,
         preferredServerUrl: String = "",
-        displayName: String = ""
+        displayName: String = "",
+        onProgress: (HomeServerCodeAuthPhase) -> Unit = {}
     ): Result<HomeServerConnection?> = withContext(Dispatchers.IO) {
         runCatching {
             when (session.serverKind) {
@@ -533,11 +548,13 @@ class HomeServerRepository @Inject constructor(
                     if (token.isNullOrBlank()) {
                         null
                     } else {
+                        onProgress(HomeServerCodeAuthPhase.AUTHORIZATION_CONFIRMED)
                         val normalizedPreferredUrl = preferredServerUrl.ifBlank { session.serverUrl }
                         connectPlexAccount(
                             accountToken = token,
                             preferredServerUrl = normalizedPreferredUrl,
-                            displayName = displayName
+                            displayName = displayName,
+                            onProgress = onProgress
                         ).recoverCatching {
                             if (normalizedPreferredUrl.isBlank()) throw it
                             // If the manually entered URL is stale/unreachable, retry once
@@ -545,12 +562,13 @@ class HomeServerRepository @Inject constructor(
                             connectPlexAccount(
                                 accountToken = token,
                                 preferredServerUrl = "",
-                                displayName = displayName
+                                displayName = displayName,
+                                onProgress = onProgress
                             ).getOrThrow()
                         }.getOrThrow()
                     }
                 }
-                HomeServerKind.JELLYFIN -> pollJellyfinQuickConnect(session, displayName)
+                HomeServerKind.JELLYFIN -> pollJellyfinQuickConnect(session, displayName, onProgress)
                 else -> error(context.getString(R.string.homeserver_code_signin_failed))
             }
         }
@@ -558,7 +576,8 @@ class HomeServerRepository @Inject constructor(
 
     private suspend fun pollJellyfinQuickConnect(
         session: PlexPinAuthSession,
-        displayName: String
+        displayName: String,
+        onProgress: (HomeServerCodeAuthPhase) -> Unit
     ): HomeServerConnection? {
         val serverUrl = session.serverUrl.ifBlank { return null }
         val secret = session.secret.ifBlank { session.id }
@@ -566,7 +585,9 @@ class HomeServerRepository @Inject constructor(
         val authenticated = state.boolean("Authenticated") ?: state.boolean("authenticated") ?: false
         if (!authenticated) return null
 
+        onProgress(HomeServerCodeAuthPhase.AUTHORIZATION_CONFIRMED)
         val auth = authenticateWithQuickConnect(serverUrl, secret)
+        onProgress(HomeServerCodeAuthPhase.CONNECTING_SERVER)
         val publicInfo = fetchPublicInfo(serverUrl)
         val connectionShell = HomeServerConnection(
             enabled = true,
@@ -582,6 +603,7 @@ class HomeServerRepository @Inject constructor(
             accountToken = auth.accountToken,
             lastConnectedAt = System.currentTimeMillis()
         )
+        onProgress(HomeServerCodeAuthPhase.LOADING_LIBRARIES)
         val connection = connectionShell.copy(collections = fetchCollections(connectionShell))
         saveConnection(connection)
         return connection
@@ -1223,7 +1245,8 @@ class HomeServerRepository @Inject constructor(
         preferredServerUrl: String,
         preferredUsername: String,
         preferredInfo: ServerInfo?,
-        displayName: String = ""
+        displayName: String = "",
+        onProgress: (HomeServerCodeAuthPhase) -> Unit = {}
     ): HomeServerConnection {
         val trimmedAccountToken = accountToken.trim()
         val trimmedDisplayName = displayName.trim()
@@ -1247,6 +1270,7 @@ class HomeServerRepository @Inject constructor(
             }
         val accountName = validatePlexAccount(trimmedAccountToken)
             .ifBlank { preferredUsername.ifBlank { "Account" } }
+        onProgress(HomeServerCodeAuthPhase.LOCATING_SERVER)
         val resources = fetchPlexResources(trimmedAccountToken)
         val targetDevice = selectPlexResourceDevice(
             resources = resources,
@@ -1266,6 +1290,7 @@ class HomeServerRepository @Inject constructor(
 
         var lastError: Throwable? = null
         candidateUrls.forEach { candidateUrl ->
+            onProgress(HomeServerCodeAuthPhase.CONNECTING_SERVER)
             val candidate = HomeServerConnection(
                 enabled = true,
                 connectionId = "",
@@ -1302,6 +1327,7 @@ class HomeServerRepository @Inject constructor(
                 serverId = info.serverId.ifBlank { candidate.serverId },
                 lastConnectedAt = System.currentTimeMillis()
             )
+            onProgress(HomeServerCodeAuthPhase.LOADING_LIBRARIES)
             val collections = try { Result.success(fetchCollections(shell)) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Result.failure(e) }
                 .getOrElse { error ->
                     lastError = error

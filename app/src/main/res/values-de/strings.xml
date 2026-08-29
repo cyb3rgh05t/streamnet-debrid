@@ -438,7 +438,7 @@
     <string name="channel_guide">Senderprogramm</string>
     <!-- Einstellungen -->
     <string name="settings_home_server">Heimserver</string>
-    <string name="settings_app_version_label">StreamNet TV V%1$s</string>
+    <string name="settings_app_version_label">StreamNet TV %1$s</string>
     <string name="settings_label_url">URL</string>
     <string name="settings_home_server_https_note">Möglichst HTTPS verwenden. HTTP-Server-URLs sind in lokalen Netzwerken zulässig, aber nicht verschlüsselt.</string>
     <string name="settings_label_server_name">Servername</string>
@@ -523,6 +523,8 @@
     <string name="settings_status">Status</string>
     <string name="settings_group_profile">Profil</string>
     <string name="settings_group_system">System</string>
+    <string name="settings_cloud_sync_title">Cloud-Sync</string>
+    <string name="settings_info_updates_title">Info &amp; Updates</string>
     <string name="settings_desc_language">App-Texte und bevorzugte Audiospur.</string>
     <string name="settings_desc_subtitles">Untertitelsprache, Darstellung und Filterung.</string>
     <string name="settings_desc_ai_subtitles">KI-Übersetzung und Bereinigung von Untertiteln.</string>
@@ -534,7 +536,9 @@
     <string name="settings_desc_home_server">Persönliche Medienserver verbinden und deren Bibliotheken als Quellen nutzen.</string>
     <string name="settings_desc_catalogs">Startseitenreihen und Listenkataloge entdecken, umbenennen, sortieren und entfernen.</string>
     <string name="settings_desc_stremio">Addons von Drittanbietern für Katalog- und Quellensuche verwalten.</string>
-    <string name="settings_desc_accounts">Cloud-Sync, Trakt-Verbindung, App-Updates und Kontoeinstellungen.</string>
+    <string name="settings_desc_accounts">Verbundene Dienste und Tracking-Einstellungen.</string>
+    <string name="settings_desc_cloud_sync">StreamNet-Cloud-Konto, manuelle Synchronisierung, Wiederherstellung und Datenlöschung.</string>
+    <string name="settings_desc_info_updates">App-Updates, Datenschutzerklärung und Freigabe von Diagnosedaten.</string>
     <string name="settings_desc_default">StreamNet TV für dieses Profil einrichten.</string>
     <string name="settings_pill_app">App %1$s</string>
     <string name="settings_pill_audio">Audio %1$s</string>
@@ -765,6 +769,18 @@
     <string name="settings_update_available_format">Update verfügbar: %1$s</string>
     <string name="settings_update_latest">Du hast bereits die neueste StreamNet-TV-Version</string>
     <string name="settings_update_check_releases">GitHub-Releases nach dem neuesten StreamNet-TV-APK durchsuchen</string>
+    <string name="settings_up_to_date">Aktuell</string>
+    <string name="settings_update_check_failed_short">Prüfung fehlgeschlagen</string>
+    <string name="settings_update_downloading_short">Download läuft</string>
+    <string name="settings_update_installing_short">Installation läuft</string>
+    <string name="settings_homeserver_phase_starting">Verbindungscode wird erstellt...</string>
+    <string name="settings_homeserver_phase_waiting">Auf Freigabe auf der Anmeldeseite warten...</string>
+    <string name="settings_homeserver_phase_checking">Freigabe wird geprüft...</string>
+    <string name="settings_homeserver_phase_authorized">Autorisierung bestätigt...</string>
+    <string name="settings_homeserver_phase_locating">Server wird gesucht...</string>
+    <string name="settings_homeserver_phase_connecting">Verbindung zum Server wird hergestellt...</string>
+    <string name="settings_homeserver_phase_libraries">Bibliotheken werden geladen...</string>
+    <string name="settings_homeserver_phase_finalizing">Einrichtung wird abgeschlossen...</string>
     <string name="settings_badge_play">PLAY</string>
     <string name="settings_badge_install">INSTALLIEREN</string>
     <string name="settings_badge_checking">PRÜFUNG</string>
@@ -1220,8 +1236,6 @@
     <string name="catalog_pack_delete_title">Katalog-Paket löschen</string>
     <string name="catalog_pack_delete_message">Möchtest du das Paket \&quot;%1$s\&quot; löschen? Dadurch werden alle Kataloge entfernt, die mit diesem Paket importiert wurden.</string>
     <string name="catalog_pack_delete">Paket löschen</string>
-    <string name="start_on_device_boot">Beim Gerätestart öffnen</string>
-    <string name="start_on_device_boot_desc">App nach Abschluss des Gerätestarts automatisch öffnen.</string>
     <string name="settings_tracking_integrations">Tracking-Integrationen</string>
     <string name="settings_tracking_movies">Synchronisierte Filme</string>
     <string name="settings_tracking_episodes">Synchronisierte Episoden</string>

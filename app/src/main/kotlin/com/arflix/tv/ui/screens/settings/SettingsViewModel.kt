@@ -32,6 +32,7 @@ import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.CollectionTemplateManifest
 import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.HomeServerConnection
+import com.arflix.tv.data.repository.HomeServerCodeAuthPhase
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.PlexPinAuthSession
 import com.arflix.tv.data.repository.IptvConfig
@@ -218,14 +219,13 @@ data class SettingsUiState(
     val homeServerError: String? = null,
     val plexHomeServerAuth: PlexPinAuthSession? = null,
     val isPlexHomeServerPolling: Boolean = false,
+    val homeServerCodeAuthPhase: HomeServerCodeAuthPhase? = null,
     // Content language (TMDB metadata)
     val contentLanguage: String = "de-DE",
     // Device mode override
     val deviceModeOverride: String = "auto",
     // Skip profile selection
     val skipProfileSelection: Boolean = false,
-    // App auto-start after device boot
-    val startOnDeviceBoot: Boolean = false,
     val oledBlackBackground: Boolean = false,
     val clockFormat: String = "24h",
     val qualityFilters: List<QualityFilterConfig> = emptyList(),
@@ -500,7 +500,6 @@ class SettingsViewModel @Inject constructor(
             val frameRateMode = normalizeFrameRateMode(prefs[frameRateMatchingModeKey()])
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
-            val startOnDeviceBoot = prefs[com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY] ?: false
             val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
             val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
@@ -672,7 +671,6 @@ class SettingsViewModel @Inject constructor(
                 contentLanguage = contentLang,
                 deviceModeOverride = deviceModeOverride,
                 skipProfileSelection = skipProfileSelection,
-                startOnDeviceBoot = startOnDeviceBoot,
                 oledBlackBackground = oledBlackBackground,
                 clockFormat = clockFormat,
                 accentColor = accentColor,
@@ -1308,16 +1306,6 @@ class SettingsViewModel @Inject constructor(
                 prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] = skip
             }
             _uiState.value = _uiState.value.copy(skipProfileSelection = skip)
-            syncLocalStateToCloud(silent = true)
-        }
-    }
-
-    fun setStartOnDeviceBoot(enabled: Boolean) {
-        viewModelScope.launch {
-            context.settingsDataStore.edit { prefs ->
-                prefs[com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY] = enabled
-            }
-            _uiState.value = _uiState.value.copy(startOnDeviceBoot = enabled)
             syncLocalStateToCloud(silent = true)
         }
     }
@@ -2963,6 +2951,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isHomeServerConnecting = true,
                 homeServerError = null,
+                homeServerCodeAuthPhase = null,
                     toastMessage = context.getString(R.string.toast_connecting_home_server),
                 toastType = ToastType.INFO
             )
@@ -3003,6 +2992,7 @@ class SettingsViewModel @Inject constructor(
                 homeServerError = null,
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
+                homeServerCodeAuthPhase = HomeServerCodeAuthPhase.STARTING_CODE,
                     toastMessage = context.getString(R.string.toast_starting_code_sign_in),
                 toastType = ToastType.INFO
             )
@@ -3012,6 +3002,7 @@ class SettingsViewModel @Inject constructor(
                     isHomeServerConnecting = false,
                     plexHomeServerAuth = session,
                     isPlexHomeServerPolling = true,
+                    homeServerCodeAuthPhase = HomeServerCodeAuthPhase.WAITING_FOR_APPROVAL,
                     homeServerError = null,
                     toastMessage = context.getString(R.string.toast_enter_connection_code),
                     toastType = ToastType.INFO
@@ -3024,6 +3015,7 @@ class SettingsViewModel @Inject constructor(
                     isHomeServerConnecting = false,
                     plexHomeServerAuth = null,
                     isPlexHomeServerPolling = false,
+                    homeServerCodeAuthPhase = null,
                     homeServerError = error.message ?: context.getString(R.string.homeserver_code_signin_failed),
                     toastMessage = error.message ?: context.getString(R.string.homeserver_code_signin_failed),
                     toastType = ToastType.ERROR
@@ -3039,10 +3031,16 @@ class SettingsViewModel @Inject constructor(
             var lastFailure: String? = null
             while (System.currentTimeMillis() < deadline) {
                 delay(session.interval.coerceIn(2, 15) * 1000L)
+                _uiState.value = _uiState.value.copy(
+                    homeServerCodeAuthPhase = HomeServerCodeAuthPhase.CHECKING_APPROVAL
+                )
                 val connectionResult = homeServerRepository.pollHomeServerCodeAuth(
                     session = session,
                     preferredServerUrl = serverUrl,
-                    displayName = plexHomeServerDisplayName.orEmpty()
+                    displayName = plexHomeServerDisplayName.orEmpty(),
+                    onProgress = { phase ->
+                        _uiState.value = _uiState.value.copy(homeServerCodeAuthPhase = phase)
+                    }
                 )
                 if (connectionResult.isFailure) {
                     val error = connectionResult.exceptionOrNull()
@@ -3054,6 +3052,7 @@ class SettingsViewModel @Inject constructor(
                         isHomeServerConnecting = false,
                         plexHomeServerAuth = null,
                         isPlexHomeServerPolling = false,
+                        homeServerCodeAuthPhase = null,
                         homeServerError = message,
                         toastMessage = message,
                         toastType = ToastType.ERROR
@@ -3062,11 +3061,15 @@ class SettingsViewModel @Inject constructor(
                 }
                 val connection = connectionResult.getOrNull()
                 if (connection == null) {
+                    _uiState.value = _uiState.value.copy(
+                        homeServerCodeAuthPhase = HomeServerCodeAuthPhase.WAITING_FOR_APPROVAL
+                    )
                     continue
                 }
 
                 _uiState.value = _uiState.value.copy(
                     isHomeServerConnecting = true,
+                    homeServerCodeAuthPhase = HomeServerCodeAuthPhase.FINALIZING,
                     toastMessage = context.getString(R.string.toast_connecting_server),
                     toastType = ToastType.INFO
                 )
@@ -3081,6 +3084,7 @@ class SettingsViewModel @Inject constructor(
                         homeServerConnections = connections,
                         plexHomeServerAuth = null,
                         isPlexHomeServerPolling = false,
+                        homeServerCodeAuthPhase = null,
                         homeServerError = null,
                         toastMessage = context.getString(R.string.toast_server_connected),
                         toastType = ToastType.SUCCESS
@@ -3094,6 +3098,7 @@ class SettingsViewModel @Inject constructor(
                         isHomeServerConnecting = false,
                         plexHomeServerAuth = null,
                         isPlexHomeServerPolling = false,
+                        homeServerCodeAuthPhase = null,
                         homeServerError = error.message ?: context.getString(R.string.homeserver_server_connection_failed),
                         toastMessage = error.message ?: context.getString(R.string.homeserver_server_connection_failed),
                         toastType = ToastType.ERROR
@@ -3108,6 +3113,7 @@ class SettingsViewModel @Inject constructor(
                 isHomeServerConnecting = false,
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
+                homeServerCodeAuthPhase = null,
                 homeServerError = lastFailure ?: "Activation code expired",
                 toastMessage = lastFailure ?: "Activation code expired",
                 toastType = ToastType.ERROR
@@ -3124,7 +3130,8 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isHomeServerConnecting = false,
                 plexHomeServerAuth = null,
-                isPlexHomeServerPolling = false
+                isPlexHomeServerPolling = false,
+                homeServerCodeAuthPhase = null
             )
         }
     }
@@ -3169,6 +3176,7 @@ class SettingsViewModel @Inject constructor(
                 homeServerConnections = emptyList(),
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
+                homeServerCodeAuthPhase = null,
                 homeServerError = null,
                     toastMessage = context.getString(R.string.toast_home_server_disconnected),
                 toastType = ToastType.INFO
@@ -3507,7 +3515,7 @@ class SettingsViewModel @Inject constructor(
                             toastType = ToastType.INFO
                         )
                     }
-                    updateStatusManager.reset()
+                    updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.Success)
                 }
             }.onFailure { error ->
                 if (showNoUpdateFeedback) {
@@ -3516,7 +3524,11 @@ class SettingsViewModel @Inject constructor(
                         toastType = ToastType.ERROR
                     )
                 }
-                updateStatusManager.reset()
+                updateStatusManager.updateStatus(
+                    com.arflix.tv.updater.UpdateStatus.Failure(
+                        error.message ?: context.getString(R.string.update_check_failed)
+                    )
+                )
             }
         }
     }

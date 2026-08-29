@@ -36,9 +36,6 @@ val DEVICE_MODE_OVERRIDE_KEY = stringPreferencesKey("device_mode_override")
 /** Key for skipping profile selection on startup */
 val SKIP_PROFILE_SELECTION_KEY = booleanPreferencesKey("skip_profile_selection")
 
-/** Key for launching the app directly after the device finishes booting */
-val START_ON_DEVICE_BOOT_KEY = booleanPreferencesKey("start_on_device_boot")
-
 /** Key for forcing pure-black (OLED) app background */
 val OLED_BLACK_BACKGROUND_KEY = booleanPreferencesKey("oled_black_background")
 

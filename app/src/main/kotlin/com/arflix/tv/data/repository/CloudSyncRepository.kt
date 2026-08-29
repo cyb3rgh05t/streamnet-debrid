@@ -22,7 +22,6 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
-import com.arflix.tv.util.START_ON_DEVICE_BOOT_KEY
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.profileAccentColorKey
 import com.arflix.tv.util.settingsDataStore
@@ -875,7 +874,7 @@ class CloudSyncRepository @Inject constructor(
     // existing merges; `defaultSubtitle` keeps its own `subtitleSettingsUpdatedAt` logic.
 
     private val globalMergeKeys = listOf(
-        "accentColor", "oledBlackBackground", "skipProfileSelection", "startOnDeviceBoot", "customUserAgent",
+        "accentColor", "oledBlackBackground", "skipProfileSelection", "customUserAgent",
         "dnsProvider", "subtitleAiEnabled", "subtitleAiAutoSelect", "subtitleAiFindBestMatch",
         "subtitlePreloadEnabled", "dolbyVisionCompatEnabled", "subtitleAiApiKey",
         "subtitleAiModel", "subtitleRemoveHearingImpaired"
@@ -1139,7 +1138,6 @@ class CloudSyncRepository @Inject constructor(
         root.put("subtitleUsageJson", prefs[subtitleUsageKey()] ?: "")
         root.put("subtitleSettingsUpdatedAt", prefs[subtitleSettingsUpdatedAtKey()]?.toLongOrNull() ?: 0L)
         root.put("skipProfileSelection", prefs[SKIP_PROFILE_SELECTION_KEY] ?: false)
-        root.put("startOnDeviceBoot", prefs[START_ON_DEVICE_BOOT_KEY] ?: false)
 
         // Global AI subtitle settings (non-profile-scoped)
         root.put("subtitleAiEnabled", prefs[subtitleAiEnabledKey] ?: false)
@@ -2006,12 +2004,6 @@ class CloudSyncRepository @Inject constructor(
         if (root.has("skipProfileSelection")) {
             context.settingsDataStore.edit { prefs ->
                 prefs[SKIP_PROFILE_SELECTION_KEY] = root.optBoolean("skipProfileSelection", false)
-            }
-        }
-
-        if (root.has("startOnDeviceBoot")) {
-            context.settingsDataStore.edit { prefs ->
-                prefs[START_ON_DEVICE_BOOT_KEY] = root.optBoolean("startOnDeviceBoot", false)
             }
         }
 

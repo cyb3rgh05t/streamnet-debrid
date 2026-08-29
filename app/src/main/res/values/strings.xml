@@ -135,7 +135,6 @@
     <string name="card_layout">Card Layout</string>
     <string name="ui_mode">UI Mode</string>
     <string name="skip_profile">Skip Profile Selection</string>
-    <string name="start_on_device_boot">Start on device boot</string>
     <string name="oled_black_background">OLED Black Background</string>
     <string name="clock_format">Clock Format</string>
     <string name="show_budget">Show Budget on Home</string>
@@ -194,7 +193,6 @@
     <string name="card_layout_desc">Landscape or poster cards</string>
     <string name="ui_mode_desc">Force TV, Tablet, or Phone</string>
     <string name="skip_profile_desc">Auto-load last used profile after restart</string>
-    <string name="start_on_device_boot_desc">Launch the app automatically when the device finishes booting.</string>
     <string name="oled_black_background_desc">Use pure black app backgrounds for OLED screens</string>
     <string name="clock_format_desc">Choose 12-hour or 24-hour time</string>
     <string name="show_budget_desc">Display the movie budget on the home hero banner</string>
@@ -316,7 +314,7 @@
 
     <!-- Extracted from code: Settings screen -->
     <string name="settings_home_server">Home Server</string>
-    <string name="settings_app_version_label">StreamNet TV V%1$s</string>
+    <string name="settings_app_version_label">StreamNet TV %1$s</string>
     <string name="settings_label_url">URL</string>
     <string name="settings_home_server_https_note">Use HTTPS where possible. HTTP server URLs are allowed for local networks but are not encrypted.</string>
     <string name="settings_label_server_name">Server name</string>
@@ -401,6 +399,8 @@
     <string name="settings_status">Status</string>
     <string name="settings_group_profile">Profile</string>
     <string name="settings_group_system">System</string>
+    <string name="settings_cloud_sync_title">Cloud Sync</string>
+    <string name="settings_info_updates_title">Info &amp; Updates</string>
     <string name="settings_desc_language">App text and preferred audio track.</string>
     <string name="settings_desc_subtitles">Subtitle language defaults, display style and filtering.</string>
     <string name="settings_desc_ai_subtitles">AI subtitle translation and cleanup options.</string>
@@ -412,7 +412,9 @@
     <string name="settings_desc_home_server">Connect personal media servers and use their libraries as sources.</string>
     <string name="settings_desc_catalogs">Discover, rename, order and remove home rows and list catalogs.</string>
     <string name="settings_desc_stremio">Manage third-party addons used for catalog and source discovery.</string>
-    <string name="settings_desc_accounts">Cloud sync, Trakt connection, app updates and account controls.</string>
+    <string name="settings_desc_accounts">Connected services and tracking controls.</string>
+    <string name="settings_desc_cloud_sync">StreamNet Cloud account, manual sync, restore, and data deletion.</string>
+    <string name="settings_desc_info_updates">App updates, privacy policy, and diagnostics sharing.</string>
     <string name="settings_desc_default">Configure StreamNet TV for this profile.</string>
     <string name="settings_pill_app">App %1$s</string>
     <string name="settings_pill_audio">Audio %1$s</string>
@@ -672,6 +674,18 @@
     <string name="settings_update_available_format">Update available: %1$s</string>
     <string name="settings_update_latest">You already have the latest StreamNet TV version</string>
     <string name="settings_update_check_releases">Check GitHub Releases for the latest StreamNet TV APK</string>
+    <string name="settings_up_to_date">Up to date</string>
+    <string name="settings_update_check_failed_short">Check failed</string>
+    <string name="settings_update_downloading_short">Downloading</string>
+    <string name="settings_update_installing_short">Installing</string>
+    <string name="settings_homeserver_phase_starting">Creating connection code...</string>
+    <string name="settings_homeserver_phase_waiting">Waiting for approval on the sign-in page...</string>
+    <string name="settings_homeserver_phase_checking">Checking approval...</string>
+    <string name="settings_homeserver_phase_authorized">Authorization confirmed...</string>
+    <string name="settings_homeserver_phase_locating">Locating your server...</string>
+    <string name="settings_homeserver_phase_connecting">Connecting to the server...</string>
+    <string name="settings_homeserver_phase_libraries">Loading libraries...</string>
+    <string name="settings_homeserver_phase_finalizing">Finishing setup...</string>
     <string name="settings_badge_play">PLAY</string>
     <string name="settings_badge_install">INSTALL</string>
     <string name="settings_badge_checking">CHECKING</string>
