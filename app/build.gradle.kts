@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 366
-        versionName = "2.1.020"
+        versionCode = 367
+        versionName = "2.1.102"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -58,6 +58,11 @@ android {
             "String",
             "CLOUD_BACKEND_URL",
             "\"${escapeBuildConfigString(localSecretValue("CLOUD_BACKEND_URL").ifBlank { "https://auth.mystreamnet.club" })}\""
+        )
+        buildConfigField(
+            "String",
+            "STREAMNET_TV_XTREAM_URL",
+            "\"${escapeBuildConfigString(localSecretValue("STREAMNET_TV_XTREAM_URL"))}\""
         )
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")

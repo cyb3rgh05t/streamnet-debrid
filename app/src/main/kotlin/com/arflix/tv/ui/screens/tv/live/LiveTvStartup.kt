@@ -10,6 +10,14 @@ import com.arflix.tv.data.model.IptvChannel
  */
 object LiveTvStartup {
 
+    /** Channel id whose playback and rail position should be restored. */
+    fun sessionChannelId(
+        focusedChannelId: String?,
+        playingChannelId: String?,
+    ): String? = sequenceOf(playingChannelId, focusedChannelId)
+        .mapNotNull { it?.trim()?.takeIf(String::isNotEmpty) }
+        .firstOrNull()
+
     /**
      * Which channel Live TV should open on.
      *

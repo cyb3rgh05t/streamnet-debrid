@@ -25,6 +25,8 @@ Copy local secrets and fill real values:
 cp secrets.defaults.properties secrets.properties
 ```
 
+Set `STREAMNET_TV_XTREAM_URL` to the Xtream server base URL to include the fixed StreamNet TV preset. The host is hidden in the playlist settings; each user enters their own username and password when activating it. Because the host is embedded in the APK, treat it as configuration rather than a confidential server-side secret.
+
 Build a sideload debug APK:
 
 ```bash
@@ -81,5 +83,6 @@ The workflow expects these repository secrets as needed:
 - `DISCORD_PARTNER_SDK_URL`
 - `DISCORD_PARTNER_SDK_BEARER_TOKEN` (if the SDK URL is private)
 - `DISCORD_PARTNER_SDK_AAR_SHA256` (optional integrity check)
+- `STREAMNET_TV_XTREAM_URL`
 
 The local `secrets.properties` file is ignored by Git and should be used for local builds only. Do not upload it or put private API credentials into source code. Values that must be embedded in an APK should be treated as public, because APK users can extract them; keep signing passwords, SDK download tokens, and server-side secrets only in GitHub Actions secrets or the backend environment.

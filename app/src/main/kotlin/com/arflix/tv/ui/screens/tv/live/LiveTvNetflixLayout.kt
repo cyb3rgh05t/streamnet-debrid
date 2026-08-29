@@ -580,7 +580,10 @@ private fun NetflixCategoryChipRow(
     val items = rememberNetflixCategoryItems(tree, hiddenGroups, groupOrder)
     val listState = rememberLazyListState()
     val selectedIndex = remember(items, selectedId) {
-        items.indexOfFirst { it.id == selectedId }.coerceAtLeast(0)
+        items.indexOfFirst { it.id == selectedId }
+            .takeIf { it >= 0 }
+            ?.plus(1) // Search is the first LazyRow item.
+            ?: 0
     }
     LaunchedEffect(focusSelectedCategorySignal, selectedIndex) {
         if (focusSelectedCategorySignal > 0) {
@@ -752,6 +755,9 @@ private fun NetflixChannelRail(
     val latestAnchorIndex by rememberUpdatedState(anchorIndex)
     val channelWindowKey = remember(channels) {
         "${channels.size}:${channels.firstOrNull()?.id.orEmpty()}:${channels.lastOrNull()?.id.orEmpty()}"
+    }
+    LaunchedEffect(channelWindowKey) {
+        runCatching { listState.scrollToItem(latestAnchorIndex.coerceAtLeast(0)) }
     }
     suspend fun requestAnchorFocus(): Boolean {
         val index = latestAnchorIndex.coerceAtLeast(0)

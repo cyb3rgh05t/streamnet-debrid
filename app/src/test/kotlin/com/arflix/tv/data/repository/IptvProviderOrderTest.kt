@@ -7,6 +7,105 @@ import org.junit.Test
 class IptvProviderOrderTest {
 
     @Test
+    fun streamNetTvPresetIsPreinstalledOnceAndFirst() {
+        val playlists = ensureStreamNetTvPreset(
+            listOf(
+                playlist("custom", "https://example.test/list.m3u"),
+                IptvPlaylistEntry("streamnet_tv", "Renamed", "https://old.test/list.m3u"),
+                IptvPlaylistEntry("streamnet_tv", "Duplicate", "https://duplicate.test/list.m3u"),
+            )
+        )
+
+        assertThat(playlists.map { it.id }).containsExactly("streamnet_tv", "custom").inOrder()
+        assertThat(playlists.first().name).isEqualTo("StreamNet TV")
+        assertThat(playlists.first().m3uUrl).isEqualTo("https://old.test/list.m3u")
+    }
+
+    @Test
+    fun freshStreamNetTvPresetIsDisabledUntilLogin() {
+        val preset = ensureStreamNetTvPreset(emptyList()).single()
+
+        assertThat(preset.id).isEqualTo("streamnet_tv")
+        assertThat(preset.m3uUrl).isEmpty()
+        assertThat(preset.enabled).isFalse()
+    }
+
+    @Test
+    fun manualStreamNetTvPlaylistIsMigratedByConfiguredHost() {
+        val playlists = ensureStreamNetTvPreset(
+            playlists = listOf(
+                IptvPlaylistEntry(
+                    id = "list_1",
+                    name = "My TV",
+                    m3uUrl = "https://provider.test/get.php?username=user&password=pass",
+                ),
+            ),
+            streamNetHost = "https://provider.test",
+        )
+
+        assertThat(playlists).hasSize(1)
+        assertThat(playlists.single().id).isEqualTo("streamnet_tv")
+        assertThat(playlists.single().name).isEqualTo("StreamNet TV")
+        assertThat(playlists.single().m3uUrl).contains("username=user")
+    }
+
+    @Test
+    fun configuredPresetMovesToChangedHostWithoutLosingCredentials() {
+        val playlists = ensureStreamNetTvPreset(
+            playlists = listOf(
+                IptvPlaylistEntry(
+                    id = "streamnet_tv",
+                    name = "StreamNet TV",
+                    m3uUrl = "https://old.test/get.php?username=personal-user&password=personal-pass",
+                ),
+            ),
+            streamNetHost = "https://new.test",
+        )
+
+        assertThat(playlists.single().m3uUrl)
+            .isEqualTo("https://new.test personal-user personal-pass")
+        assertThat(playlists.single().enabled).isTrue()
+    }
+
+    @Test
+    fun emptyPresetDoesNotRemoveThreeExistingPlaylistsOrConsumeCapacity() {
+        val playlists = ensureStreamNetTvPreset(
+            listOf(
+                playlist("one", "https://one.test/list.m3u"),
+                playlist("two", "https://two.test/list.m3u"),
+                playlist("three", "https://three.test/list.m3u"),
+            )
+        )
+
+        assertThat(playlists.map { it.id })
+            .containsExactly("streamnet_tv", "one", "two", "three")
+            .inOrder()
+        assertThat(configuredIptvPlaylistCount(playlists)).isEqualTo(3)
+    }
+
+    @Test
+    fun streamNetTvLoginUsesPersonalCredentialsForPlaylistAndEpg() {
+        val playlist = configuredStreamNetTvPlaylist(
+            host = " https://provider.test/ ",
+            username = " personal-user ",
+            password = " personal-password ",
+        )
+
+        assertThat(playlist).isNotNull()
+        assertThat(playlist!!.m3uUrl)
+            .isEqualTo("https://provider.test personal-user personal-password")
+        assertThat(playlist.epgUrl).isEqualTo(playlist.m3uUrl)
+        assertThat(playlist.enabled).isTrue()
+    }
+
+    @Test
+    fun streamNetTvLoginRequiresHostAndBothCredentials() {
+        assertThat(configuredStreamNetTvPlaylist("", "user", "password")).isNull()
+        assertThat(configuredStreamNetTvPlaylist("https://provider.test", "", "password")).isNull()
+        assertThat(configuredStreamNetTvPlaylist("https://provider.test", "user", "")).isNull()
+    }
+
+    @Test
     fun iptvSortOrderRejectsUnknownCloudValues() {
         assertThat(normalizeIptvSortOrder(" NUMBER ")).isEqualTo("number")
         assertThat(normalizeIptvSortOrder("name")).isEqualTo("name")

@@ -1673,7 +1673,7 @@ fun LiveTvScreen(
         startupCategoryApplied,
     ) {
         if (!state.tvSessionLoaded || !state.iptvPreferencesLoaded || !startupCategoryApplied) return@LaunchedEffect
-        val lastChannel = (playingChannelId ?: focusedChannelId).orEmpty().trim().ifBlank { null }
+        val lastChannel = LiveTvStartup.sessionChannelId(focusedChannelId, playingChannelId)
         viewModel.rememberTvSession(
             lastChannelId = lastChannel,
             lastGroupName = selectedCategoryId,
@@ -1688,10 +1688,10 @@ fun LiveTvScreen(
     DisposableEffect(Unit) {
         onDispose {
             if (!latestStartupCategoryApplied) return@onDispose
-            val lastChannel = (latestSessionPlayingChannelId ?: latestSessionFocusedChannelId)
-                .orEmpty()
-                .trim()
-                .ifBlank { null }
+            val lastChannel = LiveTvStartup.sessionChannelId(
+                latestSessionFocusedChannelId,
+                latestSessionPlayingChannelId,
+            )
             viewModel.rememberTvSession(
                 lastChannelId = lastChannel,
                 lastGroupName = latestSessionCategoryId,

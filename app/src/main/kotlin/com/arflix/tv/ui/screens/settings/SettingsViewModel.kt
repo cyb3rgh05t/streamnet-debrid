@@ -37,6 +37,10 @@ import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.PlexPinAuthSession
 import com.arflix.tv.data.repository.IptvConfig
 import com.arflix.tv.data.repository.IptvRepository
+import com.arflix.tv.data.repository.configuredIptvPlaylistCount
+import com.arflix.tv.data.repository.configuredStreamNetTvPlaylist
+import com.arflix.tv.data.repository.ensureStreamNetTvPreset
+import com.arflix.tv.data.repository.isStreamNetTvPlaylist
 import com.arflix.tv.data.repository.normalizeIptvSortOrder
 import com.arflix.tv.data.repository.IptvPlaylistEntry
 import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
@@ -2393,11 +2397,57 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.savePlaylists(playlists)
             _uiState.value = _uiState.value.copy(
-                iptvPlaylists = playlists.filter { it.m3uUrl.isNotBlank() },
+                iptvPlaylists = ensureStreamNetTvPreset(playlists, BuildConfig.STREAMNET_TV_XTREAM_URL),
                 toastMessage = context.getString(R.string.toast_iptv_playlists_updated),
                 toastType = ToastType.SUCCESS
             )
             syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun activateStreamNetTvPlaylist(
+        playlists: List<IptvPlaylistEntry>,
+        username: String,
+        password: String,
+    ) {
+        val entry = configuredStreamNetTvPlaylist(
+            host = BuildConfig.STREAMNET_TV_XTREAM_URL,
+            username = username,
+            password = password,
+        )
+        if (entry == null) {
+            val message = if (BuildConfig.STREAMNET_TV_XTREAM_URL.isBlank()) {
+                context.getString(R.string.toast_streamnet_tv_unavailable)
+            } else {
+                context.getString(R.string.toast_streamnet_credentials_required)
+            }
+            _uiState.value = _uiState.value.copy(toastMessage = message, toastType = ToastType.ERROR)
+            return
+        }
+
+        val preparedPlaylists = ensureStreamNetTvPreset(playlists, BuildConfig.STREAMNET_TV_XTREAM_URL)
+        val presetIsConfigured = preparedPlaylists
+            .firstOrNull(::isStreamNetTvPlaylist)
+            ?.m3uUrl
+            ?.isNotBlank() == true
+        if (!presetIsConfigured && configuredIptvPlaylistCount(preparedPlaylists) >= 3) {
+            _uiState.value = _uiState.value.copy(
+                toastMessage = context.getString(R.string.toast_iptv_playlist_limit),
+                toastType = ToastType.ERROR,
+            )
+            return
+        }
+
+        viewModelScope.launch {
+            val updated = preparedPlaylists.toMutableList()
+            val presetIndex = updated.indexOfFirst(::isStreamNetTvPlaylist)
+            if (presetIndex >= 0) updated[presetIndex] = entry else updated.add(0, entry)
+            iptvRepository.savePlaylists(updated)
+            _uiState.value = _uiState.value.copy(
+                iptvPlaylists = ensureStreamNetTvPreset(updated, BuildConfig.STREAMNET_TV_XTREAM_URL)
+            )
+            syncLocalStateToCloud(silent = true)
+            refreshIptv(showToast = true, configured = true, force = true)
         }
     }
 

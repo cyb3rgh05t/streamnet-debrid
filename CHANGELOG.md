@@ -41,13 +41,15 @@ All notable changes to this project are documented in this file.
 ### Added
 
 - Added an IPTV setting to show or hide the Live TV special categories (All Channels and Recently Watched), including TV and mobile settings UI and persisted per-profile behavior.
+- Added a protected StreamNet TV playlist preset that is ready on fresh profiles, keeps its configured host out of the settings UI, and connects with each user's personal username and password.
+- Migrated existing manual StreamNet TV logins to the preset and corrected the playlist capacity badge to count only configured sources out of the three available slots.
 
 ### Live TV, IPTV, and focus
 
 - Reduced Live TV selector border thickness to 1dp across category sidebar, channel list, search results, and EPG program cells for TV mode.
 - Restored and hardened Live TV startup focus so it lands on the selected/remembered category instead of falling into Search.
 - Enforced explicit-only Search focus in the category sidebar so Search only takes focus when intentionally opened.
-- Persisted last used Live TV category and channel during navigation so app restarts restore the previous context more reliably.
+- Restored the Live TV Netflix category and channel rails to the currently playing sender after switching screens or restarting the app.
 - Updated mini-player side EPG info to follow the currently focused channel while scrolling the channel list up/down.
 - Improved Xtream EPG mapping, description retention, visible-channel retries, and authenticated XMLTV fallback so Home and Live TV show consistent rich guide data.
 - Made manual playlist refresh publish channel changes immediately and force a complete EPG refresh while preserving existing data during transient failures.

@@ -19,6 +19,26 @@ class LiveTvStartupTest {
         streamUrl = "http://example.test/$id",
     )
 
+    @Test
+    fun sessionRestoresPlayingChannelInsteadOfBrowsedChannel() {
+        val remembered = LiveTvStartup.sessionChannelId(
+            focusedChannelId = "browsed-channel",
+            playingChannelId = "playing-channel",
+        )
+
+        assertThat(remembered).isEqualTo("playing-channel")
+    }
+
+    @Test
+    fun sessionFallsBackToFocusedChannelWithoutPlayingChannel() {
+        val remembered = LiveTvStartup.sessionChannelId(
+            focusedChannelId = " browsed-channel ",
+            playingChannelId = "  ",
+        )
+
+        assertThat(remembered).isEqualTo("browsed-channel")
+    }
+
     // ── Resuming the last channel ──────────────────────────────────────────
 
     @Test

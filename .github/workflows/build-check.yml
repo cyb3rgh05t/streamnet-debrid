@@ -119,6 +119,7 @@ jobs:
           TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
           TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          STREAMNET_TV_XTREAM_URL: ${{ secrets.STREAMNET_TV_XTREAM_URL }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
@@ -129,6 +130,7 @@ jobs:
           : "${TRAKT_CLIENT_SECRET:?Missing TRAKT_CLIENT_SECRET repository secret}"
           : "${DISCORD_CLIENT_ID:?Missing DISCORD_CLIENT_ID repository secret}"
           [[ "$DISCORD_CLIENT_ID" =~ ^[0-9]{17,20}$ ]] || { echo "DISCORD_CLIENT_ID must be a 17-20 digit Discord application id" >&2; exit 1; }
+          : "${STREAMNET_TV_XTREAM_URL:?Missing STREAMNET_TV_XTREAM_URL repository secret}"
           : "${KEYSTORE_BASE64:?Missing KEYSTORE_BASE64 repository secret}"
           : "${KEYSTORE_PASSWORD:?Missing KEYSTORE_PASSWORD repository secret}"
           : "${KEY_ALIAS:?Missing KEY_ALIAS repository secret}"
@@ -146,6 +148,7 @@ jobs:
           FANART_API_KEY: ${{ secrets.FANART_API_KEY }}
           VODWISHARR_API_KEY: ${{ secrets.VODWISHARR_API_KEY }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
+          STREAMNET_TV_XTREAM_URL: ${{ secrets.STREAMNET_TV_XTREAM_URL }}
         run: |
           printf '%s\n' \
             "CLOUD_BACKEND_URL=$CLOUD_BACKEND_URL" \
@@ -158,6 +161,7 @@ jobs:
             "FANART_API_KEY=$FANART_API_KEY" \
             "VODWISHARR_API_KEY=$VODWISHARR_API_KEY" \
             "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" \
+            "STREAMNET_TV_XTREAM_URL=$STREAMNET_TV_XTREAM_URL" \
             > secrets.properties
 
       - name: Prepare production signing

@@ -329,6 +329,15 @@
     <string name="settings_ph_server_url_discover">Leave empty to discover automatically</string>
     <string name="settings_edit_tv_playlist">Edit TV Playlist</string>
     <string name="settings_add_tv_playlist">Add TV Playlist</string>
+    <string name="settings_streamnet_tv_login">Personalize StreamNet TV</string>
+    <string name="settings_streamnet_tv_login_note">Sign in with your personal StreamNet TV credentials.</string>
+    <string name="settings_label_streamnet_user">StreamNet username</string>
+    <string name="settings_label_streamnet_password">StreamNet password</string>
+    <string name="settings_streamnet_tv_ready">Ready to connect with your personal login</string>
+    <string name="settings_streamnet_tv_connected">Connected with personal StreamNet login</string>
+    <string name="toast_streamnet_tv_unavailable">StreamNet TV is not configured in this build.</string>
+    <string name="toast_streamnet_credentials_required">Enter your StreamNet username and password.</string>
+    <string name="toast_iptv_playlist_limit">Remove another playlist before activating StreamNet TV. Up to three playlists can be configured.</string>
     <string name="settings_iptv_epg_note">EPG supports multiple sources for this playlist. Add one URL per line; StreamNet TV will match them in order.</string>
     <string name="settings_label_playlist_name">Playlist Name</string>
     <string name="settings_label_m3u_or_xtream">M3U URL or Xtream Host</string>
