@@ -2986,7 +2986,6 @@ private fun CloudEmailPasswordModal(
     onOpenPrivacy: () -> Unit
 ) {
     val accentColor = resolveAccentColor(fallback = AccentYellow)
-    // Focus order: 0 email, 1 password, 2 cancel, 3 sign in, 4 create
     // Focus order: 0 email, 1 password, 2 cancel, 3 sign in, 4 create, 5 privacy
     var focusedIndex by remember { mutableIntStateOf(0) }
     val emailRequester = remember { FocusRequester() }
@@ -3175,7 +3174,7 @@ private fun CloudEmailPasswordModal(
                             .clickable { onDismiss() }
                             .border(
                                 width = if (isCancelFocused) 2.dp else 0.dp,
-                                color = if (isCancelFocused) Pink else Color.Transparent,
+                                color = if (isCancelFocused) accentColor else Color.Transparent,
                                 shape = RoundedCornerShape(8.dp)
                             )
                             .padding(vertical = 14.dp),
@@ -3208,7 +3207,7 @@ private fun CloudEmailPasswordModal(
                         Text(
                             text = stringResource(R.string.sign_in),
                             style = ArflixTypography.button,
-                            color = if (isSignInFocused) Color.Black else Color.White
+                            color = contrastingContentColor(accentColor)
                         )
                     }
 
@@ -3251,7 +3250,7 @@ private fun CloudEmailPasswordModal(
                         .clickable(onClick = onOpenPrivacy)
                         .border(
                             width = if (focusedIndex == 5) 2.dp else 1.dp,
-                            color = if (focusedIndex == 5) Pink else Color.White.copy(alpha = 0.14f),
+                            color = if (focusedIndex == 5) accentColor else Color.White.copy(alpha = 0.14f),
                             shape = RoundedCornerShape(8.dp)
                         )
                         .padding(horizontal = 16.dp, vertical = 10.dp),
@@ -11676,20 +11675,16 @@ private fun IptvCategoriesSettings(
             )
         }
 
-        SettingsRow(
-            icon = Icons.Default.Refresh,
-            title = stringResource(R.string.settings_reset_order),
-            subtitle = stringResource(R.string.settings_reset_order_desc),
-            value = stringResource(R.string.settings_badge_reset),
-            isFocused = focusedIndex == 0,
-            onClick = onReset,
-            modifier = Modifier.settingsFocusSlot(0)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         if (isMobile) {
             MobileSettingsCategory(title = stringResource(R.string.settings_section_categories)) {
+                MobileSettingsRow(
+                    icon = Icons.Default.Refresh,
+                    title = stringResource(R.string.settings_reset_order),
+                    subtitle = stringResource(R.string.settings_reset_order_desc),
+                    value = stringResource(R.string.settings_badge_reset),
+                    showDivider = orderedGroups.isNotEmpty(),
+                    onClick = onReset
+                )
                 if (orderedGroups.isEmpty()) {
                     Text(
                         text = stringResource(R.string.settings_no_categories_available),
@@ -11713,6 +11708,18 @@ private fun IptvCategoriesSettings(
                 }
             }
         } else {
+            SettingsRow(
+                icon = Icons.Default.Refresh,
+                title = stringResource(R.string.settings_reset_order),
+                subtitle = stringResource(R.string.settings_reset_order_desc),
+                value = stringResource(R.string.settings_badge_reset),
+                isFocused = focusedIndex == 0,
+                onClick = onReset,
+                modifier = Modifier.settingsFocusSlot(0)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
             if (orderedGroups.isEmpty()) {
                 Text(
                     text = stringResource(R.string.settings_no_categories_available),

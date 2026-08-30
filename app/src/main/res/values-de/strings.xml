@@ -275,7 +275,7 @@
     <string name="live_search_now">Jetzt: %1$s</string>
     <string name="live_status_loading_guide">Sichtbare Programmdaten werden geladen…</string>
     <string name="live_status_no_epg_source">Keine EPG-Quelle eingerichtet</string>
-    <string name="live_status_guide_pending">Programmdaten ausstehend</string>
+    <string name="live_status_guide_pending">Programdaten nicht verfügbar...</string>
     <string name="live_status_matched">%1$s  |  %2$d/%3$d sichtbaren Sendern zugeordnet</string>
     <string name="live_empty_no_programme">Keine Programmdaten</string>
     <string name="live_empty_no_channel">Kein Sender</string>
@@ -286,7 +286,7 @@
     <string name="live_empty_no_playlist">Keine IPTV-Playlist eingerichtet.</string>
     <string name="live_placeholder_loading_guide">Programm wird geladen…</string>
     <string name="live_placeholder_no_guide_matched">Keine passenden Programmdaten</string>
-    <string name="live_placeholder_guide_pending">Programmdaten ausstehend…</string>
+    <string name="live_placeholder_guide_pending">Programdaten nicht verfügbar...</string>
     <string name="live_placeholder_no_guide_source">Keine Programmquelle</string>
     <string name="live_btn_guide">PROGRAMM</string>
     <string name="live_btn_open_settings">Einstellungen öffnen</string>

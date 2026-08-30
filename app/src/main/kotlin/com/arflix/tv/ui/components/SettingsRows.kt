@@ -6,6 +6,9 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -22,9 +25,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
@@ -44,6 +51,7 @@ import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.ui.skin.resolveAccentColor
+import kotlinx.coroutines.launch
 
 /** Display-only localization of stored setting values (Off/Any/Medium/White...).
  *  The stored/compared value stays English; only the shown label is translated.
@@ -274,6 +282,7 @@ fun MobileSettingsCategory(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun MobileSettingsRow(
     icon: ImageVector? = null,
@@ -292,11 +301,34 @@ fun MobileSettingsRow(
 ) {
     val alpha = if (enabled) 1f else 0.4f
     val accentColor = resolveAccentColor(fallback = Pink)
+    val interactionSource = remember { MutableInteractionSource() }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
+    val coroutineScope = rememberCoroutineScope()
+    var hasFocus by remember { androidx.compose.runtime.mutableStateOf(false) }
+    val showFocus = enabled && (isFocused || hasFocus)
     Column(modifier = Modifier.alpha(alpha)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = enabled) { onClick() }
+                .bringIntoViewRequester(bringIntoViewRequester)
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (showFocus) accentColor.copy(alpha = 0.14f) else Color.Transparent)
+                .border(
+                    width = if (showFocus) 2.dp else 0.dp,
+                    color = if (showFocus) accentColor else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp)
+                )
+                .onFocusChanged { state ->
+                    hasFocus = state.hasFocus
+                    if (state.hasFocus) {
+                        coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
+                    }
+                }
+                .clickable(
+                    enabled = enabled,
+                    interactionSource = interactionSource,
+                    indication = null
+                ) { onClick() }
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -309,13 +341,13 @@ fun MobileSettingsRow(
                     iconRes != null -> Icon(
                         painter = painterResource(id = iconRes),
                         contentDescription = null,
-                        tint = iconTint,
+                        tint = if (showFocus) accentColor else iconTint,
                         modifier = Modifier.size(24.dp)
                     )
                     icon != null -> Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = iconTint,
+                        tint = if (showFocus) accentColor else iconTint,
                         modifier = Modifier.size(24.dp)
                     )
                 }

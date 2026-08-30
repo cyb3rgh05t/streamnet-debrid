@@ -10,6 +10,11 @@ import com.arflix.tv.data.model.IptvChannel
  */
 object LiveTvStartup {
 
+    fun channelWindowMatchesCategory(
+        selectedCategoryId: String,
+        filteredCategoryId: String?,
+    ): Boolean = selectedCategoryId == filteredCategoryId
+
     /** Channel id whose playback and rail position should be restored. */
     fun sessionChannelId(
         focusedChannelId: String?,

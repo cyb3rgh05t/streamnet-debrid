@@ -347,6 +347,18 @@ sealed class AuthState {
     data class Error(val message: String) : AuthState()
 }
 
+internal fun resolveCloudStartupUserId(
+    refreshRequired: Boolean,
+    refreshTokenAvailable: Boolean,
+    refreshSucceeded: Boolean,
+    persistedUserId: String?,
+    accessTokenUserId: String?,
+): String? = when {
+    !refreshRequired || refreshSucceeded -> persistedUserId ?: accessTokenUserId
+    refreshTokenAvailable -> persistedUserId
+    else -> null
+}?.takeIf { it.isNotBlank() }
+
 /**
  * Repository for Supabase authentication and user profile management
  */
@@ -412,9 +424,23 @@ class AuthRepository @Inject constructor(
                     hasRefreshToken -> refreshAccessToken(force = false)
                     else -> null
                 }
-                val userId = cachedUserId
-                    ?: usableAccessToken?.let { extractUserIdFromAccessToken(it) }
-                val email = cachedEmail
+                // A rejected refresh clears the persisted session. Re-read after the
+                // request so a stale in-memory user ID cannot authenticate it again.
+                // Transient failures leave the persisted identity intact for a later retry.
+                val currentPrefs = if (shouldRefreshCloudToken && hasRefreshToken) {
+                    context.authDataStore.data.first()
+                } else {
+                    prefs
+                }
+                val userId = resolveCloudStartupUserId(
+                    refreshRequired = shouldRefreshCloudToken,
+                    refreshTokenAvailable = hasRefreshToken,
+                    refreshSucceeded = !usableAccessToken.isNullOrBlank(),
+                    persistedUserId = currentPrefs[PrefsKeys.USER_ID],
+                    accessTokenUserId = usableAccessToken?.let { extractUserIdFromAccessToken(it) },
+                )
+                val email = currentPrefs[PrefsKeys.USER_EMAIL]
+                    ?: cachedEmail
                     ?: usableAccessToken?.let { extractUserEmailFromAccessToken(it) }
                     ?: ""
 

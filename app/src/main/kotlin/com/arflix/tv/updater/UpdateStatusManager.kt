@@ -17,6 +17,13 @@ sealed class UpdateStatus {
     data class Failure(val message: String, val update: AppUpdate? = null) : UpdateStatus()
 }
 
+internal fun shouldShowAppUpdateDialog(
+    force: Boolean,
+    updateTag: String,
+    persistedIgnoredTag: String?,
+    sessionIgnoredTag: String?,
+): Boolean = force || (updateTag != persistedIgnoredTag && updateTag != sessionIgnoredTag)
+
 @Singleton
 class UpdateStatusManager @Inject constructor() {
     private val _status = MutableStateFlow<UpdateStatus>(UpdateStatus.Idle)

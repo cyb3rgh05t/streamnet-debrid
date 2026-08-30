@@ -1332,7 +1332,7 @@ private fun SelectablePill(
     icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     iconOnly: Boolean = false
 ) {
-    val shape = RoundedCornerShape(6.dp)
+    val shape = RoundedCornerShape(percent = 50)
     val scale by animateFloatAsState(
         targetValue = if (focused) 1.018f else 1f,
         animationSpec = tween(durationMillis = 110),
@@ -1366,7 +1366,7 @@ private fun SelectablePill(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         if (leading != null) {
-            Box(modifier = Modifier.size(7.dp).background(leading, RoundedCornerShape(2.dp)))
+            Box(modifier = Modifier.size(7.dp).background(leading, RoundedCornerShape(percent = 50)))
         }
         if (icon != null) {
             Icon(icon, contentDescription = if (iconOnly) label else null, tint = foreground, modifier = Modifier.size(16.dp))

@@ -56,6 +56,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.net.URLDecoder
 import java.text.SimpleDateFormat
+import java.text.Normalizer
 import java.util.Calendar
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
@@ -86,6 +87,81 @@ internal fun mergeEnrichedItemIntoFullDetails(
 ): MediaItem = fullDetails.copy(
     overview = fullDetails.overview.ifBlank { enrichedItem.overview },
 )
+
+private val IPTV_ARTWORK_EPISODE_SUFFIX_REGEX = Regex(
+    """(?i)\s*(?:[-–—|:]\s*)?(?:s(?:eason)?\s*\d{1,2}\s*e(?:pisode)?\s*\d{1,4}|staffel\s*\d{1,2}(?:\s*folge\s*\d{1,4})?|episode\s*\d{1,4}|folge\s*\d{1,4})\b.*$"""
+)
+private val IPTV_ARTWORK_QUALIFIER_REGEX = Regex("""\([^)]*\)|\[[^]]*]""")
+private val IPTV_ARTWORK_FORMAT_REGEX = Regex("""(?i)\b(live|hd|uhd|4k)\b""")
+private val IPTV_ARTWORK_DIACRITICS_REGEX = Regex("""\p{M}+""")
+private val IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX = Regex("""[^a-z0-9\s]""")
+private val IPTV_ARTWORK_ARTICLES_REGEX = Regex("""\b(the|a|an|der|die|das)\b""")
+private val IPTV_ARTWORK_WHITESPACE_REGEX = Regex("""\s+""")
+
+internal fun cleanIptvArtworkTitle(rawTitle: String): String = rawTitle
+    .replace(IPTV_ARTWORK_EPISODE_SUFFIX_REGEX, " ")
+    .replace(IPTV_ARTWORK_QUALIFIER_REGEX, " ")
+    .replace(IPTV_ARTWORK_FORMAT_REGEX, " ")
+    .replace(IPTV_ARTWORK_WHITESPACE_REGEX, " ")
+    .trim()
+
+internal fun normalizeIptvArtworkTitle(value: String): String =
+    Normalizer.normalize(value, Normalizer.Form.NFD)
+        .replace(IPTV_ARTWORK_DIACRITICS_REGEX, "")
+        .lowercase(Locale.US)
+        .replace("&", " and ")
+        .replace(IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX, " ")
+        .replace(IPTV_ARTWORK_ARTICLES_REGEX, " ")
+        .replace(IPTV_ARTWORK_WHITESPACE_REGEX, " ")
+        .trim()
+
+internal fun iptvArtworkTitleScore(requestedTitle: String, candidateTitle: String): Double {
+    val requested = normalizeIptvArtworkTitle(requestedTitle)
+    val candidate = normalizeIptvArtworkTitle(candidateTitle)
+    if (requested.isBlank() || candidate.isBlank()) return 0.0
+    if (requested == candidate) return 1_000.0
+    if (candidate.contains(requested) || requested.contains(candidate)) return 700.0
+
+    val requestedTokens = requested.split(' ').filter { it.length > 1 }.toSet()
+    val candidateTokens = candidate.split(' ').filter { it.length > 1 }.toSet()
+    if (requestedTokens.isEmpty() || candidateTokens.isEmpty()) return 0.0
+    return requestedTokens.intersect(candidateTokens).size.toDouble() /
+        maxOf(requestedTokens.size, candidateTokens.size).toDouble() * 100.0
+}
+
+internal fun artworkLanguageRank(
+    language: String?,
+    appLanguage: String,
+    neutralFirst: Boolean,
+): Int {
+    val normalized = language?.trim()?.lowercase(Locale.US).orEmpty()
+    val appLanguageCode = appLanguage.substringBefore('-').substringBefore('_').lowercase(Locale.US)
+    val appLanguageCodes = buildSet {
+        add(appLanguageCode)
+        runCatching { add(Locale.forLanguageTag(appLanguageCode).isO3Language.lowercase(Locale.US)) }
+    }
+    val isNeutral = normalized.isBlank() || normalized == "00" || normalized == "null"
+    return when {
+        neutralFirst && isNeutral -> 4
+        normalized in appLanguageCodes -> 3
+        normalized == "en" || normalized == "eng" -> 2
+        !neutralFirst && isNeutral -> 1
+        else -> 0
+    }
+}
+
+internal fun mergeTvDetailsLanguageFallback(
+    localized: TmdbTvDetails,
+    english: TmdbTvDetails?,
+): TmdbTvDetails {
+    if (english == null) return localized
+    return localized.copy(
+        name = localized.name.ifBlank { english.name },
+        overview = localized.overview?.takeIf { it.isNotBlank() } ?: english.overview,
+        posterPath = localized.posterPath ?: english.posterPath,
+        backdropPath = localized.backdropPath ?: english.backdropPath,
+    )
+}
 
 internal object HomeServerLibraryIdentity {
     fun stableNativeId(sourceRef: String, itemId: String): Int {
@@ -3056,7 +3132,18 @@ class MediaRepository @Inject constructor(
             val detailsDeferred = async { tmdbApi.getTvDetails(tvId, apiKey, language = contentLanguage) }
             val externalIdsDeferred = async { resolveExternalIds(MediaType.TV, tvId) }
 
-            val details = detailsDeferred.await()
+            val localizedDetails = detailsDeferred.await()
+            val englishDetails = if (
+                !contentLanguage.startsWith("en", ignoreCase = true) &&
+                (localizedDetails.overview.isNullOrBlank() ||
+                    localizedDetails.posterPath.isNullOrBlank() ||
+                    localizedDetails.backdropPath.isNullOrBlank())
+            ) {
+                runCatching { tmdbApi.getTvDetails(tvId, apiKey, language = "en-US") }.getOrNull()
+            } else {
+                null
+            }
+            val details = mergeTvDetailsLanguageFallback(localizedDetails, englishDetails)
             val imdbId = externalIdsDeferred.await()?.imdbId?.also { cacheImdbId(MediaType.TV, tvId, it) }
             val imdbRating = imdbId?.let { getImdbRating(MediaType.TV, tvId, it) }
             details.toMediaItem().copy(imdbRating = imdbRating.orEmpty())
@@ -3101,34 +3188,15 @@ class MediaRepository @Inject constructor(
 
     /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
     suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
-        val cleanedTitle = rawTitle
-            .replace(Regex("""\([^)]*\)|\[[^]]*]"""), " ")
-            .replace(Regex("""(?i)\b(live|hd|uhd|4k|s\d+e\d+|episode\s*\d+)\b"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
+        val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
-        val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
-        val languageOverrides = buildList<String?> {
-            add(null)
-            if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
-        }
-        val candidates = languageOverrides.flatMap { languageOverride ->
-            runCatching { search(cleanedTitle, languageOverride = languageOverride) }
-                .getOrDefault(emptyList<MediaItem>())
-        }.distinctBy { "${it.mediaType.name}:${it.id}" }
+        val candidates = searchTvArtworkCandidates(cleanedTitle)
 
         return candidates
             .filter { !it.backdrop.isNullOrBlank() }
-            .maxByOrNull { item ->
-                val candidateTitle = normalizeIptvArtworkTitle(item.title)
-                when {
-                    candidateTitle == normalizedTitle -> 1_000.0
-                    candidateTitle.contains(normalizedTitle) || normalizedTitle.contains(candidateTitle) -> 700.0
-                    else -> artworkTitleOverlap(normalizedTitle, candidateTitle) * 100.0
-                } + (item.popularity / 100f)
-            }
+            .maxByOrNull { item -> iptvArtworkTitleScore(cleanedTitle, item.title) + (item.popularity / 100f) }
             ?.backdrop
             ?.also { android.util.Log.d("IptvArtwork", "TMDB backdrop hit title=$cleanedTitle") }
             ?: lookupFanartArtwork(cleanedTitle, candidates, preferLogo = false)
@@ -3136,29 +3204,13 @@ class MediaRepository @Inject constructor(
     }
 
     suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
-        val cleanedTitle = rawTitle
-            .replace(Regex("""\([^)]*\)|\[[^]]*]"""), " ")
-            .replace(Regex("""(?i)\b(live|hd|uhd|4k|s\d+e\d+|episode\s*\d+)\b"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
+        val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
-        val normalizedTitle = normalizeIptvArtworkTitle(cleanedTitle)
-        val candidates = buildList<String?> {
-            add(null)
-            if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
-        }.flatMap { languageOverride ->
-            runCatching { search(cleanedTitle, languageOverride = languageOverride) }
-                .getOrDefault(emptyList<MediaItem>())
-        }.distinctBy { "${it.mediaType.name}:${it.id}" }
+        val candidates = searchTvArtworkCandidates(cleanedTitle)
             .sortedByDescending { item ->
-                val candidateTitle = normalizeIptvArtworkTitle(item.title)
-                when {
-                    candidateTitle == normalizedTitle -> 1_000.0
-                    candidateTitle.contains(normalizedTitle) || normalizedTitle.contains(candidateTitle) -> 700.0
-                    else -> artworkTitleOverlap(normalizedTitle, candidateTitle) * 100.0
-                } + (item.popularity / 100f)
+                iptvArtworkTitleScore(cleanedTitle, item.title) + (item.popularity / 100f)
             }
 
         for (candidate in candidates.take(8)) {
@@ -3171,13 +3223,38 @@ class MediaRepository @Inject constructor(
             ?.also { android.util.Log.d("IptvArtwork", "Fallback logo hit title=$cleanedTitle") }
     }
 
+    private suspend fun searchTvArtworkCandidates(title: String): List<MediaItem> =
+        buildList<String?> {
+            add(contentLanguage)
+            if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
+        }.flatMap { language ->
+            runCatching {
+                tmdbApi.searchTv(apiKey, title, language = language).results.map {
+                    it.toMediaItem(MediaType.TV)
+                }
+            }.getOrDefault(emptyList())
+        }.groupBy { it.id }
+            .values
+            .map { localizedFirst ->
+                localizedFirst.drop(1).fold(localizedFirst.first()) { preferred, fallback ->
+                    preferred.copy(
+                        overview = preferred.overview.ifBlank { fallback.overview },
+                        image = preferred.image.ifBlank { fallback.image },
+                        backdrop = preferred.backdrop ?: fallback.backdrop,
+                    )
+                }
+            }
+            .filter { iptvArtworkTitleScore(title, it.title) >= 35.0 }
+            .sortedByDescending { item ->
+                iptvArtworkTitleScore(title, item.title) + (item.popularity / 100f)
+            }
+
     private suspend fun lookupFanartArtwork(
         title: String,
         tmdbCandidates: List<MediaItem>,
         preferLogo: Boolean,
     ): String? {
-        if (Constants.TVDB_API_KEY.isBlank()) return null
-        val tvdbAuthenticated = ensureTvdbToken() != null
+        val tvdbAuthenticated = Constants.TVDB_API_KEY.isNotBlank() && ensureTvdbToken() != null
         val tvCandidates = tmdbCandidates.filter { it.mediaType == MediaType.TV }.take(6)
         val ids = tvCandidates.mapNotNull { candidate ->
             runCatching { tmdbApi.getTvExternalIds(candidate.id, apiKey).tvdbId }.getOrNull()
@@ -3187,7 +3264,11 @@ class MediaRepository @Inject constructor(
             val searchResults = runCatching {
                 tvdbApi.search(title, type = "series").data
             }.getOrDefault(emptyList())
-            ids += searchResults.mapNotNull { it.id?.toIntOrNull() }.take(5)
+            ids += searchResults
+                .filter { iptvArtworkTitleScore(title, it.name.orEmpty()) >= 35.0 }
+                .sortedByDescending { iptvArtworkTitleScore(title, it.name.orEmpty()) }
+                .mapNotNull { it.id?.toIntOrNull() }
+                .take(5)
         }
         for (tvdbId in ids.distinct()) {
             if (Constants.FANART_API_KEY.isNotBlank()) {
@@ -3200,7 +3281,9 @@ class MediaRepository @Inject constructor(
                 images.asSequence()
                     .filter { image -> !image.url.isNullOrBlank() }
                     .sortedWith(
-                        compareByDescending<com.arflix.tv.data.api.FanartImage> { it.lang.equals("en", true) }
+                        compareByDescending<com.arflix.tv.data.api.FanartImage> {
+                            artworkLanguageRank(it.lang, contentLanguage, neutralFirst = !preferLogo)
+                        }
                             .thenByDescending { it.likes ?: 0 }
                     )
                     .firstOrNull()
@@ -3219,7 +3302,11 @@ class MediaRepository @Inject constructor(
             tvdbArtwork?.data
                 ?.asSequence()
                 ?.filter { image -> !image.image.isNullOrBlank() }
-                ?.sortedByDescending { it.score ?: 0 }
+                ?.sortedWith(
+                    compareByDescending<com.arflix.tv.data.api.TvdbArtwork> {
+                        artworkLanguageRank(it.language, contentLanguage, neutralFirst = !preferLogo)
+                    }.thenByDescending { it.score ?: 0 }
+                )
                 ?.firstOrNull()
                 ?.image
                 ?.takeIf { it.isNotBlank() }
@@ -3238,21 +3325,6 @@ class MediaRepository @Inject constructor(
             tvdbApi.login(TvdbLoginRequest(Constants.TVDB_API_KEY)).data?.token
                 ?.also { tvdbToken = it }
         }.getOrNull()
-    }
-
-    private fun normalizeIptvArtworkTitle(value: String): String =
-        value.lowercase(Locale.US)
-            .replace(Regex("""[^a-z0-9\s]"""), " ")
-            .replace(Regex("""\b(the|a|an|der|die|das)\b"""), " ")
-            .replace(Regex("""\s+"""), " ")
-            .trim()
-
-    private fun artworkTitleOverlap(left: String, right: String): Double {
-        val leftTokens = left.split(' ').filter { it.length > 1 }.toSet()
-        val rightTokens = right.split(' ').filter { it.length > 1 }.toSet()
-        if (leftTokens.isEmpty() || rightTokens.isEmpty()) return 0.0
-        return leftTokens.intersect(rightTokens).size.toDouble() /
-            maxOf(leftTokens.size, rightTokens.size).toDouble()
     }
 
     private fun String.isArtworkPlaceholderTitle(): Boolean {
@@ -3429,13 +3501,13 @@ class MediaRepository @Inject constructor(
         val type = if (mediaType == MediaType.TV) "tv" else "movie"
         return logoRequestSemaphore.withPermit {
             try {
-                // Request English + language-agnostic logos explicitly so logo availability
-                // is stable even when app locale is non-English.
+                val appLanguageCode = contentLanguage.substringBefore('-').substringBefore('_').lowercase(Locale.US)
+                val includedLanguages = listOf(appLanguageCode, "en", "null").distinct().joinToString(",")
                 val images = tmdbApi.getImages(
                     mediaType = type,
                     id = mediaId,
                     apiKey = apiKey,
-                    includeImageLanguage = "en,null"
+                    includeImageLanguage = includedLanguages
                 )
                 // Quality ranking for clearlogos: prefer PNG over SVG (the app has
                 // no SVG decoder), English over other locales, and among the
@@ -3446,7 +3518,9 @@ class MediaRepository @Inject constructor(
                     .filter { !it.filePath.isNullOrBlank() }
                     .filterNot { it.filePath!!.endsWith(".svg", ignoreCase = true) }
                     .sortedWith(
-                        compareByDescending<TmdbImage> { it.iso6391 == "en" }
+                        compareByDescending<TmdbImage> {
+                            artworkLanguageRank(it.iso6391, contentLanguage, neutralFirst = false)
+                        }
                             .thenByDescending { it.voteAverage }
                             .thenByDescending { it.width }
                     )

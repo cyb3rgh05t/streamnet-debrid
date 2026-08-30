@@ -3554,8 +3554,14 @@ class SettingsViewModel @Inject constructor(
 
                 if (isNewer) {
                     updateStatusManager.updateStatus(com.arflix.tv.updater.UpdateStatus.UpdateAvailable(update))
-                    // If force is true, we want to show the dialog even if ignored
-                    if (force) {
+                    val ignoredTag = updatePreferences.ignoredTag.first()
+                    if (com.arflix.tv.updater.shouldShowAppUpdateDialog(
+                            force = force,
+                            updateTag = update.tag,
+                            persistedIgnoredTag = ignoredTag,
+                            sessionIgnoredTag = updateStatusManager.sessionIgnoredTag,
+                        )
+                    ) {
                         _uiState.value = _uiState.value.copy(showAppUpdateDialog = true)
                     }
                 } else {

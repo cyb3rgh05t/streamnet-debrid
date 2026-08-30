@@ -20,6 +20,13 @@ class LiveTvStartupTest {
     )
 
     @Test
+    fun guideWaitsForSelectedCategoryWindow() {
+        assertThat(LiveTvStartup.channelWindowMatchesCategory("all", "sports")).isFalse()
+        assertThat(LiveTvStartup.channelWindowMatchesCategory("all", null)).isFalse()
+        assertThat(LiveTvStartup.channelWindowMatchesCategory("all", "all")).isTrue()
+    }
+
+    @Test
     fun sessionRestoresPlayingChannelInsteadOfBrowsedChannel() {
         val remembered = LiveTvStartup.sessionChannelId(
             focusedChannelId = "browsed-channel",

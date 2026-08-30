@@ -68,6 +68,28 @@ class IptvProviderOrderTest {
     }
 
     @Test
+    fun streamNetPresetMigrationPreservesGroupPreferenceKeys() {
+        val playlists = listOf(
+            IptvPlaylistEntry(
+                id = "list_1",
+                name = "Manual StreamNet",
+                m3uUrl = "https://provider.test/get.php?username=user&password=pass",
+            ),
+            playlist("other", "https://other.test/list.m3u"),
+        )
+
+        val migrated = migrateStreamNetGroupKeys(
+            keys = listOf("list_1|News", "other|Movies", "list_1|Sports"),
+            playlists = playlists,
+            streamNetHost = "https://provider.test",
+        )
+
+        assertThat(migrated)
+            .containsExactly("streamnet_tv|News", "other|Movies", "streamnet_tv|Sports")
+            .inOrder()
+    }
+
+    @Test
     fun emptyPresetDoesNotRemoveThreeExistingPlaylistsOrConsumeCapacity() {
         val playlists = ensureStreamNetTvPreset(
             listOf(
@@ -250,6 +272,16 @@ class IptvProviderOrderTest {
         assertThat(movedToTop)
             .containsExactly("one|Docs", "two|Sports", "one|News", "two|Movies", "one|Kids")
             .inOrder()
+    }
+
+    @Test
+    fun resettingCategoryOrderRemovesOnlyTheNormalizedPlaylistEntries() {
+        val reset = resetIptvPlaylistGroupOrder(
+            savedOrder = listOf(" one|News ", "two|Sports", "one|Kids", "two|Movies"),
+            playlistId = " one ",
+        )
+
+        assertThat(reset).containsExactly("two|Sports", "two|Movies").inOrder()
     }
 
     private fun apiChannel(

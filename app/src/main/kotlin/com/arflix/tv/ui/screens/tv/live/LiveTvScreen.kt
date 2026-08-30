@@ -1221,6 +1221,9 @@ fun LiveTvScreen(
     }
     LaunchedEffect(selectedProviderId, selectedCategoryId, filteredChannelsWindowKey) {
         if (filteredChannels.isEmpty()) return@LaunchedEffect
+        if (!LiveTvStartup.channelWindowMatchesCategory(selectedCategoryId, filteredChannelsCategoryKey)) {
+            return@LaunchedEffect
+        }
         val nextScopeKey = "$selectedProviderId|$selectedCategoryId"
         if (guideScopeKey != nextScopeKey) {
             val anchorId = rememberedChannelByCategory[selectedCategoryId]
