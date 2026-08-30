@@ -2785,8 +2785,14 @@ fun LiveTvScreen(
                     isBuffering = playerIsBuffering,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
-                    lookupBackdrop = { title ->
-                        runCatching { viewModel.lookupProgramBackdrop(title) }.getOrNull()
+                    lookupBackdrop = { program ->
+                        runCatching {
+                            viewModel.lookupProgramBackdrop(
+                                program.title,
+                                program.startUtcMillis,
+                                program.endUtcMillis,
+                            )
+                        }.getOrNull()
                     },
                     onSelectCategory = { id ->
                         noteGuideUserNavigation()

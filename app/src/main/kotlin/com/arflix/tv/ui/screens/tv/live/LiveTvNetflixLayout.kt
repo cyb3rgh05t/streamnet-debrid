@@ -109,7 +109,7 @@ internal fun LiveTvNetflixLayout(
     variantCountFor: (EnrichedChannel) -> Int,
     isFullScreen: Boolean,
     isBuffering: Boolean = false,
-    lookupBackdrop: suspend (String) -> String? = { null },
+    lookupBackdrop: suspend (IptvProgram) -> String? = { null },
     onSelectCategory: (String) -> Unit,
     onOpenSearch: () -> Unit,
     onCategoryFocused: () -> Unit,
@@ -152,9 +152,9 @@ internal fun LiveTvNetflixLayout(
         initialValue = null,
         key1 = previewNowNext?.now?.title,
     ) {
-        val title = previewNowNext?.now?.title?.takeIf { it.isNotBlank() } ?: return@produceState
+        val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
-        value = runCatching { lookupBackdrop(title) }.getOrNull()
+        value = runCatching { lookupBackdrop(program) }.getOrNull()
     }
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -723,7 +723,7 @@ private fun NetflixChannelRail(
     nowNextMap: Map<String, IptvNowNext>,
     favoriteSet: Set<String>,
     clockTickMillis: Long,
-    lookupBackdrop: suspend (String) -> String?,
+    lookupBackdrop: suspend (IptvProgram) -> String?,
     onChannelFocused: (EnrichedChannel) -> Unit,
     onChannelSelected: (EnrichedChannel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
@@ -818,7 +818,7 @@ private fun NetflixChannelCard(
     clockTickMillis: Long,
     isPlaying: Boolean,
     isFavorite: Boolean,
-    lookupBackdrop: suspend (String) -> String?,
+    lookupBackdrop: suspend (IptvProgram) -> String?,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongPress: () -> Unit,
@@ -837,9 +837,9 @@ private fun NetflixChannelCard(
 
     // Async TMDB backdrop for the current program; cached by TvViewModel.
     val cardBackdropUrl by produceState<String?>(initialValue = null, key1 = now?.title) {
-        val title = now?.title?.takeIf { it.isNotBlank() } ?: return@produceState
+        val program = now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
-        value = runCatching { lookupBackdrop(title) }.getOrNull()
+        value = runCatching { lookupBackdrop(program) }.getOrNull()
     }
 
     val shape = RoundedCornerShape(8.dp)

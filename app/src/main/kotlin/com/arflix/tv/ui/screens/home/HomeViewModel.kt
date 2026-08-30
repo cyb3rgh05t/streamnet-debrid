@@ -855,9 +855,14 @@ class HomeViewModel @Inject constructor(
     /** Get the stream URL for an IPTV MediaItem. */
     fun getIptvStreamUrl(itemId: Int): String? = iptvChannelMap[itemId]?.streamUrl
 
-    suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
+    suspend fun lookupIptvProgramBackdrop(
+        rawTitle: String,
+        startUtcMillis: Long? = null,
+        endUtcMillis: Long? = null,
+    ): String? {
         val query = parseIptvProgramQuery(rawTitle) ?: return null
-        val key = query.cacheKey
+        val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
+        val key = "${query.cacheKey}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
         programBackdropCache[key]?.let { return it }
         if (hasActiveMiss(programBackdropMisses, key)) return null
 
@@ -865,7 +870,7 @@ class HomeViewModel @Inject constructor(
             // Keep Home and Live TV on the same tolerant resolver. EPG titles often
             // contain episode subtitles (e.g. "Blue Bloods - Crime Scene New York")
             // while TMDB only returns the parent series title ("Blue Bloods").
-            mediaRepository.lookupIptvProgramBackdrop(rawTitle)
+            mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
                 ?.also { backdrop ->
                     programBackdropCache[key] = backdrop
                     programBackdropMisses.remove(key)
@@ -880,14 +885,19 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
+    suspend fun lookupIptvProgramLogo(
+        rawTitle: String,
+        startUtcMillis: Long? = null,
+        endUtcMillis: Long? = null,
+    ): String? {
         val query = parseIptvProgramQuery(rawTitle) ?: return null
-        val key = query.cacheKey
+        val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
+        val key = "${query.cacheKey}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
         programLogoCache[key]?.let { return it }
         if (hasActiveMiss(programLogoMisses, key)) return null
 
         return runCatching {
-            mediaRepository.lookupIptvProgramLogo(rawTitle)
+            mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs)
                 ?.also { logoUrl ->
                     programLogoCache[key] = logoUrl
                     programLogoMisses.remove(key)
@@ -901,6 +911,13 @@ class HomeViewModel @Inject constructor(
             null
         }
     }
+
+    private fun programDurationMs(startUtcMillis: Long?, endUtcMillis: Long?): Long? =
+        if (startUtcMillis != null && endUtcMillis != null && endUtcMillis > startUtcMillis) {
+            endUtcMillis - startUtcMillis
+        } else {
+            null
+        }
 
     private data class IptvProgramQuery(
         val cleanedTitle: String,
