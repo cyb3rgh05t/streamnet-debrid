@@ -4,6 +4,30 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Cloud sessions, TV metadata, and IPTV artwork
+
+- Kept a persisted StreamNet Cloud session during temporary token-refresh or network failures while still signing out sessions that are definitively expired, rejected, or missing a refresh token.
+- Improved TV metadata localization by retaining app-language fields and filling only missing values from English TMDB details.
+- Ranked TV logos by app language, English, then neutral artwork; ranked backdrops by neutral, app language, then English artwork.
+- Cleaned episode suffixes and preserved diacritics during IPTV artwork matching so localized EPG titles resolve more reliably.
+- Searched both TMDB movie and TV results for IPTV artwork and used EPG duration as a soft type hint. Long exact-title programs now prefer a movie result, preventing titles such as `Rambo` from resolving to a same-named TV series.
+- Passed EPG start/end times through Home hero, Home IPTV cards, and Live TV cards, and separated movie-like artwork cache entries from mixed searches.
+
+### Startup, updates, and validation
+
+- Restored the currently playing Live TV channel rather than a merely browsed channel and retained the remembered channel while asynchronous playlists are still loading.
+- Made automatic update checks open newly available, non-ignored releases while manual checks can still reopen an ignored release.
+- Added regression coverage for Cloud startup sessions, localized artwork ordering, ambiguous movie/TV IPTV titles, Live TV restoration, and update-dialog behavior.
+- Validated the official `2.1.105` Android build with the full opt-in Sideload Debug unit-test task and APK assembly.
+
+### Media3 1.10.1 evaluation
+
+- Added the isolated `test/media3-1.10.1` branch with version name `2.1.105-media3-test`; the official `main` branch remains on Media3 `1.9.0`.
+- Updated the Media3 ExoPlayer, HLS, DASH, OkHttp datasource, UI, session, and common modules to `1.10.1` on the test branch.
+- Kept Jellyfin's FFmpeg extension at `1.9.0+1` because no matching `1.10.1` artifact is available, and kept the custom Dolby Vision Matroska extractor based on Media3 `1.9.0` pending device playback validation.
+- Confirmed that the Media3 test branch passes Sideload Debug unit tests and builds an APK. Real-device Dolby Vision, DTS/TrueHD/Atmos, HLS, DASH, seeking, subtitles, and fallback behavior remain the promotion gate.
+- Documented the branch matrix, Cloud/proxy feature flags, expected Media3 benefits, compatibility boundaries, and test checklist in `docs/media3-1.10.1-evaluation.md`.
+
 ### APK size and build compatibility
 
 - Reduced the default universal APK from 206.58 MB to 115.25 MB by packaging 32-bit and 64-bit ARM libraries while retaining optional x86/x86_64 emulator builds through `-PincludeX86Abis=true`.
