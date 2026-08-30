@@ -1229,7 +1229,11 @@ fun HomeScreen(
                 ?.liveProgramTitle
                 ?.takeIf { it.isNotBlank() }
                 ?: return@produceState
-            value = viewModel.lookupIptvProgramBackdrop(title)
+            value = viewModel.lookupIptvProgramBackdrop(
+                title,
+                displayHeroItem.liveProgramStartMs,
+                displayHeroItem.liveProgramEndMs,
+            )
         }
         val iptvHeroProgramLogo by produceState<String?>(
             null,
@@ -1245,7 +1249,11 @@ fun HomeScreen(
                 ?.liveProgramTitle
                 ?.takeIf { it.isNotBlank() }
                 ?: return@produceState
-            value = viewModel.lookupIptvProgramLogo(title)
+            value = viewModel.lookupIptvProgramLogo(
+                title,
+                displayHeroItem.liveProgramStartMs,
+                displayHeroItem.liveProgramEndMs,
+            )
         }
         val currentBackdrop = displayHeroItem?.let { item ->
             when {
@@ -3030,7 +3038,7 @@ private fun HomeInputLayer(
     onNavigateToWatchlist: () -> Unit,
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit,
     getIptvStreamUrl: (itemId: Int) -> String?,
-    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
+    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
     isSportsHomeItem: (MediaItem) -> Boolean = { false },
     onSportsHomeItemClick: (MediaItem) -> Unit = {},
     onNavigateToSettings: () -> Unit,
@@ -3522,7 +3530,7 @@ private fun HomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
+    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null
 ) {
@@ -3586,7 +3594,7 @@ private fun MobileHomeRowsLayer(
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     onLoadMoreCategory: (String) -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
-    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
+    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null,
     onCategoryVisiblePosition: (String, Int) -> Unit = { _, _ -> }
@@ -3828,7 +3836,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
+    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
     onItemClick: (MediaItem) -> Unit
 ) {
     // ── Focus-row stabilizer ──
@@ -4250,7 +4258,7 @@ private fun ContentRow(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String) -> String? = { null },
+    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit
 ) {
@@ -4670,7 +4678,7 @@ private fun IptvHomeCard(
     width: Dp,
     matchLandscapeFootprint: Boolean = false,
     isFocused: Boolean,
-    lookupBackdrop: suspend (String) -> String?,
+    lookupBackdrop: suspend (String, Long?, Long?) -> String?,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -4694,7 +4702,7 @@ private fun IptvHomeCard(
         item.liveProgramEndMs,
     ) {
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
-        value = lookupBackdrop(title)
+        value = lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
     }
     val start = item.liveProgramStartMs
     val end = item.liveProgramEndMs

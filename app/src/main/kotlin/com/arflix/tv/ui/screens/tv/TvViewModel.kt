@@ -2053,14 +2053,21 @@ class TvViewModel @Inject constructor(
     private val programBackdropCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val programBackdropNegativeCache = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
-    suspend fun lookupProgramBackdrop(rawTitle: String): String? {
+    suspend fun lookupProgramBackdrop(
+        rawTitle: String,
+        startUtcMillis: Long? = null,
+        endUtcMillis: Long? = null,
+    ): String? {
         val cleaned = cleanProgramTitle(rawTitle)
         if (cleaned.length < 3) return null
-        val key = cleaned.lowercase()
+        val durationMs = if (
+            startUtcMillis != null && endUtcMillis != null && endUtcMillis > startUtcMillis
+        ) endUtcMillis - startUtcMillis else null
+        val key = "${cleaned.lowercase()}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
         programBackdropCache[key]?.let { return it }
         if (key in programBackdropNegativeCache) return null
         return runCatching {
-            val backdrop = mediaRepository.lookupIptvProgramBackdrop(rawTitle)
+            val backdrop = mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
             if (backdrop.isNullOrBlank()) {
                 programBackdropNegativeCache.add(key)
                 null

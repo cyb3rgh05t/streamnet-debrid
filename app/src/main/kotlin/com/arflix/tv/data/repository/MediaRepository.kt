@@ -129,6 +129,20 @@ internal fun iptvArtworkTitleScore(requestedTitle: String, candidateTitle: Strin
         maxOf(requestedTokens.size, candidateTokens.size).toDouble() * 100.0
 }
 
+internal fun iptvArtworkCandidateScore(
+    requestedTitle: String,
+    candidateTitle: String,
+    mediaType: MediaType,
+    durationMs: Long?,
+    popularity: Float = 0f,
+): Double {
+    val titleScore = iptvArtworkTitleScore(requestedTitle, candidateTitle)
+    val longProgramMovieBonus = if (
+        mediaType == MediaType.MOVIE && durationMs != null && durationMs >= 75 * 60_000L
+    ) 150.0 else 0.0
+    return titleScore + longProgramMovieBonus + (popularity / 100f)
+}
+
 internal fun artworkLanguageRank(
     language: String?,
     appLanguage: String,
@@ -3187,30 +3201,32 @@ class MediaRepository @Inject constructor(
     }
 
     /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
-    suspend fun lookupIptvProgramBackdrop(rawTitle: String): String? {
+    suspend fun lookupIptvProgramBackdrop(rawTitle: String, durationMs: Long? = null): String? {
         val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
-        val candidates = searchTvArtworkCandidates(cleanedTitle)
+        val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
 
         return candidates
             .filter { !it.backdrop.isNullOrBlank() }
-            .maxByOrNull { item -> iptvArtworkTitleScore(cleanedTitle, item.title) + (item.popularity / 100f) }
+            .maxByOrNull { item ->
+                iptvArtworkCandidateScore(cleanedTitle, item.title, item.mediaType, durationMs, item.popularity)
+            }
             ?.backdrop
             ?.also { android.util.Log.d("IptvArtwork", "TMDB backdrop hit title=$cleanedTitle") }
             ?: lookupFanartArtwork(cleanedTitle, candidates, preferLogo = false)
                 ?.also { android.util.Log.d("IptvArtwork", "Fallback backdrop hit title=$cleanedTitle") }
     }
 
-    suspend fun lookupIptvProgramLogo(rawTitle: String): String? {
+    suspend fun lookupIptvProgramLogo(rawTitle: String, durationMs: Long? = null): String? {
         val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
-        val candidates = searchTvArtworkCandidates(cleanedTitle)
+        val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
             .sortedByDescending { item ->
-                iptvArtworkTitleScore(cleanedTitle, item.title) + (item.popularity / 100f)
+                iptvArtworkCandidateScore(cleanedTitle, item.title, item.mediaType, durationMs, item.popularity)
             }
 
         for (candidate in candidates.take(8)) {
@@ -3223,17 +3239,23 @@ class MediaRepository @Inject constructor(
             ?.also { android.util.Log.d("IptvArtwork", "Fallback logo hit title=$cleanedTitle") }
     }
 
-    private suspend fun searchTvArtworkCandidates(title: String): List<MediaItem> =
+    private suspend fun searchIptvArtworkCandidates(title: String, durationMs: Long?): List<MediaItem> =
         buildList<String?> {
             add(contentLanguage)
             if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
         }.flatMap { language ->
-            runCatching {
+            val movies = runCatching {
+                tmdbApi.searchMovies(apiKey, title, language = language).results.map {
+                    it.toMediaItem(MediaType.MOVIE)
+                }
+            }.getOrDefault(emptyList())
+            val shows = runCatching {
                 tmdbApi.searchTv(apiKey, title, language = language).results.map {
                     it.toMediaItem(MediaType.TV)
                 }
             }.getOrDefault(emptyList())
-        }.groupBy { it.id }
+            movies + shows
+        }.groupBy { "${it.mediaType}:${it.id}" }
             .values
             .map { localizedFirst ->
                 localizedFirst.drop(1).fold(localizedFirst.first()) { preferred, fallback ->
@@ -3246,7 +3268,7 @@ class MediaRepository @Inject constructor(
             }
             .filter { iptvArtworkTitleScore(title, it.title) >= 35.0 }
             .sortedByDescending { item ->
-                iptvArtworkTitleScore(title, item.title) + (item.popularity / 100f)
+                iptvArtworkCandidateScore(title, item.title, item.mediaType, durationMs, item.popularity)
             }
 
     private suspend fun lookupFanartArtwork(
@@ -3254,6 +3276,7 @@ class MediaRepository @Inject constructor(
         tmdbCandidates: List<MediaItem>,
         preferLogo: Boolean,
     ): String? {
+        if (tmdbCandidates.firstOrNull()?.mediaType == MediaType.MOVIE) return null
         val tvdbAuthenticated = Constants.TVDB_API_KEY.isNotBlank() && ensureTvdbToken() != null
         val tvCandidates = tmdbCandidates.filter { it.mediaType == MediaType.TV }.take(6)
         val ids = tvCandidates.mapNotNull { candidate ->

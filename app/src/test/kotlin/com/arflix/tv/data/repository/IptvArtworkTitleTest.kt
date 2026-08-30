@@ -1,6 +1,7 @@
 package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.api.TmdbTvDetails
+import com.arflix.tv.data.model.MediaType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,6 +29,16 @@ class IptvArtworkTitleTest {
     @Test
     fun `unrelated series title has no match score`() {
         assertEquals(0.0, iptvArtworkTitleScore("Tatort", "Tagesschau"), 0.0)
+    }
+
+    @Test
+    fun `long exact movie outranks same titled tv result`() {
+        val durationMs = 99 * 60_000L
+
+        assertTrue(
+            iptvArtworkCandidateScore("Rambo", "Rambo", MediaType.MOVIE, durationMs) >
+                iptvArtworkCandidateScore("Rambo", "Rambo", MediaType.TV, durationMs)
+        )
     }
 
     @Test
