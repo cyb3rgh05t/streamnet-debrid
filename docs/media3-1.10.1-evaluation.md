@@ -2,16 +2,15 @@
 
 ## Purpose
 
-Media3 `1.10.1` is being evaluated without changing the official StreamNet release. The
-upgrade is isolated on `test/media3-1.10.1` so playback compatibility can be tested before
-promotion to `main`.
+Media3 `1.10.1` was evaluated on `test/media3-1.10.1` before being promoted to the official
+StreamNet release on `main`.
 
 ## Branch and Version Matrix
 
 | Branch               |           App version | Version code |   Media3 | Jellyfin FFmpeg | Status                   |
 | -------------------- | --------------------: | -----------: | -------: | --------------: | ------------------------ |
-| `main`               |             `2.1.016` |        `371` |  `1.9.0` |       `1.9.0+1` | Official StreamNet build |
-| `test/media3-1.10.1` | `2.1.016-media3-test` |        `371` | `1.10.1` |       `1.9.0+1` | Isolated playback test   |
+| `main`               |             `2.1.107` |        `373` | `1.10.1` |       `1.9.0+1` | Official StreamNet build |
+| `test/media3-1.10.1` | `2.1.107-media3-test` |        `372` | `1.10.1` |       `1.9.0+1` | Completed playback test  |
 
 The test branch updates these AndroidX modules together:
 
@@ -59,8 +58,8 @@ library is the likely source of the Google Play 16 KB page-size warning.
 ### Custom Dolby Vision Matroska extractor
 
 `app/src/main/dvmkv-java` remains a vendored Media3 `1.9.0` Matroska extractor with the
-StreamNet Dolby Vision Profile-7 hooks. The surrounding player libraries are `1.10.1` on
-the test branch, but this extractor has not been re-vendored from `1.10.1`.
+StreamNet Dolby Vision Profile-7 hooks. The surrounding player libraries are `1.10.1`, but
+this extractor has not been re-vendored from `1.10.1`.
 
 Before promotion, verify both paths:
 
@@ -153,6 +152,6 @@ Android TV/Google TV/Fire TV hardware:
 
 ## Promotion Decision
 
-Current status: automated validation passed, but promotion is intentionally pending real-device
-codec and Dolby Vision testing. Until then, `main` remains on Media3 `1.9.0` and the test APK
-must be identified by its `2.1.016-media3-test` version name.
+Current status: automated validation passed and Media3 `1.10.1` was promoted to `main` for
+the official `2.1.107` build. The compatibility checklist remains the reference for ongoing
+real-device codec and Dolby Vision validation.

@@ -35,10 +35,10 @@ All notable changes to this project are documented in this file.
 
 ### Media3 1.10.1 evaluation
 
-- Added the isolated `test/media3-1.10.1` branch with version name `2.1.105-media3-test`; the official `main` branch remains on Media3 `1.9.0`.
-- Updated the Media3 ExoPlayer, HLS, DASH, OkHttp datasource, UI, session, and common modules to `1.10.1` on the test branch.
+- Promoted the tested Media3 `1.10.1` dependency set to the official `2.1.107` build after evaluation on `test/media3-1.10.1`.
+- Updated the Media3 ExoPlayer, HLS, DASH, OkHttp datasource, UI, session, and common modules to `1.10.1`.
 - Kept Jellyfin's FFmpeg extension at `1.9.0+1` because no matching `1.10.1` artifact is available, and kept the custom Dolby Vision Matroska extractor based on Media3 `1.9.0` pending device playback validation.
-- Confirmed that the Media3 test branch passes Sideload Debug unit tests and builds an APK. Real-device Dolby Vision, DTS/TrueHD/Atmos, HLS, DASH, seeking, subtitles, and fallback behavior remain the promotion gate.
+- Confirmed that the Media3 test branch passes Sideload Debug unit tests and builds an APK. The real-device Dolby Vision, DTS/TrueHD/Atmos, HLS, DASH, seeking, subtitles, and fallback checklist remains documented for compatibility tracking.
 - Documented the branch matrix, Cloud/proxy feature flags, expected Media3 benefits, compatibility boundaries, and test checklist in `docs/media3-1.10.1-evaluation.md`.
 
 ### APK size and build compatibility

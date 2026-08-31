@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 372
-        versionName = "2.1.106"
+        versionCode = 373
+        versionName = "2.1.107"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -366,7 +366,7 @@ ksp {
     implementation("androidx.tvprovider:tvprovider:1.1.0")
 
     // ExoPlayer / Media3 for video playback
-    val media3Version = "1.9.0"
+    val media3Version = "1.10.1"
     implementation("androidx.media3:media3-exoplayer:$media3Version")
     implementation("androidx.media3:media3-exoplayer-hls:$media3Version")
     implementation("androidx.media3:media3-exoplayer-dash:$media3Version")
