@@ -197,6 +197,19 @@ private object DetailsScreenRegexes {
     val YEAR_REGEX = Regex("""\d{4}""")
 }
 
+internal class DetailsResumeRefreshGate {
+    private var hasLeftDetails = false
+
+    fun onEvent(event: Lifecycle.Event): Boolean = when (event) {
+        Lifecycle.Event.ON_PAUSE -> {
+            hasLeftDetails = true
+            false
+        }
+        Lifecycle.Event.ON_RESUME -> hasLeftDetails.also { hasLeftDetails = false }
+        else -> false
+    }
+}
+
 /**
  * Details screen for movies and TV shows
  */
@@ -259,7 +272,9 @@ fun DetailsScreen(
     var showSeasonContextMenu by remember { mutableStateOf(false) }
     var contextMenuSeason by remember { mutableIntStateOf(1) }
     var seasonSelectDownAtMs by remember { mutableLongStateOf(0L) }
-    var ignoreFirstResumeRefresh by remember(mediaType, mediaId, initialSeason, initialEpisode) { mutableStateOf(true) }
+    val resumeRefreshGate = remember(mediaType, mediaId, initialSeason, initialEpisode) {
+        DetailsResumeRefreshGate()
+    }
 
     fun requestFastAutoPlay(
         imdbId: String?,
@@ -360,12 +375,8 @@ fun DetailsScreen(
     // Keep watched badges and continue target fresh when returning from player.
     DisposableEffect(lifecycleOwner, mediaType, mediaId) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                if (ignoreFirstResumeRefresh) {
-                    ignoreFirstResumeRefresh = false
-                } else {
-                    viewModel.refreshAfterPlayerReturn()
-                }
+            if (resumeRefreshGate.onEvent(event)) {
+                viewModel.refreshAfterPlayerReturn()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

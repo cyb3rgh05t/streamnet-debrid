@@ -16,6 +16,7 @@ All notable changes to this project are documented in this file.
 ### Startup, updates, and validation
 
 - Restored the currently playing Live TV channel rather than a merely browsed channel and retained the remembered channel while asynchronous playlists are still loading.
+- Refreshed the series play target on the first real return from the player, so completing episode 9 updates the Details button to episode 10 instead of leaving the stale episode 9 label visible.
 - Made automatic update checks open newly available, non-ignored releases while manual checks can still reopen an ignored release.
 - Added regression coverage for Cloud startup sessions, localized artwork ordering, ambiguous movie/TV IPTV titles, Live TV restoration, and update-dialog behavior.
 - Validated the official `2.1.105` Android build with the full opt-in Sideload Debug unit-test task and APK assembly.
