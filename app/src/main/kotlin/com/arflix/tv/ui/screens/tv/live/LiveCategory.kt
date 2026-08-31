@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvChannel
+import java.util.Locale
 
 /** Broad channel genre derived from M3U group name. */
 enum class Genre {
@@ -84,17 +85,10 @@ private val TRIM_PUNCT = Regex("""^[\s\-|:•\u2022]+|[\s\-|:•\u2022]+$""")
 // Bucketing codes. Real ISO countries plus language prefixes commonly used in
 // IPTV playlists (EN, JA, KO, ZH, AR, SV, DA, EL, CS, HI, HE, FA) so groups
 // like "EN | CHRISTMAS 1 4K" resolve instead of falling into the null bucket.
-private val KNOWN_COUNTRIES = setOf(
-    // ISO 3166-1 alpha-2 plus the UK/GB, USA aliases
-    "NL", "UK", "GB", "US", "USA", "DE", "FR", "IT", "ES", "PT",
-    "BE", "TR", "AR", "IN", "BR", "PL", "EX", "SE", "DK", "NO",
-    "FI", "RU", "GR", "RO", "HU", "CZ", "AT", "CH", "IE", "JP",
-    "KR", "CN", "TW", "HK", "MX", "CA", "AU", "NZ", "ZA", "AE",
-    "SA", "EG", "MA", "UA", "BG", "HR", "RS", "SK", "SI", "LT",
-    "LV", "EE", "IL",
+private val KNOWN_COUNTRIES = Locale.getISOCountries().toSet() + setOf(
+    "UK", "USA", "EX",
     // Language codes used as playlist buckets
-    "EN", "JA", "KO", "ZH", "SV", "DA", "EL", "CS", "HI", "HE",
-    "FA", "AF",
+    "EN", "JA", "KO", "ZH", "SV", "DA", "EL", "CS", "HI", "HE", "FA", "AF",
 )
 
 private val COUNTRY_ALIASES = mapOf("GB" to "UK", "USA" to "US")
@@ -104,6 +98,8 @@ private val COUNTRY_ALIASES = mapOf("GB" to "UK", "USA" to "US")
 // "EN" → UK flag, "JA" → JP, etc. Keeps sidebar labels honest ("EN") while
 // producing a recognisable flag glyph.
 private val FLAG_SUBSTITUTES = mapOf(
+    "UK" to "GB",
+    "EX" to "EU",
     "EN" to "GB",
     "JA" to "JP",
     "KO" to "KR",
@@ -153,6 +149,105 @@ private val COUNTRY_NAMES = mapOf(
 )
 
 fun countryName(code: String): String = COUNTRY_NAMES[code.uppercase()] ?: code
+
+private fun normalizedCountryLabel(value: String): String = value
+    .lowercase()
+    .replace(Regex("[^a-z0-9]+"), " ")
+    .trim()
+
+internal fun countryCodeFromCategoryName(categoryName: String?): String? {
+    val normalizedName = normalizedCountryLabel(categoryName.orEmpty())
+    if (normalizedName.isBlank()) return null
+    if (normalizedName == "schweiz" || normalizedName == "schweiz ch" || normalizedName == "ch schweiz") {
+        return "CH"
+    }
+
+    return Locale.getISOCountries().firstOrNull { code ->
+        val canonicalCode = if (code == "GB") "UK" else code
+        val names = setOf(
+            Locale.Builder().setRegion(code).build().getDisplayCountry(Locale.ENGLISH),
+            countryName(canonicalCode),
+        ).map(::normalizedCountryLabel)
+        val normalizedCode = canonicalCode.lowercase()
+        names.any { name ->
+            normalizedName == name ||
+                normalizedName == "$name $normalizedCode" ||
+                normalizedName == "$normalizedCode $name"
+        }
+    }?.let { code -> if (code == "GB") "UK" else code }
+}
+
+internal data class LiveChannelFallbackArtwork(
+    val assetPath: String? = null,
+    val isCountryFlag: Boolean = false,
+)
+
+private fun countryFlagArtwork(code: String): LiveChannelFallbackArtwork {
+    val assetCode = (FLAG_SUBSTITUTES[code.uppercase()] ?: code).lowercase()
+    return LiveChannelFallbackArtwork(
+        assetPath = "file:///android_asset/iptv_flags/$assetCode.svg",
+        isCountryFlag = true,
+    )
+}
+
+private val CATEGORY_ARTWORK_RULES = listOf(
+    Regex("streamnet\\s*24[\\s/-]*7") to "streamnet_24_7.webp",
+    Regex("magenta\\s*tv") to "magenta_tv.webp",
+    Regex("sky\\s*(premium|cinema)") to "sky_premium.webp",
+    Regex("sky\\s*f1") to "sky_f1.webp",
+    Regex("sony\\s*bad\\s*boys") to "sony_bad_boys.webp",
+    Regex("\\bufc\\b") to "ufc.webp",
+    Regex("\\bnfl\\b") to "nfl.webp",
+    Regex("rtl\\s*\\+") to "rtl_plus.webp",
+    Regex("amazon\\s*(prime|events?)") to "amazon_prime.webp",
+    Regex("dyn\\s*sports?") to "dyn_sports.webp",
+    Regex("\\bmusik\\b") to "musik.webp",
+    Regex("\\bex[\\s-]*yu\\b") to "ex_yu.webp",
+    Regex("\\b(fussball|fußball)\\b") to "fussball.webp",
+)
+
+internal fun liveChannelFallbackArtwork(
+    groupName: String?,
+    countryCode: String?,
+    selectedCountryCode: String? = null,
+    selectedCategoryName: String? = null,
+): LiveChannelFallbackArtwork? {
+    val normalizedCategory = selectedCategoryName.orEmpty().trim().lowercase()
+        .replace(Regex("[_|:]+"), " ")
+        .replace(Regex("\\s+"), " ")
+    val normalizedGroup = groupName.orEmpty().trim().lowercase()
+        .replace(Regex("[_|:]+"), " ")
+        .replace(Regex("\\s+"), " ")
+    val logoOnlyGroup = Regex("(^|\\s)streamnet\\s+relax($|\\s)")
+    if (
+        logoOnlyGroup.containsMatchIn(normalizedCategory) ||
+        logoOnlyGroup.containsMatchIn(normalizedGroup)
+    ) {
+        return null
+    }
+    CATEGORY_ARTWORK_RULES.firstOrNull { (pattern, _) -> pattern.containsMatchIn(normalizedCategory) }
+        ?.let { (_, fileName) ->
+            return LiveChannelFallbackArtwork(assetPath = "file:///android_asset/iptv_category_art/$fileName")
+        }
+    selectedCountryCode?.takeIf { it.length == 2 }?.let {
+        return countryFlagArtwork(it)
+    }
+    if (normalizedGroup.isBlank()) return null
+
+    CATEGORY_ARTWORK_RULES.firstOrNull { (pattern, _) -> pattern.containsMatchIn(normalizedGroup) }
+        ?.let { (_, fileName) ->
+            return LiveChannelFallbackArtwork(assetPath = "file:///android_asset/iptv_category_art/$fileName")
+        }
+    if (Regex("\\bdazn\\b").containsMatchIn(normalizedGroup)) {
+        return LiveChannelFallbackArtwork(assetPath = "file:///android_asset/iptv_category_art/dazn.webp")
+    }
+    if (Regex("\\b(sport|sports|bundesliga)\\b").containsMatchIn(normalizedGroup)) {
+        return LiveChannelFallbackArtwork(assetPath = "file:///android_asset/iptv_category_art/sports.webp")
+    }
+
+    val code = countryCode?.uppercase()?.takeIf { it.length == 2 } ?: return null
+    return countryFlagArtwork(code)
+}
 
 /** Parse a genre out of any slice of text (group name, channel name, etc). */
 fun genreFromText(text: String): Genre {
@@ -387,6 +482,20 @@ data class LiveCategoryTree(
             }
         }
         return null
+    }
+
+    fun countryCodeForCategory(categoryId: String): String? {
+        val selected = byId(categoryId) ?: return null
+        if (selected.iconToken == CategoryIcon.Country) return selected.id
+
+        return top.asSequence()
+            .flatMap { it.children.asSequence() }
+            .plus(countries.categories.asSequence())
+            .firstOrNull { country ->
+                country.iconToken == CategoryIcon.Country && country.children.any { it.id == categoryId }
+            }
+            ?.id
+            ?: countryCodeFromCategoryName(selected.label)
     }
 }
 

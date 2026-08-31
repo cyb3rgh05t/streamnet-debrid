@@ -10,6 +10,13 @@ import org.junit.Test
 class HomeRowStateTest {
 
     @Test
+    fun `IPTV Home category fallback uses artwork but never country flags`() {
+        assertThat(iptvHomeCategoryBackdrop("SKY Premium")).endsWith("sky_premium.webp")
+        assertThat(iptvHomeCategoryBackdrop("Regional Fussball")).endsWith("fussball.webp")
+        assertThat(iptvHomeCategoryBackdrop("Portugal")).isNull()
+    }
+
+    @Test
     fun `row key depends on catalog identity and not its position`() {
         assertThat(stableHomeRowKey("tv", "trending_movies"))
             .isEqualTo("tv_home_row_trending_movies")

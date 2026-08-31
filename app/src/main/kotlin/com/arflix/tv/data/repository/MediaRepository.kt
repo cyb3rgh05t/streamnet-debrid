@@ -96,7 +96,9 @@ private val IPTV_ARTWORK_FORMAT_REGEX = Regex("""(?i)\b(live|hd|uhd|4k)\b""")
 private val IPTV_ARTWORK_DIACRITICS_REGEX = Regex("""\p{M}+""")
 private val IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX = Regex("""[^a-z0-9\s]""")
 private val IPTV_ARTWORK_ARTICLES_REGEX = Regex("""\b(the|a|an|der|die|das)\b""")
+private val IPTV_ARTWORK_NAVY_CIS_REGEX = Regex("""\bnavy\s+cis\b""")
 private val IPTV_ARTWORK_WHITESPACE_REGEX = Regex("""\s+""")
+private val IPTV_ARTWORK_SUBTITLE_SEPARATOR_REGEX = Regex("""\s*(?::|[-–—|])\s*""")
 
 internal fun cleanIptvArtworkTitle(rawTitle: String): String = rawTitle
     .replace(IPTV_ARTWORK_EPISODE_SUFFIX_REGEX, " ")
@@ -111,16 +113,33 @@ internal fun normalizeIptvArtworkTitle(value: String): String =
         .lowercase(Locale.US)
         .replace("&", " and ")
         .replace(IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX, " ")
+        .replace(IPTV_ARTWORK_NAVY_CIS_REGEX, "ncis")
         .replace(IPTV_ARTWORK_ARTICLES_REGEX, " ")
         .replace(IPTV_ARTWORK_WHITESPACE_REGEX, " ")
         .trim()
+
+internal fun iptvArtworkSearchQueries(cleanedTitle: String): List<String> {
+    val queries = mutableListOf(cleanedTitle.trim())
+    var shortened = cleanedTitle.trim()
+    while (queries.size < 3) {
+        val separator = IPTV_ARTWORK_SUBTITLE_SEPARATOR_REGEX.findAll(shortened).lastOrNull() ?: break
+        shortened = shortened.substring(0, separator.range.first).trim()
+        if (shortened.length < 3 || shortened == queries.last()) break
+        queries += shortened
+    }
+    return queries
+}
 
 internal fun iptvArtworkTitleScore(requestedTitle: String, candidateTitle: String): Double {
     val requested = normalizeIptvArtworkTitle(requestedTitle)
     val candidate = normalizeIptvArtworkTitle(candidateTitle)
     if (requested.isBlank() || candidate.isBlank()) return 0.0
     if (requested == candidate) return 1_000.0
-    if (candidate.contains(requested) || requested.contains(candidate)) return 700.0
+    if (candidate.contains(requested) || requested.contains(candidate)) {
+        val coverage = minOf(requested.length, candidate.length).toDouble() /
+            maxOf(requested.length, candidate.length).toDouble()
+        return 500.0 + coverage * 200.0
+    }
 
     val requestedTokens = requested.split(' ').filter { it.length > 1 }.toSet()
     val candidateTokens = candidate.split(' ').filter { it.length > 1 }.toSet()
@@ -3207,16 +3226,14 @@ class MediaRepository @Inject constructor(
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
         val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
+        val bestCandidate = candidates.firstOrNull()
 
-        return candidates
-            .filter { !it.backdrop.isNullOrBlank() }
-            .maxByOrNull { item ->
-                iptvArtworkCandidateScore(cleanedTitle, item.title, item.mediaType, durationMs, item.popularity)
-            }
-            ?.backdrop
+        return bestCandidate?.backdrop
             ?.also { android.util.Log.d("IptvArtwork", "TMDB backdrop hit title=$cleanedTitle") }
             ?: lookupFanartArtwork(cleanedTitle, candidates, preferLogo = false)
                 ?.also { android.util.Log.d("IptvArtwork", "Fallback backdrop hit title=$cleanedTitle") }
+            ?: candidates.firstNotNullOfOrNull { it.backdrop?.takeIf(String::isNotBlank) }
+                ?.also { android.util.Log.d("IptvArtwork", "Secondary TMDB backdrop hit title=$cleanedTitle") }
     }
 
     suspend fun lookupIptvProgramLogo(rawTitle: String, durationMs: Long? = null): String? {
@@ -3239,23 +3256,29 @@ class MediaRepository @Inject constructor(
             ?.also { android.util.Log.d("IptvArtwork", "Fallback logo hit title=$cleanedTitle") }
     }
 
-    private suspend fun searchIptvArtworkCandidates(title: String, durationMs: Long?): List<MediaItem> =
-        buildList<String?> {
+    private suspend fun searchIptvArtworkCandidates(title: String, durationMs: Long?): List<MediaItem> {
+        val languages = buildList<String?> {
             add(contentLanguage)
             if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
-        }.flatMap { language ->
-            val movies = runCatching {
-                tmdbApi.searchMovies(apiKey, title, language = language).results.map {
-                    it.toMediaItem(MediaType.MOVIE)
-                }
-            }.getOrDefault(emptyList())
-            val shows = runCatching {
-                tmdbApi.searchTv(apiKey, title, language = language).results.map {
-                    it.toMediaItem(MediaType.TV)
-                }
-            }.getOrDefault(emptyList())
-            movies + shows
-        }.groupBy { "${it.mediaType}:${it.id}" }
+        }
+        val searchResults = mutableListOf<MediaItem>()
+        for (query in iptvArtworkSearchQueries(title)) {
+            searchResults += languages.flatMap { language ->
+                val movies = runCatching {
+                    tmdbApi.searchMovies(apiKey, query, language = language).results.map {
+                        it.toMediaItem(MediaType.MOVIE)
+                    }
+                }.getOrDefault(emptyList())
+                val shows = runCatching {
+                    tmdbApi.searchTv(apiKey, query, language = language).results.map {
+                        it.toMediaItem(MediaType.TV)
+                    }
+                }.getOrDefault(emptyList())
+                movies + shows
+            }
+            if (searchResults.any { iptvArtworkTitleScore(title, it.title) >= 35.0 }) break
+        }
+        return searchResults.groupBy { "${it.mediaType}:${it.id}" }
             .values
             .map { localizedFirst ->
                 localizedFirst.drop(1).fold(localizedFirst.first()) { preferred, fallback ->
@@ -3270,6 +3293,7 @@ class MediaRepository @Inject constructor(
             .sortedByDescending { item ->
                 iptvArtworkCandidateScore(title, item.title, item.mediaType, durationMs, item.popularity)
             }
+    }
 
     private suspend fun lookupFanartArtwork(
         title: String,
@@ -3284,9 +3308,15 @@ class MediaRepository @Inject constructor(
         }.distinct().toMutableList()
         if (ids.isEmpty()) {
             if (!tvdbAuthenticated) return null
-            val searchResults = runCatching {
-                tvdbApi.search(title, type = "series").data
-            }.getOrDefault(emptyList())
+            val searchResults = buildList {
+                for (query in iptvArtworkSearchQueries(title)) {
+                    addAll(
+                        runCatching { tvdbApi.search(query, type = "series").data }
+                            .getOrDefault(emptyList())
+                    )
+                    if (any { iptvArtworkTitleScore(title, it.name.orEmpty()) >= 35.0 }) break
+                }
+            }
             ids += searchResults
                 .filter { iptvArtworkTitleScore(title, it.name.orEmpty()) >= 35.0 }
                 .sortedByDescending { iptvArtworkTitleScore(title, it.name.orEmpty()) }
