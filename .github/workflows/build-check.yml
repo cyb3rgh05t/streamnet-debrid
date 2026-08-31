@@ -5,17 +5,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/build-check.yml"
       - "app/build.gradle.kts"
-      - "app/src/**"
-      - "app/libs/**"
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle.properties"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - "secrets.defaults.properties"
   workflow_dispatch:
 
 permissions:
@@ -26,8 +16,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  version-check:
+    name: Check Android version change
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.version.outputs.should_build }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare versionCode and versionName
+        id: version
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          read_versions() {
+            grep -E '^[[:space:]]*version(Code|Name)[[:space:]]*=' \
+              | sed -E 's/^[[:space:]]+//'
+          }
+
+          previous="$(git show "$BEFORE_SHA:app/build.gradle.kts" | read_versions)"
+          current="$(read_versions < app/build.gradle.kts)"
+
+          test "$(printf '%s\n' "$current" | grep -c .)" -eq 2
+          if [ "$previous" != "$current" ]; then
+            echo "Android version changed:"
+            printf '%s\n' "$previous" "$current"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "versionCode and versionName are unchanged; skipping Android build."
+            echo "should_build=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     name: Verify build
+    needs: version-check
+    if: needs.version-check.outputs.should_build == 'true'
     runs-on: ubuntu-latest
 
     steps:
