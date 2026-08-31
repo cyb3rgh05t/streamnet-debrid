@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Live TV category artwork and settings focus
+
+- Added 15 bundled category backdrops and 255 SVG country flags for Live TV, with provider/category-aware mappings and country aliases.
+- Applied non-flag category artwork to Home Favorite TV and Recently Watched TV cards, Home hero, and the IPTV program dialog while preserving remote program artwork as the first choice.
+- Applied category artwork to the TV-mode Netflix Live TV channel cards and info panel; country flags remain card-only and are never stretched across hero/info backgrounds.
+- Kept `STREAMNET RELAX` on the sender-logo fallback without category artwork or country flags.
+- Improved TMDB, TVDB, and Fanart.tv matching with staged title queries, spin-off-aware scoring, `Navy CIS` canonicalization, and retryable negative artwork caching.
+- Reworked TV IPTV category ordering to use the single outer settings scroller, retain focus on the moved category, reset inherited scroll state, and show an accent-colored focused-row selector without hidden rows or page jumps.
+- Added focused regression coverage for category/flag resolution, Home artwork eligibility, IPTV title matching, category ordering, and focus movement.
+
 ### Cloud sessions, TV metadata, and IPTV artwork
 
 - Kept a persisted StreamNet Cloud session during temporary token-refresh or network failures while still signing out sessions that are definitively expired, rejected, or missing a refresh token.

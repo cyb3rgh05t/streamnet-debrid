@@ -33,6 +33,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.ui.res.painterResource
 import com.arflix.tv.R
+import com.arflix.tv.ui.screens.tv.live.liveChannelFallbackArtwork
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.draw.drawWithCache
@@ -1224,6 +1225,7 @@ fun HomeScreen(
             displayHeroItem?.liveProgramStartMs,
             displayHeroItem?.liveProgramEndMs,
         ) {
+            value = null
             val title = displayHeroItem
                 ?.takeIf(viewModel::isIptvItem)
                 ?.liveProgramTitle
@@ -1234,6 +1236,9 @@ fun HomeScreen(
                 displayHeroItem.liveProgramStartMs,
                 displayHeroItem.liveProgramEndMs,
             )
+        }
+        val iptvHeroCategoryBackdrop = remember(displayHeroItem?.subtitle) {
+            iptvHomeCategoryBackdrop(displayHeroItem?.subtitle)
         }
         val iptvHeroProgramLogo by produceState<String?>(
             null,
@@ -1258,6 +1263,7 @@ fun HomeScreen(
         val currentBackdrop = displayHeroItem?.let { item ->
             when {
                 viewModel.isIptvItem(item) -> iptvHeroBackdrop
+                    ?: iptvHeroCategoryBackdrop
                     ?: "android.resource://${context.packageName}/${R.drawable.live_tv_theatre_fanart}"
                 viewModel.isCollectionItem(item) -> viewModel.getCollectionHeroImageUrl(item) ?: item.image
                 else -> item.backdrop ?: item.image
@@ -1675,7 +1681,9 @@ private fun IptvProgramDetailsDialog(
     val programLogo by produceState<String?>(null, programTitle) {
         value = lookupLogo(programTitle)
     }
-    val fallbackBackdrop = "android.resource://${LocalContext.current.packageName}/${R.drawable.live_tv_theatre_fanart}"
+    val fallbackBackdrop = remember(item.subtitle) {
+        iptvHomeCategoryBackdrop(item.subtitle)
+    } ?: "android.resource://${LocalContext.current.packageName}/${R.drawable.live_tv_theatre_fanart}"
 
     LaunchedEffect(item.id, isMobile) {
         if (!isMobile) {
@@ -4701,8 +4709,12 @@ private fun IptvHomeCard(
         item.liveProgramStartMs,
         item.liveProgramEndMs,
     ) {
+        value = null
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
         value = lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+    }
+    val categoryBackdropUrl = remember(item.subtitle) {
+        iptvHomeCategoryBackdrop(item.subtitle)
     }
     val start = item.liveProgramStartMs
     val end = item.liveProgramEndMs
@@ -4742,6 +4754,13 @@ private fun IptvHomeCard(
                 if (!backdropUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = backdropUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize().alpha(0.62f),
+                    )
+                } else if (!categoryBackdropUrl.isNullOrBlank()) {
+                    AsyncImage(
+                        model = categoryBackdropUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().alpha(0.62f),
@@ -4822,6 +4841,11 @@ private fun IptvHomeCard(
         }
     }
 }
+
+internal fun iptvHomeCategoryBackdrop(groupName: String?): String? =
+    liveChannelFallbackArtwork(groupName = groupName, countryCode = null)
+        ?.takeUnless { it.isCountryFlag }
+        ?.assetPath
 
 private fun iptvLogoFallbackGradient(seed: String): List<Color> {
     val hue = (seed.hashCode().toLong().let { if (it < 0L) -it else it } % 360L).toFloat()

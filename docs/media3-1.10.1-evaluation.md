@@ -8,10 +8,10 @@ promotion to `main`.
 
 ## Branch and Version Matrix
 
-| Branch | App version | Version code | Media3 | Jellyfin FFmpeg | Status |
-| --- | ---: | ---: | ---: | ---: | --- |
-| `main` | `2.1.105` | `370` | `1.9.0` | `1.9.0+1` | Official StreamNet build |
-| `test/media3-1.10.1` | `2.1.105-media3-test` | `370` | `1.10.1` | `1.9.0+1` | Isolated playback test |
+| Branch               |           App version | Version code |   Media3 | Jellyfin FFmpeg | Status                   |
+| -------------------- | --------------------: | -----------: | -------: | --------------: | ------------------------ |
+| `main`               |             `2.1.016` |        `371` |  `1.9.0` |       `1.9.0+1` | Official StreamNet build |
+| `test/media3-1.10.1` | `2.1.016-media3-test` |        `371` | `1.10.1` |       `1.9.0+1` | Isolated playback test   |
 
 The test branch updates these AndroidX modules together:
 
@@ -74,14 +74,14 @@ See `docs/dolby-vision-compat.md` for the extractor architecture and log workflo
 The four disabled flags in `app/build.gradle.kts` are intentional and do not disable the
 normal StreamNet Cloud implementation.
 
-| Flag | Value | Effective behavior |
-| --- | ---: | --- |
-| `ENABLE_TMDB_EDGE_PROXY` | `false` | TMDB calls use the app's direct API path and OkHttp cache instead of a billable backend proxy. |
-| `ENABLE_TRAKT_EDGE_PROXY` | `false` | Trakt remains direct. The current interceptor always keeps Trakt OAuth/user endpoints direct, so this field has no active routing effect. |
-| `ENABLE_REALTIME_CLOUD_SYNC` | `false` | The app does not start the legacy persistent realtime socket. Startup/login pulls and normal Cloud pushes still run. |
-| `ENABLE_REALTIME_WATCH_SYNC` | `false` | Realtime watch-history/status channel joins are disabled. This is currently subordinate to the disabled realtime Cloud socket. |
-| `ENABLE_PERIODIC_CLOUD_PULL` | `true` | Normal Sideload/Play builds periodically pull Cloud changes. |
-| `ENABLE_CLOUD_SYNC` | `true` | The self-hosted StreamNet account backend and snapshot synchronization are enabled. |
+| Flag                         |   Value | Effective behavior                                                                                                                        |
+| ---------------------------- | ------: | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `ENABLE_TMDB_EDGE_PROXY`     | `false` | TMDB calls use the app's direct API path and OkHttp cache instead of a billable backend proxy.                                            |
+| `ENABLE_TRAKT_EDGE_PROXY`    | `false` | Trakt remains direct. The current interceptor always keeps Trakt OAuth/user endpoints direct, so this field has no active routing effect. |
+| `ENABLE_REALTIME_CLOUD_SYNC` | `false` | The app does not start the legacy persistent realtime socket. Startup/login pulls and normal Cloud pushes still run.                      |
+| `ENABLE_REALTIME_WATCH_SYNC` | `false` | Realtime watch-history/status channel joins are disabled. This is currently subordinate to the disabled realtime Cloud socket.            |
+| `ENABLE_PERIODIC_CLOUD_PULL` |  `true` | Normal Sideload/Play builds periodically pull Cloud changes.                                                                              |
+| `ENABLE_CLOUD_SYNC`          |  `true` | The self-hosted StreamNet account backend and snapshot synchronization are enabled.                                                       |
 
 The `selfHosted` build type overrides `ENABLE_PERIODIC_CLOUD_PULL` to `false`; that variant
 still enables Cloud sync but does not run the periodic pull loop.
@@ -109,13 +109,13 @@ The Media3 test branch also contains the current `main` playback-adjacent fixes:
 
 ## Commit Map
 
-| Commit | Branch | Purpose |
-| --- | --- | --- |
-| `59b383f9` | `main` | Cloud session persistence, TV metadata/artwork fallbacks, IPTV/settings/startup/updater fixes (`2.1.104`) |
-| `f57ead64` | `main` | Ambiguous IPTV movie/TV artwork resolution |
-| `1a7bd51b` | `main` | Official version bump to `2.1.105` |
-| `4e2439e1` | test branch | Media3 `1.10.1` dependency test and test-version suffix |
-| `711efd61` | test branch | IPTV artwork fix carried onto the Media3 branch |
+| Commit     | Branch      | Purpose                                                                                                   |
+| ---------- | ----------- | --------------------------------------------------------------------------------------------------------- |
+| `59b383f9` | `main`      | Cloud session persistence, TV metadata/artwork fallbacks, IPTV/settings/startup/updater fixes (`2.1.104`) |
+| `f57ead64` | `main`      | Ambiguous IPTV movie/TV artwork resolution                                                                |
+| `1a7bd51b` | `main`      | Official version bump to `2.1.105`                                                                        |
+| `4e2439e1` | test branch | Media3 `1.10.1` dependency test and test-version suffix                                                   |
+| `711efd61` | test branch | IPTV artwork fix carried onto the Media3 branch                                                           |
 
 ## Automated Validation
 
@@ -155,4 +155,4 @@ Android TV/Google TV/Fire TV hardware:
 
 Current status: automated validation passed, but promotion is intentionally pending real-device
 codec and Dolby Vision testing. Until then, `main` remains on Media3 `1.9.0` and the test APK
-must be identified by its `2.1.105-media3-test` version name.
+must be identified by its `2.1.016-media3-test` version name.

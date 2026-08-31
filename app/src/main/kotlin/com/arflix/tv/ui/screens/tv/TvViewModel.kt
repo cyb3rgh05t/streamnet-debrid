@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.tv
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.arflix.tv.R
@@ -53,6 +54,7 @@ private const val RichCatchupRefreshThrottleMs = 45_000L
 private const val CurrentChannelEpgRefreshThrottleMs = 12_000L
 private const val VisibleEpgRetryDelayMs = 60_000L
 private const val PeriodicIptvNetworkRefreshIntervalMs = 4L * 60L * 60_000L
+private const val ProgramBackdropMissTtlMs = 10L * 60_000L
 private const val PeriodicIptvRefreshCheckIntervalMs = 60_000L
 private const val LargeListCompleteGuideCoverageTarget = 0.75f
 private const val PlaybackEpgBackfillResumeDelayMs = 90_000L
@@ -2051,7 +2053,20 @@ class TvViewModel @Inject constructor(
     }
 
     private val programBackdropCache = java.util.concurrent.ConcurrentHashMap<String, String>()
-    private val programBackdropNegativeCache = java.util.Collections.synchronizedSet(mutableSetOf<String>())
+    private val programBackdropNegativeCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+
+    private fun hasActiveProgramBackdropMiss(key: String): Boolean {
+        val expiresAt = programBackdropNegativeCache[key] ?: return false
+        if (expiresAt <= SystemClock.elapsedRealtime()) {
+            programBackdropNegativeCache.remove(key, expiresAt)
+            return false
+        }
+        return true
+    }
+
+    private fun registerProgramBackdropMiss(key: String) {
+        programBackdropNegativeCache[key] = SystemClock.elapsedRealtime() + ProgramBackdropMissTtlMs
+    }
 
     suspend fun lookupProgramBackdrop(
         rawTitle: String,
@@ -2065,18 +2080,19 @@ class TvViewModel @Inject constructor(
         ) endUtcMillis - startUtcMillis else null
         val key = "${cleaned.lowercase()}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
         programBackdropCache[key]?.let { return it }
-        if (key in programBackdropNegativeCache) return null
+        if (hasActiveProgramBackdropMiss(key)) return null
         return runCatching {
             val backdrop = mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
             if (backdrop.isNullOrBlank()) {
-                programBackdropNegativeCache.add(key)
+                registerProgramBackdropMiss(key)
                 null
             } else {
                 programBackdropCache[key] = backdrop
+                programBackdropNegativeCache.remove(key)
                 backdrop
             }
         }.getOrElse {
-            programBackdropNegativeCache.add(key)
+            registerProgramBackdropMiss(key)
             null
         }
     }

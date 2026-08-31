@@ -148,10 +148,33 @@ internal fun LiveTvNetflixLayout(
         selectedCategoryId == "fav" -> stringResource(R.string.live_empty_no_favorites)
         else -> stringResource(R.string.live_empty_no_channels_category)
     }
+    val selectedCountryCode = remember(tree, selectedCategoryId) {
+        tree.countryCodeForCategory(selectedCategoryId)
+    }
+    val selectedCategoryName = remember(tree, selectedCategoryId) {
+        tree.byId(selectedCategoryId)?.label
+    }
+    val previewFallbackArtwork = remember(
+        previewChannel?.source?.group,
+        previewChannel?.country,
+        selectedCountryCode,
+        selectedCategoryName,
+    ) {
+        previewChannel?.let { channel ->
+            liveChannelFallbackArtwork(
+                channel.source.group,
+                channel.country,
+                selectedCountryCode,
+                selectedCategoryName,
+            )
+        }
+    }
     val previewBackdropUrl by produceState<String?>(
         initialValue = null,
-        key1 = previewNowNext?.now?.title,
+        key1 = previewChannel?.id,
+        key2 = previewNowNext?.now?.startUtcMillis,
     ) {
+        value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
         value = runCatching { lookupBackdrop(program) }.getOrNull()
@@ -183,6 +206,9 @@ internal fun LiveTvNetflixLayout(
                 nowNext = previewNowNext,
                 isFavorite = previewChannel?.id?.let { it in favoriteSet } == true,
                 backdropUrl = previewBackdropUrl,
+                fallbackBackdropUrl = previewFallbackArtwork
+                    ?.takeUnless { it.isCountryFlag }
+                    ?.assetPath,
                 playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
                 isPlaylistRefreshing = isPlaylistRefreshing,
                 onRefreshPlaylist = onRefreshPlaylist,
@@ -217,6 +243,8 @@ internal fun LiveTvNetflixLayout(
 
         NetflixChannelRail(
             channels = channels,
+            selectedCountryCode = selectedCountryCode,
+            selectedCategoryName = selectedCategoryName,
             playingChannelId = playingChannelId,
             focusedChannelId = focusedChannelId,
             nowNextMap = nowNextMap,
@@ -357,20 +385,23 @@ private fun HeroInfoPanel(
     nowNext: IptvNowNext?,
     isFavorite: Boolean,
     backdropUrl: String?,
+    fallbackBackdropUrl: String?,
     playlistLastRefreshedAtMillis: Long?,
     isPlaylistRefreshing: Boolean,
     onRefreshPlaylist: () -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
+    val effectiveBackdropUrl = backdropUrl?.takeIf { it.isNotBlank() }
+        ?: fallbackBackdropUrl?.takeIf { it.isNotBlank() }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HeroCornerRadius))
             .background(LiveColors.PanelDeep),
     ) {
-        if (!backdropUrl.isNullOrBlank()) {
+        if (!effectiveBackdropUrl.isNullOrBlank()) {
             AsyncImage(
-                model = backdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
+            model = effectiveBackdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f },
             )
             Box(modifier = Modifier.fillMaxSize().background(
@@ -718,6 +749,8 @@ private fun rememberNetflixCategoryItems(
 @Composable
 private fun NetflixChannelRail(
     channels: List<EnrichedChannel>,
+    selectedCountryCode: String?,
+    selectedCategoryName: String?,
     playingChannelId: String?,
     focusedChannelId: String?,
     nowNextMap: Map<String, IptvNowNext>,
@@ -795,6 +828,8 @@ private fun NetflixChannelRail(
             }
             NetflixChannelCard(
                 channel = ch,
+                selectedCountryCode = selectedCountryCode,
+                selectedCategoryName = selectedCategoryName,
                 nowNext = nowNextMap[ch.id],
                 clockTickMillis = clockTickMillis,
                 isPlaying = ch.id == playingChannelId,
@@ -814,6 +849,8 @@ private fun NetflixChannelRail(
 @Composable
 private fun NetflixChannelCard(
     channel: EnrichedChannel,
+    selectedCountryCode: String?,
+    selectedCategoryName: String?,
     nowNext: IptvNowNext?,
     clockTickMillis: Long,
     isPlaying: Boolean,
@@ -834,9 +871,22 @@ private fun NetflixChannelCard(
     } ?: 0f
     val minsLeft = now?.let { ((it.endUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L) }
     val backgroundLogoUrl = remember(channel.logo) { safeChannelLogoUrl(channel.logo) }
+    val fallbackArtwork = remember(channel.source.group, channel.country, selectedCountryCode, selectedCategoryName) {
+        liveChannelFallbackArtwork(
+            channel.source.group,
+            channel.country,
+            selectedCountryCode,
+            selectedCategoryName,
+        )
+    }
 
     // Async TMDB backdrop for the current program; cached by TvViewModel.
-    val cardBackdropUrl by produceState<String?>(initialValue = null, key1 = now?.title) {
+    val cardBackdropUrl by produceState<String?>(
+        initialValue = null,
+        key1 = channel.id,
+        key2 = now?.startUtcMillis,
+    ) {
+        value = null
         val program = now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
         value = runCatching { lookupBackdrop(program) }.getOrNull()
@@ -905,7 +955,15 @@ private fun NetflixChannelCard(
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.52f },
             )
         }
-        if (cardBackdropUrl.isNullOrBlank() && !backgroundLogoUrl.isNullOrBlank()) {
+        if (cardBackdropUrl.isNullOrBlank() && fallbackArtwork?.assetPath != null) {
+            AsyncImage(
+                model = fallbackArtwork.assetPath,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.58f },
+            )
+        }
+        if (cardBackdropUrl.isNullOrBlank() && fallbackArtwork == null && !backgroundLogoUrl.isNullOrBlank()) {
             AsyncImage(
                 model = backgroundLogoUrl,
                 contentDescription = null,
@@ -922,7 +980,11 @@ private fun NetflixChannelCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = if (cardBackdropUrl.isNullOrBlank()) 0.22f else 0.12f))
+                .background(
+                    Color.Black.copy(
+                        alpha = if (cardBackdropUrl.isNullOrBlank() && fallbackArtwork == null) 0.22f else 0.12f
+                    )
+                )
         )
         Box(
             modifier = Modifier

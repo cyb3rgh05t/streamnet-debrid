@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 370
-        versionName = "2.1.105-media3-test"
+        versionCode = 371
+        versionName = "2.1.016-media3-test"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -378,8 +378,6 @@ ksp {
     // Keep this only in the sideload build. The Play Store build must comply
     // with 16 KB memory page support, and the current prebuilt native library
     // (libffmpegJNI.so) is the likely source of the Play Console warning.
-    // Jellyfin has not published a 1.10.1-compatible build yet. Keep this pin
-    // explicit while validating whether its 1.9.0 binary remains usable.
     add("sideloadImplementation", "org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
 
     // Networking - Retrofit + OkHttp

@@ -32,6 +32,50 @@ class IptvArtworkTitleTest {
     }
 
     @Test
+    fun `episode subtitle creates progressively shorter series queries`() {
+        assertEquals(
+            listOf("NCIS: Origins: Enter Sandman", "NCIS: Origins", "NCIS"),
+            iptvArtworkSearchQueries("NCIS: Origins: Enter Sandman")
+        )
+        assertEquals(
+            listOf("NCIS: New Orleans", "NCIS"),
+            iptvArtworkSearchQueries("NCIS: New Orleans")
+        )
+    }
+
+    @Test
+    fun `specific ncis spinoff outranks franchise parent for episode subtitle`() {
+        val requested = "NCIS: Origins: Enter Sandman"
+
+        assertTrue(
+            iptvArtworkTitleScore(requested, "NCIS: Origins") >
+                iptvArtworkTitleScore(requested, "NCIS")
+        )
+        assertTrue(
+            iptvArtworkTitleScore("NCIS: New Orleans", "NCIS: New Orleans") >
+                iptvArtworkTitleScore("NCIS: New Orleans", "NCIS")
+        )
+    }
+
+    @Test
+    fun `german navy cis title matches the specific tmdb spinoff`() {
+        assertEquals("ncis origins", normalizeIptvArtworkTitle("Navy CIS: Origins"))
+        assertEquals(
+            1_000.0,
+            iptvArtworkTitleScore("Navy CIS: Origins", "NCIS: Origins"),
+            0.0
+        )
+        assertTrue(
+            iptvArtworkTitleScore("Navy CIS: Origins", "NCIS: Origins") >
+                iptvArtworkTitleScore("Navy CIS: Origins", "Navy CIS")
+        )
+        assertTrue(
+            iptvArtworkTitleScore("Navy CIS: New Orleans", "NCIS: New Orleans") >
+                iptvArtworkTitleScore("Navy CIS: New Orleans", "Navy CIS")
+        )
+    }
+
+    @Test
     fun `long exact movie outranks same titled tv result`() {
         val durationMs = 99 * 60_000L
 

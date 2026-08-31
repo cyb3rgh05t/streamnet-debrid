@@ -11,6 +11,143 @@ import org.junit.Test
 class LiveCategoryIndexTest {
 
     @Test
+    fun streamnetRelaxAlwaysUsesTheChannelLogoFallback() {
+        assertThat(liveChannelFallbackArtwork("STREAMNET RELAX", "DE")).isNull()
+        assertThat(
+            liveChannelFallbackArtwork(
+                groupName = "DE | STREAMNET_RELAX",
+                countryCode = "DE",
+                selectedCountryCode = "DE",
+            )
+        ).isNull()
+        assertThat(
+            liveChannelFallbackArtwork(
+                groupName = "General",
+                countryCode = "DE",
+                selectedCategoryName = "STREAMNET RELAX",
+            )
+        ).isNull()
+    }
+
+    @Test
+    fun fallbackArtworkPrefersSpecificCategoryMappings() {
+        assertThat(liveChannelFallbackArtwork("Streamnet 24/7", null)?.assetPath)
+            .endsWith("streamnet_24_7.webp")
+        assertThat(liveChannelFallbackArtwork("DE | Sky F1", "DE")?.assetPath)
+            .endsWith("sky_f1.webp")
+        assertThat(liveChannelFallbackArtwork("Amazon Events", null)?.assetPath)
+            .endsWith("amazon_prime.webp")
+        assertThat(liveChannelFallbackArtwork("RTL+", null)?.assetPath)
+            .endsWith("rtl_plus.webp")
+        assertThat(liveChannelFallbackArtwork("DE | Musik", "DE")?.assetPath)
+            .endsWith("musik.webp")
+        assertThat(liveChannelFallbackArtwork("SKY_PREMIUM", null)?.assetPath)
+            .endsWith("sky_premium.webp")
+    }
+
+    @Test
+    fun fallbackArtworkUsesWildcardRulesAfterSpecificMappings() {
+        assertThat(liveChannelFallbackArtwork("DAZN PPV 12", null)?.assetPath)
+            .endsWith("dazn.webp")
+        assertThat(liveChannelFallbackArtwork("Sky Sports Bundesliga", null)?.assetPath)
+            .endsWith("sports.webp")
+        assertThat(liveChannelFallbackArtwork("International Sports", null)?.assetPath)
+            .endsWith("sports.webp")
+        assertThat(liveChannelFallbackArtwork("Regional Fussball", null)?.assetPath)
+            .endsWith("fussball.webp")
+        assertThat(liveChannelFallbackArtwork("DE | Fußball", "DE")?.assetPath)
+            .endsWith("fussball.webp")
+        assertThat(liveChannelFallbackArtwork("Ex-Yu", null)?.assetPath)
+            .endsWith("ex_yu.webp")
+    }
+
+    @Test
+    fun fallbackArtworkUsesFlagOnlyForCountryOnlyGroups() {
+        assertThat(liveChannelFallbackArtwork("DE | Germany", "DE")?.assetPath)
+            .endsWith("iptv_flags/de.svg")
+        assertThat(liveChannelFallbackArtwork("Germany News", "DE")?.assetPath)
+            .endsWith("iptv_flags/de.svg")
+        assertThat(liveChannelFallbackArtwork("Documentaries", "DE")?.assetPath)
+            .endsWith("iptv_flags/de.svg")
+    }
+
+    @Test
+    fun selectedCountryCategoryUsesItsFlagForEveryChannelGroup() {
+        assertThat(liveChannelFallbackArtwork("DE | News", "DE", selectedCountryCode = "DE")?.assetPath)
+            .endsWith("iptv_flags/de.svg")
+        assertThat(liveChannelFallbackArtwork("UK | Entertainment", "UK", selectedCountryCode = "UK")?.assetPath)
+            .endsWith("iptv_flags/gb.svg")
+        assertThat(liveChannelFallbackArtwork("LU | News", "LU")?.assetPath)
+            .endsWith("iptv_flags/lu.svg")
+        assertThat(liveChannelFallbackArtwork("AL | General", "AL")?.assetPath)
+            .endsWith("iptv_flags/al.svg")
+        assertThat(liveChannelFallbackArtwork("AL | General", "AL")?.isCountryFlag).isTrue()
+        assertThat(liveChannelFallbackArtwork("Sky Premium", null)?.isCountryFlag).isFalse()
+    }
+
+    @Test
+    fun nestedCountryCategoryAndItsChildrenResolveTheirCountryCode() {
+        val country = LiveCategory(
+            id = "DE",
+            label = "Germany",
+            count = 2,
+            iconToken = CategoryIcon.Country,
+            children = listOf(
+                LiveCategory("DE-news", "DE | News", 1, CategoryIcon.SubEntry),
+            ),
+        )
+        val tree = LiveCategoryTree(
+            top = listOf(
+                LiveCategory("all", "All Channels", 2, CategoryIcon.All, children = listOf(country)),
+            ),
+            global = LiveSection("playlist", "PLAYLIST", emptyList()),
+            countries = LiveSection("matched", "MATCHED", emptyList()),
+            adult = LiveSection("adult", "ADULT", emptyList()),
+        )
+
+        assertThat(tree.countryCodeForCategory("DE")).isEqualTo("DE")
+        assertThat(tree.countryCodeForCategory("DE-news")).isEqualTo("DE")
+        assertThat(tree.countryCodeForCategory("fav")).isNull()
+    }
+
+    @Test
+    fun playlistCategoryNamesResolveExactCountryOverrides() {
+        assertThat(countryCodeFromCategoryName("Portugal")).isEqualTo("PT")
+        assertThat(countryCodeFromCategoryName("Netherlands - NL")).isEqualTo("NL")
+        assertThat(countryCodeFromCategoryName("UK | United Kingdom")).isEqualTo("UK")
+        assertThat(countryCodeFromCategoryName("Schweiz")).isEqualTo("CH")
+        assertThat(countryCodeFromCategoryName("Brazil Sports")).isNull()
+
+        val portugal = LiveCategory("grp:list:portugal", "Portugal", 2, CategoryIcon.Grid)
+        val tree = LiveCategoryTree(
+            top = emptyList(),
+            global = LiveSection("playlist", "PLAYLIST", listOf(portugal)),
+            countries = LiveSection("matched", "MATCHED", emptyList()),
+            adult = LiveSection("adult", "ADULT", emptyList()),
+        )
+
+        assertThat(tree.countryCodeForCategory(portugal.id)).isEqualTo("PT")
+    }
+
+    @Test
+    fun selectedCategoryNameOverridesIncorrectChannelMetadata() {
+        assertThat(
+            liveChannelFallbackArtwork(
+                groupName = "General",
+                countryCode = "GB",
+                selectedCategoryName = "Regional Fussball",
+            )?.assetPath
+        ).endsWith("fussball.webp")
+        assertThat(
+            liveChannelFallbackArtwork(
+                groupName = "General",
+                countryCode = "BR",
+                selectedCategoryName = "Ex-Yu",
+            )?.assetPath
+        ).endsWith("ex_yu.webp")
+    }
+
+    @Test
     fun channelsForKeepsFavoriteOrderAndUsesStaticBuckets() {
         val channels = listOf(
             channel("1", "NL News HD", "NL | News"),

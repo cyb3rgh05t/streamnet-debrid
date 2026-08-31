@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.settings
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.runtime.key
 import com.arflix.tv.ui.motion.*
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -285,6 +286,16 @@ internal fun orderedIptvGroups(
     return (explicitOrder + available).distinct()
 }
 
+internal fun movedIptvCategoryFocusIndex(
+    focusedIndex: Int,
+    groupCount: Int,
+    moveUp: Boolean,
+): Int = when {
+    moveUp && focusedIndex in 2..groupCount -> focusedIndex - 1
+    !moveUp && focusedIndex in 1 until groupCount -> focusedIndex + 1
+    else -> focusedIndex
+}
+
 private fun openExternalUrl(context: Context, url: String) {
     runCatching {
         context.startActivity(
@@ -547,6 +558,8 @@ fun SettingsScreen(
         activeZone = Zone.CONTENT
         contentFocusIndex = 0
         iptvActionIndex = 0
+        focusTracker.clear()
+        scope.launch { scrollState.scrollTo(0) }
     }
     val openContentLanguagePicker = {
         contentLanguagePickerIndex = TMDB_LANGUAGES.indexOfFirst { it.first == uiState.contentLanguage }.coerceAtLeast(0)
@@ -1048,8 +1061,22 @@ fun SettingsScreen(
                                                         if (!group.isNullOrBlank()) {
                                                             when (iptvActionIndex) {
                                                                 0 -> viewModel.toggleIptvHiddenGroup(playlistId, group)
-                                                                1 -> viewModel.moveIptvGroupUp(playlistId, group)
-                                                                2 -> viewModel.moveIptvGroupDown(playlistId, group)
+                                                                1 -> {
+                                                                    viewModel.moveIptvGroupUp(playlistId, group)
+                                                                    contentFocusIndex = movedIptvCategoryFocusIndex(
+                                                                        focusedIndex = contentFocusIndex,
+                                                                        groupCount = orderedGroups.size,
+                                                                        moveUp = true,
+                                                                    )
+                                                                }
+                                                                2 -> {
+                                                                    viewModel.moveIptvGroupDown(playlistId, group)
+                                                                    contentFocusIndex = movedIptvCategoryFocusIndex(
+                                                                        focusedIndex = contentFocusIndex,
+                                                                        groupCount = orderedGroups.size,
+                                                                        moveUp = false,
+                                                                    )
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -11650,6 +11677,7 @@ private fun IptvCategoriesSettings(
     onReset: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val focusRingColor = resolveAccentColor(fallback = AccentYellow)
     val orderedGroups = remember(groupOrder, availableGroups, playlistId) {
         orderedIptvGroups(
             playlistId = playlistId,
@@ -11657,14 +11685,6 @@ private fun IptvCategoriesSettings(
             groupOrder = groupOrder
         )
     }
-    val categoryListState = rememberLazyListState()
-
-    LaunchedEffect(isMobile, focusedIndex, orderedGroups.size) {
-        if (!isMobile && focusedIndex > 0 && orderedGroups.isNotEmpty()) {
-            categoryListState.animateScrollToItem((focusedIndex - 1).coerceIn(0, orderedGroups.lastIndex))
-        }
-    }
-
     Column {
         if (!isMobile) {
             Text(
@@ -11728,71 +11748,72 @@ private fun IptvCategoriesSettings(
                     modifier = Modifier.padding(16.dp)
                 )
             } else {
-                LazyColumn(
-                    state = categoryListState,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(max = 560.dp),
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
-                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
-                    itemsIndexed(
-                        items = orderedGroups,
-                        key = { _, group -> com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, group) }
-                    ) { index, group ->
-                        val rowFocusIndex = index + 1
-                        val isRowFocused = focusedIndex == rowFocusIndex
-                        val groupKey = com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, group)
-                        val isHidden = hiddenGroups.contains(groupKey)
+                    orderedGroups.forEachIndexed { index, group ->
+                        key(com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, group)) {
+                            val rowFocusIndex = index + 1
+                            val isRowFocused = focusedIndex == rowFocusIndex
+                            val groupKey = com.arflix.tv.data.model.PlaylistGroupKey.build(playlistId, group)
+                            val isHidden = hiddenGroups.contains(groupKey)
 
-                        Row(
-                            modifier = Modifier
-                                .settingsFocusSlot(rowFocusIndex)
-                                .fillMaxWidth()
-                                .background(
-                                    if (isRowFocused) Color.White.copy(alpha = 0.08f)
-                                    else Color.Transparent,
-                                    RoundedCornerShape(12.dp)
+                            Row(
+                                modifier = Modifier
+                                    .settingsFocusSlot(rowFocusIndex)
+                                    .fillMaxWidth()
+                                    .background(
+                                        if (isRowFocused) focusRingColor.copy(alpha = 0.12f)
+                                        else Color.Transparent,
+                                        RoundedCornerShape(12.dp)
+                                    )
+                                    .border(
+                                        width = if (isRowFocused) 2.dp else 0.dp,
+                                        color = if (isRowFocused) focusRingColor else Color.Transparent,
+                                        shape = RoundedCornerShape(12.dp),
+                                    )
+                                    .clickable { onToggleHidden(group) }
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = group,
+                                        style = ArflixTypography.body,
+                                        color = if (isRowFocused) TextPrimary else TextSecondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = if (isHidden) stringResource(R.string.settings_hidden) else stringResource(R.string.settings_visible),
+                                        style = ArflixTypography.caption,
+                                        color = TextSecondary.copy(alpha = 0.7f)
+                                    )
+                                }
+
+                                CatalogActionChip(
+                                    icon = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Check,
+                                    isFocused = isRowFocused && focusedActionIndex == 0,
+                                    onClick = { onToggleHidden(group) }
                                 )
-                                .clickable { onToggleHidden(group) }
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = group,
-                                    style = ArflixTypography.body,
-                                    color = if (isRowFocused) TextPrimary else TextSecondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                Spacer(modifier = Modifier.width(6.dp))
+                                CatalogActionChip(
+                                    icon = Icons.Default.ArrowUpward,
+                                    isFocused = isRowFocused && focusedActionIndex == 1,
+                                    onClick = { onMoveUp(group) }
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = if (isHidden) stringResource(R.string.settings_hidden) else stringResource(R.string.settings_visible),
-                                    style = ArflixTypography.caption,
-                                    color = TextSecondary.copy(alpha = 0.7f)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                CatalogActionChip(
+                                    icon = Icons.Default.ArrowDownward,
+                                    isFocused = isRowFocused && focusedActionIndex == 2,
+                                    onClick = { onMoveDown(group) }
                                 )
                             }
-
-                            CatalogActionChip(
-                                icon = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Check,
-                                isFocused = isRowFocused && focusedActionIndex == 0,
-                                onClick = { onToggleHidden(group) }
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            CatalogActionChip(
-                                icon = Icons.Default.ArrowUpward,
-                                isFocused = isRowFocused && focusedActionIndex == 1,
-                                onClick = { onMoveUp(group) }
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            CatalogActionChip(
-                                icon = Icons.Default.ArrowDownward,
-                                isFocused = isRowFocused && focusedActionIndex == 2,
-                                onClick = { onMoveDown(group) }
-                            )
                         }
                     }
+                    Spacer(modifier = Modifier.height(24.dp))
                 }
             }
         }
