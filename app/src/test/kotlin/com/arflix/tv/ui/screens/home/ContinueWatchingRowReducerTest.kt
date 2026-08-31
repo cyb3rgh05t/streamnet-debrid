@@ -4,6 +4,7 @@ import com.arflix.tv.data.model.Category
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.NextEpisode
+import com.arflix.tv.data.repository.ContinueWatchingItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -68,11 +69,41 @@ class ContinueWatchingRowReducerTest {
         assertNull(categories.firstOrNull { it.id == "continue_watching" })
     }
 
+    @Test
+    fun `new local up next episode replaces stale remote episode for same show`() {
+        val remote = continueWatchingItem(id = 20, season = 5, episode = 1, updatedAtMs = 1_000L)
+        val localUpNext = continueWatchingItem(id = 20, season = 5, episode = 2, updatedAtMs = 2_000L)
+
+        val result = mergeTraktAndRecentLocalContinueWatching(
+            traktItems = listOf(remote),
+            localItems = listOf(localUpNext),
+            historyItems = emptyList()
+        )
+
+        assertEquals(1, result.size)
+        assertEquals(2, result.single().episode)
+    }
+
     private fun tvItem(id: Int, season: Int, episode: Int) = MediaItem(
         id = id,
         title = "Show",
         mediaType = MediaType.TV,
         progress = 3,
         nextEpisode = NextEpisode(0, season, episode, "Episode $episode")
+    )
+
+    private fun continueWatchingItem(
+        id: Int,
+        season: Int,
+        episode: Int,
+        updatedAtMs: Long
+    ) = ContinueWatchingItem(
+        id = id,
+        title = "Show",
+        mediaType = MediaType.TV,
+        progress = 3,
+        season = season,
+        episode = episode,
+        updatedAtMs = updatedAtMs
     )
 }
