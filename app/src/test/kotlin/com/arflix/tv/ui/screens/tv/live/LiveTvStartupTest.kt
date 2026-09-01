@@ -1,8 +1,10 @@
 package com.arflix.tv.ui.screens.tv.live
 
+import androidx.media3.common.Format
 import com.arflix.tv.data.model.IptvChannel
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import java.util.Locale
 
 /**
  * Covers the Live TV startup behaviour users reported as broken: the selector
@@ -183,6 +185,30 @@ class LiveTvStartupTest {
 
         assertThat(twelveHour).containsMatch("(?i)\\b(am|pm)\\b")
         assertThat(twentyFourHour).doesNotContainMatch("(?i)\\b(am|pm)\\b")
+    }
+
+    @Test
+    fun liveVideoMetadataUsesSeparateResolutionAndFpsBadges() {
+        val format = Format.Builder()
+            .setWidth(1920)
+            .setHeight(1080)
+            .setFrameRate(50f)
+            .build()
+
+        assertThat(formatLiveVideoBadge(format)).isEqualTo("FHD · 1920×1080")
+        assertThat(formatLiveFpsBadge(format)).isEqualTo("50 FPS")
+    }
+
+    @Test
+    fun liveAudioMetadataShowsCodecLayoutAndLanguage() {
+        assertThat(
+            formatLiveAudioDetails(
+                codecSource = "audio/eac3",
+                channelCount = 6,
+                languageTag = "de",
+                locale = Locale.ENGLISH,
+            )
+        ).isEqualTo("E-AC-3 · 5.1 · German")
     }
 
     // ── Keeping search out of the way while the playlist loads ─────────────

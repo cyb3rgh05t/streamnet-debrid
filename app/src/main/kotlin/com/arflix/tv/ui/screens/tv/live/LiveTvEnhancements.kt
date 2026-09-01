@@ -68,6 +68,7 @@ data class PlaybackDiagnostic(
     val title: String,
     val detail: String,
     val severity: PlaybackDiagnosticSeverity = PlaybackDiagnosticSeverity.Info,
+    val channel: EnrichedChannel? = null,
 )
 
 enum class PlaybackDiagnosticSeverity {
@@ -395,16 +396,30 @@ fun PlaybackDiagnosticBanner(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(
-                imageVector = Icons.Filled.ErrorOutline,
-                contentDescription = null,
-                tint = tint,
-                modifier = Modifier.size(20.dp),
-            )
+            if (current.channel != null) {
+                ChannelLogo(
+                    channel = current.channel,
+                    size = 46.dp,
+                    showBackground = true,
+                )
+            } else {
+                Icon(
+                    imageVector = Icons.Filled.ErrorOutline,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(current.title, style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 13.sp))
+                val channelHeading = current.channel?.name
                 Text(
-                    current.detail,
+                    channelHeading ?: current.title,
+                    style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 15.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    if (channelHeading != null) current.title else current.detail,
                     style = LiveType.SectionTag.copy(color = LiveColors.FgDim),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,

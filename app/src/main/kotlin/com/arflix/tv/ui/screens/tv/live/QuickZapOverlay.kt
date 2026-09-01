@@ -440,7 +440,6 @@ private fun ChannelColumnPanel(
                 channels.getOrNull(index)?.let { ch ->
                     val nowNext = nowNextMap[ch.id]
                     NonFocusedChannelSlot(
-                        number = ch.number,
                         channel = ch,
                         nowNext = nowNext
                     )
@@ -451,7 +450,6 @@ private fun ChannelColumnPanel(
             channels.getOrNull(selectedIndex)?.let { ch ->
                 val nowNext = nowNextMap[ch.id]
                 FocusedChannelSlot(
-                    number = ch.number,
                     channel = ch,
                     nowNext = nowNext,
                     isFocused = isFocused
@@ -464,7 +462,6 @@ private fun ChannelColumnPanel(
                 channels.getOrNull(index)?.let { ch ->
                     val nowNext = nowNextMap[ch.id]
                     NonFocusedChannelSlot(
-                        number = ch.number,
                         channel = ch,
                         nowNext = nowNext
                     )
@@ -483,7 +480,6 @@ private fun ChannelColumnPanel(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun NonFocusedChannelSlot(
-    number: Int,
     channel: EnrichedChannel,
     nowNext: IptvNowNext?
 ) {
@@ -495,25 +491,13 @@ private fun NonFocusedChannelSlot(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = number.toString(),
-            style = LiveType.NumberMono.copy(
-                color = LiveColors.FgMute,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold
-            ),
-            modifier = Modifier.width(42.dp),
-            textAlign = TextAlign.End
-        )
-
         Box(
             modifier = Modifier
                 .width(42.dp)
                 .height(28.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(LiveColors.Panel)
         ) {
-            ChannelLogo(channel = channel, size = 28.dp)
+            ChannelLogo(channel = channel, size = 28.dp, showBackground = false)
         }
 
         Text(
@@ -532,7 +516,6 @@ private fun NonFocusedChannelSlot(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun FocusedChannelSlot(
-    number: Int,
     channel: EnrichedChannel,
     nowNext: IptvNowNext?,
     isFocused: Boolean
@@ -540,7 +523,7 @@ private fun FocusedChannelSlot(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(96.dp)
+            .height(124.dp)
             .clip(RoundedCornerShape(LiveDims.CardRadius))
             .border(
                 width = if (isFocused) 2.dp else 0.dp,
@@ -552,45 +535,13 @@ private fun FocusedChannelSlot(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-            modifier = Modifier.width(42.dp)
-        ) {
-            if (isFocused) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowUp,
-                    contentDescription = null,
-                    tint = LiveColors.FgDim,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-            Text(
-                text = number.toString(),
-                style = LiveType.NumberMono.copy(
-                    color = if (isFocused) LiveColors.Accent else LiveColors.FgDim,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            )
-            if (isFocused) {
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = LiveColors.FgDim,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
-
         Box(
             modifier = Modifier
                 .width(64.dp)
                 .height(48.dp)
                 .clip(RoundedCornerShape(LiveDims.CellRadius))
-                .background(LiveColors.Panel)
         ) {
-            ChannelLogo(channel = channel, size = 48.dp)
+            ChannelLogo(channel = channel, size = 48.dp, showBackground = false)
         }
 
         Column(
@@ -639,6 +590,21 @@ private fun FocusedChannelSlot(
                 color = LiveColors.Accent,
                 trackColor = LiveColors.Divider
             )
+
+            now?.description
+                ?.takeIf { it.isNotBlank() }
+                ?.let { description ->
+                    Text(
+                        text = description,
+                        style = LiveType.BodySynopsis.copy(
+                            color = LiveColors.FgDim,
+                            fontSize = 11.sp,
+                        ),
+                        modifier = Modifier.padding(top = 8.dp),
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
         }
     }
 }

@@ -447,12 +447,13 @@ private fun NowCard(channel: EnrichedChannel?, clockTickMillis: Long, nowNext: I
             }
         }
         Text(
-            text = now?.title ?: channel?.name ?: stringResource(R.string.live_empty_no_programme),
+            text = now?.title ?: stringResource(R.string.live_empty_no_programme),
             style = LiveType.ProgramTitle.copy(color = LiveColors.Fg),
             maxLines = if (landscapeCompact) 1 else 2,
             overflow = TextOverflow.Ellipsis,
         )
-        val description = now?.description
+        val description = now?.description?.takeIf { it.isNotBlank() }
+            ?: if (now == null) stringResource(R.string.live_empty_no_programme_description) else null
         if (landscapeSpec?.showDescription != false && !description.isNullOrBlank()) {
             Text(
                 text = description,

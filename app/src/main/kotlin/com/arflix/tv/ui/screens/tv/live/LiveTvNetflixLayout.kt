@@ -368,7 +368,7 @@ private fun HeroVideoCard(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.38f)),
+                    .background(Color.Black.copy(alpha = 0.72f)),
                 contentAlignment = Alignment.Center,
             ) {
                 LoadingIndicator(size = 44.dp, color = LiveColors.Accent, strokeWidth = 3.dp)
@@ -469,11 +469,17 @@ private fun HeroInfoPanel(
                 Text(
                     text = emptyMessage
                         ?: nowProgram?.title
-                        ?: stringResource(R.string.live_placeholder_guide_pending),
+                        ?: stringResource(R.string.live_empty_no_programme),
                     style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
-                val desc = nowProgram?.description?.trim().orEmpty()
+                val desc = nowProgram?.description?.trim().orEmpty().ifBlank {
+                    if (emptyMessage == null && nowProgram == null) {
+                        stringResource(R.string.live_empty_no_programme_description)
+                    } else {
+                        ""
+                    }
+                }
                 if (desc.isNotBlank()) {
                     Text(
                         text = desc,

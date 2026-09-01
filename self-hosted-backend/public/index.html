@@ -834,7 +834,10 @@
         const userAgent = navigator.userAgent || "";
         const touch = navigator.maxTouchPoints > 0;
         if (/Android|iPhone|iPod|Mobile/i.test(userAgent)) return "phone";
-        if (/iPad|Tablet/i.test(userAgent) || (touch && Math.min(screen.width, screen.height) >= 600)) {
+        if (
+          /iPad|Tablet/i.test(userAgent) ||
+          (touch && Math.min(screen.width, screen.height) >= 600)
+        ) {
           return "tablet";
         }
         return "web";

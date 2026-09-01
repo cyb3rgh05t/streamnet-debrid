@@ -101,6 +101,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -410,6 +411,9 @@ fun PlayerScreen(
     var focusedButton by remember { mutableIntStateOf(0) }
     var showSubtitleMenu by remember { mutableStateOf(false) }
     var showSourceMenu by remember { mutableStateOf(false) }
+    var showQuickSettings by remember { mutableStateOf(false) }
+    var quickSettingsIndex by remember { mutableIntStateOf(0) }
+    var controlsInteractionSignal by remember { mutableIntStateOf(0) }
     // Post-episode "Up Next" prompt (issue #86). Shown on STATE_ENDED for TV shows:
     // a 10-second countdown lets the user stop watching or immediately Continue. On timeout we
     // advance to the next episode. Gated on the existing autoPlayNext profile setting —
@@ -1714,7 +1718,7 @@ fun PlayerScreen(
             val prepareStartMs = streamSelectedTime ?: System.currentTimeMillis()
             bufferingStartTime = null
             hasPlaybackStarted = false  // Reset for new stream
-            startupPhase = "Loading video stream…"
+            startupPhase = context.getString(R.string.player_loading_video_stream)
             firstVideoFrameRendered = false
             readyPlayingSinceMs = null
             playbackIssueReported = false
@@ -1796,7 +1800,7 @@ fun PlayerScreen(
             var preloadedSubtitleConfigs = emptyList<MediaItem.SubtitleConfiguration>()
             if (latestUiState.subtitlePreloadEnabled) {
                 if (!latestUiState.subtitlePreloadComplete) {
-                    startupPhase = "Loading subtitles…"
+                    startupPhase = context.getString(R.string.player_loading_subtitles)
                 }
                 val gateStartMs = System.currentTimeMillis()
                 val gateReady = withTimeoutOrNull(SUBTITLE_PRELOAD_GATE_TIMEOUT_MS) {
@@ -1874,7 +1878,7 @@ fun PlayerScreen(
             // No manual startup gate - trust the CDN/debrid while keeping enough safety margin.
             exoPlayer.playWhenReady = true
             exoPlayer.prepare()
-            startupPhase = "Starting playback…"
+            startupPhase = context.getString(R.string.player_starting_playback)
             playbackStartupDiag(
                 "prepare issued setupMs=${System.currentTimeMillis() - prepareStartMs} source=${uiState.selectedStream?.addonId}/${uiState.selectedStream?.quality}/${uiState.selectedStream?.size} host=${runCatching { Uri.parse(url).host }.getOrNull().orEmpty()}"
             )
@@ -2132,8 +2136,8 @@ fun PlayerScreen(
     }
 
     // Auto-hide controls and return focus to container
-    LaunchedEffect(showControls, isPlaying, isCasting) {
-        if (showControls && isPlaying && !isCasting && !showSubtitleMenu && !showSourceMenu && !showSubtitleSettings) {
+    LaunchedEffect(showControls, isPlaying, isCasting, controlsInteractionSignal) {
+        if (showControls && isPlaying && !isCasting && !showSubtitleMenu && !showSourceMenu && !showSubtitleSettings && !showQuickSettings) {
             delay(5000)
             showControls = false
             // Return focus to container so it can receive key events
@@ -2605,12 +2609,13 @@ fun PlayerScreen(
         if (uiState.error != null) {
             showSourceMenu = false
             showSubtitleMenu = false
+            showQuickSettings = false
         }
     }
 
     // Request focus on the container when not showing controls
-    LaunchedEffect(showControls, showSubtitleMenu, showSourceMenu, showNextEpisodePrompt, uiState.error) {
-        if (!showControls && !showSubtitleMenu && !showSourceMenu && !showNextEpisodePrompt && uiState.error == null) {
+    LaunchedEffect(showControls, showSubtitleMenu, showSourceMenu, showQuickSettings, showNextEpisodePrompt, uiState.error) {
+        if (!showControls && !showSubtitleMenu && !showSourceMenu && !showQuickSettings && !showNextEpisodePrompt && uiState.error == null) {
             delay(100)
             try {
                 containerFocusRequester.requestFocus()
@@ -2642,6 +2647,11 @@ fun PlayerScreen(
         }
     }
 
+    BackHandler(enabled = showQuickSettings) {
+        showQuickSettings = false
+        showControls = false
+    }
+
     BackHandler(enabled = showSubtitleSettings) {
         showSubtitleSettings = false
         showControls = true
@@ -2660,7 +2670,7 @@ fun PlayerScreen(
     }
 
     BackHandler(
-        enabled = !showSubtitleMenu && !showSourceMenu && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
+        enabled = !showSubtitleMenu && !showSourceMenu && !showQuickSettings && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
     ) {
         if (showControls) {
             showControls = false
@@ -2692,6 +2702,26 @@ fun PlayerScreen(
         }
         aspectIndicatorTrigger++
     }
+    val activateQuickSetting: (Int) -> Unit = { index ->
+        showQuickSettings = false
+        when (index) {
+            0 -> {
+                subtitleMenuTab = 0
+                subtitleMenuIndex = 0
+                subtitlePanelFocus = 0
+                showSubtitleMenu = true
+            }
+            1 -> {
+                subtitleSettingsRow = 0
+                showSubtitleSettings = true
+            }
+            2 -> {
+                showSourceMenu = true
+                showControls = true
+            }
+            3 -> cycleAspectRatio()
+        }
+    }
 
     androidx.compose.runtime.CompositionLocalProvider(
         androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
@@ -2702,6 +2732,12 @@ fun PlayerScreen(
             .background(Color.Black)
             .focusRequester(containerFocusRequester)
             .focusable()
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown && showControls) {
+                    controlsInteractionSignal++
+                }
+                false
+            }
             .then(
                 if (isTouchDevice) {
                     // isCasting is a key so the handler restarts when casting changes,
@@ -2828,8 +2864,38 @@ fun PlayerScreen(
                         }
                     }
 
+                    if (showQuickSettings) {
+                        return@onKeyEvent when (event.key) {
+                            Key.DirectionUp -> {
+                                quickSettingsIndex = (quickSettingsIndex - 1).coerceAtLeast(0)
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                quickSettingsIndex = (quickSettingsIndex + 1).coerceAtMost(3)
+                                true
+                            }
+                            Key.Enter, Key.DirectionCenter -> {
+                                activateQuickSetting(quickSettingsIndex)
+                                true
+                            }
+                            Key.Back, Key.Escape, Key.Menu -> {
+                                showQuickSettings = false
+                                showControls = false
+                                true
+                            }
+                            else -> true
+                        }
+                    }
+
+                    if (event.key == Key.Menu && hasPlaybackStarted && uiState.error == null) {
+                        quickSettingsIndex = 0
+                        showControls = false
+                        showQuickSettings = true
+                        return@onKeyEvent true
+                    }
+
                     if ((event.key == Key.Back || event.key == Key.Escape) &&
-                        !showSubtitleMenu && !showSourceMenu && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
+                        !showSubtitleMenu && !showSourceMenu && !showQuickSettings && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
                     ) {
                         if (showControls) {
                             showControls = false
@@ -3113,7 +3179,10 @@ fun PlayerScreen(
                             val skipVisible = uiState.activeSkipInterval != null && !uiState.skipIntervalDismissed
                             // When hidden, prefer focusing the skip button (if present) instead of showing controls.
                             if (!showControls) {
-                                if (skipVisible && event.key == Key.DirectionUp) {
+                                if (event.key == Key.DirectionDown && hasPlaybackStarted) {
+                                    quickSettingsIndex = 0
+                                    showQuickSettings = true
+                                } else if (skipVisible) {
                                     coroutineScope.launch {
                                         delay(40)
                                         runCatching { skipIntroFocusRequester.requestFocus() }
@@ -3128,11 +3197,12 @@ fun PlayerScreen(
                             }
                         }
                         Key.Enter, Key.DirectionCenter -> {
-                            // Always toggle play/pause on Enter/Select.
-                            // Controls overlay buttons have their own onKeyEvent handlers
-                            // that will intercept Enter before this point if they have focus.
-                            if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
-                            if (!showControls) showControls = true
+                            if (!showControls) {
+                                showControls = true
+                            } else {
+                                // Overlay buttons intercept Enter before this point when focused.
+                                if (exoPlayer.isPlaying) exoPlayer.pause() else exoPlayer.play()
+                            }
                             true
                         }
                         Key.Spacebar -> {
@@ -3252,13 +3322,16 @@ fun PlayerScreen(
                                 // Name the addons still being queried so a chronically slow one
                                 // identifies itself to the user ("Loading subtitles… (bla)").
                                 val pending = uiState.pendingSubtitleAddons
-                                if (phase.startsWith("Loading subtitles") && pending.isNotEmpty()) {
+                                if (phase == context.getString(R.string.player_loading_subtitles) && pending.isNotEmpty()) {
                                     val shown = pending.take(2).joinToString(", ")
                                     val more = pending.size - 2
-                                    "Loading subtitles… ($shown${if (more > 0) " +$more" else ""})"
+                                    context.getString(
+                                        R.string.player_loading_subtitles_addons,
+                                        "$shown${if (more > 0) " +$more" else ""}"
+                                    )
                                 } else phase
                             }
-                        ?: uiState.streamLoadPhase
+                        ?: uiState.streamLoadPhase?.let { localizedPlayerLoadPhase(context, it) }
                 )
             }
         }
@@ -3846,6 +3919,21 @@ fun PlayerScreen(
                     }
                 }
             }
+        }
+
+        // Compact playback settings opened from the remote's Down or Menu key.
+        AnimatedVisibility(
+            visible = showQuickSettings && hasPlaybackStarted,
+            enter = fadeIn(animTween(150)),
+            exit = fadeOut(animTween(150)),
+            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 48.dp).zIndex(9f)
+        ) {
+            PlayerQuickSettingsPanel(
+                selectedRow = quickSettingsIndex,
+                aspectModeLabel = aspectModeLabel,
+                onRowSelect = { quickSettingsIndex = it },
+                onRowActivate = activateQuickSetting,
+            )
         }
 
         // In-player subtitle settings panel (Delay, Size, Vertical Position)
@@ -6240,10 +6328,111 @@ private fun subtitleMatchScore(streamSource: String, subtitle: Subtitle): Int {
     return weightedSubtitleScore(streamSource, subtitle.id)
 }
 
+private fun localizedPlayerLoadPhase(context: Context, phase: String): String {
+    if (phase == "Preparing stream") return context.getString(R.string.player_preparing_stream)
+    if (phase == "Preparing sources") return context.getString(R.string.player_preparing_sources)
+
+    PlayerScreenRegexes.SEARCHING_SOURCES_REGEX.matchEntire(phase)?.let { match ->
+        return context.getString(
+            R.string.player_searching_sources,
+            match.groupValues[1].toInt(),
+            match.groupValues[2].toInt()
+        )
+    }
+    PlayerScreenRegexes.FOUND_SOURCES_REGEX.matchEntire(phase)?.let { match ->
+        return context.getString(
+            R.string.player_found_sources,
+            match.groupValues[1].toInt(),
+            match.groupValues[2].toInt(),
+            match.groupValues[3].toInt()
+        )
+    }
+    return phase
+}
+
 private object PlayerScreenRegexes {
+    val SEARCHING_SOURCES_REGEX = Regex("^Searching (\\d+)/(\\d+) sources$")
+    val FOUND_SOURCES_REGEX = Regex("^Found (\\d+) sources \\((\\d+)/(\\d+)\\)$")
     val BRACKET_REGEX = Regex("^\\[[^]]+]")
     val MULTI_SPACE_REGEX = Regex("\\s+")
     val SIZE_REGEX = Regex("""(\d+(?:\.\d+)?)\s*(TIB|GIB|MIB|KIB|TB|GB|MB|KB)""")
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun PlayerQuickSettingsPanel(
+    selectedRow: Int,
+    aspectModeLabel: String,
+    onRowSelect: (Int) -> Unit,
+    onRowActivate: (Int) -> Unit,
+) {
+    val accent = LocalAccentColorOverride.current ?: Color.White
+    val items = listOf(
+        Triple(Icons.Default.ClosedCaption, stringResource(R.string.language_and_subtitles), ""),
+        Triple(Icons.Default.Tune, stringResource(R.string.subtitle_settings_title), ""),
+        Triple(Icons.Default.Folder, stringResource(R.string.sources), ""),
+        Triple(Icons.Default.AspectRatio, stringResource(R.string.player_picture_format), aspectModeLabel),
+    )
+
+    Column(
+        modifier = Modifier
+            .width(340.dp)
+            .background(Color.Black.copy(alpha = 0.94f), RoundedCornerShape(8.dp))
+            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.player_quick_settings),
+            style = ArflixTypography.sectionTitle.copy(fontSize = 18.sp),
+            color = Color.White,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        )
+        items.forEachIndexed { index, (icon, label, value) ->
+            val selected = selectedRow == index
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        if (selected) accent.copy(alpha = 0.18f) else Color.Transparent,
+                        RoundedCornerShape(6.dp),
+                    )
+                    .border(
+                        width = if (selected) 2.dp else 0.dp,
+                        color = if (selected) accent else Color.Transparent,
+                        shape = RoundedCornerShape(6.dp),
+                    )
+                    .clickable {
+                        onRowSelect(index)
+                        onRowActivate(index)
+                    }
+                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (selected) accent else Color.White.copy(alpha = 0.78f),
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    text = label,
+                    style = ArflixTypography.body.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium),
+                    color = Color.White,
+                    modifier = Modifier.padding(start = 14.dp).weight(1f),
+                    maxLines = 1,
+                )
+                if (value.isNotBlank()) {
+                    Text(
+                        text = value,
+                        style = ArflixTypography.label.copy(fontSize = 13.sp),
+                        color = if (selected) accent else Color.White.copy(alpha = 0.55f),
+                        maxLines = 1,
+                    )
+                }
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
