@@ -2991,6 +2991,15 @@ fun LiveTvScreen(
                             )
                         }.getOrNull()
                     },
+                    lookupLogo = { program ->
+                        runCatching {
+                            viewModel.lookupProgramLogo(
+                                program.title,
+                                program.startUtcMillis,
+                                program.endUtcMillis,
+                            )
+                        }.getOrNull()
+                    },
                     onSelectCategory = { id ->
                         noteGuideUserNavigation()
                         selectedCategoryId = id

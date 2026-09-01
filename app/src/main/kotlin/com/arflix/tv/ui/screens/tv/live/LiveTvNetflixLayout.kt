@@ -80,7 +80,7 @@ import java.util.Date
 
 // Netflix-style Live TV layout for TV mode only. Touch layout stays in LiveTvScreen.
 
-private val HeroHeight = 260.dp          // smaller hero → more room for channel rail
+private val HeroHeight = 300.dp          // taller hero while preserving the channel rail
 private val CategoryRowHeight = 48.dp
 private val ChannelCardWidth = 220.dp
 private val HeroCornerRadius = 18.dp
@@ -110,6 +110,7 @@ internal fun LiveTvNetflixLayout(
     isFullScreen: Boolean,
     isBuffering: Boolean = false,
     lookupBackdrop: suspend (IptvProgram) -> String? = { null },
+    lookupLogo: suspend (IptvProgram) -> String? = { null },
     onSelectCategory: (String) -> Unit,
     onOpenSearch: () -> Unit,
     onCategoryFocused: () -> Unit,
@@ -179,6 +180,16 @@ internal fun LiveTvNetflixLayout(
         delay(200L)
         value = runCatching { lookupBackdrop(program) }.getOrNull()
     }
+    val previewProgramLogoUrl by produceState<String?>(
+        initialValue = null,
+        key1 = previewChannel?.id,
+        key2 = previewNowNext?.now?.startUtcMillis,
+    ) {
+        value = null
+        val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
+        delay(200L)
+        value = runCatching { lookupLogo(program) }.getOrNull()
+    }
     Column(modifier = modifier.fillMaxSize()) {
         Row(
             modifier = Modifier
@@ -209,9 +220,11 @@ internal fun LiveTvNetflixLayout(
                 fallbackBackdropUrl = previewFallbackArtwork
                     ?.takeUnless { it.isCountryFlag }
                     ?.assetPath,
+                programLogoUrl = previewProgramLogoUrl,
                 playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
                 isPlaylistRefreshing = isPlaylistRefreshing,
                 onRefreshPlaylist = onRefreshPlaylist,
+                onMoveUp = onMoveUpFromCategory,
                 emptyMessage = emptyCategoryMessage,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
@@ -386,9 +399,11 @@ private fun HeroInfoPanel(
     isFavorite: Boolean,
     backdropUrl: String?,
     fallbackBackdropUrl: String?,
+    programLogoUrl: String?,
     playlistLastRefreshedAtMillis: Long?,
     isPlaylistRefreshing: Boolean,
     onRefreshPlaylist: () -> Unit,
+    onMoveUp: () -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -401,7 +416,8 @@ private fun HeroInfoPanel(
     ) {
         if (!effectiveBackdropUrl.isNullOrBlank()) {
             AsyncImage(
-            model = effectiveBackdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                model = effectiveBackdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
+                alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f },
             )
             Box(modifier = Modifier.fillMaxSize().background(
@@ -415,26 +431,16 @@ private fun HeroInfoPanel(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (channel != null) {
-                    ChannelLogo(
-                        channel = channel,
-                        size = 64.dp,
-                        showBackground = false,
-                        imagePadding = 2.dp,
-                    )
-                } else {
-                    Spacer(Modifier.size(64.dp))
-                }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val group = channel?.source?.group?.takeIf { it.isNotBlank() }
                 Column(modifier = Modifier.weight(1f)) {
                     channel?.name?.takeIf { it.isNotBlank() }?.let { channelName ->
                         Text(
                             text = channelName,
-                            style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 14.sp),
+                            style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 12.sp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -442,7 +448,7 @@ private fun HeroInfoPanel(
                     if (!group.isNullOrBlank()) {
                         Text(
                             text = liveCategoryLabel(group),
-                            style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 10.sp),
+                            style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 9.sp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -452,27 +458,42 @@ private fun HeroInfoPanel(
                     Icon(imageVector = Icons.Filled.Star, contentDescription = null,
                         tint = LiveColors.Accent, modifier = Modifier.size(13.dp))
                 }
-                PlaylistRefreshControl(
-                    lastRefreshedAtMillis = playlistLastRefreshedAtMillis,
-                    isRefreshing = isPlaylistRefreshing,
-                    onRefresh = onRefreshPlaylist,
-                )
+                if (channel != null) {
+                    ChannelLogo(
+                        channel = channel,
+                        size = 36.dp,
+                        showBackground = false,
+                        imagePadding = 1.dp,
+                    )
+                } else {
+                    Spacer(Modifier.size(36.dp))
+                }
             }
 
             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(LiveColors.Divider))
 
             val nowProgram = nowNext?.now
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 if (emptyMessage == null) {
                     Text(text = stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
                 }
-                Text(
-                    text = emptyMessage
-                        ?: nowProgram?.title
-                        ?: stringResource(R.string.live_empty_no_programme),
-                    style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
-                    maxLines = 2, overflow = TextOverflow.Ellipsis,
-                )
+                if (!programLogoUrl.isNullOrBlank() && emptyMessage == null && nowProgram != null) {
+                    AsyncImage(
+                        model = programLogoUrl,
+                        contentDescription = nowProgram.title,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.CenterStart,
+                        modifier = Modifier.width(260.dp).height(32.dp),
+                    )
+                } else {
+                    Text(
+                        text = emptyMessage
+                            ?: nowProgram?.title
+                            ?: stringResource(R.string.live_empty_no_programme),
+                        style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 val desc = nowProgram?.description?.trim().orEmpty().ifBlank {
                     if (emptyMessage == null && nowProgram == null) {
                         stringResource(R.string.live_empty_no_programme_description)
@@ -484,7 +505,7 @@ private fun HeroInfoPanel(
                     Text(
                         text = desc,
                         style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
-                        maxLines = 3,
+                        maxLines = 4,
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -492,7 +513,11 @@ private fun HeroInfoPanel(
                     val progress = ((clockTickMillis - nowProgram.startUtcMillis).toFloat() /
                         (nowProgram.endUtcMillis - nowProgram.startUtcMillis).coerceAtLeast(1L)).coerceIn(0f, 1f)
                     val minsLeft = ((nowProgram.endUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L)
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         Text(
                             text = "${formatClock(nowProgram.startUtcMillis)} – ${formatClock(nowProgram.endUtcMillis)}",
                             style = LiveType.TimeMono.copy(color = LiveColors.FgMute),
@@ -503,28 +528,69 @@ private fun HeroInfoPanel(
                         }
                     }
                     LinearProgressIndicator(
-                        progress = { progress }, color = LiveColors.Accent, trackColor = LiveColors.Panel,
-                        modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(999.dp)),
+                        progress = { progress },
+                        color = LiveColors.Accent,
+                        trackColor = LiveColors.Panel,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(3.dp)
+                            .clip(RoundedCornerShape(999.dp)),
                     )
                 }
             }
 
             val upcoming = remember(nowNext) { collectUpcoming(nowNext).take(HeroUpcomingMax) }
             if (upcoming.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text(text = stringResource(R.string.live_label_upcoming), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.live_label_upcoming).uppercase(),
+                        style = LiveType.SectionTag.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+                    )
                     upcoming.forEach { program ->
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(text = formatClock(program.startUtcMillis),
-                                style = LiveType.TimeMono.copy(color = LiveColors.FgMute),
-                                modifier = Modifier.width(40.dp))
-                            Text(text = program.title,
-                                style = LiveType.CellTitle.copy(color = LiveColors.FgDim),
-                                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        ) {
+                            Text(
+                                text = formatClock(program.startUtcMillis),
+                                style = LiveType.TimeMono.copy(color = LiveColors.Accent, fontSize = 9.sp),
+                                modifier = Modifier.width(40.dp),
+                            )
+                            Text(
+                                text = program.title,
+                                style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 9.sp),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            val startsInMinutes = ((program.startUtcMillis - clockTickMillis) / 60_000L)
+                                .coerceAtLeast(0L)
+                            Text(
+                                text = stringResource(R.string.live_label_starts_in_min, startsInMinutes),
+                                style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+                            )
                         }
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                PlaylistRefreshControl(
+                    lastRefreshedAtMillis = playlistLastRefreshedAtMillis,
+                    isRefreshing = isPlaylistRefreshing,
+                    onRefresh = onRefreshPlaylist,
+                    onMoveUp = onMoveUp,
+                )
             }
         }
     }
@@ -536,6 +602,7 @@ private fun PlaylistRefreshControl(
     lastRefreshedAtMillis: Long?,
     isRefreshing: Boolean,
     onRefresh: () -> Unit,
+    onMoveUp: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     val formattedTimestamp = remember(lastRefreshedAtMillis) {
@@ -555,14 +622,17 @@ private fun PlaylistRefreshControl(
             .onFocusChanged { focused = it.hasFocus }
             .focusable(enabled = !isRefreshing)
             .onKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionCenter || event.key == Key.Enter) &&
-                    !isRefreshing
-                ) {
-                    onRefresh()
-                    true
-                } else {
-                    false
+                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                when (event.key) {
+                    Key.DirectionUp -> {
+                        onMoveUp()
+                        true
+                    }
+                    Key.DirectionCenter, Key.Enter -> {
+                        if (!isRefreshing) onRefresh()
+                        !isRefreshing
+                    }
+                    else -> false
                 }
             }
             .clickable(enabled = !isRefreshing, onClick = onRefresh)

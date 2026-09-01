@@ -55,6 +55,7 @@ private const val CurrentChannelEpgRefreshThrottleMs = 12_000L
 private const val VisibleEpgRetryDelayMs = 60_000L
 private const val PeriodicIptvNetworkRefreshIntervalMs = 4L * 60L * 60_000L
 private const val ProgramBackdropMissTtlMs = 10L * 60_000L
+private const val ProgramLogoMissTtlMs = 10L * 60_000L
 private const val PeriodicIptvRefreshCheckIntervalMs = 60_000L
 private const val LargeListCompleteGuideCoverageTarget = 0.75f
 private const val PlaybackEpgBackfillResumeDelayMs = 90_000L
@@ -2054,6 +2055,8 @@ class TvViewModel @Inject constructor(
 
     private val programBackdropCache = java.util.concurrent.ConcurrentHashMap<String, String>()
     private val programBackdropNegativeCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
+    private val programLogoCache = java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val programLogoNegativeCache = java.util.concurrent.ConcurrentHashMap<String, Long>()
 
     private fun hasActiveProgramBackdropMiss(key: String): Boolean {
         val expiresAt = programBackdropNegativeCache[key] ?: return false
@@ -2093,6 +2096,37 @@ class TvViewModel @Inject constructor(
             }
         }.getOrElse {
             registerProgramBackdropMiss(key)
+            null
+        }
+    }
+
+    suspend fun lookupProgramLogo(
+        rawTitle: String,
+        startUtcMillis: Long? = null,
+        endUtcMillis: Long? = null,
+    ): String? {
+        val cleaned = cleanProgramTitle(rawTitle)
+        if (cleaned.length < 3) return null
+        val durationMs = if (
+            startUtcMillis != null && endUtcMillis != null && endUtcMillis > startUtcMillis
+        ) endUtcMillis - startUtcMillis else null
+        val key = "${cleaned.lowercase()}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
+        programLogoCache[key]?.let { return it }
+        val missExpiresAt = programLogoNegativeCache[key]
+        if (missExpiresAt != null && missExpiresAt > SystemClock.elapsedRealtime()) return null
+        programLogoNegativeCache.remove(key)
+        return runCatching {
+            val logo = mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs)
+            if (logo.isNullOrBlank()) {
+                programLogoNegativeCache[key] = SystemClock.elapsedRealtime() + ProgramLogoMissTtlMs
+                null
+            } else {
+                programLogoCache[key] = logo
+                programLogoNegativeCache.remove(key)
+                logo
+            }
+        }.getOrElse {
+            programLogoNegativeCache[key] = SystemClock.elapsedRealtime() + ProgramLogoMissTtlMs
             null
         }
     }
