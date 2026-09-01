@@ -80,7 +80,7 @@ import java.util.Date
 
 // Netflix-style Live TV layout for TV mode only. Touch layout stays in LiveTvScreen.
 
-private val HeroHeight = 300.dp          // taller hero while preserving the channel rail
+private val HeroHeight = 260.dp          // smaller hero → more room for channel rail
 private val CategoryRowHeight = 48.dp
 private val ChannelCardWidth = 220.dp
 private val HeroCornerRadius = 18.dp
