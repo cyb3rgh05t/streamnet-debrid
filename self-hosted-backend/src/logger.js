@@ -6,15 +6,16 @@ const routeActions = new Map([
   ["POST /auth-login", "Account sign-in"],
   ["POST /cloud-auth-email", "Account created"],
   ["POST /auth-refresh", "Session refreshed"],
+  ["POST /app-usage-event", "App usage recorded"],
   ["POST /account-sync-pull", "Cloud snapshot loaded"],
   ["POST /account-sync-push", "Cloud snapshot saved"],
   ["POST /account-delete-start", "Account deletion started"],
   ["POST /account-delete-status", "Account deletion checked"],
-  ["POST /tv-auth-start", "TV pairing started"],
-  ["POST /tv-auth-status", "TV pairing checked"],
-  ["POST /tv-auth-poll", "TV pairing checked"],
-  ["POST /tv-auth-complete", "TV pairing completed"],
-  ["POST /tv-auth-web", "TV pairing completed"],
+  ["POST /tv-auth-start", "Device pairing started"],
+  ["POST /tv-auth-status", "Device pairing checked"],
+  ["POST /tv-auth-poll", "Device pairing checked"],
+  ["POST /tv-auth-complete", "Device pairing completed"],
+  ["POST /tv-auth-web", "Device pairing completed"],
 ]);
 
 function envFlag(name, fallback) {
@@ -82,6 +83,15 @@ export function requestLogDetails(request, reply, elapsedMs) {
   const statusCode = reply.statusCode;
   const routeKey = `${method} ${path}`;
   const action = routeActions.get(routeKey) || "Request completed";
+  const requestedDeviceType = String(request.body?.device_type || "")
+    .trim()
+    .toLowerCase();
+  const deviceType = new Set(["phone", "tablet", "tv", "web"]).has(
+    requestedDeviceType,
+  )
+    ? requestedDeviceType
+    : "";
+  const describedAction = deviceType ? `${action} (${deviceType})` : action;
   const level =
     statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "info";
   const message =
@@ -90,8 +100,8 @@ export function requestLogDetails(request, reply, elapsedMs) {
       : action === "Request completed" && statusCode >= 400
         ? "Request failed"
         : statusCode >= 400
-          ? `${action} failed`
-          : action;
+          ? `${describedAction} failed`
+          : describedAction;
 
   return {
     level,
@@ -104,6 +114,7 @@ export function requestLogDetails(request, reply, elapsedMs) {
       durationMs: Number(elapsedMs.toFixed(1)),
       durationLabel: `${elapsedMs.toFixed(1)} ms`,
       requestId: request.id,
+      ...(deviceType ? { deviceType } : {}),
     },
   };
 }

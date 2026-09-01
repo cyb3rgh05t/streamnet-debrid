@@ -9,7 +9,7 @@ import com.arflix.tv.BuildConfig
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.DiagnosticsManager
-import com.arflix.tv.util.detectDeviceType
+import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.settingsDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +54,7 @@ class AppUsageAnalyticsRepository @Inject constructor(
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 profileManager.getProfileIdSync()
             }.takeIf { it.isNotBlank() }
-            val deviceType = detectDeviceType(context).name.lowercase()
+            val deviceType = detectPhysicalDeviceType(context).name.lowercase()
 
             val metadata = JSONObject()
                 .put("android_sdk", Build.VERSION.SDK_INT)

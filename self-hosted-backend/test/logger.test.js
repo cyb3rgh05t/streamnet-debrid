@@ -2,12 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { backendLoggerOptions, requestLogDetails } from "../src/logger.js";
 
-function request(method, url, routeUrl) {
+function request(method, url, routeUrl, body) {
   return {
     id: "req-1",
     method,
     url,
     routeOptions: routeUrl ? { url: routeUrl } : undefined,
+    body,
   };
 }
 
@@ -47,6 +48,42 @@ test("highlights server failures as errors", () => {
   assert.equal(details.level, "error");
   assert.equal(details.fields.path, "/unknown");
   assert.equal(details.message, "Request failed");
+});
+
+test("describes pairing endpoints without assuming a TV device", () => {
+  const details = requestLogDetails(
+    request("POST", "/tv-auth-complete", "/tv-auth-complete"),
+    { statusCode: 200 },
+    4.2,
+  );
+
+  assert.equal(details.message, "Device pairing completed");
+});
+
+test("includes a validated client type for account sign-in", () => {
+  const details = requestLogDetails(
+    request("POST", "/auth-login", "/auth-login", {
+      device_type: "tablet",
+    }),
+    { statusCode: 200 },
+    3.7,
+  );
+
+  assert.equal(details.message, "Account sign-in (tablet)");
+  assert.equal(details.fields.deviceType, "tablet");
+});
+
+test("ignores unknown client types", () => {
+  const details = requestLogDetails(
+    request("POST", "/auth-login", "/auth-login", {
+      device_type: "telepathy",
+    }),
+    { statusCode: 200 },
+    3.7,
+  );
+
+  assert.equal(details.message, "Account sign-in");
+  assert.equal(details.fields.deviceType, undefined);
 });
 
 test("adds a rotating file target when LOG_FILE is configured", () => {

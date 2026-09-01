@@ -67,7 +67,8 @@ import com.arflix.tv.updater.AppUpdateRepository
 import com.arflix.tv.updater.UpdatePreferences
 import com.arflix.tv.updater.VersionUtils
 import com.arflix.tv.util.AuthEmailValidator
-import com.arflix.tv.util.detectDeviceType
+import com.arflix.tv.util.DeviceType
+import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
@@ -254,6 +255,8 @@ data class SettingsUiState(
     val smoothScrolling: Boolean = true
 )
 
+internal fun shouldUseDirectCloudAuth(deviceType: DeviceType): Boolean = deviceType.isTouchDevice()
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -281,9 +284,8 @@ class SettingsViewModel @Inject constructor(
     private val watchHistoryRepository: com.arflix.tv.data.repository.WatchHistoryRepository,
     private val simklAuthManager: com.arflix.tv.data.repository.simkl.SimklAuthManager
 ) : ViewModel() {
-    private val usesSelfHostedDirectAuth: Boolean
-        get() = BuildConfig.BUILD_TYPE == "selfHosted" &&
-            detectDeviceType(context).isTouchDevice()
+    private val usesDirectCloudAuth: Boolean
+        get() = shouldUseDirectCloudAuth(detectPhysicalDeviceType(context))
 
     private fun visibleCatalogs(catalogs: List<CatalogConfig>): List<CatalogConfig> {
         return catalogs.filter { config ->
@@ -2605,7 +2607,7 @@ class SettingsViewModel @Inject constructor(
 
     fun startCloudAuth() {
         if (_uiState.value.isLoggedIn || _uiState.value.isCloudAuthWorking) return
-        if (usesSelfHostedDirectAuth) {
+        if (usesDirectCloudAuth) {
             _uiState.value = _uiState.value.copy(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = true,
@@ -2659,7 +2661,7 @@ class SettingsViewModel @Inject constructor(
 
     fun openCloudEmailPasswordDialog() {
         if (_uiState.value.isLoggedIn) return
-        if (usesSelfHostedDirectAuth) {
+        if (usesDirectCloudAuth) {
             _uiState.value = _uiState.value.copy(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = true,
@@ -2729,7 +2731,7 @@ class SettingsViewModel @Inject constructor(
             return
         }
 
-        if (usesSelfHostedDirectAuth) {
+        if (usesDirectCloudAuth) {
             viewModelScope.launch {
                 _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
                 val result = if (createAccount) {

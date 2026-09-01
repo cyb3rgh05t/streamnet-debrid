@@ -450,7 +450,7 @@ app.get("/", async (request, reply) => {
         new MutationObserver(() => {
           if (!statusNode || !statusNode.classList.contains("ok")) return;
           const text = statusNode.textContent.toLowerCase();
-          const pairing = text.includes("gekoppelt") || text.includes("paired");
+          const pairing = Boolean(new URLSearchParams(window.location.search).get("code"));
           const success = pairing || text.includes("angemeldet") || text.includes("signed in") || text.includes("konto erstellt") || text.includes("account created");
           if (success && document.body.contains(statusNode)) showSuccessPage(pairing);
         }).observe(statusNode, { childList: true, characterData: true, attributes: true, subtree: true });
@@ -753,10 +753,19 @@ async function tvAuthStatus(request, reply) {
   if (!deviceCode)
     return reply.code(400).send({ error: "device_code is required" });
   const consumed = await pool.query(
-    `update tv_device_auth_sessions
-        set status = 'consumed', consumed_at = now(), access_token = null, refresh_token = null
-      where device_code = $1 and status = 'approved' and access_token is not null and refresh_token is not null and expires_at > now()
-      returning access_token, refresh_token, user_email`,
+    `with approved as materialized (
+       select device_code, access_token, refresh_token, user_email
+         from tv_device_auth_sessions
+        where device_code = $1 and status = 'approved' and access_token is not null and refresh_token is not null and expires_at > now()
+          for update
+     ), consumed as (
+       update tv_device_auth_sessions as sessions
+          set status = 'consumed', consumed_at = now(), access_token = null, refresh_token = null
+         from approved
+        where sessions.device_code = approved.device_code
+        returning approved.access_token, approved.refresh_token, approved.user_email
+     )
+     select access_token, refresh_token, user_email from consumed`,
     [deviceCode],
   );
   const approvedSession = consumed.rows[0];

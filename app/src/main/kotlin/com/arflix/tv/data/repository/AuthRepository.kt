@@ -12,6 +12,7 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.AuthEmailValidator
 import com.arflix.tv.util.authDataStore
+import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.settingsDataStore
 import com.arflix.tv.util.hash
 import com.arflix.tv.util.sanitizeEmail
@@ -582,6 +583,7 @@ class AuthRepository @Inject constructor(
             val payload = JSONObject()
                 .put("email", email)
                 .put("password", password)
+                .put("device_type", detectPhysicalDeviceType(context).name.lowercase())
                 .toString()
 
             val request = Request.Builder()

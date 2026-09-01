@@ -90,8 +90,11 @@ fun detectDeviceType(context: Context): DeviceType {
         // "auto" or null -> fall through to auto-detection
     }
 
-    return detectAutoDeviceType(context, context.resources.configuration)
+    return detectPhysicalDeviceType(context)
 }
+
+fun detectPhysicalDeviceType(context: Context): DeviceType =
+    detectAutoDeviceType(context, context.resources.configuration)
 
 fun detectAutoDeviceType(
     context: Context,

@@ -830,6 +830,16 @@
         queryMode === "recovery" || hashType === "recovery";
       const isPasswordSetupMode = queryMode === "set-password" && !!setupToken;
 
+      function browserDeviceType() {
+        const userAgent = navigator.userAgent || "";
+        const touch = navigator.maxTouchPoints > 0;
+        if (/Android|iPhone|iPod|Mobile/i.test(userAgent)) return "phone";
+        if (/iPad|Tablet/i.test(userAgent) || (touch && Math.min(screen.width, screen.height) >= 600)) {
+          return "tablet";
+        }
+        return "web";
+      }
+
       const I18N = {
         en: {
           meta: { title: "StreamNet Cloud" },
@@ -1391,6 +1401,7 @@
           body: JSON.stringify({
             email: normalizedEmail,
             password,
+            device_type: browserDeviceType(),
           }),
         });
         const json = await resp.json().catch(() => ({}));
@@ -1412,7 +1423,11 @@
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({
+            email,
+            password,
+            device_type: browserDeviceType(),
+          }),
         });
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok) {
