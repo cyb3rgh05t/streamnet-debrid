@@ -752,8 +752,24 @@ async function tvAuthStatus(request, reply) {
   const deviceCode = String(request.body?.device_code || "").trim();
   if (!deviceCode)
     return reply.code(400).send({ error: "device_code is required" });
+  const consumed = await pool.query(
+    `update tv_device_auth_sessions
+        set status = 'consumed', consumed_at = now(), access_token = null, refresh_token = null
+      where device_code = $1 and status = 'approved' and access_token is not null and refresh_token is not null and expires_at > now()
+      returning access_token, refresh_token, user_email`,
+    [deviceCode],
+  );
+  const approvedSession = consumed.rows[0];
+  if (approvedSession) {
+    return reply.send({
+      status: "approved",
+      access_token: approvedSession.access_token,
+      refresh_token: approvedSession.refresh_token,
+      email: approvedSession.user_email,
+    });
+  }
   const result = await pool.query(
-    "select status, access_token, refresh_token, user_email, expires_at from tv_device_auth_sessions where device_code = $1",
+    "select status, expires_at from tv_device_auth_sessions where device_code = $1",
     [deviceCode],
   );
   const session = result.rows[0];
@@ -764,22 +780,6 @@ async function tvAuthStatus(request, reply) {
         [deviceCode],
       );
     return reply.send({ status: "expired", message: "Code expired" });
-  }
-  if (
-    session.status === "approved" &&
-    session.access_token &&
-    session.refresh_token
-  ) {
-    await pool.query(
-      "update tv_device_auth_sessions set status = 'consumed', consumed_at = now(), access_token = null, refresh_token = null where device_code = $1",
-      [deviceCode],
-    );
-    return reply.send({
-      status: "approved",
-      access_token: session.access_token,
-      refresh_token: session.refresh_token,
-      email: session.user_email,
-    });
   }
   return reply.send({ status: "pending" });
 }

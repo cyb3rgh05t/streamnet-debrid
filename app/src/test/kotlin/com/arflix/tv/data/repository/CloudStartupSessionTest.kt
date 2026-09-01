@@ -44,4 +44,14 @@ class CloudStartupSessionTest {
             )
         )
     }
+
+    @Test
+    fun `rejected current refresh token clears session`() {
+        assertEquals(true, shouldClearRejectedCloudSession("token-1", "token-1"))
+    }
+
+    @Test
+    fun `stale rejection preserves concurrently refreshed session`() {
+        assertEquals(false, shouldClearRejectedCloudSession("token-1", "token-2"))
+    }
 }

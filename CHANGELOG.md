@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Cloud session reliability
+
+- Made TV pairing token delivery atomic so overlapping status polls cannot receive the same refresh token.
+- Prevented a delayed refresh rejection from clearing a newer session that another request already stored.
+
 ### Live TV category artwork and settings focus
 
 - Added 15 bundled category backdrops and 255 SVG country flags for Live TV, with provider/category-aware mappings and country aliases.

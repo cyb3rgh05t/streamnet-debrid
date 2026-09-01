@@ -359,6 +359,11 @@ internal fun resolveCloudStartupUserId(
     else -> null
 }?.takeIf { it.isNotBlank() }
 
+internal fun shouldClearRejectedCloudSession(
+    rejectedRefreshToken: String,
+    currentRefreshToken: String?,
+): Boolean = currentRefreshToken.isNullOrBlank() || currentRefreshToken == rejectedRefreshToken
+
 /**
  * Repository for Supabase authentication and user profile management
  */
@@ -827,7 +832,7 @@ class AuthRepository @Inject constructor(
                     val body = response.body?.string().orEmpty()
                     if (!response.isSuccessful) {
                         if (response.code == 401 || response.code == 403) {
-                            clearInvalidCloudSession()
+                            clearInvalidCloudSession(refreshToken)
                         }
                         return@withContext null
                     }
@@ -858,8 +863,15 @@ class AuthRepository @Inject constructor(
         }
     }
 
-    private suspend fun clearInvalidCloudSession() {
-        context.authDataStore.edit { prefs -> prefs.clear() }
+    private suspend fun clearInvalidCloudSession(rejectedRefreshToken: String) {
+        var sessionCleared = false
+        context.authDataStore.edit { prefs ->
+            if (shouldClearRejectedCloudSession(rejectedRefreshToken, prefs[PrefsKeys.REFRESH_TOKEN])) {
+                prefs.clear()
+                sessionCleared = true
+            }
+        }
+        if (!sessionCleared) return
         _userProfile.value = null
         _authState.value = AuthState.NotAuthenticated
         AppLogger.breadcrumb("Auth", "cloud_session_revoked", severity = "warning")
