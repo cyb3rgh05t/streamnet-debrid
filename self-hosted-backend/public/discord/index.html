@@ -6,26 +6,85 @@
     <title>Connecting to Discord... | StreamNet TV</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
     <style>
+      :root {
+        --bg-1: #0f0d0b;
+        --bg-2: #171311;
+        --bg-3: #221b16;
+        --card: #1c1713;
+        --line: rgba(255, 255, 255, 0.08);
+        --text: #f4efe7;
+        --muted: #b4a798;
+        --accent: #e5a209;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
         margin: 0;
         padding: 24px;
         min-height: 100vh;
         display: grid;
         place-items: center;
-        background: #0a0806;
-        color: #f5efe5;
+        background:
+          radial-gradient(
+            circle at 14% 4%,
+            rgba(229, 162, 9, 0.12),
+            transparent 26%
+          ),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2) 62%, var(--bg-3));
+        color: var(--text);
         font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
         text-align: center;
+      }
+      .page {
+        width: min(100%, 500px);
+      }
+      .brand-logo {
+        display: block;
+        width: min(260px, 72vw);
+        height: auto;
+        margin: 0 auto 22px;
+      }
+      .card {
+        width: 100%;
+        padding: 36px 28px;
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: var(--card);
+        box-shadow: 0 28px 70px -34px rgba(0, 0, 0, 0.86);
       }
       .spinner {
         width: 40px;
         height: 40px;
-        border: 3px solid rgba(88, 101, 242, 0.2);
-        border-top-color: #5865f2;
+        border: 3px solid rgba(229, 162, 9, 0.18);
+        border-top-color: var(--accent);
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
         margin: 0 auto 16px;
+      }
+      #message {
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.55;
+      }
+      @media (max-width: 480px) {
+        body {
+          padding: 14px;
+        }
+        .brand-logo {
+          width: 210px;
+          margin-bottom: 16px;
+        }
+        .card {
+          padding: 28px 18px;
+          border-radius: 18px;
+        }
       }
       @keyframes spin {
         to {
@@ -35,16 +94,38 @@
     </style>
   </head>
   <body>
-    <div>
-      <div class="spinner"></div>
-      <h2>Redirecting to Discord...</h2>
-      <p style="color: #a59c8e; font-size: 14px">
-        Please wait while we open the authorization page.
-      </p>
-    </div>
+    <main class="page">
+      <a href="/">
+        <img
+          class="brand-logo"
+          src="/assets/streamnet-club-logo.svg"
+          alt="StreamNet Club"
+        />
+      </a>
+      <div class="card">
+        <div class="spinner"></div>
+        <h2 id="heading">Redirecting to Discord...</h2>
+        <p id="message">Please wait while we open the authorization page.</p>
+      </div>
+    </main>
 
     <script>
       (function () {
+        var german =
+          (
+            window.localStorage.getItem("streamnet:lang") ||
+            navigator.language ||
+            "en"
+          )
+            .toLowerCase()
+            .indexOf("de") === 0;
+        document.documentElement.lang = german ? "de" : "en";
+        document.getElementById("heading").textContent = german
+          ? "Weiterleitung zu Discord..."
+          : "Redirecting to Discord...";
+        document.getElementById("message").textContent = german
+          ? "Bitte warte, waehrend die Autorisierungsseite geoeffnet wird."
+          : "Please wait while we open the authorization page.";
         var params = new URLSearchParams(window.location.search);
         var session = params.get("session") || params.get("state") || "";
         var challenge =
@@ -57,8 +138,14 @@
           !/^[A-Za-z0-9_-]{43,128}$/.test(challenge) ||
           !/^\d{17,20}$/.test(clientId)
         ) {
-          document.body.innerHTML =
-            "<div style='color:#ff8a76;'><h3>Invalid Authorization Request</h3><p>Please scan the QR code on your TV again.</p></div>";
+          document.querySelector(".spinner").remove();
+          document.getElementById("heading").textContent = german
+            ? "Ungueltige Autorisierungsanfrage"
+            : "Invalid Authorization Request";
+          document.getElementById("heading").style.color = "#ff8a76";
+          document.getElementById("message").textContent = german
+            ? "Bitte scanne den QR-Code auf deinem TV erneut."
+            : "Please scan the QR code on your TV again.";
           return;
         }
 

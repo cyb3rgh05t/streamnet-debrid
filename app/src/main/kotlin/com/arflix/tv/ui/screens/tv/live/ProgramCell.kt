@@ -50,6 +50,12 @@ import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.util.LocalDeviceType
 
+internal fun shouldShowEpgLiveBadge(
+    isNow: Boolean,
+    narrowCell: Boolean,
+    isTouchDevice: Boolean,
+): Boolean = isNow && !narrowCell && !isTouchDevice
+
 /**
  * A single EPG program cell placed inside a row with an absolute offset.
  * Width is determined by duration × px/min (handled by caller).
@@ -208,7 +214,7 @@ fun ProgramCell(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 val nowMs = clockTickMillis
-                if (isNow && !narrowCell) {
+                if (shouldShowEpgLiveBadge(isNow, narrowCell, isTouchDevice)) {
                     Badge(stringResource(R.string.live_badge_live), Color.White, LiveColors.LiveRed)
                     Spacer(Modifier.size(6.dp))
                 } else if (isPast && isCatchupSupported && !narrowCell) {

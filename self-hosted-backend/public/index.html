@@ -850,7 +850,7 @@
             kicker: "Cloud Account",
             title: "Sign in once. Sync everything.",
             subtitleDefault:
-              "Connect your StreamNet Cloud account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and web.",
+              "Connect your StreamNet Cloud account to keep profiles, settings, watch progress and watchlists in one place across TV, mobile and tablet.",
             subtitlePairing:
               "Sign in here to approve the pairing request from your StreamNet TV device and restore your cloud account there.",
             subtitleRecovery:
@@ -969,6 +969,13 @@
             passwordSetupFailed: "Password setup failed",
             passwordLinkInvalid:
               "This password link is no longer valid. Request a new reset email.",
+            invalidCredentials: "Invalid email or password.",
+            accountExists: "Account already exists. Sign in instead.",
+            accountCooldown: "Please wait before creating this account again.",
+            invalidOrExpiredCode: "The code is invalid or has expired.",
+            invalidOrExpiredPairing:
+              "The pairing session is invalid or has expired.",
+            missingRequiredFields: "Required information is missing.",
           },
         },
         de: {
@@ -977,7 +984,7 @@
             kicker: "Cloud Konto",
             title: "Einmal anmelden. Alles synchron.",
             subtitleDefault:
-              "Verbinde dein StreamNet Cloud Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Web zusammen bleiben.",
+              "Verbinde dein StreamNet Cloud Konto, damit Profile, Einstellungen, Wiedergabefortschritt und Watchlists auf TV, Handy und Tablet zusammen bleiben.",
             subtitlePairing:
               "Melde dich hier an, um die Kopplungsanfrage deines StreamNet TV Geraets zu bestaetigen und dein Cloud Konto dort wiederherzustellen.",
             subtitleRecovery:
@@ -1098,6 +1105,15 @@
             passwordSetupFailed: "Passwort-Setup fehlgeschlagen",
             passwordLinkInvalid:
               "Dieser Passwort-Link ist nicht mehr gueltig. Fordere eine neue Reset-E-Mail an.",
+            invalidCredentials: "E-Mail-Adresse oder Passwort ist falsch.",
+            accountExists:
+              "Das Konto existiert bereits. Melde dich stattdessen an.",
+            accountCooldown:
+              "Bitte warte, bevor du dieses Konto erneut erstellst.",
+            invalidOrExpiredCode: "Der Code ist ungueltig oder abgelaufen.",
+            invalidOrExpiredPairing:
+              "Die Kopplungssitzung ist ungueltig oder abgelaufen.",
+            missingRequiredFields: "Erforderliche Angaben fehlen.",
           },
         },
       };
@@ -1123,6 +1139,27 @@
         return String(raw).replace(/\{(\w+)\}/g, (_, name) =>
           vars[name] == null ? `{${name}}` : String(vars[name]),
         );
+      }
+
+      const API_ERROR_KEYS = {
+        "Email and password are required": "errors.emailRequired",
+        "Invalid email or password": "errors.invalidCredentials",
+        "Enter a valid email address": "errors.emailInvalid",
+        "Password must be at least 6 characters": "errors.passwordMin",
+        "Please wait before creating this account again":
+          "errors.accountCooldown",
+        "Account already exists. Sign in instead.": "errors.accountExists",
+        "Invalid or expired code": "errors.invalidOrExpiredCode",
+        "Invalid or expired pairing session": "errors.invalidOrExpiredPairing",
+        "Missing required fields": "errors.missingRequiredFields",
+      };
+
+      function localizeApiError(message, fallbackKey) {
+        const normalized = String(message || "").trim();
+        const key = API_ERROR_KEYS[normalized];
+        if (key) return t(key);
+        if (normalized) return normalized;
+        return fallbackKey ? t(fallbackKey) : "";
       }
 
       function renderStaticI18n() {
@@ -1366,7 +1403,9 @@
         });
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok)
-          throw new Error(json.error || t("errors.tvPairingFailed"));
+          throw new Error(
+            localizeApiError(json.error, "errors.tvPairingFailed"),
+          );
       }
 
       async function signUpAndPairViaServer(email, password) {
@@ -1388,7 +1427,7 @@
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok)
           throw new Error(
-            json.error || t("errors.accountCreationPairingFailed"),
+            localizeApiError(json.error, "errors.accountCreationPairingFailed"),
           );
         markEmailSent("signup", normalizedEmail);
       }
@@ -1409,7 +1448,9 @@
         });
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok)
-          throw new Error(json.error || t("errors.accountCreationFailed"));
+          throw new Error(
+            localizeApiError(json.error, "errors.accountCreationFailed"),
+          );
         if (!json.access_token || !json.refresh_token) {
           throw new Error(t("errors.accountCreatedIncomplete"));
         }
@@ -1446,7 +1487,9 @@
               setupHint = t("errors.setupHintUseForgot");
             }
           }
-          throw new Error((json.error || t("errors.signInFailed")) + setupHint);
+          throw new Error(
+            localizeApiError(json.error, "errors.signInFailed") + setupHint,
+          );
         }
         return { email, password };
       }
@@ -1473,7 +1516,9 @@
         });
         const json = await resp.json().catch(() => ({}));
         if (!resp.ok)
-          throw new Error(json.error || t("errors.passwordResetFailed"));
+          throw new Error(
+            localizeApiError(json.error, "errors.passwordResetFailed"),
+          );
         if (!json.account_exists) {
           throw new Error(t("errors.accountNotFound"));
         }
@@ -1496,7 +1541,9 @@
           });
           const json = await resp.json().catch(() => ({}));
           if (!resp.ok)
-            throw new Error(json.error || t("errors.passwordSetupFailed"));
+            throw new Error(
+              localizeApiError(json.error, "errors.passwordSetupFailed"),
+            );
           return;
         }
         throw new Error(t("errors.passwordLinkInvalid"));

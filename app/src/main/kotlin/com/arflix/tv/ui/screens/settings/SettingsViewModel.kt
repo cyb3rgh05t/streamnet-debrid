@@ -187,6 +187,7 @@ data class SettingsUiState(
     val iptvStalkerUrl: String = "",
     val iptvStalkerMac: String = "",
     val iptvShowSpecialCategories: Boolean = true,
+    val iptvOnlyMode: Boolean = true,
     val iptvSortOrder: String = "provider",
     val iptvChannelCount: Int = 0,
     val isIptvLoading: Boolean = false,
@@ -1975,7 +1976,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.observeConfig().collect { config ->
                 val current = _uiState.value
-                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories) {
+                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories || current.iptvOnlyMode != config.iptvOnlyMode) {
                     _uiState.value = current.copy(
                         iptvM3uUrl = config.m3uUrl,
                         iptvEpgUrl = config.epgUrl,
@@ -1983,7 +1984,8 @@ class SettingsViewModel @Inject constructor(
                         iptvStalkerUrl = config.stalkerPortalUrl,
                         iptvStalkerMac = config.stalkerMacAddress,
                         iptvSortOrder = config.sortOrder,
-                        iptvShowSpecialCategories = config.showSpecialCategories
+                        iptvShowSpecialCategories = config.showSpecialCategories,
+                        iptvOnlyMode = config.iptvOnlyMode,
                     )
                 }
                 if (!hasObservedIptvConfig) {
@@ -2556,6 +2558,13 @@ class SettingsViewModel @Inject constructor(
     fun setIptvShowSpecialCategories(show: Boolean) {
         viewModelScope.launch {
             iptvRepository.saveShowSpecialCategories(show)
+        }
+    }
+
+    fun setIptvOnlyMode(enabled: Boolean) {
+        viewModelScope.launch {
+            iptvRepository.saveIptvOnlyMode(enabled)
+            syncLocalStateToCloud(silent = true)
         }
     }
 

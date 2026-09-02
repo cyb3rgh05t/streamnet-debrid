@@ -55,6 +55,7 @@ import com.arflix.tv.util.LocalDeviceType
 
 internal enum class LiveTvMiniPlayerLayout {
     STANDARD,
+    TABLET_LANDSCAPE,
     PORTRAIT_STACKED,
     LANDSCAPE_COMPACT,
 }
@@ -75,13 +76,19 @@ internal fun landscapePhoneMiniPlayerSpec() = LandscapePhoneMiniPlayerSpec(
     showNextProgramme = false,
 )
 
+private val TabletLandscapeVideoWidth = 380.dp
+private val TabletLandscapeVideoHeight = 214.dp
+
 internal fun liveTvMiniPlayerLayout(
     isTouchDevice: Boolean,
     smallestScreenWidthDp: Int,
     screenWidthDp: Int,
     screenHeightDp: Int,
 ): LiveTvMiniPlayerLayout = when {
-    !isTouchDevice || smallestScreenWidthDp >= 600 -> LiveTvMiniPlayerLayout.STANDARD
+    !isTouchDevice -> LiveTvMiniPlayerLayout.STANDARD
+    screenWidthDp >= 900 && screenWidthDp > screenHeightDp ->
+        LiveTvMiniPlayerLayout.TABLET_LANDSCAPE
+    smallestScreenWidthDp >= 600 -> LiveTvMiniPlayerLayout.STANDARD
     screenWidthDp > screenHeightDp -> LiveTvMiniPlayerLayout.LANDSCAPE_COMPACT
     else -> LiveTvMiniPlayerLayout.PORTRAIT_STACKED
 }
@@ -101,6 +108,7 @@ fun MiniPlayerRow(
     onOpenVariants: (() -> Unit)? = null,
     compact: Boolean = false,
     landscapeCompact: Boolean = false,
+    tabletLandscape: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (landscapeCompact) {
@@ -164,6 +172,7 @@ fun MiniPlayerRow(
             VideoCard(
                 exoPlayer = exoPlayer,
                 channel = channel,
+                tabletLandscape = tabletLandscape,
                 onFullscreenClick = onFullscreenClick,
             )
             InfoColumn(
@@ -174,7 +183,13 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
-                modifier = Modifier.weight(1f),
+                tabletLandscape = tabletLandscape,
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (tabletLandscape) Modifier.height(TabletLandscapeVideoHeight)
+                        else Modifier
+                    ),
             )
         }
     }
@@ -187,6 +202,7 @@ private fun VideoCard(
     channel: EnrichedChannel?,
     compact: Boolean = false,
     landscapeCompact: Boolean = false,
+    tabletLandscape: Boolean = false,
     onFullscreenClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -200,6 +216,7 @@ private fun VideoCard(
                 when {
                     compact -> Modifier.aspectRatio(16f / 9f)
                     landscapeSpec != null -> Modifier.size(landscapeSpec.videoWidthDp.dp, landscapeSpec.videoHeightDp.dp)
+                    tabletLandscape -> Modifier.size(TabletLandscapeVideoWidth, TabletLandscapeVideoHeight)
                     else -> Modifier.size(LiveDims.MiniPlayerWidth, LiveDims.MiniPlayerHeight)
                 }
             )
@@ -317,8 +334,21 @@ private fun InfoColumn(
     variantCount: Int,
     onOpenVariants: (() -> Unit)?,
     landscapeCompact: Boolean = false,
+    tabletLandscape: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    if (tabletLandscape) {
+        TabletLandscapeInfoPanel(
+            channel = channel,
+            clockTickMillis = clockTickMillis,
+            nowNext = nowNext,
+            isFavorite = isFavorite,
+            variantCount = variantCount,
+            onOpenVariants = onOpenVariants,
+            modifier = modifier,
+        )
+        return
+    }
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(if (landscapeCompact) 5.dp else 8.dp),
@@ -326,6 +356,147 @@ private fun InfoColumn(
         ChannelIdentityRow(channel = channel, variantCount = variantCount, onOpenVariants = onOpenVariants)
         NowCard(channel = channel, clockTickMillis = clockTickMillis, nowNext = nowNext, landscapeCompact = landscapeCompact)
         if (!landscapeCompact) NextRow(nowNext = nowNext)
+    }
+}
+
+internal fun tabletUpcomingPrograms(nowNext: IptvNowNext?): List<IptvProgram> =
+    (listOfNotNull(nowNext?.next, nowNext?.later) + nowNext?.upcoming.orEmpty())
+        .distinctBy { program -> program.startUtcMillis to program.title }
+        .sortedBy(IptvProgram::startUtcMillis)
+        .take(2)
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun TabletLandscapeInfoPanel(
+    channel: EnrichedChannel?,
+    clockTickMillis: Long,
+    nowNext: IptvNowNext?,
+    isFavorite: Boolean,
+    variantCount: Int,
+    onOpenVariants: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val now = nowNext?.now
+    val upcoming = tabletUpcomingPrograms(nowNext)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .clip(RoundedCornerShape(18.dp))
+            .background(LiveColors.Panel)
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = channel?.name ?: "—",
+                    style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 12.sp),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                channel?.source?.group?.takeIf { it.isNotBlank() }?.let { group ->
+                    Text(
+                        text = liveCategoryLabel(group),
+                        style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 9.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (variantCount > 1) {
+                    SourceBadge(variantCount, onOpenVariants)
+                }
+            }
+            if (isFavorite) {
+                Text("★", style = LiveType.ChannelName.copy(color = LiveColors.Accent, fontSize = 13.sp))
+            }
+            if (channel != null) {
+                ChannelLogo(channel = channel, size = 36.dp, showBackground = false, imagePadding = 1.dp)
+            } else {
+                Spacer(Modifier.size(36.dp))
+            }
+        }
+
+        Box(Modifier.fillMaxWidth().height(1.dp).background(LiveColors.Divider))
+
+        Text(
+            text = stringResource(R.string.live_badge_now),
+            style = LiveType.SectionTag.copy(color = LiveColors.Accent),
+        )
+        Text(
+            text = now?.title ?: stringResource(R.string.live_empty_no_programme),
+            style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+        val description = now?.description?.takeIf { it.isNotBlank() }
+            ?: if (now == null) stringResource(R.string.live_empty_no_programme_description) else null
+        if (!description.isNullOrBlank()) {
+            Text(
+                text = description,
+                style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
+                maxLines = 4,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        if (now != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(formatTimeWindow(now), style = LiveType.TimeMono.copy(color = LiveColors.FgMute))
+                val remaining = remainingLabel(now)
+                if (remaining.isNotBlank()) {
+                    Text("·", style = LiveType.TimeMono.copy(color = LiveColors.FgMute))
+                    Text(remaining, style = LiveType.TimeMono.copy(color = LiveColors.Accent))
+                }
+            }
+            progressOf(now)?.let { progress ->
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(999.dp)),
+                    color = LiveColors.Accent,
+                    trackColor = LiveColors.Panel,
+                )
+            }
+        }
+
+        if (upcoming.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.live_label_upcoming).uppercase(),
+                style = LiveType.SectionTag.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+            )
+            upcoming.forEach { program ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = formatClock(program.startUtcMillis),
+                        style = LiveType.TimeMono.copy(color = LiveColors.Accent, fontSize = 9.sp),
+                        modifier = Modifier.width(40.dp),
+                    )
+                    Text(
+                        text = program.title,
+                        style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 9.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Text(
+                        text = stringResource(
+                            R.string.live_label_starts_in_min,
+                            ((program.startUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L),
+                        ),
+                        style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+                    )
+                }
+            }
+        }
     }
 }
 

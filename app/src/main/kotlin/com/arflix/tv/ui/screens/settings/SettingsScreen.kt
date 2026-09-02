@@ -462,6 +462,9 @@ fun SettingsScreen(
     var iptvEditUrl by remember { mutableStateOf("") }
     var iptvEditEpg by remember { mutableStateOf("") }
     var iptvEditEnabled by remember { mutableStateOf(true) }
+    var iptvEditImportLiveTv by remember { mutableStateOf(true) }
+    var iptvEditImportVod by remember { mutableStateOf(true) }
+    var iptvEditImportSeries by remember { mutableStateOf(true) }
     var iptvEditXtreamUser by remember { mutableStateOf("") }
     var iptvEditXtreamPass by remember { mutableStateOf("") }
     var showCatalogInput by remember { mutableStateOf(false) }
@@ -508,7 +511,7 @@ fun SettingsScreen(
                     groupOrder = uiState.iptvGroupOrder
                 ).size // Reset row + category rows
             } else {
-                4 + uiState.iptvPlaylists.size // Add + rows + order + refresh + clear + special categories
+                5 + uiState.iptvPlaylists.size // Add + rows + order + IPTV-only + refresh + clear + special categories
             }
             "home_server" -> uiState.homeServerConnections.size + 3
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
@@ -694,6 +697,9 @@ fun SettingsScreen(
             iptvEditUrl = ""
             iptvEditEpg = ""
             iptvEditEnabled = true
+            iptvEditImportLiveTv = true
+            iptvEditImportVod = true
+            iptvEditImportSeries = true
             iptvEditXtreamUser = ""
             iptvEditXtreamPass = ""
         } else {
@@ -725,6 +731,9 @@ fun SettingsScreen(
             }
             iptvEditEpg = playlist?.settingsEpgInput().orEmpty()
             iptvEditEnabled = playlist?.enabled ?: true
+            iptvEditImportLiveTv = playlist?.importLiveTv ?: true
+            iptvEditImportVod = playlist?.importVod ?: true
+            iptvEditImportSeries = playlist?.importSeries ?: true
         }
     }
 
@@ -1154,12 +1163,15 @@ fun SettingsScreen(
                                                     viewModel.setIptvSortOrder(next)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 2 -> {
-                                                    viewModel.refreshIptv(force = true)
+                                                    viewModel.setIptvOnlyMode(!uiState.iptvOnlyMode)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
-                                                    viewModel.clearIptvConfig()
+                                                    viewModel.refreshIptv(force = true)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 4 -> {
+                                                    viewModel.clearIptvConfig()
+                                                }
+                                                contentFocusIndex == uiState.iptvPlaylists.size + 5 -> {
                                                     viewModel.setIptvShowSpecialCategories(!uiState.iptvShowSpecialCategories)
                                                 }
                                             }
@@ -1726,6 +1738,8 @@ fun SettingsScreen(
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
+                            iptvOnlyMode = uiState.iptvOnlyMode,
+                            onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                             sortOrder = uiState.iptvSortOrder,
                             onSortOrderChange = { viewModel.setIptvSortOrder(it) }
@@ -1774,6 +1788,8 @@ fun SettingsScreen(
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
+                            iptvOnlyMode = uiState.iptvOnlyMode,
+                            onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                             sortOrder = uiState.iptvSortOrder,
                             onSortOrderChange = { viewModel.setIptvSortOrder(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
@@ -2075,6 +2091,23 @@ fun SettingsScreen(
                         onValueChange = { iptvEditEpg = it }
                     )
                 ),
+                toggleFields = if (isStreamNetTvEditor) emptyList() else listOf(
+                    ToggleField(
+                        label = stringResource(R.string.live),
+                        value = iptvEditImportLiveTv,
+                        onValueChange = { iptvEditImportLiveTv = it }
+                    ),
+                    ToggleField(
+                        label = stringResource(R.string.movies),
+                        value = iptvEditImportVod,
+                        onValueChange = { iptvEditImportVod = it }
+                    ),
+                    ToggleField(
+                        label = stringResource(R.string.series),
+                        value = iptvEditImportSeries,
+                        onValueChange = { iptvEditImportSeries = it }
+                    )
+                ),
                 onConfirm = {
                     if (isStreamNetTvEditor) {
                         viewModel.activateStreamNetTvPlaylist(
@@ -2112,7 +2145,10 @@ fun SettingsScreen(
                         m3uUrl = finalM3uUrl,
                         epgUrl = finalEpgUrls.firstOrNull().orEmpty(),
                         enabled = iptvEditEnabled,
-                        epgUrls = finalEpgUrls
+                        epgUrls = finalEpgUrls,
+                        importLiveTv = iptvEditImportLiveTv,
+                        importVod = iptvEditImportVod,
+                        importSeries = iptvEditImportSeries
                     )
                     if (editingIptvIndex in updated.indices) updated[editingIptvIndex] = entry else updated.add(entry)
                     viewModel.saveIptvPlaylists(updated)
@@ -5178,6 +5214,8 @@ private fun MobileSettingsSubPage(
                         onNavigate("IPTV_CATEGORIES")
                     },
                     showSpecialCategories = uiState.iptvShowSpecialCategories,
+                    iptvOnlyMode = uiState.iptvOnlyMode,
+                    onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                     onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                     sortOrder = uiState.iptvSortOrder,
                     onSortOrderChange = { viewModel.setIptvSortOrder(it) }
@@ -7393,8 +7431,10 @@ private fun IptvSettings(
     onDelete: () -> Unit,
     onManageCategories: (String) -> Unit = {},
     showSpecialCategories: Boolean = true,
+    iptvOnlyMode: Boolean = true,
     sortOrder: String = "provider",
     onSortOrderChange: (String) -> Unit = {},
+    onIptvOnlyModeChange: (Boolean) -> Unit = {},
     onShowSpecialCategoriesChange: (Boolean) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
@@ -7501,6 +7541,14 @@ private fun IptvSettings(
                     }
                 )
                 MobileSettingsRow(
+                    icon = Icons.Default.LiveTv,
+                    title = stringResource(R.string.settings_iptv_only_mode_title),
+                    subtitle = stringResource(R.string.settings_iptv_only_mode_subtitle),
+                    value = if (iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
+                    isFocused = false,
+                    onClick = { onIptvOnlyModeChange(!iptvOnlyMode) }
+                )
+                MobileSettingsRow(
                     icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                     title = stringResource(R.string.settings_iptv_special_categories_title),
                     subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
@@ -7604,19 +7652,29 @@ private fun IptvSettings(
                 modifier = Modifier.settingsFocusSlot(playlists.size + 1)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
-            SettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.settings_badge_loading) else stringResource(R.string.settings_badge_refresh), isFocused = focusedIndex == playlists.size + 2, onClick = onRefresh, modifier = Modifier.settingsFocusSlot(playlists.size + 2))
+            SettingsRow(
+                icon = Icons.Default.LiveTv,
+                title = stringResource(R.string.settings_iptv_only_mode_title),
+                subtitle = stringResource(R.string.settings_iptv_only_mode_subtitle),
+                value = if (iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
+                isFocused = focusedIndex == playlists.size + 2,
+                onClick = { onIptvOnlyModeChange(!iptvOnlyMode) },
+                modifier = Modifier.settingsFocusSlot(playlists.size + 2)
+            )
             Spacer(modifier = Modifier.height(16.dp))
-            SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 3, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 3))
+            val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
+            SettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.settings_badge_loading) else stringResource(R.string.settings_badge_refresh), isFocused = focusedIndex == playlists.size + 3, onClick = onRefresh, modifier = Modifier.settingsFocusSlot(playlists.size + 3))
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 4, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 4))
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(
                 icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                 title = stringResource(R.string.settings_iptv_special_categories_title),
                 subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
                 value = if (showSpecialCategories) stringResource(R.string.on) else stringResource(R.string.off),
-                isFocused = focusedIndex == playlists.size + 4,
+                isFocused = focusedIndex == playlists.size + 5,
                 onClick = { onShowSpecialCategoriesChange(!showSpecialCategories) },
-                modifier = Modifier.settingsFocusSlot(playlists.size + 4)
+                modifier = Modifier.settingsFocusSlot(playlists.size + 5)
             )
             if (isLoading && !progressText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
@@ -10588,6 +10646,12 @@ data class InputField(
     val onValueChange: (String) -> Unit
 )
 
+data class ToggleField(
+    val label: String,
+    val value: Boolean,
+    val onValueChange: (Boolean) -> Unit
+)
+
 private fun IptvPlaylistEntry.settingsEpgInput(): String {
     return (epgUrls.orEmpty().ifEmpty { listOf(epgUrl) })
         .map { it.trim() }
@@ -10885,12 +10949,14 @@ private fun InputModal(
     title: String,
     supportingText: String? = null,
     fields: List<InputField>,
+    toggleFields: List<ToggleField> = emptyList(),
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var focusedIndex by remember(title, fields.size) { mutableIntStateOf(0) }
+    var focusedIndex by remember(title, fields.size, toggleFields.size) { mutableIntStateOf(0) }
     var lastFocusedFieldIndex by remember(title, fields.size) { mutableStateOf<Int?>(null) }
-    val totalItems = fields.size + 3 // inputs + paste + cancel + confirm
+    val pasteIndex = fields.size + toggleFields.size
+    val totalItems = pasteIndex + 3 // inputs + toggles + paste + cancel + confirm
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
     val maxDialogHeight = (screenHeightDp * 0.88f).coerceAtMost(if (isTouchDevice) 620.dp else 660.dp)
@@ -11036,11 +11102,11 @@ private fun InputModal(
                                     true
                                 }
                                 Key.DirectionLeft -> {
-                                    if (focusedIndex == fields.size + 2) focusedIndex = fields.size + 1
+                                    if (focusedIndex == pasteIndex + 2) focusedIndex = pasteIndex + 1
                                     true
                                 }
                                 Key.DirectionRight -> {
-                                    if (focusedIndex == fields.size + 1) focusedIndex = fields.size + 2
+                                    if (focusedIndex == pasteIndex + 1) focusedIndex = pasteIndex + 2
                                     true
                                 }
                                 Key.Enter, Key.DirectionCenter -> {
@@ -11049,16 +11115,21 @@ private fun InputModal(
                                             showKeyboardFor(focusedIndex)
                                             true
                                         }
-                                        focusedIndex == fields.size -> {
+                                        focusedIndex in fields.size until pasteIndex -> {
+                                            val toggle = toggleFields[focusedIndex - fields.size]
+                                            toggle.onValueChange(!toggle.value)
+                                            true
+                                        }
+                                        focusedIndex == pasteIndex -> {
                                             pasteClipboardIntoTarget()
                                             true
                                         }
-                                        focusedIndex == fields.size + 1 -> {
+                                        focusedIndex == pasteIndex + 1 -> {
                                             hideKeyboardAll()
                                             onDismiss()
                                             true
                                         }
-                                        focusedIndex == fields.size + 2 -> {
+                                        focusedIndex == pasteIndex + 2 -> {
                                             hideKeyboardAll()
                                             onConfirm()
                                             true
@@ -11258,10 +11329,54 @@ private fun InputModal(
                             }
                         }
                     }
+                    if (fields.isNotEmpty() && toggleFields.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                    }
+                    toggleFields.forEachIndexed { index, field ->
+                        val itemIndex = fields.size + index
+                        val isFocused = focusedIndex == itemIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(
+                                    if (isFocused) accentColor.copy(alpha = 0.14f) else BackgroundElevated,
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .border(
+                                    if (isFocused) 2.dp else 1.dp,
+                                    if (isFocused) accentColor else Color.White.copy(alpha = 0.14f),
+                                    RoundedCornerShape(6.dp)
+                                )
+                                .clickable { field.onValueChange(!field.value) }
+                                .padding(horizontal = 14.dp, vertical = 11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = field.label,
+                                style = ArflixTypography.body,
+                                color = if (isFocused) TextPrimary else TextSecondary,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .height(24.dp)
+                                    .background(
+                                        if (field.value) accentColor else Color.White.copy(alpha = 0.2f),
+                                        RoundedCornerShape(13.dp)
+                                    )
+                                    .padding(3.dp),
+                                contentAlignment = if (field.value) Alignment.CenterEnd else Alignment.CenterStart
+                            ) {
+                                Box(Modifier.size(18.dp).background(Color.White, RoundedCornerShape(10.dp)))
+                            }
+                        }
+                        if (index < toggleFields.lastIndex) Spacer(modifier = Modifier.height(8.dp))
+                    }
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                val isPasteFocused = focusedIndex == fields.size
+                val isPasteFocused = focusedIndex == pasteIndex
                 val fieldFallbackLabel = stringResource(R.string.settings_field_fallback)
                 val pasteTargetLabel = fields.getOrNull(pasteTargetIndex())
                     ?.label
@@ -11311,7 +11426,7 @@ private fun InputModal(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val isCancelFocused = focusedIndex == fields.size + 1
+                    val isCancelFocused = focusedIndex == pasteIndex + 1
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -11338,7 +11453,7 @@ private fun InputModal(
                         }
                     }
 
-                    val isConfirmFocused = focusedIndex == fields.size + 2
+                    val isConfirmFocused = focusedIndex == pasteIndex + 2
                     Box(
                         modifier = Modifier
                             .weight(1f)

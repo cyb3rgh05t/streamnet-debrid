@@ -24,4 +24,9 @@ class ProfileAccentColorTest {
 
         assertThat(readProfileAccentColor(preferences, "primary")).isEqualTo("Violet")
     }
+
+    @Test
+    fun `fresh profile uses Orange immediately`() {
+        assertThat(readProfileAccentColor(mutablePreferencesOf(), "primary")).isEqualTo("Orange")
+    }
 }

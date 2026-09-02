@@ -102,9 +102,11 @@ import com.arflix.tv.data.repository.LauncherContinueWatchingRequest
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.ProfileRepository
+import com.arflix.tv.data.repository.StreamRepository
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
+import com.arflix.tv.data.repository.isEnabledVodStreamingAddon
 import com.arflix.tv.data.repository.toLauncherContinueWatchingRequest
 import com.arflix.tv.navigation.AppNavigation
 import com.arflix.tv.navigation.Screen
@@ -164,6 +166,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var mediaRepository: Lazy<MediaRepository>
+
+    @Inject
+    lateinit var streamRepository: Lazy<StreamRepository>
 
     // Prefetch IPTV early so the TV screen opens without a loading stall.
     // IptvRepository is @Singleton; touching it at activity start warms the
@@ -301,13 +306,17 @@ class MainActivity : ComponentActivity() {
                     this@MainActivity.settingsDataStore.data.first()[SKIP_PROFILE_SELECTION_KEY] ?: false
                 if (skipSelection) {
                     val profiles = profileRepository.get()
-                    val activeProfile = profiles.getActiveProfile()
+                    var activeProfile = profiles.getActiveProfile()
                     if (activeProfile == null) {
                         val fallbackProfile = profiles.getProfiles().maxByOrNull { it.lastUsedAt }
                             ?: profiles.createDefaultProfileIfNeeded()
                         if (fallbackProfile != null) {
                             profiles.setActiveProfile(fallbackProfile.id)
+                            activeProfile = fallbackProfile
                         }
+                    }
+                    activeProfile?.let { profile ->
+                        traktRepository.get().preloadContinueWatchingForProfile(profile.id)
                     }
                 }
                 skipProfileSelection = skipSelection
@@ -322,7 +331,15 @@ class MainActivity : ComponentActivity() {
                 this@MainActivity.settingsDataStore.data.map { preferences ->
                     readProfileAccentColor(preferences, activeProfileId)
                 }
-            }.collectAsStateWithLifecycle(initialValue = null)
+            }.collectAsStateWithLifecycle(initialValue = "Orange")
+            LaunchedEffect(activeProfileId) {
+                if (activeProfileId.isNullOrBlank()) return@LaunchedEffect
+                streamRepository.get().installedAddons.collect { addons ->
+                    iptvRepository.get().reconcileIptvOnlyModeWithVodAddons(
+                        hasVodAddon = addons.any(::isEnabledVodStreamingAddon)
+                    )
+                }
+            }
             val appLanguage by remember(activeProfileId) {
                 this@MainActivity.settingsDataStore.data.map { prefs ->
                     val fallbackLanguage = prefs[LAST_APP_LANGUAGE_KEY] ?: "de-DE"

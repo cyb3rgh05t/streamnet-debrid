@@ -8,15 +8,18 @@
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
     <style>
       :root {
-        --bg: #0f0d0b;
-        --surface: #171311;
-        --surface-raised: #201a15;
-        --line: rgba(255, 255, 255, 0.1);
-        --line-strong: rgba(229, 162, 9, 0.3);
+        --bg-1: #0f0d0b;
+        --bg-2: #171311;
+        --bg-3: #221b16;
+        --surface: #1c1713;
+        --surface-raised: #15110e;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-strong: rgba(229, 162, 9, 0.26);
         --text: #f4efe7;
         --muted: #b4a798;
         --accent: #e5a209;
         --accent-2: #ce8017;
+        --shadow: rgba(0, 0, 0, 0.42);
       }
 
       * {
@@ -35,45 +38,62 @@
             rgba(229, 162, 9, 0.12),
             transparent 26%
           ),
-          linear-gradient(145deg, #090807, var(--bg) 45%, #18110c);
-        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+          linear-gradient(160deg, var(--bg-1), var(--bg-2) 62%, var(--bg-3));
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
         letter-spacing: 0;
+        overflow-x: hidden;
+        padding: 28px;
       }
       a {
         color: var(--accent);
       }
       .topbar {
-        position: sticky;
-        top: 0;
-        z-index: 2;
-        border-bottom: 1px solid var(--line);
-        background: rgba(12, 10, 8, 0.92);
-        backdrop-filter: blur(12px);
-      }
-      .topbar-inner,
-      .page {
-        width: min(100% - 36px, 1040px);
-        margin: 0 auto;
-      }
-      .topbar-inner {
-        min-height: 76px;
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 16px;
+        justify-content: flex-end;
+      }
+      .page {
+        width: 100%;
+        max-width: 1180px;
+        margin: 0 auto;
+        display: grid;
+        gap: 12px;
       }
       .brand {
-        width: 190px;
+        width: min(290px, 100%);
         height: auto;
         display: block;
       }
+      .shell {
+        width: 100%;
+        padding: 40px;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background:
+          linear-gradient(180deg, rgba(229, 162, 9, 0.06), transparent 18%),
+          var(--surface);
+        box-shadow:
+          0 28px 70px -34px rgba(0, 0, 0, 0.86),
+          0 8px 18px -12px var(--shadow);
+      }
+      .brand-link {
+        display: inline-block;
+        margin-bottom: 32px;
+      }
       .lang-switch {
+        align-items: center;
         display: inline-flex;
         gap: 4px;
         padding: 4px;
-        border: 1px solid var(--line-strong);
+        border: 1px solid var(--line);
         border-radius: 999px;
-        background: #100d0b;
+        background: rgba(255, 255, 255, 0.03);
       }
       .lang-btn {
         min-width: 50px;
@@ -87,11 +107,8 @@
         cursor: pointer;
       }
       .lang-btn[aria-pressed="true"] {
-        color: #130f0b;
-        background: var(--accent);
-      }
-      .page {
-        padding: 54px 0 80px;
+        color: #17120f;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
       }
       .hero {
         padding-bottom: 34px;
@@ -125,13 +142,14 @@
       .policy {
         display: grid;
         gap: 18px;
+        min-width: 0;
       }
       section.card,
       aside {
         border: 1px solid var(--line);
-        border-radius: 14px;
-        background: rgba(23, 19, 17, 0.86);
-        box-shadow: 0 18px 48px rgba(0, 0, 0, 0.32);
+        border-radius: 18px;
+        background: var(--surface);
+        box-shadow: 0 18px 48px var(--shadow);
       }
       section.card {
         padding: 24px;
@@ -156,9 +174,9 @@
       }
       table {
         width: 100%;
+        max-width: 100%;
         border-collapse: collapse;
         margin-top: 14px;
-        overflow: hidden;
         border-radius: 10px;
       }
       th,
@@ -212,23 +230,81 @@
           position: static;
         }
         .brand {
-          width: 158px;
+          width: 220px;
         }
         section.card {
           padding: 20px;
         }
       }
+      @media (max-width: 560px) {
+        body {
+          padding: 14px;
+        }
+        .brand {
+          width: 190px;
+        }
+        .shell {
+          padding: 24px 16px 28px;
+          border-radius: 18px;
+        }
+        .brand-link {
+          margin-bottom: 24px;
+        }
+        .hero {
+          padding-bottom: 24px;
+        }
+        h1 {
+          font-size: 28px;
+          overflow-wrap: normal;
+        }
+        .content {
+          gap: 18px;
+          padding-top: 24px;
+        }
+        section.card,
+        aside {
+          min-width: 0;
+          border-radius: 14px;
+        }
+        section.card {
+          padding: 18px 16px;
+          overflow-x: auto;
+          overscroll-behavior-inline: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+        h2 {
+          font-size: 19px;
+          overflow-wrap: anywhere;
+        }
+        p,
+        li {
+          font-size: 14px;
+          overflow-wrap: anywhere;
+        }
+        table {
+          min-width: 660px;
+        }
+        th,
+        td {
+          padding: 10px;
+          font-size: 13px;
+        }
+        aside {
+          padding: 16px;
+        }
+        .quicklinks {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .quicklinks a {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+      }
     </style>
   </head>
   <body>
-    <header class="topbar">
-      <div class="topbar-inner">
-        <a href="/"
-          ><img
-            class="brand"
-            src="/assets/streamnet-club-logo.svg"
-            alt="StreamNet Club"
-        /></a>
+    <div class="page">
+      <div class="topbar">
         <div class="lang-switch" role="group" aria-label="Language switch">
           <button
             class="lang-btn"
@@ -248,722 +324,747 @@
           </button>
         </div>
       </div>
-    </header>
 
-    <main class="page">
-      <div id="policy-en">
-        <header class="hero">
-          <p class="eyebrow">Privacy Policy</p>
-          <h1>StreamNet TV Privacy Policy</h1>
-          <p class="updated">Last updated: August 19, 2026</p>
-        </header>
-        <div class="content">
-          <article class="policy">
-            <section class="card" id="en-scope">
-              <h2>1. Scope And Controller</h2>
-              <p>
-                This policy explains how the StreamNet TV project processes
-                personal data in the Android app and StreamNet Cloud account
-                portal. StreamNet TV is an open-source media hub and does not
-                host, sell, or distribute movies, series, live TV channels,
-                playlists, or third-party streams.
-              </p>
-              <p>
-                The StreamNet TV project owner is the data controller for
-                StreamNet Cloud, the account portal, first-party usage
-                measurements, and first-party website services. Third-party
-                services that you connect may act as separate controllers under
-                their own privacy policies.
-              </p>
-              <p>
-                For privacy requests, use the secure account deletion page at
-                <a href="/delete-account"
-                  >auth.mystreamnet.club/delete-account</a
-                >
-                or contact the project through
-                <a href="https://github.com/cyb3rgh05t/streamnet-debrid"
-                  >GitHub</a
-                >. Do not put passwords, tokens, identity documents, or other
-                sensitive data in a public GitHub issue.
-              </p>
-            </section>
-            <section class="card" id="en-local">
-              <h2>2. Data Stored Only On Your Device</h2>
-              <p>
-                StreamNet TV can store profiles, preferences, playback progress,
-                watch history, watchlist entries, addon configuration, IPTV
-                configuration, home-server configuration, caches, and
-                authorization tokens locally on your device. This local data is
-                not received by StreamNet TV unless you enable a cloud feature,
-                send a diagnostic report, or connect a third-party service that
-                needs it.
-              </p>
-              <p>
-                You can remove local data by using the relevant in-app controls,
-                clearing Android app data, or uninstalling the app.
-              </p>
-            </section>
-            <section class="card" id="en-cloud">
-              <h2>3. StreamNet Cloud Account And Sync</h2>
-              <p>
-                Creating a StreamNet Cloud account processes your email address,
-                account identifier, password hash, authentication sessions,
-                password-reset records, profiles, settings, catalog order, addon
-                configuration, IPTV configuration, watchlist, watch history,
-                playback progress, and other data you choose to sync. Security
-                and operational information such as timestamps, request
-                metadata, and IP address can appear in infrastructure logs.
-              </p>
-              <p>
-                StreamNet TV stores a one-way password hash, not your plain-text
-                password. StreamNet Cloud is optional; the Android app can be
-                used without a StreamNet Cloud account.
-              </p>
-              <p>
-                The legal basis for account authentication and requested cloud
-                sync is performance of the service you request (GDPR Article
-                6(1)(b)). Security, abuse prevention, reliability, and limited
-                operational logging are based on StreamNet TV's legitimate
-                interests in operating and protecting the service (Article
-                6(1)(f)).
-              </p>
-            </section>
-            <section class="card" id="en-measurement">
-              <h2>4. Diagnostics And Usage Measurement</h2>
-              <p>
-                Release builds can send limited diagnostics and usage
-                information when Share diagnostics and usage is enabled in
-                Settings. This is a device-local choice and is not cloud-synced.
-              </p>
-              <p>
-                Crash diagnostics can include crash stack traces, exception
-                details, app version and build, device model, Android version,
-                and limited diagnostic breadcrumbs. StreamNet TV disables
-                default PII collection, screenshots, view hierarchy, network
-                breadcrumbs, and user-interaction breadcrumbs. Diagnostic logs
-                are sanitized, but exception text and transport metadata can
-                still contain personal data such as an IP address.
-              </p>
-              <p>
-                At most once per 24 hours, StreamNet TV can send an app_open
-                event containing a random install identifier, app version,
-                Android API level, device type, distribution type, and
-                account/profile identifiers when signed in. Direct identifiers
-                are converted into keyed pseudonymous values before storage.
-                This is used only to estimate active use and release adoption,
-                not for advertising or user profiling.
-              </p>
-              <p>
-                StreamNet no longer relies on Netlify for the primary production
-                account portal and sync backend. Any legacy Netlify/Supabase
-                services kept during rollback testing are not used for the
-                normal production sync path.
-              </p>
-              <p>
-                If optional membership or entitlement features are used,
-                StreamNet records a small set of service events such as viewing
-                membership information, starting a trial, opening checkout,
-                linking a membership, and completing first successful playback.
-                Ko-fi separately handles payment details under its own privacy
-                policy.
-              </p>
-              <p>
-                When you deliberately start a StreamNet Cloud trial, StreamNet
-                sends only three service messages: trial confirmation, one
-                reminder before expiry, and one final expiry notice. The
-                temporary delivery queue stores the email address encrypted and
-                is not a general marketing mailing list.
-              </p>
-            </section>
-            <section class="card" id="en-third">
-              <h2>5. Optional Third-Party Services</h2>
-              <p>Data is sent to services you deliberately use or connect:</p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Service</th>
-                    <th>Purpose</th>
-                    <th>Privacy policy</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Self-hosted StreamNet backend</td>
-                    <td>
-                      Account portal, cloud sync, TV pairing, Discord pairing
-                      session handoff, and account deletion
-                    </td>
-                    <td>This policy</td>
-                  </tr>
-                  <tr>
-                    <td>Resend</td>
-                    <td>
-                      Account verification and password-reset email delivery
-                      when configured
-                    </td>
-                    <td>
-                      <a href="https://resend.com/legal/privacy-policy"
-                        >resend.com/legal/privacy-policy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Sentry</td>
-                    <td>Crash reporting and diagnostics when enabled</td>
-                    <td>
-                      <a href="https://sentry.io/privacy">sentry.io/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Firebase Crashlytics</td>
-                    <td>Crash-reporting fallback in configured builds</td>
-                    <td>
-                      <a href="https://firebase.google.com/support/privacy"
-                        >firebase.google.com/support/privacy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>TMDB</td>
-                    <td>Movie and TV metadata and images</td>
-                    <td>
-                      <a href="https://www.themoviedb.org/privacy-policy"
-                        >themoviedb.org/privacy-policy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Trakt.tv</td>
-                    <td>
-                      Optional watch history, progress, ratings, and watchlist
-                      sync
-                    </td>
-                    <td>
-                      <a href="https://trakt.tv/privacy">trakt.tv/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Discord</td>
-                    <td>
-                      Optional Rich Presence login and the title/playback status
-                      you choose to display
-                    </td>
-                    <td>
-                      <a href="https://discord.com/privacy"
-                        >discord.com/privacy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Ko-fi</td>
-                    <td>Optional StreamNet Cloud membership verification</td>
-                    <td>
-                      <a href="https://ko-fi.com/privacy">ko-fi.com/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>User-configured services</td>
-                    <td>
-                      Addons, IPTV providers, Plex, Jellyfin, Emby, debrid
-                      services, and URLs you add
-                    </td>
-                    <td>Governed by the provider you configure</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p>
-                StreamNet TV sends only the data needed for the requested
-                integration. Third-party services may process data outside the
-                European Economic Area under their own transfer mechanisms and
-                terms.
-              </p>
-            </section>
-            <section class="card" id="en-retention">
-              <h2>6. Retention</h2>
-              <ul>
-                <li>
-                  Local data remains until you remove it, clear app data, or
-                  uninstall StreamNet TV.
-                </li>
-                <li>
-                  Cloud account and sync data remains while the account is
-                  active and is deleted when account deletion completes, except
-                  for a minimal record required to prove or secure the deletion.
-                </li>
-                <li>
-                  Stored first-party app-open events are retained for up to 31
-                  days.
-                </li>
-                <li>
-                  Pseudonymous Premium funnel events are retained for up to 90
-                  days.
-                </li>
-                <li>
-                  Completed Premium trial email jobs are removed within 14 days.
-                </li>
-                <li>
-                  Password-reset and device-pairing codes expire after a short
-                  operational period.
-                </li>
-                <li>
-                  Crash diagnostics follow the configured Sentry or Firebase
-                  retention period.
-                </li>
-                <li>
-                  Infrastructure security logs follow the hosting provider's
-                  operational retention schedule.
-                </li>
-              </ul>
-              <p>
-                StreamNet TV may keep data longer where required by law, to
-                resolve a dispute, or to prevent abuse, and will keep only what
-                is necessary.
-              </p>
-            </section>
-            <section class="card" id="en-security">
-              <h2>7. Security</h2>
-              <p>
-                StreamNet TV uses HTTPS for first-party cloud services and
-                supported APIs, hashes account passwords with a salted
-                memory-hard password function, limits crash-report contents, and
-                scopes cloud data to authenticated accounts. No system is
-                risk-free.
-              </p>
-              <p>
-                StreamNet TV also permits user-configured HTTP URLs for local
-                servers and IPTV providers because some private-network services
-                do not support HTTPS. Prefer HTTPS and only add services you
-                trust.
-              </p>
-            </section>
-            <section class="card" id="en-rights">
-              <h2>8. Your Rights</h2>
-              <p>
-                Depending on where you live, you may have the right to access,
-                correct, export, restrict, object to, or delete your personal
-                data, and to complain to your local data-protection authority.
-              </p>
-              <ul>
-                <li>
-                  Disable diagnostics and usage reporting in app Settings.
-                </li>
-                <li>
-                  Disconnect Trakt and other optional services in app Settings.
-                </li>
-                <li>
-                  Revoke StreamNet TV from the relevant third-party account.
-                </li>
-                <li>
-                  Delete your StreamNet Cloud account and synced data at
-                  <a href="/delete-account"
-                    >auth.mystreamnet.club/delete-account</a
-                  >.
-                </li>
-              </ul>
-              <p>
-                StreamNet TV may need to verify that a request concerns your
-                account before acting on it.
-              </p>
-            </section>
-            <section class="card" id="en-children">
-              <h2>9. Children's Privacy</h2>
-              <p>
-                StreamNet TV is not directed at children who cannot legally
-                manage their own online account in their country. StreamNet TV
-                does not knowingly create cloud accounts for such children
-                without authorization from a parent or guardian.
-              </p>
-            </section>
-            <section class="card" id="en-changes">
-              <h2>10. Changes</h2>
-              <p>
-                This policy may change when StreamNet TV's services or legal
-                obligations change. Material changes will be published with a
-                new date, and an in-app or account notice will be used when
-                appropriate.
-              </p>
-              <p>
-                <em
-                  >StreamNet TV is an open-source project licensed under Apache
-                  2.0.</em
-                >
-              </p>
-            </section>
-          </article>
-          <aside>
-            <h2>Quick Links</h2>
-            <nav class="quicklinks">
-              <a href="#en-cloud">Cloud Account</a
-              ><a href="#en-measurement">Diagnostics</a
-              ><a href="#en-third">Third Parties</a
-              ><a href="#en-rights">Your Rights</a
-              ><a href="/delete-account">Delete Account</a>
-            </nav>
-          </aside>
-        </div>
-      </div>
-
-      <div id="policy-de" class="hidden">
-        <header class="hero">
-          <p class="eyebrow">Datenschutzerklaerung</p>
-          <h1>StreamNet TV Datenschutzerklaerung</h1>
-          <p class="updated">Zuletzt aktualisiert: 19. August 2026</p>
-        </header>
-        <div class="content">
-          <article class="policy">
-            <section class="card" id="de-scope">
-              <h2>1. Geltungsbereich und Verantwortlicher</h2>
-              <p>
-                Diese Erklaerung beschreibt, wie das StreamNet TV Projekt
-                personenbezogene Daten in der Android-App und im StreamNet TV
-                Cloud-Kontoportal verarbeitet. StreamNet TV ist ein
-                Open-Source-Medienhub und hostet, verkauft oder verbreitet keine
-                Filme, Serien, Live-TV-Kanaele, Playlists oder
-                Drittanbieter-Streams.
-              </p>
-              <p>
-                Der Projektinhaber ist Verantwortlicher fuer StreamNet Cloud,
-                das Kontoportal, eigene Nutzungsmessungen und eigene Webdienste.
-                Verbundene Drittanbieter koennen eigenstaendige Verantwortliche
-                mit eigenen Datenschutzerklaerungen sein.
-              </p>
-              <p>
-                Fuer Datenschutzanfragen nutze die sichere Kontoloeschseite
-                unter
-                <a href="/delete-account"
-                  >auth.mystreamnet.club/delete-account</a
-                >
-                oder kontaktiere das Projekt ueber
-                <a href="https://github.com/cyb3rgh05t/streamnet-debrid"
-                  >GitHub</a
-                >. Bitte veroeffentliche keine Passwoerter, Tokens,
-                Ausweisdokumente oder andere sensible Daten in einem
-                oeffentlichen GitHub-Issue.
-              </p>
-            </section>
-            <section class="card" id="de-local">
-              <h2>2. Daten nur auf deinem Geraet</h2>
-              <p>
-                StreamNet TV kann Profile, Einstellungen, Wiedergabefortschritt,
-                Verlauf, Merkliste, Addon-Konfiguration, IPTV-Konfiguration,
-                Home-Server-Konfiguration, Caches und Autorisierungstokens lokal
-                auf deinem Geraet speichern. Diese lokalen Daten werden nicht an
-                StreamNet TV uebermittelt, ausser du aktivierst eine
-                Cloud-Funktion, sendest einen Diagnosebericht oder verbindest
-                einen Drittanbieter, der die Daten benoetigt.
-              </p>
-              <p>
-                Du kannst lokale Daten ueber die App-Steuerung, durch Loeschen
-                der Android-App-Daten oder durch Deinstallation entfernen.
-              </p>
-            </section>
-            <section class="card" id="de-cloud">
-              <h2>3. StreamNet Cloud-Konto und Sync</h2>
-              <p>
-                Beim Erstellen eines StreamNet Cloud-Kontos werden
-                E-Mail-Adresse, Konto-ID, Passwort-Hash, Sitzungen,
-                Passwort-Reset-Daten, Profile, Einstellungen,
-                Katalogreihenfolge, Addons, IPTV-Konfiguration, Merkliste,
-                Wiedergabeverlauf, Fortschritt und weitere von dir
-                synchronisierte Daten verarbeitet. Sicherheits- und
-                Betriebsdaten wie Zeitstempel, Request-Metadaten und IP-Adresse
-                koennen in Infrastruktur-Logs erscheinen.
-              </p>
-              <p>
-                StreamNet TV speichert einen Einweg-Passwort-Hash, nicht dein
-                Klartextpasswort. StreamNet Cloud ist optional; die Android-App
-                kann ohne Cloud-Konto genutzt werden.
-              </p>
-              <p>
-                Rechtsgrundlage fuer Authentifizierung und gewuenschten
-                Cloud-Sync ist die Vertragserfuellung bzw. Bereitstellung des
-                angeforderten Dienstes (Art. 6 Abs. 1 lit. b DSGVO). Sicherheit,
-                Missbrauchsschutz, Zuverlaessigkeit und begrenzte
-                Betriebsprotokolle beruhen auf berechtigten Interessen (Art. 6
-                Abs. 1 lit. f DSGVO).
-              </p>
-            </section>
-            <section class="card" id="de-measurement">
-              <h2>4. Diagnose und Nutzungsmessung</h2>
-              <p>
-                Release-Builds koennen begrenzte Diagnose- und Nutzungsdaten
-                senden, wenn Diagnose- und Nutzungsfreigabe in den Einstellungen
-                aktiviert ist. Diese Auswahl bleibt lokal auf dem Geraet und
-                wird nicht cloud-synchronisiert.
-              </p>
-              <p>
-                Crash-Diagnosen koennen Stacktraces, Ausnahmedetails,
-                App-Version, Build, Geraetemodell, Android-Version und begrenzte
-                Breadcrumbs enthalten. StreamNet TV deaktiviert
-                Standard-PII-Erfassung, Screenshots, View-Hierarchie,
-                Netzwerk-Breadcrumbs und Interaktions-Breadcrumbs.
-                Diagnoseprotokolle werden bereinigt, koennen aber in
-                Ausnahmefaellen personenbezogene Daten wie IP-Adressen
-                enthalten.
-              </p>
-              <p>
-                Hoechstens einmal pro 24 Stunden kann StreamNet TV ein
-                app_open-Ereignis mit zufaelliger Installations-ID, App-Version,
-                Android-API-Level, Geraetetyp, Distribution und
-                Konto-/Profilreferenzen senden. Direkte Kennungen werden vor
-                Speicherung pseudonymisiert. Die Messung dient nur aktiver
-                Nutzung und Release-Gesundheit, nicht Werbung oder
-                Profilbildung.
-              </p>
-              <p>
-                StreamNet nutzt fuer den produktiven Konto- und Sync-Betrieb
-                nicht mehr Netlify als primaeres Backend.
-                Legacy-Netlify/Supabase-Dienste koennen waehrend Rollback-Tests
-                bestehen bleiben, gehoeren aber nicht zum normalen
-                Produktions-Sync.
-              </p>
-              <p>
-                Bei optionalen Mitgliedschafts- oder Berechtigungsfunktionen
-                werden wenige Service-Ereignisse verarbeitet, z. B.
-                Mitgliedschaftsinformationen ansehen, Trial starten, Checkout
-                oeffnen, Mitgliedschaft verknuepfen und erste erfolgreiche
-                Wiedergabe. Ko-fi verarbeitet Zahlungsdaten separat nach eigener
-                Datenschutzerklaerung.
-              </p>
-              <p>
-                Wenn du bewusst einen Cloud-Trial startest, sendet StreamNet nur
-                drei Service-Nachrichten: Startbestaetigung, Erinnerung vor
-                Ablauf und Ablaufhinweis. Die temporaere Zustellwarteschlange
-                speichert die E-Mail-Adresse verschluesselt und ist keine
-                Marketingliste.
-              </p>
-            </section>
-            <section class="card" id="de-third">
-              <h2>5. Optionale Drittanbieter</h2>
-              <p>
-                Daten werden an Dienste gesendet, die du bewusst nutzt oder
-                verbindest:
-              </p>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Dienst</th>
-                    <th>Zweck</th>
-                    <th>Datenschutzerklaerung</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Self-hosted StreamNet Backend</td>
-                    <td>
-                      Kontoportal, Cloud-Sync, TV-Kopplung, Discord-Kopplung,
-                      Kontoloeschung
-                    </td>
-                    <td>Diese Erklaerung</td>
-                  </tr>
-                  <tr>
-                    <td>Resend</td>
-                    <td>
-                      Konto- und Passwort-Reset-E-Mails, falls konfiguriert
-                    </td>
-                    <td>
-                      <a href="https://resend.com/legal/privacy-policy"
-                        >resend.com/legal/privacy-policy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Sentry</td>
-                    <td>Crash-Reporting und Diagnose, wenn aktiviert</td>
-                    <td>
-                      <a href="https://sentry.io/privacy">sentry.io/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Firebase Crashlytics</td>
-                    <td>Crash-Reporting-Fallback in konfigurierten Builds</td>
-                    <td>
-                      <a href="https://firebase.google.com/support/privacy"
-                        >firebase.google.com/support/privacy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>TMDB</td>
-                    <td>Film- und Serienmetadaten sowie Bilder</td>
-                    <td>
-                      <a href="https://www.themoviedb.org/privacy-policy"
-                        >themoviedb.org/privacy-policy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Trakt.tv</td>
-                    <td>
-                      Optionale Synchronisierung von Verlauf, Fortschritt,
-                      Bewertungen und Merkliste
-                    </td>
-                    <td>
-                      <a href="https://trakt.tv/privacy">trakt.tv/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Discord</td>
-                    <td>
-                      Optionale Rich Presence Anmeldung und der von dir
-                      angezeigte Wiedergabestatus
-                    </td>
-                    <td>
-                      <a href="https://discord.com/privacy"
-                        >discord.com/privacy</a
-                      >
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Ko-fi</td>
-                    <td>Optionale StreamNet Cloud-Mitgliedschaftspruefung</td>
-                    <td>
-                      <a href="https://ko-fi.com/privacy">ko-fi.com/privacy</a>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Von dir konfigurierte Dienste</td>
-                    <td>
-                      Addons, IPTV-Anbieter, Plex, Jellyfin, Emby,
-                      Debrid-Dienste und eigene URLs
-                    </td>
-                    <td>Gilt nach den Bedingungen des jeweiligen Anbieters</td>
-                  </tr>
-                </tbody>
-              </table>
-              <p>
-                StreamNet TV sendet nur die fuer die angeforderte Integration
-                noetigen Daten. Drittanbieter koennen Daten ausserhalb des EWR
-                nach eigenen Regeln verarbeiten.
-              </p>
-            </section>
-            <section class="card" id="de-retention">
-              <h2>6. Aufbewahrung</h2>
-              <ul>
-                <li>
-                  Lokale Daten bleiben bis du sie entfernst, App-Daten loeschst
-                  oder StreamNet TV deinstallierst.
-                </li>
-                <li>
-                  Cloud-Konto- und Sync-Daten bleiben waehrend der
-                  Kontoaktivitaet und werden nach abgeschlossener Kontoloeschung
-                  entfernt, ausser ein minimaler Nachweis- oder
-                  Sicherheitsdatensatz ist erforderlich.
-                </li>
-                <li>App-open-Ereignisse werden bis zu 31 Tage gespeichert.</li>
-                <li>
-                  Pseudonyme Premium-Funnel-Ereignisse werden bis zu 90 Tage
-                  gespeichert.
-                </li>
-                <li>
-                  Abgeschlossene Trial-E-Mail-Jobs werden innerhalb von 14 Tagen
-                  entfernt.
-                </li>
-                <li>
-                  Passwort-Reset- und Geraetekopplungs-Codes laufen nach kurzer
-                  Betriebszeit ab.
-                </li>
-                <li>
-                  Crash-Diagnosen folgen der Sentry- oder Firebase-Aufbewahrung.
-                </li>
-                <li>
-                  Infrastruktur-Sicherheitslogs folgen der Aufbewahrung des
-                  Hosting-Anbieters.
-                </li>
-              </ul>
-              <p>
-                StreamNet TV kann Daten laenger aufbewahren, wenn dies
-                gesetzlich erforderlich ist, zur Streitbeilegung oder zur
-                Missbrauchsverhinderung, und nur soweit notwendig.
-              </p>
-            </section>
-            <section class="card" id="de-security">
-              <h2>7. Sicherheit</h2>
-              <p>
-                StreamNet TV nutzt HTTPS fuer eigene Cloud-Dienste und
-                unterstuetzte APIs, hasht Kontopasswoerter mit einer gesalzenen
-                speicherharten Funktion, begrenzt Crash-Report-Inhalte und
-                ordnet Cloud-Daten authentifizierten Konten zu. Kein System ist
-                risikofrei.
-              </p>
-              <p>
-                StreamNet TV erlaubt auch von Nutzern konfigurierte HTTP-URLs
-                fuer lokale Server und IPTV-Anbieter, weil manche privaten
-                Dienste kein HTTPS unterstuetzen. Bevorzuge HTTPS und fuege nur
-                vertrauenswuerdige Dienste hinzu.
-              </p>
-            </section>
-            <section class="card" id="de-rights">
-              <h2>8. Deine Rechte</h2>
-              <p>
-                Je nach Wohnort hast du Rechte auf Auskunft, Berichtigung,
-                Export, Einschraenkung, Widerspruch oder Loeschung deiner
-                personenbezogenen Daten sowie Beschwerde bei einer
-                Datenschutzaufsicht.
-              </p>
-              <ul>
-                <li>
-                  Diagnose- und Nutzungsfreigabe in den App-Einstellungen
-                  deaktivieren.
-                </li>
-                <li>
-                  Trakt und andere optionale Dienste in den App-Einstellungen
-                  trennen.
-                </li>
-                <li>
-                  StreamNet TV im jeweiligen Drittanbieter-Konto widerrufen.
-                </li>
-                <li>
-                  Dein StreamNet Cloud-Konto und synchronisierte Daten unter
+      <main class="shell">
+        <a class="brand-link" href="/"
+          ><img
+            class="brand"
+            src="/assets/streamnet-club-logo.svg"
+            alt="StreamNet Club"
+        /></a>
+        <div id="policy-en">
+          <header class="hero">
+            <p class="eyebrow">Privacy Policy</p>
+            <h1>StreamNet TV Privacy Policy</h1>
+            <p class="updated">Last updated: August 19, 2026</p>
+          </header>
+          <div class="content">
+            <article class="policy">
+              <section class="card" id="en-scope">
+                <h2>1. Scope And Controller</h2>
+                <p>
+                  This policy explains how the StreamNet TV project processes
+                  personal data in the Android app and StreamNet Cloud account
+                  portal. StreamNet TV is an open-source media hub and does not
+                  host, sell, or distribute movies, series, live TV channels,
+                  playlists, or third-party streams.
+                </p>
+                <p>
+                  The StreamNet TV project owner is the data controller for
+                  StreamNet Cloud, the account portal, first-party usage
+                  measurements, and first-party website services. Third-party
+                  services that you connect may act as separate controllers
+                  under their own privacy policies.
+                </p>
+                <p>
+                  For privacy requests, use the secure account deletion page at
                   <a href="/delete-account"
                     >auth.mystreamnet.club/delete-account</a
                   >
-                  loeschen.
-                </li>
-              </ul>
-              <p>
-                StreamNet TV muss ggf. pruefen, dass eine Anfrage dein Konto
-                betrifft.
-              </p>
-            </section>
-            <section class="card" id="de-children">
-              <h2>9. Datenschutz von Kindern</h2>
-              <p>
-                StreamNet TV richtet sich nicht an Kinder, die in ihrem Land
-                kein eigenes Online-Konto verwalten duerfen. StreamNet TV
-                erstellt wissentlich keine Cloud-Konten fuer solche Kinder ohne
-                Zustimmung eines Elternteils oder Vormunds.
-              </p>
-            </section>
-            <section class="card" id="de-changes">
-              <h2>10. Aenderungen</h2>
-              <p>
-                Diese Erklaerung kann sich aendern, wenn sich Dienste oder
-                rechtliche Pflichten von StreamNet TV aendern. Wesentliche
-                Aenderungen werden mit neuem Datum veroeffentlicht und bei
-                Bedarf in App oder Konto angezeigt.
-              </p>
-              <p>
-                <em
-                  >StreamNet TV ist ein Open-Source-Projekt unter Apache 2.0
-                  Lizenz.</em
-                >
-              </p>
-            </section>
-          </article>
-          <aside>
-            <h2>Schnellzugriff</h2>
-            <nav class="quicklinks">
-              <a href="#de-cloud">Cloud-Konto</a
-              ><a href="#de-measurement">Diagnose</a
-              ><a href="#de-third">Drittanbieter</a
-              ><a href="#de-rights">Deine Rechte</a
-              ><a href="/delete-account">Konto loeschen</a>
-            </nav>
-          </aside>
+                  or contact the project through
+                  <a href="https://github.com/cyb3rgh05t/streamnet-debrid"
+                    >GitHub</a
+                  >. Do not put passwords, tokens, identity documents, or other
+                  sensitive data in a public GitHub issue.
+                </p>
+              </section>
+              <section class="card" id="en-local">
+                <h2>2. Data Stored Only On Your Device</h2>
+                <p>
+                  StreamNet TV can store profiles, preferences, playback
+                  progress, watch history, watchlist entries, addon
+                  configuration, IPTV configuration, home-server configuration,
+                  caches, and authorization tokens locally on your device. This
+                  local data is not received by StreamNet TV unless you enable a
+                  cloud feature, send a diagnostic report, or connect a
+                  third-party service that needs it.
+                </p>
+                <p>
+                  You can remove local data by using the relevant in-app
+                  controls, clearing Android app data, or uninstalling the app.
+                </p>
+              </section>
+              <section class="card" id="en-cloud">
+                <h2>3. StreamNet Cloud Account And Sync</h2>
+                <p>
+                  Creating a StreamNet Cloud account processes your email
+                  address, account identifier, password hash, authentication
+                  sessions, password-reset records, profiles, settings, catalog
+                  order, addon configuration, IPTV configuration, watchlist,
+                  watch history, playback progress, and other data you choose to
+                  sync. Security and operational information such as timestamps,
+                  request metadata, and IP address can appear in infrastructure
+                  logs.
+                </p>
+                <p>
+                  StreamNet TV stores a one-way password hash, not your
+                  plain-text password. StreamNet Cloud is optional; the Android
+                  app can be used without a StreamNet Cloud account.
+                </p>
+                <p>
+                  The legal basis for account authentication and requested cloud
+                  sync is performance of the service you request (GDPR Article
+                  6(1)(b)). Security, abuse prevention, reliability, and limited
+                  operational logging are based on StreamNet TV's legitimate
+                  interests in operating and protecting the service (Article
+                  6(1)(f)).
+                </p>
+              </section>
+              <section class="card" id="en-measurement">
+                <h2>4. Diagnostics And Usage Measurement</h2>
+                <p>
+                  Release builds can send limited diagnostics and usage
+                  information when Share diagnostics and usage is enabled in
+                  Settings. This is a device-local choice and is not
+                  cloud-synced.
+                </p>
+                <p>
+                  Crash diagnostics can include crash stack traces, exception
+                  details, app version and build, device model, Android version,
+                  and limited diagnostic breadcrumbs. StreamNet TV disables
+                  default PII collection, screenshots, view hierarchy, network
+                  breadcrumbs, and user-interaction breadcrumbs. Diagnostic logs
+                  are sanitized, but exception text and transport metadata can
+                  still contain personal data such as an IP address.
+                </p>
+                <p>
+                  At most once per 24 hours, StreamNet TV can send an app_open
+                  event containing a random install identifier, app version,
+                  Android API level, device type, distribution type, and
+                  account/profile identifiers when signed in. Direct identifiers
+                  are converted into keyed pseudonymous values before storage.
+                  This is used only to estimate active use and release adoption,
+                  not for advertising or user profiling.
+                </p>
+                <p>
+                  StreamNet no longer relies on Netlify for the primary
+                  production account portal and sync backend. Any legacy
+                  Netlify/Supabase services kept during rollback testing are not
+                  used for the normal production sync path.
+                </p>
+                <p>
+                  If optional membership or entitlement features are used,
+                  StreamNet records a small set of service events such as
+                  viewing membership information, starting a trial, opening
+                  checkout, linking a membership, and completing first
+                  successful playback. Ko-fi separately handles payment details
+                  under its own privacy policy.
+                </p>
+                <p>
+                  When you deliberately start a StreamNet Cloud trial, StreamNet
+                  sends only three service messages: trial confirmation, one
+                  reminder before expiry, and one final expiry notice. The
+                  temporary delivery queue stores the email address encrypted
+                  and is not a general marketing mailing list.
+                </p>
+              </section>
+              <section class="card" id="en-third">
+                <h2>5. Optional Third-Party Services</h2>
+                <p>Data is sent to services you deliberately use or connect:</p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Purpose</th>
+                      <th>Privacy policy</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Self-hosted StreamNet backend</td>
+                      <td>
+                        Account portal, cloud sync, TV pairing, Discord pairing
+                        session handoff, and account deletion
+                      </td>
+                      <td>This policy</td>
+                    </tr>
+                    <tr>
+                      <td>Resend</td>
+                      <td>
+                        Account verification and password-reset email delivery
+                        when configured
+                      </td>
+                      <td>
+                        <a href="https://resend.com/legal/privacy-policy"
+                          >resend.com/legal/privacy-policy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Sentry</td>
+                      <td>Crash reporting and diagnostics when enabled</td>
+                      <td>
+                        <a href="https://sentry.io/privacy"
+                          >sentry.io/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Firebase Crashlytics</td>
+                      <td>Crash-reporting fallback in configured builds</td>
+                      <td>
+                        <a href="https://firebase.google.com/support/privacy"
+                          >firebase.google.com/support/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>TMDB</td>
+                      <td>Movie and TV metadata and images</td>
+                      <td>
+                        <a href="https://www.themoviedb.org/privacy-policy"
+                          >themoviedb.org/privacy-policy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Trakt.tv</td>
+                      <td>
+                        Optional watch history, progress, ratings, and watchlist
+                        sync
+                      </td>
+                      <td>
+                        <a href="https://trakt.tv/privacy">trakt.tv/privacy</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Discord</td>
+                      <td>
+                        Optional Rich Presence login and the title/playback
+                        status you choose to display
+                      </td>
+                      <td>
+                        <a href="https://discord.com/privacy"
+                          >discord.com/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Ko-fi</td>
+                      <td>Optional StreamNet Cloud membership verification</td>
+                      <td>
+                        <a href="https://ko-fi.com/privacy"
+                          >ko-fi.com/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>User-configured services</td>
+                      <td>
+                        Addons, IPTV providers, Plex, Jellyfin, Emby, debrid
+                        services, and URLs you add
+                      </td>
+                      <td>Governed by the provider you configure</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p>
+                  StreamNet TV sends only the data needed for the requested
+                  integration. Third-party services may process data outside the
+                  European Economic Area under their own transfer mechanisms and
+                  terms.
+                </p>
+              </section>
+              <section class="card" id="en-retention">
+                <h2>6. Retention</h2>
+                <ul>
+                  <li>
+                    Local data remains until you remove it, clear app data, or
+                    uninstall StreamNet TV.
+                  </li>
+                  <li>
+                    Cloud account and sync data remains while the account is
+                    active and is deleted when account deletion completes,
+                    except for a minimal record required to prove or secure the
+                    deletion.
+                  </li>
+                  <li>
+                    Stored first-party app-open events are retained for up to 31
+                    days.
+                  </li>
+                  <li>
+                    Pseudonymous Premium funnel events are retained for up to 90
+                    days.
+                  </li>
+                  <li>
+                    Completed Premium trial email jobs are removed within 14
+                    days.
+                  </li>
+                  <li>
+                    Password-reset and device-pairing codes expire after a short
+                    operational period.
+                  </li>
+                  <li>
+                    Crash diagnostics follow the configured Sentry or Firebase
+                    retention period.
+                  </li>
+                  <li>
+                    Infrastructure security logs follow the hosting provider's
+                    operational retention schedule.
+                  </li>
+                </ul>
+                <p>
+                  StreamNet TV may keep data longer where required by law, to
+                  resolve a dispute, or to prevent abuse, and will keep only
+                  what is necessary.
+                </p>
+              </section>
+              <section class="card" id="en-security">
+                <h2>7. Security</h2>
+                <p>
+                  StreamNet TV uses HTTPS for first-party cloud services and
+                  supported APIs, hashes account passwords with a salted
+                  memory-hard password function, limits crash-report contents,
+                  and scopes cloud data to authenticated accounts. No system is
+                  risk-free.
+                </p>
+                <p>
+                  StreamNet TV also permits user-configured HTTP URLs for local
+                  servers and IPTV providers because some private-network
+                  services do not support HTTPS. Prefer HTTPS and only add
+                  services you trust.
+                </p>
+              </section>
+              <section class="card" id="en-rights">
+                <h2>8. Your Rights</h2>
+                <p>
+                  Depending on where you live, you may have the right to access,
+                  correct, export, restrict, object to, or delete your personal
+                  data, and to complain to your local data-protection authority.
+                </p>
+                <ul>
+                  <li>
+                    Disable diagnostics and usage reporting in app Settings.
+                  </li>
+                  <li>
+                    Disconnect Trakt and other optional services in app
+                    Settings.
+                  </li>
+                  <li>
+                    Revoke StreamNet TV from the relevant third-party account.
+                  </li>
+                  <li>
+                    Delete your StreamNet Cloud account and synced data at
+                    <a href="/delete-account"
+                      >auth.mystreamnet.club/delete-account</a
+                    >.
+                  </li>
+                </ul>
+                <p>
+                  StreamNet TV may need to verify that a request concerns your
+                  account before acting on it.
+                </p>
+              </section>
+              <section class="card" id="en-children">
+                <h2>9. Children's Privacy</h2>
+                <p>
+                  StreamNet TV is not directed at children who cannot legally
+                  manage their own online account in their country. StreamNet TV
+                  does not knowingly create cloud accounts for such children
+                  without authorization from a parent or guardian.
+                </p>
+              </section>
+              <section class="card" id="en-changes">
+                <h2>10. Changes</h2>
+                <p>
+                  This policy may change when StreamNet TV's services or legal
+                  obligations change. Material changes will be published with a
+                  new date, and an in-app or account notice will be used when
+                  appropriate.
+                </p>
+                <p>
+                  <em
+                    >StreamNet TV is an open-source project licensed under
+                    Apache 2.0.</em
+                  >
+                </p>
+              </section>
+            </article>
+            <aside>
+              <h2>Quick Links</h2>
+              <nav class="quicklinks">
+                <a href="#en-cloud">Cloud Account</a
+                ><a href="#en-measurement">Diagnostics</a
+                ><a href="#en-third">Third Parties</a
+                ><a href="#en-rights">Your Rights</a
+                ><a href="/delete-account">Delete Account</a>
+              </nav>
+            </aside>
+          </div>
         </div>
-      </div>
-    </main>
+
+        <div id="policy-de" class="hidden">
+          <header class="hero">
+            <p class="eyebrow">Datenschutzerklaerung</p>
+            <h1>StreamNet TV Datenschutzerklaerung</h1>
+            <p class="updated">Zuletzt aktualisiert: 19. August 2026</p>
+          </header>
+          <div class="content">
+            <article class="policy">
+              <section class="card" id="de-scope">
+                <h2>1. Geltungsbereich und Verantwortlicher</h2>
+                <p>
+                  Diese Erklaerung beschreibt, wie das StreamNet TV Projekt
+                  personenbezogene Daten in der Android-App und im StreamNet TV
+                  Cloud-Kontoportal verarbeitet. StreamNet TV ist ein
+                  Open-Source-Medienhub und hostet, verkauft oder verbreitet
+                  keine Filme, Serien, Live-TV-Kanaele, Playlists oder
+                  Drittanbieter-Streams.
+                </p>
+                <p>
+                  Der Projektinhaber ist Verantwortlicher fuer StreamNet Cloud,
+                  das Kontoportal, eigene Nutzungsmessungen und eigene
+                  Webdienste. Verbundene Drittanbieter koennen eigenstaendige
+                  Verantwortliche mit eigenen Datenschutzerklaerungen sein.
+                </p>
+                <p>
+                  Fuer Datenschutzanfragen nutze die sichere Kontoloeschseite
+                  unter
+                  <a href="/delete-account"
+                    >auth.mystreamnet.club/delete-account</a
+                  >
+                  oder kontaktiere das Projekt ueber
+                  <a href="https://github.com/cyb3rgh05t/streamnet-debrid"
+                    >GitHub</a
+                  >. Bitte veroeffentliche keine Passwoerter, Tokens,
+                  Ausweisdokumente oder andere sensible Daten in einem
+                  oeffentlichen GitHub-Issue.
+                </p>
+              </section>
+              <section class="card" id="de-local">
+                <h2>2. Daten nur auf deinem Geraet</h2>
+                <p>
+                  StreamNet TV kann Profile, Einstellungen,
+                  Wiedergabefortschritt, Verlauf, Merkliste,
+                  Addon-Konfiguration, IPTV-Konfiguration,
+                  Home-Server-Konfiguration, Caches und Autorisierungstokens
+                  lokal auf deinem Geraet speichern. Diese lokalen Daten werden
+                  nicht an StreamNet TV uebermittelt, ausser du aktivierst eine
+                  Cloud-Funktion, sendest einen Diagnosebericht oder verbindest
+                  einen Drittanbieter, der die Daten benoetigt.
+                </p>
+                <p>
+                  Du kannst lokale Daten ueber die App-Steuerung, durch Loeschen
+                  der Android-App-Daten oder durch Deinstallation entfernen.
+                </p>
+              </section>
+              <section class="card" id="de-cloud">
+                <h2>3. StreamNet Cloud-Konto und Sync</h2>
+                <p>
+                  Beim Erstellen eines StreamNet Cloud-Kontos werden
+                  E-Mail-Adresse, Konto-ID, Passwort-Hash, Sitzungen,
+                  Passwort-Reset-Daten, Profile, Einstellungen,
+                  Katalogreihenfolge, Addons, IPTV-Konfiguration, Merkliste,
+                  Wiedergabeverlauf, Fortschritt und weitere von dir
+                  synchronisierte Daten verarbeitet. Sicherheits- und
+                  Betriebsdaten wie Zeitstempel, Request-Metadaten und
+                  IP-Adresse koennen in Infrastruktur-Logs erscheinen.
+                </p>
+                <p>
+                  StreamNet TV speichert einen Einweg-Passwort-Hash, nicht dein
+                  Klartextpasswort. StreamNet Cloud ist optional; die
+                  Android-App kann ohne Cloud-Konto genutzt werden.
+                </p>
+                <p>
+                  Rechtsgrundlage fuer Authentifizierung und gewuenschten
+                  Cloud-Sync ist die Vertragserfuellung bzw. Bereitstellung des
+                  angeforderten Dienstes (Art. 6 Abs. 1 lit. b DSGVO).
+                  Sicherheit, Missbrauchsschutz, Zuverlaessigkeit und begrenzte
+                  Betriebsprotokolle beruhen auf berechtigten Interessen (Art. 6
+                  Abs. 1 lit. f DSGVO).
+                </p>
+              </section>
+              <section class="card" id="de-measurement">
+                <h2>4. Diagnose und Nutzungsmessung</h2>
+                <p>
+                  Release-Builds koennen begrenzte Diagnose- und Nutzungsdaten
+                  senden, wenn Diagnose- und Nutzungsfreigabe in den
+                  Einstellungen aktiviert ist. Diese Auswahl bleibt lokal auf
+                  dem Geraet und wird nicht cloud-synchronisiert.
+                </p>
+                <p>
+                  Crash-Diagnosen koennen Stacktraces, Ausnahmedetails,
+                  App-Version, Build, Geraetemodell, Android-Version und
+                  begrenzte Breadcrumbs enthalten. StreamNet TV deaktiviert
+                  Standard-PII-Erfassung, Screenshots, View-Hierarchie,
+                  Netzwerk-Breadcrumbs und Interaktions-Breadcrumbs.
+                  Diagnoseprotokolle werden bereinigt, koennen aber in
+                  Ausnahmefaellen personenbezogene Daten wie IP-Adressen
+                  enthalten.
+                </p>
+                <p>
+                  Hoechstens einmal pro 24 Stunden kann StreamNet TV ein
+                  app_open-Ereignis mit zufaelliger Installations-ID,
+                  App-Version, Android-API-Level, Geraetetyp, Distribution und
+                  Konto-/Profilreferenzen senden. Direkte Kennungen werden vor
+                  Speicherung pseudonymisiert. Die Messung dient nur aktiver
+                  Nutzung und Release-Gesundheit, nicht Werbung oder
+                  Profilbildung.
+                </p>
+                <p>
+                  StreamNet nutzt fuer den produktiven Konto- und Sync-Betrieb
+                  nicht mehr Netlify als primaeres Backend.
+                  Legacy-Netlify/Supabase-Dienste koennen waehrend
+                  Rollback-Tests bestehen bleiben, gehoeren aber nicht zum
+                  normalen Produktions-Sync.
+                </p>
+                <p>
+                  Bei optionalen Mitgliedschafts- oder Berechtigungsfunktionen
+                  werden wenige Service-Ereignisse verarbeitet, z. B.
+                  Mitgliedschaftsinformationen ansehen, Trial starten, Checkout
+                  oeffnen, Mitgliedschaft verknuepfen und erste erfolgreiche
+                  Wiedergabe. Ko-fi verarbeitet Zahlungsdaten separat nach
+                  eigener Datenschutzerklaerung.
+                </p>
+                <p>
+                  Wenn du bewusst einen Cloud-Trial startest, sendet StreamNet
+                  nur drei Service-Nachrichten: Startbestaetigung, Erinnerung
+                  vor Ablauf und Ablaufhinweis. Die temporaere
+                  Zustellwarteschlange speichert die E-Mail-Adresse
+                  verschluesselt und ist keine Marketingliste.
+                </p>
+              </section>
+              <section class="card" id="de-third">
+                <h2>5. Optionale Drittanbieter</h2>
+                <p>
+                  Daten werden an Dienste gesendet, die du bewusst nutzt oder
+                  verbindest:
+                </p>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Dienst</th>
+                      <th>Zweck</th>
+                      <th>Datenschutzerklaerung</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>Self-hosted StreamNet Backend</td>
+                      <td>
+                        Kontoportal, Cloud-Sync, TV-Kopplung, Discord-Kopplung,
+                        Kontoloeschung
+                      </td>
+                      <td>Diese Erklaerung</td>
+                    </tr>
+                    <tr>
+                      <td>Resend</td>
+                      <td>
+                        Konto- und Passwort-Reset-E-Mails, falls konfiguriert
+                      </td>
+                      <td>
+                        <a href="https://resend.com/legal/privacy-policy"
+                          >resend.com/legal/privacy-policy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Sentry</td>
+                      <td>Crash-Reporting und Diagnose, wenn aktiviert</td>
+                      <td>
+                        <a href="https://sentry.io/privacy"
+                          >sentry.io/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Firebase Crashlytics</td>
+                      <td>Crash-Reporting-Fallback in konfigurierten Builds</td>
+                      <td>
+                        <a href="https://firebase.google.com/support/privacy"
+                          >firebase.google.com/support/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>TMDB</td>
+                      <td>Film- und Serienmetadaten sowie Bilder</td>
+                      <td>
+                        <a href="https://www.themoviedb.org/privacy-policy"
+                          >themoviedb.org/privacy-policy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Trakt.tv</td>
+                      <td>
+                        Optionale Synchronisierung von Verlauf, Fortschritt,
+                        Bewertungen und Merkliste
+                      </td>
+                      <td>
+                        <a href="https://trakt.tv/privacy">trakt.tv/privacy</a>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Discord</td>
+                      <td>
+                        Optionale Rich Presence Anmeldung und der von dir
+                        angezeigte Wiedergabestatus
+                      </td>
+                      <td>
+                        <a href="https://discord.com/privacy"
+                          >discord.com/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Ko-fi</td>
+                      <td>Optionale StreamNet Cloud-Mitgliedschaftspruefung</td>
+                      <td>
+                        <a href="https://ko-fi.com/privacy"
+                          >ko-fi.com/privacy</a
+                        >
+                      </td>
+                    </tr>
+                    <tr>
+                      <td>Von dir konfigurierte Dienste</td>
+                      <td>
+                        Addons, IPTV-Anbieter, Plex, Jellyfin, Emby,
+                        Debrid-Dienste und eigene URLs
+                      </td>
+                      <td>
+                        Gilt nach den Bedingungen des jeweiligen Anbieters
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p>
+                  StreamNet TV sendet nur die fuer die angeforderte Integration
+                  noetigen Daten. Drittanbieter koennen Daten ausserhalb des EWR
+                  nach eigenen Regeln verarbeiten.
+                </p>
+              </section>
+              <section class="card" id="de-retention">
+                <h2>6. Aufbewahrung</h2>
+                <ul>
+                  <li>
+                    Lokale Daten bleiben bis du sie entfernst, App-Daten
+                    loeschst oder StreamNet TV deinstallierst.
+                  </li>
+                  <li>
+                    Cloud-Konto- und Sync-Daten bleiben waehrend der
+                    Kontoaktivitaet und werden nach abgeschlossener
+                    Kontoloeschung entfernt, ausser ein minimaler Nachweis- oder
+                    Sicherheitsdatensatz ist erforderlich.
+                  </li>
+                  <li>
+                    App-open-Ereignisse werden bis zu 31 Tage gespeichert.
+                  </li>
+                  <li>
+                    Pseudonyme Premium-Funnel-Ereignisse werden bis zu 90 Tage
+                    gespeichert.
+                  </li>
+                  <li>
+                    Abgeschlossene Trial-E-Mail-Jobs werden innerhalb von 14
+                    Tagen entfernt.
+                  </li>
+                  <li>
+                    Passwort-Reset- und Geraetekopplungs-Codes laufen nach
+                    kurzer Betriebszeit ab.
+                  </li>
+                  <li>
+                    Crash-Diagnosen folgen der Sentry- oder
+                    Firebase-Aufbewahrung.
+                  </li>
+                  <li>
+                    Infrastruktur-Sicherheitslogs folgen der Aufbewahrung des
+                    Hosting-Anbieters.
+                  </li>
+                </ul>
+                <p>
+                  StreamNet TV kann Daten laenger aufbewahren, wenn dies
+                  gesetzlich erforderlich ist, zur Streitbeilegung oder zur
+                  Missbrauchsverhinderung, und nur soweit notwendig.
+                </p>
+              </section>
+              <section class="card" id="de-security">
+                <h2>7. Sicherheit</h2>
+                <p>
+                  StreamNet TV nutzt HTTPS fuer eigene Cloud-Dienste und
+                  unterstuetzte APIs, hasht Kontopasswoerter mit einer
+                  gesalzenen speicherharten Funktion, begrenzt
+                  Crash-Report-Inhalte und ordnet Cloud-Daten authentifizierten
+                  Konten zu. Kein System ist risikofrei.
+                </p>
+                <p>
+                  StreamNet TV erlaubt auch von Nutzern konfigurierte HTTP-URLs
+                  fuer lokale Server und IPTV-Anbieter, weil manche privaten
+                  Dienste kein HTTPS unterstuetzen. Bevorzuge HTTPS und fuege
+                  nur vertrauenswuerdige Dienste hinzu.
+                </p>
+              </section>
+              <section class="card" id="de-rights">
+                <h2>8. Deine Rechte</h2>
+                <p>
+                  Je nach Wohnort hast du Rechte auf Auskunft, Berichtigung,
+                  Export, Einschraenkung, Widerspruch oder Loeschung deiner
+                  personenbezogenen Daten sowie Beschwerde bei einer
+                  Datenschutzaufsicht.
+                </p>
+                <ul>
+                  <li>
+                    Diagnose- und Nutzungsfreigabe in den App-Einstellungen
+                    deaktivieren.
+                  </li>
+                  <li>
+                    Trakt und andere optionale Dienste in den App-Einstellungen
+                    trennen.
+                  </li>
+                  <li>
+                    StreamNet TV im jeweiligen Drittanbieter-Konto widerrufen.
+                  </li>
+                  <li>
+                    Dein StreamNet Cloud-Konto und synchronisierte Daten unter
+                    <a href="/delete-account"
+                      >auth.mystreamnet.club/delete-account</a
+                    >
+                    loeschen.
+                  </li>
+                </ul>
+                <p>
+                  StreamNet TV muss ggf. pruefen, dass eine Anfrage dein Konto
+                  betrifft.
+                </p>
+              </section>
+              <section class="card" id="de-children">
+                <h2>9. Datenschutz von Kindern</h2>
+                <p>
+                  StreamNet TV richtet sich nicht an Kinder, die in ihrem Land
+                  kein eigenes Online-Konto verwalten duerfen. StreamNet TV
+                  erstellt wissentlich keine Cloud-Konten fuer solche Kinder
+                  ohne Zustimmung eines Elternteils oder Vormunds.
+                </p>
+              </section>
+              <section class="card" id="de-changes">
+                <h2>10. Aenderungen</h2>
+                <p>
+                  Diese Erklaerung kann sich aendern, wenn sich Dienste oder
+                  rechtliche Pflichten von StreamNet TV aendern. Wesentliche
+                  Aenderungen werden mit neuem Datum veroeffentlicht und bei
+                  Bedarf in App oder Konto angezeigt.
+                </p>
+                <p>
+                  <em
+                    >StreamNet TV ist ein Open-Source-Projekt unter Apache 2.0
+                    Lizenz.</em
+                  >
+                </p>
+              </section>
+            </article>
+            <aside>
+              <h2>Schnellzugriff</h2>
+              <nav class="quicklinks">
+                <a href="#de-cloud">Cloud-Konto</a
+                ><a href="#de-measurement">Diagnose</a
+                ><a href="#de-third">Drittanbieter</a
+                ><a href="#de-rights">Deine Rechte</a
+                ><a href="/delete-account">Konto loeschen</a>
+              </nav>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </div>
 
     <script>
       const en = document.getElementById("policy-en");
@@ -972,6 +1073,7 @@
       const deButton = document.getElementById("lang-de");
       function setLanguage(lang) {
         const german = lang === "de";
+        window.localStorage.setItem("streamnet:lang", german ? "de" : "en");
         document.documentElement.lang = german ? "de" : "en";
         document.title = german
           ? "StreamNet TV Datenschutzerklaerung"
@@ -984,7 +1086,13 @@
       enButton.addEventListener("click", () => setLanguage("en"));
       deButton.addEventListener("click", () => setLanguage("de"));
       setLanguage(
-        (navigator.language || "en").toLowerCase().startsWith("de")
+        (
+          window.localStorage.getItem("streamnet:lang") ||
+          navigator.language ||
+          "en"
+        )
+          .toLowerCase()
+          .startsWith("de")
           ? "de"
           : "en",
       );

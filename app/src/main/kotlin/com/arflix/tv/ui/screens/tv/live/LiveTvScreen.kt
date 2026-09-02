@@ -512,6 +512,7 @@ fun LiveTvScreen(
         screenHeightDp = configuration.screenHeightDp,
     )
     val landscapeCompactMiniPlayer = miniPlayerLayout == LiveTvMiniPlayerLayout.LANDSCAPE_COMPACT
+    val tabletLandscapeMiniPlayer = miniPlayerLayout == LiveTvMiniPlayerLayout.TABLET_LANDSCAPE
     val compactTouchLayout = isTouchDevice && configuration.screenWidthDp < 900
     val showTopBar = !isTouchDevice
     val contentTopPadding = if (showTopBar) AppTopBarHeight else 0.dp
@@ -2909,6 +2910,7 @@ fun LiveTvScreen(
                         onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
                         landscapeCompact = landscapeCompactMiniPlayer,
+                        tabletLandscape = tabletLandscapeMiniPlayer,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(

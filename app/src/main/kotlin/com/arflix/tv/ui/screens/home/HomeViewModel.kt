@@ -23,6 +23,8 @@ import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.R
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.cleanIptvArtworkTitle
+import com.arflix.tv.data.repository.normalizeIptvArtworkTitle
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.TraktSyncService
 import com.arflix.tv.data.repository.ContinueWatchingItem
@@ -59,6 +61,7 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
@@ -68,6 +71,7 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -85,6 +89,17 @@ internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
     channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
 private const val RECENT_TV_HOME_ITEM_LIMIT = 10
+internal fun isIptvLiveHomeCategory(categoryId: String): Boolean =
+    categoryId == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
+        categoryId == HomeViewModel.RECENT_TV_CATEGORY_ID
+
+internal fun isAvailableInXtreamVod(
+    item: MediaItem,
+    availability: IptvRepository.XtreamVodAvailability,
+): Boolean = availability.contains(item)
+
+private fun isIptvOnlyCollectionCategory(category: Category): Boolean =
+    category.id == "collection_row_service" || category.id == "collection_row_franchise"
 
 internal fun recentTvHomeChannelIds(channelIds: List<String>): List<String> =
     newestFirstChannelIds(channelIds).take(RECENT_TV_HOME_ITEM_LIMIT)
@@ -179,6 +194,63 @@ data class HomeUiState(
     val categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     val smoothScrolling: Boolean = false
 )
+
+internal fun projectHomeForIptvOnlyMode(
+    state: HomeUiState,
+    enabled: Boolean,
+    availability: IptvRepository.XtreamVodAvailability? = null,
+    filteredCollectionRows: List<HomeCollectionRow>? = null,
+): HomeUiState {
+    if (!enabled) return state
+    val iptvCollectionRows = filteredCollectionRows ?: state.collectionRows.filter { row ->
+        row.id == "collection_row_service" || row.id == "collection_row_franchise"
+    }
+    val availableCollectionIds = iptvCollectionRows
+        .flatMap { it.items }
+        .mapTo(HashSet(), CatalogConfig::id)
+    val categories = state.categories.mapNotNull { category ->
+        when {
+            category.id == "continue_watching" -> category
+            isIptvLiveHomeCategory(category.id) -> category
+            availability == null -> null
+            category.id.startsWith("collection_row_") -> category
+                .takeIf(::isIptvOnlyCollectionCategory)
+                ?.let { collectionCategory ->
+                    if (filteredCollectionRows == null) {
+                        collectionCategory
+                    } else {
+                        collectionCategory.copy(
+                            items = collectionCategory.items.filter { item ->
+                                item.status?.removePrefix("collection:") in availableCollectionIds
+                            }
+                        ).takeIf { it.items.isNotEmpty() }
+                    }
+                }
+            else -> category.copy(
+                items = category.items.filter { item -> isAvailableInXtreamVod(item, availability) }
+            ).takeIf { it.items.isNotEmpty() }
+        }
+    }
+    val iptvItems = categories.flatMap(Category::items)
+    val currentHero = state.heroItem?.takeIf { hero ->
+        iptvItems.any { it.id == hero.id && it.mediaType == hero.mediaType }
+    }
+    val hero = currentHero ?: iptvItems.firstOrNull()
+    val heroChanged = hero?.id != state.heroItem?.id
+    return state.copy(
+        categories = categories,
+        collectionRows = iptvCollectionRows,
+        heroItem = hero,
+        heroLogoUrl = if (heroChanged) null else state.heroLogoUrl,
+        heroTrailerKey = null,
+        previousHeroItem = null,
+        previousHeroLogoUrl = null,
+        isHeroTransitioning = false,
+        categoryHasMoreMap = state.categoryHasMoreMap.filterKeys { categoryId ->
+            categories.any { it.id == categoryId }
+        },
+    )
+}
 
 @androidx.compose.runtime.Immutable
 data class HomeCollectionRow(
@@ -525,16 +597,49 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun repairContinueWatchingMetadataIfNeeded(
-        items: List<ContinueWatchingItem>
+        items: List<ContinueWatchingItem>,
+        prioritizeFirstItem: Boolean = false,
     ): List<ContinueWatchingItem> {
-        if (items.none(::needsContinueWatchingArtworkRepair)) return items
-        return runCatching {
-            traktRepository.enrichContinueWatchingItems(items)
-                .zip(items) { enriched, original ->
-                    mergeContinueWatchingVisuals(enriched, original)
+        if (items.none(::needsContinueWatchingArtworkRepair) && !prioritizeFirstItem) return items
+        return try {
+            coroutineScope {
+                val semaphore = Semaphore(5)
+                items.mapIndexed { index, original ->
+                    async(networkDispatcher) {
+                        if (!needsContinueWatchingArtworkRepair(original) && !(prioritizeFirstItem && index == 0)) {
+                            return@async original
+                        }
+                        semaphore.withPermit {
+                            val details = runCatching {
+                                if (original.mediaType == MediaType.MOVIE) {
+                                    mediaRepository.getMovieDetails(original.id)
+                                } else {
+                                    mediaRepository.getTvDetails(original.id)
+                                }
+                            }.getOrNull() ?: return@withPermit original
+                            mergeContinueWatchingVisuals(
+                                preferred = original.copy(
+                                    title = details.title.ifBlank { original.title },
+                                    backdropPath = details.backdrop ?: original.backdropPath,
+                                    posterPath = details.image.ifBlank { original.posterPath.orEmpty() },
+                                    year = details.year.ifBlank { original.year },
+                                    releaseDate = details.releaseDate.orEmpty().ifBlank { original.releaseDate },
+                                    overview = details.overview.ifBlank { original.overview },
+                                    imdbRating = details.imdbRating.ifBlank { original.imdbRating },
+                                    tmdbRating = details.tmdbRating.ifBlank { original.tmdbRating },
+                                    duration = details.duration.ifBlank { original.duration },
+                                    budget = details.budget ?: original.budget,
+                                ),
+                                fallback = original,
+                            )
+                        }
+                    }
                 }
-                .ifEmpty { items }
-        }.onFailure { error ->
+                    .awaitAll()
+                    .ifEmpty { items }
+            }
+        } catch (error: Exception) {
+            if (error is CancellationException) throw error
             AppLogger.recordException(
                 throwable = error,
                 context = mapOf(
@@ -542,7 +647,8 @@ class HomeViewModel @Inject constructor(
                     "cw_phase" to "metadata_repair"
                 )
             )
-        }.getOrDefault(items)
+            items
+        }
     }
 
     private fun overviewLooksTruncated(overview: String): Boolean {
@@ -1095,6 +1201,98 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    private suspend fun refreshIptvVodAvailability(allowNetwork: Boolean) {
+        val availability = runCatching {
+            iptvRepository.getXtreamVodAvailability(allowNetwork = allowNetwork)
+        }.getOrElse { error ->
+            if (error is CancellationException) throw error
+            AppLogger.e("HomeVM", "Failed to load IPTV VOD availability: ${error.message}", error)
+            return
+        }
+        _iptvVodAvailability.value = availability
+        prioritizeIptvOnlyInitialHero(availability)
+        refreshIptvCollectionRows(availability)
+    }
+
+    private fun refreshIptvCollectionRows(availability: IptvRepository.XtreamVodAvailability) {
+        iptvCollectionFilterJob?.cancel()
+        _iptvCollectionRows.value = null
+        val sourceRows = _uiState.value.collectionRows.filter { row ->
+            row.id == "collection_row_service" || row.id == "collection_row_franchise"
+        }
+        if (sourceRows.isEmpty()) return
+
+        iptvCollectionFilterJob = viewModelScope.launch(networkDispatcher) {
+            val semaphore = Semaphore(4)
+            val filteredRows = sourceRows.map { row ->
+                val retained = row.items.map { catalog ->
+                    async {
+                        semaphore.withPermit {
+                            catalog.takeIf { collectionHasIptvContent(it, availability) }
+                        }
+                    }
+                }.awaitAll().filterNotNull()
+                row.copy(items = retained)
+            }.filter { it.items.isNotEmpty() }
+            if (iptvRepository.observeConfig().first().iptvOnlyMode) {
+                _iptvCollectionRows.value = filteredRows
+            }
+        }
+    }
+
+    private suspend fun collectionHasIptvContent(
+        catalog: CatalogConfig,
+        availability: IptvRepository.XtreamVodAvailability,
+    ): Boolean {
+        var offset = 0
+        var hasMore = true
+        var pagesScanned = 0
+        while (hasMore && pagesScanned < 20) {
+            val page = runCatching {
+                mediaRepository.loadCollectionCatalogPage(catalog, offset = offset, limit = 48)
+            }.getOrNull() ?: return false
+            if (page.items.any(availability::contains)) return true
+            if (page.items.isEmpty()) return false
+            offset += page.items.size
+            hasMore = page.hasMore
+            pagesScanned++
+        }
+        return false
+    }
+
+    private fun prioritizeIptvOnlyInitialHero(availability: IptvRepository.XtreamVodAvailability) {
+        val hero = projectHomeForIptvOnlyMode(_uiState.value, enabled = true, availability).heroItem
+            ?: return
+        val current = _uiState.value.heroItem
+        if (current?.id != hero.id || current.mediaType != hero.mediaType) {
+            _uiState.value = _uiState.value.copy(
+                heroItem = hero,
+                heroLogoUrl = null,
+                heroTrailerKey = null,
+                previousHeroItem = null,
+                previousHeroLogoUrl = null,
+                isHeroTransitioning = false,
+            )
+        }
+        if (isIptvItem(hero)) {
+            val title = hero.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return
+            viewModelScope.launch(networkDispatcher) {
+                coroutineScope {
+                    launch {
+                        lookupIptvProgramBackdrop(title, hero.liveProgramStartMs, hero.liveProgramEndMs)
+                    }
+                    launch {
+                        lookupIptvProgramLogo(title, hero.liveProgramStartMs, hero.liveProgramEndMs)
+                    }
+                }
+            }
+        } else if (isStartupSettling()) {
+            scheduleStartupHeroHydration(hero)
+        } else {
+            hydrateHeroDetailsIfNeeded(hero)
+        }
+    }
+
     private fun isCustomCatalogConfig(cfg: CatalogConfig): Boolean {
         if (cfg.kind == CatalogKind.COLLECTION || cfg.kind == CatalogKind.COLLECTION_RAIL) {
             return false
@@ -1213,6 +1411,7 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                 }
+                warmFirstIptvRailArtwork(_uiState.value.categories)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 AppLogger.e("HomeVM", "[EPG-Refresh] Error: ${e.message}", e)
@@ -1224,6 +1423,7 @@ class HomeViewModel @Inject constructor(
     private fun startEpgRefreshTimer() {
         epgRefreshJob?.cancel()
         activeEpgRefreshJob?.cancel()
+        iptvHomeArtworkWarmupJob?.cancel()
         epgRefreshJob = viewModelScope.launch {
             delay(if (isLowRamDevice) 20_000L else 10_000L)
             var tickCount = 0L
@@ -1234,6 +1434,31 @@ class HomeViewModel @Inject constructor(
                 val doNetwork = tickCount % ((EPG_NETWORK_REFRESH_MS / EPG_LOCAL_REFRESH_MS).coerceAtLeast(1)) == 0L
                 refreshTvCatalogEpg(networkFetch = doNetwork)
                 delay(EPG_LOCAL_REFRESH_MS)
+            }
+        }
+    }
+
+    private fun warmFirstIptvRailArtwork(categories: List<Category>) {
+        val firstItems = categories
+            .filter { isIptvLiveHomeCategory(it.id) }
+            .mapNotNull { it.items.firstOrNull() }
+            .distinctBy { it.id }
+        if (firstItems.isEmpty()) return
+
+        iptvHomeArtworkWarmupJob?.cancel()
+        iptvHomeArtworkWarmupJob = viewModelScope.launch(networkDispatcher) {
+            firstItems.forEach { item ->
+                val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@forEach
+                coroutineScope {
+                    val backdrop = async {
+                        lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                    }
+                    val logo = async {
+                        lookupIptvProgramLogo(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                    }
+                    backdrop.await()?.let { preloadBackdropImages(listOf(it)) }
+                    logo.await()?.let { preloadLogoImages(listOf(it), batchLimit = 1) }
+                }
             }
         }
     }
@@ -1406,10 +1631,21 @@ class HomeViewModel @Inject constructor(
     private val EPG_STARTUP_NETWORK_STALE_MS = 2 * 60_000L
     private var epgRefreshJob: Job? = null
     private var activeEpgRefreshJob: Job? = null
+    private var iptvHomeArtworkWarmupJob: Job? = null
+    private var iptvCollectionFilterJob: Job? = null
     private var lastEpgNetworkRefreshMs: Long = 0L
 
     private val _uiState = MutableStateFlow(HomeUiState())
-    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+    private val _iptvVodAvailability = MutableStateFlow<IptvRepository.XtreamVodAvailability?>(null)
+    private val _iptvCollectionRows = MutableStateFlow<List<HomeCollectionRow>?>(null)
+    val uiState: StateFlow<HomeUiState> = combine(
+        _uiState,
+        iptvRepository.observeConfig().map { it.iptvOnlyMode }.distinctUntilChanged(),
+        _iptvVodAvailability,
+        _iptvCollectionRows,
+    ) { state, iptvOnlyMode, availability, filteredCollectionRows ->
+        projectHomeForIptvOnlyMode(state, iptvOnlyMode, availability, filteredCollectionRows)
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
     val cardLogoUrls = mutableStateMapOf<String, String>()
 
     // Debounce job for hero updates (Phase 6.1)
@@ -1611,6 +1847,8 @@ class HomeViewModel @Inject constructor(
         customCatalogsJob?.cancel()
         epgRefreshJob?.cancel()
         activeEpgRefreshJob?.cancel()
+        iptvHomeArtworkWarmupJob?.cancel()
+        iptvCollectionFilterJob?.cancel()
         lastContinueWatchingItems = emptyList()
         lastContinueWatchingUpdateMs = 0L
         lastResolvedBaseCategories = emptyList()
@@ -1623,6 +1861,8 @@ class HomeViewModel @Inject constructor(
         watchlistRepository.clearWatchlistCache()
         watchHistoryRepository.clearProfileCaches()
         iptvRepository.invalidateCache()
+        _iptvVodAvailability.value = null
+        _iptvCollectionRows.value = null
         _uiState.value = HomeUiState(syncStatus = _uiState.value.syncStatus)
         activeRuntimeProfileId = profileId
     }
@@ -1801,7 +2041,24 @@ class HomeViewModel @Inject constructor(
                 programBackdropMisses.clear()
                 programLogoMisses.clear()
                 refreshIptvHomeCatalogs()
+                if (iptvRepository.observeConfig().first().iptvOnlyMode) {
+                    refreshIptvVodAvailability(allowNetwork = true)
+                }
             }
+        }
+        viewModelScope.launch {
+            iptvRepository.observeConfig()
+                .map { profileManager.getProfileIdSync() to it.iptvOnlyMode }
+                .distinctUntilChanged()
+                .collectLatest { (_, enabled) ->
+                    if (enabled) {
+                        refreshIptvVodAvailability(allowNetwork = true)
+                    } else {
+                        _iptvVodAvailability.value = null
+                        iptvCollectionFilterJob?.cancel()
+                        _iptvCollectionRows.value = null
+                    }
+                }
         }
         viewModelScope.launch {
             iptvRepository.observeTvSessionState()
@@ -3140,6 +3397,9 @@ class HomeViewModel @Inject constructor(
                     categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
                     error = null
                 )
+                if (iptvRepository.observeConfig().first().iptvOnlyMode) {
+                    refreshIptvVodAvailability(allowNetwork = false)
+                }
                 heroItem?.let { item ->
                     if (isStartupSettling()) {
                         scheduleStartupHeroHydration(item)
@@ -3718,6 +3978,7 @@ class HomeViewModel @Inject constructor(
                     heroItem = updatedHero ?: currentState.heroItem,
                 )
             }
+            warmFirstIptvRailArtwork(_uiState.value.categories)
             refreshTvCatalogEpg(networkFetch = true)
         }
     }
@@ -4141,7 +4402,7 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val repairedItems = repairContinueWatchingMetadataIfNeeded(items)
+        val repairedItems = repairContinueWatchingMetadataIfNeeded(items, prioritizeFirstItem = true)
         return applyContinueWatchingDismissals(sanitizeContinueWatchingItems(repairedItems))
             .filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
@@ -4652,9 +4913,11 @@ class HomeViewModel @Inject constructor(
 
             val focusWindowItems = (startIndex..endIndex)
                 .mapNotNull { category.items.getOrNull(it) }
+
+            val actionableFocusWindowItems = focusWindowItems
                 .filter { isActionableMediaItem(it) }
 
-            val itemsToLoad = focusWindowItems.filter { item ->
+            val itemsToLoad = actionableFocusWindowItems.filter { item ->
                 val key = "${item.mediaType}_${item.id}"
                 !hasCachedLogo(key) && logoFetchInFlight.add(key)
             }

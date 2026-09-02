@@ -50,8 +50,6 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.SERVICE,
         CollectionGroupKind.MOVIE_GENRE,
         CollectionGroupKind.TV_GENRE,
-        CollectionGroupKind.STUDIO,
-        CollectionGroupKind.NETWORK,
         CollectionGroupKind.FRANCHISE
     )
 
@@ -1064,12 +1062,12 @@ internal object CollectionTemplateManifest {
 
     val entries: List<CollectionTemplateEntry> =
         legacyEntries.filterNot {
-            it.group == CollectionGroupKind.GENRE || it.group == CollectionGroupKind.NETWORK
+            it.group == CollectionGroupKind.GENRE ||
+                it.group == CollectionGroupKind.STUDIO ||
+                it.group == CollectionGroupKind.NETWORK
         } +
             genreEntries(movieGenreSpecs, CollectionGroupKind.MOVIE_GENRE, "movie") +
-            genreEntries(tvGenreSpecs, CollectionGroupKind.TV_GENRE, "series") +
-            companyEntries(studioSpecs, CollectionGroupKind.STUDIO) +
-            companyEntries(networkSpecs, CollectionGroupKind.NETWORK)
+            genreEntries(tvGenreSpecs, CollectionGroupKind.TV_GENRE, "series")
 
     private val entriesById: Map<String, CollectionTemplateEntry> = entries.associateBy { it.id }
     private val entryIds: Set<String> = entriesById.keys

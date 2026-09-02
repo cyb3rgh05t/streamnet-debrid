@@ -40,11 +40,9 @@ class PreinstalledServicesTest {
                 "trending_anime",
                 "new_kdramas",
                 "coming_soon",
-                "just_added",
-                "collection_rail_studio",
-                "collection_rail_network"
+                "just_added"
             ),
-            ids.take(17)
+            ids
         )
     }
 
@@ -217,42 +215,10 @@ class PreinstalledServicesTest {
     }
 
     @Test
-    fun `movie studios and TV networks have separate rails and source IDs`() {
+    fun `movie studios and TV networks are not preinstalled`() {
         val catalogs = MediaRepository.buildPreinstalledDefaults()
-        val studios = catalogs.filter {
-            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.STUDIO
-        }
-        val networks = catalogs.filter {
-            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.NETWORK
-        }
-
-        assertEquals(11, studios.size)
-        assertEquals(22, networks.size)
-        assertTrue(catalogs.any {
-            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.STUDIO
-        })
-        assertTrue(catalogs.any {
-            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.NETWORK
-        })
-        assertTrue(studios.all { catalog ->
-            catalog.collectionSources.first().let { source ->
-                source.kind == CollectionSourceKind.VODWISHARR_STUDIO &&
-                    source.mediaType == "movie" && source.tmdbStudioId != null &&
-                    source.tmdbNetworkId == null
-            }
-        })
-        assertTrue(networks.all { catalog ->
-            catalog.collectionSources.first().let { source ->
-                source.kind == CollectionSourceKind.VODWISHARR_NETWORK &&
-                    source.mediaType == "series" && source.tmdbNetworkId != null &&
-                    source.tmdbStudioId == null
-            }
-        })
-
-        assertEquals(174, studios.first { it.title == "Warner Bros. Pictures" }
-            .collectionSources.first().tmdbStudioId)
-        assertEquals(174, networks.first { it.title == "AMC" }
-            .collectionSources.first().tmdbNetworkId)
+        assertFalse(catalogs.any { it.collectionGroup == CollectionGroupKind.STUDIO })
+        assertFalse(catalogs.any { it.collectionGroup == CollectionGroupKind.NETWORK })
     }
 
 }

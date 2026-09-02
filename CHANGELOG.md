@@ -4,6 +4,35 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### IPTV-only home and Xtream VOD
+
+- Added a profile-scoped IPTV-only mode for TV, tablet, and phone that filters the Home presentation without deleting configured catalogs or cached data.
+- Added provider-grouped Xtream movie and series rails, including stable unresolved identities for entries without TMDB IDs and lazy metadata resolution when cards are focused or opened.
+- Kept Continue Watching visible while IPTV-only mode is active and while provider availability is still loading.
+- Fixed unresolved Xtream VOD playback classification and progress persistence so negative local identities are not mistaken for Live TV.
+- Allowed the self-hosted watch-history API to synchronize negative identities only for the dedicated `iptv_xtream_vod` source while continuing to reject zero or unrelated negative IDs.
+- Hardened selective IPTV playlist imports and legacy playlist activation behavior, with focused regression coverage.
+
+### Touch and Live TV experience
+
+- Added a larger landscape-tablet Live TV preview and a height-matched TV-style current/upcoming-program panel while keeping categories and the EPG grid visible.
+- Removed the red LIVE badge from phone and tablet EPG cells while retaining it on TV.
+- Applied the selected accent theme to the touch Search field, cursor, loading indicators, and selected filter chips.
+- Refined collection and Home behavior for IPTV-only projection, card focus prefetch, and provider artwork fallback.
+
+### Self-hosted account portal
+
+- Localized known browser-facing authentication, pairing, password, deletion, and Discord errors in German while keeping the backend API contract language-neutral.
+- Unified sign-in, privacy, account deletion, and Discord pages around the StreamNet dark/gold visual system and shared language preference.
+- Rebuilt privacy and account deletion pages with the same standalone language switch and in-shell logo structure as the main account page, without navigation bars.
+- Made the privacy policy mobile-safe, including contained horizontal scrolling for wide data tables and overflow checks across phone and desktop viewports.
+- Added public-page regression tests for German errors, responsive styling, and shared StreamNet branding.
+
+### Release
+
+- Bumped the Android application to `2.2.003` (`versionCode` 378).
+- Documented implementation boundaries, validation, and merge-preservation guidance in `docs/superpowers/iptv-only-vod-and-portal-2026-09-02.md`.
+
 ### Cloud session reliability
 
 - Made TV pairing token delivery atomic so overlapping status polls cannot receive the same refresh token.

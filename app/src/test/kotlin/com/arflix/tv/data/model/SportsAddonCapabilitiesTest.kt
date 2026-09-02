@@ -178,6 +178,48 @@ class SportsAddonCapabilitiesTest {
     }
 
     @Test
+    fun `negative unresolved vod id is not treated as live`() {
+        assertFalse(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.MOVIE,
+                id = -123,
+            )
+        )
+    }
+
+    @Test
+    fun `xtream vod source is not treated as live iptv`() {
+        assertFalse(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.MOVIE,
+                id = 123,
+                streamAddonId = "iptv_xtream_vod",
+            )
+        )
+    }
+
+    @Test
+    fun `explicit live status remains live for a negative id`() {
+        assertTrue(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.TV,
+                id = -123,
+                status = "iptv:channel-123",
+            )
+        )
+    }
+
+    @Test
+    fun `zero placeholder id remains excluded from progress`() {
+        assertTrue(
+            SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                mediaType = MediaType.MOVIE,
+                id = 0,
+            )
+        )
+    }
+
+    @Test
     fun `sports statuses are recognized as home sports items`() {
         assertTrue(SportsAddonCapabilities.isSportsHomeStatus("sports:football"))
         assertTrue(SportsAddonCapabilities.isSportsHomeStatus("sports_event:addon|sports|event"))

@@ -49,6 +49,7 @@ fun readProfileAccentColor(preferences: Preferences, profileId: String?): String
     profileId?.takeIf { it.isNotBlank() }
         ?.let { preferences[profileAccentColorKey(it)] }
         ?: preferences[ACCENT_COLOR_KEY]
+        ?: "Orange"
 
 /**
  * Fast-path cache for the device-mode override. Read before onCreate() during

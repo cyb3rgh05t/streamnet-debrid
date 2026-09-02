@@ -122,6 +122,7 @@ fun SearchScreen(
     val configuration = LocalConfiguration.current
     val isCompactHeight = configuration.screenHeightDp <= 780
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val searchBarWidth = if (isTouchDevice) configuration.screenWidthDp.dp - 24.dp
         else (configuration.screenWidthDp.dp * 0.48f).coerceIn(460.dp, 680.dp)
@@ -613,7 +614,7 @@ fun SearchScreen(
 
             // ── Content ──
             when {
-                uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator(color = Pink, size = 48.dp) }
+                uiState.isLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator(color = accentColor, size = 48.dp) }
 
                 hasAiResults -> {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)) {
@@ -627,7 +628,7 @@ fun SearchScreen(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("${stringResource(R.string.no_results_for)} \"${uiState.query}\"", style = ArflixTypography.body, color = TextSecondary) }
                 }
 
-                uiState.isDiscoverLoading && activeCategories.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator(color = Pink, size = 48.dp) }
+                uiState.isDiscoverLoading && activeCategories.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { LoadingIndicator(color = accentColor, size = 48.dp) }
 
                 activeCategories.isNotEmpty() -> {
                     // Row-based content (discover rows or search results) - HomeScreen pattern
@@ -677,11 +678,12 @@ private fun SearchInputBar(
     onMoveDown: () -> Unit
 ) {
     if (isTouchDevice) {
+        val accentColor = resolveAccentColor(fallback = Pink)
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
             placeholder = { Text(stringResource(R.string.search), style = ArflixTypography.body, color = TextSecondary) },
-            leadingIcon = { Icon(Icons.Default.Search, null, tint = if (isFocused) Pink else TextSecondary, modifier = Modifier.size(22.dp)) },
+            leadingIcon = { Icon(Icons.Default.Search, null, tint = if (isFocused) accentColor else TextSecondary, modifier = Modifier.size(22.dp)) },
             textStyle = ArflixTypography.body.copy(color = TextPrimary),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
@@ -689,10 +691,10 @@ private fun SearchInputBar(
             colors = TextFieldDefaults.colors(
                 focusedTextColor = TextPrimary,
                 unfocusedTextColor = TextPrimary,
-                cursorColor = Color.White,
+                cursorColor = accentColor,
                 focusedContainerColor = BackgroundCard,
                 unfocusedContainerColor = BackgroundCard,
-                focusedIndicatorColor = Color.White,
+                focusedIndicatorColor = accentColor,
                 unfocusedIndicatorColor = Color.White.copy(alpha = 0.18f)
             ),
             shape = RoundedCornerShape(10.dp),
@@ -824,6 +826,7 @@ private fun DiscoverFilterStrip(
             GlowChip(
                 label = filter.label,
                 isSelected = filter.isSelected,
+                useAccentForSelection = isTouchDevice,
                 isVisuallyFocused = !isTouchDevice && focusZone == FocusZone.FILTERS && focusedFilterIndex == index,
                 modifier = if (index == 0) Modifier.focusRequester(filtersFocusRequester) else Modifier,
                 onFocused = { onFocused(index) },
@@ -839,6 +842,7 @@ private fun DiscoverFilterStrip(
 private fun GlowChip(
     label: String,
     isSelected: Boolean,
+    useAccentForSelection: Boolean = false,
     isVisuallyFocused: Boolean = false,
     modifier: Modifier = Modifier,
     onFocused: () -> Unit = {},
@@ -852,11 +856,13 @@ private fun GlowChip(
     val accentColor = resolveAccentColor(fallback = Color.White)
     val backgroundColor = when {
         focused -> Color.White.copy(alpha = 0.12f)
+        isSelected && useAccentForSelection -> accentColor.copy(alpha = 0.18f)
         isSelected -> Color.White.copy(alpha = 0.92f)
         else -> Color.White.copy(alpha = 0.075f)
     }
     val borderColor = when {
         focused -> accentColor
+        isSelected && useAccentForSelection -> accentColor
         isSelected -> Color.White.copy(alpha = 0.92f)
         else -> Color.White.copy(alpha = 0.24f)
     }
@@ -888,6 +894,7 @@ private fun GlowChip(
             ),
             color = when {
                 focused -> Color.White                // White text on dark bg
+                isSelected && useAccentForSelection -> accentColor
                 isSelected -> Color.Black             // Black text on bright bg
                 else -> Color.White.copy(alpha = 0.84f)
             },
@@ -1084,6 +1091,7 @@ private fun RowsLayer(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ContentGrid(items: List<MediaItem>, usePosterCards: Boolean, isLoading: Boolean, isTouchDevice: Boolean, onItemClick: (MediaItem) -> Unit, onLoadMore: () -> Unit) {
+    val accentColor = resolveAccentColor(fallback = Pink)
     val screenHeight = LocalConfiguration.current.screenHeightDp
     val itemWidth = if (usePosterCards) 105.dp else 210.dp
     val gridState = rememberLazyGridState()
@@ -1104,7 +1112,7 @@ private fun ContentGrid(items: List<MediaItem>, usePosterCards: Boolean, isLoadi
                 isFocusedOverride = false, enableSystemFocus = true, onFocused = {}, onClick = { onItemClick(item) },
                 modifier = if (isTouchDevice) Modifier.clickable { onItemClick(item) } else Modifier)
         }
-        if (isLoading) { item { Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { LoadingIndicator(color = Pink, size = 32.dp) } } }
+        if (isLoading) { item { Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { LoadingIndicator(color = accentColor, size = 32.dp) } } }
     }
 }
 

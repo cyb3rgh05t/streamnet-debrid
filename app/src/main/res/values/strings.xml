@@ -665,6 +665,8 @@
     <string name="settings_iptv_sort_alphabetical">Alphabetical (A-Z)</string>
     <string name="settings_iptv_special_categories_title">Special categories</string>
     <string name="settings_iptv_special_categories_subtitle">Show or hide All Channels and Recently Watched in Live TV</string>
+    <string name="settings_iptv_only_mode_title">Only IPTV-Provider Sources</string>
+    <string name="settings_iptv_only_mode_subtitle">Show only IPTV-Provider Content on Home</string>
     <string name="settings_section_add_addon">ADD ADDON</string>
     <string name="settings_install_custom_addon">Install a custom Stremio addon by URL</string>
     <string name="settings_section_my_addons">MY ADDONS</string>

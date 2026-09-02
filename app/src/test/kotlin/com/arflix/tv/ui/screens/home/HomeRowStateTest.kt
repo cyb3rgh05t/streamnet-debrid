@@ -62,22 +62,33 @@ class HomeRowStateTest {
     }
 
     @Test
-    fun `cold start prepares the first visible home rail`() {
+    fun `cold start prioritizes continue watching`() {
         val categories = listOf(
             Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Channel"))),
             Category("trending_movies", "Trending Movies", listOf(MediaItem(20, "Movie"))),
             Category("continue_watching", "Continue Watching", listOf(MediaItem(30, "Resume"))),
         )
 
-        assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(0)
+        assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(2)
     }
 
     @Test
-    fun `cold start skips hidden rows before the first visible rail`() {
+    fun `cold start prioritizes TV favorites when continue watching is absent`() {
         val categories = listOf(
             Category("recent_tv", "Recently Watched TV", listOf(MediaItem(-1, "", isPlaceholder = true))),
             Category("favorite_tv", "Favorite TV", listOf(MediaItem(11, "Favorite"))),
             Category("trending_movies", "Trending Movies", listOf(MediaItem(20, "Movie"))),
+        )
+
+        assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(1)
+    }
+
+    @Test
+    fun `cold start falls back to the first visible configured rail`() {
+        val categories = listOf(
+            Category("recent_tv", "Recently Watched TV", listOf(MediaItem(-1, "", isPlaceholder = true))),
+            Category("trending_tv", "Trending Shows", listOf(MediaItem(20, "Show"))),
+            Category("trending_movies", "Trending Movies", listOf(MediaItem(30, "Movie"))),
         )
 
         assertThat(preferredHomeStartRowIndex(categories)).isEqualTo(1)

@@ -458,11 +458,25 @@ private data class HomeFocusedHeroSnapshot(
 )
 
 internal fun preferredHomeStartRowIndex(categories: List<Category>): Int {
+    val preferredCategoryIds = listOf(
+        "continue_watching",
+        HomeViewModel.FAVORITE_TV_CATEGORY_ID,
+    )
+    preferredCategoryIds.forEach { categoryId ->
+        val index = categories.indexOfFirst { category ->
+            category.id == categoryId &&
+                shouldDisplayHomeCategory(category) &&
+                category.items.any { !it.isPlaceholder }
+        }
+        if (index >= 0) return index
+    }
     return categories.indexOfFirst(::shouldDisplayHomeCategory).coerceAtLeast(0)
 }
 
 private fun isActionableHomeItem(item: MediaItem?): Boolean {
-    return item != null && item.id > 0 && !item.isPlaceholder
+    return item != null &&
+    item.id > 0 &&
+        !item.isPlaceholder
 }
 
 internal fun shouldPlayIptvHomeHero(
@@ -4021,7 +4035,7 @@ private fun TvHomeRowsLayer(
                         { onLoadMoreCategory(category.id) }
                     }
                     val onRowItemFocused = remember(actualRowIndex, category.id) {
-                        { item: MediaItem, itemIdx: Int ->
+                        { _: MediaItem, itemIdx: Int ->
                             focusState.currentRowIndex = actualRowIndex
                             focusState.currentItemIndex = itemIdx
                             focusState.rowItemIndicesByCategoryId[category.id] = itemIdx

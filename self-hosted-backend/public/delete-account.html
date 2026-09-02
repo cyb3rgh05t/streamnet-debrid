@@ -8,14 +8,18 @@
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
     <style>
       :root {
-        --bg: #141414;
-        --surface: #1f1f1f;
-        --surface-raised: #252525;
-        --line: #2e2e2e;
-        --line-strong: #3d3d3d;
-        --text: #f0f0f0;
-        --muted: #888888;
+        --bg-1: #0f0d0b;
+        --bg-2: #171311;
+        --bg-3: #221b16;
+        --surface: #1c1713;
+        --surface-raised: #15110e;
+        --field: #120f0c;
+        --line: rgba(255, 255, 255, 0.08);
+        --line-strong: rgba(229, 162, 9, 0.26);
+        --text: #f4efe7;
+        --muted: #b4a798;
         --accent: #e5a209;
+        --accent-2: #ce8017;
         --danger: #ff5b62;
         --danger-strong: #e83d46;
         --success: #41d89b;
@@ -26,15 +30,28 @@
       }
       html {
         min-height: 100%;
-        background: var(--bg);
+        background: var(--bg-1);
       }
       body {
         min-height: 100vh;
         margin: 0;
         color: var(--text);
-        background: var(--bg);
-        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        background:
+          radial-gradient(
+            circle at 14% 4%,
+            rgba(229, 162, 9, 0.12),
+            transparent 26%
+          ),
+          linear-gradient(160deg, var(--bg-1), var(--bg-2) 62%, var(--bg-3));
+        font-family:
+          "Inter",
+          -apple-system,
+          BlinkMacSystemFont,
+          "Segoe UI",
+          system-ui,
+          sans-serif;
         letter-spacing: 0;
+        padding: 28px;
       }
 
       button,
@@ -51,23 +68,15 @@
       }
 
       .topbar {
-        height: 72px;
         display: flex;
-        align-items: center;
-        border-bottom: 1px solid #262626;
-        background: #1a1a1a;
+        justify-content: flex-end;
       }
 
-      .topbar-inner,
       .page {
-        width: min(100% - 40px, 760px);
+        width: 100%;
+        max-width: 1180px;
         margin: 0 auto;
-      }
-
-      .topbar-inner {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
+        display: grid;
         gap: 12px;
       }
 
@@ -77,7 +86,7 @@
         gap: 4px;
         border: 1px solid var(--line-strong);
         border-radius: 999px;
-        background: #151515;
+        background: rgba(255, 255, 255, 0.03);
         padding: 4px;
       }
 
@@ -95,19 +104,34 @@
       }
 
       .lang-btn[aria-pressed="true"] {
-        background: var(--accent);
-        color: #141414;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        color: #17120f;
       }
 
       .brand {
-        width: 160px;
+        width: min(290px, 100%);
         height: auto;
         display: block;
         filter: drop-shadow(0 0 8px rgba(229, 162, 9, 0.25));
       }
 
-      .page {
-        padding: 54px 0 72px;
+      .shell {
+        width: 100%;
+        max-width: 820px;
+        margin: 0 auto;
+        padding: 40px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background:
+          linear-gradient(180deg, rgba(229, 162, 9, 0.06), transparent 18%),
+          var(--surface);
+        box-shadow:
+          0 28px 70px -34px rgba(0, 0, 0, 0.86),
+          0 8px 18px -12px rgba(0, 0, 0, 0.42);
+      }
+      .brand-link {
+        display: inline-block;
+        margin-bottom: 32px;
       }
       .eyebrow {
         margin: 0 0 12px;
@@ -136,16 +160,16 @@
       .panel {
         overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 10px;
+        border-radius: 22px;
         background: var(--surface);
-        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+        box-shadow: 0 28px 70px -34px rgba(0, 0, 0, 0.86);
       }
 
       .steps {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
         border-bottom: 1px solid var(--line);
-        background: #181818;
+        background: var(--surface-raised);
       }
 
       .step {
@@ -163,7 +187,7 @@
       }
       .step.active {
         color: var(--text);
-        background: var(--surface-raised);
+        background: rgba(229, 162, 9, 0.08);
         border-bottom: 2px solid var(--accent);
       }
       .step.done {
@@ -201,9 +225,9 @@
         height: 48px;
         padding: 0 14px;
         color: var(--text);
-        background: #181818;
+        background: var(--field);
         border: 1px solid var(--line-strong);
-        border-radius: 6px;
+        border-radius: 12px;
         outline: none;
       }
 
@@ -220,18 +244,17 @@
       .secondary {
         min-height: 46px;
         padding: 0 18px;
-        border-radius: 6px;
+        border-radius: 12px;
         font-weight: 700;
       }
 
       .primary {
-        color: #141414;
-        background: var(--accent);
-        border: 1px solid var(--accent);
+        color: #0d0e12;
+        background: linear-gradient(135deg, var(--accent), var(--accent-2));
+        border: 0;
       }
       .primary:hover:not(:disabled) {
-        background: #ce8017;
-        border-color: #ce8017;
+        background: linear-gradient(135deg, #efaf14, #d88419);
       }
       .danger {
         color: #ffffff;
@@ -243,7 +266,7 @@
       }
       .secondary {
         color: var(--text);
-        background: transparent;
+        background: rgba(255, 245, 230, 0.03);
         border: 1px solid var(--line-strong);
       }
       .secondary:hover:not(:disabled) {
@@ -354,15 +377,15 @@
       }
 
       @media (max-width: 560px) {
-        .topbar {
-          height: 64px;
+        body {
+          padding: 14px;
         }
-        .topbar-inner,
-        .page {
-          width: min(100% - 24px, 760px);
+        .shell {
+          padding: 24px 16px 28px;
+          border-radius: 18px;
         }
-        .page {
-          padding: 34px 0 48px;
+        .brand-link {
+          margin-bottom: 24px;
         }
         .intro {
           margin-bottom: 26px;
@@ -375,6 +398,9 @@
         .stage {
           padding: 22px 18px;
         }
+        .panel {
+          border-radius: 18px;
+        }
         .actions {
           flex-direction: column-reverse;
         }
@@ -385,12 +411,8 @@
       }
 
       @media (max-width: 420px) {
-        .topbar-inner,
-        .page {
-          width: min(100% - 16px, 760px);
-        }
         .brand {
-          width: 134px;
+          width: 190px;
         }
         .stage {
           padding: 18px 14px;
@@ -410,13 +432,8 @@
     </style>
   </head>
   <body>
-    <header class="topbar">
-      <div class="topbar-inner">
-        <img
-          class="brand"
-          src="/assets/streamnet-club-logo.svg"
-          alt="StreamNet Club"
-        />
+    <div class="page">
+      <div class="topbar">
         <div class="lang-switch" role="group" aria-label="Language switch">
           <button
             class="lang-btn"
@@ -436,158 +453,165 @@
           </button>
         </div>
       </div>
-    </header>
 
-    <main class="page">
-      <p class="eyebrow" id="eyebrow">Account privacy</p>
-      <h1 id="page-title">Permanently delete your StreamNet TV account</h1>
-      <p class="intro" id="intro-copy">
-        Verify the account, review what will be removed, and confirm deletion.
-        The process signs out every device and permanently removes your cloud
-        data.
-      </p>
+      <main class="shell">
+        <a class="brand-link" href="/">
+          <img
+            class="brand"
+            src="/assets/streamnet-club-logo.svg"
+            alt="StreamNet Club"
+          />
+        </a>
+        <p class="eyebrow" id="eyebrow">Account privacy</p>
+        <h1 id="page-title">Permanently delete your StreamNet TV account</h1>
+        <p class="intro" id="intro-copy">
+          Verify the account, review what will be removed, and confirm deletion.
+          The process signs out every device and permanently removes your cloud
+          data.
+        </p>
 
-      <section class="panel" aria-labelledby="stage-title">
-        <div class="steps" aria-label="Deletion progress" id="steps-label">
-          <div class="step active" data-step="1" id="step-1">1. Verify</div>
-          <div class="step" data-step="2" id="step-2">2. Confirm</div>
-          <div class="step" data-step="3" id="step-3">3. Delete</div>
-        </div>
-
-        <form class="stage" id="login-stage">
-          <h2 id="stage-title">Verify your account</h2>
-          <p class="stage-copy" id="stage-copy-login">
-            Sign in again so no one else can delete your account from an
-            unattended device.
-          </p>
-
-          <div class="field">
-            <label for="email" id="label-email">Email address</label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autocomplete="email"
-              inputmode="email"
-              required
-            />
+        <section class="panel" aria-labelledby="stage-title">
+          <div class="steps" aria-label="Deletion progress" id="steps-label">
+            <div class="step active" data-step="1" id="step-1">1. Verify</div>
+            <div class="step" data-step="2" id="step-2">2. Confirm</div>
+            <div class="step" data-step="3" id="step-3">3. Delete</div>
           </div>
-          <div class="field">
-            <label for="password" id="label-password">Password</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autocomplete="current-password"
-              required
-              minlength="6"
-            />
-          </div>
-          <button
-            class="primary"
-            id="verify-button"
-            type="submit"
-            style="width: 100%; margin-top: 24px"
-          >
-            <span id="verify-button-text">Continue</span>
-          </button>
-          <p
-            class="message"
-            id="login-message"
-            role="alert"
-            aria-live="polite"
-          ></p>
-          <p class="privacy-note" id="privacy-note">
-            Your password is used only for this verification and is never stored
-            on this page.
-          </p>
-        </form>
 
-        <form class="stage" id="confirm-stage" hidden>
-          <h2 id="confirm-title">Review permanent deletion</h2>
-          <p class="account-line">
-            <span id="signed-in-as">Signed in as</span>
-            <strong id="verified-email"></strong>
-          </p>
-          <div class="warning" id="warning-copy">
-            This cannot be undone. Local data on devices is not a backup and may
-            be cleared when the account signs out.
-          </div>
-          <ul class="data-list">
-            <li id="delete-item-1">
-              Account credentials and every active cloud session
-            </li>
-            <li>
-              <span id="delete-item-2">
-                Profiles, settings, addons, catalogs, IPTV configuration, and
-                home server configuration
-              </span>
-            </li>
-            <li>
-              <span id="delete-item-3">
-                Watch history, progress, watchlists, favorites, and synced
-                third-party tokens
-              </span>
-            </li>
-            <li>
-              <span id="delete-item-4">
-                Cloud snapshots, sync history, and pending TV pairing sessions
-              </span>
-            </li>
-          </ul>
-          <div class="field">
-            <label for="confirmation" id="label-confirm"
-              >Type DELETE to confirm</label
+          <form class="stage" id="login-stage">
+            <h2 id="stage-title">Verify your account</h2>
+            <p class="stage-copy" id="stage-copy-login">
+              Sign in again so no one else can delete your account from an
+              unattended device.
+            </p>
+
+            <div class="field">
+              <label for="email" id="label-email">Email address</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                inputmode="email"
+                required
+              />
+            </div>
+            <div class="field">
+              <label for="password" id="label-password">Password</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+                minlength="6"
+              />
+            </div>
+            <button
+              class="primary"
+              id="verify-button"
+              type="submit"
+              style="width: 100%; margin-top: 24px"
             >
-            <input
-              id="confirmation"
-              name="confirmation"
-              type="text"
-              autocomplete="off"
-              spellcheck="false"
-              placeholder="DELETE"
-              required
-            />
-            <p class="confirm-help" id="confirm-help">
-              The confirmation is case-sensitive.
+              <span id="verify-button-text">Continue</span>
+            </button>
+            <p
+              class="message"
+              id="login-message"
+              role="alert"
+              aria-live="polite"
+            ></p>
+            <p class="privacy-note" id="privacy-note">
+              Your password is used only for this verification and is never
+              stored on this page.
             </p>
-          </div>
-          <div class="actions">
-            <button class="secondary" id="cancel-button" type="button">
-              <span id="cancel-button-text">Cancel</span>
-            </button>
-            <button class="danger" id="delete-button" type="submit" disabled>
-              <span id="delete-button-text">Delete permanently</span>
-            </button>
-          </div>
-          <p
-            class="message"
-            id="delete-message"
-            role="alert"
-            aria-live="polite"
-          ></p>
-        </form>
+          </form>
 
-        <section class="stage" id="progress-stage" hidden aria-live="polite">
-          <div class="status-box" id="working-state">
-            <div class="spinner" aria-hidden="true"></div>
-            <h2 id="working-title">Deleting your account</h2>
-            <p class="stage-copy" id="working-copy">
-              Revoking sessions and removing cloud data. Keep this page open.
+          <form class="stage" id="confirm-stage" hidden>
+            <h2 id="confirm-title">Review permanent deletion</h2>
+            <p class="account-line">
+              <span id="signed-in-as">Signed in as</span>
+              <strong id="verified-email"></strong>
             </p>
-          </div>
-          <div class="status-box" id="success-state" hidden>
-            <div class="success-mark" aria-hidden="true">&#10003;</div>
-            <h2 id="success-title">Account deleted</h2>
-            <p class="stage-copy" id="success-copy">
-              Your StreamNet Cloud account and data have been removed. A
-              confirmation email has been sent when delivery is available.
-            </p>
-          </div>
-          <p class="message" id="progress-message" role="alert"></p>
+            <div class="warning" id="warning-copy">
+              This cannot be undone. Local data on devices is not a backup and
+              may be cleared when the account signs out.
+            </div>
+            <ul class="data-list">
+              <li id="delete-item-1">
+                Account credentials and every active cloud session
+              </li>
+              <li>
+                <span id="delete-item-2">
+                  Profiles, settings, addons, catalogs, IPTV configuration, and
+                  home server configuration
+                </span>
+              </li>
+              <li>
+                <span id="delete-item-3">
+                  Watch history, progress, watchlists, favorites, and synced
+                  third-party tokens
+                </span>
+              </li>
+              <li>
+                <span id="delete-item-4">
+                  Cloud snapshots, sync history, and pending TV pairing sessions
+                </span>
+              </li>
+            </ul>
+            <div class="field">
+              <label for="confirmation" id="label-confirm"
+                >Type DELETE to confirm</label
+              >
+              <input
+                id="confirmation"
+                name="confirmation"
+                type="text"
+                autocomplete="off"
+                spellcheck="false"
+                placeholder="DELETE"
+                required
+              />
+              <p class="confirm-help" id="confirm-help">
+                The confirmation is case-sensitive.
+              </p>
+            </div>
+            <div class="actions">
+              <button class="secondary" id="cancel-button" type="button">
+                <span id="cancel-button-text">Cancel</span>
+              </button>
+              <button class="danger" id="delete-button" type="submit" disabled>
+                <span id="delete-button-text">Delete permanently</span>
+              </button>
+            </div>
+            <p
+              class="message"
+              id="delete-message"
+              role="alert"
+              aria-live="polite"
+            ></p>
+          </form>
+
+          <section class="stage" id="progress-stage" hidden aria-live="polite">
+            <div class="status-box" id="working-state">
+              <div class="spinner" aria-hidden="true"></div>
+              <h2 id="working-title">Deleting your account</h2>
+              <p class="stage-copy" id="working-copy">
+                Revoking sessions and removing cloud data. Keep this page open.
+              </p>
+            </div>
+            <div class="status-box" id="success-state" hidden>
+              <div class="success-mark" aria-hidden="true">&#10003;</div>
+              <h2 id="success-title">Account deleted</h2>
+              <p class="stage-copy" id="success-copy">
+                Your StreamNet Cloud account and data have been removed. A
+                confirmation email has been sent when delivery is available.
+              </p>
+            </div>
+            <p class="message" id="progress-message" role="alert"></p>
+          </section>
         </section>
-      </section>
-    </main>
+      </main>
+    </div>
 
     <script>
       const FUNCTIONS = "/.netlify/functions";
@@ -657,6 +681,11 @@
             waitingService: "Waiting for the deletion service to respond...",
             stillProcessing:
               "Deletion is still processing. Contact support if you do not receive confirmation shortly.",
+            invalidCredentials: "Invalid email or password.",
+            missingCredentials: "Email and password are required.",
+            invalidConfirmation: "Type DELETE to confirm.",
+            receiptNotFound: "The deletion confirmation was not found.",
+            requestFailed: "Request failed ({status}).",
           },
         },
         de: {
@@ -710,25 +739,52 @@
             waitingService: "Warte auf Rueckmeldung des Loeschdienstes...",
             stillProcessing:
               "Die Loeschung wird noch verarbeitet. Kontaktiere den Support, falls du in Kuerze keine Bestaetigung erhaeltst.",
+            invalidCredentials: "E-Mail-Adresse oder Passwort ist falsch.",
+            missingCredentials:
+              "E-Mail-Adresse und Passwort sind erforderlich.",
+            invalidConfirmation: "Gib zum Bestaetigen DELETE ein.",
+            receiptNotFound: "Die Loeschbestaetigung wurde nicht gefunden.",
+            requestFailed: "Anfrage fehlgeschlagen ({status}).",
           },
         },
       };
 
-      const preferredLang = (navigator.language || "en")
+      const preferredLang = (
+        window.localStorage.getItem("streamnet:lang") ||
+        navigator.language ||
+        "en"
+      )
         .toLowerCase()
         .startsWith("de")
         ? "de"
         : "en";
       let currentLang = preferredLang;
 
-      function t(key) {
-        return (
+      function t(key, vars = {}) {
+        const raw =
           key
             .split(".")
             .reduce((acc, part) => acc?.[part], I18N[currentLang]) ??
           key.split(".").reduce((acc, part) => acc?.[part], I18N.en) ??
-          key
+          key;
+        return String(raw).replace(/\{(\w+)\}/g, (_, name) =>
+          vars[name] == null ? `{${name}}` : String(vars[name]),
         );
+      }
+
+      const API_ERROR_KEYS = {
+        "Email and password are required": "messages.missingCredentials",
+        "Invalid email or password": "messages.invalidCredentials",
+        "Type DELETE to confirm": "messages.invalidConfirmation",
+        "Deletion receipt not found": "messages.receiptNotFound",
+      };
+
+      function localizeApiError(message, status) {
+        const normalized = String(message || "").trim();
+        const key = API_ERROR_KEYS[normalized];
+        if (key) return t(key);
+        if (normalized) return normalized;
+        return t("messages.requestFailed", { status });
       }
 
       function setText(id, key) {
@@ -738,6 +794,7 @@
 
       function applyLanguage(lang) {
         currentLang = lang === "de" ? "de" : "en";
+        window.localStorage.setItem("streamnet:lang", currentLang);
         document.documentElement.lang = currentLang;
         document.title = t("title");
         langEnButton.setAttribute("aria-pressed", String(currentLang === "en"));
@@ -799,9 +856,7 @@
         const result = await response.json().catch(() => ({}));
         if (!response.ok) {
           const error = new Error(
-            result.error ||
-              result.message ||
-              `Request failed (${response.status})`,
+            localizeApiError(result.error || result.message, response.status),
           );
           error.status = response.status;
           error.code = result.code || "";
@@ -842,9 +897,13 @@
           if (error.code === "password_setup_required") {
             loginMessage.textContent = error.details?.email_sent
               ? t("messages.passwordSetupSent")
-              : error.message || t("messages.passwordSetupRequired");
+              : localizeApiError(error.message) ||
+                t("messages.passwordSetupRequired");
           } else {
-            loginMessage.textContent = error.message;
+            loginMessage.textContent = localizeApiError(
+              error.message,
+              error.status,
+            );
           }
         } finally {
           verifyButton.disabled = false;
@@ -880,7 +939,10 @@
           showStage(3);
           await pollDeletion();
         } catch (error) {
-          deleteMessage.textContent = error.message;
+          deleteMessage.textContent = localizeApiError(
+            error.message,
+            error.status,
+          );
           deleteButton.disabled = false;
         }
       });
@@ -901,7 +963,7 @@
               return;
             }
             if (status.status === "failed") {
-              progressMessage.textContent = `${status.error || t("messages.deletionFailed")} ${t("messages.supportHint")}`;
+              progressMessage.textContent = `${localizeApiError(status.error) || t("messages.deletionFailed")} ${t("messages.supportHint")}`;
               return;
             }
           } catch (error) {

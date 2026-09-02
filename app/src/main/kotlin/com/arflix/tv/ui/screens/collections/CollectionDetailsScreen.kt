@@ -72,6 +72,7 @@ import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.GenreFanartRepository
+import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
@@ -89,6 +90,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
@@ -129,11 +131,20 @@ class CollectionDetailsViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val mediaRepository: MediaRepository,
     private val genreFanartRepository: GenreFanartRepository,
+    private val iptvRepository: IptvRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(CollectionDetailsUiState())
     val uiState: StateFlow<CollectionDetailsUiState> = _uiState.asStateFlow()
     private val _cardLogoUrls = MutableStateFlow<Map<String, String>>(emptyMap())
     val cardLogoUrls: StateFlow<Map<String, String>> = _cardLogoUrls.asStateFlow()
+    private var iptvOnlyMode = true
+    private var iptvVodAvailability: IptvRepository.XtreamVodAvailability? = null
+
+    private data class CollectionPage(
+        val items: List<MediaItem>,
+        val hasMore: Boolean,
+        val nextOffset: Int,
+    )
 
     private companion object {
         const val FIRST_PAGE = 8
@@ -152,6 +163,12 @@ class CollectionDetailsViewModel @Inject constructor(
             if (current.catalog?.id == normalizedCatalogId && !current.isLoadingMovies && !current.isLoadingSeries) return@launch
 
             _uiState.value = CollectionDetailsUiState(isLoadingMovies = true, isLoadingSeries = true)
+            iptvOnlyMode = iptvRepository.observeConfig().first().iptvOnlyMode
+            iptvVodAvailability = if (iptvOnlyMode) {
+                runCatching { iptvRepository.getXtreamVodAvailability(allowNetwork = false) }.getOrNull()
+            } else {
+                null
+            }
             val baseCatalog = catalogRepository.getCatalogs()
                 .firstOrNull { it.id == normalizedCatalogId || it.id == catalogId }
                 ?: syntheticTmdbCollectionCatalog(normalizedCatalogId)
@@ -243,7 +260,7 @@ class CollectionDetailsViewModel @Inject constructor(
                 movieItems = pageItems,
                 isLoadingMovies = false,
                 hasMoreMovies = page?.hasMore == true,
-                loadedMovieOffset = pageItems.size,
+                loadedMovieOffset = page?.nextOffset ?: 0,
                 error = _uiState.value.error ?: if (page == null) COLLECTION_LOAD_FAILED_ERROR else null
             )
             CollectionTab.SERIES -> _uiState.value.copy(
@@ -251,7 +268,7 @@ class CollectionDetailsViewModel @Inject constructor(
                 seriesItems = pageItems,
                 isLoadingSeries = false,
                 hasMoreSeries = page?.hasMore == true,
-                loadedSeriesOffset = pageItems.size,
+                loadedSeriesOffset = page?.nextOffset ?: 0,
                 error = _uiState.value.error ?: if (page == null) COLLECTION_LOAD_FAILED_ERROR else null
             )
         }
@@ -301,13 +318,13 @@ class CollectionDetailsViewModel @Inject constructor(
                     movieItems = state.movieItems + uniqueNew,
                     isLoadingMoreMovies = false,
                     hasMoreMovies = next?.hasMore == true,
-                    loadedMovieOffset = state.loadedMovieOffset + freshItems.size
+                    loadedMovieOffset = next?.nextOffset ?: state.loadedMovieOffset
                 )
                 CollectionTab.SERIES -> _uiState.value.copy(
                     seriesItems = state.seriesItems + uniqueNew,
                     isLoadingMoreSeries = false,
                     hasMoreSeries = next?.hasMore == true,
-                    loadedSeriesOffset = state.loadedSeriesOffset + freshItems.size
+                    loadedSeriesOffset = next?.nextOffset ?: state.loadedSeriesOffset
                 )
             }
             preloadLogos(uniqueNew)
@@ -360,12 +377,34 @@ class CollectionDetailsViewModel @Inject constructor(
         tab: CollectionTab,
         offset: Int,
         limit: Int
-    ): MediaRepository.CategoryPageResult {
-        return mediaRepository.loadCollectionCatalogPage(
-            catalogForTab(catalog, tab),
-            offset = offset,
-            limit = limit
-        )
+    ): CollectionPage {
+        val pageCatalog = catalogForTab(catalog, tab)
+        val availability = iptvVodAvailability
+        if (!iptvOnlyMode || availability == null) {
+            val page = mediaRepository.loadCollectionCatalogPage(pageCatalog, offset, limit)
+            return CollectionPage(page.items, page.hasMore, offset + page.items.size)
+        }
+
+        val availableItems = mutableListOf<MediaItem>()
+        var sourceOffset = offset
+        var hasMore = true
+        var pagesScanned = 0
+        while (availableItems.size < limit && hasMore && pagesScanned < 12) {
+            val page = mediaRepository.loadCollectionCatalogPage(
+                pageCatalog,
+                offset = sourceOffset,
+                limit = maxOf(limit, PAGE_STEP),
+            )
+            if (page.items.isEmpty()) {
+                hasMore = false
+                break
+            }
+            sourceOffset += page.items.size
+            availableItems += page.items.filter(availability::contains)
+            hasMore = page.hasMore
+            pagesScanned++
+        }
+        return CollectionPage(availableItems, hasMore, sourceOffset)
     }
 
     private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {

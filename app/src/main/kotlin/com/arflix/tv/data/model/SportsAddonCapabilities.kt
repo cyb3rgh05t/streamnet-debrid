@@ -143,7 +143,12 @@ object SportsAddonCapabilities {
 
     fun isLiveStreamAddonId(addonId: String?): Boolean {
         val id = addonId?.trim()?.lowercase(Locale.US) ?: return false
-        if (id.contains("cinemeta") || id.contains("tmdb") || id.contains("torrentio")) return false
+        if (
+            id == "iptv_xtream_vod" ||
+            id.contains("cinemeta") ||
+            id.contains("tmdb") ||
+            id.contains("torrentio")
+        ) return false
         return id.contains("livetv") || id.contains("live_tv") ||
             id.contains("live-tv") || id.contains("live_stream") ||
             id.contains("livestream") || id.contains("live-stream") ||
@@ -186,7 +191,7 @@ object SportsAddonCapabilities {
         if (status != null && (isSportsHomeStatus(status) || status.startsWith("iptv:") || status.startsWith("live:") || status.startsWith("channel:"))) {
             return true
         }
-        if (id != null && id <= 0) {
+        if (id == 0) {
             return true
         }
         if (!streamAddonId.isNullOrBlank()) {

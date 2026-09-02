@@ -135,6 +135,7 @@
     <string name="subtitle_size">Untertitelgröße</string>
     <string name="subtitle_color">Untertitelfarbe</string>
     <string name="subtitle_style">Untertitelstil</string>
+    <string name="subtitle_font">Untertitelschrift</string>
     <string name="subtitle_offset">Untertitelposition</string>
     <string name="auto_play_next_title">Nächste Folge automatisch</string>
     <string name="autoplay">Autoplay</string>
@@ -192,6 +193,7 @@
     <string name="included_with_prime">In Prime enthalten</string>
     <string name="app_language_desc">App-Texte, Titel, Beschreibungen und Metadaten</string>
     <string name="audio_desc">Bevorzugte Audiospur</string>
+    <string name="subtitle_font_desc">Schriftart für Untertitel</string>
     <string name="auto_play_desc">Nächste Folge automatisch starten</string>
     <string name="autoplay_desc">Aus öffnet den Quellenwähler bei Play</string>
     <string name="auto_play_quality_desc">Mindestqualität für Autoplay</string>
@@ -238,7 +240,9 @@
     <string name="settings_iptv_sort_channel_number">Kanalnummer</string>
     <string name="settings_iptv_sort_alphabetical">Alphabetisch (A-Z)</string>
     <string name="settings_iptv_special_categories_title">Spezialkategorien</string>
-    <string name="settings_iptv_special_categories_subtitle">Alle Sender und zuletzt gesehene Sender in Live-TV ein- oder ausblenden</string>
+    <string name="settings_iptv_special_categories_subtitle">Alle Sender  und zuletzt gesehene Sender in Live-TV ein- oder ausblenden</string>
+    <string name="settings_iptv_only_mode_title">Nur IPTV-Provider Quellen</string>
+    <string name="settings_iptv_only_mode_subtitle">Auf der Startseite nur Content von IPTV-Providern anzeigen</string>
 
     <!-- Live-TV -->
     <string name="live_badge_live">LIVE</string>
@@ -283,7 +287,7 @@
     <string name="live_search_now">Jetzt: %1$s</string>
     <string name="live_status_loading_guide">Sichtbare Programmdaten werden geladen…</string>
     <string name="live_status_no_epg_source">Keine EPG-Quelle eingerichtet</string>
-    <string name="live_status_guide_pending">Programdaten nicht verfügbar...</string>
+    <string name="live_status_guide_pending">Programmdaten nicht verfügbar...</string>
     <string name="live_status_matched">%1$s  |  %2$d/%3$d sichtbaren Sendern zugeordnet</string>
     <string name="live_empty_no_programme">Programmdaten nicht verfügbar</string>
     <string name="live_empty_no_programme_description">Leider ist für diesen Sender kein TV-Programm verfügbar.</string>
@@ -295,7 +299,7 @@
     <string name="live_empty_no_playlist">Keine IPTV-Playlist eingerichtet.</string>
     <string name="live_placeholder_loading_guide">Programm wird geladen…</string>
     <string name="live_placeholder_no_guide_matched">Keine passenden Programmdaten</string>
-    <string name="live_placeholder_guide_pending">Programdaten nicht verfügbar...</string>
+    <string name="live_placeholder_guide_pending">Programmdaten nicht verfügbar...</string>
     <string name="live_placeholder_no_guide_source">Keine Programmquelle</string>
     <string name="live_btn_channels">SENDER</string>
     <string name="live_btn_guide">PROGRAMM</string>
