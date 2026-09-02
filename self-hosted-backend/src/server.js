@@ -14,6 +14,7 @@ import { normalizeAndValidateEmail } from "./email.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 import { deleteAccountData } from "./account-deletion.js";
+import { isValidWatchHistoryIdentity } from "./watch-history.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -166,7 +167,7 @@ app.post("/watch-history", async (request, reply) => {
   const body = request.body || {};
   const mediaType = String(body.media_type || "").trim();
   const showTmdbId = Number(body.show_tmdb_id);
-  if (!mediaType || !Number.isInteger(showTmdbId) || showTmdbId <= 0)
+  if (!isValidWatchHistoryIdentity(body))
     return reply
       .code(400)
       .send({ error: "media_type and show_tmdb_id are required" });
