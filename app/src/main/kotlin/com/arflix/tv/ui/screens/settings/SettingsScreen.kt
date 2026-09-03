@@ -511,7 +511,7 @@ fun SettingsScreen(
                     groupOrder = uiState.iptvGroupOrder
                 ).size // Reset row + category rows
             } else {
-                5 + uiState.iptvPlaylists.size // Add + rows + order + IPTV-only + refresh + clear + special categories
+                6 + uiState.iptvPlaylists.size // Add + rows + order + IPTV-only + VOD search + refresh + clear + special categories
             }
             "home_server" -> uiState.homeServerConnections.size + 3
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
@@ -1166,13 +1166,16 @@ fun SettingsScreen(
                                                     viewModel.setIptvOnlyMode(!uiState.iptvOnlyMode)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 3 -> {
-                                                    viewModel.refreshIptv(force = true)
+                                                    viewModel.setIptvVodSearchEnabled(!uiState.iptvVodSearchEnabled)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 4 -> {
-                                                    viewModel.clearIptvConfig()
+                                                    viewModel.refreshIptv(force = true)
                                                 }
                                                 contentFocusIndex == uiState.iptvPlaylists.size + 5 -> {
                                                     viewModel.setIptvShowSpecialCategories(!uiState.iptvShowSpecialCategories)
+                                                }
+                                                contentFocusIndex == uiState.iptvPlaylists.size + 6 -> {
+                                                    viewModel.clearIptvConfig()
                                                 }
                                             }
                                         }
@@ -1739,7 +1742,9 @@ fun SettingsScreen(
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
                             iptvOnlyMode = uiState.iptvOnlyMode,
+                            vodSearchEnabled = uiState.iptvVodSearchEnabled,
                             onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
+                            onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                             sortOrder = uiState.iptvSortOrder,
                             onSortOrderChange = { viewModel.setIptvSortOrder(it) }
@@ -1789,7 +1794,9 @@ fun SettingsScreen(
                             onManageCategories = openIptvCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
                             iptvOnlyMode = uiState.iptvOnlyMode,
+                            vodSearchEnabled = uiState.iptvVodSearchEnabled,
                             onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
+                            onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                             sortOrder = uiState.iptvSortOrder,
                             onSortOrderChange = { viewModel.setIptvSortOrder(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
@@ -2588,6 +2595,13 @@ fun SettingsScreen(
             )
         }
 
+        if (uiState.isIptvLoading) {
+            IptvLoadingOverlay(
+                progressText = uiState.iptvProgressText,
+                progressPercent = uiState.iptvProgressPercent,
+            )
+        }
+
         // Toast notification
         uiState.toastMessage?.let { message ->
             Toast(
@@ -2602,6 +2616,65 @@ fun SettingsScreen(
             )
         }
 
+    }
+}
+
+@Composable
+private fun IptvLoadingOverlay(
+    progressText: String?,
+    progressPercent: Int,
+) {
+    val accentColor = resolveAccentColor(fallback = Pink)
+    val percent = progressPercent.coerceIn(0, 100)
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 16.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Row(
+            modifier = Modifier
+                .widthIn(max = 560.dp)
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(Color(0xF21A1E28))
+                .border(1.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
+                .padding(horizontal = 16.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            LoadingIndicator(size = 26.dp, color = accentColor)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = progressText ?: stringResource(R.string.settings_refreshing_channels_epg),
+                    style = ArflixTypography.body,
+                    color = TextPrimary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(7.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(5.dp)
+                        .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(999.dp)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(percent / 100f)
+                            .background(accentColor, RoundedCornerShape(999.dp)),
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = "$percent%",
+                style = ArflixTypography.caption,
+                color = accentColor,
+            )
+        }
     }
 }
 
@@ -5215,7 +5288,9 @@ private fun MobileSettingsSubPage(
                     },
                     showSpecialCategories = uiState.iptvShowSpecialCategories,
                     iptvOnlyMode = uiState.iptvOnlyMode,
+                    vodSearchEnabled = uiState.iptvVodSearchEnabled,
                     onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
+                    onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                     onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
                     sortOrder = uiState.iptvSortOrder,
                     onSortOrderChange = { viewModel.setIptvSortOrder(it) }
@@ -7432,9 +7507,11 @@ private fun IptvSettings(
     onManageCategories: (String) -> Unit = {},
     showSpecialCategories: Boolean = true,
     iptvOnlyMode: Boolean = true,
+    vodSearchEnabled: Boolean = true,
     sortOrder: String = "provider",
     onSortOrderChange: (String) -> Unit = {},
     onIptvOnlyModeChange: (Boolean) -> Unit = {},
+    onVodSearchToggle: (Boolean) -> Unit = {},
     onShowSpecialCategoriesChange: (Boolean) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
@@ -7549,6 +7626,14 @@ private fun IptvSettings(
                     onClick = { onIptvOnlyModeChange(!iptvOnlyMode) }
                 )
                 MobileSettingsRow(
+                    icon = Icons.Default.Movie,
+                    title = stringResource(R.string.settings_iptv_vod_search),
+                    subtitle = stringResource(R.string.settings_iptv_vod_search_desc),
+                    value = if (vodSearchEnabled) stringResource(R.string.on) else stringResource(R.string.off),
+                    isFocused = false,
+                    onClick = { onVodSearchToggle(!vodSearchEnabled) }
+                )
+                MobileSettingsRow(
                     icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                     title = stringResource(R.string.settings_iptv_special_categories_title),
                     subtitle = stringResource(R.string.settings_iptv_special_categories_subtitle),
@@ -7630,7 +7715,14 @@ private fun IptvSettings(
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = stringResource(R.string.settings_iptv_playlist_settings_header),
+                style = ArflixTypography.sectionTitle.copy(fontSize = 18.sp),
+                color = TextPrimary,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
             SettingsRow(
                 icon = Icons.Default.List,
                 title = stringResource(R.string.settings_iptv_channel_order),
@@ -7662,10 +7754,18 @@ private fun IptvSettings(
                 modifier = Modifier.settingsFocusSlot(playlists.size + 2)
             )
             Spacer(modifier = Modifier.height(16.dp))
-            val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
-            SettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.settings_badge_loading) else stringResource(R.string.settings_badge_refresh), isFocused = focusedIndex == playlists.size + 3, onClick = onRefresh, modifier = Modifier.settingsFocusSlot(playlists.size + 3))
+            SettingsToggleRow(
+                title = stringResource(R.string.settings_iptv_vod_search),
+                subtitle = stringResource(R.string.settings_iptv_vod_search_desc),
+                isEnabled = vodSearchEnabled,
+                isFocused = focusedIndex == playlists.size + 3,
+                onToggle = onVodSearchToggle,
+                modifier = Modifier.settingsFocusSlot(playlists.size + 3),
+                icon = Icons.Default.Movie
+            )
             Spacer(modifier = Modifier.height(16.dp))
-            SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 4, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 4))
+            val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
+            SettingsRow(icon = Icons.Default.Link, title = stringResource(R.string.refresh_iptv), subtitle = refreshSubtitle, value = if (isLoading) stringResource(R.string.settings_badge_loading) else stringResource(R.string.settings_badge_refresh), isFocused = focusedIndex == playlists.size + 4, onClick = onRefresh, modifier = Modifier.settingsFocusSlot(playlists.size + 4))
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(
                 icon = if (showSpecialCategories) Icons.Default.Visibility else Icons.Default.VisibilityOff,
@@ -7676,6 +7776,8 @@ private fun IptvSettings(
                 onClick = { onShowSpecialCategoriesChange(!showSpecialCategories) },
                 modifier = Modifier.settingsFocusSlot(playlists.size + 5)
             )
+            Spacer(modifier = Modifier.height(16.dp))
+            SettingsRow(icon = Icons.Default.Delete, title = stringResource(R.string.delete_iptv), subtitle = if (playlists.isEmpty()) stringResource(R.string.settings_no_playlists_configured) else stringResource(R.string.settings_remove_playlists_epg), value = if (playlists.isEmpty()) stringResource(R.string.settings_badge_empty) else stringResource(R.string.settings_badge_delete), isFocused = focusedIndex == playlists.size + 6, onClick = onDelete, modifier = Modifier.settingsFocusSlot(playlists.size + 6))
             if (isLoading && !progressText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(stringResource(R.string.settings_progress_format, progressText, progressPercent.coerceIn(0, 100)), style = ArflixTypography.caption, color = TextSecondary)
@@ -9212,7 +9314,7 @@ private fun AddonRow(
                 modifier = Modifier
                     .border(
                         width = if (isToggleFocused) 2.dp else 0.dp,
-                        color = if (isToggleFocused) Color.White else Color.Transparent,
+                        color = if (isToggleFocused) focusRingColor else Color.Transparent,
                         shape = RoundedCornerShape(13.dp)
                     )
                     .padding(2.dp)

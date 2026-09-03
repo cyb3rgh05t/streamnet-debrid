@@ -63,6 +63,12 @@ val COUNTRIES = listOf(
 enum class DiscoverType(val label: String) { ALL("All"), MOVIES("Movies"), TV_SHOWS("TV Shows"), ANIME("Anime") }
 enum class SortOption(val label: String, val apiValue: String) { POPULAR("Popular", "popularity.desc"), TOP_RATED("Top Rated", "vote_average.desc"), NEWEST("Newest", "primary_release_date.desc") }
 
+internal fun buildAnimeGenreFilter(genre: String?): String? = when (genre) {
+    null -> null
+    "16" -> "16"
+    else -> "16,$genre"
+}
+
 // Memoized empty collections to reduce GC pressure
 private val EMPTY_MEDIA_ITEMS: List<MediaItem> = emptyList()
 private val EMPTY_CATEGORIES: List<Category> = emptyList()
@@ -180,7 +186,7 @@ class SearchViewModel @Inject constructor(
                 DiscoverType.MOVIES -> mediaRepository.discoverMovies(movieGenre, sort, minVotes, page, language = lang, releaseDateLte = releaseDateLte, releaseDateGte = releaseDateGte)
                 DiscoverType.TV_SHOWS -> mediaRepository.discoverTv(tvGenre, sort, minVotes, page, language = lang, airDateLte = releaseDateLte, airDateGte = releaseDateGte)
                 DiscoverType.ANIME -> {
-                    val animeGenre = buildAnimeGenre(tvGenre)
+                    val animeGenre = buildAnimeGenreFilter(tvGenre)
                     mediaRepository.discoverTv(animeGenre, sort, minVotes, page, language = lang, keywords = "210024", airDateLte = releaseDateLte, airDateGte = releaseDateGte)
                 }
                 DiscoverType.ALL -> {
@@ -200,11 +206,6 @@ class SearchViewModel @Inject constructor(
         "14", "878" -> "10765"
         "10752" -> "10768"
         else -> genre
-    }
-
-    private fun buildAnimeGenre(genre: String?): String = when (genre) {
-        null, "16" -> "16"
-        else -> "16,$genre"
     }
 
     // ── Filters → reload discover rows ──────────────────────────────────
@@ -357,7 +358,7 @@ class SearchViewModel @Inject constructor(
                         when (sq.type) {
                             DiscoverType.MOVIES -> mediaRepository.discoverMovies(sq.genreId, sq.sort, sq.minVotes, 1)
                             DiscoverType.TV_SHOWS -> mediaRepository.discoverTv(tvGenre, sq.sort, sq.minVotes, 1)
-                            DiscoverType.ANIME -> mediaRepository.discoverTv(buildAnimeGenre(tvGenre), sq.sort, sq.minVotes, 1, keywords = "210024")
+                            DiscoverType.ANIME -> mediaRepository.discoverTv(buildAnimeGenreFilter(tvGenre), sq.sort, sq.minVotes, 1, keywords = "210024")
                             DiscoverType.ALL -> {
                                 coroutineScope {
                                     val a = async { mediaRepository.discoverMovies(sq.genreId, sq.sort, sq.minVotes, 1) }

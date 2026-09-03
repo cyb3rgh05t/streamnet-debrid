@@ -88,6 +88,16 @@ import kotlin.math.abs
 internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
     channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
+internal fun normalizeLogoCacheLanguage(language: String): String =
+    language.ifBlank { "en-US" }
+        .replace('_', '-')
+        .replace("iw", "he")
+        .lowercase(Locale.US)
+
+internal fun isLogoCacheLanguageCurrent(cachedLanguage: String?, contentLanguage: String): Boolean =
+    cachedLanguage != null &&
+        normalizeLogoCacheLanguage(cachedLanguage) == normalizeLogoCacheLanguage(contentLanguage)
+
 private const val RECENT_TV_HOME_ITEM_LIMIT = 10
 internal fun isIptvLiveHomeCategory(categoryId: String): Boolean =
     categoryId == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
@@ -1726,6 +1736,8 @@ class HomeViewModel @Inject constructor(
     private var logoCacheRevision: Long = 0L
     private var lastPublishedLogoCacheRevision: Long = -1L
     private val logoCachePrefs = context.getSharedPreferences("logo_cache", Context.MODE_PRIVATE)
+    @Volatile
+    private var logoCacheLanguage: String? = logoCachePrefs.getString("content_language", null)
     private var logoCacheDiskWriteJob: Job? = null
     private val logoFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
     private val heroDetailsCache = ConcurrentHashMap<String, HeroDetailsSnapshot>()
@@ -1977,6 +1989,11 @@ class HomeViewModel @Inject constructor(
     /** Restore logo URL cache from disk (SharedPreferences). Called once at init. */
     private fun restoreLogoCacheFromDisk() {
         try {
+            val storedLanguage = logoCachePrefs.getString("content_language", null)
+            if (!isLogoCacheLanguageCurrent(storedLanguage, logoCacheLanguage.orEmpty())) {
+                logoCachePrefs.edit().remove("urls").remove("content_language").apply()
+                return
+            }
             val json = logoCachePrefs.getString("urls", null) ?: return
             if (json.length > maxLogoCacheJsonChars) {
                 logoCachePrefs.edit().remove("urls").apply()
@@ -1985,6 +2002,9 @@ class HomeViewModel @Inject constructor(
             val map = org.json.JSONObject(json)
             val keys = map.keys()
             synchronized(logoCacheLock) {
+                if (!isLogoCacheLanguageCurrent(storedLanguage, logoCacheLanguage.orEmpty())) {
+                    return
+                }
                 while (keys.hasNext()) {
                     val key = keys.next()
                     logoCache[key] = map.getString(key)
@@ -2012,7 +2032,12 @@ class HomeViewModel @Inject constructor(
             try {
                 val snapshot = synchronized(logoCacheLock) { LinkedHashMap(logoCache) }
                 val json = org.json.JSONObject(snapshot as Map<*, *>).toString()
-                logoCachePrefs.edit().putString("urls", json).apply()
+                val language = normalizeLogoCacheLanguage(mediaRepository.contentLanguage)
+                logoCacheLanguage = language
+                logoCachePrefs.edit()
+                    .putString("content_language", language)
+                    .putString("urls", json)
+                    .apply()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 AppLogger.e("HomeVM", "failed to save logo cache: ${e.message}", e)
@@ -2020,12 +2045,23 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private fun invalidateContentLanguageCaches() {
+    private fun invalidateContentLanguageCaches(contentLanguage: String) {
         heroUpdateJob?.cancel()
         heroDetailsJob?.cancel()
         prefetchJob?.cancel()
+        logoCacheDiskWriteJob?.cancel()
         heroDetailsCache.clear()
         heroDetailsFetchInFlight.clear()
+        synchronized(logoCacheLock) {
+            logoCacheLanguage = normalizeLogoCacheLanguage(contentLanguage)
+            logoCache.clear()
+            logoCacheRevision += 1L
+        }
+        replaceCardLogoState(emptyMap())
+        logoCachePrefs.edit()
+            .remove("urls")
+            .putString("content_language", logoCacheLanguage)
+            .apply()
         lastResolvedBaseCategories = emptyList()
         mediaRepository.clearMediaCache()
         _uiState.value = _uiState.value.copy(
@@ -2107,6 +2143,10 @@ class HomeViewModel @Inject constructor(
                     mediaRepository.contentLanguage = preferences.contentLanguage
                     val normalizedLanguage = mediaRepository.contentLanguage
                     val langChanged = observedContentLanguage?.let { it != normalizedLanguage } ?: false
+                    val logoLanguageChanged = !isLogoCacheLanguageCurrent(
+                        logoCacheLanguage,
+                        normalizedLanguage,
+                    )
                     observedContentLanguage = normalizedLanguage
 
                     _uiState.value = previousState.copy(
@@ -2119,8 +2159,8 @@ class HomeViewModel @Inject constructor(
                         smoothScrolling = preferences.smoothScrolling
                     )
 
-                    if (langChanged) {
-                        invalidateContentLanguageCaches()
+                    if (langChanged || logoLanguageChanged) {
+                        invalidateContentLanguageCaches(normalizedLanguage)
                         loadHomeData()
                     } else if (autoplayJustEnabled) {
                         _uiState.value.heroItem?.let(::hydrateHeroDetailsIfNeeded)

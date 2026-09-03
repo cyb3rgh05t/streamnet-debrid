@@ -93,4 +93,12 @@ class HomeProfilePreferencesTest {
 
         assertThat(settings.contentLanguage).isEqualTo("iw-IL")
     }
+
+    @Test
+    fun `logo cache is reusable only for the current content language`() {
+        assertThat(isLogoCacheLanguageCurrent("de-DE", "de_de")).isTrue()
+        assertThat(isLogoCacheLanguageCurrent("iw-IL", "he-IL")).isTrue()
+        assertThat(isLogoCacheLanguageCurrent("en-US", "de-DE")).isFalse()
+        assertThat(isLogoCacheLanguageCurrent(null, "de-DE")).isFalse()
+    }
 }

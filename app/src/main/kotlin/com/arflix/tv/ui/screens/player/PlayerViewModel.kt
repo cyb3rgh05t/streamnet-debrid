@@ -69,6 +69,52 @@ private fun Addon.isVodStreamingAddon(): Boolean =
     isEnabled &&
         type != AddonType.SUBTITLE
 
+internal fun selectForcedSubtitleForAudio(
+    subtitles: List<Subtitle>,
+    audioLanguage: String,
+    normalizeLanguage: (String) -> String,
+): Subtitle? {
+    val targetLanguage = normalizeLanguage(audioLanguage)
+        .takeUnless { it.isBlank() || it == "none" }
+        ?: return null
+    return subtitles.firstOrNull { subtitle ->
+        val isForced = subtitle.isForced || subtitle.label.contains("forced", ignoreCase = true)
+        val languageMatches = normalizeLanguage(subtitle.lang) == targetLanguage ||
+            normalizeLanguage(subtitle.label) == targetLanguage
+        subtitle.isEmbedded && isForced && languageMatches
+    }
+}
+
+internal fun shouldAutoSelectForcedSubtitle(preference: String?): Boolean {
+    val normalized = preference?.trim()?.lowercase().orEmpty()
+    return normalized.isBlank() ||
+        normalized == "forced" ||
+        normalized == "off" ||
+        normalized == "none" ||
+        normalized == "no subtitles" ||
+        normalized == "disabled" ||
+        normalized == "disable"
+}
+
+internal fun resolveSelectedAudioLanguage(
+    language: String?,
+    label: String?,
+    normalizeLanguage: (String) -> String,
+): String? {
+    val normalizedLanguage = normalizeLanguage(language.orEmpty())
+        .takeUnless { it.isBlank() || it == "und" || it == "zxx" }
+    if (normalizedLanguage != null) return normalizedLanguage
+
+    val rawLabel = label.orEmpty().trim().lowercase()
+    val normalizedLabel = normalizeLanguage(rawLabel)
+    if (normalizedLabel.isNotBlank() && normalizedLabel != rawLabel) return normalizedLabel
+    return Regex("[A-Za-z-]+").findAll(rawLabel)
+        .map { it.value }
+        .map { token -> token to normalizeLanguage(token) }
+        .firstOrNull { (token, normalized) -> normalized.isNotBlank() && normalized != token }
+        ?.second
+}
+
 private const val PLAYBACK_DIAGNOSTICS = true
 
 // "Preload Subtitles" mode: cap on how many preferred-language subs are downloaded and
@@ -224,6 +270,7 @@ class PlayerViewModel @Inject constructor(
     private var currentBackdrop: String? = null
     private var currentEpisodeTitle: String? = null
     private var currentOriginalLanguage: String? = null
+    private var selectedAudioLanguage: String? = null
     private var currentAirDate: String? = null
     private var currentGenreIds: List<Int> = emptyList()
     private var currentItemTitle: String = ""
@@ -568,6 +615,7 @@ class PlayerViewModel @Inject constructor(
         activeSkipRequestKey = null
         _uiState.value = _uiState.value.copy(activeSkipInterval = null, skipIntervalDismissed = false)
         currentOriginalLanguage = cachedItem?.originalLanguage
+        selectedAudioLanguage = null
         currentGenreIds = cachedItem?.genreIds ?: emptyList()
         currentItemTitle = cachedItem?.title ?: ""
 
@@ -1456,6 +1504,29 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun applyPreferredSubtitle(preference: String, subtitles: List<Subtitle>, fallbackLanguage: String?) {
+        if (shouldAutoSelectForcedSubtitle(preference)) {
+            if (userPickedSubtitle) return
+            val forcedSubtitle = selectForcedSubtitleForAudio(
+                subtitles = subtitles,
+                audioLanguage = selectedAudioLanguage ?: _uiState.value.preferredAudioLanguage,
+                normalizeLanguage = ::normalizeLanguage,
+            )
+            val current = _uiState.value.selectedSubtitle
+            if (current?.id != forcedSubtitle?.id) {
+                cancelFindBestMatch()
+                translationManager.isEnabled = false
+                aiSourceSubtitle = null
+                _uiState.value = _uiState.value.copy(
+                    selectedSubtitle = forcedSubtitle,
+                    isAiTranslating = false,
+                    isAiAvailable = false,
+                    aiTargetLanguageName = "",
+                    subtitleSelectionNonce = _uiState.value.subtitleSelectionNonce + 1,
+                )
+            }
+            return
+        }
+
         val normalizedPref = normalizeLanguage(preference)
         if (normalizedPref.isNotBlank() && !isSubtitleDisabledPreference(preference)) {
             setTargetSubtitleLang(normalizedPref)
@@ -2748,6 +2819,14 @@ class PlayerViewModel @Inject constructor(
             subtitleSelectionNonce = _uiState.value.subtitleSelectionNonce + 1
         )
         recordSubtitleUsage(subtitle)
+    }
+
+    fun onSelectedAudioTrackChanged(language: String?, label: String?) {
+        val resolvedLanguage = resolveSelectedAudioLanguage(language, label, ::normalizeLanguage)
+            ?: return
+        if (selectedAudioLanguage == resolvedLanguage) return
+        selectedAudioLanguage = resolvedLanguage
+        scheduleSubtitleSelection(currentOriginalLanguage)
     }
 
     /** Cancel a running/queued "Find best match" scan and clear its transient state. */

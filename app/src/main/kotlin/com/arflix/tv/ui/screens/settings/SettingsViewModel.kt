@@ -70,6 +70,7 @@ import com.arflix.tv.util.AuthEmailValidator
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
+import com.arflix.tv.util.IPTV_VOD_SEARCH_ENABLED_KEY
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -188,6 +189,7 @@ data class SettingsUiState(
     val iptvStalkerMac: String = "",
     val iptvShowSpecialCategories: Boolean = true,
     val iptvOnlyMode: Boolean = true,
+    val iptvVodSearchEnabled: Boolean = true,
     val iptvSortOrder: String = "provider",
     val iptvChannelCount: Int = 0,
     val isIptvLoading: Boolean = false,
@@ -254,6 +256,15 @@ data class SettingsUiState(
     val subtitleRemoveHearingImpaired: Boolean = true,
     val aiKeyServerState: AiKeyServerState = AiKeyServerState(),
     val smoothScrolling: Boolean = true
+)
+
+internal fun SettingsUiState.withIptvConnecting(message: String): SettingsUiState = copy(
+    isIptvLoading = true,
+    iptvError = null,
+    iptvStatusMessage = message,
+    iptvStatusType = ToastType.INFO,
+    iptvProgressText = message,
+    iptvProgressPercent = 0,
 )
 
 internal fun shouldUseDirectCloudAuth(deviceType: DeviceType): Boolean = deviceType.isTouchDevice()
@@ -550,6 +561,7 @@ class SettingsViewModel @Inject constructor(
             val volumeBoostDb = prefs[volumeBoostDbKey()]?.toIntOrNull()?.coerceIn(0, 15) ?: 0
             val showLoadingStats = prefs[showLoadingStatsKey()] ?: true
             val smoothScrolling = prefs[smoothScrollingKey()] ?: true
+            val iptvVodSearchEnabled = prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
 
             val subtitleSize = prefs[subtitleSizeKey()] ?: "Medium"
             val subtitleColor = prefs[subtitleColorKey()] ?: "White"
@@ -691,7 +703,8 @@ class SettingsViewModel @Inject constructor(
                 subtitleAiApiKey = subtitleAiApiKey,
                 subtitleAiModel = subtitleAiModel,
                 subtitleRemoveHearingImpaired = subtitleRemoveHearingImpaired,
-                smoothScrolling = smoothScrolling
+                smoothScrolling = smoothScrolling,
+                iptvVodSearchEnabled = iptvVodSearchEnabled
             )
 
             refreshIntegrationUsernames(loadProfileId, isTrakt, isMdbList, isSimkl)
@@ -2442,16 +2455,33 @@ class SettingsViewModel @Inject constructor(
             return
         }
 
+        _uiState.value = _uiState.value.withIptvConnecting(
+            context.getString(R.string.settings_connecting)
+        )
         viewModelScope.launch {
-            val updated = preparedPlaylists.toMutableList()
-            val presetIndex = updated.indexOfFirst(::isStreamNetTvPlaylist)
-            if (presetIndex >= 0) updated[presetIndex] = entry else updated.add(0, entry)
-            iptvRepository.savePlaylists(updated)
-            _uiState.value = _uiState.value.copy(
-                iptvPlaylists = ensureStreamNetTvPreset(updated, BuildConfig.STREAMNET_TV_XTREAM_URL)
-            )
-            syncLocalStateToCloud(silent = true)
-            refreshIptv(showToast = true, configured = true, force = true)
+            runCatching {
+                val updated = preparedPlaylists.toMutableList()
+                val presetIndex = updated.indexOfFirst(::isStreamNetTvPlaylist)
+                if (presetIndex >= 0) updated[presetIndex] = entry else updated.add(0, entry)
+                iptvRepository.savePlaylists(updated)
+                _uiState.value = _uiState.value.copy(
+                    iptvPlaylists = ensureStreamNetTvPreset(updated, BuildConfig.STREAMNET_TV_XTREAM_URL)
+                )
+                syncLocalStateToCloud(silent = true)
+                refreshIptv(showToast = true, configured = true, force = true)
+            }.onFailure { error ->
+                val message = error.message ?: context.getString(R.string.iptv_failed_load_m3u)
+                _uiState.value = _uiState.value.copy(
+                    isIptvLoading = false,
+                    iptvError = message,
+                    iptvStatusMessage = message,
+                    iptvStatusType = ToastType.ERROR,
+                    iptvProgressText = null,
+                    iptvProgressPercent = 0,
+                    toastMessage = message,
+                    toastType = ToastType.ERROR,
+                )
+            }
         }
     }
 
@@ -2565,6 +2595,13 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.saveIptvOnlyMode(enabled)
             syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun setIptvVodSearchEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[IPTV_VOD_SEARCH_ENABLED_KEY] = enabled }
+            _uiState.value = _uiState.value.copy(iptvVodSearchEnabled = enabled)
         }
     }
 

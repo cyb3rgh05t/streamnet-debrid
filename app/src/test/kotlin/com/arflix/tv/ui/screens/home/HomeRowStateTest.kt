@@ -231,35 +231,32 @@ class HomeRowStateTest {
         val resolvedIndex = resolveHomeItemIndex(
             itemKeys = reorderedKeys,
             preferredItemKey = "MOVIE-2",
-            fallbackIndex = 1,
-            hasMore = false
+            fallbackIndex = 1
         )
 
         assertThat(resolvedIndex).isEqualTo(2)
     }
 
     @Test
-    fun `empty refreshing catalog preserves pending poster index`() {
+    fun `empty refreshing catalog resets poster index`() {
         val resolvedIndex = resolveHomeItemIndex(
             itemKeys = emptyList(),
             preferredItemKey = "MOVIE-20",
-            fallbackIndex = 19,
-            hasMore = true
+            fallbackIndex = 19
         )
 
-        assertThat(resolvedIndex).isEqualTo(19)
+        assertThat(resolvedIndex).isEqualTo(0)
     }
 
     @Test
-    fun `partial paged catalog preserves pending poster index`() {
+    fun `partial paged catalog clamps poster index to real items`() {
         val resolvedIndex = resolveHomeItemIndex(
             itemKeys = stableHomeRowItemKeys("trending", List(10) { mediaItem(it + 1) }),
             preferredItemKey = "MOVIE-20",
-            fallbackIndex = 19,
-            hasMore = true
+            fallbackIndex = 19
         )
 
-        assertThat(resolvedIndex).isEqualTo(19)
+        assertThat(resolvedIndex).isEqualTo(9)
     }
 
     @Test
@@ -267,11 +264,22 @@ class HomeRowStateTest {
         val resolvedIndex = resolveHomeItemIndex(
             itemKeys = stableHomeRowItemKeys("trending", List(10) { mediaItem(it + 1) }),
             preferredItemKey = "MOVIE-20",
-            fallbackIndex = 19,
-            hasMore = false
+            fallbackIndex = 19
         )
 
         assertThat(resolvedIndex).isEqualTo(9)
+    }
+
+    @Test
+    fun `remembered index ignores trailing placeholders`() {
+        val items = List(4) { mediaItem(it + 1) } + MediaItem(
+            id = -1,
+            title = "",
+            mediaType = MediaType.MOVIE,
+            isPlaceholder = true
+        )
+
+        assertThat(clampHomeItemIndex(items, 8)).isEqualTo(3)
     }
 
     private fun mediaItem(id: Int) = MediaItem(

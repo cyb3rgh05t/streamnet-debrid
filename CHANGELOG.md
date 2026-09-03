@@ -4,6 +4,21 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Playback, IPTV, Search, and portal polish
+
+- Automatically selects an embedded forced subtitle matching the active audio language even when normal subtitles are set to Off, while preserving explicit manual subtitle choices.
+- Invalidates Home logo caches when the content language changes so Home and Details prefer the same localized artwork.
+- Added a device-local IPTV VOD search toggle that controls Xtream movie/series source lookup and cache warmup without affecting Live TV or configured playlists.
+- Improved IPTV-only Home matching with TMDB ID, IMDb ID, and release-year checks before falling back to normalized titles.
+- Kept loaded Home cards visible during pagination and prevented focus restoration from landing on paging placeholders.
+- Improved Xtream catalog reliability by using the long-running IPTV HTTP client and removing short nested lookup timeouts from full-catalog fallbacks.
+- Fixed TV Search filter activation, persistent selection, Anime filtering, and active-accent styling across common remote Enter key variants.
+- Reorganized TV playlist settings with a dedicated section heading, consistent icons and focus styling, and the destructive playlist deletion action last.
+- Made loading feedback immediate during IPTV setup and positioned toast notifications above system navigation insets.
+- Corrected mobile content ordering on the self-hosted Privacy and Cloud account pages while leaving account deletion flow unchanged.
+- Bumped the Android application to `2.2.004` (`versionCode` 379).
+- Documented implementation behavior and validation in `docs/superpowers/playback-iptv-search-polish-2026-09-03.md`.
+
 ### IPTV-only home and Xtream VOD
 
 - Added a profile-scoped IPTV-only mode for TV, tablet, and phone that filters the Home presentation without deleting configured catalogs or cached data.

@@ -190,7 +190,8 @@ fun SettingsToggleRow(
     isEnabled: Boolean,
     isFocused: Boolean,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focusRingColor = resolveAccentColor(fallback = Pink)
@@ -215,6 +216,15 @@ fun SettingsToggleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(19.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+        }
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,

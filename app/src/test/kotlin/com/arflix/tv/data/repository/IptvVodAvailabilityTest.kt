@@ -1,5 +1,6 @@
 package com.arflix.tv.data.repository
 
+import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -34,5 +35,61 @@ class IptvVodAvailabilityTest {
     @Test
     fun `blank provider title is ignored`() {
         assertNull(repository.xtreamVodAvailabilityKey("  ", MediaType.MOVIE))
+    }
+
+    @Test
+    fun `matching TMDB id confirms same-title movie`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(
+                repository.xtreamVodAvailabilityKey(
+                    rawTitle = "The Example",
+                    mediaType = MediaType.MOVIE,
+                    tmdbId = "123",
+                    year = 2025,
+                )!!,
+            ),
+        )
+
+        assertEquals(true, availability.contains(MediaItem(123, "The Example", year = "2025")))
+    }
+
+    @Test
+    fun `different TMDB id rejects same-title movie`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(
+                repository.xtreamVodAvailabilityKey(
+                    rawTitle = "The Example",
+                    mediaType = MediaType.MOVIE,
+                    tmdbId = "456",
+                    year = 2025,
+                )!!,
+            ),
+        )
+
+        assertEquals(false, availability.contains(MediaItem(123, "The Example", year = "2025")))
+    }
+
+    @Test
+    fun `different year rejects title fallback when provider has no id`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(
+                repository.xtreamVodAvailabilityKey(
+                    rawTitle = "The Example",
+                    mediaType = MediaType.MOVIE,
+                    year = 1999,
+                )!!,
+            ),
+        )
+
+        assertEquals(false, availability.contains(MediaItem(123, "The Example", year = "2025")))
+    }
+
+    @Test
+    fun `title fallback remains available when provider exposes no metadata`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(repository.xtreamVodAvailabilityKey("The Example", MediaType.MOVIE)!!),
+        )
+
+        assertEquals(true, availability.contains(MediaItem(123, "The Example", year = "2025")))
     }
 }

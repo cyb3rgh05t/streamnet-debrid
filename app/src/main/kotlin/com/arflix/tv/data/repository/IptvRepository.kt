@@ -18,6 +18,7 @@ import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.BuildConfig
 import com.arflix.tv.R
 import com.arflix.tv.util.settingsDataStore
+import com.arflix.tv.util.IPTV_VOD_SEARCH_ENABLED_KEY
 import com.google.gson.Gson
 import com.google.gson.JsonArray
 import com.google.gson.JsonElement
@@ -604,6 +605,16 @@ class IptvRepository @Inject constructor(
             apply()
         }
     }
+
+    fun observeVodSearchEnabled(): Flow<Boolean> =
+        context.settingsDataStore.data.map { prefs ->
+            prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
+        }
+
+    suspend fun isVodSearchEnabled(): Boolean =
+        runCatching {
+            context.settingsDataStore.data.first()[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
+        }.getOrDefault(true)
 
     @Volatile
     private var cachedPlaylistAt: Long = 0L
@@ -4701,6 +4712,7 @@ class IptvRepository @Inject constructor(
         allowNetwork: Boolean = true
     ): List<StreamSource> {
         return withContext(Dispatchers.IO) {
+            if (!isVodSearchEnabled()) return@withContext emptyList()
             val config = observeConfig().first()
             val creds = xtreamCredentialsForVodImport(config) ?: return@withContext emptyList()
 
@@ -4817,6 +4829,7 @@ class IptvRepository @Inject constructor(
         allowNetwork: Boolean = true
     ): List<StreamSource> {
         return withContext(Dispatchers.IO) {
+            if (!isVodSearchEnabled()) return@withContext emptyList()
             val config = observeConfig().first()
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@withContext emptyList()
             val normalizedTitle = normalizeLookupText(title)
@@ -4889,34 +4902,30 @@ class IptvRepository @Inject constructor(
                 return@withContext sortVodSources(cachedSeriesSources)
             }
 
-            val networkSeriesSources = withTimeoutOrNull(3_500L) {
-                seriesResolver.resolveEpisodeVariants(
-                    providerKey = providerKey,
-                    creds = creds,
-                    showTitle = title,
-                    season = season,
-                    episode = episode,
-                    tmdbId = tmdbId,
-                    imdbId = imdbId,
-                    year = parseYear(title),
-                    allowNetwork = true
-                ).toSeriesVodSources()
-            }.orEmpty()
+            val networkSeriesSources = seriesResolver.resolveEpisodeVariants(
+                providerKey = providerKey,
+                creds = creds,
+                showTitle = title,
+                season = season,
+                episode = episode,
+                tmdbId = tmdbId,
+                imdbId = imdbId,
+                year = parseYear(title),
+                allowNetwork = true
+            ).toSeriesVodSources()
             if (networkSeriesSources.isNotEmpty()) {
                 return@withContext sortVodSources(networkSeriesSources)
             }
 
-            val vodCatalogSources = withTimeoutOrNull(3_000L) {
-                findEpisodeVodFromVodCatalogFallbackSources(
-                    creds = creds,
-                    title = title,
-                    season = season,
-                    episode = episode,
-                    normalizedImdb = normalizedImdb,
-                    normalizedTmdb = normalizedTmdb,
-                    allowNetwork = true
-                )
-            }.orEmpty()
+            val vodCatalogSources = findEpisodeVodFromVodCatalogFallbackSources(
+                creds = creds,
+                title = title,
+                season = season,
+                episode = episode,
+                normalizedImdb = normalizedImdb,
+                normalizedTmdb = normalizedTmdb,
+                allowNetwork = true
+            )
             return@withContext sortVodSources(vodCatalogSources + cachedSeriesSources)
         }
     }
@@ -5048,6 +5057,7 @@ class IptvRepository @Inject constructor(
 
     suspend fun warmXtreamVodCachesIfPossible() {
         withContext(Dispatchers.IO) {
+            if (!isVodSearchEnabled()) return@withContext
             val config = observeConfig().first()
             xtreamCredentialsForVodImport(config)?.let { creds ->
                 runCatching { loadXtreamVodStreams(creds) }
@@ -5071,6 +5081,7 @@ class IptvRepository @Inject constructor(
         tmdbId: Int? = null
     ) {
         withContext(Dispatchers.IO) {
+            if (!isVodSearchEnabled()) return@withContext
             val config = observeConfig().first()
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@withContext
             val activeProfileId = runCatching { profileManager.getProfileIdSync() }.getOrDefault("default")
@@ -5097,6 +5108,7 @@ class IptvRepository @Inject constructor(
         tmdbId: Int? = null
     ) {
         withContext(Dispatchers.IO) {
+            if (!isVodSearchEnabled()) return@withContext
             val config = observeConfig().first()
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@withContext
             val activeProfileId = runCatching { profileManager.getProfileIdSync() }.getOrDefault("default")
@@ -5232,7 +5244,7 @@ class IptvRepository @Inject constructor(
                 requestJson(
                     url,
                     TypeToken.getParameterized(List::class.java, XtreamVodStream::class.java).type,
-                    client = if (fast) xtreamLookupHttpClient else iptvHttpClient
+                    client = iptvHttpClient
                 ) ?: emptyList()
             val elapsed = System.currentTimeMillis() - downloadStart
             System.err.println("[VOD-Cache] Downloaded ${vod.size} VOD streams in ${elapsed}ms")
@@ -5312,7 +5324,7 @@ class IptvRepository @Inject constructor(
                 requestJson(
                     url,
                     TypeToken.getParameterized(List::class.java, XtreamSeriesItem::class.java).type,
-                    client = if (fast) xtreamLookupHttpClient else iptvHttpClient
+                    client = iptvHttpClient
                 ) ?: emptyList()
             val elapsed = System.currentTimeMillis() - downloadStart
             System.err.println("[VOD-Cache] Downloaded ${series.size} series in ${elapsed}ms")
@@ -8738,6 +8750,9 @@ class IptvRepository @Inject constructor(
     data class XtreamVodAvailabilityKey(
         val mediaType: MediaType,
         val normalizedTitle: String,
+        val tmdbId: String? = null,
+        val imdbId: String? = null,
+        val year: Int? = null,
     )
 
     data class XtreamVodAvailability(
@@ -8746,10 +8761,28 @@ class IptvRepository @Inject constructor(
         fun contains(item: MediaItem): Boolean {
             if (item.mediaType != MediaType.MOVIE && item.mediaType != MediaType.TV) return false
             val normalizedTitle = normalizeIptvArtworkTitle(cleanIptvArtworkTitle(item.title))
-            return normalizedTitle.isNotBlank() && XtreamVodAvailabilityKey(
-                mediaType = item.mediaType,
-                normalizedTitle = normalizedTitle,
-            ) in keys
+            if (normalizedTitle.isBlank()) return false
+            val itemTmdbId = item.id.takeIf { it > 0 }?.toString()
+            val itemImdbId = item.homeServerImdbId
+                ?.trim()
+                ?.lowercase(Locale.US)
+                ?.takeIf { it.matches(Regex("tt\\d+")) }
+            val itemYear = sequenceOf(item.year, item.releaseDate.orEmpty())
+                .mapNotNull { value -> Regex("(?:19|20)\\d{2}").find(value)?.value?.toIntOrNull() }
+                .firstOrNull()
+
+            return keys.asSequence()
+                .filter { key ->
+                    key.mediaType == item.mediaType && key.normalizedTitle == normalizedTitle
+                }
+                .any { key ->
+                    when {
+                        itemTmdbId != null && key.tmdbId != null -> itemTmdbId == key.tmdbId
+                        itemImdbId != null && key.imdbId != null -> itemImdbId == key.imdbId
+                        itemYear != null && key.year != null -> itemYear == key.year
+                        else -> true
+                    }
+                }
         }
     }
 
@@ -8904,13 +8937,25 @@ class IptvRepository @Inject constructor(
         val movieKeys = async {
             val creds = xtreamCredentialsForVodImport(config) ?: return@async emptySet()
             getXtreamVodStreams(creds, allowNetwork, fast = true).mapNotNullTo(mutableSetOf()) { item ->
-                xtreamVodAvailabilityKey(item.name, MediaType.MOVIE)
+                xtreamVodAvailabilityKey(
+                    rawTitle = item.name,
+                    mediaType = MediaType.MOVIE,
+                    tmdbId = item.tmdb,
+                    imdbId = item.imdb,
+                    year = item.year?.toIntOrNull() ?: parseYear(item.name.orEmpty()),
+                )
             }
         }
         val seriesKeys = async {
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@async emptySet()
             getXtreamSeriesList(creds, allowNetwork, fast = true).mapNotNullTo(mutableSetOf()) { item ->
-                xtreamVodAvailabilityKey(item.name, MediaType.TV)
+                xtreamVodAvailabilityKey(
+                    rawTitle = item.name,
+                    mediaType = MediaType.TV,
+                    tmdbId = item.tmdb,
+                    imdbId = item.imdb,
+                    year = parseYear(item.name.orEmpty()),
+                )
             }
         }
         XtreamVodAvailability(movieKeys.await() + seriesKeys.await())
@@ -8919,11 +8964,20 @@ class IptvRepository @Inject constructor(
     internal fun xtreamVodAvailabilityKey(
         rawTitle: String?,
         mediaType: MediaType,
+        tmdbId: String? = null,
+        imdbId: String? = null,
+        year: Int? = null,
     ): XtreamVodAvailabilityKey? {
         val title = rawTitle?.trim().orEmpty()
         val normalizedTitle = normalizeIptvArtworkTitle(cleanIptvArtworkTitle(title))
         if (normalizedTitle.isBlank()) return null
-        return XtreamVodAvailabilityKey(mediaType, normalizedTitle)
+        return XtreamVodAvailabilityKey(
+            mediaType = mediaType,
+            normalizedTitle = normalizedTitle,
+            tmdbId = normalizeTmdbId(tmdbId),
+            imdbId = normalizeImdbId(imdbId)?.takeIf { it != IptvIdSentinels.IMDB_NONE },
+            year = year?.takeIf { it in 1870..2100 },
+        )
     }
 
     private fun XtreamVodCategoryWire.toInfoOrNull(): XtreamVodCategoryInfo? {

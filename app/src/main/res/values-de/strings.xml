@@ -242,6 +242,9 @@
     <string name="settings_iptv_special_categories_title">Spezialkategorien</string>
     <string name="settings_iptv_special_categories_subtitle">Alle Sender  und zuletzt gesehene Sender in Live-TV ein- oder ausblenden</string>
     <string name="settings_iptv_only_mode_title">Nur IPTV-Provider Quellen</string>
+    <string name="settings_iptv_vod_search">IPTV-VOD-Streams</string>
+    <string name="settings_iptv_vod_search_desc">IPTV-Filme und -Serien bei der Quellensuche berücksichtigen</string>
+    <string name="settings_iptv_playlist_settings_header">Playlist-Einstellungen</string>
     <string name="settings_iptv_only_mode_subtitle">Auf der Startseite nur Content von IPTV-Providern anzeigen</string>
 
     <!-- Live-TV -->

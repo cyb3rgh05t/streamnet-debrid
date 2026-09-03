@@ -333,6 +333,12 @@ fun SearchScreen(
     // D-pad handler: manages zone transitions. FILTERS zone lets native focus handle Left/Right.
     val dpadModifier = if (!isTouchDevice) {
         Modifier.onPreviewKeyEvent { event ->
+            val isSelectKey = event.key == Key.Enter ||
+                event.key == Key.NumPadEnter ||
+                event.key == Key.DirectionCenter
+            if (event.type == KeyEventType.KeyUp) {
+                return@onPreviewKeyEvent focusZone == FocusZone.FILTERS && isSelectKey
+            }
             if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
             if (isSearchEditing && (event.key == Key.Back || event.key == Key.Escape)) {
                 isSearchEditing = false
@@ -474,7 +480,7 @@ fun SearchScreen(
                     }
                     else -> false
                 }
-                Key.Enter, Key.DirectionCenter -> {
+                Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
                     when (focusZone) {
                         FocusZone.SIDEBAR -> {
                             if (hasProfile && sidebarFocusIndex == 0) onSwitchProfile()
@@ -718,7 +724,7 @@ private fun SearchInputBar(
                 when (event.key) {
                     Key.DirectionUp -> { onMoveUp(); true }
                     Key.DirectionDown -> { onMoveDown(); true }
-                    Key.Enter, Key.DirectionCenter -> { onStartEditing(); true }
+                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> { onStartEditing(); true }
                     else -> false
                 }
             }
@@ -809,7 +815,7 @@ private fun DiscoverFilterStrip(
                     Key.DirectionDown -> { onMoveDown(); true }
                     Key.DirectionLeft -> { if (isRtl) onMoveRight() else onMoveLeft(); true }
                     Key.DirectionRight -> { if (isRtl) onMoveLeft() else onMoveRight(); true }
-                    Key.Enter, Key.DirectionCenter -> false
+                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> false
                     else -> false
                 }
             }
@@ -826,7 +832,7 @@ private fun DiscoverFilterStrip(
             GlowChip(
                 label = filter.label,
                 isSelected = filter.isSelected,
-                useAccentForSelection = isTouchDevice,
+                useAccentForSelection = true,
                 isVisuallyFocused = !isTouchDevice && focusZone == FocusZone.FILTERS && focusedFilterIndex == index,
                 modifier = if (index == 0) Modifier.focusRequester(filtersFocusRequester) else Modifier,
                 onFocused = { onFocused(index) },

@@ -1383,6 +1383,10 @@ fun PlayerScreen(
                             }
                             if (matchingTrack != null) {
                                 selectedAudioIndex = extractedAudioTracks.indexOf(matchingTrack)
+                                viewModel.onSelectedAudioTrackChanged(
+                                    matchingTrack.language,
+                                    matchingTrack.label,
+                                )
                             }
                         }
 
