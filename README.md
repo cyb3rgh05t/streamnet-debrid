@@ -7,7 +7,37 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 - `app/` - Android TV/mobile APK source
 - `self-hosted-backend/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
 
-Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, screenshots and release artifact folders.
+Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, and release artifact folders.
+
+## Screenshots
+
+### Mobile
+
+| Home | Live TV |
+| --- | --- |
+| ![StreamNet mobile home screen](screenshots/mobile/mobile-home.png) | ![StreamNet mobile Live TV screen](screenshots/mobile/mobile-live.png) |
+| Profiles | IPTV VOD |
+| ![StreamNet mobile profile selection](screenshots/mobile/mobile-profiles.png) | ![StreamNet mobile IPTV VOD screen](screenshots/mobile/mobile-vod-screen.png) |
+
+### Tablet
+
+| Home | Home catalog |
+| --- | --- |
+| ![StreamNet tablet home screen](screenshots/tablet/tablet-home.png) | ![StreamNet tablet home catalog](screenshots/tablet/tablet-home2.png) |
+| Live TV | Profiles |
+| ![StreamNet tablet Live TV screen](screenshots/tablet/tablet-live.png) | ![StreamNet tablet profile selection](screenshots/tablet/tablet-profile.png) |
+| IPTV VOD | |
+| ![StreamNet tablet IPTV VOD screen](screenshots/tablet/tablet-vod.png) | |
+
+### TV
+
+| Home | Live TV |
+| --- | --- |
+| ![StreamNet TV home screen](screenshots/tv/tv-home.png) | ![StreamNet TV Live TV screen](screenshots/tv/tv-live.png) |
+| Profiles | IPTV VOD |
+| ![StreamNet TV profile selection](screenshots/tv/tv-profile.png) | ![StreamNet TV IPTV VOD catalog](screenshots/tv/tv-vod.png) |
+| IPTV VOD details | |
+| ![StreamNet TV IPTV VOD details](screenshots/tv/tv-vod2.png) | |
 
 ## Cloud Migration Status
 
