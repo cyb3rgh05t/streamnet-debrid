@@ -130,14 +130,11 @@ supabase/functions/tv-auth-web/
 **/.netlify/
 
 # Screenshots and debug images
-*.png
-*.jpg
-*.jpeg
 !app/src/main/res/**/*.png
 !app/src/main/res/**/*.jpg
 !**/drawable*/*.png
 !**/mipmap*/*.png
-!screenshots/*.png
+
 
 # Build logs and dev artifacts
 build_*.txt
