@@ -8,6 +8,8 @@ import android.widget.Toast
 import com.arflix.tv.R
 import com.arflix.tv.data.api.TmdbApi
 import com.arflix.tv.data.model.StreamSource
+import com.arflix.tv.ui.components.AppToastBus
+import com.arflix.tv.ui.components.ToastType
 import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.async
@@ -193,8 +195,10 @@ class TelegramSourceResolver @Inject constructor(
     }
 
     private fun showToast(message: String) {
-        Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        if (!AppToastBus.show(message, ToastType.ERROR, durationMs = 5000)) {
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+            }
         }
     }
 

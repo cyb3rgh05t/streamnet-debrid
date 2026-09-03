@@ -3449,33 +3449,15 @@ fun PlayerScreen(
             )
         }
 
-        // "Find best match" outcome — same top-center pill and spot as the scanning indicator
-        // above (a bottom toast would sit on the subtitles and interrupt watching).
+        // "Find best match" outcome uses the same themed toast as the rest of the app.
         uiState.matchToast?.let { msg ->
-            LaunchedEffect(msg) {
-                delay(4000)
-                viewModel.dismissMatchToast()
-            }
-            androidx.compose.foundation.layout.Row(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    // Slide below the scanning pill on the rare frames both are visible
-                    // (e.g. a remembered-match toast fired before the scan state cleared).
-                    .padding(top = if (hasPlaybackStarted && uiState.isFindingBestMatch) 60.dp else 16.dp)
-                    .background(
-                        color = androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.72f),
-                        shape = RoundedCornerShape(20.dp)
-                    )
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-                    .zIndex(6f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = msg,
-                    style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
-                    color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f)
-                )
-            }
+            Toast(
+                message = msg,
+                type = ToastType.INFO,
+                isVisible = true,
+                durationMs = 4000,
+                onDismiss = { viewModel.dismissMatchToast() }
+            )
         }
 
         // Netflix-style Controls Overlay

@@ -15,7 +15,7 @@ This update preserves the StreamNet fork boundaries: the Android APK uses the se
 
 ## IPTV and Home
 
-- The IPTV VOD search preference defaults to enabled and is stored locally in DataStore.
+- The IPTV VOD search preference defaults to enabled, is stored per profile in DataStore, and is included in IPTV cloud synchronization. Legacy local values migrate as a fallback, and cloud backups without the field remain enabled.
 - Disabling it skips Xtream movie and episode source lookup, series prefetch, and VOD/series cache warmup. Live TV, EPG, and playlist configuration remain active.
 - IPTV-only remains a non-destructive Home presentation filter, not a player-wide source restriction.
 - Home availability matching compares media type and normalized title, then uses TMDB ID, IMDb ID, or release year when both provider and app metadata expose them. Title-only fallback remains for providers with incomplete metadata.

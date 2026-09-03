@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -46,11 +47,58 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
+import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.AccentYellow
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.appBackgroundDark
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import java.util.concurrent.atomic.AtomicLong
 
 enum class ToastType {
     SUCCESS, ERROR, INFO
+}
+
+data class AppToastEvent(
+    val id: Long,
+    val message: String,
+    val type: ToastType,
+    val durationMs: Long
+)
+
+object AppToastBus {
+    private val nextId = AtomicLong()
+    internal val events = MutableSharedFlow<AppToastEvent>(extraBufferCapacity = 16)
+
+    fun show(
+        message: String,
+        type: ToastType = ToastType.INFO,
+        durationMs: Long = 3000
+    ): Boolean {
+        if (events.subscriptionCount.value == 0) return false
+        return events.tryEmit(AppToastEvent(nextId.incrementAndGet(), message, type, durationMs))
+    }
+}
+
+@Composable
+fun AppToastHost() {
+    var current by remember { mutableStateOf<AppToastEvent?>(null) }
+
+    LaunchedEffect(Unit) {
+        AppToastBus.events.collect { current = it }
+    }
+
+    current?.let { event ->
+        key(event.id) {
+            Toast(
+                message = event.message,
+                type = event.type,
+                isVisible = true,
+                durationMs = event.durationMs,
+                onDismiss = { current = null }
+            )
+        }
+    }
 }
 
 /**
@@ -66,6 +114,8 @@ fun Toast(
     onDismiss: () -> Unit = {}
 ) {
     var visible by remember(isVisible, message, type) { mutableStateOf(isVisible) }
+    val themeAccent = resolveAccentColor(fallback = AccentYellow)
+    val toastBackground = appBackgroundDark().copy(alpha = 0.96f)
 
     LaunchedEffect(isVisible, message, type) {
         if (isVisible) {
@@ -105,23 +155,12 @@ fun Toast(
                 enter = fadeIn() + slideInVertically(initialOffsetY = { it }),
                 exit = fadeOut() + slideOutVertically(targetOffsetY = { it })
             ) {
-                val (accentColor, icon, iconBgColor) = when (type) {
-                    ToastType.SUCCESS -> Triple(
-                        Color(0xFF34D399),
-                        Icons.Default.Check,
-                        Color(0x2234D399)
-                    )
-                    ToastType.ERROR -> Triple(
-                        Color(0xFFF87171),
-                        Icons.Default.Close,
-                        Color(0x22F87171)
-                    )
-                    ToastType.INFO -> Triple(
-                        Color(0xFF60A5FA),
-                        Icons.Default.Info,
-                        Color(0x2260A5FA)
-                    )
+                val icon = when (type) {
+                    ToastType.SUCCESS -> Icons.Default.Check
+                    ToastType.ERROR -> Icons.Default.Close
+                    ToastType.INFO -> Icons.Default.Info
                 }
+                val toastShape = RoundedCornerShape(8.dp)
 
                 Row(
                     modifier = Modifier
@@ -129,16 +168,16 @@ fun Toast(
                         .padding(horizontal = 16.dp, vertical = 16.dp)
                         .shadow(
                             elevation = 18.dp,
-                            shape = RoundedCornerShape(18.dp),
+                            shape = toastShape,
                             ambientColor = Color.Black.copy(alpha = 0.32f),
                             spotColor = Color.Black.copy(alpha = 0.32f)
                         )
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xE61A1E28))
+                        .clip(toastShape)
+                        .background(toastBackground)
                         .border(
                             width = 1.dp,
-                            color = accentColor.copy(alpha = 0.55f),
-                            shape = RoundedCornerShape(18.dp)
+                            color = themeAccent.copy(alpha = 0.72f),
+                            shape = toastShape
                         )
                         .widthIn(max = 560.dp)
                         .padding(horizontal = 18.dp, vertical = 13.dp),
@@ -149,13 +188,13 @@ fun Toast(
                         modifier = Modifier
                             .size(28.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(iconBgColor),
+                            .background(themeAccent.copy(alpha = 0.16f)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = accentColor,
+                            tint = themeAccent,
                             modifier = Modifier.size(16.dp)
                         )
                     }

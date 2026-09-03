@@ -70,7 +70,6 @@ import com.arflix.tv.util.AuthEmailValidator
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
-import com.arflix.tv.util.IPTV_VOD_SEARCH_ENABLED_KEY
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -561,7 +560,7 @@ class SettingsViewModel @Inject constructor(
             val volumeBoostDb = prefs[volumeBoostDbKey()]?.toIntOrNull()?.coerceIn(0, 15) ?: 0
             val showLoadingStats = prefs[showLoadingStatsKey()] ?: true
             val smoothScrolling = prefs[smoothScrollingKey()] ?: true
-            val iptvVodSearchEnabled = prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
+            val iptvVodSearchEnabled = iptvRepository.isVodSearchEnabled()
 
             val subtitleSize = prefs[subtitleSizeKey()] ?: "Medium"
             val subtitleColor = prefs[subtitleColorKey()] ?: "White"
@@ -2600,8 +2599,9 @@ class SettingsViewModel @Inject constructor(
 
     fun setIptvVodSearchEnabled(enabled: Boolean) {
         viewModelScope.launch {
-            context.settingsDataStore.edit { it[IPTV_VOD_SEARCH_ENABLED_KEY] = enabled }
+            iptvRepository.saveVodSearchEnabled(enabled)
             _uiState.value = _uiState.value.copy(iptvVodSearchEnabled = enabled)
+            syncLocalStateToCloud(silent = true)
         }
     }
 

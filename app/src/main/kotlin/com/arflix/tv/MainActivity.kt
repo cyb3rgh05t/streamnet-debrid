@@ -426,6 +426,7 @@ class MainActivity : ComponentActivity() {
                         preloadedTrendingBackdropUrls = startupState.trendingBackdropUrls,
                         onExitApp = { finish() }
                     )
+                    com.arflix.tv.ui.components.AppToastHost()
                 }
             }
         }

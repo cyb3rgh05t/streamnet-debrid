@@ -512,6 +512,7 @@ data class IptvCloudProfileState(
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
     val showSpecialCategories: Boolean = true,
     val iptvOnlyMode: Boolean = true,
+    val vodSearchEnabled: Boolean? = null,
 )
 
 data class IptvTvSessionState(
@@ -608,13 +609,21 @@ class IptvRepository @Inject constructor(
 
     fun observeVodSearchEnabled(): Flow<Boolean> =
         context.settingsDataStore.data.map { prefs ->
-            prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
+            prefs[vodSearchEnabledKey()] ?: prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
         }
 
     suspend fun isVodSearchEnabled(): Boolean =
         runCatching {
-            context.settingsDataStore.data.first()[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
+            val prefs = context.settingsDataStore.data.first()
+            prefs[vodSearchEnabledKey()] ?: prefs[IPTV_VOD_SEARCH_ENABLED_KEY] ?: true
         }.getOrDefault(true)
+
+    suspend fun saveVodSearchEnabled(enabled: Boolean) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[vodSearchEnabledKey()] = enabled
+        }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save iptv vod search")
+    }
 
     @Volatile
     private var cachedPlaylistAt: Long = 0L
@@ -3380,6 +3389,10 @@ class IptvRepository @Inject constructor(
         booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_only_vod_addon_seen")
     private fun iptvOnlyModeKeyFor(profileId: String): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileId}_iptv_only_mode")
+    private fun vodSearchEnabledKey(): Preferences.Key<Boolean> =
+        profileManager.profileBooleanKey("iptv_vod_search_enabled")
+    private fun vodSearchEnabledKeyFor(profileId: String): Preferences.Key<Boolean> =
+        profileManager.profileBooleanKeyFor(profileId, "iptv_vod_search_enabled")
 
     private fun sortOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_sort_order")
     private fun sortOrderKeyFor(profileId: String): Preferences.Key<String> =
@@ -3601,6 +3614,9 @@ class IptvRepository @Inject constructor(
             tvSession = decodeTvSessionState(tvSessionRaw),
             showSpecialCategories = prefs[showSpecialCategoriesKeyFor(safeProfileId)] ?: true,
             iptvOnlyMode = prefs[iptvOnlyModeKeyFor(safeProfileId)] ?: true,
+            vodSearchEnabled = prefs[vodSearchEnabledKeyFor(safeProfileId)]
+                ?: prefs[IPTV_VOD_SEARCH_ENABLED_KEY]
+                ?: true,
         )
     }
 
@@ -3689,6 +3705,7 @@ class IptvRepository @Inject constructor(
             }
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
             prefs[iptvOnlyModeKeyFor(safeProfileId)] = state.iptvOnlyMode
+            prefs[vodSearchEnabledKeyFor(safeProfileId)] = state.vodSearchEnabled ?: true
         }
         if (importedGroupPreferences) {
             groupPreferencesLocallyDirtyProfiles.remove(safeProfileId)

@@ -19,6 +19,13 @@ This update aligns TV Settings controls with the active StreamNet theme while pr
 - Addon refresh and install actions use the selected theme accent for their focus border, icon, and label.
 - The AI model dialog resolves the selected theme accent for its selected and focused backgrounds and check icon instead of using a fixed color.
 
+## Transient notifications
+
+- In-app toasts share one bottom-center layout above navigation insets, an OLED-aware dark background, and the active profile accent for their border and status icon.
+- Success, error, and information states remain distinguishable by icon while preserving one visual theme.
+- Player subtitle-match results and Telegram or installer events shown while the app is active use the shared toast presentation.
+- Native Android toasts remain only as a fallback when no Compose host is active, such as installer callbacks outside the running app and the crash-report handoff to Discord.
+
 ## Localization
 
 - StreamNet username and password fields provide explicit localized placeholders.

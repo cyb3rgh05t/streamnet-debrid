@@ -8,6 +8,8 @@ import android.os.Build
 import android.util.Log
 import android.widget.Toast
 import com.arflix.tv.R
+import com.arflix.tv.ui.components.AppToastBus
+import com.arflix.tv.ui.components.ToastType
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -102,6 +104,7 @@ class ApkInstallReceiver : BroadcastReceiver() {
     }
 
     private fun showToast(context: Context, text: String) {
+        if (AppToastBus.show(text, ToastType.ERROR, durationMs = 5000)) return
         try {
             Toast.makeText(context.applicationContext, text, Toast.LENGTH_LONG).show()
         } catch (_: Exception) {

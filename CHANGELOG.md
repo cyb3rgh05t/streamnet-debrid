@@ -8,6 +8,7 @@ All notable changes to this project are documented in this file.
 
 - Added semantic leading icons throughout TV Settings, including toggles, actions, account integrations, custom playlists, catalogs, and plugin scraper controls.
 - Standardized TV Settings icon sizing, spacing, neutral tint, and selected-theme accent treatment across shared and custom rows.
+- Unified in-app toast styling with the active profile accent, OLED-aware background, and bottom-center placement; Player match results and Telegram/update events now use the same presentation while the app is visible.
 - Removed the redundant inner focus border from Addon switches while preserving the full-row focus indicator and D-pad actions.
 - Applied the selected theme accent to Addon refresh/install actions and the AI model selection dialog.
 - Localized StreamNet credential placeholders and the default Settings input placeholder in English and German.
@@ -18,7 +19,7 @@ All notable changes to this project are documented in this file.
 
 - Automatically selects an embedded forced subtitle matching the active audio language even when normal subtitles are set to Off, while preserving explicit manual subtitle choices.
 - Invalidates Home logo caches when the content language changes so Home and Details prefer the same localized artwork.
-- Added a device-local IPTV VOD search toggle that controls Xtream movie/series source lookup and cache warmup without affecting Live TV or configured playlists.
+- Added a profile-scoped, cloud-synced IPTV VOD search toggle that controls Xtream movie/series source lookup and cache warmup without affecting Live TV or configured playlists.
 - Improved IPTV-only Home matching with TMDB ID, IMDb ID, and release-year checks before falling back to normalized titles.
 - Kept loaded Home cards visible during pagination and prevented focus restoration from landing on paging placeholders.
 - Improved Xtream catalog reliability by using the long-running IPTV HTTP client and removing short nested lookup timeouts from full-catalog fallbacks.
