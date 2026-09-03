@@ -474,6 +474,9 @@
     <string name="settings_streamnet_tv_login_note">Melde dich mit deinen persönlichen StreamNet-TV-Zugangsdaten an.</string>
     <string name="settings_label_streamnet_user">StreamNet-Benutzername</string>
     <string name="settings_label_streamnet_password">StreamNet-Passwort</string>
+    <string name="settings_ph_streamnet_user">StreamNet-Benutzernamen eingeben...</string>
+    <string name="settings_ph_streamnet_password">StreamNet-Passwort eingeben...</string>
+    <string name="settings_ph_enter_value">%1$s eingeben...</string>
     <string name="settings_streamnet_tv_ready">Bereit für deine persönliche Anmeldung</string>
     <string name="settings_streamnet_tv_connected">Mit persönlichem StreamNet-Login verbunden</string>
     <string name="toast_streamnet_tv_unavailable">StreamNet TV ist in diesem Build nicht konfiguriert.</string>

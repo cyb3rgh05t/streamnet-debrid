@@ -185,13 +185,13 @@ fun SettingsRow(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun SettingsToggleRow(
+    icon: ImageVector,
     title: String,
     subtitle: String,
     isEnabled: Boolean,
     isFocused: Boolean,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier,
-    icon: ImageVector? = null
+    modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focusRingColor = resolveAccentColor(fallback = Pink)
@@ -216,15 +216,13 @@ fun SettingsToggleRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        if (icon != null) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = TextSecondary,
-                modifier = Modifier.size(19.dp)
-            )
-            Spacer(modifier = Modifier.width(12.dp))
-        }
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = TextSecondary,
+            modifier = Modifier.size(19.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,

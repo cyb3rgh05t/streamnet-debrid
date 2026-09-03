@@ -2056,11 +2056,13 @@ fun SettingsScreen(
                     InputField(
                         label = stringResource(R.string.settings_label_streamnet_user),
                         value = iptvEditXtreamUser,
+                        placeholder = stringResource(R.string.settings_ph_streamnet_user),
                         onValueChange = { iptvEditXtreamUser = it }
                     ),
                     InputField(
                         label = stringResource(R.string.settings_label_streamnet_password),
                         value = iptvEditXtreamPass,
+                        placeholder = stringResource(R.string.settings_ph_streamnet_password),
                         isSecret = true,
                         onValueChange = { iptvEditXtreamPass = it }
                     )
@@ -6363,13 +6365,13 @@ private fun TvGeneralSettingsRows(
                 6 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.subtitle_offset), stringResource(R.string.subtitle_offset_desc), subtitleOffset, focusedIndex == localIndex, onSubtitleOffsetClick, Modifier.settingsFocusSlot(localIndex))
                 7 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.subtitle_style), stringResource(R.string.subtitle_style_desc), subtitleStyle, focusedIndex == localIndex, onSubtitleStyleClick, Modifier.settingsFocusSlot(localIndex))
                 43 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.subtitle_font), stringResource(R.string.subtitle_font_desc), subtitleFont, focusedIndex == localIndex, onSubtitleFontClick, Modifier.settingsFocusSlot(localIndex))
-                8 -> SettingsToggleRow(stringResource(R.string.subtitle_stylized), stringResource(R.string.subtitle_stylized_desc), subtitleStylized, focusedIndex == localIndex, { onSubtitleStylizedToggle() }, Modifier.settingsFocusSlot(localIndex))
-                9 -> SettingsToggleRow(stringResource(R.string.filter_subtitles), stringResource(R.string.filter_subtitles_desc), filterSubtitlesByLanguage, focusedIndex == localIndex, onFilterSubtitlesByLanguageToggle, Modifier.settingsFocusSlot(localIndex))
-                10 -> SettingsToggleRow(stringResource(R.string.auto_play_next_title), stringResource(R.string.auto_play_desc), autoPlayNext, focusedIndex == localIndex, onAutoPlayToggle, Modifier.settingsFocusSlot(localIndex))
-                11 -> SettingsToggleRow(stringResource(R.string.autoplay), stringResource(R.string.autoplay_desc), autoPlaySingleSource, focusedIndex == localIndex, onAutoPlaySingleSourceToggle, Modifier.settingsFocusSlot(localIndex))
+                8 -> SettingsToggleRow(Icons.Default.Subtitles, stringResource(R.string.subtitle_stylized), stringResource(R.string.subtitle_stylized_desc), subtitleStylized, focusedIndex == localIndex, { onSubtitleStylizedToggle() }, Modifier.settingsFocusSlot(localIndex))
+                9 -> SettingsToggleRow(Icons.Default.Subtitles, stringResource(R.string.filter_subtitles), stringResource(R.string.filter_subtitles_desc), filterSubtitlesByLanguage, focusedIndex == localIndex, onFilterSubtitlesByLanguageToggle, Modifier.settingsFocusSlot(localIndex))
+                10 -> SettingsToggleRow(Icons.Default.PlayArrow, stringResource(R.string.auto_play_next_title), stringResource(R.string.auto_play_desc), autoPlayNext, focusedIndex == localIndex, onAutoPlayToggle, Modifier.settingsFocusSlot(localIndex))
+                11 -> SettingsToggleRow(Icons.Default.PlayArrow, stringResource(R.string.autoplay), stringResource(R.string.autoplay_desc), autoPlaySingleSource, focusedIndex == localIndex, onAutoPlaySingleSourceToggle, Modifier.settingsFocusSlot(localIndex))
                 12 -> SettingsRow(Icons.Default.HighQuality, stringResource(R.string.auto_play_min_quality), stringResource(R.string.auto_play_quality_desc), autoPlayMinQuality, focusedIndex == localIndex, onAutoPlayMinQualityClick, Modifier.settingsFocusSlot(localIndex))
-                13 -> SettingsToggleRow(stringResource(R.string.trailer_auto_play), stringResource(R.string.trailer_desc), trailerAutoPlay, focusedIndex == localIndex, onTrailerAutoPlayToggle, Modifier.settingsFocusSlot(localIndex))
-                14 -> SettingsToggleRow(stringResource(R.string.trailer_sound), stringResource(R.string.trailer_sound_desc), trailerSoundEnabled, focusedIndex == localIndex, onTrailerSoundEnabledToggle, Modifier.settingsFocusSlot(localIndex))
+                13 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.trailer_auto_play), stringResource(R.string.trailer_desc), trailerAutoPlay, focusedIndex == localIndex, onTrailerAutoPlayToggle, Modifier.settingsFocusSlot(localIndex))
+                14 -> SettingsToggleRow(Icons.Default.VolumeUp, stringResource(R.string.trailer_sound), stringResource(R.string.trailer_sound_desc), trailerSoundEnabled, focusedIndex == localIndex, onTrailerSoundEnabledToggle, Modifier.settingsFocusSlot(localIndex))
                 15 -> SettingsRow(Icons.Default.Movie, stringResource(R.string.frame_rate), stringResource(R.string.frame_rate_desc), frameRateMatchingMode, focusedIndex == localIndex, onFrameRateMatchingClick, Modifier.settingsFocusSlot(localIndex))
                 16 -> SettingsRow(Icons.Default.HighQuality, stringResource(R.string.quality_filters), stringResource(R.string.quality_filters_desc), qualityFilterValue, focusedIndex == localIndex, onQualityFiltersClick, Modifier.settingsFocusSlot(localIndex))
                 17 -> SettingsRow(Icons.Default.Widgets, stringResource(R.string.card_layout), stringResource(R.string.card_layout_desc), cardLayoutMode, focusedIndex == localIndex, onCardLayoutToggle, Modifier.settingsFocusSlot(localIndex))
@@ -6387,16 +6389,16 @@ private fun TvGeneralSettingsRows(
                     onClick = onDeviceModeClick,
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
-                19 -> SettingsToggleRow(stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))
-                21 -> SettingsToggleRow(stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
+                19 -> SettingsToggleRow(Icons.Default.Person, stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))
+                21 -> SettingsToggleRow(Icons.Default.Palette, stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
                 22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
-                23 -> SettingsToggleRow(stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
-                41 -> SettingsToggleRow(stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
-                36 -> SettingsToggleRow(stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
-                24 -> SettingsToggleRow(stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
+                23 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
+                41 -> SettingsToggleRow(Icons.Default.Star, stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
+                36 -> SettingsToggleRow(Icons.Default.Widgets, stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
+                24 -> SettingsToggleRow(Icons.Default.VisibilityOff, stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
                 42 -> SettingsRow(Icons.Default.Palette, stringResource(R.string.accent_color), stringResource(R.string.accent_color_desc), accentColor, focusedIndex == localIndex, onAccentColorClick, Modifier.settingsFocusSlot(localIndex))
                 25 -> SettingsRow(Icons.Default.Language, stringResource(R.string.dns_provider), stringResource(R.string.dns_desc), dnsProvider, focusedIndex == localIndex, onDnsProviderClick, Modifier.settingsFocusSlot(localIndex))
-                26 -> SettingsToggleRow(stringResource(R.string.show_loading_stats), stringResource(R.string.show_loading_stats_desc), showLoadingStats, focusedIndex == localIndex, onShowLoadingStatsToggle, Modifier.settingsFocusSlot(localIndex))
+                26 -> SettingsToggleRow(Icons.Default.Settings, stringResource(R.string.show_loading_stats), stringResource(R.string.show_loading_stats_desc), showLoadingStats, focusedIndex == localIndex, onShowLoadingStatsToggle, Modifier.settingsFocusSlot(localIndex))
                 27 -> SettingsRow(
                     icon = Icons.Default.VolumeUp,
                     title = stringResource(R.string.volume_boost),
@@ -6406,7 +6408,7 @@ private fun TvGeneralSettingsRows(
                     onClick = onVolumeBoostClick,
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
-                28 -> SettingsToggleRow(stringResource(R.string.ai_subtitle_translation_title), stringResource(R.string.ai_subtitle_translation_desc), subtitleAiEnabled, focusedIndex == localIndex, onSubtitleAiEnabledToggle, Modifier.settingsFocusSlot(localIndex))
+                28 -> SettingsToggleRow(Icons.Default.AutoAwesome, stringResource(R.string.ai_subtitle_translation_title), stringResource(R.string.ai_subtitle_translation_desc), subtitleAiEnabled, focusedIndex == localIndex, onSubtitleAiEnabledToggle, Modifier.settingsFocusSlot(localIndex))
                 29 -> SettingsRow(
                     icon = Icons.Default.AutoAwesome,
                     title = stringResource(R.string.ai_model_title),
@@ -6419,17 +6421,17 @@ private fun TvGeneralSettingsRows(
                     onClick = onSubtitleAiModelClick,
                     modifier = Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f)
                 )
-                30 -> SettingsToggleRow(stringResource(R.string.ai_auto_select_title), stringResource(R.string.ai_auto_select_desc), subtitleAiAutoSelect, focusedIndex == localIndex, onSubtitleAiAutoSelectToggle, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
+                30 -> SettingsToggleRow(Icons.Default.AutoAwesome, stringResource(R.string.ai_auto_select_title), stringResource(R.string.ai_auto_select_desc), subtitleAiAutoSelect, focusedIndex == localIndex, onSubtitleAiAutoSelectToggle, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
                 // AI-independent: the timing-based match scan needs no API key.
-                38 -> SettingsToggleRow(stringResource(R.string.ai_find_best_match_title), stringResource(R.string.ai_find_best_match_desc), subtitleAiFindBestMatch, focusedIndex == localIndex, onSubtitleAiFindBestMatchToggle, Modifier.settingsFocusSlot(localIndex))
-                39 -> SettingsToggleRow(stringResource(R.string.subtitle_preload_title), stringResource(R.string.subtitle_preload_desc), subtitlePreloadEnabled, focusedIndex == localIndex, onSubtitlePreloadToggle, Modifier.settingsFocusSlot(localIndex))
-                40 -> SettingsToggleRow(stringResource(R.string.dv_compat_title), stringResource(R.string.dv_compat_desc), dolbyVisionCompatEnabled, focusedIndex == localIndex, onDolbyVisionCompatToggle, Modifier.settingsFocusSlot(localIndex))
-                31 -> SettingsToggleRow(stringResource(R.string.ai_remove_hi_title), stringResource(R.string.ai_remove_hi_desc), subtitleRemoveHearingImpaired, focusedIndex == localIndex, onSubtitleRemoveHearingImpairedToggle, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
+                38 -> SettingsToggleRow(Icons.Default.Subtitles, stringResource(R.string.ai_find_best_match_title), stringResource(R.string.ai_find_best_match_desc), subtitleAiFindBestMatch, focusedIndex == localIndex, onSubtitleAiFindBestMatchToggle, Modifier.settingsFocusSlot(localIndex))
+                39 -> SettingsToggleRow(Icons.Default.Subtitles, stringResource(R.string.subtitle_preload_title), stringResource(R.string.subtitle_preload_desc), subtitlePreloadEnabled, focusedIndex == localIndex, onSubtitlePreloadToggle, Modifier.settingsFocusSlot(localIndex))
+                40 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.dv_compat_title), stringResource(R.string.dv_compat_desc), dolbyVisionCompatEnabled, focusedIndex == localIndex, onDolbyVisionCompatToggle, Modifier.settingsFocusSlot(localIndex))
+                31 -> SettingsToggleRow(Icons.Default.Subtitles, stringResource(R.string.ai_remove_hi_title), stringResource(R.string.ai_remove_hi_desc), subtitleRemoveHearingImpaired, focusedIndex == localIndex, onSubtitleRemoveHearingImpairedToggle, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
                 32 -> SettingsRow(Icons.Default.VpnKey, stringResource(R.string.ai_api_key_title), stringResource(R.string.ai_api_key_desc), maskAiApiKey(subtitleAiApiKey, stringResource(R.string.ai_key_not_set)), focusedIndex == localIndex, onSubtitleAiApiKeyClick, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
                 33 -> SettingsRow(Icons.Default.QrCode, stringResource(R.string.ai_scan_qr_title), stringResource(R.string.ai_scan_qr_desc), "", focusedIndex == localIndex, onSubtitleAiQrClick, Modifier.settingsFocusSlot(localIndex).alpha(if (subtitleAiEnabled) 1f else 0.4f))
                 34 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.trailer_delay), stringResource(R.string.trailer_delay_desc), "${trailerDelaySeconds}s", focusedIndex == localIndex, onTrailerDelayClick, Modifier.settingsFocusSlot(localIndex))
                 35 -> SettingsRow(Icons.Default.Language, stringResource(R.string.custom_user_agent), stringResource(R.string.custom_user_agent_desc), formatUserAgentPreview(customUserAgent, 30), focusedIndex == localIndex, onCustomUserAgentClick, Modifier.settingsFocusSlot(localIndex))
-                37 -> SettingsToggleRow(stringResource(R.string.trailer_in_cards), stringResource(R.string.trailer_in_cards_desc), trailerInCards, focusedIndex == localIndex, onTrailerInCardsToggle, Modifier.settingsFocusSlot(localIndex))
+                37 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.trailer_in_cards), stringResource(R.string.trailer_in_cards_desc), trailerInCards, focusedIndex == localIndex, onTrailerInCardsToggle, Modifier.settingsFocusSlot(localIndex))
             }
         }
     }
@@ -6603,6 +6605,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Subtitles,
             title = stringResource(R.string.subtitle_stylized),
             subtitle = stringResource(R.string.subtitle_stylized_desc),
             isEnabled = subtitleStylized,
@@ -6612,6 +6615,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Subtitles,
             title = stringResource(R.string.filter_subtitles),
             subtitle = stringResource(R.string.filter_subtitles_desc),
             isEnabled = filterSubtitlesByLanguage,
@@ -6630,6 +6634,7 @@ private fun GeneralSettings(
         )
 
         SettingsToggleRow(
+            icon = Icons.Default.PlayArrow,
             title = stringResource(R.string.auto_play_next_title),
             subtitle = stringResource(R.string.auto_play_desc),
             isEnabled = autoPlayNext,
@@ -6639,6 +6644,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.PlayArrow,
             title = stringResource(R.string.autoplay),
             subtitle = stringResource(R.string.autoplay_desc),
             isEnabled = autoPlaySingleSource,
@@ -6658,6 +6664,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Movie,
             title = stringResource(R.string.trailer_auto_play),
             subtitle = stringResource(R.string.trailer_desc),
             isEnabled = trailerAutoPlay,
@@ -6667,6 +6674,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.VolumeUp,
             title = stringResource(R.string.trailer_sound),
             subtitle = stringResource(R.string.trailer_sound_desc),
             isEnabled = trailerSoundEnabled,
@@ -6730,6 +6738,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Person,
             title = stringResource(R.string.skip_profile),
             subtitle = stringResource(R.string.skip_profile_desc),
             isEnabled = skipProfileSelection,
@@ -6739,6 +6748,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Palette,
             title = stringResource(R.string.oled_black_background),
             subtitle = stringResource(R.string.oled_black_background_desc),
             isEnabled = oledBlackBackground,
@@ -6760,6 +6770,7 @@ private fun GeneralSettings(
         // Home hero controls — issue #72. The movie Budget line on the hero banner
         // makes the metadata row noisy on small screens and some users want to hide it.
         SettingsToggleRow(
+            icon = Icons.Default.Movie,
             title = stringResource(R.string.show_budget),
             subtitle = stringResource(R.string.show_budget_desc),
             isEnabled = showBudget,
@@ -6769,6 +6780,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Star,
             title = stringResource(R.string.show_episode_ratings),
             subtitle = stringResource(R.string.show_episode_ratings_desc),
             isEnabled = showEpisodeRatings,
@@ -6778,6 +6790,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.VisibilityOff,
             title = stringResource(R.string.spoiler_blur),
             subtitle = stringResource(R.string.spoiler_blur_desc),
             isEnabled = spoilerBlurEnabled,
@@ -6816,6 +6829,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Settings,
             title = stringResource(R.string.show_loading_stats),
             subtitle = stringResource(R.string.show_loading_stats_desc),
             isEnabled = showLoadingStats,
@@ -6865,6 +6879,7 @@ private fun GeneralSettings(
             modifier = Modifier.padding(start = 4.dp, bottom = 12.dp)
         )
         SettingsToggleRow(
+            icon = Icons.Default.AutoAwesome,
             title = stringResource(R.string.ai_subtitle_translation_title),
             subtitle = stringResource(R.string.ai_subtitle_translation_desc),
             isEnabled = subtitleAiEnabled,
@@ -6887,6 +6902,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.AutoAwesome,
             title = stringResource(R.string.ai_auto_select_title),
             subtitle = stringResource(R.string.ai_auto_select_desc),
             isEnabled = subtitleAiAutoSelect,
@@ -6896,6 +6912,7 @@ private fun GeneralSettings(
         )
         Spacer(modifier = Modifier.height(10.dp))
         SettingsToggleRow(
+            icon = Icons.Default.Subtitles,
             title = stringResource(R.string.ai_remove_hi_title),
             subtitle = stringResource(R.string.ai_remove_hi_desc),
             isEnabled = subtitleRemoveHearingImpaired,
@@ -6959,6 +6976,7 @@ private fun AiModelDialog(
     onDismiss: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
     val options = listOf(
         Triple(com.arflix.tv.ui.screens.player.SubtitleAiModel.GROQ_LLAMA_70B, "Groq – GPT-OSS 120B", stringResource(R.string.ai_groq_model_note)),
         Triple(com.arflix.tv.ui.screens.player.SubtitleAiModel.GEMINI_FLASH_25, "Google – Gemini 3.5 Flash Lite", stringResource(R.string.ai_gemini_model_note))
@@ -6998,8 +7016,8 @@ private fun AiModelDialog(
                                 detectTapGestures(onTap = { onModelSelected(model) })
                             },
                         colors = ClickableSurfaceDefaults.colors(
-                            containerColor = if (isSelected) Pink.copy(alpha = 0.15f) else BackgroundElevated,
-                            focusedContainerColor = Pink.copy(alpha = 0.25f)
+                            containerColor = if (isSelected) accentColor.copy(alpha = 0.18f) else BackgroundElevated,
+                            focusedContainerColor = accentColor.copy(alpha = 0.28f)
                         ),
                         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(10.dp))
                     ) {
@@ -7016,7 +7034,7 @@ private fun AiModelDialog(
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Pink,
+                                    tint = accentColor,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -7409,6 +7427,7 @@ private fun HomeServerSettings(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsActionRow(
+                icon = Icons.Default.QrCode,
                 title = stringResource(R.string.settings_connect_with_code),
                 description = stringResource(R.string.settings_connect_code_description),
                 actionLabel = if (isPlexWorking) stringResource(R.string.settings_waiting) else stringResource(R.string.settings_code),
@@ -7427,6 +7446,7 @@ private fun HomeServerSettings(
                 ).joinToString("  |  ").ifBlank { connection.serverUrl }
 
                 SettingsActionRow(
+                    icon = Icons.Default.Cloud,
                     title = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl },
                     description = description,
                     actionLabel = stringResource(R.string.settings_change),
@@ -7442,6 +7462,7 @@ private fun HomeServerSettings(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsActionRow(
+                icon = Icons.Default.Settings,
                 title = stringResource(R.string.settings_test_connection),
                 description = if (!hasConnections) stringResource(R.string.settings_connect_server_first) else stringResource(R.string.settings_test_reach_servers),
                 actionLabel = if (isWorking) stringResource(R.string.settings_working) else stringResource(R.string.settings_test),
@@ -7453,6 +7474,7 @@ private fun HomeServerSettings(
             Spacer(modifier = Modifier.height(16.dp))
 
             SettingsActionRow(
+                icon = Icons.Default.Delete,
                 title = stringResource(R.string.settings_disconnect_all),
                 description = if (!hasConnections) stringResource(R.string.settings_no_server_connected) else stringResource(R.string.settings_remove_all_servers),
                 actionLabel = stringResource(R.string.settings_remove),
@@ -7666,6 +7688,8 @@ private fun IptvSettings(
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
                 val focusRingColor = resolveAccentColor(fallback = Pink)
                 Row(modifier = Modifier.settingsFocusSlot(rowIndex).fillMaxWidth().background(if (focusedIndex == rowIndex) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == rowIndex) 2.dp else 0.dp, color = if (focusedIndex == rowIndex) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onEditPlaylist(index) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(19.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(playlist.name, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (focusedIndex == rowIndex) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.height(4.dp))
@@ -7755,13 +7779,13 @@ private fun IptvSettings(
             )
             Spacer(modifier = Modifier.height(16.dp))
             SettingsToggleRow(
+                icon = Icons.Default.Movie,
                 title = stringResource(R.string.settings_iptv_vod_search),
                 subtitle = stringResource(R.string.settings_iptv_vod_search_desc),
                 isEnabled = vodSearchEnabled,
                 isFocused = focusedIndex == playlists.size + 3,
                 onToggle = onVodSearchToggle,
-                modifier = Modifier.settingsFocusSlot(playlists.size + 3),
-                icon = Icons.Default.Movie
+                modifier = Modifier.settingsFocusSlot(playlists.size + 3)
             )
             Spacer(modifier = Modifier.height(16.dp))
             val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }
@@ -8915,6 +8939,8 @@ private fun CatalogsSettings(
                 val layoutRowKey = remember(catalog.id, catalog.kind) { catalogueLayoutRowKey(catalog) }
                 val focusRingColor = resolveAccentColor(fallback = Pink)
                 Row(modifier = Modifier.settingsFocusSlot(rowFocusIndex).fillMaxWidth().background(if (isSelected) Pink.copy(alpha = 0.2f) else if (isRowFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (isRowFocused) 2.dp else 0.dp, color = if (isRowFocused) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onRenameCatalog(catalog) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.Widgets, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(19.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (isRowFocused || isSelected) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.height(4.dp))
@@ -9159,12 +9185,12 @@ private fun StremioAddonsSettings(
                     .fillMaxWidth()
                     .clickable(enabled = !isRefreshingAddons, onClick = onRefreshAddons)
                     .background(if (focusedIndex == addons.size) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                    .border(width = if (focusedIndex == addons.size) 2.dp else 0.dp, color = if (focusedIndex == addons.size) Pink else Color.Transparent, shape = RoundedCornerShape(12.dp))
+                    .border(width = if (focusedIndex == addons.size) 2.dp else 0.dp, color = if (focusedIndex == addons.size) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = Pink, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(
@@ -9175,7 +9201,7 @@ private fun StremioAddonsSettings(
                         }
                     ),
                     style = ArflixTypography.button,
-                    color = Pink
+                    color = accentColor
                 )
             }
             Spacer(modifier = Modifier.height(12.dp))
@@ -9185,14 +9211,14 @@ private fun StremioAddonsSettings(
                     .fillMaxWidth()
                     .clickable(onClick = onAddCustomAddon)
                     .background(if (focusedIndex == addons.size + 1) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                    .border(width = if (focusedIndex == addons.size + 1) 2.dp else 0.dp, color = if (focusedIndex == addons.size + 1) Pink else Color.Transparent, shape = RoundedCornerShape(12.dp))
+                    .border(width = if (focusedIndex == addons.size + 1) 2.dp else 0.dp, color = if (focusedIndex == addons.size + 1) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
             ) {
-                Icon(Icons.Default.Widgets, contentDescription = null, tint = Pink, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.Widgets, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
-                Text(stringResource(R.string.add_addon), style = ArflixTypography.button, color = Pink)
+                Text(stringResource(R.string.add_addon), style = ArflixTypography.button, color = accentColor)
             }
         }
     }
@@ -9231,7 +9257,6 @@ private fun AddonRow(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isToggleFocused = isFocused && focusedAction == 0
     val isMoveUpFocused = isFocused && focusedAction == 1
     val isMoveDownFocused = isFocused && focusedAction == 2
     val isDeleteFocused = canDelete && isFocused && focusedAction == 3
@@ -9312,33 +9337,23 @@ private fun AddonRow(
         ) {
             Box(
                 modifier = Modifier
-                    .border(
-                        width = if (isToggleFocused) 2.dp else 0.dp,
-                        color = if (isToggleFocused) focusRingColor else Color.Transparent,
+                    .width(44.dp)
+                    .height(24.dp)
+                    .background(
+                        color = if (isEnabled) focusRingColor else Color.White.copy(alpha = 0.2f),
                         shape = RoundedCornerShape(13.dp)
                     )
-                    .padding(2.dp)
+                    .padding(3.dp),
+                contentAlignment = if (isEnabled) Alignment.CenterEnd else Alignment.CenterStart
             ) {
                 Box(
                     modifier = Modifier
-                        .width(44.dp)
-                        .height(24.dp)
+                        .size(18.dp)
                         .background(
-                            color = if (isEnabled) focusRingColor else Color.White.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(13.dp)
+                            color = Color.White,
+                            shape = RoundedCornerShape(10.dp)
                         )
-                        .padding(3.dp),
-                    contentAlignment = if (isEnabled) Alignment.CenterEnd else Alignment.CenterStart
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .background(
-                                color = Color.White,
-                                shape = RoundedCornerShape(10.dp)
-                            )
-                    )
-                }
+                )
             }
 
             CatalogActionChip(
@@ -9381,6 +9396,7 @@ private fun CloudSyncSettings(
 ) {
     Column {
         AccountRow(
+            icon = Icons.Default.Cloud,
             name = stringResource(R.string.settings_arvio_cloud),
             description = cloudEmail ?: stringResource(R.string.settings_cloud_account_desc),
             isConnected = isCloudAuthenticated,
@@ -9397,6 +9413,7 @@ private fun CloudSyncSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.Upload,
             title = stringResource(R.string.force_cloud_sync),
             description = if (isForceCloudSyncing) {
                 stringResource(R.string.settings_sync_local_cloud_now)
@@ -9416,6 +9433,7 @@ private fun CloudSyncSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.Download,
             title = stringResource(R.string.settings_force_pull),
             description = stringResource(R.string.settings_force_pull_desc),
             actionLabel = if (isForceCloudSyncing) stringResource(R.string.settings_badge_syncing) else stringResource(R.string.settings_action_pull),
@@ -9427,6 +9445,7 @@ private fun CloudSyncSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.Delete,
             title = stringResource(R.string.settings_account_data_deletion),
             description = stringResource(R.string.settings_account_data_deletion_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
@@ -9451,6 +9470,7 @@ private fun InfoUpdatesSettings(
 ) {
     Column {
         SettingsActionRow(
+            icon = Icons.Default.SystemUpdate,
             title = stringResource(R.string.app_update),
             description = when {
                 !isSelfUpdateSupported -> stringResource(R.string.settings_update_managed_play)
@@ -9477,6 +9497,7 @@ private fun InfoUpdatesSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.Security,
             title = stringResource(R.string.settings_privacy_policy),
             description = stringResource(R.string.settings_privacy_policy_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
@@ -9488,6 +9509,7 @@ private fun InfoUpdatesSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsToggleRow(
+            icon = Icons.Default.Security,
             title = stringResource(R.string.settings_diagnostics_sharing),
             subtitle = stringResource(R.string.settings_diagnostics_sharing_desc),
             isEnabled = diagnosticsSharingEnabled,
@@ -9541,6 +9563,7 @@ private fun AccountsSettings(
 
         // Trakt.tv
         AccountRow(
+            icon = Icons.Default.Link,
             name = "Trakt.tv",
             description = stringResource(R.string.settings_trakt_desc),
             isConnected = isTraktAuthenticated,
@@ -9558,6 +9581,7 @@ private fun AccountsSettings(
 
         // MDBList (per-profile alternative to Trakt)
         AccountRow(
+            icon = Icons.Default.List,
             name = stringResource(R.string.mdblist_account),
             description = stringResource(R.string.mdblist_key_help),
             isConnected = isMdbListConnected,
@@ -9575,6 +9599,7 @@ private fun AccountsSettings(
 
         // Simkl (per-profile alternative to Trakt)
         AccountRow(
+            icon = Icons.Default.Sync,
             name = "Simkl",
             description = stringResource(R.string.settings_simkl_tagline),
             isConnected = isSimklConnected,
@@ -9591,6 +9616,7 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.Star,
             title = stringResource(R.string.tracking_watchlist_source),
             description = stringResource(R.string.tracking_watchlist_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingWatchlistReadMode),
@@ -9607,6 +9633,7 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.PlayArrow,
             title = stringResource(R.string.tracking_continue_source),
             description = stringResource(R.string.tracking_continue_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingContinueReadMode),
@@ -9623,6 +9650,7 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsActionRow(
+            icon = Icons.Default.CheckCircle,
             title = stringResource(R.string.tracking_watched_source),
             description = stringResource(R.string.tracking_watched_source_desc),
             actionLabel = trackingModeLabel(trackingUiState.trackingWatchedReadMode),
@@ -9639,6 +9667,7 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsToggleRow(
+            icon = Icons.Default.Sync,
             title = stringResource(R.string.tracking_update_trakt),
             subtitle = if (isTraktAuthenticated) stringResource(R.string.tracking_update_trakt_desc) else stringResource(R.string.tracking_update_trakt_connect),
             isEnabled = isTraktAuthenticated && trackingUiState.trackingWriteToTrakt,
@@ -9650,6 +9679,7 @@ private fun AccountsSettings(
         Spacer(modifier = Modifier.height(16.dp))
 
         SettingsToggleRow(
+            icon = Icons.Default.Sync,
             title = stringResource(R.string.tracking_update_simkl),
             subtitle = if (isSimklConnected) stringResource(R.string.tracking_update_simkl_desc) else stringResource(R.string.tracking_update_simkl_connect),
             isEnabled = isSimklConnected && trackingUiState.trackingWriteToSimkl,
@@ -9662,6 +9692,7 @@ private fun AccountsSettings(
 
         // Telegram
         SettingsActionRow(
+            icon = Icons.Default.Link,
             title = stringResource(R.string.telegram_title),
             description = stringResource(R.string.settings_telegram_desc),
             actionLabel = stringResource(R.string.settings_badge_open),
@@ -9678,6 +9709,7 @@ private fun AccountsSettings(
         val discordUsername by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.usernameFlow.collectAsStateWithLifecycle(initialValue = null)
         val isDiscordSupported = com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isSupported
         AccountRow(
+            icon = Icons.Default.Link,
             name = stringResource(R.string.discord_rich_presence_title),
             description = when {
                 !isDiscordSupported -> stringResource(R.string.discord_not_included)
@@ -9953,6 +9985,7 @@ private fun AccountActionRow(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun SettingsActionRow(
+    icon: ImageVector,
     title: String,
     description: String,
     actionLabel: String,
@@ -9979,22 +10012,31 @@ private fun SettingsActionRow(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
-                color = TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = TextSecondary,
+                modifier = Modifier.size(19.dp)
             )
-            if (description.isNotEmpty()) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = description,
-                    style = ArflixTypography.caption.copy(fontSize = 13.sp),
-                    color = TextSecondary,
-                    maxLines = 2,
+                    text = title,
+                    style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
+                    color = TextPrimary,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (description.isNotEmpty()) {
+                    Text(
+                        text = description,
+                        style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                        color = TextSecondary,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
 
@@ -10576,7 +10618,7 @@ private fun TrackingServiceRow(
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun AccountRow(
-
+    icon: ImageVector,
     name: String,
     description: String,
     isConnected: Boolean,
@@ -10615,22 +10657,31 @@ private fun AccountRow(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = name,
-                    style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = TextSecondary,
+                    modifier = Modifier.size(19.dp)
                 )
-                if (description.isNotEmpty()) {
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = description,
-                        style = ArflixTypography.caption.copy(fontSize = 13.sp),
-                        color = TextSecondary,
-                        maxLines = 2,
+                        text = name,
+                        style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
+                        color = TextPrimary,
+                        maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
+                    if (description.isNotEmpty()) {
+                        Text(
+                            text = description,
+                            style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                            color = TextSecondary,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
             Spacer(modifier = Modifier.width(12.dp))
@@ -11280,6 +11331,9 @@ private fun InputModal(
                 ) {
                     fields.forEachIndexed { index, field ->
                         val isFocused = focusedIndex == index
+                        val placeholder = field.placeholder.ifBlank {
+                            stringResource(R.string.settings_ph_enter_value, field.label.lowercase())
+                        }
 
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -11324,7 +11378,7 @@ private fun InputModal(
                                             setText(field.value)
                                             setTextColor(android.graphics.Color.WHITE)
                                             setHintTextColor(android.graphics.Color.GRAY)
-                                            hint = field.placeholder.ifBlank { "Enter ${field.label.lowercase()}..." }
+                                            hint = placeholder
                                             textSize = 16f
                                             background = null
                                             setPadding(20, 14, 20, 14)

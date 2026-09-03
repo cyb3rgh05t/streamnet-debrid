@@ -4,6 +4,16 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Settings visual consistency
+
+- Added semantic leading icons throughout TV Settings, including toggles, actions, account integrations, custom playlists, catalogs, and plugin scraper controls.
+- Standardized TV Settings icon sizing, spacing, neutral tint, and selected-theme accent treatment across shared and custom rows.
+- Removed the redundant inner focus border from Addon switches while preserving the full-row focus indicator and D-pad actions.
+- Applied the selected theme accent to Addon refresh/install actions and the AI model selection dialog.
+- Localized StreamNet credential placeholders and the default Settings input placeholder in English and German.
+- Bumped the Android application to `2.2.005` (`versionCode` 380).
+- Documented implementation behavior and validation in `docs/superpowers/settings-visual-consistency-2026-09-03.md`.
+
 ### Playback, IPTV, Search, and portal polish
 
 - Automatically selects an embedded forced subtitle matching the active audio language even when normal subtitles are set to Off, while preserving explicit manual subtitle choices.

@@ -341,6 +341,9 @@
     <string name="settings_streamnet_tv_login_note">Sign in with your personal StreamNet TV credentials.</string>
     <string name="settings_label_streamnet_user">StreamNet username</string>
     <string name="settings_label_streamnet_password">StreamNet password</string>
+    <string name="settings_ph_streamnet_user">Enter StreamNet username...</string>
+    <string name="settings_ph_streamnet_password">Enter StreamNet password...</string>
+    <string name="settings_ph_enter_value">Enter %1$s...</string>
     <string name="settings_streamnet_tv_ready">Ready to connect with your personal login</string>
     <string name="settings_streamnet_tv_connected">Connected with personal StreamNet login</string>
     <string name="toast_streamnet_tv_unavailable">StreamNet TV is not configured in this build.</string>

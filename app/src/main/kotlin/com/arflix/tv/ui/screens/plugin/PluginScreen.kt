@@ -321,6 +321,7 @@ fun PluginScreen(
                     FocusableSettingsToggleRow(
                         index = slotIndex,
                         focusedIndex = focusedIndex,
+                        icon = Icons.Default.Extension,
                         title = scraper.name,
                         subtitle = scraper.id,
                         isEnabled = scraper.enabled,
@@ -456,6 +457,7 @@ fun FocusableSettingsRow(
 fun FocusableSettingsToggleRow(
     index: Int,
     focusedIndex: Int,
+    icon: ImageVector,
     title: String,
     subtitle: String = "",
     isEnabled: Boolean,
@@ -463,6 +465,7 @@ fun FocusableSettingsToggleRow(
     modifier: Modifier = Modifier
 ) {
     SettingsToggleRow(
+        icon = icon,
         title = title,
         subtitle = subtitle,
         isEnabled = isEnabled,
