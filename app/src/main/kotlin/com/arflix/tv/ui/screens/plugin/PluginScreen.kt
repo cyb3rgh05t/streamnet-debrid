@@ -59,6 +59,10 @@ import com.arflix.tv.util.LocalDeviceType
 
 import com.arflix.tv.domain.model.PluginRepository
 
+@Composable
+private fun PluginMessage.localizedText(): String =
+    stringResource(resourceId, *formatArgs.toTypedArray())
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun PluginScreen(
@@ -143,7 +147,7 @@ fun PluginScreen(
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
             uiState.errorMessage?.let { msg ->
-                Text(msg, color = Color.Red, style = ArflixTypography.body)
+                Text(msg.localizedText(), color = Color.Red, style = ArflixTypography.body)
             }
 
             MobileSettingsCategory(title = stringResource(R.string.plugin_screen_add_repo)) {
@@ -202,8 +206,8 @@ fun PluginScreen(
             MobileSettingsCategory(title = "") {
                 MobileSettingsRow(
                     icon = Icons.Default.Delete,
-                    title = "Reset Plugins & Extensions",
-                    subtitle = "Deletes all repositories, scrapers, and local data",
+                    title = stringResource(R.string.plugin_screen_reset_title),
+                    subtitle = stringResource(R.string.plugin_screen_reset_desc),
                     value = "",
                     isFocused = false,
                     showDivider = false,
@@ -234,7 +238,7 @@ fun PluginScreen(
                 }
         ) {
             uiState.errorMessage?.let { msg ->
-                Text(msg, color = Color.Red, style = ArflixTypography.body)
+                Text(msg.localizedText(), color = Color.Red, style = ArflixTypography.body)
                 Spacer(modifier = Modifier.height(16.dp))
             }
 
@@ -383,8 +387,8 @@ fun PluginScreen(
 
     if (showResetDialog) {
         WarningDialog(
-            title = "Warning",
-            message = "Are you sure you want to delete all plugins, scrapers, and local code data? This action cannot be undone.",
+            title = stringResource(R.string.plugin_screen_reset_warning_title),
+            message = stringResource(R.string.plugin_screen_reset_warning_message),
             cancelText = stringResource(R.string.cancel),
             confirmText = stringResource(R.string.delete),
             onConfirm = {
@@ -399,7 +403,7 @@ fun PluginScreen(
     repoToDelete?.let { repo ->
         WarningDialog(
             title = stringResource(R.string.delete),
-            message = "Are you sure you want to remove '${repo.name}'?",
+            message = stringResource(R.string.plugin_screen_remove_repo_message, repo.name),
             cancelText = stringResource(R.string.cancel),
             confirmText = stringResource(R.string.delete),
             onConfirm = {
@@ -483,6 +487,7 @@ fun AddRepoDialog(
     onDismiss: () -> Unit
 ) {
     HideDialogSystemBars()
+    val accentColor = resolveAccentColor(fallback = Pink)
     var value by remember { mutableStateOf("") }
     val inputFocusRequester = remember { FocusRequester() }
     val saveFocus = remember { FocusRequester() }
@@ -537,9 +542,9 @@ fun AddRepoDialog(
                         colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedBorderColor = Pink,
+                            focusedBorderColor = accentColor,
                             unfocusedBorderColor = TextSecondary.copy(alpha = 0.3f),
-                            focusedLabelColor = Pink,
+                            focusedLabelColor = accentColor,
                             unfocusedLabelColor = TextSecondary
                         )
                     )
@@ -580,10 +585,10 @@ fun AddRepoDialog(
                                 .focusRequester(saveFocus)
                                 .onFocusChanged { isSaveFocused = it.isFocused }
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isSaveFocused) Pink.copy(alpha = 0.35f) else Pink.copy(alpha = 0.15f))
+                                .background(if (isSaveFocused) accentColor.copy(alpha = 0.35f) else accentColor.copy(alpha = 0.15f))
                                 .border(
                                     width = if (isSaveFocused) 2.dp else 1.dp,
-                                    color = if (isSaveFocused) Pink else Pink.copy(alpha = 0.4f),
+                                    color = if (isSaveFocused) accentColor else accentColor.copy(alpha = 0.4f),
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clickable { onSave(value) }
@@ -593,7 +598,7 @@ fun AddRepoDialog(
                             Text(
                                 text = stringResource(R.string.add),
                                 textAlign = TextAlign.Center,
-                                color = Pink,
+                                color = accentColor,
                                 style = ArflixTypography.button
                             )
                         }
@@ -613,6 +618,7 @@ fun WarningDialog(
     onDismiss: () -> Unit
 ) {
     HideDialogSystemBars()
+    val accentColor = resolveAccentColor(fallback = Pink)
     val cancelFocusRequester = remember { FocusRequester() }
     val confirmFocus = remember { FocusRequester() }
 
@@ -699,10 +705,10 @@ fun WarningDialog(
                                 .focusRequester(confirmFocus)
                                 .onFocusChanged { isConfirmFocused = it.isFocused }
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isConfirmFocused) Pink.copy(alpha = 0.35f) else Pink.copy(alpha = 0.15f))
+                                .background(if (isConfirmFocused) accentColor.copy(alpha = 0.35f) else accentColor.copy(alpha = 0.15f))
                                 .border(
                                     width = if (isConfirmFocused) 2.dp else 1.dp,
-                                    color = if (isConfirmFocused) Pink else Pink.copy(alpha = 0.4f),
+                                    color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.4f),
                                     shape = RoundedCornerShape(8.dp)
                                 )
                                 .clickable { onConfirm() }
@@ -712,7 +718,7 @@ fun WarningDialog(
                             Text(
                                 text = confirmText,
                                 textAlign = TextAlign.Center,
-                                color = Pink,
+                                color = accentColor,
                                 style = ArflixTypography.button
                             )
                         }

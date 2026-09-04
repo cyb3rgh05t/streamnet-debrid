@@ -244,6 +244,14 @@
     <string name="settings_iptv_only_mode_title">Nur IPTV-Provider Quellen</string>
     <string name="settings_iptv_vod_search">IPTV-VOD-Streams</string>
     <string name="settings_iptv_vod_search_desc">IPTV-Filme und -Serien bei der Quellensuche berücksichtigen</string>
+    <string name="settings_iptv_vod_categories">VOD-Kategorien</string>
+    <string name="settings_iptv_live_categories">Live-Kategorien</string>
+    <string name="settings_iptv_live_categories_desc">Lege fest, welche Sendergruppen in Live-TV sichtbar sind.</string>
+    <string name="settings_iptv_vod_categories_home_only">Lege fest, welche StreamNet-TV-Kategorien auf Home erscheinen. Suche und Wiedergabequellen bleiben verfügbar.</string>
+    <string name="settings_iptv_vod_movies">Filme</string>
+    <string name="settings_iptv_vod_series">Serien</string>
+    <string name="settings_no_vod_categories_available">Keine VOD-Kategorien verfügbar</string>
+    <string name="settings_include_all_vod_categories">Alle Kategorien einschließen</string>
     <string name="settings_iptv_playlist_settings_header">Playlist-Einstellungen</string>
     <string name="settings_iptv_only_mode_subtitle">Auf der Startseite nur Content von IPTV-Providern anzeigen</string>
 
@@ -695,12 +703,23 @@
     <string name="settings_help_setting_desc">Mit OK diese Option ändern.</string>
     <string name="settings_media_server">Medienserver</string>
     <string name="settings_section_connections">VERBINDUNGEN</string>
+    <string name="settings_section_add_server">SERVER HINZUFÜGEN</string>
+    <string name="settings_section_connected_servers">VERBUNDENE SERVER</string>
+    <string name="settings_section_server_actions">SERVER-AKTIONEN</string>
+    <string name="settings_server_settings">Servereinstellungen</string>
+    <string name="settings_server_libraries">Bibliotheken</string>
+    <string name="settings_server_libraries_description">%1$d von %2$d Bibliotheken eingeschlossen</string>
+    <string name="settings_manage">Verwalten</string>
+    <string name="settings_no_video_libraries">Keine Film- oder Serienbibliotheken gefunden.</string>
+    <string name="settings_library_included">Auf Home eingeschlossen</string>
+    <string name="settings_library_excluded">Von Home ausgeschlossen</string>
     <string name="settings_add_server">Server hinzufügen</string>
     <string name="settings_add_server_subtitle">Persönliche Medienbibliotheken als Quellen</string>
     <string name="settings_add_another">Weiteren hinzufügen</string>
     <string name="settings_connect_code_subtitle">Plex-PIN oder Jellyfin Quick Connect</string>
     <string name="settings_waiting">Warten</string>
-    <string name="settings_collections_count">%1$d Sammlungen</string>
+    <string name="settings_collections_count">%1$d Bibliotheken</string>
+    <string name="settings_home_server_library_visibility">Diese Bibliothek als Home-Katalog anzeigen</string>
     <string name="settings_section_actions">AKTIONEN</string>
     <string name="settings_test_connection">Verbindung testen</string>
     <string name="settings_connect_server_first">Zuerst einen Server verbinden</string>
@@ -759,6 +778,7 @@
     <string name="settings_source_addon">Addon</string>
     <string name="settings_section_add_catalog">KATALOG HINZUFÜGEN</string>
     <string name="settings_section_my_catalogs">MEINE KATALOGE</string>
+    <string name="settings_section_home_catalog_settings">HOME-KATALOG-EINSTELLUNGEN</string>
     <string name="settings_title_builtin_collection">%1$s (integrierte Sammlung)</string>
     <string name="settings_title_builtin_rail">%1$s (integrierte Reihe)</string>
     <string name="settings_title_builtin">%1$s (integriert)</string>
@@ -901,6 +921,12 @@
     <string name="plugin_screen_no_scrapers">Keine Scraper installiert.</string>
     <string name="plugin_screen_add_repo_dialog_title">Plugin-Repository hinzufügen</string>
     <string name="plugin_screen_repo_url">Repository-URL</string>
+    <string name="plugin_screen_reset_title">Plugins und Erweiterungen zurücksetzen</string>
+    <string name="plugin_screen_reset_desc">Löscht alle Repositorys, Scraper und lokalen Daten</string>
+    <string name="plugin_screen_reset_warning_title">Warnung</string>
+    <string name="plugin_screen_reset_warning_message">Möchtest du wirklich alle Plugins, Scraper und lokalen Codedaten löschen? Diese Aktion kann nicht rückgängig gemacht werden.</string>
+    <string name="plugin_screen_remove_repo_message">Möchtest du \"%1$s\" wirklich entfernen?</string>
+    <string name="plugin_all_cleared">Alle Plugins und Erweiterungen wurden gelöscht</string>
 
     <!-- Profile, Details, Startseite und Player -->
     <string name="collection_empty">Hier gibt es noch nichts zu sehen.</string>
@@ -1056,6 +1082,14 @@
     <string name="watchlist_error_load_trakt">Trakt-Merkliste konnte nicht geladen werden</string>
     <string name="watchlist_error_refresh">Aktualisierung fehlgeschlagen</string>
     <string name="watchlist_toast_removed">Von der Merkliste entfernt</string>
+    <string name="watchlist_my_watchlist">Meine Merkliste</string>
+    <string name="watchlist_provider_home_server">Server</string>
+    <string name="watchlist_tracker_default_list">Merkliste</string>
+    <string name="watchlist_simkl_watching">Wird angesehen</string>
+    <string name="watchlist_simkl_plan_to_watch">Geplant</string>
+    <string name="watchlist_simkl_completed">Abgeschlossen</string>
+    <string name="watchlist_simkl_on_hold">Pausiert</string>
+    <string name="watchlist_simkl_dropped">Abgebrochen</string>
 
     <!-- Datenebene und ViewModels -->
     <string name="continue_season_episode">S%1$dE%2$d fortsetzen</string>

@@ -265,16 +265,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
           VERSION_NAME: ${{ steps.package.outputs.version_name }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
           tag="${VERSION_NAME}"
 
+          gh api \
+            --method POST \
+            "repos/${GH_REPO}/releases/generate-notes" \
+            -f tag_name="$tag" \
+            -f target_commitish="$GITHUB_SHA" \
+            --jq '.body' \
+            > release-notes.md
+          test -s release-notes.md
+
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release-artifacts/* --clobber
+            current_notes="$(gh release view "$tag" --json body --jq '.body')"
+            if [ -z "${current_notes//[[:space:]]/}" ]; then
+              gh release edit "$tag" --notes-file release-notes.md
+            fi
           else
             gh release create "$tag" release-artifacts/* \
               --target "$GITHUB_SHA" \
               --title "StreamNet Debrid ${VERSION_NAME}" \
-              --generate-notes
+              --notes-file release-notes.md
           fi

@@ -40,6 +40,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
@@ -109,6 +110,23 @@ internal fun appBottomBarSpec(mode: AppBottomBarMode): AppBottomBarSpec = when (
         indicatorSizeDp = 4,
         labelFontSizeSp = 10,
     )
+}
+
+@Composable
+internal fun appBottomBarOverlayOffset(): Dp {
+    if (!LocalAppBottomBarVisible.current) return 0.dp
+    val configuration = LocalConfiguration.current
+    return when (
+        appBottomBarMode(
+            isTouchDevice = LocalDeviceType.current.isTouchDevice(),
+            smallestScreenWidthDp = configuration.smallestScreenWidthDp,
+            screenWidthDp = configuration.screenWidthDp,
+            screenHeightDp = configuration.screenHeightDp,
+        )
+    ) {
+        AppBottomBarMode.LANDSCAPE_COMPACT -> 53.dp
+        AppBottomBarMode.STANDARD -> 72.dp
+    }
 }
 
 data class BottomBarItem(

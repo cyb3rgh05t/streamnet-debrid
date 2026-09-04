@@ -865,6 +865,7 @@ fun HomeScreen(
             if (event == Lifecycle.Event.ON_RESUME) {
                 // Keep the profile-to-Home transition local-first. A forced remote
                 // refresh here cancelled the cache fast path on every app launch.
+                viewModel.refreshHomeDataIfStale()
                 viewModel.refreshContinueWatchingOnly(force = false)
                 viewModel.refreshIptvHomeCatalogs()
                 // Pull the full cloud state (addons, catalogs, settings) on resume.

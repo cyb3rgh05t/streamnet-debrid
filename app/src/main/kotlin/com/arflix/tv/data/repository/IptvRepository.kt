@@ -328,8 +328,13 @@ data class IptvConfig(
     val stalkerMacAddress: String = "",
     val showSpecialCategories: Boolean = true,
     val iptvOnlyMode: Boolean = true,
+    val excludedVodCategoryIds: List<String> = emptyList(),
+    val excludedSeriesCategoryIds: List<String> = emptyList(),
     val sortOrder: String = "provider"
 )
+
+internal fun isXtreamVodCategoryIncluded(categoryId: String?, excludedCategoryIds: Set<String>): Boolean =
+    categoryId?.trim().orEmpty() !in excludedCategoryIds
 
 data class IptvPlaylistEntry(
     val id: String,
@@ -513,6 +518,8 @@ data class IptvCloudProfileState(
     val showSpecialCategories: Boolean = true,
     val iptvOnlyMode: Boolean = true,
     val vodSearchEnabled: Boolean? = null,
+    val excludedVodCategoryIds: List<String>? = null,
+    val excludedSeriesCategoryIds: List<String>? = null,
 )
 
 data class IptvTvSessionState(
@@ -724,6 +731,16 @@ class IptvRepository @Inject constructor(
     private fun xtreamCredentialsForSeriesImport(config: IptvConfig): XtreamCredentials? =
         activeSeriesPlaylists(config).firstNotNullOfOrNull(::resolveXtreamCredentials)
 
+    private fun streamNetCredentialsForVodImport(config: IptvConfig): XtreamCredentials? =
+        config.playlists.firstOrNull(::isStreamNetTvPlaylist)
+            ?.takeIf { it.m3uUrl.isNotBlank() && it.importVod }
+            ?.let(::resolveXtreamCredentials)
+
+    private fun streamNetCredentialsForSeriesImport(config: IptvConfig): XtreamCredentials? =
+        config.playlists.firstOrNull(::isStreamNetTvPlaylist)
+            ?.takeIf { it.m3uUrl.isNotBlank() && it.importSeries }
+            ?.let(::resolveXtreamCredentials)
+
     @Volatile
     private var xtreamSeriesLoadedAtMs: Long = 0L
     @Volatile
@@ -852,6 +869,8 @@ class IptvRepository @Inject constructor(
                 stalkerMacAddress = prefs[stalkerMacAddressKey()].orEmpty(),
                 showSpecialCategories = prefs[showSpecialCategoriesKey()] ?: true,
                 iptvOnlyMode = prefs[iptvOnlyModeKey()] ?: true,
+                excludedVodCategoryIds = decodeStringList(prefs[excludedVodCategoriesKey()].orEmpty()),
+                excludedSeriesCategoryIds = decodeStringList(prefs[excludedSeriesCategoriesKey()].orEmpty()),
                 sortOrder = normalizeIptvSortOrder(prefs[sortOrderKey()])
             )
         }
@@ -3393,6 +3412,14 @@ class IptvRepository @Inject constructor(
         profileManager.profileBooleanKey("iptv_vod_search_enabled")
     private fun vodSearchEnabledKeyFor(profileId: String): Preferences.Key<Boolean> =
         profileManager.profileBooleanKeyFor(profileId, "iptv_vod_search_enabled")
+    private fun excludedVodCategoriesKey(): Preferences.Key<String> =
+        profileManager.profileStringKey("iptv_excluded_vod_categories")
+    private fun excludedVodCategoriesKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_excluded_vod_categories")
+    private fun excludedSeriesCategoriesKey(): Preferences.Key<String> =
+        profileManager.profileStringKey("iptv_excluded_series_categories")
+    private fun excludedSeriesCategoriesKeyFor(profileId: String): Preferences.Key<String> =
+        profileManager.profileStringKeyFor(profileId, "iptv_excluded_series_categories")
 
     private fun sortOrderKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_sort_order")
     private fun sortOrderKeyFor(profileId: String): Preferences.Key<String> =
@@ -3423,6 +3450,18 @@ class IptvRepository @Inject constructor(
         if (raw.isBlank()) return emptyList()
         return decodePlaylistJsonCompat(decryptConfigValue(raw), gson)
             .mapIndexedNotNull { index, playlist -> normalizePlaylistEntry(playlist, index) }
+    }
+
+    private fun decodeStringList(raw: String): List<String> {
+        if (raw.isBlank()) return emptyList()
+        return runCatching {
+            val type = TypeToken.getParameterized(List::class.java, String::class.java).type
+            gson.fromJson<List<String>>(raw, type)
+                ?.map(String::trim)
+                ?.filter(String::isNotBlank)
+                ?.distinct()
+                .orEmpty()
+        }.getOrDefault(emptyList())
     }
 
     private fun hiddenGroupsKey(): Preferences.Key<String> = profileManager.profileStringKey("iptv_hidden_groups")
@@ -3617,6 +3656,8 @@ class IptvRepository @Inject constructor(
             vodSearchEnabled = prefs[vodSearchEnabledKeyFor(safeProfileId)]
                 ?: prefs[IPTV_VOD_SEARCH_ENABLED_KEY]
                 ?: true,
+            excludedVodCategoryIds = decodeStringList(prefs[excludedVodCategoriesKeyFor(safeProfileId)].orEmpty()),
+            excludedSeriesCategoryIds = decodeStringList(prefs[excludedSeriesCategoriesKeyFor(safeProfileId)].orEmpty()),
         )
     }
 
@@ -3706,6 +3747,12 @@ class IptvRepository @Inject constructor(
             prefs[showSpecialCategoriesKeyFor(safeProfileId)] = state.showSpecialCategories
             prefs[iptvOnlyModeKeyFor(safeProfileId)] = state.iptvOnlyMode
             prefs[vodSearchEnabledKeyFor(safeProfileId)] = state.vodSearchEnabled ?: true
+            val excludedVodCategoryIds = state.excludedVodCategoryIds.orEmpty().map(String::trim).filter(String::isNotBlank).distinct()
+            if (excludedVodCategoryIds.isEmpty()) prefs.remove(excludedVodCategoriesKeyFor(safeProfileId))
+            else prefs[excludedVodCategoriesKeyFor(safeProfileId)] = gson.toJson(excludedVodCategoryIds)
+            val excludedSeriesCategoryIds = state.excludedSeriesCategoryIds.orEmpty().map(String::trim).filter(String::isNotBlank).distinct()
+            if (excludedSeriesCategoryIds.isEmpty()) prefs.remove(excludedSeriesCategoriesKeyFor(safeProfileId))
+            else prefs[excludedSeriesCategoriesKeyFor(safeProfileId)] = gson.toJson(excludedSeriesCategoryIds)
         }
         if (importedGroupPreferences) {
             groupPreferencesLocallyDirtyProfiles.remove(safeProfileId)
@@ -8919,41 +8966,58 @@ class IptvRepository @Inject constructor(
         list
     }
 
-    suspend fun getVodCategories(): List<XtreamVodCategoryInfo> {
+    suspend fun getStreamNetVodCategories(): List<XtreamVodCategoryInfo> {
         val config = observeConfig().first()
-        val creds = xtreamCredentialsForVodImport(config) ?: return emptyList()
+        val creds = streamNetCredentialsForVodImport(config) ?: return emptyList()
         return loadXtreamVodCategoriesInternal(creds, allowNetwork = true)
             .mapNotNull { it.toInfoOrNull() }
     }
 
-    suspend fun getCachedVodCategories(): List<XtreamVodCategoryInfo> {
+    suspend fun getStreamNetSeriesCategories(): List<XtreamSeriesCategoryInfo> {
         val config = observeConfig().first()
-        val creds = xtreamCredentialsForVodImport(config) ?: return emptyList()
-        return loadXtreamVodCategoriesInternal(creds, allowNetwork = false)
-            .mapNotNull { it.toInfoOrNull() }
-    }
-
-    suspend fun getSeriesCategories(): List<XtreamSeriesCategoryInfo> {
-        val config = observeConfig().first()
-        val creds = xtreamCredentialsForSeriesImport(config) ?: return emptyList()
+        val creds = streamNetCredentialsForSeriesImport(config) ?: return emptyList()
         return loadXtreamSeriesCategoriesInternal(creds, allowNetwork = true)
             .mapNotNull { it.toInfoOrNull() }
     }
 
-    suspend fun getCachedSeriesCategories(): List<XtreamSeriesCategoryInfo> {
-        val config = observeConfig().first()
-        val creds = xtreamCredentialsForSeriesImport(config) ?: return emptyList()
-        return loadXtreamSeriesCategoriesInternal(creds, allowNetwork = false)
-            .mapNotNull { it.toInfoOrNull() }
+    suspend fun setVodCategoryExcluded(mediaType: MediaType, categoryId: String, excluded: Boolean) {
+        val normalizedId = categoryId.trim()
+        if (normalizedId.isBlank() || mediaType !in setOf(MediaType.MOVIE, MediaType.TV)) return
+        val key = if (mediaType == MediaType.MOVIE) excludedVodCategoriesKey() else excludedSeriesCategoriesKey()
+        context.settingsDataStore.edit { prefs ->
+            val ids = decodeStringList(prefs[key].orEmpty()).toMutableSet()
+            if (excluded) ids.add(normalizedId) else ids.remove(normalizedId)
+            if (ids.isEmpty()) prefs.remove(key) else prefs[key] = gson.toJson(ids.sorted())
+        }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "change VOD category visibility")
+    }
+
+    suspend fun resetVodCategoryExclusions(mediaType: MediaType) {
+        val key = when (mediaType) {
+            MediaType.MOVIE -> excludedVodCategoriesKey()
+            MediaType.TV -> excludedSeriesCategoriesKey()
+        }
+        context.settingsDataStore.edit { prefs -> prefs.remove(key) }
+        invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "reset VOD category visibility")
     }
 
     suspend fun getXtreamVodAvailability(
         allowNetwork: Boolean = true,
     ): XtreamVodAvailability = coroutineScope {
         val config = observeConfig().first()
+        val movieSourceIsStreamNet = activeVodPlaylists(config)
+            .firstOrNull { resolveXtreamCredentials(it) != null }
+            ?.let(::isStreamNetTvPlaylist) == true
+        val seriesSourceIsStreamNet = activeSeriesPlaylists(config)
+            .firstOrNull { resolveXtreamCredentials(it) != null }
+            ?.let(::isStreamNetTvPlaylist) == true
+        val excludedMovieCategories = config.excludedVodCategoryIds.takeIf { movieSourceIsStreamNet }.orEmpty().toSet()
+        val excludedSeriesCategories = config.excludedSeriesCategoryIds.takeIf { seriesSourceIsStreamNet }.orEmpty().toSet()
         val movieKeys = async {
             val creds = xtreamCredentialsForVodImport(config) ?: return@async emptySet()
-            getXtreamVodStreams(creds, allowNetwork, fast = true).mapNotNullTo(mutableSetOf()) { item ->
+            getXtreamVodStreams(creds, allowNetwork, fast = true)
+                .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedMovieCategories) }
+                .mapNotNullTo(mutableSetOf()) { item ->
                 xtreamVodAvailabilityKey(
                     rawTitle = item.name,
                     mediaType = MediaType.MOVIE,
@@ -8965,7 +9029,9 @@ class IptvRepository @Inject constructor(
         }
         val seriesKeys = async {
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@async emptySet()
-            getXtreamSeriesList(creds, allowNetwork, fast = true).mapNotNullTo(mutableSetOf()) { item ->
+            getXtreamSeriesList(creds, allowNetwork, fast = true)
+                .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedSeriesCategories) }
+                .mapNotNullTo(mutableSetOf()) { item ->
                 xtreamVodAvailabilityKey(
                     rawTitle = item.name,
                     mediaType = MediaType.TV,

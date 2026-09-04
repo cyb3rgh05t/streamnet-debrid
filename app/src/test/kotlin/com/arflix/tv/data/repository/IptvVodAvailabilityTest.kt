@@ -38,6 +38,13 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `excluded provider category is removed from Home availability`() {
+        assertEquals(false, isXtreamVodCategoryIncluded(" 42 ", setOf("42")))
+        assertEquals(true, isXtreamVodCategoryIncluded("43", setOf("42")))
+        assertEquals(true, isXtreamVodCategoryIncluded(null, setOf("42")))
+    }
+
+    @Test
     fun `matching TMDB id confirms same-title movie`() {
         val availability = IptvRepository.XtreamVodAvailability(
             setOf(

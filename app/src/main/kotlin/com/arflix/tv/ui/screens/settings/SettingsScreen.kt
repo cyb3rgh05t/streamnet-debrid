@@ -187,19 +187,24 @@ import com.arflix.tv.data.model.CatalogConfig
 import com.arflix.tv.data.model.CatalogDiscoveryResult
 import com.arflix.tv.data.model.CatalogKind
 import com.arflix.tv.data.model.CatalogPackManifest
+import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.effectivePackId
 import com.arflix.tv.data.model.effectivePackName
 import com.arflix.tv.data.model.isBulkDeletablePack
 import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.QualityFilterConfig
 import com.arflix.tv.data.model.RuntimeKind
+import com.arflix.tv.data.repository.HomeServerCollection
 import com.arflix.tv.data.repository.HomeServerConnection
 import com.arflix.tv.data.repository.HomeServerCodeAuthPhase
 import com.arflix.tv.data.repository.HomeServerKind
+import com.arflix.tv.data.repository.isHomeServerVideoLibraryType
+import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvPlaylistEntry
 import com.arflix.tv.data.repository.configuredIptvPlaylistCount
 import com.arflix.tv.data.repository.isStreamNetTvPlaylist
 import com.arflix.tv.ui.components.AppTopBar
+import com.arflix.tv.ui.components.AppNotificationSurface
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
 import com.arflix.tv.ui.components.CatalogueRowLayoutToggleButton
 import com.arflix.tv.util.LocalDeviceType
@@ -435,6 +440,7 @@ fun SettingsScreen(
     // For IPTV category rows: 0 = visibility, 1 = up, 2 = down
     var iptvActionIndex by remember { mutableIntStateOf(0) }
     var showIptvCategoriesSettings by remember { mutableStateOf(false) }
+    var showIptvVodCategoriesDialog by remember { mutableStateOf(false) }
     // Rename dialog state
     var showCatalogRename by remember { mutableStateOf(false) }
     var renameCatalogId by remember { mutableStateOf("") }
@@ -497,6 +503,11 @@ fun SettingsScreen(
     var homeServerPassword by remember { mutableStateOf("") }
     var plexHomeServerDisplayName by remember { mutableStateOf("") }
     var plexHomeServerUrl by remember { mutableStateOf("") }
+    var homeServerLibrariesConnectionId by remember { mutableStateOf<String?>(null) }
+
+    val homeServerSettingsEntries = remember(uiState.homeServerConnections) {
+        homeServerSettingsEntries(uiState.homeServerConnections)
+    }
 
     val stremioAddons = remember(uiState.addons) {
         uiState.addons.filter { it.runtimeKind == RuntimeKind.STREMIO }
@@ -513,8 +524,8 @@ fun SettingsScreen(
             } else {
                 6 + uiState.iptvPlaylists.size // Add + rows + order + IPTV-only + VOD search + refresh + clear + special categories
             }
-            "home_server" -> uiState.homeServerConnections.size + 3
-            "catalogs" -> uiState.catalogs.size + 2 // Add + Import + catalogs + restore hidden
+            "home_server" -> if (uiState.homeServerConnections.isEmpty()) 1 else homeServerSettingsEntries.size + 3
+            "catalogs" -> uiState.catalogs.size + 2 // Add + Import + restore hidden + catalogs
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "plugins" -> pluginsMaxIndex
             "accounts" -> 9 // Accounts, tracking routing, telegram and discord
@@ -563,6 +574,10 @@ fun SettingsScreen(
         iptvActionIndex = 0
         focusTracker.clear()
         scope.launch { scrollState.scrollTo(0) }
+    }
+    val openIptvVodCategories = {
+        viewModel.loadIptvVodCategories()
+        showIptvVodCategoriesDialog = true
     }
     val openContentLanguagePicker = {
         contentLanguagePickerIndex = TMDB_LANGUAGES.indexOfFirst { it.first == uiState.contentLanguage }.coerceAtLeast(0)
@@ -835,7 +850,7 @@ fun SettingsScreen(
                         ?.takeIf { currentSection == "iptv" && !showIptvCategoriesSettings }
                     val focusedIptvPlaylistMaxAction = if (
                         focusedIptvPlaylist?.let(::isStreamNetTvPlaylist) == true
-                    ) 2 else 5
+                    ) 3 else 5
 
                     val isRtl = isRtlLayoutDirection
                     val actualKey = event.key
@@ -880,7 +895,7 @@ fun SettingsScreen(
                                             )
                                     ) {
                                         iptvActionIndex--
-                                    } else if (currentSection == "catalogs" && contentFocusIndex > 1 && catalogActionIndex > 0) {
+                                    } else if (currentSection == "catalogs" && contentFocusIndex > 2 && catalogActionIndex > 0) {
                                         catalogActionIndex--
                                     } else {
                                         activeZone = Zone.SECTION
@@ -923,8 +938,10 @@ fun SettingsScreen(
                                         iptvActionIndex++
                                     } else if (currentSection == "iptv" && !showIptvCategoriesSettings && contentFocusIndex in 1..uiState.iptvPlaylists.size && iptvActionIndex < focusedIptvPlaylistMaxAction) {
                                         iptvActionIndex++
-                                    } else if (currentSection == "catalogs" && contentFocusIndex > 1 && catalogActionIndex < 5) {
-                                        catalogActionIndex++
+                                    } else if (currentSection == "catalogs" && contentFocusIndex > 2) {
+                                        val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 3)
+                                        val maxAction = if (catalog?.let(::hasCatalogUnpackAction) == true) 5 else 4
+                                        if (catalogActionIndex < maxAction) catalogActionIndex++
                                     }
                                 }
                             }
@@ -1113,6 +1130,9 @@ fun SettingsScreen(
                                                                 openIptvCategories(playlist.id)
                                                             }
                                                             isStreamNetPreset && iptvActionIndex == 1 -> {
+                                                                openIptvVodCategories()
+                                                            }
+                                                            isStreamNetPreset && iptvActionIndex == 2 -> {
                                                                 updated[idx] = playlist.copy(enabled = !playlist.enabled)
                                                                 viewModel.saveIptvPlaylists(updated)
                                                             }
@@ -1193,16 +1213,25 @@ fun SettingsScreen(
                                            plexHomeServerUrl = ""
                                            showPlexHomeServerInput = true
                                        }
-                                       in 2..(uiState.homeServerConnections.size + 1) -> {
-                                           val connection = uiState.homeServerConnections.getOrNull(contentFocusIndex - 2)
-                                           homeServerUrl = connection?.serverUrl.orEmpty()
-                                           homeServerDisplayName = connection?.displayName.orEmpty()
-                                           homeServerUsername = connection?.userName.orEmpty()
-                                           homeServerPassword = ""
-                                           showHomeServerInput = true
+                                       in 2..(homeServerSettingsEntries.size + 1) -> {
+                                           val entry = homeServerSettingsEntries.getOrNull(contentFocusIndex - 2)
+                                           when (entry?.action) {
+                                               HomeServerSettingsAction.SETTINGS -> {
+                                                   val connection = entry.connection
+                                                   homeServerUrl = connection.serverUrl
+                                                   homeServerDisplayName = connection.displayName
+                                                   homeServerUsername = connection.userName
+                                                   homeServerPassword = ""
+                                                   showHomeServerInput = true
+                                               }
+                                               HomeServerSettingsAction.LIBRARIES -> {
+                                                   homeServerLibrariesConnectionId = entry.connection.connectionId
+                                               }
+                                               null -> Unit
+                                           }
                                        }
-                                                uiState.homeServerConnections.size + 2 -> viewModel.testHomeServerConnection()
-                                                uiState.homeServerConnections.size + 3 -> viewModel.disconnectHomeServer()
+                                                homeServerSettingsEntries.size + 2 -> viewModel.testHomeServerConnection()
+                                                homeServerSettingsEntries.size + 3 -> viewModel.disconnectHomeServer()
                                             }
                                         }
                                         "catalogs" -> {
@@ -1210,10 +1239,10 @@ fun SettingsScreen(
                                                 showCatalogInput = true
                                             } else if (contentFocusIndex == 1) {
                                                 showCatalogPackInput = true
-                                            } else if (contentFocusIndex == uiState.catalogs.size + 2) {
+                                            } else if (contentFocusIndex == 2) {
                                                 viewModel.restoreHiddenCatalogs()
                                             } else {
-                                                val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 2)
+                                                val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 3)
                                                 if (catalog != null) {
                                                     when (catalogActionIndex) {
                                                         0 -> {
@@ -1231,6 +1260,12 @@ fun SettingsScreen(
                                                         4 -> {
                                                             if (catalog.packId != null && catalog.isBulkDeletablePack) {
                                                                 viewModel.unpackCatalog(catalog.id)
+                                                            } else if (catalog.isBulkDeletablePack) {
+                                                                deletePackId = catalog.effectivePackId
+                                                                deletePackName = catalog.effectivePackName
+                                                                showDeletePackConfirm = true
+                                                            } else {
+                                                                viewModel.removeCatalog(catalog.id)
                                                             }
                                                         }
                                                         else -> {
@@ -1414,10 +1449,16 @@ fun SettingsScreen(
                 },
                 onRestoreHiddenCatalogs = viewModel::restoreHiddenCatalogs,
                 onConnectHomeServerClick = {
-                    val connection = uiState.homeServerConnection
-                    homeServerUrl = connection?.serverUrl.orEmpty()
-                    homeServerDisplayName = connection?.displayName.orEmpty()
-                    homeServerUsername = connection?.userName.orEmpty()
+                    homeServerUrl = ""
+                    homeServerDisplayName = ""
+                    homeServerUsername = ""
+                    homeServerPassword = ""
+                    showHomeServerInput = true
+                },
+                onEditHomeServerConnection = { connection ->
+                    homeServerUrl = connection.serverUrl
+                    homeServerDisplayName = connection.displayName
+                    homeServerUsername = connection.userName
                     homeServerPassword = ""
                     showHomeServerInput = true
                 },
@@ -1425,6 +1466,9 @@ fun SettingsScreen(
                     plexHomeServerDisplayName = ""
                     plexHomeServerUrl = ""
                     showPlexHomeServerInput = true
+                },
+                onOpenHomeServerLibraries = { connection ->
+                    homeServerLibrariesConnectionId = connection.connectionId
                 },
                 onAddCustomAddonClick = { showCustomAddonInput = true },
                 openCustomUserAgentDialog = { showCustomUserAgentDialog = true },
@@ -1740,6 +1784,7 @@ fun SettingsScreen(
                             onRefresh = { viewModel.refreshIptv() },
                             onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
+                            onManageVodCategories = openIptvVodCategories,
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
                             iptvOnlyMode = uiState.iptvOnlyMode,
                             vodSearchEnabled = uiState.iptvVodSearchEnabled,
@@ -1825,6 +1870,9 @@ fun SettingsScreen(
                                 homeServerUsername = connection.userName
                                 homeServerPassword = ""
                                 showHomeServerInput = true
+                            },
+                            onOpenLibraries = { connection ->
+                                homeServerLibrariesConnectionId = connection.connectionId
                             },
                             onTest = { viewModel.testHomeServerConnection() },
                             onDisconnect = { viewModel.disconnectHomeServer() }
@@ -2041,6 +2089,33 @@ fun SettingsScreen(
                     plexHomeServerUrl = ""
                     showPlexHomeServerInput = false
                 }
+            )
+        }
+        uiState.homeServerConnections
+            .firstOrNull { it.connectionId == homeServerLibrariesConnectionId }
+            ?.let { connection ->
+                HomeServerLibrariesDialog(
+                    connection = connection,
+                    onToggleLibrary = { library ->
+                        viewModel.setHomeServerLibraryEnabled(
+                            connection.connectionId,
+                            library.id,
+                            !library.enabled
+                        )
+                    },
+                    onDismiss = { homeServerLibrariesConnectionId = null }
+                )
+            }
+        if (showIptvVodCategoriesDialog) {
+            IptvVodCategoriesDialog(
+                movieCategories = uiState.iptvVodCategories,
+                seriesCategories = uiState.iptvSeriesCategories,
+                excludedMovieCategoryIds = uiState.iptvExcludedVodCategoryIds.toSet(),
+                excludedSeriesCategoryIds = uiState.iptvExcludedSeriesCategoryIds.toSet(),
+                isLoading = uiState.isIptvVodCategoriesLoading,
+                onSetExcluded = viewModel::setIptvVodCategoryExcluded,
+                onResetExclusions = viewModel::resetIptvVodCategoryExclusions,
+                onDismiss = { showIptvVodCategoriesDialog = false },
             )
         }
         if (showIptvInput) {
@@ -2631,22 +2706,14 @@ private fun IptvLoadingOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 16.dp),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        Row(
-            modifier = Modifier
-                .widthIn(max = 560.dp)
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color(0xF21A1E28))
-                .border(1.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(16.dp))
-                .padding(horizontal = 16.dp, vertical = 13.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        AppNotificationSurface(
+            leadingContent = {
+                LoadingIndicator(size = 26.dp, color = accentColor)
+            },
         ) {
-            LoadingIndicator(size = 26.dp, color = accentColor)
-            Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = progressText ?: stringResource(R.string.settings_refreshing_channels_epg),
@@ -4505,7 +4572,9 @@ private fun MobileSettingsLayout(
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
     onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
+    onEditHomeServerConnection: (HomeServerConnection) -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
+    onOpenHomeServerLibraries: (HomeServerConnection) -> Unit,
     onAddCustomAddonClick: () -> Unit,
     openCustomUserAgentDialog: () -> Unit = {},
     onNavigateToTelegram: () -> Unit = {},
@@ -4626,7 +4695,9 @@ private fun MobileSettingsLayout(
                     onDeleteCatalogClick = onDeleteCatalogClick,
                     onRestoreHiddenCatalogs = onRestoreHiddenCatalogs,
                     onConnectHomeServerClick = onConnectHomeServerClick,
+                    onEditHomeServerConnection = onEditHomeServerConnection,
                     onConnectPlexHomeServerClick = onConnectPlexHomeServerClick,
+                    onOpenHomeServerLibraries = onOpenHomeServerLibraries,
                     onAddCustomAddonClick = onAddCustomAddonClick,
                     openCustomUserAgentDialog = openCustomUserAgentDialog,
                     onConnectTrakt = { viewModel.startTraktAuth() },
@@ -4852,7 +4923,9 @@ private fun MobileSettingsSubPage(
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
     onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
+    onEditHomeServerConnection: (HomeServerConnection) -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
+    onOpenHomeServerLibraries: (HomeServerConnection) -> Unit,
     onAddCustomAddonClick: () -> Unit,
     openCustomUserAgentDialog: () -> Unit = {},
     // Tracking integrations
@@ -5321,9 +5394,8 @@ private fun MobileSettingsSubPage(
                     focusedIndex = -1,
                     onConnect = onConnectHomeServerClick,
                     onConnectPlex = onConnectPlexHomeServerClick,
-                    onEditConnection = { connection ->
-                        onConnectHomeServerClick()
-                    },
+                    onEditConnection = onEditHomeServerConnection,
+                    onOpenLibraries = onOpenHomeServerLibraries,
                     onTest = { viewModel.testHomeServerConnection() },
                     onDisconnect = { viewModel.disconnectHomeServer() }
                 )
@@ -6051,7 +6123,11 @@ private fun tvSettingsSectionPills(
         )
         "home_server" -> listOf(
             stringResource(R.string.settings_pill_connected_count, uiState.homeServerConnections.size),
-            if (uiState.isHomeServerConnecting || uiState.isPlexHomeServerPolling) stringResource(R.string.settings_working) else stringResource(R.string.settings_idle)
+            when {
+                uiState.isHomeServerConnecting || uiState.isPlexHomeServerPolling -> stringResource(R.string.settings_working)
+                uiState.homeServerConnections.isNotEmpty() -> stringResource(R.string.settings_ready)
+                else -> stringResource(R.string.settings_idle)
+            }
         )
         "catalogs" -> listOf(stringResource(R.string.settings_pill_catalogs, uiState.catalogs.size), stringResource(R.string.settings_cloud_synced))
         "stremio" -> listOf(stringResource(R.string.settings_pill_installed, addonCount), stringResource(R.string.settings_profile_scoped))
@@ -7327,6 +7403,350 @@ private fun AiKeyQrOverlay(
     }
 }
 
+private enum class HomeServerSettingsAction { SETTINGS, LIBRARIES }
+
+private data class HomeServerSettingsEntry(
+    val connection: HomeServerConnection,
+    val action: HomeServerSettingsAction
+)
+
+private fun homeServerSettingsEntries(connections: List<HomeServerConnection>): List<HomeServerSettingsEntry> =
+    connections.flatMap { connection ->
+        listOf(
+            HomeServerSettingsEntry(connection, HomeServerSettingsAction.SETTINGS),
+            HomeServerSettingsEntry(connection, HomeServerSettingsAction.LIBRARIES)
+        )
+    }
+
+@Composable
+private fun IptvVodCategoriesDialog(
+    movieCategories: List<IptvRepository.XtreamVodCategoryInfo>,
+    seriesCategories: List<IptvRepository.XtreamSeriesCategoryInfo>,
+    excludedMovieCategoryIds: Set<String>,
+    excludedSeriesCategoryIds: Set<String>,
+    isLoading: Boolean,
+    onSetExcluded: (MediaType, String, Boolean) -> Unit,
+    onResetExclusions: (MediaType) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var showSeries by remember { mutableStateOf(false) }
+    var focusedIndex by remember(showSeries) { mutableIntStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val listState = rememberLazyListState()
+    val categories = if (showSeries) {
+        seriesCategories.map { it.categoryId to it.categoryName }
+    } else {
+        movieCategories.map { it.categoryId to it.categoryName }
+    }
+    val excludedIds = if (showSeries) excludedSeriesCategoryIds else excludedMovieCategoryIds
+    val mediaType = if (showSeries) MediaType.TV else MediaType.MOVIE
+
+    LaunchedEffect(Unit) { focusRequester.requestFocus() }
+    LaunchedEffect(focusedIndex, categories.size) {
+        if (categories.isNotEmpty()) listState.animateScrollToItem(focusedIndex.coerceIn(0, categories.size))
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        ModalScrim(onDismiss = onDismiss) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .widthIn(max = 680.dp)
+                    .heightIn(max = 680.dp)
+                    .background(BackgroundElevated, RoundedCornerShape(12.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .padding(20.dp)
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionLeft -> {
+                                showSeries = false
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                showSeries = true
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                focusedIndex = (focusedIndex - 1).coerceAtLeast(0)
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                focusedIndex = (focusedIndex + 1).coerceAtMost(categories.size)
+                                true
+                            }
+                            Key.Enter, Key.DirectionCenter -> {
+                                if (focusedIndex == 0) {
+                                    onResetExclusions(mediaType)
+                                } else {
+                                    categories.getOrNull(focusedIndex - 1)?.first?.let { categoryId ->
+                                        onSetExcluded(mediaType, categoryId, categoryId !in excludedIds)
+                                    }
+                                }
+                                true
+                            }
+                            Key.Back, Key.Escape -> {
+                                onDismiss()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_iptv_vod_categories),
+                    style = ArflixTypography.sectionTitle,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.settings_iptv_vod_categories_home_only),
+                    style = ArflixTypography.caption,
+                    color = TextSecondary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(false to R.string.settings_iptv_vod_movies, true to R.string.settings_iptv_vod_series).forEach { (seriesTab, label) ->
+                        val selected = showSeries == seriesTab
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .background(
+                                    if (selected) accentColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f),
+                                    RoundedCornerShape(8.dp)
+                                )
+                                .border(if (selected) 2.dp else 1.dp, if (selected) accentColor else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .clickable { showSeries = seriesTab }
+                                .padding(vertical = 11.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(stringResource(label), style = ArflixTypography.button, color = if (selected) TextPrimary else TextSecondary)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
+                when {
+                    isLoading && categories.isEmpty() -> Text(stringResource(R.string.loading_label), style = ArflixTypography.body, color = TextSecondary)
+                    categories.isEmpty() -> Text(stringResource(R.string.settings_no_vod_categories_available), style = ArflixTypography.body, color = TextSecondary)
+                    else -> LazyColumn(
+                        modifier = Modifier.heightIn(max = 430.dp),
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item(key = "reset:${mediaType.name}") {
+                            val isFocused = focusedIndex == 0
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(if (isFocused) accentColor.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                    .border(if (isFocused) 2.dp else 1.dp, if (isFocused) accentColor else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        focusedIndex = 0
+                                        onResetExclusions(mediaType)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(stringResource(R.string.settings_include_all_vod_categories), style = ArflixTypography.cardTitle, color = TextPrimary)
+                            }
+                        }
+                        itemsIndexed(categories, key = { _, category -> "${mediaType.name}:${category.first}" }) { index, (categoryId, categoryName) ->
+                            val included = categoryId !in excludedIds
+                            val isFocused = index + 1 == focusedIndex
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(if (isFocused) accentColor.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f), RoundedCornerShape(8.dp))
+                                    .border(if (isFocused) 2.dp else 1.dp, if (isFocused) accentColor else Color.White.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                    .clickable {
+                                        focusedIndex = index + 1
+                                        onSetExcluded(mediaType, categoryId, included)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (included) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = if (included) accentColor else TextSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(categoryName.ifBlank { categoryId }, style = ArflixTypography.cardTitle, color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(stringResource(if (included) R.string.settings_library_included else R.string.settings_library_excluded), style = ArflixTypography.caption, color = TextSecondary)
+                                }
+                            }
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = stringResource(R.string.done),
+                    style = ArflixTypography.button,
+                    color = accentColor,
+                    modifier = Modifier.align(Alignment.End).clickable(onClick = onDismiss).padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeServerLibrariesDialog(
+    connection: HomeServerConnection,
+    onToggleLibrary: (HomeServerCollection) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val libraries = connection.collections.filter { isHomeServerVideoLibraryType(it.type) }
+    var focusedIndex by remember(connection.connectionId, libraries.size) { mutableIntStateOf(0) }
+    val focusRequester = remember { FocusRequester() }
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(connection.connectionId) {
+        focusRequester.requestFocus()
+    }
+    LaunchedEffect(focusedIndex) {
+        if (libraries.isNotEmpty()) listState.animateScrollToItem(focusedIndex)
+    }
+
+    androidx.compose.ui.window.Dialog(
+        onDismissRequest = onDismiss,
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        ModalScrim(onDismiss = onDismiss) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .widthIn(max = 620.dp)
+                    .heightIn(max = 620.dp)
+                    .background(BackgroundElevated, RoundedCornerShape(12.dp))
+                    .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(12.dp))
+                    .padding(20.dp)
+                    .focusRequester(focusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (event.key) {
+                            Key.DirectionUp -> {
+                                focusedIndex = (focusedIndex - 1).coerceAtLeast(0)
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                focusedIndex = (focusedIndex + 1).coerceAtMost((libraries.size - 1).coerceAtLeast(0))
+                                true
+                            }
+                            Key.Enter, Key.DirectionCenter -> {
+                                libraries.getOrNull(focusedIndex)?.let(onToggleLibrary)
+                                true
+                            }
+                            Key.Back, Key.Escape -> {
+                                onDismiss()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_server_libraries),
+                    style = ArflixTypography.sectionTitle,
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl },
+                    style = ArflixTypography.body,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(18.dp))
+
+                if (libraries.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_no_video_libraries),
+                        style = ArflixTypography.body,
+                        color = TextSecondary
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.heightIn(max = 420.dp),
+                        state = listState,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(libraries, key = { _, library -> library.id }) { index, library ->
+                            val isFocused = index == focusedIndex
+                            val background = if (isFocused) accentColor.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.06f)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(background, RoundedCornerShape(8.dp))
+                                    .border(
+                                        if (isFocused) 2.dp else 1.dp,
+                                        if (isFocused) accentColor else Color.White.copy(alpha = 0.08f),
+                                        RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        focusedIndex = index
+                                        onToggleLibrary(library)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 13.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = if (library.enabled) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                                    contentDescription = null,
+                                    tint = if (library.enabled) accentColor else TextSecondary,
+                                    modifier = Modifier.size(22.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = library.name.ifBlank { stringResource(R.string.library_default) },
+                                        style = ArflixTypography.cardTitle,
+                                        color = TextPrimary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = stringResource(if (library.enabled) R.string.settings_library_included else R.string.settings_library_excluded),
+                                        style = ArflixTypography.caption,
+                                        color = TextSecondary
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+                Text(
+                    text = stringResource(R.string.done),
+                    style = ArflixTypography.button,
+                    color = accentColor,
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .clickable(onClick = onDismiss)
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                )
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun HomeServerSettings(
@@ -7338,6 +7758,7 @@ private fun HomeServerSettings(
     onConnect: () -> Unit,
     onConnectPlex: () -> Unit,
     onEditConnection: (HomeServerConnection) -> Unit,
+    onOpenLibraries: (HomeServerConnection) -> Unit,
     onTest: () -> Unit,
     onDisconnect: () -> Unit
 ) {
@@ -7347,7 +7768,7 @@ private fun HomeServerSettings(
     if (isMobile) {
         // Mobile UI: use MobileSettingsCategory/MobileSettingsRow style
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            MobileSettingsCategory(title = stringResource(R.string.settings_section_connections)) {
+            MobileSettingsCategory(title = stringResource(R.string.settings_section_add_server)) {
                 MobileSettingsRow(
                     icon = Icons.Default.Cloud,
                     title = stringResource(R.string.settings_add_server),
@@ -7365,42 +7786,63 @@ private fun HomeServerSettings(
                     showDivider = hasConnections,
                     onClick = onConnectPlex
                 )
-                connections.forEachIndexed { index, connection ->
-                    val libraries = connection.collections.count { it.enabled }
+            }
+            if (hasConnections) {
+                Text(
+                    text = stringResource(R.string.settings_section_connected_servers),
+                    style = ArflixTypography.caption,
+                    color = TextSecondary.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+                connections.forEach { connection ->
+                    val videoLibraries = connection.collections.filter { isHomeServerVideoLibraryType(it.type) }
+                    val libraries = videoLibraries.count { it.enabled }
                     val description = listOfNotNull(
                         homeServerKindLabel(connection.serverKind).takeIf { it.isNotBlank() },
                         connection.userName.takeIf { it.isNotBlank() },
                         if (libraries > 0) stringResource(R.string.settings_collections_count, libraries) else null
                     ).joinToString("  |  ").ifBlank { connection.serverUrl }
+                    MobileSettingsCategory(
+                        title = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl }
+                    ) {
+                        MobileSettingsRow(
+                            icon = Icons.Default.Settings,
+                            title = stringResource(R.string.settings_server_settings),
+                            subtitle = description,
+                            value = "",
+                            isFocused = false,
+                            onClick = { onEditConnection(connection) }
+                        )
+                        MobileSettingsRow(
+                            icon = Icons.Default.Movie,
+                            title = stringResource(R.string.settings_server_libraries),
+                            subtitle = stringResource(R.string.settings_server_libraries_description, libraries, videoLibraries.size),
+                            value = "",
+                            isFocused = false,
+                            showDivider = false,
+                            onClick = { onOpenLibraries(connection) }
+                        )
+                    }
+                }
+                MobileSettingsCategory(title = stringResource(R.string.settings_section_server_actions)) {
                     MobileSettingsRow(
-                        icon = Icons.Default.Cloud,
-                        title = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl },
-                        subtitle = description,
+                        icon = Icons.Default.Settings,
+                        title = stringResource(R.string.settings_test_connection),
+                        subtitle = stringResource(R.string.settings_test_reach_servers),
                         value = "",
                         isFocused = false,
-                        showDivider = index < connections.size - 1,
-                        onClick = { onEditConnection(connection) }
+                        onClick = onTest
+                    )
+                    MobileSettingsRow(
+                        icon = Icons.Default.Delete,
+                        title = stringResource(R.string.settings_disconnect_all),
+                        subtitle = stringResource(R.string.settings_remove_all_servers),
+                        value = "",
+                        isFocused = false,
+                        showDivider = false,
+                        onClick = onDisconnect
                     )
                 }
-            }
-            MobileSettingsCategory(title = stringResource(R.string.settings_section_actions)) {
-                MobileSettingsRow(
-                    icon = Icons.Default.Settings,
-                    title = stringResource(R.string.settings_test_connection),
-                    subtitle = if (!hasConnections) stringResource(R.string.settings_connect_server_first) else stringResource(R.string.settings_test_reach_servers),
-                    value = "",
-                    isFocused = false,
-                    onClick = { if (hasConnections) onTest() }
-                )
-                MobileSettingsRow(
-                    icon = Icons.Default.Delete,
-                    title = stringResource(R.string.settings_disconnect_all),
-                    subtitle = if (!hasConnections) stringResource(R.string.settings_no_server_connected) else stringResource(R.string.settings_remove_all_servers),
-                    value = "",
-                    isFocused = false,
-                    showDivider = false,
-                    onClick = { if (hasConnections) onDisconnect() }
-                )
             }
             if (!error.isNullOrBlank()) {
                 Text(
@@ -7414,6 +7856,12 @@ private fun HomeServerSettings(
     } else {
         // TV UI: existing layout
         Column {
+            Text(
+                text = stringResource(R.string.settings_section_add_server),
+                style = ArflixTypography.caption,
+                color = TextSecondary.copy(alpha = 0.65f),
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
             SettingsRow(
                 icon = Icons.Default.Cloud,
                 title = stringResource(R.string.settings_add_server),
@@ -7436,30 +7884,69 @@ private fun HomeServerSettings(
                 modifier = Modifier.settingsFocusSlot(1)
             )
 
-            connections.forEachIndexed { index, connection ->
-                Spacer(modifier = Modifier.height(16.dp))
-                val libraries = connection.collections.count { it.enabled }
+            var rowIndex = 2
+            if (hasConnections) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = stringResource(R.string.settings_section_connected_servers),
+                    style = ArflixTypography.caption,
+                    color = TextSecondary.copy(alpha = 0.65f)
+                )
+            }
+            connections.forEach { connection ->
+                Spacer(modifier = Modifier.height(20.dp))
+                val libraries = connection.collections.count {
+                    it.enabled && isHomeServerVideoLibraryType(it.type)
+                }
+                val videoLibraryCount = connection.collections.count { isHomeServerVideoLibraryType(it.type) }
                 val description = listOfNotNull(
                     homeServerKindLabel(connection.serverKind).takeIf { it.isNotBlank() },
                     connection.userName.takeIf { it.isNotBlank() },
                     if (libraries > 0) stringResource(R.string.settings_collections_count, libraries) else null
                 ).joinToString("  |  ").ifBlank { connection.serverUrl }
 
+                Text(
+                    text = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl },
+                    style = ArflixTypography.caption,
+                    color = TextSecondary.copy(alpha = 0.65f)
+                )
+
+                val connectionIndex = rowIndex++
+                Spacer(modifier = Modifier.height(10.dp))
+
                 SettingsActionRow(
-                    icon = Icons.Default.Cloud,
-                    title = connection.displayName.ifBlank { connection.serverName }.ifBlank { connection.serverUrl },
+                    icon = Icons.Default.Settings,
+                    title = stringResource(R.string.settings_server_settings),
                     description = description,
                     actionLabel = stringResource(R.string.settings_change),
-                    isFocused = focusedIndex == index + 2,
+                    isFocused = focusedIndex == connectionIndex,
                     onClick = { onEditConnection(connection) },
-                    modifier = Modifier.settingsFocusSlot(index + 2)
+                    modifier = Modifier.settingsFocusSlot(connectionIndex)
+                )
+
+                val libraryIndex = rowIndex++
+                Spacer(modifier = Modifier.height(12.dp))
+                SettingsActionRow(
+                    icon = Icons.Default.Movie,
+                    title = stringResource(R.string.settings_server_libraries),
+                    description = stringResource(R.string.settings_server_libraries_description, libraries, videoLibraryCount),
+                    actionLabel = stringResource(R.string.settings_manage),
+                    isFocused = focusedIndex == libraryIndex,
+                    onClick = { onOpenLibraries(connection) },
+                    modifier = Modifier.settingsFocusSlot(libraryIndex)
                 )
             }
 
-            val testIndex = connections.size + 2
-            val disconnectIndex = connections.size + 3
+            val testIndex = rowIndex
+            val disconnectIndex = rowIndex + 1
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = stringResource(R.string.settings_section_server_actions),
+                style = ArflixTypography.caption,
+                color = TextSecondary.copy(alpha = 0.65f)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
 
             SettingsActionRow(
                 icon = Icons.Default.Settings,
@@ -7527,6 +8014,7 @@ private fun IptvSettings(
     onRefresh: () -> Unit,
     onDelete: () -> Unit,
     onManageCategories: (String) -> Unit = {},
+    onManageVodCategories: () -> Unit = {},
     showSpecialCategories: Boolean = true,
     iptvOnlyMode: Boolean = true,
     vodSearchEnabled: Boolean = true,
@@ -7537,84 +8025,80 @@ private fun IptvSettings(
     onShowSpecialCategoriesChange: (Boolean) -> Unit = {}
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
-    val accentColor = resolveAccentColor(fallback = Pink)
-    var selectionMode by remember { mutableStateOf(false) }
-    var selectedIndices by remember { mutableStateOf(setOf<Int>()) }
 
     if (isMobile) {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-            if (selectionMode) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(stringResource(R.string.settings_n_selected, selectedIndices.size), style = ArflixTypography.sectionTitle, color = TextPrimary)
-                    Spacer(modifier = Modifier.weight(1f))
-                    if (selectedIndices.isNotEmpty()) {
-                        Box(modifier = Modifier.size(36.dp).clickable { selectedIndices.sortedDescending().forEach { onDeletePlaylist(it) }; selectionMode = false; selectedIndices = emptySet() }.background(Color(0xFFDC2626), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                            Icon(Icons.Default.VisibilityOff, contentDescription = "Kataloge ausblenden", tint = Color.White, modifier = Modifier.size(20.dp))
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                    }
-                    Box(modifier = Modifier.size(36.dp).clickable { selectionMode = false; selectedIndices = emptySet() }.background(Color.White.copy(alpha = 0.15f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.close), tint = Color.White, modifier = Modifier.size(20.dp))
-                    }
-                }
-            }
             MobileSettingsCategory(title = stringResource(R.string.settings_section_playlists)) {
-                MobileSettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_playlist), subtitle = if (configuredIptvPlaylistCount(playlists) == 0) stringResource(R.string.settings_add_tv_lists_hint) else stringResource(R.string.settings_create_another_tv), value = if (configuredIptvPlaylistCount(playlists) >= 3) stringResource(R.string.settings_badge_full_short) else "", isFocused = false, showDivider = playlists.isNotEmpty(), onClick = { if (configuredIptvPlaylistCount(playlists) < 3) onConfigure() })
-                playlists.forEachIndexed { index, playlist ->
-                    val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
-                    val isConfigured = playlist.m3uUrl.isNotBlank()
-                    val isSelected = selectedIndices.contains(index)
-                    val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
-                    Column {
-                        Row(
-                            modifier = Modifier.fillMaxWidth()
-                                .background(if (isSelected) Pink.copy(alpha = 0.15f) else Color.Transparent)
-                                .then(Modifier.combinedClickable(
-                                    onClick = { if (selectionMode) { selectedIndices = if (isSelected) selectedIndices - index else selectedIndices + index; if (selectedIndices.isEmpty()) selectionMode = false } else onEditPlaylist(index) },
-                                    onLongClick = { if (!selectionMode && !isStreamNetPreset) { selectionMode = true; selectedIndices = setOf(index) } }
-                                ))
-                                .padding(horizontal = 16.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            if (selectionMode) {
-                                Icon(imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked, contentDescription = null, tint = if (isSelected) Pink else TextSecondary, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(16.dp))
-                            } else {
-                                Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.width(16.dp))
-                            }
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(playlist.name, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } }, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            if (selectionMode && selectedIndices.size == 1 && isSelected) {
-                                Icon(imageVector = Icons.Default.DragHandle, contentDescription = stringResource(R.string.settings_cd_drag_reorder), tint = TextSecondary, modifier = Modifier.size(24.dp).pointerInput(index) {
-                                    var dragOffset = 0f; val itemHeight = 64.dp.toPx()
-                                    detectVerticalDragGestures(onDragEnd = { dragOffset = 0f }, onDragCancel = { dragOffset = 0f }) { change, dragAmount -> change.consume(); dragOffset += dragAmount; if (dragOffset > itemHeight) { onMovePlaylistDown(index); dragOffset -= itemHeight } else if (dragOffset < -itemHeight) { onMovePlaylistUp(index); dragOffset += itemHeight } }
-                                })
-                            } else if (!selectionMode) {
-                                Icon(
-                                    imageVector = Icons.Default.List,
-                                    contentDescription = stringResource(R.string.settings_cd_manage_categories),
-                                    tint = TextSecondary,
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clickable(enabled = isConfigured) { onManageCategories(playlist.id) }
-                                        .padding(6.dp)
-                                )
-                                Spacer(modifier = Modifier.width(16.dp))
-                                // Toggle chip
-                                Box(modifier = Modifier.width(44.dp).height(24.dp).background(color = if (playlist.enabled) accentColor else Color.White.copy(alpha = 0.2f), shape = RoundedCornerShape(13.dp)).clickable(enabled = isConfigured) { onTogglePlaylist(index) }.padding(3.dp), contentAlignment = if (playlist.enabled) Alignment.CenterEnd else Alignment.CenterStart) {
-                                    Box(modifier = Modifier.size(18.dp).background(color = Color.White, shape = RoundedCornerShape(10.dp)))
-                                }
-                            }
-                        }
-                        if (index < playlists.size - 1) {
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).padding(horizontal = 16.dp).background(Color.White.copy(alpha = 0.05f)))
-                        }
+                MobileSettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_playlist), subtitle = if (configuredIptvPlaylistCount(playlists) == 0) stringResource(R.string.settings_add_tv_lists_hint) else stringResource(R.string.settings_create_another_tv), value = if (configuredIptvPlaylistCount(playlists) >= 3) stringResource(R.string.settings_badge_full_short) else "", isFocused = false, showDivider = false, onClick = { if (configuredIptvPlaylistCount(playlists) < 3) onConfigure() })
+            }
+            playlists.forEachIndexed { index, playlist ->
+                val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
+                val isConfigured = playlist.m3uUrl.isNotBlank()
+                val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
+                MobileSettingsCategory(title = playlist.name.uppercase()) {
+                    MobileSettingsRow(
+                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                        title = playlist.name,
+                        subtitle = if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } },
+                        value = if (playlist.enabled) stringResource(R.string.on) else stringResource(R.string.off),
+                        isFocused = false,
+                        onClick = { onEditPlaylist(index) },
+                    )
+                    MobileSettingsRow(
+                        icon = Icons.Default.List,
+                        title = stringResource(R.string.settings_iptv_live_categories),
+                        subtitle = stringResource(R.string.settings_iptv_live_categories_desc),
+                        value = "",
+                        isFocused = false,
+                        onClick = { if (isConfigured) onManageCategories(playlist.id) },
+                    )
+                    if (isStreamNetPreset) {
+                        MobileSettingsRow(
+                            icon = Icons.Default.Movie,
+                            title = stringResource(R.string.settings_iptv_vod_categories),
+                            subtitle = stringResource(R.string.settings_iptv_vod_categories_home_only),
+                            value = "",
+                            isFocused = false,
+                            showDivider = false,
+                            onClick = { if (isConfigured) onManageVodCategories() },
+                        )
+                    }
+                    MobileSettingsRow(
+                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                        title = stringResource(R.string.settings_enabled),
+                        value = if (playlist.enabled) stringResource(R.string.on) else stringResource(R.string.off),
+                        enabled = isConfigured,
+                        isToggle = true,
+                        isFocused = false,
+                        showDivider = !isStreamNetPreset,
+                        onClick = { onTogglePlaylist(index) },
+                    )
+                    if (!isStreamNetPreset) {
+                        MobileSettingsRow(
+                            icon = Icons.Default.ArrowUpward,
+                            title = stringResource(R.string.live_menu_move_up),
+                            value = "",
+                            enabled = index > 0,
+                            isFocused = false,
+                            onClick = { onMovePlaylistUp(index) },
+                        )
+                        MobileSettingsRow(
+                            icon = Icons.Default.ArrowDownward,
+                            title = stringResource(R.string.live_menu_move_down),
+                            value = "",
+                            enabled = index < playlists.lastIndex,
+                            isFocused = false,
+                            onClick = { onMovePlaylistDown(index) },
+                        )
+                        MobileSettingsRow(
+                            icon = Icons.Default.Delete,
+                            iconTint = Color(0xFFFF8A8A),
+                            title = stringResource(R.string.delete),
+                            value = "",
+                            isFocused = false,
+                            showDivider = false,
+                            onClick = { onDeletePlaylist(index) },
+                        )
                     }
                 }
             }
@@ -7679,14 +8163,28 @@ private fun IptvSettings(
     } else {
         // TV UI
         Column {
+            Text(
+                text = stringResource(R.string.settings_section_playlists),
+                style = ArflixTypography.sectionTitle.copy(fontSize = 18.sp),
+                color = TextPrimary,
+                modifier = Modifier.padding(horizontal = 4.dp)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
             SettingsRow(icon = Icons.Default.LiveTv, title = stringResource(R.string.add_playlist), subtitle = if (configuredIptvPlaylistCount(playlists) == 0) stringResource(R.string.settings_add_iptv_lists_hint) else stringResource(R.string.settings_create_another_iptv), value = if (configuredIptvPlaylistCount(playlists) >= 3) stringResource(R.string.settings_badge_full) else stringResource(R.string.settings_badge_add), isFocused = focusedIndex == 0, onClick = { if (configuredIptvPlaylistCount(playlists) < 3) onConfigure() }, modifier = Modifier.settingsFocusSlot(0))
             Spacer(modifier = Modifier.height(16.dp))
             playlists.forEachIndexed { index, playlist ->
                 val rowIndex = index + 1
                 val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
+                val streamNetActionOffset = if (isStreamNetPreset) 1 else 0
                 val isConfigured = playlist.m3uUrl.isNotBlank()
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
                 val focusRingColor = resolveAccentColor(fallback = Pink)
+                Text(
+                    text = playlist.name.uppercase(),
+                    style = ArflixTypography.caption.copy(fontSize = 12.sp),
+                    color = TextSecondary,
+                    modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
+                )
                 Row(modifier = Modifier.settingsFocusSlot(rowIndex).fillMaxWidth().background(if (focusedIndex == rowIndex) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == rowIndex) 2.dp else 0.dp, color = if (focusedIndex == rowIndex) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onEditPlaylist(index) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(19.dp))
                     Spacer(modifier = Modifier.width(12.dp))
@@ -7697,41 +8195,52 @@ private fun IptvSettings(
                     }
                     CatalogActionChip(
                         icon = Icons.Default.List,
+                        label = stringResource(R.string.settings_iptv_live_categories),
                         isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
                         enabled = isConfigured,
                         onClick = { onManageCategories(playlist.id) }
                     )
                     Spacer(modifier = Modifier.width(6.dp))
+                    if (isStreamNetPreset) {
+                        CatalogActionChip(
+                            icon = Icons.Default.Movie,
+                            label = stringResource(R.string.settings_iptv_vod_categories),
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                            enabled = isConfigured,
+                            onClick = onManageVodCategories
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
                     CatalogActionChip(
                         icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 1 + streamNetActionOffset,
                         enabled = isConfigured,
                         onClick = { onTogglePlaylist(index) }
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(
                         icon = Icons.Default.Edit,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 2,
+                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 2 + streamNetActionOffset,
                         onClick = { onEditPlaylist(index) }
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(
                         icon = Icons.Default.ArrowUpward,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 3,
+                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 3 + streamNetActionOffset,
                         enabled = !isStreamNetPreset,
                         onClick = { onMovePlaylistUp(index) }
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(
                         icon = Icons.Default.ArrowDownward,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 4,
+                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 4 + streamNetActionOffset,
                         enabled = !isStreamNetPreset,
                         onClick = { onMovePlaylistDown(index) }
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(
                         icon = Icons.Default.Delete,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 5,
+                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 5 + streamNetActionOffset,
                         isDestructive = true,
                         enabled = !isStreamNetPreset,
                         onClick = { onDeletePlaylist(index) }
@@ -8744,8 +9253,13 @@ private fun CatalogsSettings(
                 MobileSettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_catalog), subtitle = stringResource(R.string.add_catalog_desc), value = "", isFocused = false, showDivider = true, onClick = onAddCatalog)
                 MobileSettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = "", isFocused = false, showDivider = false, onClick = onImportCatalogPack)
             }
+            RestoreHiddenCatalogsRow(
+                focusIndex = 2,
+                focusedIndex = focusedIndex,
+                onClick = onRestoreHiddenCatalogs
+            )
             if (catalogs.isNotEmpty()) {
-                MobileSettingsCategory(title = stringResource(R.string.settings_section_my_catalogs)) {
+                MobileSettingsCategory(title = stringResource(R.string.settings_section_home_catalog_settings)) {
                     catalogs.forEachIndexed { index, catalog ->
                         val title = if (catalog.isPreinstalled) { when (catalog.kind) { CatalogKind.COLLECTION -> stringResource(R.string.settings_title_builtin_collection, catalog.title); CatalogKind.COLLECTION_RAIL -> stringResource(R.string.settings_title_builtin_rail, catalog.title); else -> stringResource(R.string.settings_title_builtin, catalog.title) } } else catalog.title
                         val currentPackId = catalog.packId
@@ -8859,11 +9373,6 @@ private fun CatalogsSettings(
                     }
                 }
             }
-            RestoreHiddenCatalogsRow(
-                focusIndex = catalogs.size + 2,
-                focusedIndex = focusedIndex,
-                onClick = onRestoreHiddenCatalogs
-            )
         }
     } else {
         // TV UI
@@ -8881,8 +9390,19 @@ private fun CatalogsSettings(
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = stringResource(R.string.catalog_pack_import_action), isFocused = focusedIndex == 1, onClick = onImportCatalogPack, modifier = Modifier.settingsFocusSlot(1))
             Spacer(modifier = Modifier.height(16.dp))
+            RestoreHiddenCatalogsRow(
+                focusIndex = 2,
+                focusedIndex = focusedIndex,
+                onClick = onRestoreHiddenCatalogs
+            )
+            Text(
+                text = stringResource(R.string.settings_section_home_catalog_settings),
+                style = ArflixTypography.caption,
+                color = TextSecondary.copy(alpha = 0.65f),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
             catalogs.forEachIndexed { index, catalog ->
-                val rowFocusIndex = index + 2; val isRowFocused = focusedIndex == rowFocusIndex
+                val rowFocusIndex = index + 3; val isRowFocused = focusedIndex == rowFocusIndex
                 val currentPackId = catalog.packId
                 val prevPackId = if (index > 0) catalogs[index - 1].packId else null
                 val showPackHeader = currentPackId != null && currentPackId != prevPackId && catalog.isBulkDeletablePack
@@ -8954,20 +9474,26 @@ private fun CatalogsSettings(
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogueRowLayoutToggleButton(rowKey = layoutRowKey, enabled = layoutToggleEnabled, forceFocused = isRowFocused && focusedActionIndex == 3)
                     Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, enabled = catalog.packId != null && catalog.isBulkDeletablePack, onClick = { onUnpackCatalog(catalog) })
-                    Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(icon = Icons.Default.VisibilityOff, isFocused = isRowFocused && focusedActionIndex == 5, isDestructive = false, enabled = true, onClick = { onDeleteCatalog(catalog) })
+                    if (hasCatalogUnpackAction(catalog)) {
+                        CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, onClick = { onUnpackCatalog(catalog) })
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
+                    CatalogActionChip(
+                        icon = Icons.Default.VisibilityOff,
+                        isFocused = isRowFocused && focusedActionIndex == if (hasCatalogUnpackAction(catalog)) 5 else 4,
+                        isDestructive = false,
+                        enabled = true,
+                        onClick = { onDeleteCatalog(catalog) }
+                    )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
-            RestoreHiddenCatalogsRow(
-                focusIndex = catalogs.size + 2,
-                focusedIndex = focusedIndex,
-                onClick = onRestoreHiddenCatalogs
-            )
         }
     }
 }
+
+private fun hasCatalogUnpackAction(catalog: CatalogConfig): Boolean =
+    catalog.packId != null && catalog.isBulkDeletablePack
 
 
 private fun catalogueLayoutRowKey(catalog: CatalogConfig): String {
@@ -8982,6 +9508,7 @@ private fun catalogueLayoutRowKey(catalog: CatalogConfig): String {
 @Composable
 private fun CatalogActionChip(
     icon: ImageVector,
+    label: String? = null,
     isFocused: Boolean,
     isDestructive: Boolean = false,
     enabled: Boolean = true,
@@ -9010,7 +9537,8 @@ private fun CatalogActionChip(
     }
     Box(
         modifier = Modifier
-            .size(36.dp)
+            .height(36.dp)
+            .widthIn(min = 36.dp)
             .onPreviewKeyEvent { event ->
                 if (!enabled || !isFocused || event.type != KeyEventType.KeyDown) {
                     return@onPreviewKeyEvent false
@@ -9032,12 +9560,26 @@ private fun CatalogActionChip(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = fgColor,
-            modifier = Modifier.size(16.dp)
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = if (label == null) 0.dp else 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = fgColor,
+                modifier = Modifier.size(16.dp)
+            )
+            if (label != null) {
+                Text(
+                    text = label,
+                    style = ArflixTypography.caption.copy(fontSize = 11.sp),
+                    color = fgColor,
+                    maxLines = 1,
+                )
+            }
+        }
     }
 }
 

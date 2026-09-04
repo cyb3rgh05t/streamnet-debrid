@@ -120,6 +120,7 @@ class TvViewModel @Inject constructor(
     private var visibleEpgRetryJob: Job? = null
     private val pendingVisibleEpgRetryIds = LinkedHashSet<String>()
     private var tvSessionSaveJob: Job? = null
+    private var pendingTvSession: IptvTvSessionState? = null
     private var startupGuideWarmupKey: String? = null
     private var fullEpgWarmupJob: Job? = null
     private var lastFullEpgWarmupKey: String? = null
@@ -284,8 +285,15 @@ class TvViewModel @Inject constructor(
             iptvRepository.observeTvSessionState()
                 .distinctUntilChanged()
                 .collect { session ->
+                    val localSession = pendingTvSession
+                    val resolvedSession = if (localSession == null || session == localSession) {
+                        pendingTvSession = null
+                        session
+                    } else {
+                        localSession
+                    }
                     _uiState.value = _uiState.value.copy(
-                        tvSession = session,
+                        tvSession = resolvedSession,
                         tvSessionLoaded = true,
                     )
                     maybeWarmStartupGuide()
@@ -2178,6 +2186,7 @@ class TvViewModel @Inject constructor(
             return
         }
 
+        pendingTvSession = next
         _uiState.value = _uiState.value.copy(tvSession = next)
         maybeWarmStartupGuide()
         tvSessionSaveJob?.cancel()

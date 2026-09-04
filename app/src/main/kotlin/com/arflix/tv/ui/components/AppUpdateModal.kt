@@ -339,34 +339,34 @@ fun AppUpdateModal(
                     is UpdateStatus.Installing -> {
                         androidx.compose.material3.Text(stringResource(R.string.update_msg_installer_hint), style = ArflixTypography.body, color = ArvioSkin.colors.textPrimary)
                     }
-                    is UpdateStatus.UpdateAvailable -> {
-                        if (status.update.notes.isNotBlank()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(ArvioSkin.colors.surfaceRaised.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
-                                    .padding(14.dp),
-                            ) {
-                                androidx.compose.material3.Text(
-                                    text = stringResource(R.string.update_release_notes),
-                                    style = ArflixTypography.label,
-                                    color = accent,
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                androidx.compose.material3.Text(
-                                    text = status.update.notes.take(1800),
-                                    style = ArflixTypography.caption.copy(lineHeight = 18.sp),
-                                    color = ArvioSkin.colors.textMuted,
-                                    modifier = if (isTouchDevice) {
-                                        Modifier
-                                    } else {
-                                        Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState())
-                                    },
-                                )
-                            }
-                        }
-                    }
                     else -> {}
+                }
+
+                update?.notes?.takeIf { it.isNotBlank() }?.let { releaseNotes ->
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(ArvioSkin.colors.surfaceRaised.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
+                            .padding(14.dp),
+                    ) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.update_release_notes),
+                            style = ArflixTypography.label,
+                            color = accent,
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material3.Text(
+                            text = releaseNotes.take(1800),
+                            style = ArflixTypography.caption.copy(lineHeight = 18.sp),
+                            color = ArvioSkin.colors.textMuted,
+                            modifier = if (isTouchDevice) {
+                                Modifier
+                            } else {
+                                Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState())
+                            },
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

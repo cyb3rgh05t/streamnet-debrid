@@ -21,7 +21,8 @@ This update aligns TV Settings controls with the active StreamNet theme while pr
 
 ## Transient notifications
 
-- In-app toasts share one bottom-center layout above navigation insets, an OLED-aware dark background, and the active profile accent for their border and status icon.
+- In-app toasts share one bottom-center layout above navigation insets and any visible app bottom bar, an OLED-aware dark background, and the active profile accent for their border and status icon.
+- The IPTV loading/progress banner is not a system toast; it now reuses the same notification surface, width, corner radius, background, border, and spacing as regular app toasts.
 - Success, error, and information states remain distinguishable by icon while preserving one visual theme.
 - Player subtitle-match results and Telegram or installer events shown while the app is active use the shared toast presentation.
 - Native Android toasts remain only as a fallback when no Compose host is active, such as installer callbacks outside the running app and the crash-report handoff to Discord.

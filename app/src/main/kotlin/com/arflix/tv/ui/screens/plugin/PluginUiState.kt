@@ -1,10 +1,16 @@
 package com.arflix.tv.ui.screens.plugin
 
 import android.graphics.Bitmap
+import androidx.annotation.StringRes
 import com.arflix.tv.core.plugin.TestDiagnostics
 import com.arflix.tv.domain.model.LocalScraperResult
 import com.arflix.tv.domain.model.PluginRepository
 import com.arflix.tv.domain.model.ScraperInfo
+
+data class PluginMessage(
+    @param:StringRes val resourceId: Int,
+    val formatArgs: List<Any> = emptyList()
+)
 
 data class PluginUiState(
     val pluginsEnabled: Boolean = true,
@@ -17,8 +23,8 @@ data class PluginUiState(
     val testResults: List<LocalScraperResult>? = null,
     val testDiagnostics: TestDiagnostics? = null,
     val testScraperId: String? = null,
-    val errorMessage: String? = null,
-    val successMessage: String? = null,
+    val errorMessage: PluginMessage? = null,
+    val successMessage: PluginMessage? = null,
     // QR mode
     val isQrModeActive: Boolean = false,
     val qrCodeBitmap: Bitmap? = null,

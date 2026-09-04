@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.3.001] - 2026-09-04
+
+### Cloud and account reliability
+
+- Protected Trakt, Simkl, and MDBList provider choices and credentials with per-profile timestamps so older devices and legacy cloud payloads cannot overwrite newer selections or credential removals.
+- Preserved the preferred tracking provider when another provider is connected and repaired read modes only when their selected provider is unavailable.
+- Debounced rapid Settings cloud updates and contained unexpected push, restore, and authentication errors at the Settings boundary.
+- Prevented failed HTTP responses from being cached and initialized shared networking early enough for startup consumers.
+
+### Home Server and Home
+
+- Limited Plex, Jellyfin, and Emby Home catalogs to real movie and series libraries, excluding collections, box sets, music, photos, and mixed views.
+- Added profile-synced per-server library visibility controls for TV and touch Settings, with stale or disabled catalogs removed from Home.
+- Reorganized Home Server Settings into add, connected-server, library, and server-action sections and corrected the connected-server status badge.
+- Preserved usable cached Home rows during refreshes and added a six-hour stale refresh instead of repeatedly replacing loaded content.
+
+### IPTV and Live TV
+
+- Added profile-synced StreamNet movie and series category visibility while keeping search, playback sources, and other Xtream playlists unaffected.
+- Reorganized IPTV Settings into a Playlists section with a subsection for every playlist and separate Live and VOD category controls.
+- Preserved the selected Live TV group and channel across playlist refreshes and Settings navigation.
+- Fixed green preview artifacts after leaving fullscreen by enforcing exclusive ExoPlayer surface ownership.
+
+### Interface and updates
+
+- Unified toast height and bottom placement above navigation controls and reused the themed notification surface for IPTV progress.
+- Applied the selected accent theme to Plugin dialogs and localized Plugin status messages and tracker list labels.
+- Kept GitHub release notes visible throughout download, retry, and installation-ready states in the update dialog.
+- Updated the Android release workflow to generate release notes and backfill empty descriptions on existing releases.
+- Improved Home navigation fallback and English trailer fallback without overriding explicitly requested video languages.
+
+### Validation
+
+- Added regression coverage for Home Server library filtering, IPTV VOD category visibility, legacy catalog compatibility, and timestamp-aware sync-provider state.
+- Validated the Sideload Kotlin build, enabled Sideload unit-test suite, Debug APK assembly, IDE diagnostics, and whitespace checks.
+
 ### Settings visual consistency
 
 - Added semantic leading icons throughout TV Settings, including toggles, actions, account integrations, custom playlists, catalogs, and plugin scraper controls.

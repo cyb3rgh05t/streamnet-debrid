@@ -1329,6 +1329,19 @@ class HomeViewModel @Inject constructor(
         return category?.items?.any { !it.isPlaceholder } == true
     }
 
+    private fun hasRealBaseCategories(): Boolean =
+        _uiState.value.categories.any { category ->
+            category.id != "continue_watching" &&
+                !category.id.startsWith("collection_row_") &&
+                hasRealItems(category)
+        }
+
+    private fun markHomeDataLoadSuccessful(requestId: Long) {
+        if (requestId == loadHomeRequestId) {
+            lastHomeDataLoadAtMs = SystemClock.elapsedRealtime()
+        }
+    }
+
     private fun chooseInitialHero(categories: List<Category>): MediaItem? {
         val preferredRow = categories.firstOrNull { category ->
             !category.id.startsWith("collection_row_") && category.items.any { !it.isPlaceholder }
@@ -1614,6 +1627,9 @@ class HomeViewModel @Inject constructor(
     private val dismissedContinueWatchingAt = Collections.synchronizedMap(mutableMapOf<String, Long>())
     private val CONTINUE_WATCHING_REFRESH_MS = 45_000L
     private val WATCHED_BADGES_REFRESH_MS = 90_000L
+    private val HOME_DATA_STALE_AFTER_MS = 6 * 60 * 60 * 1000L
+    private var lastHomeDataLoadAtMs = 0L
+    private var homeDataLoadAttempted = false
     private var lastWatchedBadgesRefreshMs: Long = 0L
     private val HOME_PLACEHOLDER_ITEM_COUNT = 8
     private val IPTV_PROGRAM_MISS_TTL_MS = 10 * 60_000L
@@ -1864,6 +1880,8 @@ class HomeViewModel @Inject constructor(
         lastContinueWatchingItems = emptyList()
         lastContinueWatchingUpdateMs = 0L
         lastResolvedBaseCategories = emptyList()
+        lastHomeDataLoadAtMs = 0L
+        homeDataLoadAttempted = false
         dismissedContinueWatchingAt.clear()
         categoryPaginationStates.clear()
         savedCatalogById.clear()
@@ -2084,7 +2102,13 @@ class HomeViewModel @Inject constructor(
         }
         viewModelScope.launch {
             iptvRepository.observeConfig()
-                .map { profileManager.getProfileIdSync() to it.iptvOnlyMode }
+                .map { config ->
+                    Triple(
+                        profileManager.getProfileIdSync(),
+                        config.iptvOnlyMode,
+                        config.excludedVodCategoryIds to config.excludedSeriesCategoryIds,
+                    )
+                }
                 .distinctUntilChanged()
                 .collectLatest { (_, enabled) ->
                     if (enabled) {
@@ -2316,18 +2340,35 @@ class HomeViewModel @Inject constructor(
                 } else {
                     cachedCategories
                 }
-                if (orderedCachedCategories.isNotEmpty() && _uiState.value.categories.isEmpty()) {
-                    val heroItem = chooseInitialHero(orderedCachedCategories)
-                    val heroKey = heroItem?.let { "${it.mediaType}_${it.id}" }
-                    val heroLogo = heroKey?.let { getCachedLogo(it) }
+                if (orderedCachedCategories.isNotEmpty() && !hasRealBaseCategories()) {
+                    val cachedHero = chooseInitialHero(orderedCachedCategories)
+                    val cachedHeroKey = cachedHero?.let { "${it.mediaType}_${it.id}" }
+                    val cachedHeroLogo = cachedHeroKey?.let { getCachedLogo(it) }
                     withContext(Dispatchers.Main) {
-                        if (_uiState.value.categories.isEmpty()) {
+                        if (!hasRealBaseCategories()) {
+                            val liveContinueWatching = _uiState.value.categories
+                                .firstOrNull { it.id == "continue_watching" }
+                            val mergedCategories = if (liveContinueWatching != null) {
+                                listOf(liveContinueWatching) + orderedCachedCategories.filterNot {
+                                    it.id == "continue_watching"
+                                }
+                            } else {
+                                orderedCachedCategories
+                            }
+                            val liveHero = _uiState.value.heroItem
+                            val finalHero = liveHero ?: cachedHero
+                            val finalLogo = if (liveHero != null) {
+                                _uiState.value.heroLogoUrl
+                                    ?: getCachedLogo("${liveHero.mediaType}_${liveHero.id}")
+                            } else {
+                                cachedHeroLogo
+                            }
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isInitialLoad = false,
-                                categories = orderedCachedCategories,
-                                heroItem = heroItem,
-                                heroLogoUrl = heroLogo,
+                                categories = mergedCategories,
+                                heroItem = finalHero,
+                                heroLogoUrl = finalLogo,
                                 error = null
                             )
                         }
@@ -2840,6 +2881,7 @@ class HomeViewModel @Inject constructor(
 
     private fun loadHomeData() {
         loadHomeJob?.cancel()
+        homeDataLoadAttempted = true
         val requestId = ++loadHomeRequestId
         loadHomeJob = viewModelScope.launch loadHome@{
             // Skip delay - preloading now happens on profile focus for instant display
@@ -2968,10 +3010,12 @@ class HomeViewModel @Inject constructor(
                     runCatching { buildTvCategories() }.getOrDefault(emptyMap())
                 }
 
+                var loadedFreshCatalogRows = false
                 var categories = withContext(networkDispatcher) {
                     val baseCategories = runCatching {
                         mediaRepository.getHomeCategories()
                     }.getOrElse { emptyList() }
+                    loadedFreshCatalogRows = baseCategories.any(::hasRealItems)
 
                     val baseById = LinkedHashMap<String, Category>().apply {
                         currentBaseCategories.forEach { put(it.id, it) }
@@ -3066,6 +3110,7 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                     val mdblistCategories = mdblistInitial.awaitAll().filterNotNull()
+                    loadedFreshCatalogRows = loadedFreshCatalogRows || mdblistCategories.any(::hasRealItems)
                     // Create placeholder categories for deferred ones (will load on scroll)
                     val deferredCategories = deferredBatch.map { cfg -> Category(id = cfg.id, title = cfg.title, items = emptyList()) }
                     // Merge both lists maintaining the saved catalog order
@@ -3092,13 +3137,14 @@ class HomeViewModel @Inject constructor(
  null }
                                     }
                                 }.awaitAll().filterNotNull()
-                                if (results.isNotEmpty()) {
+                                if (results.isNotEmpty() && requestId == loadHomeRequestId) {
                                     val current = _uiState.value.categories.toMutableList()
                                     for (cat in results) {
                                         val idx = current.indexOfFirst { it.id == cat.id }
                                         if (idx >= 0) current[idx] = cat else current.add(cat)
                                     }
                                     _uiState.value = _uiState.value.copy(categories = current)
+                                    markHomeDataLoadSuccessful(requestId)
                                 }
                             }
                         }
@@ -3142,6 +3188,7 @@ class HomeViewModel @Inject constructor(
                             }
                         }
                     }.awaitAll().filterNotNull()
+                    loadedFreshCatalogRows = loadedFreshCatalogRows || freshCustomCategories.any(::hasRealItems)
 
                     // Fall back to previously cached data for any custom catalog
                     // that failed to load in this round
@@ -3437,6 +3484,9 @@ class HomeViewModel @Inject constructor(
                     categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
                     error = null
                 )
+                if (loadedFreshCatalogRows) {
+                    markHomeDataLoadSuccessful(requestId)
+                }
                 if (iptvRepository.observeConfig().first().iptvOnlyMode) {
                     refreshIptvVodAvailability(allowNetwork = false)
                 }
@@ -3837,6 +3887,7 @@ class HomeViewModel @Inject constructor(
                     categories = updatedCategories,
                     categoryHasMoreMap = _uiState.value.categoryHasMoreMap + (categoryId to result.hasMore)
                 )
+                markHomeDataLoadSuccessful(loadHomeRequestId)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
 
@@ -3981,6 +4032,14 @@ class HomeViewModel @Inject constructor(
 
     fun refresh() {
         loadHomeData()
+    }
+
+    fun refreshHomeDataIfStale() {
+        if (!homeDataLoadAttempted || loadHomeJob?.isActive == true) return
+        val lastLoadAtMs = lastHomeDataLoadAtMs
+        if (lastLoadAtMs == 0L || SystemClock.elapsedRealtime() - lastLoadAtMs >= HOME_DATA_STALE_AFTER_MS) {
+            loadHomeData()
+        }
     }
 
     fun refreshIptvHomeCatalogs() {

@@ -23,6 +23,8 @@ class IptvVodSearchPreferenceTest {
         val state = Gson().fromJson("{}", IptvCloudProfileState::class.java)
 
         assertThat(state.vodSearchEnabled).isNull()
+        assertThat(state.excludedVodCategoryIds).isNull()
+        assertThat(state.excludedSeriesCategoryIds).isNull()
     }
 
     @Test
@@ -30,5 +32,16 @@ class IptvVodSearchPreferenceTest {
         val state = Gson().fromJson("{\"vodSearchEnabled\":false}", IptvCloudProfileState::class.java)
 
         assertThat(state.vodSearchEnabled).isFalse()
+    }
+
+    @Test
+    fun cloudStatePreservesExcludedVodCategories() {
+        val state = Gson().fromJson(
+            """{"excludedVodCategoryIds":["12"],"excludedSeriesCategoryIds":["34"]}""",
+            IptvCloudProfileState::class.java,
+        )
+
+        assertThat(state.excludedVodCategoryIds).containsExactly("12")
+        assertThat(state.excludedSeriesCategoryIds).containsExactly("34")
     }
 }

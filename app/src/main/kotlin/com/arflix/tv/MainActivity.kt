@@ -743,8 +743,11 @@ fun ArflixApp(
         !currentRoute.contains("profile") &&
         !currentRoute.contains("login")
 
-    Column(
-        modifier = Modifier
+    CompositionLocalProvider(
+        com.arflix.tv.ui.components.LocalAppBottomBarVisible provides showBottomBar
+    ) {
+        Column(
+            modifier = Modifier
             .fillMaxSize()
             // Background fills edge-to-edge (including behind transparent bars).
             .background(
@@ -765,9 +768,9 @@ fun ArflixApp(
             // systemBarsPadding() reads live WindowInsets, so it automatically
             // becomes 0 when the player hides the bars.
             .then(if (isMobile) Modifier.systemBarsPadding() else Modifier)
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            AppNavigation(
+        ) {
+            Box(modifier = Modifier.weight(1f)) {
+                AppNavigation(
                 navController = navController,
                 startDestination = startDestination,
                 preloadedCategories = preloadedCategories,
@@ -792,10 +795,10 @@ fun ArflixApp(
                     iptvFullscreen = fullscreen
                 },
                 onExitApp = onExitApp
-            )
-        }
-        if (showBottomBar) {
-            AppBottomBar(
+                )
+            }
+            if (showBottomBar) {
+                AppBottomBar(
                 currentRoute = currentRoute,
                 onNavigate = { route ->
                     navController.navigate(route) {
@@ -804,7 +807,8 @@ fun ArflixApp(
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
-            )
+                )
+            }
         }
     }
 

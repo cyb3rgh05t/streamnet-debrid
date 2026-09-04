@@ -43,6 +43,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withTimeoutOrNull
+import androidx.annotation.StringRes
 import javax.inject.Inject
 
 enum class ToastType {
@@ -102,7 +103,8 @@ sealed interface WatchlistSourceItem {
     data class TrackerList(
         val provider: TrackerLibraryProvider,
         val listKey: String,
-        override val title: String
+        override val title: String,
+        @param:StringRes val titleRes: Int? = null
     ) : WatchlistSourceItem {
         override val id: String = "tracker_${provider.name.lowercase()}_$listKey"
         override val subtitle: String = provider.displayName
@@ -343,7 +345,8 @@ class WatchlistViewModel @Inject constructor(
                         WatchlistSourceItem.TrackerList(
                             provider = TrackerLibraryProvider.TRAKT,
                             listKey = TRAKT_WATCHLIST_KEY,
-                            title = "Watchlist"
+                            title = "Watchlist",
+                            titleRes = R.string.watchlist_tracker_default_list
                         )
                     )
                 } else {
@@ -359,12 +362,13 @@ class WatchlistViewModel @Inject constructor(
                 }
             }
             if (simklConnected) {
-                SIMKL_LIBRARY_LISTS.forEach { (status, title) ->
+                SIMKL_LIBRARY_LISTS.forEach { (status, title, titleRes) ->
                     add(
                         WatchlistSourceItem.TrackerList(
                             provider = TrackerLibraryProvider.SIMKL,
                             listKey = status,
-                            title = title
+                            title = title,
+                            titleRes = titleRes
                         )
                     )
                 }
@@ -1292,11 +1296,11 @@ class WatchlistViewModel @Inject constructor(
         private const val TRACKER_LIST_ITEM_LIMIT = 240
         private const val TRAKT_WATCHLIST_KEY = "__watchlist__"
         private val SIMKL_LIBRARY_LISTS = listOf(
-            "watching" to "Watching",
-            "plantowatch" to "Plan to watch",
-            "completed" to "Completed",
-            "hold" to "On hold",
-            "dropped" to "Dropped"
+            Triple("watching", "Watching", R.string.watchlist_simkl_watching),
+            Triple("plantowatch", "Plan to watch", R.string.watchlist_simkl_plan_to_watch),
+            Triple("completed", "Completed", R.string.watchlist_simkl_completed),
+            Triple("hold", "On hold", R.string.watchlist_simkl_on_hold),
+            Triple("dropped", "Dropped", R.string.watchlist_simkl_dropped)
         )
         private val BROWSABLE_LIBRARY_TYPES = setOf(
             "",

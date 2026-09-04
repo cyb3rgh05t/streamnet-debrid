@@ -13,9 +13,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -30,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -59,6 +63,8 @@ enum class ToastType {
     SUCCESS, ERROR, INFO
 }
 
+val LocalAppBottomBarVisible = compositionLocalOf { false }
+
 data class AppToastEvent(
     val id: Long,
     val message: String,
@@ -77,6 +83,42 @@ object AppToastBus {
     ): Boolean {
         if (events.subscriptionCount.value == 0) return false
         return events.tryEmit(AppToastEvent(nextId.incrementAndGet(), message, type, durationMs))
+    }
+}
+
+@Composable
+fun AppNotificationSurface(
+    modifier: Modifier = Modifier,
+    leadingContent: @Composable () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    val themeAccent = resolveAccentColor(fallback = AccentYellow)
+    val notificationShape = RoundedCornerShape(8.dp)
+    Row(
+        modifier = modifier
+            .widthIn(max = 560.dp)
+            .fillMaxWidth()
+            .heightIn(min = 58.dp)
+            .shadow(
+                elevation = 18.dp,
+                shape = notificationShape,
+                ambientColor = Color.Black.copy(alpha = 0.32f),
+                spotColor = Color.Black.copy(alpha = 0.32f),
+            )
+            .clip(notificationShape)
+            .background(appBackgroundDark().copy(alpha = 0.96f))
+            .border(
+                width = 1.dp,
+                color = themeAccent.copy(alpha = 0.72f),
+                shape = notificationShape,
+            )
+            .padding(horizontal = 18.dp, vertical = 13.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start,
+    ) {
+        leadingContent()
+        Spacer(modifier = Modifier.width(12.dp))
+        content()
     }
 }
 
@@ -115,7 +157,7 @@ fun Toast(
 ) {
     var visible by remember(isVisible, message, type) { mutableStateOf(isVisible) }
     val themeAccent = resolveAccentColor(fallback = AccentYellow)
-    val toastBackground = appBackgroundDark().copy(alpha = 0.96f)
+    val bottomBarOffset = appBottomBarOverlayOffset()
 
     LaunchedEffect(isVisible, message, type) {
         if (isVisible) {
@@ -160,30 +202,15 @@ fun Toast(
                     ToastType.ERROR -> Icons.Default.Close
                     ToastType.INFO -> Icons.Default.Info
                 }
-                val toastShape = RoundedCornerShape(8.dp)
-
-                Row(
+                AppNotificationSurface(
                     modifier = Modifier
                         .windowInsetsPadding(WindowInsets.navigationBars)
-                        .padding(horizontal = 16.dp, vertical = 16.dp)
-                        .shadow(
-                            elevation = 18.dp,
-                            shape = toastShape,
-                            ambientColor = Color.Black.copy(alpha = 0.32f),
-                            spotColor = Color.Black.copy(alpha = 0.32f)
-                        )
-                        .clip(toastShape)
-                        .background(toastBackground)
-                        .border(
-                            width = 1.dp,
-                            color = themeAccent.copy(alpha = 0.72f),
-                            shape = toastShape
-                        )
-                        .widthIn(max = 560.dp)
-                        .padding(horizontal = 18.dp, vertical = 13.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Start
-                ) {
+                        .padding(
+                            start = 16.dp,
+                            end = 16.dp,
+                            bottom = 20.dp + bottomBarOffset,
+                        ),
+                    leadingContent = {
                     Box(
                         modifier = Modifier
                             .size(28.dp)
@@ -198,7 +225,8 @@ fun Toast(
                             modifier = Modifier.size(16.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
+                    },
+                ) {
                     Text(
                         text = message,
                         style = ArflixTypography.body,

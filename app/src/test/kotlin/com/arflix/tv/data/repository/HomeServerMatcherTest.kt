@@ -24,6 +24,42 @@ class HomeServerMatcherTest {
     }
 
     @Test
+    fun `only movie and series libraries become home catalogs`() {
+        listOf("movie", "movies", "show", "tvshows").forEach { type ->
+            assertTrue(isHomeServerVideoLibraryType(type))
+        }
+        listOf("collection", "boxsets", "music", "photos", "mixed").forEach { type ->
+            assertFalse(isHomeServerVideoLibraryType(type))
+        }
+    }
+
+    @Test
+    fun `library selection only changes the requested server library`() {
+        val first = HomeServerConnection(
+            connectionId = "first",
+            collections = listOf(
+                HomeServerCollection(id = "movies", type = "movie"),
+                HomeServerCollection(id = "shows", type = "show")
+            )
+        )
+        val second = HomeServerConnection(
+            connectionId = "second",
+            collections = listOf(HomeServerCollection(id = "movies", type = "movies"))
+        )
+
+        val updated = updateHomeServerLibraryState(
+            connections = listOf(first, second),
+            connectionId = "first",
+            libraryId = "movies",
+            enabled = false
+        )
+
+        assertFalse(updated[0].collections[0].enabled)
+        assertTrue(updated[0].collections[1].enabled)
+        assertTrue(updated[1].collections[0].enabled)
+    }
+
+    @Test
     fun `explicit home server media type remains supported`() {
         assertEquals(MediaType.TV, homeServerCatalogMediaType("movies", MediaType.TV))
     }

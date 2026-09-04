@@ -300,10 +300,15 @@ private fun HeroVideoCard(
     modifier: Modifier = Modifier,
 ) {
     val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
+    val fullScreenState = rememberUpdatedState(isFullScreen)
     var focused by remember { mutableStateOf(false) }
 
     LaunchedEffect(isFullScreen) {
-        if (!isFullScreen) {
+        if (isFullScreen) {
+            textureViewRef.value?.let { tv ->
+                runCatching { exoPlayer.clearVideoTextureView(tv) }
+            }
+        } else {
             delay(120L)
             textureViewRef.value?.takeIf { it.isAvailable }?.let { tv ->
                 runCatching { exoPlayer.setVideoTextureView(tv) }
@@ -364,7 +369,9 @@ private fun HeroVideoCard(
                     textureViewRef.value = tv
                     tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
                         override fun onSurfaceTextureAvailable(s: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                            runCatching { exoPlayer.setVideoTextureView(tv) }
+                            if (!fullScreenState.value) {
+                                runCatching { exoPlayer.setVideoTextureView(tv) }
+                            }
                         }
                         override fun onSurfaceTextureSizeChanged(s: android.graphics.SurfaceTexture, w: Int, h: Int) {}
                         override fun onSurfaceTextureDestroyed(s: android.graphics.SurfaceTexture): Boolean {

@@ -146,14 +146,12 @@ fun AppNavigation(
     }
 
     val navigateHome: () -> Unit = {
-        // Navigate to Home clearing the entire back stack above it.
-        // Uses navigate() instead of popBackStack() because popBackStack can
-        // silently fail if Home is not found, and restoreState on other
-        // navigateTopLevel calls can bring back stale Details pages.
-        navController.navigate(Screen.Home.route) {
-            popUpTo(Screen.Home.route) { inclusive = true; saveState = false }
-            launchSingleTop = true
-            restoreState = false
+        if (!navController.popBackStack(Screen.Home.route, inclusive = false)) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Home.route) { inclusive = true; saveState = false }
+                launchSingleTop = true
+                restoreState = false
+            }
         }
     }
 

@@ -578,12 +578,23 @@
     <string name="settings_help_setting_desc">Use OK to change this option.</string>
     <string name="settings_media_server">Media Server</string>
     <string name="settings_section_connections">CONNECTIONS</string>
+    <string name="settings_section_add_server">ADD SERVER</string>
+    <string name="settings_section_connected_servers">CONNECTED SERVERS</string>
+    <string name="settings_section_server_actions">SERVER ACTIONS</string>
+    <string name="settings_server_settings">Server settings</string>
+    <string name="settings_server_libraries">Libraries</string>
+    <string name="settings_server_libraries_description">%1$d of %2$d libraries included</string>
+    <string name="settings_manage">Manage</string>
+    <string name="settings_no_video_libraries">No movie or series libraries found.</string>
+    <string name="settings_library_included">Included on Home</string>
+    <string name="settings_library_excluded">Excluded from Home</string>
     <string name="settings_add_server">Add server</string>
     <string name="settings_add_server_subtitle">Personal media libraries as sources</string>
     <string name="settings_add_another">Add another</string>
     <string name="settings_connect_code_subtitle">Plex PIN or Jellyfin Quick Connect</string>
     <string name="settings_waiting">Waiting</string>
-    <string name="settings_collections_count">%1$d collections</string>
+    <string name="settings_collections_count">%1$d libraries</string>
+    <string name="settings_home_server_library_visibility">Show this library as a Home catalog</string>
     <string name="settings_section_actions">ACTIONS</string>
     <string name="settings_test_connection">Test connection</string>
     <string name="settings_connect_server_first">Connect a server first</string>
@@ -648,6 +659,7 @@
     <string name="settings_source_addon">Addon</string>
     <string name="settings_section_add_catalog">ADD CATALOG</string>
     <string name="settings_section_my_catalogs">MY CATALOGS</string>
+    <string name="settings_section_home_catalog_settings">HOME CATALOG SETTINGS</string>
     <string name="settings_title_builtin_collection">%1$s (Built-in Collection)</string>
     <string name="settings_title_builtin_rail">%1$s (Built-in Rail)</string>
     <string name="settings_title_builtin">%1$s (Built-in)</string>
@@ -671,6 +683,14 @@
     <string name="settings_iptv_only_mode_title">Only IPTV-Provider Sources</string>
     <string name="settings_iptv_vod_search">IPTV VOD streams</string>
     <string name="settings_iptv_vod_search_desc">Include IPTV movies and series when searching playback sources</string>
+    <string name="settings_iptv_vod_categories">VOD categories</string>
+    <string name="settings_iptv_live_categories">Live categories</string>
+    <string name="settings_iptv_live_categories_desc">Choose which channel groups are visible in Live TV.</string>
+    <string name="settings_iptv_vod_categories_home_only">Choose which StreamNet TV categories appear on Home. Search and playback sources remain available.</string>
+    <string name="settings_iptv_vod_movies">Movies</string>
+    <string name="settings_iptv_vod_series">Series</string>
+    <string name="settings_no_vod_categories_available">No VOD categories available</string>
+    <string name="settings_include_all_vod_categories">Include all categories</string>
     <string name="settings_iptv_playlist_settings_header">Playlist settings</string>
     <string name="settings_iptv_only_mode_subtitle">Show only IPTV-Provider Content on Home</string>
     <string name="settings_section_add_addon">ADD ADDON</string>
@@ -904,6 +924,12 @@
     <string name="plugin_screen_no_scrapers">No scrapers installed.</string>
     <string name="plugin_screen_add_repo_dialog_title">Add Plugin Repository</string>
     <string name="plugin_screen_repo_url">Repository URL</string>
+    <string name="plugin_screen_reset_title">Reset Plugins &amp; Extensions</string>
+    <string name="plugin_screen_reset_desc">Deletes all repositories, scrapers, and local data</string>
+    <string name="plugin_screen_reset_warning_title">Warning</string>
+    <string name="plugin_screen_reset_warning_message">Are you sure you want to delete all plugins, scrapers, and local code data? This action cannot be undone.</string>
+    <string name="plugin_screen_remove_repo_message">Are you sure you want to remove \"%1$s\"?</string>
+    <string name="plugin_all_cleared">All plugins and extensions cleared successfully</string>
 
     <!-- Extracted from code: Profile, Login and Collections -->
     <string name="profile_edit_title">Edit Profile</string>
@@ -1145,6 +1171,14 @@
     <string name="watchlist_error_load_trakt">Failed to load Trakt watchlist</string>
     <string name="watchlist_error_refresh">Failed to refresh</string>
     <string name="watchlist_toast_removed">Removed from watchlist</string>
+    <string name="watchlist_my_watchlist">My Watchlist</string>
+    <string name="watchlist_provider_home_server">Server</string>
+    <string name="watchlist_tracker_default_list">Watchlist</string>
+    <string name="watchlist_simkl_watching">Watching</string>
+    <string name="watchlist_simkl_plan_to_watch">Plan to watch</string>
+    <string name="watchlist_simkl_completed">Completed</string>
+    <string name="watchlist_simkl_on_hold">On hold</string>
+    <string name="watchlist_simkl_dropped">Dropped</string>
 
 
     <!-- Extracted from code (data layer): shared labels and errors -->

@@ -96,6 +96,7 @@ class TraktRepository @Inject constructor(
     private fun accessTokenKey() = profileManager.profileStringKey("trakt_access_token")
     private fun refreshTokenKey() = profileManager.profileStringKey("trakt_refresh_token")
     private fun expiresAtKey() = profileManager.profileLongKey("trakt_expires_at")
+    private fun tokenUpdatedAtKey() = profileManager.profileLongKey("trakt_token_updated_at_v3")
     private fun includeSpecialsKey() = profileManager.profileBooleanKey("trakt_include_specials")
     private fun dismissedContinueWatchingKey() = profileManager.profileStringKey("trakt_dismissed_continue_watching_v1")
     private fun continueWatchingCacheKey() = profileManager.profileStringKey("trakt_continue_watching_cache_v4")
@@ -105,9 +106,10 @@ class TraktRepository @Inject constructor(
     private fun localWatchedEpisodesKey() = profileManager.profileStringKey("local_watched_episodes_v1")
 
     data class CloudTraktToken(
-        val accessToken: String,
+        val accessToken: String?,
         val refreshToken: String?,
-        val expiresAt: Long?
+        val expiresAt: Long?,
+        val updatedAt: Long? = null
     )
 
     @Volatile private var activeCacheProfileId: String? = null
@@ -226,6 +228,7 @@ class TraktRepository @Inject constructor(
             prefs.remove(accessTokenKey())
             prefs.remove(refreshTokenKey())
             prefs.remove(expiresAtKey())
+            prefs[tokenUpdatedAtKey()] = System.currentTimeMillis()
         }
         tokenRefreshBackoffUntilMs = 0L
         clearProfileScopedMemoryCaches(clearPreloaded = false)
@@ -322,6 +325,7 @@ class TraktRepository @Inject constructor(
             prefs[accessTokenKey()] = token.accessToken
             prefs[refreshTokenKey()] = token.refreshToken
             prefs[expiresAtKey()] = token.createdAt + token.expiresIn
+            prefs[tokenUpdatedAtKey()] = System.currentTimeMillis()
         }
     }
 
@@ -348,6 +352,7 @@ class TraktRepository @Inject constructor(
             prefs.remove(accessTokenKey())
             prefs.remove(refreshTokenKey())
             prefs.remove(expiresAtKey())
+            prefs[tokenUpdatedAtKey()] = System.currentTimeMillis()
         }
         clearProfileScopedMemoryCaches(clearPreloaded = false)
     }
@@ -358,11 +363,27 @@ class TraktRepository @Inject constructor(
     suspend fun exportTokensForProfiles(profileIds: List<String>): Map<String, CloudTraktToken> {
         val prefs = context.traktDataStore.data.first()
         val out = LinkedHashMap<String, CloudTraktToken>()
+        val migratedProfiles = mutableListOf<String>()
+        val migrationUpdatedAt = System.currentTimeMillis()
         profileIds.forEach { profileId ->
-            val access = prefs[profileManager.profileStringKeyFor(profileId, "trakt_access_token")] ?: return@forEach
+            val access = prefs[profileManager.profileStringKeyFor(profileId, "trakt_access_token")]
             val refresh = prefs[profileManager.profileStringKeyFor(profileId, "trakt_refresh_token")]
             val expiresAt = prefs[profileManager.profileLongKeyFor(profileId, "trakt_expires_at")]
-            out[profileId] = CloudTraktToken(accessToken = access, refreshToken = refresh, expiresAt = expiresAt)
+            val updatedAtKey = profileManager.profileLongKeyFor(profileId, "trakt_token_updated_at_v3")
+            val updatedAt = prefs[updatedAtKey]?.takeIf { it > 0L } ?: access?.let {
+                migratedProfiles += profileId
+                migrationUpdatedAt
+            }
+            if (access != null || updatedAt != null) {
+                out[profileId] = CloudTraktToken(access, refresh, expiresAt, updatedAt)
+            }
+        }
+        if (migratedProfiles.isNotEmpty()) {
+            context.traktDataStore.edit { current ->
+                migratedProfiles.forEach {
+                    current[profileManager.profileLongKeyFor(it, "trakt_token_updated_at_v3")] = migrationUpdatedAt
+                }
+            }
         }
         return out
     }
@@ -372,11 +393,33 @@ class TraktRepository @Inject constructor(
      */
     suspend fun importTokensForProfiles(tokens: Map<String, CloudTraktToken>) {
         if (tokens.isEmpty()) return
+        val local = context.traktDataStore.data.first()
+        val tokensToApply = tokens.filter { (profileId, token) ->
+            com.arflix.tv.data.repository.sync.shouldApplyCloudCredential(
+                token.updatedAt,
+                local[profileManager.profileLongKeyFor(profileId, "trakt_token_updated_at_v3")],
+                !token.accessToken.isNullOrBlank(),
+                !local[profileManager.profileStringKeyFor(profileId, "trakt_access_token")].isNullOrBlank()
+            )
+        }
+        if (tokensToApply.isEmpty()) return
         context.traktDataStore.edit { prefs ->
-            tokens.forEach { (profileId, token) ->
-                prefs[profileManager.profileStringKeyFor(profileId, "trakt_access_token")] = token.accessToken
-                token.refreshToken?.let { prefs[profileManager.profileStringKeyFor(profileId, "trakt_refresh_token")] = it }
-                token.expiresAt?.let { prefs[profileManager.profileLongKeyFor(profileId, "trakt_expires_at")] = it }
+            tokensToApply.forEach { (profileId, token) ->
+                val accessKey = profileManager.profileStringKeyFor(profileId, "trakt_access_token")
+                val refreshKey = profileManager.profileStringKeyFor(profileId, "trakt_refresh_token")
+                val expiresKey = profileManager.profileLongKeyFor(profileId, "trakt_expires_at")
+                val updatedAtKey = profileManager.profileLongKeyFor(profileId, "trakt_token_updated_at_v3")
+                val access = token.accessToken?.trim().orEmpty()
+                if (access.isEmpty()) {
+                    prefs.remove(accessKey)
+                    prefs.remove(refreshKey)
+                    prefs.remove(expiresKey)
+                } else {
+                    prefs[accessKey] = access
+                    token.refreshToken?.let { prefs[refreshKey] = it } ?: prefs.remove(refreshKey)
+                    token.expiresAt?.let { prefs[expiresKey] = it } ?: prefs.remove(expiresKey)
+                }
+                token.updatedAt?.takeIf { it > 0L }?.let { prefs[updatedAtKey] = it }
             }
         }
         clearProfileScopedMemoryCaches(clearPreloaded = false)

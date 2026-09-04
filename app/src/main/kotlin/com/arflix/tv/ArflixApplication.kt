@@ -3,6 +3,7 @@ package com.arflix.tv
 import android.app.ActivityManager
 import android.app.Application
 import android.content.ComponentCallbacks2
+import android.content.Context
 import android.graphics.Bitmap
 import android.os.Build
 import android.util.Log
@@ -77,14 +78,14 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
     @Inject
     lateinit var appUsageAnalyticsRepository: AppUsageAnalyticsRepository
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        OkHttpProvider.init(this)
+    }
+
     override fun onCreate() {
         super.onCreate()
         instance = this
-
-        // OkHttpProvider.init(context) just stashes the app context; it does
-        // not build the OkHttpClient. Safe to keep on the main thread — it's
-        // a single volatile assignment.
-        OkHttpProvider.init(this)
 
         // Initialize global DNS provider and user agent from DataStore before network calls.
         appScope.launch(Dispatchers.IO) {

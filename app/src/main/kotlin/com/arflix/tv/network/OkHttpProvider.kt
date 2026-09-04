@@ -74,7 +74,7 @@ object OkHttpProvider {
      * Provides the application context needed for the disk cache directory.
      */
     fun init(context: Context) {
-        appContext = context.applicationContext
+        appContext = context.applicationContext ?: context
     }
 
     @Volatile
@@ -316,6 +316,7 @@ object OkHttpProvider {
 
         appContext?.let { ctx ->
             builder.cache(getOrCreateHttpCache(ctx))
+            builder.addNetworkInterceptor(noCacheErrorsInterceptor)
         }
 
         return builder.build()
@@ -359,6 +360,15 @@ object OkHttpProvider {
 
     private fun isSafeHeaderValue(value: String): Boolean {
         return value.all { ch -> ch == '\t' || ch.code in 32..126 }
+    }
+
+    private val noCacheErrorsInterceptor = Interceptor { chain ->
+        val response = chain.proceed(chain.request())
+        if (response.isSuccessful) {
+            response
+        } else {
+            response.newBuilder().header("Cache-Control", "no-store").build()
+        }
     }
 
     private fun getOrCreateHttpCache(context: Context): Cache {

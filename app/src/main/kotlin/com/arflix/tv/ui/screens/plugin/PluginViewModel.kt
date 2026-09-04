@@ -107,7 +107,7 @@ class PluginViewModel @Inject constructor(
 
     private fun addRepository(url: String) {
         if (url.isBlank()) {
-            _uiState.update { it.copy(errorMessage = "Error") }
+            _uiState.update { it.copy(errorMessage = PluginMessage(R.string.plugin_error_invalid_url)) }
             return
         }
 
@@ -121,9 +121,9 @@ class PluginViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isAddingRepo = false,
-                            successMessage = context.getString(
+                            successMessage = PluginMessage(
                                 R.string.plugin_repo_added_with_providers,
-                                repo.scraperCount
+                                listOf(repo.scraperCount)
                             )
                         )
                     }
@@ -132,7 +132,7 @@ class PluginViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isAddingRepo = false,
-                            errorMessage = context.getString(R.string.plugin_error_add_repo, e.message ?: "")
+                            errorMessage = PluginMessage(R.string.plugin_error_add_repo)
                         )
                     }
                 }
@@ -147,7 +147,7 @@ class PluginViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    successMessage = "Error"
+                    successMessage = PluginMessage(R.string.plugin_repo_removed)
                 )
             }
         }
@@ -164,7 +164,7 @@ class PluginViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            successMessage = "Error"
+                            successMessage = PluginMessage(R.string.plugin_repo_refreshed)
                         )
                     }
                 },
@@ -172,7 +172,7 @@ class PluginViewModel @Inject constructor(
                     _uiState.update {
                         it.copy(
                             isLoading = false,
-                            errorMessage = context.getString(R.string.plugin_error_refresh, e.message ?: "")
+                            errorMessage = PluginMessage(R.string.plugin_error_refresh)
                         )
                     }
                 }
@@ -232,9 +232,9 @@ class PluginViewModel @Inject constructor(
                             testResults = results,
                             testDiagnostics = diagnostics,
                             successMessage = if (results.isEmpty()) {
-                                "Error"
+                                PluginMessage(R.string.plugin_test_no_results)
                             } else {
-                                context.getString(R.string.plugin_test_found_streams, results.size)
+                                PluginMessage(R.string.plugin_test_found_streams, listOf(results.size))
                             }
                         )
                     }
@@ -245,10 +245,7 @@ class PluginViewModel @Inject constructor(
                             isTesting = false,
                             testResults = emptyList(),
                             testDiagnostics = null,
-                            errorMessage = context.getString(
-                                R.string.plugin_error_test,
-                                e.message ?: "Error"
-                            )
+                            errorMessage = PluginMessage(R.string.plugin_error_test)
                         )
                     }
                 }
@@ -263,7 +260,7 @@ class PluginViewModel @Inject constructor(
             _uiState.update {
                 it.copy(
                     isLoading = false,
-                    successMessage = "All plugins and extensions cleared successfully"
+                    successMessage = PluginMessage(R.string.plugin_all_cleared)
                 )
             }
         }

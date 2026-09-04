@@ -149,6 +149,26 @@ internal fun homeServerCatalogMediaType(
     }
 }
 
+internal fun isHomeServerVideoLibraryType(collectionType: String): Boolean =
+    homeServerCatalogMediaType(collectionType) != null
+
+internal fun updateHomeServerLibraryState(
+    connections: List<HomeServerConnection>,
+    connectionId: String,
+    libraryId: String,
+    enabled: Boolean
+): List<HomeServerConnection> = connections.map { connection ->
+    if (connection.connectionId != connectionId) {
+        connection
+    } else {
+        connection.copy(
+            collections = connection.collections.map { library ->
+                if (library.id == libraryId) library.copy(enabled = enabled) else library
+            }
+        )
+    }
+}
+
 data class HomeServerCatalogPage(
     val items: List<HomeServerCatalogItem>,
     val hasMore: Boolean
@@ -621,17 +641,27 @@ class HomeServerRepository @Inject constructor(
 
     suspend fun hasUsableConnections(): Boolean = currentConnections().any { it.isUsable }
 
+    suspend fun setLibraryEnabled(connectionId: String, libraryId: String, enabled: Boolean) {
+        val updated = updateHomeServerLibraryState(
+            connections = currentConnections(),
+            connectionId = connectionId,
+            libraryId = libraryId,
+            enabled = enabled
+        )
+        saveConnections(updated)
+    }
+
     suspend fun getCatalogCandidates(): List<HomeServerCatalogCandidate> = withContext(Dispatchers.IO) {
         currentConnections()
             .filter { it.isUsable }
             .flatMap { connection ->
-                val libraryCandidates = connection.collections
-                    .filter { it.enabled && it.id.isNotBlank() }
+                connection.collections
+                    .filter {
+                        it.enabled &&
+                            it.id.isNotBlank() &&
+                            isHomeServerVideoLibraryType(it.type)
+                    }
                     .map { collection -> connection.toCatalogCandidate(collection) }
-                val serverCollectionCandidates = runCatching {
-                    fetchServerCollectionCatalogs(connection)
-                }.getOrDefault(emptyList())
-                libraryCandidates + serverCollectionCandidates
             }
             .distinctBy { it.sourceRef }
     }

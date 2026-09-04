@@ -49,7 +49,7 @@ object AppModule {
 
                 // Only inject if it's not the default English. Map "iw" to "he".
                 val urlBuilder = originalHttpUrl.newBuilder()
-                if (lang != "en-US") {
+                if (lang != "en-US" && originalHttpUrl.queryParameter("language") == null) {
                     val tmdbLang = lang.replace("iw", "he").replace('_', '-')
                     urlBuilder.setQueryParameter("language", tmdbLang)
                 }

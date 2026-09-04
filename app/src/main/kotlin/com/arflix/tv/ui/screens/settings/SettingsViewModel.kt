@@ -23,6 +23,7 @@ import com.arflix.tv.data.model.CatalogConfig
 import com.arflix.tv.data.model.CatalogDiscoveryResult
 import com.arflix.tv.data.model.CatalogKind
 import com.arflix.tv.data.model.CatalogPackManifest
+import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Profile
 import com.arflix.tv.data.model.QualityFilterConfig
 import com.arflix.tv.data.repository.AuthRepository
@@ -78,7 +79,9 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -201,6 +204,11 @@ data class SettingsUiState(
     val iptvAvailableGroups: List<String> = emptyList(),
     val iptvHiddenGroups: List<String> = emptyList(),
     val iptvGroupOrder: List<String> = emptyList(),
+    val iptvVodCategories: List<IptvRepository.XtreamVodCategoryInfo> = emptyList(),
+    val iptvSeriesCategories: List<IptvRepository.XtreamSeriesCategoryInfo> = emptyList(),
+    val iptvExcludedVodCategoryIds: List<String> = emptyList(),
+    val iptvExcludedSeriesCategoryIds: List<String> = emptyList(),
+    val isIptvVodCategoriesLoading: Boolean = false,
     // App updates
     val isSelfUpdateSupported: Boolean = true,
     val updateStatus: com.arflix.tv.updater.UpdateStatus = com.arflix.tv.updater.UpdateStatus.Idle,
@@ -382,6 +390,7 @@ class SettingsViewModel @Inject constructor(
     private var plexHomeServerDisplayName: String? = null
     private var iptvLoadJob: Job? = null
     private var catalogSearchJob: Job? = null
+    private var settingsCloudSyncJob: Job? = null
     private var aiKeyServer: AiKeyConfigServer? = null
     private var lastCloudSyncedUserId: String? = null
     private var cloudDeviceCode: String? = null
@@ -947,6 +956,45 @@ class SettingsViewModel @Inject constructor(
     fun toggleIptvHiddenGroup(playlistId: String, groupName: String) {
         viewModelScope.launch {
             iptvRepository.toggleHiddenGroup(playlistId, groupName)
+        }
+    }
+
+    fun loadIptvVodCategories() {
+        if (_uiState.value.isIptvVodCategoriesLoading) return
+        _uiState.value = _uiState.value.copy(isIptvVodCategoriesLoading = true)
+        viewModelScope.launch {
+            try {
+                val (movies, series) = coroutineScope {
+                    val movieRequest = async { iptvRepository.getStreamNetVodCategories() }
+                    val seriesRequest = async { iptvRepository.getStreamNetSeriesCategories() }
+                    movieRequest.await() to seriesRequest.await()
+                }
+                _uiState.value = _uiState.value.copy(
+                    iptvVodCategories = movies,
+                    iptvSeriesCategories = series,
+                    isIptvVodCategoriesLoading = false,
+                )
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.recordException(
+                    throwable = error,
+                    context = mapOf("error_area" to "IPTV", "flow" to "load_vod_categories")
+                )
+                _uiState.value = _uiState.value.copy(isIptvVodCategoriesLoading = false)
+            }
+        }
+    }
+
+    fun setIptvVodCategoryExcluded(mediaType: MediaType, categoryId: String, excluded: Boolean) {
+        viewModelScope.launch {
+            iptvRepository.setVodCategoryExcluded(mediaType, categoryId, excluded)
+        }
+    }
+
+    fun resetIptvVodCategoryExclusions(mediaType: MediaType) {
+        viewModelScope.launch {
+            iptvRepository.resetVodCategoryExclusions(mediaType)
         }
     }
 
@@ -1988,7 +2036,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             iptvRepository.observeConfig().collect { config ->
                 val current = _uiState.value
-                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories || current.iptvOnlyMode != config.iptvOnlyMode) {
+                if (current.iptvM3uUrl != config.m3uUrl || current.iptvEpgUrl != config.epgUrl || current.iptvStalkerUrl != config.stalkerPortalUrl || current.iptvStalkerMac != config.stalkerMacAddress || current.iptvPlaylists != config.playlists || current.iptvSortOrder != config.sortOrder || current.iptvShowSpecialCategories != config.showSpecialCategories || current.iptvOnlyMode != config.iptvOnlyMode || current.iptvExcludedVodCategoryIds != config.excludedVodCategoryIds || current.iptvExcludedSeriesCategoryIds != config.excludedSeriesCategoryIds) {
                     _uiState.value = current.copy(
                         iptvM3uUrl = config.m3uUrl,
                         iptvEpgUrl = config.epgUrl,
@@ -1998,6 +2046,8 @@ class SettingsViewModel @Inject constructor(
                         iptvSortOrder = config.sortOrder,
                         iptvShowSpecialCategories = config.showSpecialCategories,
                         iptvOnlyMode = config.iptvOnlyMode,
+                        iptvExcludedVodCategoryIds = config.excludedVodCategoryIds,
+                        iptvExcludedSeriesCategoryIds = config.excludedSeriesCategoryIds,
                     )
                 }
                 if (!hasObservedIptvConfig) {
@@ -3264,6 +3314,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun setHomeServerLibraryEnabled(connectionId: String, libraryId: String, enabled: Boolean) {
+        viewModelScope.launch {
+            homeServerRepository.setLibraryEnabled(connectionId, libraryId, enabled)
+            syncHomeServerCatalogsFromConnections()
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
     fun disconnectHomeServer() {
         viewModelScope.launch {
             cancelPlexHomeServerAuth(updateState = false)
@@ -3290,32 +3348,49 @@ class SettingsViewModel @Inject constructor(
 
     fun syncLocalStateToCloud(silent: Boolean = false, force: Boolean = false) {
         if (!force && !_uiState.value.isLoggedIn) return
-        viewModelScope.launch {
-            if (!ensureCloudSyncSession()) return@launch
-            if (force) {
-                cloudSyncRepository.markLocalStateDirtyNow()
-            } else {
-                cloudSyncRepository.markLocalStateDirty()
-            }
-            if (!force) {
-                delay(350)
-            }
-            var result = cloudSyncRepository.pushToCloud(force = force)
-            if (result.isFailure) {
-                delay(1200)
-                result = cloudSyncRepository.pushToCloud(force = force)
-            }
+        settingsCloudSyncJob?.cancel()
+        settingsCloudSyncJob = viewModelScope.launch {
+            try {
+                if (!force) delay(350)
+                if (!ensureCloudSyncSession()) return@launch
+                if (force) {
+                    cloudSyncRepository.markLocalStateDirtyNow()
+                } else {
+                    cloudSyncRepository.markLocalStateDirty()
+                }
+                var result = cloudSyncRepository.pushToCloud(force = force)
+                if (result.isFailure) {
+                    delay(1200)
+                    result = cloudSyncRepository.pushToCloud(force = force)
+                }
 
-            if (!silent && result.isSuccess) {
-                _uiState.value = _uiState.value.copy(
-                    toastMessage = context.getString(R.string.toast_cloud_sync_complete),
-                    toastType = ToastType.SUCCESS
+                if (!silent && result.isSuccess) {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = context.getString(R.string.toast_cloud_sync_complete),
+                        toastType = ToastType.SUCCESS
+                    )
+                } else if (!silent && result.isFailure) {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = result.exceptionOrNull()?.message ?: context.getString(R.string.cloud_sync_failed),
+                        toastType = ToastType.ERROR
+                    )
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.recordException(
+                    throwable = error,
+                    context = mapOf(
+                        "error_area" to "Settings",
+                        "cloud_flow" to "settings_push"
+                    )
                 )
-            } else if (!silent && result.isFailure) {
-                _uiState.value = _uiState.value.copy(
-                    toastMessage = result.exceptionOrNull()?.message ?: context.getString(R.string.cloud_sync_failed),
-                    toastType = ToastType.ERROR
-                )
+                if (!silent) {
+                    _uiState.value = _uiState.value.copy(
+                        toastMessage = error.message ?: context.getString(R.string.cloud_sync_failed),
+                        toastType = ToastType.ERROR
+                    )
+                }
             }
         }
     }
@@ -3532,12 +3607,13 @@ class SettingsViewModel @Inject constructor(
         pushPendingLocalFirst: Boolean = true,
         forceApplyRemote: Boolean = false,
     ): CloudRestoreResult {
-        return when (
-            cloudSyncRepository.pullFromCloud(
-                pushPendingLocalFirst = pushPendingLocalFirst,
-                forceApplyRemote = forceApplyRemote,
-            )
-        ) {
+        return try {
+            when (
+                cloudSyncRepository.pullFromCloud(
+                    pushPendingLocalFirst = pushPendingLocalFirst,
+                    forceApplyRemote = forceApplyRemote,
+                )
+            ) {
             CloudSyncRepository.RestoreResult.RESTORED -> {
                 loadSettings()
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
@@ -3576,6 +3652,24 @@ class SettingsViewModel @Inject constructor(
                 }
                 CloudRestoreResult.FAILED
             }
+            }
+        } catch (error: CancellationException) {
+            throw error
+        } catch (error: Exception) {
+            AppLogger.recordException(
+                throwable = error,
+                context = mapOf(
+                    "error_area" to "Settings",
+                    "cloud_flow" to "settings_restore"
+                )
+            )
+            if (!silent) {
+                _uiState.value = _uiState.value.copy(
+                    toastMessage = error.message ?: context.getString(R.string.toast_cloud_restore_failed),
+                    toastType = ToastType.ERROR
+                )
+            }
+            CloudRestoreResult.FAILED
         }
     }
 

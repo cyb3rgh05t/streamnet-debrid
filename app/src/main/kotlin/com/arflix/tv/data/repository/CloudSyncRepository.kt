@@ -1554,15 +1554,86 @@ class CloudSyncRepository @Inject constructor(
             localPayload = watchlistMergedPayload,
             remotePayload = remotePayload,
         )
-        return mergeLocalHistoryByTimestamp(
+        val historyMergedPayload = mergeLocalHistoryByTimestamp(
             localPayload = catalogsMergedPayload,
             remotePayload = remotePayload,
             gson = gson,
         )
+        val traktMergedPayload = mergeRemoteTraktTokens(historyMergedPayload, remotePayload)
+        return mergeRemoteTrackingPreferences(traktMergedPayload, remotePayload)
     }
 
     private fun mergeWatchlistByTimestamp(localPayload: String, remotePayload: String): String {
         return mergeWatchlistPayloads(localPayload, remotePayload)
+    }
+
+    private fun mergeRemoteTraktTokens(localPayload: String, remotePayload: String): String {
+        return runCatching {
+            val localRoot = JSONObject(localPayload)
+            val remoteTokens = JSONObject(remotePayload).optJSONObject("traktTokens")
+                ?: return localPayload
+            val localTokens = localRoot.optJSONObject("traktTokens")
+                ?: JSONObject().also { localRoot.put("traktTokens", it) }
+            remoteTokens.keys().forEach { profileId ->
+                val remoteToken = remoteTokens.optJSONObject(profileId) ?: return@forEach
+                val localToken = localTokens.optJSONObject(profileId)
+                val remoteUpdatedAt = remoteToken.optLong("updatedAt", 0L)
+                val localUpdatedAt = localToken?.optLong("updatedAt", 0L) ?: 0L
+                if (localToken == null || remoteUpdatedAt >= localUpdatedAt) {
+                    localTokens.put(profileId, JSONObject(remoteToken.toString()))
+                }
+            }
+            localRoot.toString()
+        }.getOrDefault(localPayload)
+    }
+
+    private fun mergeRemoteTrackingPreferences(localPayload: String, remotePayload: String): String {
+        return runCatching {
+            val localRoot = JSONObject(localPayload)
+            val remoteSelections = JSONObject(remotePayload).optJSONObject("mdbListSyncByProfile")
+                ?: return localPayload
+            val localSelections = localRoot.optJSONObject("mdbListSyncByProfile")
+                ?: JSONObject().also { localRoot.put("mdbListSyncByProfile", it) }
+            remoteSelections.keys().forEach { profileId ->
+                val remote = remoteSelections.optJSONObject(profileId) ?: return@forEach
+                val local = localSelections.optJSONObject(profileId)
+                if (local == null) {
+                    localSelections.put(profileId, JSONObject(remote.toString()))
+                    return@forEach
+                }
+                if (remote.optLong("updatedAt", 0L) >= local.optLong("updatedAt", 0L)) {
+                    listOf(
+                        "provider", "watchlistReadMode", "continueWatchingReadMode",
+                        "watchedReadMode", "writeToTrakt", "writeToSimkl", "updatedAt"
+                    ).forEach { copyOptionalJsonField(local, remote, it) }
+                }
+                mergeTrackingCredential(local, remote, "simklAccessToken", "simklCredentialUpdatedAt")
+                mergeTrackingCredential(local, remote, "mdbListApiKey", "mdbListCredentialUpdatedAt")
+            }
+            localRoot.toString()
+        }.getOrDefault(localPayload)
+    }
+
+    private fun mergeTrackingCredential(
+        local: JSONObject,
+        remote: JSONObject,
+        credentialField: String,
+        timestampField: String
+    ) {
+        val remoteUpdatedAt = remote.optLong(timestampField, 0L)
+        val localUpdatedAt = local.optLong(timestampField, 0L)
+        val remoteWins = remoteUpdatedAt > localUpdatedAt ||
+            (remoteUpdatedAt > 0L && remoteUpdatedAt == localUpdatedAt)
+        val legacyRemoteCanRestore = remoteUpdatedAt == 0L && localUpdatedAt == 0L &&
+            remote.has(credentialField) && !local.has(credentialField)
+        if (remoteWins || legacyRemoteCanRestore) {
+            copyOptionalJsonField(local, remote, credentialField)
+            copyOptionalJsonField(local, remote, timestampField)
+        }
+    }
+
+    private fun copyOptionalJsonField(target: JSONObject, source: JSONObject, field: String) {
+        if (source.has(field)) target.put(field, source.opt(field)) else target.remove(field)
     }
 
     // ══════════════════════════════════════════════════════════
@@ -2310,7 +2381,7 @@ class CloudSyncRepository @Inject constructor(
                     .orEmpty()
 
                 traktTokens.forEach { (profileId, token) ->
-                    if (profileId.isNotBlank() && token.accessToken.isNotBlank()) {
+                    if (profileId.isNotBlank() && !token.accessToken.isNullOrBlank()) {
                         traktProfiles.add(profileId)
                     }
                 }
