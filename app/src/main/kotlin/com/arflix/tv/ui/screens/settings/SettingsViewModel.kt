@@ -25,6 +25,8 @@ import com.arflix.tv.data.model.CatalogKind
 import com.arflix.tv.data.model.CatalogPackManifest
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Profile
+import com.arflix.tv.data.model.hasSettingsPin
+import com.arflix.tv.data.model.requiresSettingsPin
 import com.arflix.tv.data.model.QualityFilterConfig
 import com.arflix.tv.data.repository.AuthRepository
 import com.arflix.tv.data.repository.AuthState
@@ -71,6 +73,7 @@ import com.arflix.tv.util.AuthEmailValidator
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
+import com.arflix.tv.util.PinUtil
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
@@ -241,6 +244,8 @@ data class SettingsUiState(
     val deviceModeOverride: String = "auto",
     // Skip profile selection
     val skipProfileSelection: Boolean = false,
+    val settingsLockEnabled: Boolean = false,
+    val hasSettingsPin: Boolean = false,
     val oledBlackBackground: Boolean = false,
     val clockFormat: String = "24h",
     val qualityFilters: List<QualityFilterConfig> = emptyList(),
@@ -452,6 +457,7 @@ class SettingsViewModel @Inject constructor(
         )
         loadSettings()
         observeProfileChanges()
+        observeProfileSecurity()
         observeAddons()
         observeTorrServer()
         observeHomeServer()
@@ -510,6 +516,55 @@ class SettingsViewModel @Inject constructor(
     fun setDiagnosticsSharingEnabled(enabled: Boolean) {
         DiagnosticsManager.setReportingEnabled(context, enabled)
         _uiState.value = _uiState.value.copy(diagnosticsSharingEnabled = enabled)
+    }
+
+    private fun observeProfileSecurity() {
+        viewModelScope.launch {
+            profileRepository.activeProfile.collect { profile ->
+                _uiState.value = _uiState.value.copy(
+                    settingsLockEnabled = profile?.requiresSettingsPin() == true,
+                    hasSettingsPin = profile?.hasSettingsPin() == true
+                )
+            }
+        }
+    }
+
+    fun setSettingsLockEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            val profile = profileRepository.getActiveProfile() ?: return@launch
+            if (enabled && !profile.hasSettingsPin()) return@launch
+            profileRepository.updateProfile(
+                profile.copy(
+                    settingsLocked = enabled,
+                    settingsLockUpdatedAt = System.currentTimeMillis()
+                )
+            )
+            _uiState.value = _uiState.value.copy(
+                toastMessage = context.getString(
+                    if (enabled) R.string.settings_lock_enabled_toast
+                    else R.string.settings_lock_disabled_toast
+                ),
+                toastType = ToastType.SUCCESS
+            )
+        }
+    }
+
+    fun setupSettingsPin(pin: String) {
+        if (!PinUtil.isValidPin(pin)) return
+        viewModelScope.launch {
+            val profile = profileRepository.getActiveProfile() ?: return@launch
+            profileRepository.updateProfile(
+                profile.copy(
+                    settingsPin = PinUtil.hashPin(pin),
+                    settingsLocked = true,
+                    settingsLockUpdatedAt = System.currentTimeMillis()
+                )
+            )
+            _uiState.value = _uiState.value.copy(
+                toastMessage = context.getString(R.string.settings_pin_saved_toast),
+                toastType = ToastType.SUCCESS
+            )
+        }
     }
 
     private fun loadSettings() {

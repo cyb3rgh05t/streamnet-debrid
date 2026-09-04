@@ -170,18 +170,30 @@ class ProfileRepository @Inject constructor(
         val localProfilesById = getProfiles().associateBy { it.id }
         val mergedProfiles = profiles.map { cloudProfile ->
             val localProfile = localProfilesById[cloudProfile.id]
+            val profileWithSettingsLock = if (
+                localProfile != null &&
+                localProfile.settingsLockUpdatedAt > cloudProfile.settingsLockUpdatedAt
+            ) {
+                cloudProfile.copy(
+                    settingsPin = localProfile.settingsPin,
+                    settingsLocked = localProfile.settingsLocked,
+                    settingsLockUpdatedAt = localProfile.settingsLockUpdatedAt
+                )
+            } else {
+                cloudProfile
+            }
             if (
                 localProfile != null &&
                 localProfile.avatarImageVersion > 0L &&
-                cloudProfile.avatarImageVersion <= 0L
+                profileWithSettingsLock.avatarImageVersion <= 0L
             ) {
-                cloudProfile.copy(
+                profileWithSettingsLock.copy(
                     avatarId = 0,
                     avatarImageVersion = localProfile.avatarImageVersion,
                     avatarImageStoragePath = localProfile.avatarImageStoragePath
                 )
             } else {
-                cloudProfile
+                profileWithSettingsLock
             }
         }
 

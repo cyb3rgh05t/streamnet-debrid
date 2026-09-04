@@ -57,6 +57,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
@@ -77,6 +78,7 @@ import com.arflix.tv.ui.components.AvatarIcon
 import com.arflix.tv.ui.components.AvatarRegistry
 import com.arflix.tv.ui.components.avatarCategoryLabel
 import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.ProfileAvatarFiles
 import coil.compose.AsyncImage
@@ -201,7 +203,9 @@ private fun ProfileDialogContent(
     val configuration = LocalConfiguration.current
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val useMobileLayout = isTouchDevice && configuration.screenWidthDp < 700
+    val accentColor = resolveAccentColor(fallback = Color.White)
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
+    var isNameInputFocused by remember { mutableStateOf(false) }
     val confirmButtonFocusRequester = remember { FocusRequester() }
     val avatarInitialFocusRequester = remember { FocusRequester() }
 
@@ -235,6 +239,14 @@ private fun ProfileDialogContent(
         editText.setOnKeyListener { _, keyCode, event ->
             if (isTouchDevice || event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
             when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_NUMPAD_ENTER -> {
+                    editText.requestFocus()
+                    editText.setSelection(editText.text?.length ?: 0)
+                    showKeyboard(editText)
+                    true
+                }
                 KeyEvent.KEYCODE_DPAD_RIGHT,
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     moveFocusFromNameInput(editText, avatarInitialFocusRequester)
@@ -347,8 +359,12 @@ private fun ProfileDialogContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF222222))
-                            .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                            .background(if (isNameInputFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
+                            .border(
+                                if (isNameInputFocused) 2.dp else 1.dp,
+                                if (isNameInputFocused) accentColor else Color.White.copy(alpha = 0.2f),
+                                RoundedCornerShape(8.dp)
+                            )
                             .clickable {
                                 editTextRef?.let { et ->
                                     et.requestFocus()
@@ -372,6 +388,12 @@ private fun ProfileDialogContent(
                                     imeOptions = EditorInfo.IME_ACTION_DONE
                                     isFocusable = true
                                     isFocusableInTouchMode = true
+                                    showSoftInputOnFocus = true
+                                    setOnFocusChangeListener { _, hasFocus -> isNameInputFocused = hasFocus }
+                                    setOnClickListener {
+                                        setSelection(text?.length ?: 0)
+                                        showKeyboard(this)
+                                    }
                                     installTvNameInputNavigation(this)
                                     doAfterTextChanged { editable ->
                                         onNameChange(editable?.toString() ?: "")
@@ -393,7 +415,9 @@ private fun ProfileDialogContent(
                                     }
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { isNameInputFocused = it.hasFocus },
                             update = { et ->
                                 if (et.text.toString() != name) {
                                     et.setText(name)
@@ -593,8 +617,12 @@ private fun ProfileDialogContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF222222))
-                                .border(1.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(8.dp))
+                                .background(if (isNameInputFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
+                                .border(
+                                    if (isNameInputFocused) 2.dp else 1.dp,
+                                    if (isNameInputFocused) accentColor else Color.White.copy(alpha = 0.2f),
+                                    RoundedCornerShape(8.dp)
+                                )
                                 .clickable {
                                     editTextRef?.let { et ->
                                         et.requestFocus()
@@ -618,6 +646,12 @@ private fun ProfileDialogContent(
                                         imeOptions = EditorInfo.IME_ACTION_DONE
                                         isFocusable = true
                                         isFocusableInTouchMode = true
+                                        showSoftInputOnFocus = true
+                                        setOnFocusChangeListener { _, hasFocus -> isNameInputFocused = hasFocus }
+                                        setOnClickListener {
+                                            setSelection(text?.length ?: 0)
+                                            showKeyboard(this)
+                                        }
                                         installTvNameInputNavigation(this)
                                         doAfterTextChanged { editable ->
                                             onNameChange(editable?.toString() ?: "")
@@ -639,7 +673,9 @@ private fun ProfileDialogContent(
                                         }
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { isNameInputFocused = it.hasFocus },
                                 update = { et ->
                                     if (et.text.toString() != name) {
                                         et.setText(name)
@@ -795,6 +831,7 @@ private fun ProfileDialogContent(
                     }
                 }
             }
+
         }
     }
 }
@@ -1034,20 +1071,21 @@ private fun DialogButton(
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     var isFocused by remember { mutableIntStateOf(0) }
+    val accentColor = resolveAccentColor(fallback = Color.White)
+    val accentContentColor = contrastingContentColor(accentColor)
 
     val containerColor = when {
         isDestructive -> Color(0xFFDC2626)
-        isPrimary -> Color(0xFFE5A209)
+        isPrimary -> accentColor
         else -> Color.Transparent
     }
     val focusedContainerColor = when {
         isDestructive -> Color(0xFFEF4444)
-        isPrimary -> Color(0xFFF0A809)
-        else -> Color.White.copy(alpha = 0.1f)
+        else -> accentColor
     }
     val textColor = when {
         !enabled -> Color.White.copy(alpha = 0.4f)
-        isPrimary -> Color(0xFF1A1A1A)
+        isPrimary || (isFocused > 0 && !isDestructive) -> accentContentColor
         else -> Color.White
     }
 
@@ -1061,7 +1099,9 @@ private fun DialogButton(
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = textColor,
-                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp)
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
             )
         }
     }
@@ -1075,7 +1115,7 @@ private fun DialogButton(
                     if (!isPrimary && !isDestructive) {
                         Modifier.border(
                             width = 1.dp,
-                            color = Color.White.copy(alpha = 0.3f),
+                            color = accentColor.copy(alpha = 0.55f),
                             shape = RoundedCornerShape(6.dp)
                         )
                     } else {
@@ -1104,14 +1144,14 @@ private fun DialogButton(
                         shape = RoundedCornerShape(6.dp)
                     ),
                     focusedBorder = androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, accentColor),
                         shape = RoundedCornerShape(6.dp)
                     )
                 )
             } else {
                 ClickableSurfaceDefaults.border(
                     focusedBorder = androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, accentColor),
                         shape = RoundedCornerShape(6.dp)
                     )
                 )

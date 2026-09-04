@@ -238,6 +238,16 @@
     <string name="loading_profile">Loading profile…</string>
     <string name="enter_pin_to_unlock">Enter PIN to unlock</string>
     <string name="set_profile_pin">Set Profile PIN</string>
+    <string name="settings_lock_title">Lock Settings</string>
+    <string name="settings_lock_description">Require this profile’s Settings PIN whenever Settings are opened</string>
+    <string name="settings_set_pin_title">Set Settings PIN</string>
+    <string name="settings_change_pin_title">Change Settings PIN</string>
+    <string name="settings_pin_description">A separate 4–5 digit PIN for this profile</string>
+    <string name="settings_unlock_title">Settings locked</string>
+    <string name="settings_pin_incorrect">Incorrect PIN. Please try again.</string>
+    <string name="settings_pin_saved_toast">Settings PIN saved and lock enabled</string>
+    <string name="settings_lock_enabled_toast">Settings lock enabled</string>
+    <string name="settings_lock_disabled_toast">Settings lock disabled</string>
     <string name="done">Done</string>
     <string name="save">Save</string>
     <string name="connect_to_cloud">Connect to StreamNet Cloud</string>
@@ -452,6 +462,8 @@
     <string name="settings_pill_oled">OLED %1$s</string>
     <string name="settings_pill_skip_on">Skip on</string>
     <string name="settings_pill_picker_on">Picker on</string>
+    <string name="settings_pill_settings_locked">Settings locked</string>
+    <string name="settings_pill_settings_unlocked">Settings unlocked</string>
     <string name="settings_pill_dns">DNS %1$s</string>
     <string name="settings_pill_stats_on">Stats on</string>
     <string name="settings_pill_stats_off">Stats off</string>

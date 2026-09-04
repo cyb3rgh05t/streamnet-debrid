@@ -43,6 +43,9 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.arflix.tv.R
+import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.Pink
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.PinUtil
 
@@ -50,6 +53,7 @@ import com.arflix.tv.util.PinUtil
 @Composable
 fun PinEntryDialog(
     title: String = stringResource(R.string.profile_enter_pin),
+    setupTitle: String = stringResource(R.string.set_profile_pin),
     onPinConfirmed: (String) -> Unit,
     onDismiss: () -> Unit,
     isSetup: Boolean = false,
@@ -61,6 +65,8 @@ fun PinEntryDialog(
     var errorMessage by remember { mutableStateOf(pinError) }
     val pinInvalidMessage = stringResource(R.string.profile_pin_invalid)
     val pinMismatchMessage = stringResource(R.string.profile_pin_mismatch)
+    val accentColor = resolveAccentColor(fallback = Pink)
+    val accentContentColor = contrastingContentColor(accentColor)
 
     LaunchedEffect(pinError) {
         errorMessage = pinError
@@ -89,13 +95,13 @@ fun PinEntryDialog(
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = stringResource(R.string.profile_pin_entry_cd),
-                    tint = Color.White,
+                    tint = accentColor,
                     modifier = Modifier.size(32.dp)
                 )
 
                 Text(
                     text = when {
-                        isSetup && !isConfirmingSetup -> stringResource(R.string.set_profile_pin)
+                        isSetup && !isConfirmingSetup -> setupTitle
                         isSetup && isConfirmingSetup -> stringResource(R.string.profile_confirm_pin)
                         else -> title
                     },
@@ -133,7 +139,7 @@ fun PinEntryDialog(
                                 .background(Color(0xFF2A2A2A))
                                 .border(
                                     width = 2.dp,
-                                    color = if (index < currentPin.length) Color(0xFF4CAF50) else Color(0xFF444444),
+                                    color = if (index < currentPin.length) accentColor else Color(0xFF444444),
                                     shape = RoundedCornerShape(8.dp)
                                 ),
                             contentAlignment = Alignment.Center
@@ -142,7 +148,7 @@ fun PinEntryDialog(
                                 Text(
                                     text = "•",
                                     fontSize = 24.sp,
-                                    color = Color(0xFF4CAF50),
+                                    color = accentColor,
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -163,6 +169,7 @@ fun PinEntryDialog(
                                 val num = row * 3 + col + 1
                                 PinKeyButton(
                                     label = num.toString(),
+                                    accentColor = accentColor,
                                     modifier = Modifier
                                         .weight(1f)
                                         .height(48.dp),
@@ -190,6 +197,7 @@ fun PinEntryDialog(
                     ) {
                         PinKeyButton(
                             label = "0",
+                            accentColor = accentColor,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
@@ -209,6 +217,7 @@ fun PinEntryDialog(
 
                         PinKeyButton(
                             label = stringResource(R.string.profile_clear),
+                            accentColor = accentColor,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
@@ -224,6 +233,7 @@ fun PinEntryDialog(
 
                         PinKeyButton(
                             label = "←",
+                            accentColor = accentColor,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(48.dp),
@@ -262,6 +272,9 @@ fun PinEntryDialog(
                         label = stringResource(R.string.cancel),
                         onClick = onDismiss,
                         containerColor = Color(0xFF2A2A2A),
+                        contentColor = Color.White,
+                        focusColor = accentColor,
+                        focusContentColor = accentContentColor,
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
@@ -289,7 +302,10 @@ fun PinEntryDialog(
                                 onPinConfirmed(current)
                             }
                         },
-                        containerColor = Color(0xFF4CAF50),
+                        containerColor = accentColor,
+                        contentColor = accentContentColor,
+                        focusColor = accentColor,
+                        focusContentColor = accentContentColor,
                         modifier = Modifier
                             .weight(1f)
                             .height(44.dp)
@@ -306,6 +322,9 @@ private fun PinActionButton(
     label: String,
     onClick: () -> Unit,
     containerColor: Color,
+    contentColor: Color,
+    focusColor: Color,
+    focusContentColor: Color,
     modifier: Modifier = Modifier
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
@@ -314,7 +333,7 @@ private fun PinActionButton(
             contentAlignment = Alignment.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            Text(label, color = Color.White, fontWeight = FontWeight.SemiBold)
+            Text(label, color = contentColor, fontWeight = FontWeight.SemiBold)
         }
     }
 
@@ -330,7 +349,12 @@ private fun PinActionButton(
     } else {
         Surface(
             onClick = onClick,
-            colors = ClickableSurfaceDefaults.colors(containerColor = containerColor),
+            colors = ClickableSurfaceDefaults.colors(
+                containerColor = containerColor,
+                focusedContainerColor = focusColor,
+                contentColor = contentColor,
+                focusedContentColor = focusContentColor
+            ),
             modifier = modifier
         ) {
             content()
@@ -342,6 +366,7 @@ private fun PinActionButton(
 @Composable
 private fun PinKeyButton(
     label: String,
+    accentColor: Color,
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
@@ -372,7 +397,9 @@ private fun PinKeyButton(
         Surface(
             onClick = onClick,
             colors = ClickableSurfaceDefaults.colors(
-                containerColor = Color(0xFF2A2A2A)
+                containerColor = Color(0xFF2A2A2A),
+                focusedContainerColor = accentColor,
+                focusedContentColor = contrastingContentColor(accentColor)
             ),
             modifier = modifier
         ) {

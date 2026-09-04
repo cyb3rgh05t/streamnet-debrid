@@ -193,6 +193,7 @@ import com.arflix.tv.data.model.effectivePackName
 import com.arflix.tv.data.model.isBulkDeletablePack
 import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.QualityFilterConfig
+import com.arflix.tv.data.model.requiresSettingsPin
 import com.arflix.tv.data.model.RuntimeKind
 import com.arflix.tv.data.repository.HomeServerCollection
 import com.arflix.tv.data.repository.HomeServerConnection
@@ -203,11 +204,13 @@ import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvPlaylistEntry
 import com.arflix.tv.data.repository.configuredIptvPlaylistCount
 import com.arflix.tv.data.repository.isStreamNetTvPlaylist
+import com.arflix.tv.ui.screens.profile.PinEntryDialog
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppNotificationSurface
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
 import com.arflix.tv.ui.components.CatalogueRowLayoutToggleButton
 import com.arflix.tv.util.LocalDeviceType
+import com.arflix.tv.util.PinUtil
 import com.arflix.tv.util.tr
 import com.arflix.tv.util.trUpper
 import com.arflix.tv.ui.components.SidebarItem
@@ -270,7 +273,7 @@ private fun tvGeneralRowsForSection(section: String): List<Int> {
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
         "appearance" -> listOf(17, 18, 42, 21, 22, 23, 24, 41, 36)
-        "profiles" -> listOf(19)
+        "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
     }
@@ -367,12 +370,34 @@ fun SettingsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val isRtlLayoutDirection = LocalLayoutDirection.current == LayoutDirection.Rtl
+    var settingsAccessGranted by remember(currentProfile?.id) {
+        mutableStateOf(currentProfile?.requiresSettingsPin() != true)
+    }
+    var settingsPinError by remember(currentProfile?.id) { mutableStateOf("") }
+    val incorrectSettingsPin = stringResource(R.string.settings_pin_incorrect)
+
+    if (!settingsAccessGranted) {
+        PinEntryDialog(
+            title = stringResource(R.string.settings_unlock_title),
+            onPinConfirmed = { pin ->
+                if (PinUtil.verifyPin(pin, currentProfile?.settingsPin)) {
+                    settingsPinError = ""
+                    settingsAccessGranted = true
+                } else {
+                    settingsPinError = incorrectSettingsPin
+                }
+            },
+            onDismiss = onBack,
+            pinError = settingsPinError
+        )
+        return
+    }
 
     val sections = remember {
         buildList {
-            add("accounts")
-            add("cloud_sync")
             add("profiles")
+            add("cloud_sync")
+            add("accounts")
             add("playback")
             add("language")
             add("subtitles")
@@ -381,10 +406,10 @@ fun SettingsScreen(
             add("stremio")
             add("catalogs")
             add("home_server")
+            add("appearance")
             if (BuildConfig.FEATURE_PLUGINS_ENABLED) {
                 add("plugins")
             }
-            add("appearance")
             add("network")
             add("info_updates")
         }
@@ -405,10 +430,14 @@ fun SettingsScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, uiState.isLoggedIn) {
+    DisposableEffect(lifecycleOwner, uiState.isLoggedIn, currentProfile?.settingsLocked, currentProfile?.settingsPin) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME && uiState.isLoggedIn) {
                 viewModel.validateCloudSession()
+            }
+            if (event == Lifecycle.Event.ON_STOP && currentProfile?.requiresSettingsPin() == true) {
+                settingsAccessGranted = false
+                settingsPinError = ""
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -486,6 +515,7 @@ fun SettingsScreen(
     var showContentLanguagePicker by remember { mutableStateOf(false) }
     var contentLanguagePickerIndex by remember { mutableIntStateOf(0) }
     var showUiModeWarningDialog by remember { mutableStateOf(false) }
+    var showSettingsPinSetup by remember { mutableStateOf(false) }
     var nextUiMode by remember { mutableStateOf("") }
     var showQualityFiltersModal by remember { mutableStateOf(false) }
     var showQualityFilterEditor by remember { mutableStateOf(false) }
@@ -1046,6 +1076,14 @@ fun SettingsScreen(
                                                 17 -> viewModel.toggleCardLayoutMode()
                                                 18 -> openUiModeWarningDialog()
                                                 19 -> viewModel.setSkipProfileSelection(!uiState.skipProfileSelection)
+                                                44 -> if (uiState.settingsLockEnabled) {
+                                                    viewModel.setSettingsLockEnabled(false)
+                                                } else if (uiState.hasSettingsPin) {
+                                                    viewModel.setSettingsLockEnabled(true)
+                                                } else {
+                                                    showSettingsPinSetup = true
+                                                }
+                                                45 -> showSettingsPinSetup = true
                                                 21 -> viewModel.setOledBlackBackground(!uiState.oledBlackBackground)
                                                 22 -> viewModel.cycleClockFormat()
                                                 23 -> viewModel.setShowBudget(!uiState.showBudget)
@@ -1474,7 +1512,8 @@ fun SettingsScreen(
                 openCustomUserAgentDialog = { showCustomUserAgentDialog = true },
                 onNavigateToTelegram = onNavigateToTelegramSettings,
                 onDisconnectCloud = { showCloudDisconnectConfirm = true },
-                onDisconnectTrakt = { showTraktDisconnectConfirm = true }
+                onDisconnectTrakt = { showTraktDisconnectConfirm = true },
+                onSetupSettingsPin = { showSettingsPinSetup = true }
             )
         } else {
             AppTopBar(
@@ -1619,6 +1658,8 @@ fun SettingsScreen(
                             subtitleStylized = uiState.subtitleStylized,
                             deviceModeOverride = uiState.deviceModeOverride,
                             skipProfileSelection = uiState.skipProfileSelection,
+                            settingsLockEnabled = uiState.settingsLockEnabled,
+                            hasSettingsPin = uiState.hasSettingsPin,
                             oledBlackBackground = uiState.oledBlackBackground,
                             clockFormat = uiState.clockFormat,
                             showBudget = uiState.showBudget,
@@ -1644,6 +1685,14 @@ fun SettingsScreen(
                             onDeviceModeClick = openUiModeWarningDialog,
                             onContentLanguageClick = openContentLanguagePicker,
                             onSkipProfileSelectionToggle = { viewModel.setSkipProfileSelection(it) },
+                            onSettingsLockToggle = { enabled ->
+                                if (enabled && !uiState.hasSettingsPin) {
+                                    showSettingsPinSetup = true
+                                } else {
+                                    viewModel.setSettingsLockEnabled(enabled)
+                                }
+                            },
+                            onSetupSettingsPin = { showSettingsPinSetup = true },
                             onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
                             onClockFormatClick = { viewModel.cycleClockFormat() },
                             onShowBudgetToggle = { viewModel.setShowBudget(it) },
@@ -1984,6 +2033,18 @@ fun SettingsScreen(
                   }
                 }
             }
+        }
+
+        if (showSettingsPinSetup) {
+            PinEntryDialog(
+                setupTitle = stringResource(R.string.settings_set_pin_title),
+                onPinConfirmed = { pin ->
+                    viewModel.setupSettingsPin(pin)
+                    showSettingsPinSetup = false
+                },
+                onDismiss = { showSettingsPinSetup = false },
+                isSetup = true
+            )
         }
 
         // Custom Addon Input Modal
@@ -4579,7 +4640,8 @@ private fun MobileSettingsLayout(
     openCustomUserAgentDialog: () -> Unit = {},
     onNavigateToTelegram: () -> Unit = {},
     onDisconnectCloud: () -> Unit = {},
-    onDisconnectTrakt: () -> Unit = {}
+    onDisconnectTrakt: () -> Unit = {},
+    onSetupSettingsPin: () -> Unit = {}
 ) {
     val backMotion = rememberArvioPredictiveBack(enabled = page != "MAIN") {
         onNavigate("MAIN")
@@ -4637,7 +4699,8 @@ private fun MobileSettingsLayout(
                 openSecondarySubtitlePicker = openSecondarySubtitlePicker,
                 openAudioLanguagePicker = openAudioLanguagePicker,
                 onSwitchProfile = onSwitchProfile,
-                onNavigateToTelegram = onNavigateToTelegram
+                onNavigateToTelegram = onNavigateToTelegram,
+                onSetupSettingsPin = onSetupSettingsPin
             )
         }
 
@@ -4741,7 +4804,8 @@ private fun MobileSettingsMainPage(
     openSecondarySubtitlePicker: () -> Unit = {},
     openAudioLanguagePicker: () -> Unit,
     onSwitchProfile: () -> Unit,
-    onNavigateToTelegram: () -> Unit = {}
+    onNavigateToTelegram: () -> Unit = {},
+    onSetupSettingsPin: () -> Unit = {}
 ) {
     val context = LocalContext.current
     androidx.compose.foundation.lazy.LazyColumn(
@@ -4825,6 +4889,34 @@ private fun MobileSettingsMainPage(
 
         item {
             MobileSettingsCategory(title = stringResource(R.string.settings_section_user_account)) {
+                MobileSettingsRow(
+                    icon = Icons.Default.Security,
+                    title = stringResource(R.string.settings_lock_title),
+                    subtitle = stringResource(R.string.settings_lock_description),
+                    value = if (uiState.settingsLockEnabled) "On" else "Off",
+                    isFocused = false,
+                    onClick = {
+                        if (uiState.settingsLockEnabled) {
+                            viewModel.setSettingsLockEnabled(false)
+                        } else if (uiState.hasSettingsPin) {
+                            viewModel.setSettingsLockEnabled(true)
+                        } else {
+                            onSetupSettingsPin()
+                        }
+                    }
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.VpnKey,
+                    title = stringResource(
+                        if (uiState.hasSettingsPin) R.string.settings_change_pin_title
+                        else R.string.settings_set_pin_title
+                    ),
+                    subtitle = stringResource(R.string.settings_pin_description),
+                    value = "",
+                    actionIcon = Icons.Default.Edit,
+                    isFocused = false,
+                    onClick = onSetupSettingsPin
+                )
                 MobileSettingsRow(
                     icon = Icons.Default.Person,
                     title = stringResource(R.string.cloud_account),
@@ -6111,7 +6203,13 @@ private fun tvSettingsSectionPills(
         "appearance" -> listOf(
             stringResource(R.string.settings_pill_oled, if (uiState.oledBlackBackground) stringResource(R.string.settings_inline_on) else stringResource(R.string.settings_inline_off))
         )
-        "profiles" -> listOf(if (uiState.skipProfileSelection) stringResource(R.string.settings_pill_skip_on) else stringResource(R.string.settings_pill_picker_on))
+        "profiles" -> listOf(
+            if (uiState.settingsLockEnabled) {
+                stringResource(R.string.settings_pill_settings_locked)
+            } else {
+                stringResource(R.string.settings_pill_settings_unlocked)
+            }
+        )
         "network" -> listOf(stringResource(R.string.settings_pill_dns, uiState.dnsProvider), if (uiState.showLoadingStats) stringResource(R.string.settings_pill_stats_on) else stringResource(R.string.settings_pill_stats_off))
         "iptv" -> listOf(
             stringResource(
@@ -6326,6 +6424,8 @@ private fun TvGeneralSettingsRows(
     subtitleFont: String = "System",
     deviceModeOverride: String = "auto",
     skipProfileSelection: Boolean = false,
+    settingsLockEnabled: Boolean = false,
+    hasSettingsPin: Boolean = false,
     oledBlackBackground: Boolean = false,
     clockFormat: String = "24h",
     showBudget: Boolean = true,
@@ -6347,6 +6447,8 @@ private fun TvGeneralSettingsRows(
     onDeviceModeClick: () -> Unit = {},
     onContentLanguageClick: () -> Unit = {},
     onSkipProfileSelectionToggle: (Boolean) -> Unit = {},
+    onSettingsLockToggle: (Boolean) -> Unit = {},
+    onSetupSettingsPin: () -> Unit = {},
     onOledBlackBackgroundToggle: (Boolean) -> Unit = {},
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
@@ -6466,6 +6568,24 @@ private fun TvGeneralSettingsRows(
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
                 19 -> SettingsToggleRow(Icons.Default.Person, stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))
+                44 -> SettingsToggleRow(
+                    Icons.Default.Security,
+                    stringResource(R.string.settings_lock_title),
+                    stringResource(R.string.settings_lock_description),
+                    settingsLockEnabled,
+                    focusedIndex == localIndex,
+                    onSettingsLockToggle,
+                    Modifier.settingsFocusSlot(localIndex)
+                )
+                45 -> SettingsRow(
+                    Icons.Default.VpnKey,
+                    stringResource(if (hasSettingsPin) R.string.settings_change_pin_title else R.string.settings_set_pin_title),
+                    stringResource(R.string.settings_pin_description),
+                    "",
+                    focusedIndex == localIndex,
+                    onSetupSettingsPin,
+                    Modifier.settingsFocusSlot(localIndex)
+                )
                 21 -> SettingsToggleRow(Icons.Default.Palette, stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
                 22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
                 23 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
@@ -8037,12 +8157,22 @@ private fun IptvSettings(
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
                 MobileSettingsCategory(title = playlist.name.uppercase()) {
                     MobileSettingsRow(
-                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                        icon = Icons.Default.LiveTv,
                         title = playlist.name,
                         subtitle = if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } },
-                        value = if (playlist.enabled) stringResource(R.string.on) else stringResource(R.string.off),
+                        value = "",
+                        actionIcon = Icons.Default.Edit,
                         isFocused = false,
                         onClick = { onEditPlaylist(index) },
+                    )
+                    MobileSettingsRow(
+                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                        title = stringResource(R.string.settings_enabled),
+                        value = if (playlist.enabled) stringResource(R.string.on) else stringResource(R.string.off),
+                        enabled = isConfigured,
+                        isToggle = true,
+                        isFocused = false,
+                        onClick = { onTogglePlaylist(index) },
                     )
                     MobileSettingsRow(
                         icon = Icons.Default.List,
@@ -8063,16 +8193,6 @@ private fun IptvSettings(
                             onClick = { if (isConfigured) onManageVodCategories() },
                         )
                     }
-                    MobileSettingsRow(
-                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
-                        title = stringResource(R.string.settings_enabled),
-                        value = if (playlist.enabled) stringResource(R.string.on) else stringResource(R.string.off),
-                        enabled = isConfigured,
-                        isToggle = true,
-                        isFocused = false,
-                        showDivider = !isStreamNetPreset,
-                        onClick = { onTogglePlaylist(index) },
-                    )
                     if (!isStreamNetPreset) {
                         MobileSettingsRow(
                             icon = Icons.Default.ArrowUpward,

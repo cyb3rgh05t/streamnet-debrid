@@ -55,6 +55,36 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `newer settings lock survives a profile with newer general metadata`() {
+        val local = """{"profiles":[{"id":"main","name":"Local","lastUsedAt":100,"settingsPin":"local-pin","settingsLocked":true,"settingsLockUpdatedAt":300}]}"""
+        val remote = """{"profiles":[{"id":"main","name":"Remote","lastUsedAt":200,"settingsPin":"remote-pin","settingsLocked":false,"settingsLockUpdatedAt":150}]}"""
+
+        val profile = JSONObject(mergeProfilesForPush(local, remote))
+            .getJSONArray("profiles")
+            .getJSONObject(0)
+
+        assertEquals("Remote", profile.getString("name"))
+        assertEquals("local-pin", profile.getString("settingsPin"))
+        assertTrue(profile.getBoolean("settingsLocked"))
+        assertEquals(300L, profile.getLong("settingsLockUpdatedAt"))
+    }
+
+    @Test
+    fun `newer remote settings lock survives newer local general metadata`() {
+        val local = """{"profiles":[{"id":"main","name":"Local","lastUsedAt":300,"settingsPin":"local-pin","settingsLocked":false,"settingsLockUpdatedAt":100}]}"""
+        val remote = """{"profiles":[{"id":"main","name":"Remote","lastUsedAt":200,"settingsPin":"remote-pin","settingsLocked":true,"settingsLockUpdatedAt":250}]}"""
+
+        val profile = JSONObject(mergeProfilesForPush(local, remote))
+            .getJSONArray("profiles")
+            .getJSONObject(0)
+
+        assertEquals("Local", profile.getString("name"))
+        assertEquals("remote-pin", profile.getString("settingsPin"))
+        assertTrue(profile.getBoolean("settingsLocked"))
+        assertEquals(250L, profile.getLong("settingsLockUpdatedAt"))
+    }
+
+    @Test
     fun `remote IPTV group preferences win unless changed locally`() {
         val local = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Local Hidden"],"groupOrder":["list|Local First"],"groupOrderSchema":3}}}"""
         val remote = """{"iptvByProfile":{"main":{"hiddenGroups":["list|Remote Hidden"],"groupOrder":["list|Remote First"],"groupOrderSchema":3}}}"""

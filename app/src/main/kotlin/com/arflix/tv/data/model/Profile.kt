@@ -15,9 +15,16 @@ data class Profile(
     val isKidsProfile: Boolean = false,
     val pin: String? = null, // 4-5 digit PIN, null if not set
     val isLocked: Boolean = false,
+    val settingsPin: String? = null,
+    val settingsLocked: Boolean = false,
+    val settingsLockUpdatedAt: Long = 0L,
     val createdAt: Long = System.currentTimeMillis(),
     val lastUsedAt: Long = System.currentTimeMillis()
 )
+
+fun Profile.hasSettingsPin(): Boolean = !settingsPin.isNullOrBlank()
+
+fun Profile.requiresSettingsPin(): Boolean = settingsLocked && hasSettingsPin()
 
 /**
  * Predefined profile avatar colors (Netflix-style)

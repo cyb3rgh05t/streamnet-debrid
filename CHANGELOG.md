@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [2.3.002] - 2026-09-04
+
+### Security
+
+- Added an independent, profile-scoped Settings PIN for phone, tablet, and TV. The full Settings area is blocked until the PIN is verified, while PIN hashes and lock state synchronize with timestamp-aware conflict protection.
+- Added controls to set, change, enable, and disable the Settings lock without storing the PIN in plaintext.
+
+### Interface
+
+- Removed the duplicate enabled state from mobile and tablet IPTV playlist cards and clarified the order of edit, enable, category, reorder, and delete actions.
+- Reordered the TV Settings sidebar to show Profile, Cloud Sync, and Accounts in that order, and Interface, Plugins, Network, and Info & Updates in that order.
+- Applied the selected profile accent throughout the Settings PIN dialog and made the profile status badge report the actual Settings lock state.
+- Added visible accent focus to the profile editor name field and left-side controls, and kept compact cancel/delete actions on one line.
+
 ## [2.3.001] - 2026-09-04
 
 ### Cloud and account reliability

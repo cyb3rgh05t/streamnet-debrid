@@ -298,8 +298,29 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
         remoteProfiles.filter { it.id.isNotBlank() }.forEach { merged[it.id] = it }
         localProfiles.filter { it.id.isNotBlank() }.forEach { localProfile ->
             val remoteProfile = merged[localProfile.id]
-            if (remoteProfile == null || localProfile.lastUsedAt >= remoteProfile.lastUsedAt) {
+            if (remoteProfile == null) {
                 merged[localProfile.id] = localProfile
+            } else {
+                val baseProfile = if (localProfile.lastUsedAt >= remoteProfile.lastUsedAt) {
+                    localProfile
+                } else {
+                    remoteProfile
+                }
+                val settingsLockProfile = if (
+                    localProfile.settingsLockUpdatedAt >= remoteProfile.settingsLockUpdatedAt
+                ) {
+                    localProfile
+                } else {
+                    remoteProfile
+                }
+                merged[localProfile.id] = baseProfile.copy(
+                    settingsPin = settingsLockProfile.settingsPin,
+                    settingsLocked = settingsLockProfile.settingsLocked,
+                    settingsLockUpdatedAt = max(
+                        localProfile.settingsLockUpdatedAt,
+                        remoteProfile.settingsLockUpdatedAt
+                    )
+                )
             }
         }
         val survivingProfiles = merged.values.filter { profile ->

@@ -63,6 +63,16 @@
     <string name="loading_profile">Profil wird geladen…</string>
     <string name="enter_pin_to_unlock">PIN zum Entsperren eingeben</string>
     <string name="set_profile_pin">Profil-PIN festlegen</string>
+    <string name="settings_lock_title">Einstellungen sperren</string>
+    <string name="settings_lock_description">Beim Öffnen der Einstellungen die Einstellungen-PIN dieses Profils verlangen</string>
+    <string name="settings_set_pin_title">Einstellungen-PIN festlegen</string>
+    <string name="settings_change_pin_title">Einstellungen-PIN ändern</string>
+    <string name="settings_pin_description">Separate 4–5-stellige PIN für dieses Profil</string>
+    <string name="settings_unlock_title">Einstellungen gesperrt</string>
+    <string name="settings_pin_incorrect">Falsche PIN. Bitte erneut versuchen.</string>
+    <string name="settings_pin_saved_toast">Einstellungen-PIN gespeichert und Sperre aktiviert</string>
+    <string name="settings_lock_enabled_toast">Einstellungen-Sperre aktiviert</string>
+    <string name="settings_lock_disabled_toast">Einstellungen-Sperre deaktiviert</string>
     <string name="connect_to_cloud">Mit StreamNet Cloud verbinden</string>
     <string name="profile_cloud_button">myStreamNet Cloud</string>
     <string name="next">Weiter</string>
@@ -593,6 +603,8 @@
     <string name="settings_pill_oled">OLED %1$s</string>
     <string name="settings_pill_skip_on">Überspringen ein</string>
     <string name="settings_pill_picker_on">Auswahl ein</string>
+    <string name="settings_pill_settings_locked">Einstellungen gesperrt</string>
+    <string name="settings_pill_settings_unlocked">Einstellungen nicht gesperrt</string>
     <string name="settings_pill_dns">DNS %1$s</string>
     <string name="settings_pill_stats_on">Statistik ein</string>
     <string name="settings_pill_stats_off">Statistik aus</string>
