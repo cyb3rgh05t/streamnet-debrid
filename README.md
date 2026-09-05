@@ -1,4 +1,4 @@
-![StreamNet](self-hosted-backend/public/assets/streamnet-logo.svg) 
+![StreamNet](screenshots/streamnetapp-logo.svg)
 
 StreamNet Debrid is a StreamNet-focused Android TV APK with its own cloud/auth backend.
 
