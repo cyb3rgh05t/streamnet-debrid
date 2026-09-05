@@ -334,7 +334,7 @@ class HomeViewModel @Inject constructor(
     )
 
     // IPTV favorite channels — maps MediaItem.id (Int hash) to channel data
-    private val iptvChannelMap = mutableMapOf<Int, com.arflix.tv.data.model.IptvChannel>()
+    private val iptvChannelMap = ConcurrentHashMap<Int, com.arflix.tv.data.model.IptvChannel>()
     private val programBackdropCache = ConcurrentHashMap<String, String>()
     private val programBackdropMisses = ConcurrentHashMap<String, Long>()
     private val programLogoCache = ConcurrentHashMap<String, String>()
@@ -1796,7 +1796,6 @@ class HomeViewModel @Inject constructor(
     private fun scheduleInitialHomeLoad() {
         viewModelScope.launch {
             applyContentLanguageFromPrefs()
-            delay(if (isLowRamDevice) 1_000L else 800L)
             if (
                 usedPreloadedData ||
                 _uiState.value.categories.isNotEmpty() ||

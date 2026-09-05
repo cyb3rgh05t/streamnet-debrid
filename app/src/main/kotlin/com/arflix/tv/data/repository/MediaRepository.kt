@@ -40,6 +40,7 @@ import com.arflix.tv.util.CatalogUrlParser
 import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -244,7 +245,7 @@ class MediaRepository @Inject constructor(
     @Volatile var cachedHomeCategories: List<Category> = emptyList()
         private set
     @Volatile private var homeCategoriesFetchedAt = 0L
-    private val HOME_CATEGORIES_CACHE_MS = 120_000L // 2 minutes
+    private val HOME_CATEGORIES_CACHE_MS = 5 * 60_000L
 
     fun clearMediaCache() {
         cachedHomeCategories = emptyList()
@@ -257,10 +258,14 @@ class MediaRepository @Inject constructor(
         homeServerLogoRefCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
+        imdbRatingMisses.clear()
+        agregarrRatingMisses.clear()
     }
 
-    private val detailsCache = mutableMapOf<String, CacheEntry<MediaItem>>()
-    private val fullDetailsCacheKeys = mutableSetOf<String>()
+    private val detailsCache = ConcurrentHashMap<String, CacheEntry<MediaItem>>()
+    private val fullDetailsCacheKeys = ConcurrentHashMap.newKeySet<String>()
+    private val fullDetailsInFlight = ConcurrentHashMap<String, CompletableDeferred<MediaItem>>()
+    private val imdbRatingInFlight = ConcurrentHashMap<String, CompletableDeferred<String?>>()
     private val castCache = mutableMapOf<String, CacheEntry<List<CastMember>>>()
     private val similarCache = mutableMapOf<String, CacheEntry<List<MediaItem>>>()
     private val logoCache = ConcurrentHashMap<String, CacheEntry<String?>>()
@@ -269,6 +274,9 @@ class MediaRepository @Inject constructor(
     private val watchProvidersCache = mutableMapOf<String, CacheEntry<StreamingServicesResult?>>()
     private val seasonEpisodesCache = mutableMapOf<String, CacheEntry<List<Episode>>>()
     private val imdbRatingCache = ConcurrentHashMap<String, CacheEntry<String>>()
+    private val imdbRatingMisses = ConcurrentHashMap<String, Long>()
+    private val agregarrRatingMisses = ConcurrentHashMap<String, Long>()
+    private val ratingMissCacheMs = 2 * 60_000L
     private val imdbEpisodeRatingsCache = ConcurrentHashMap<String, CacheEntry<Map<Pair<Int, Int>, String>>>()
     private val imdbRatingsByIdCache = ConcurrentHashMap<String, CacheEntry<String>>()
     private val episodeImdbIdCache = ConcurrentHashMap<String, CacheEntry<String>>()
@@ -531,19 +539,74 @@ class MediaRepository @Inject constructor(
     suspend fun getImdbRating(mediaType: MediaType, mediaId: Int, imdbId: String? = null): String? {
         val cacheKey = detailsCacheKey(mediaType, mediaId)
         getFromCache(imdbRatingCache, cacheKey)?.let { return it }
+        if (hasActiveRatingMiss(imdbRatingMisses, cacheKey)) return null
 
-        val resolvedImdbId = resolveImdbId(mediaType, mediaId, imdbId)
+        val pending = CompletableDeferred<String?>()
+        val active = imdbRatingInFlight.putIfAbsent(cacheKey, pending)
+        if (active != null) return active.await()
 
-        val rating = resolvedImdbId
-            ?.let { imdbIdValue ->
-                fetchCinemetaImdbRating(mediaType, imdbIdValue)
-                    ?: getAgregarrImdbRatings(listOf(imdbIdValue))[imdbIdValue]
+        try {
+            getFromCache(imdbRatingCache, cacheKey)?.let {
+                pending.complete(it)
+                return it
             }
-            ?.let { normalizeRating(it) }
-            ?: return null
+            val resolvedImdbId = resolveImdbId(mediaType, mediaId, imdbId)
+            val rating = resolvedImdbId
+                ?.let { imdbIdValue ->
+                    fetchCinemetaImdbRating(mediaType, imdbIdValue)
+                        ?: getAgregarrImdbRatings(listOf(imdbIdValue))[imdbIdValue]
+                }
+                ?.let { normalizeRating(it) }
+            if (rating != null) {
+                imdbRatingCache[cacheKey] = CacheEntry(rating, System.currentTimeMillis())
+                imdbRatingMisses.remove(cacheKey)
+            } else {
+                imdbRatingMisses[cacheKey] = System.currentTimeMillis() + ratingMissCacheMs
+            }
+            pending.complete(rating)
+            return rating
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            imdbRatingInFlight.remove(cacheKey, pending)
+        }
+    }
 
-        imdbRatingCache[cacheKey] = CacheEntry(rating, System.currentTimeMillis())
-        return rating
+    private fun hasActiveRatingMiss(cache: ConcurrentHashMap<String, Long>, key: String): Boolean {
+        val expiresAt = cache[key] ?: return false
+        if (expiresAt > System.currentTimeMillis()) return true
+        cache.remove(key, expiresAt)
+        return false
+    }
+
+    private suspend fun loadFullDetailsSingleFlight(
+        cacheKey: String,
+        loader: suspend () -> MediaItem,
+    ): MediaItem {
+        val requestKey = "$cacheKey:${contentLanguage.lowercase(Locale.ROOT)}"
+        val pending = CompletableDeferred<MediaItem>()
+        val active = fullDetailsInFlight.putIfAbsent(requestKey, pending)
+        if (active != null) return active.await()
+
+        try {
+            getCachedFullItem(
+                mediaType = if (cacheKey.startsWith("movie_")) MediaType.MOVIE else MediaType.TV,
+                mediaId = cacheKey.substringAfter('_').toInt(),
+            )?.let {
+                pending.complete(it)
+                return it
+            }
+            val item = loader()
+            cacheFullDetailsItem(item)
+            pending.complete(item)
+            return item
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            fullDetailsInFlight.remove(requestKey, pending)
+        }
     }
 
     private suspend fun resolveImdbId(mediaType: MediaType, mediaId: Int, imdbId: String? = null): String? {
@@ -683,7 +746,7 @@ class MediaRepository @Inject constructor(
                 result[imdbId] = cached
                 false
             } else {
-                true
+                !hasActiveRatingMiss(agregarrRatingMisses, imdbId)
             }
         }
         if (idsToFetch.isEmpty()) return@withContext result
@@ -717,7 +780,11 @@ class MediaRepository @Inject constructor(
 
             fetched.forEach { (imdbId, rating) ->
                 imdbRatingsByIdCache[imdbId] = CacheEntry(rating, now)
+                agregarrRatingMisses.remove(imdbId)
                 result[imdbId] = rating
+            }
+            chunk.filterNot(fetched::containsKey).forEach { imdbId ->
+                agregarrRatingMisses[imdbId] = System.currentTimeMillis() + ratingMissCacheMs
             }
         }
         result
@@ -3129,7 +3196,8 @@ class MediaRepository @Inject constructor(
             }
         }
 
-        val item = coroutineScope {
+        return loadFullDetailsSingleFlight(cacheKey) {
+            coroutineScope {
             val detailsDeferred = async { tmdbApi.getMovieDetails(movieId, apiKey, language = contentLanguage) }
             val externalIdsDeferred = async { resolveExternalIds(MediaType.MOVIE, movieId) }
 
@@ -3137,9 +3205,8 @@ class MediaRepository @Inject constructor(
             val imdbId = externalIdsDeferred.await()?.imdbId?.also { cacheImdbId(MediaType.MOVIE, movieId, it) }
             val imdbRating = imdbId?.let { getImdbRating(MediaType.MOVIE, movieId, it) }
             details.toMediaItem().copy(imdbRating = imdbRating.orEmpty())
+            }
         }
-        cacheFullDetailsItem(item)
-        return item
     }
 
     /**
@@ -3159,7 +3226,8 @@ class MediaRepository @Inject constructor(
             }
         }
 
-        val item = coroutineScope {
+        return loadFullDetailsSingleFlight(cacheKey) {
+            coroutineScope {
             val detailsDeferred = async { tmdbApi.getTvDetails(tvId, apiKey, language = contentLanguage) }
             val externalIdsDeferred = async { resolveExternalIds(MediaType.TV, tvId) }
 
@@ -3178,9 +3246,8 @@ class MediaRepository @Inject constructor(
             val imdbId = externalIdsDeferred.await()?.imdbId?.also { cacheImdbId(MediaType.TV, tvId, it) }
             val imdbRating = imdbId?.let { getImdbRating(MediaType.TV, tvId, it) }
             details.toMediaItem().copy(imdbRating = imdbRating.orEmpty())
+            }
         }
-        cacheFullDetailsItem(item)
-        return item
     }
 
     /**

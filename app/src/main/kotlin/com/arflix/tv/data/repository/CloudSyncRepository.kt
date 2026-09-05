@@ -632,6 +632,9 @@ class CloudSyncRepository @Inject constructor(
      * "sync silently stops, needs logout/login to recover".
      */
     private val cloudSyncMutex = Mutex()
+    @Volatile
+    private var lastSuccessfulCloudPullAtMs = 0L
+    private val cloudPullBurstWindowMs = 30_000L
 
     /** Callback invoked after a successful push so realtime listeners can skip the echo. */
     var onPushCompleted: (() -> Unit)? = null
@@ -1674,6 +1677,13 @@ class CloudSyncRepository @Inject constructor(
         }
         return cloudSyncMutex.withLock {
         val hasPendingLocalChanges = hasPendingLocalChanges()
+        if (
+            !forceApplyRemote &&
+            !hasPendingLocalChanges &&
+            System.currentTimeMillis() - lastSuccessfulCloudPullAtMs < cloudPullBurstWindowMs
+        ) {
+            return@withLock RestoreResult.UNCHANGED
+        }
         if (pushPendingLocalFirst && hasPendingLocalChanges) {
             AppLogger.breadcrumb(
                 tag = "CloudSync",
@@ -1710,6 +1720,7 @@ class CloudSyncRepository @Inject constructor(
             )
             return@withLock RestoreResult.FAILED
         }
+        lastSuccessfulCloudPullAtMs = System.currentTimeMillis()
 
         val payload = payloadResult.getOrNull().orEmpty()
         if (payload.isBlank()) {

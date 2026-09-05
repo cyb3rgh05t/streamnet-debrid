@@ -101,6 +101,10 @@ data object SentryCrashReporter : AppLogger.CrashContextProvider {
                         val editor = prefs.edit()
                             .putString("last_crash_id", eventId)
                             .putString("last_crash_msg", msg)
+                            .putString(
+                                "last_crash_details",
+                                throwable?.let(android.util.Log::getStackTraceString)?.take(12_000).orEmpty()
+                            )
                             .putLong("last_crash_time", System.currentTimeMillis())
                             .putString("last_crash_version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                         if (event.isCrashed == true || event.level == SentryLevel.FATAL) {

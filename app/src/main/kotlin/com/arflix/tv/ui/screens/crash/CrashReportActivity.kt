@@ -48,6 +48,7 @@ class CrashReportActivity : ComponentActivity() {
         val prefs = getSharedPreferences("arvio_crash_store", Context.MODE_PRIVATE)
         val crashId = intent.getStringExtra(EXTRA_CRASH_ID) ?: prefs.getString("last_crash_id", "N/A") ?: "N/A"
         val crashMsg = intent.getStringExtra(EXTRA_CRASH_MSG) ?: prefs.getString("last_crash_msg", "Unexpected error") ?: "Unexpected error"
+        val crashDetails = prefs.getString("last_crash_details", "").orEmpty()
         val crashTime = intent.getLongExtra(EXTRA_CRASH_TIME, prefs.getLong("last_crash_time", System.currentTimeMillis()))
         val crashVersion = prefs.getString("last_crash_version", "1.0") ?: "1.0"
 
@@ -56,6 +57,7 @@ class CrashReportActivity : ComponentActivity() {
                 CrashReportScreen(
                     crashId = crashId,
                     crashMsg = crashMsg,
+                    crashDetails = crashDetails,
                     crashTime = crashTime,
                     crashVersion = crashVersion,
                     onRestartApp = {
@@ -83,6 +85,7 @@ class CrashReportActivity : ComponentActivity() {
 fun CrashReportScreen(
     crashId: String,
     crashMsg: String,
+    crashDetails: String,
     crashTime: Long,
     crashVersion: String,
     onRestartApp: () -> Unit,
@@ -111,7 +114,7 @@ fun CrashReportScreen(
         if (crashId != "N/A") "https://sentry.io/issues/?query=id%3A$crashId" else "N/A"
     }
 
-    val formattedReport = remember(crashId, sentryLink, crashMsg, crashVersion, timeString) {
+    val formattedReport = remember(crashId, sentryLink, crashMsg, crashDetails, crashVersion, timeString) {
         """
         **StreamNet TV Crash Report**
         **Crash ID:** `$crashId`
@@ -119,7 +122,15 @@ fun CrashReportScreen(
         **Version:** $crashVersion
         **Time:** $timeString
         **Error:** $crashMsg
+        **Stacktrace:**
+        ```
+        $crashDetails
+        ```
         """.trimIndent()
+    }
+
+    val visibleCrashDetails = remember(crashDetails) {
+        crashDetails.lineSequence().take(12).joinToString("\n")
     }
 
     val webBridgeUrl = remember(crashId, crashVersion, crashMsg, crashTime) {
@@ -203,7 +214,13 @@ fun CrashReportScreen(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "ID: $crashId\nTime: $timeString\nVersion: $crashVersion\nError: $crashMsg",
+                        text = buildString {
+                            append("ID: $crashId\nTime: $timeString\nVersion: $crashVersion\nError: $crashMsg")
+                            if (visibleCrashDetails.isNotBlank()) {
+                                append("\n\nTrace:\n")
+                                append(visibleCrashDetails)
+                            }
+                        },
                         color = Color(0xFFD0D5DD),
                         fontSize = 12.sp,
                         fontFamily = FontFamily.Monospace

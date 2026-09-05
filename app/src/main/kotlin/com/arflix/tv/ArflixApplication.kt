@@ -112,6 +112,7 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
                 prefs.edit()
                     .putString("last_crash_id", fallbackId)
                     .putString("last_crash_msg", "${throwable::class.java.simpleName}: ${throwable.message?.take(200) ?: ""}")
+                    .putString("last_crash_details", Log.getStackTraceString(throwable).take(12_000))
                     .putLong("last_crash_time", System.currentTimeMillis())
                     .putString("last_crash_version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")
                     .putBoolean("has_pending_crash_report", true)

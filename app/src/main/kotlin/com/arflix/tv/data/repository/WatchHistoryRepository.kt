@@ -9,6 +9,9 @@ import kotlinx.serialization.Serializable
 import retrofit2.HttpException
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -61,6 +64,9 @@ class WatchHistoryRepository @Inject constructor(
     private var cachedContinueWatching: List<WatchHistoryEntry> = emptyList()
     private val cachedContinueWatchingByProfile = ConcurrentHashMap<String, List<WatchHistoryEntry>>()
     private val cachedWatchHistoryByProfile = ConcurrentHashMap<String, List<WatchHistoryEntry>>()
+    private val watchHistoryFetchedAtByProfile = ConcurrentHashMap<String, Long>()
+    private val watchHistoryFetchMutex = Mutex()
+    private val watchHistoryBurstCacheMs = 10_000L
 
     private fun currentProfileId(): String = profileManager.getProfileIdSync().ifBlank { "default" }
 
@@ -81,12 +87,14 @@ class WatchHistoryRepository @Inject constructor(
      * Legacy entries (source = "arvio" / "trakt" / null) are only accepted
      * for the default profile to avoid cross-profile leakage.
      */
-    private fun filterByProfile(entries: List<WatchHistoryEntry>): List<WatchHistoryEntry> {
-        val profileId = currentProfileId()
-        val profileName = profileManager.getProfileNameSync()
+    private fun filterByProfile(
+        entries: List<WatchHistoryEntry>,
+        profileId: String = currentProfileId(),
+        profileName: String = profileManager.getProfileNameSync(),
+        isDefault: Boolean = profileManager.isDefaultProfile(),
+    ): List<WatchHistoryEntry> {
         val prefixById = "profile:$profileId:"
         val prefixByName = "profile:$profileName:"
-        val isDefault = profileManager.isDefaultProfile()
 
         return entries.filter { entry ->
             if (!entry.profile_id.isNullOrBlank()) {
@@ -189,6 +197,7 @@ class WatchHistoryRepository @Inject constructor(
         // trigger a redundant Home Continue Watching refresh. See issue #91 fix.
         if (saved) {
             val profileId = currentProfileId()
+            watchHistoryFetchedAtByProfile.remove(profileId)
             val nowIso = Instant.now().toString()
             val cachedEntry = entry.copy(
                 paused_at = nowIso,
@@ -219,30 +228,55 @@ class WatchHistoryRepository @Inject constructor(
     @Volatile
     private var cachedWatchHistory: List<WatchHistoryEntry> = emptyList()
 
+    private suspend fun fetchCurrentProfileHistory(): List<WatchHistoryEntry> {
+        val profileId = currentProfileId()
+        val now = System.currentTimeMillis()
+        val cachedAt = watchHistoryFetchedAtByProfile[profileId] ?: 0L
+        if (now - cachedAt < watchHistoryBurstCacheMs) {
+            return cachedWatchHistoryByProfile[profileId].orEmpty()
+        }
+
+        val userId = authRepositoryProvider.get().getCurrentUserId()
+            ?: return cachedWatchHistoryByProfile[profileId].orEmpty()
+
+        return watchHistoryFetchMutex.withLock {
+            val refreshedAt = watchHistoryFetchedAtByProfile[profileId] ?: 0L
+            if (System.currentTimeMillis() - refreshedAt < watchHistoryBurstCacheMs) {
+                return@withLock cachedWatchHistoryByProfile[profileId].orEmpty()
+            }
+            if (currentProfileId() != profileId) {
+                return@withLock cachedWatchHistoryByProfile[profileId].orEmpty()
+            }
+
+            val profileName = profileManager.getProfileNameSync()
+            val isDefault = profileManager.isDefaultProfile()
+            try {
+                val records = executeBackendCall("get watch history") { auth ->
+                    watchHistoryApi.getWatchHistory(auth = auth, profileId = profileId)
+                }.map { it.toEntry() }
+                if (currentProfileId() != profileId) {
+                    return@withLock cachedWatchHistoryByProfile[profileId].orEmpty()
+                }
+                val result = filterByProfile(records, profileId, profileName, isDefault)
+                cachedWatchHistory = result
+                cachedWatchHistoryByProfile[profileId] = result
+                watchHistoryFetchedAtByProfile[profileId] = System.currentTimeMillis()
+                result
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.e("WatchHistoryRepository", "Error getting watch history, returning cache", error)
+                cachedWatchHistoryByProfile[profileId].orEmpty()
+            }
+        }
+    }
+
     /**
      * Get watch history for current user.
      * Returns cached data on failure instead of empty list.
      */
     suspend fun getWatchHistory(): List<WatchHistoryEntry> {
-        val profileId = currentProfileId()
-        val userId = authRepositoryProvider.get().getCurrentUserId()
-            ?: return cachedWatchHistoryByProfile[profileId].orEmpty()
-
-        return try {
-            val records = executeBackendCall("get watch history") { auth ->
-                watchHistoryApi.getWatchHistory(
-                    auth = auth,
-                    profileId = currentProfileQuery()
-                )
-            }.map { it.toEntry() }
-            val result = filterByProfile(records)
-            cachedWatchHistory = result
-            cachedWatchHistoryByProfile[profileId] = result
-            result
-        } catch (e: Exception) {
-            AppLogger.e("WatchHistoryRepository", "Error getting watch history, returning cache", e)
-            cachedWatchHistoryByProfile[profileId].orEmpty()
-        }
+        return fetchCurrentProfileHistory()
     }
 
     /**
@@ -266,26 +300,10 @@ class WatchHistoryRepository @Inject constructor(
                 title = entry.title
             )
         }
-        val userId = authRepositoryProvider.get().getCurrentUserId()
-        if (userId == null) return filterLive(cachedContinueWatchingByProfile[profileId].orEmpty())
-
-        return try {
-            val records = executeBackendCall("get continue watching history") { auth ->
-                watchHistoryApi.getWatchHistory(
-                    auth = auth,
-                    profileId = currentProfileQuery()
-                )
-            }
-            val allEntries = records.map { it.toEntry() }
-            val result = filterLive(filterByProfile(allEntries).filter { isEntryInProgress(it) })
-            // Cache the successful result for offline/error fallback
-            cachedContinueWatching = result
-            cachedContinueWatchingByProfile[profileId] = result
-            result
-        } catch (e: Exception) {
-            AppLogger.e("WatchHistoryRepository", "Error getting continue watching, returning cache", e)
-            filterLive(cachedContinueWatchingByProfile[profileId].orEmpty())
-        }
+        val result = filterLive(fetchCurrentProfileHistory().filter { isEntryInProgress(it) })
+        cachedContinueWatching = result
+        cachedContinueWatchingByProfile[profileId] = result
+        return result
     }
 
 
@@ -368,6 +386,7 @@ class WatchHistoryRepository @Inject constructor(
             cachedWatchHistoryByProfile[profileId].orEmpty().filter(::keepEntry)
         cachedContinueWatchingByProfile[profileId] =
             cachedContinueWatchingByProfile[profileId].orEmpty().filter(::keepEntry)
+        watchHistoryFetchedAtByProfile.remove(profileId)
 
         val userId = authRepositoryProvider.get().getCurrentUserId() ?: return
 
@@ -390,6 +409,7 @@ class WatchHistoryRepository @Inject constructor(
      * Clear all watch history
      */
     suspend fun clearHistory() {
+        val profileId = currentProfileId()
         val userId = authRepositoryProvider.get().getCurrentUserId() ?: return
 
         try {
@@ -399,6 +419,11 @@ class WatchHistoryRepository @Inject constructor(
                     profileId = currentProfileQuery()
                 )
             }
+            cachedWatchHistory = emptyList()
+            cachedContinueWatching = emptyList()
+            cachedWatchHistoryByProfile[profileId] = emptyList()
+            cachedContinueWatchingByProfile[profileId] = emptyList()
+            watchHistoryFetchedAtByProfile.remove(profileId)
         } catch (e: Exception) {
             AppLogger.e("WatchHistoryRepository", "Silently handled error", e)
         }
@@ -409,6 +434,7 @@ class WatchHistoryRepository @Inject constructor(
         cachedWatchHistory = emptyList()
         cachedContinueWatchingByProfile.clear()
         cachedWatchHistoryByProfile.clear()
+        watchHistoryFetchedAtByProfile.clear()
     }
 
     private suspend fun <T> executeBackendCall(

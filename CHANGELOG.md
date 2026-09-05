@@ -4,6 +4,23 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.004] - 2026-09-05
+
+### Stabilität und Leistung
+
+- Ein leerer Home-Bildschirm beginnt ohne den bisherigen pauschalen Startaufschub von bis zu einer Sekunde zu laden; erfolgreiche Home-Metadaten bleiben fünf Minuten im Speicher und bereits sichtbare Disk-Cache-Inhalte behalten den verzögerten Hintergrund-Refresh.
+- Schnelle IPTV-Änderungen in den Einstellungen brechen veraltete Gruppen-Ladevorgänge ab und fangen Repository-Fehler an der Coroutine-Grenze ab, statt die App zu beenden.
+- Der Home-IPTV-Kanalindex ist bei gleichzeitigen Hintergrund- und UI-Zugriffen threadsicher.
+- Parallele Startabfragen für Watch-History und Cloud-Snapshots werden kurzzeitig zusammengeführt, damit Home, Einstellungen und Watchlist nicht denselben Backend-Payload mehrfach gleichzeitig laden.
+- Gleichzeitige Detail- und IMDb-Rating-Abfragen für denselben Film oder dieselbe Serie teilen sich einen laufenden Request; fehlende Ratings werden kurzzeitig negativ gecacht und die zugehörigen In-Memory-Caches sind threadsicher.
+- Debug-Netzwerklogs enthalten keine Query-Parameter oder API-Schlüssel mehr.
+- Lokale Absturzberichte enthalten nun einen begrenzten Stacktrace, damit auch seltene Abstürze ohne verfügbaren Remote-Bericht untersucht werden können.
+
+### Wartung
+
+- Die veraltete Fastify-Option `disableRequestLogging` wurde durch den für Fastify 6 vorbereiteten `LogController` ersetzt, ohne das bestehende benutzerdefinierte Request-Logging zu verändern.
+- GitHub Actions wurden auf die aktuellen Node-24-basierten Versionen `checkout@v7`, `setup-java@v6` und `upload-artifact@v7` aktualisiert.
+
 ## [2.3.003] - 2026-09-05
 
 ### TV-Oberfläche

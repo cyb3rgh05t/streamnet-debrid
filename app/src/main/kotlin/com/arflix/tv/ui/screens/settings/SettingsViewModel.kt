@@ -394,6 +394,7 @@ class SettingsViewModel @Inject constructor(
     private var plexHomeServerUrl: String? = null
     private var plexHomeServerDisplayName: String? = null
     private var iptvLoadJob: Job? = null
+    private var iptvGroupLoadJob: Job? = null
     private var catalogSearchJob: Job? = null
     private var settingsCloudSyncJob: Job? = null
     private var aiKeyServer: AiKeyConfigServer? = null
@@ -414,6 +415,20 @@ class SettingsViewModel @Inject constructor(
         NO_BACKUP,
         FAILED
     }
+
+    private fun launchSettingsTask(flow: String, block: suspend () -> Unit): Job =
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                AppLogger.recordException(
+                    throwable = error,
+                    context = mapOf("error_area" to "Settings", "settings_flow" to flow)
+                )
+            }
+        }
 
     private enum class QualityFilterPreset(
         val label: String,
@@ -957,7 +972,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun resetIptvGroupOrder(playlistId: String) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_reset_group_order") {
             iptvRepository.resetGroupOrder(playlistId)
         }
     }
@@ -965,6 +980,7 @@ class SettingsViewModel @Inject constructor(
     fun setIptvSelectedPlaylistId(playlistId: String?) {
         val selectedPlaylistId = playlistId?.trim().orEmpty()
         if (selectedPlaylistId.isBlank()) {
+            iptvGroupLoadJob?.cancel()
             _uiState.value = _uiState.value.copy(
                 iptvSelectedPlaylistId = null,
                 iptvAvailableGroups = emptyList()
@@ -976,7 +992,8 @@ class SettingsViewModel @Inject constructor(
             iptvSelectedPlaylistId = selectedPlaylistId,
             iptvAvailableGroups = emptyList()
         )
-        viewModelScope.launch {
+        iptvGroupLoadJob?.cancel()
+        iptvGroupLoadJob = launchSettingsTask("iptv_load_groups") {
             val groups = loadIptvGroupsForPlaylist(selectedPlaylistId)
             if (_uiState.value.iptvSelectedPlaylistId == selectedPlaylistId) {
                 _uiState.value = _uiState.value.copy(iptvAvailableGroups = groups)
@@ -1009,7 +1026,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun toggleIptvHiddenGroup(playlistId: String, groupName: String) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_toggle_hidden_group") {
             iptvRepository.toggleHiddenGroup(playlistId, groupName)
         }
     }
@@ -1042,31 +1059,31 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setIptvVodCategoryExcluded(mediaType: MediaType, categoryId: String, excluded: Boolean) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_set_vod_category") {
             iptvRepository.setVodCategoryExcluded(mediaType, categoryId, excluded)
         }
     }
 
     fun resetIptvVodCategoryExclusions(mediaType: MediaType) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_reset_vod_categories") {
             iptvRepository.resetVodCategoryExclusions(mediaType)
         }
     }
 
     fun moveIptvGroupUp(playlistId: String, groupName: String) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_move_group_up") {
             iptvRepository.moveGroupUp(playlistId, groupName, _uiState.value.iptvAvailableGroups)
         }
     }
 
     fun moveIptvGroupDown(playlistId: String, groupName: String) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_move_group_down") {
             iptvRepository.moveGroupDown(playlistId, groupName, _uiState.value.iptvAvailableGroups)
         }
     }
 
     fun moveIptvGroupToTop(playlistId: String, groupName: String) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_move_group_to_top") {
             iptvRepository.moveGroupToTop(playlistId, groupName, _uiState.value.iptvAvailableGroups)
         }
     }
@@ -2690,20 +2707,20 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setIptvShowSpecialCategories(show: Boolean) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_special_categories") {
             iptvRepository.saveShowSpecialCategories(show)
         }
     }
 
     fun setIptvOnlyMode(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_only_mode") {
             iptvRepository.saveIptvOnlyMode(enabled)
             syncLocalStateToCloud(silent = true)
         }
     }
 
     fun setIptvVodSearchEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSettingsTask("iptv_vod_search") {
             iptvRepository.saveVodSearchEnabled(enabled)
             _uiState.value = _uiState.value.copy(iptvVodSearchEnabled = enabled)
             syncLocalStateToCloud(silent = true)
@@ -2713,7 +2730,7 @@ class SettingsViewModel @Inject constructor(
     fun setIptvSortOrder(mode: String) {
         val normalized = normalizeIptvSortOrder(mode)
         _uiState.value = _uiState.value.copy(iptvSortOrder = normalized)
-        viewModelScope.launch {
+        launchSettingsTask("iptv_sort_order") {
             iptvRepository.saveSortOrder(normalized)
             syncLocalStateToCloud(silent = true)
         }
@@ -4382,6 +4399,7 @@ class SettingsViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         traktPollingJob?.cancel()
+        iptvGroupLoadJob?.cancel()
         stopAiKeyServerInternal()
         plexHomeServerPollingJob?.cancel()
     }

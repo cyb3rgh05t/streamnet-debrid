@@ -179,7 +179,8 @@ object OkHttpProvider {
         val request = chain.request()
         Log.i(
             TAG,
-            "API request dnsProvider=$selectedDnsProvider method=${request.method} host=${request.url.host} url=${request.url}"
+            "API request dnsProvider=$selectedDnsProvider method=${request.method} " +
+                "host=${request.url.host} path=${request.url.encodedPath}"
         )
         chain.proceed(request)
     }

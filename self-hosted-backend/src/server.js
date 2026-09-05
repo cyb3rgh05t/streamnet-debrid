@@ -1,4 +1,4 @@
-import Fastify from "fastify";
+import Fastify, { LogController } from "fastify";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { SignJWT, jwtVerify } from "jose";
@@ -21,7 +21,7 @@ const pool = new Pool({ connectionString: config.databaseUrl });
 const jwtKey = new TextEncoder().encode(config.jwtSecret);
 const app = Fastify({
   logger: backendLoggerOptions(),
-  disableRequestLogging: true,
+  logController: new LogController({ disableRequestLogging: true }),
   bodyLimit: 2 * 1024 * 1024,
 });
 registerRequestLogging(app);
