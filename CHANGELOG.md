@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.007] - 2026-09-05
+
+### Update-Dialog
+
+- Aktionsbuttons behalten auf TV-Geräten eine lesbare Mindestgröße und sichtbare Beschriftungen, auch wenn umfangreiche Versionshinweise angezeigt werden.
+- Der Changelog ist auf TV, Smartphone und Tablet kompakter und separat scrollbar, während die Aktionsleiste dauerhaft sichtbar bleibt.
+- Mobile Dialoge berücksichtigen die sicheren Bildschirmränder, damit Buttons nicht mehr hinter der Android-Navigationsleiste liegen.
+
 ## [2.3.006] - 2026-09-05
 
 ### Branding

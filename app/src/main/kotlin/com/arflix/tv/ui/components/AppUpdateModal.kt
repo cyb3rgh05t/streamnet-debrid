@@ -14,14 +14,17 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowForward
@@ -146,7 +149,10 @@ fun AppUpdateModal(
     ) {
         ModalScrim(onDismiss = onDismiss) {
             BoxWithConstraints(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.safeDrawing)
+                    .padding(horizontal = if (isTouchDevice) 10.dp else 24.dp, vertical = 8.dp),
                 contentAlignment = Alignment.Center,
             ) {
             Column(
@@ -155,7 +161,7 @@ fun AppUpdateModal(
                         if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 600.dp)
                         else Modifier.width(760.dp)
                     )
-                    .heightIn(max = if (isTouchDevice) maxHeight * 0.92f else maxHeight)
+                    .heightIn(max = if (isTouchDevice) maxHeight * 0.92f else maxHeight * 0.90f)
                     .clip(cardShape)
                     .background(ArvioSkin.colors.surface)
                     .border(1.dp, accent.copy(alpha = 0.38f), cardShape)
@@ -183,13 +189,9 @@ fun AppUpdateModal(
                     }
             ) {
                 Column(
-                    modifier = if (isTouchDevice) {
-                        Modifier
-                            .weight(1f, fill = false)
-                            .verticalScroll(rememberScrollState())
-                    } else {
-                        Modifier
-                    },
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState()),
                 ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -366,19 +368,17 @@ fun AppUpdateModal(
                         Spacer(modifier = Modifier.height(8.dp))
                         androidx.compose.material3.Text(
                             text = releaseNotes.take(1800),
-                            style = ArflixTypography.caption.copy(lineHeight = 18.sp),
+                            style = ArflixTypography.caption.copy(lineHeight = 17.sp),
                             color = ArvioSkin.colors.textMuted,
-                            modifier = if (isTouchDevice) {
-                                Modifier
-                            } else {
-                                Modifier.heightIn(max = 210.dp).verticalScroll(rememberScrollState())
-                            },
+                            modifier = Modifier
+                                .heightIn(max = if (isTouchDevice) 180.dp else 150.dp)
+                                .verticalScroll(rememberScrollState()),
                         )
                     }
                 }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(if (isTouchDevice) 16.dp else 18.dp))
 
                 if (isTouchDevice) {
                     Column(
@@ -393,7 +393,9 @@ fun AppUpdateModal(
                                 onClick = btn.action,
                                 highlighted = btn.highlighted,
                                 enabled = btn.enabled,
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(min = 48.dp),
                             )
                         }
                     }
@@ -408,7 +410,10 @@ fun AppUpdateModal(
                                 isFocused = focusedIndex == index,
                                 onClick = btn.action,
                                 highlighted = btn.highlighted,
-                                enabled = btn.enabled
+                                enabled = btn.enabled,
+                                modifier = Modifier
+                                    .widthIn(min = 150.dp)
+                                    .heightIn(min = 48.dp),
                             )
                         }
                     }
@@ -474,6 +479,7 @@ private fun UpdateActionButton(
 
     Box(
         modifier = modifier
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(10.dp))
             .background(background)
             .border(
