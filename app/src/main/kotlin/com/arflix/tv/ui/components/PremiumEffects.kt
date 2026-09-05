@@ -40,7 +40,7 @@ import kotlin.math.sin
 import kotlin.random.Random
 
 /**
- * Premium visual effects for StreamNet TV
+ * Premium visual effects for StreamNet
  * Inspired by NoopyTV's neon dark theme
  */
 

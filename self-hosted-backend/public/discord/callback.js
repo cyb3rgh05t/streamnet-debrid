@@ -27,13 +27,13 @@
       codeLabel: "Your pairing code:",
       authorizationFailed: "Authorization Failed",
       authorizationFailedMessage: "Discord authorization failed.",
-      returnPrefix: "If StreamNet TV did not open automatically, ",
-      returnLink: "tap here to return to StreamNet TV",
+      returnPrefix: "If StreamNet did not open automatically, ",
+      returnLink: "tap here to return to StreamNet",
       noCode: "No Code Received",
       noCodeMessage: "Discord did not return a valid authorization response.",
       connected: "Discord Connected!",
       authorizedPrefix:
-        "Authorized! If StreamNet TV did not open automatically, ",
+        "Authorized! If StreamNet did not open automatically, ",
       invalidPairing: "Invalid Pairing Session",
       scanAgain: "Please scan the QR code on your TV again.",
       tvConnected: "Your TV is connected. You can close this page.",
@@ -44,7 +44,7 @@
         "Authorized with Discord, but network delivery to your TV failed. Please scan the QR code again.",
       invalidSession: "Invalid Authorization Session",
       restartAuthorization:
-        "Please start Discord authorization from StreamNet TV again.",
+        "Please start Discord authorization from StreamNet again.",
     },
     de: {
       connecting: "Verbindung zum TV wird hergestellt...",
@@ -54,14 +54,14 @@
       authorizationFailed: "Autorisierung fehlgeschlagen",
       authorizationFailedMessage:
         "Die Discord-Autorisierung ist fehlgeschlagen.",
-      returnPrefix: "Falls StreamNet TV nicht automatisch geoeffnet wurde, ",
-      returnLink: "tippe hier, um zu StreamNet TV zurueckzukehren",
+      returnPrefix: "Falls StreamNet nicht automatisch geoeffnet wurde, ",
+      returnLink: "tippe hier, um zu StreamNet zurueckzukehren",
       noCode: "Kein Code empfangen",
       noCodeMessage:
         "Discord hat keine gueltige Autorisierungsantwort geliefert.",
       connected: "Discord verbunden!",
       authorizedPrefix:
-        "Autorisiert! Falls StreamNet TV nicht automatisch geoeffnet wurde, ",
+        "Autorisiert! Falls StreamNet nicht automatisch geoeffnet wurde, ",
       invalidPairing: "Ungueltige Kopplungssitzung",
       scanAgain: "Bitte scanne den QR-Code auf deinem TV erneut.",
       tvConnected: "Dein TV ist verbunden. Du kannst diese Seite schliessen.",
@@ -72,7 +72,7 @@
         "Discord wurde autorisiert, aber die Uebertragung an deinen TV ist fehlgeschlagen. Bitte scanne den QR-Code erneut.",
       invalidSession: "Ungueltige Autorisierungssitzung",
       restartAuthorization:
-        "Bitte starte die Discord-Autorisierung in StreamNet TV erneut.",
+        "Bitte starte die Discord-Autorisierung in StreamNet erneut.",
     },
   };
 

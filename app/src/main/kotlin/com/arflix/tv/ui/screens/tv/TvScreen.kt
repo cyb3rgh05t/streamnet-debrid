@@ -598,7 +598,7 @@ fun TvScreen(
     }
     val iptvDataSourceFactory = remember(iptvHttpClient) {
         OkHttpDataSource.Factory(iptvHttpClient)
-            .setUserAgent("StreamNetTV/1.2.0 (Android TV)")
+            .setUserAgent("StreamNet/1.2.0 (Android TV)")
     }
     // HLS factory with chunkless preparation (used when stream is detected as HLS)
     val iptvHlsFactory = remember(iptvDataSourceFactory) {

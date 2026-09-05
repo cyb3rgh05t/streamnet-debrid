@@ -513,7 +513,7 @@ object DiscordRpcManager {
                 startTime = startTime / 1_000,
                 endTime = 0L,
                 largeImage = largeImage,
-                largeText = "StreamNet TV"
+                largeText = "StreamNet"
             )
         }
     }

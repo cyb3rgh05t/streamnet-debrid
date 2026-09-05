@@ -82,6 +82,7 @@ import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Category
 import com.arflix.tv.data.model.isPortrait
 import com.arflix.tv.ui.components.LoadingIndicator
+import com.arflix.tv.ui.components.movieGenreNameRes
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
@@ -103,6 +104,12 @@ import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.util.LocalDeviceType
+
+@Composable
+private fun Genre.localizedName(): String {
+    val resource = movieGenreNameRes(id)
+    return if (resource != null) stringResource(resource) else name
+}
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -206,7 +213,7 @@ fun SearchScreen(
         actionGenre?.let { genre ->
             DiscoverQuickFilter(
                 key = "genre_${genre.id}",
-                label = genre.name,
+                label = genre.localizedName(),
                 isSelected = uiState.selectedGenre?.id == genre.id,
                 onSelect = { viewModel.setDiscoverFilters(uiState.selectedType, genre, uiState.selectedCountry) }
             )
@@ -214,7 +221,7 @@ fun SearchScreen(
         comedyGenre?.let { genre ->
             DiscoverQuickFilter(
                 key = "genre_${genre.id}",
-                label = genre.name,
+                label = genre.localizedName(),
                 isSelected = uiState.selectedGenre?.id == genre.id,
                 onSelect = { viewModel.setDiscoverFilters(uiState.selectedType, genre, uiState.selectedCountry) }
             )
@@ -222,7 +229,7 @@ fun SearchScreen(
         horrorGenre?.let { genre ->
             DiscoverQuickFilter(
                 key = "genre_${genre.id}",
-                label = genre.name,
+                label = genre.localizedName(),
                 isSelected = uiState.selectedGenre?.id == genre.id,
                 onSelect = { viewModel.setDiscoverFilters(uiState.selectedType, genre, uiState.selectedCountry) }
             )
@@ -230,7 +237,7 @@ fun SearchScreen(
         sciFiGenre?.let { genre ->
             DiscoverQuickFilter(
                 key = "genre_${genre.id}",
-                label = genre.name,
+                label = genre.localizedName(),
                 isSelected = uiState.selectedGenre?.id == genre.id,
                 onSelect = { viewModel.setDiscoverFilters(uiState.selectedType, genre, uiState.selectedCountry) }
             )

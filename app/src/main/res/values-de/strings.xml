@@ -164,7 +164,7 @@
     <string name="volume_boost">Lautstärke-Verstärkung</string>
     <string name="dns_provider">DNS-Anbieter</string>
     <string name="custom_user_agent">Eigener User-Agent</string>
-    <string name="custom_user_agent_desc">Leer lassen für StreamNet TV Standardwerte. Eigene Werte gelten nur, wenn eine Quelle keinen eigenen User-Agent liefert.</string>
+    <string name="custom_user_agent_desc">Leer lassen für StreamNet-Standardwerte. Eigene Werte gelten nur, wenn eine Quelle keinen eigenen User-Agent liefert.</string>
     <string name="add_playlist">Playlist hinzufügen</string>
     <string name="refresh_iptv">TV-Daten aktualisieren</string>
     <string name="delete_iptv">TV-Playlists löschen</string>
@@ -360,7 +360,7 @@
     <string name="update_msg_current_to_latest">Aktuelle Version %1$s → neueste Version %2$s</string>
     <string name="update_msg_current_uptodate">Version %1$s ist aktuell</string>
     <string name="update_msg_preparing">Wird vorbereitet…</string>
-    <string name="update_msg_ready">Das neueste StreamNet-TV-Update wurde heruntergeladen und kann installiert werden.</string>
+    <string name="update_msg_ready">Das neueste StreamNet-Update wurde heruntergeladen und kann installiert werden.</string>
     <string name="update_msg_installer_hint">Der Android-Paketinstaller sollte erscheinen. Falls nicht, wähle erneut „Installieren“.</string>
     <!-- Ergänzende Basis-, Wiedergabe- und Einstellungsübersetzungen -->
     <string name="app_name">StreamNet</string>
@@ -475,7 +475,7 @@
     <string name="channel_guide">Senderprogramm</string>
     <!-- Einstellungen -->
     <string name="settings_home_server">Heimserver</string>
-    <string name="settings_app_version_label">StreamNet TV %1$s</string>
+    <string name="settings_app_version_label">StreamNet %1$s</string>
     <string name="settings_label_url">URL</string>
     <string name="settings_home_server_https_note">Möglichst HTTPS verwenden. HTTP-Server-URLs sind in lokalen Netzwerken zulässig, aber nicht verschlüsselt.</string>
     <string name="settings_label_server_name">Servername</string>
@@ -514,9 +514,9 @@
     <string name="settings_label_title">Titel</string>
     <string name="settings_add_quality_filter">Qualitätsfilter hinzufügen</string>
     <string name="settings_edit_quality_filter">Qualitätsfilter bearbeiten</string>
-    <string name="settings_plex_auth_touch_instruction">Authentifizierungsseite öffnen, anmelden und zu StreamNet TV zurückkehren. Dieser Bildschirm wird automatisch abgeschlossen.</string>
+    <string name="settings_plex_auth_touch_instruction">Authentifizierungsseite öffnen, anmelden und zu StreamNet zurückkehren. Dieser Bildschirm wird automatisch abgeschlossen.</string>
     <string name="settings_plex_auth_tv_instruction">QR-Code scannen oder Authentifizierungsseite öffnen und diesen Code bestätigen</string>
-    <string name="settings_jellyfin_auth_instruction">Jellyfin-App oder Weboberfläche öffnen, zu Quick Connect gehen, diesen Code eingeben und zu StreamNet TV zurückkehren.</string>
+    <string name="settings_jellyfin_auth_instruction">Jellyfin-App oder Weboberfläche öffnen, zu Quick Connect gehen, diesen Code eingeben und zu StreamNet zurückkehren.</string>
     <string name="settings_quality_filters_subtitle">Gerätespezifische Filter. Passende Streams werden ausgeschlossen.</string>
     <string name="settings_no_filters_yet">Noch keine Filter eingerichtet.</string>
     <string name="settings_unnamed_device">Unbenanntes Gerät</string>
@@ -564,7 +564,7 @@
     <string name="settings_section_audio">AUDIO</string>
     <string name="settings_section_appearance">DARSTELLUNG</string>
     <string name="settings_allow_unknown_sources">Unbekannte Quellen zulassen</string>
-    <string name="settings_allow_unknown_sources_desc">Installationen aus unbekannten Quellen für StreamNet TV zulassen, damit das heruntergeladene Update-APK installiert werden kann.</string>
+    <string name="settings_allow_unknown_sources_desc">Installationen aus unbekannten Quellen für StreamNet zulassen, damit das heruntergeladene Update-APK installiert werden kann.</string>
     <string name="settings_open_settings">Einstellungen öffnen</string>
     <string name="settings_overview">Übersicht</string>
     <string name="settings_focused_setting">Fokussierte Einstellung</string>
@@ -588,7 +588,7 @@
     <string name="settings_desc_accounts">Verbundene Dienste und Tracking-Einstellungen.</string>
     <string name="settings_desc_cloud_sync">StreamNet-Cloud-Konto, manuelle Synchronisierung, Wiederherstellung und Datenlöschung.</string>
     <string name="settings_desc_info_updates">App-Updates, Datenschutzerklärung und Freigabe von Diagnosedaten.</string>
-    <string name="settings_desc_default">StreamNet TV für dieses Profil einrichten.</string>
+    <string name="settings_desc_default">StreamNet für dieses Profil einrichten.</string>
     <string name="settings_pill_app">App %1$s</string>
     <string name="settings_pill_audio">Audio %1$s</string>
     <string name="settings_pill_default">Standard %1$s</string>
@@ -672,7 +672,7 @@
     <string name="settings_play_build">Play-Version</string>
     <string name="settings_help_choose_title">Einstellung auswählen</string>
     <string name="settings_help_choose_desc">Zum Bearbeiten des ausgewählten Bereichs in die mittlere Spalte wechseln.</string>
-    <string name="settings_help_app_language_desc">Ändert die von StreamNet TV verwendete Sprache für Oberfläche und Metadaten.</string>
+    <string name="settings_help_app_language_desc">Ändert die von StreamNet verwendete Sprache für Oberfläche und Metadaten.</string>
     <string name="settings_help_default_audio_desc">Bevorzugte Audiosprache, wenn mehrere Spuren verfügbar sind.</string>
     <string name="settings_help_default_subtitle_desc">Bevorzugte Untertitelsprache beim Wiedergabestart.</string>
     <string name="settings_help_secondary_subtitle">Sekundäre Untertitel</string>
@@ -830,8 +830,8 @@
     <string name="settings_update_ready_install">Neuestes Update heruntergeladen und installationsbereit</string>
     <string name="settings_update_checking">GitHub-Releases werden auf ein neueres APK geprüft</string>
     <string name="settings_update_available_format">Update verfügbar: %1$s</string>
-    <string name="settings_update_latest">Du hast bereits die neueste StreamNet-TV-Version</string>
-    <string name="settings_update_check_releases">GitHub-Releases nach dem neuesten StreamNet-TV-APK durchsuchen</string>
+    <string name="settings_update_latest">Du hast bereits die neueste StreamNet-Version</string>
+    <string name="settings_update_check_releases">GitHub-Releases nach dem neuesten StreamNet-APK durchsuchen</string>
     <string name="settings_up_to_date">Aktuell</string>
     <string name="settings_update_check_failed_short">Prüfung fehlgeschlagen</string>
     <string name="settings_update_downloading_short">Download läuft</string>
@@ -883,7 +883,7 @@
     <string name="telegram_preparing_qr">QR-Code wird vorbereitet...</string>
     <string name="telegram_connect_title">Telegram verbinden</string>
     <string name="telegram_connect_desc">Deine Kanäle und Gruppen bei jedem Öffnen eines Films oder einer Serie nach Videodateien durchsuchen.</string>
-    <string name="telegram_disclaimer">StreamNet TV ist nicht für Inhalte verantwortlich, die über diese Funktion gestreamt werden. Verbinde nur dein eigenes Konto und beachte Urheberrecht sowie geltende Gesetze.</string>
+    <string name="telegram_disclaimer">StreamNet ist nicht für Inhalte verantwortlich, die über diese Funktion gestreamt werden. Verbinde nur dein eigenes Konto und beachte Urheberrecht sowie geltende Gesetze.</string>
     <string name="telegram_scan_title">Mit Telegram scannen</string>
     <string name="telegram_scan_instructions">Telegram auf dem Telefon öffnen → Einstellungen → Geräte → Desktop-Gerät verknüpfen</string>
     <string name="telegram_qr_code_desc">Telegram-QR-Code</string>
@@ -919,7 +919,7 @@
     <string name="discord_connecting">Verbindung wird hergestellt...</string>
     <string name="discord_waiting_for_approval">Warte auf Freigabe...</string>
     <string name="discord_pairing_steps">1. QR-Code mit dem Smartphone scannen\n2. In Discord auf \"Autorisieren\" tippen\n3. Die Verbindung wird automatisch hergestellt</string>
-    <string name="discord_mobile_pairing_steps">1. Discord im Browser öffnen\n2. Auf \"Autorisieren\" tippen\n3. Zu StreamNet TV zurückkehren</string>
+    <string name="discord_mobile_pairing_steps">1. Discord im Browser öffnen\n2. Auf \"Autorisieren\" tippen\n3. Zu StreamNet zurückkehren</string>
     <string name="discord_login_on_tv">Direkt am TV anmelden</string>
     <string name="discord_login_in_browser">Discord-Anmeldung öffnen</string>
     <string name="discord_scroll_up">▲ Nach oben scrollen</string>
@@ -1258,6 +1258,21 @@
     <string name="collections_genre_adventure">Abenteuer</string>
     <string name="collections_genre_superhero">Superhelden</string>
     <string name="collections_genre_war_military">Krieg und Militär</string>
+    <string name="tmdb_genre_crime">Krimi</string>
+    <string name="tmdb_genre_history">Historie</string>
+    <string name="tmdb_genre_music">Musik</string>
+    <string name="tmdb_genre_mystery">Mystery</string>
+    <string name="tmdb_genre_tv_movie">Fernsehfilm</string>
+    <string name="tmdb_genre_war">Krieg</string>
+    <string name="tmdb_genre_western">Western</string>
+    <string name="tmdb_genre_action_adventure">Action &amp; Abenteuer</string>
+    <string name="tmdb_genre_kids">Kinder</string>
+    <string name="tmdb_genre_news">Nachrichten</string>
+    <string name="tmdb_genre_reality">Reality</string>
+    <string name="tmdb_genre_sci_fi_fantasy">Sci-Fi &amp; Fantasy</string>
+    <string name="tmdb_genre_soap">Seifenoper</string>
+    <string name="tmdb_genre_talk">Talk</string>
+    <string name="tmdb_genre_war_politics">Krieg &amp; Politik</string>
     <string name="collections_decade_20s">Filme der 2020er</string>
     <string name="collections_decade_10s">Filme der 2010er</string>
     <string name="collections_decade_00s">Filme der 2000er</string>
@@ -1306,14 +1321,14 @@
     <string name="catalog_pack_author_version">Autor: %1$s • v%2$s</string>
     <string name="catalog_pack_included">Enthaltene Kataloge (%1$d):</string>
     <string name="catalog_pack_install">Paket installieren</string>
-    <string name="crash_title">StreamNet TV hat einen Fehler festgestellt</string>
+    <string name="crash_title">StreamNet hat einen Fehler festgestellt</string>
     <string name="crash_tv_message">Scanne den QR-Code mit der Kamera deines Smartphones, um den Fehlerbericht zu kopieren und den Discord-Fehlerkanal zu öffnen.</string>
     <string name="crash_touch_message">Entschuldige die Unterbrechung. Du kannst diesen Fehler direkt in unserem Discord-Kanal melden und uns so bei der Behebung helfen.</string>
-    <string name="crash_qr_hint">Scannen, um die StreamNet-TV-Berichtsseite zu öffnen, den Bericht zu kopieren und Discord zu starten.</string>
+    <string name="crash_qr_hint">Scannen, um die StreamNet-Berichtsseite zu öffnen, den Bericht zu kopieren und Discord zu starten.</string>
     <string name="crash_reference_details">Referenzdaten zum Fehler</string>
     <string name="crash_details_copied">Fehlerdetails kopiert. Discord wird geöffnet...</string>
     <string name="crash_report_discord">Auf Discord melden</string>
-    <string name="crash_restart">StreamNet TV neu starten</string>
+    <string name="crash_restart">StreamNet neu starten</string>
     <string name="previous_page">Vorherige Seite</string>
     <string name="next_page">Nächste Seite</string>
     <string name="reset_plugins_extensions">Plugins und Erweiterungen zurücksetzen</string>
@@ -1345,9 +1360,9 @@
     <string name="settings_iptv_order_number">Sendernummer</string>
     <string name="settings_iptv_order_name">Alphabetisch (A-Z)</string>
     <string name="settings_diagnostics_sharing">Diagnosen und Nutzung teilen</string>
-    <string name="settings_diagnostics_sharing_desc">Konfigurierte Absturzdiagnosen und App-Start-Informationen senden, um StreamNet TV zu verbessern</string>
+    <string name="settings_diagnostics_sharing_desc">Konfigurierte Absturzdiagnosen und App-Start-Informationen senden, um StreamNet zu verbessern</string>
     <string name="settings_privacy_policy">Datenschutzerklärung</string>
-    <string name="settings_privacy_policy_desc">Erfahre, wie StreamNet TV Daten, Aufbewahrung, Datenanbieter und deine Datenschutzrechte behandelt</string>
+    <string name="settings_privacy_policy_desc">Erfahre, wie StreamNet Daten, Aufbewahrung, Datenanbieter und deine Datenschutzrechte behandelt</string>
     <string name="settings_account_data_deletion">Cloud-Konto und Daten löschen</string>
     <string name="settings_account_data_deletion_desc">Sichere Seite zum Löschen des StreamNet-Cloud-Kontos öffnen</string>
     <string name="settings_privacy_data_title">Datenschutz und Daten</string>

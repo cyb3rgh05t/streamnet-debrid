@@ -11,7 +11,7 @@ on:
       title:
         description: "Titel der Telegram-Nachricht"
         required: true
-        default: "StreamNet TV Update"
+        default: "StreamNet Update"
         type: string
       release_url:
         description: "Optionaler Link zum GitHub-Release oder Download"

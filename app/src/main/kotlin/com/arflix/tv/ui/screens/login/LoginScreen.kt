@@ -216,7 +216,7 @@ fun LoginScreen(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = "STREAMNET TV",
+                    text = "STREAMNET",
                     fontSize = 56.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 5.sp,

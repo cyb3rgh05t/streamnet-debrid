@@ -171,7 +171,7 @@ object AppModule {
                     urlBuilder.addQueryParameter("client_id", Constants.SIMKL_CLIENT_ID)
                 }
                 if (originalUrl.queryParameter("app-name") == null) {
-                    urlBuilder.addQueryParameter("app-name", "StreamNet TV")
+                    urlBuilder.addQueryParameter("app-name", "StreamNet")
                 }
                 if (originalUrl.queryParameter("app-version") == null) {
                     urlBuilder.addQueryParameter("app-version", com.arflix.tv.BuildConfig.VERSION_NAME)
@@ -179,7 +179,7 @@ object AppModule {
 
                 val requestBuilder = original.newBuilder()
                     .url(urlBuilder.build())
-                    .header("User-Agent", "StreamNetTV/${com.arflix.tv.BuildConfig.VERSION_NAME} (Android TV)")
+                    .header("User-Agent", "StreamNet/${com.arflix.tv.BuildConfig.VERSION_NAME} (Android TV)")
 
                 if (original.header("simkl-api-key") == null) {
                     requestBuilder.header("simkl-api-key", Constants.SIMKL_CLIENT_ID)

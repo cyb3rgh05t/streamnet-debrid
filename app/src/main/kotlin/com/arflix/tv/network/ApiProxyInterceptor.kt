@@ -46,7 +46,7 @@ class ApiProxyInterceptor : Interceptor {
             }
             "api.simkl.com" -> {
                 // A Simkl client id is public and official builds can call the API
-                // directly. Contributor builds without one fall back to StreamNet TV's
+                // directly. Contributor builds without one fall back to StreamNet's
                 // credential-injecting proxy instead of shipping a broken login.
                 if (Constants.SIMKL_CLIENT_ID.isBlank()) {
                     val proxyRequest = rewriteForSimklProxy(originalRequest) ?: originalRequest

@@ -45,7 +45,7 @@ object AiKeyWebPage {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>StreamNet TV - AI Translation Key</title>
+<title>StreamNet - AI Translation Key</title>
 $sharedCss
 <style>
   .provider-btn { display: flex; flex-direction: column; align-items: flex-start; width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.1); border-radius: 16px; padding: 1.25rem 1.5rem; color: #fff; font-family: inherit; cursor: pointer; transition: all 0.25s ease; text-decoration: none; margin-bottom: 1rem; }
@@ -60,7 +60,7 @@ $sharedCss
 <body>
 <div class="page">
   <div class="header">
-    <img src="/logo.png" alt="StreamNet TV" class="header-logo">
+    <img src="/logo.png" alt="StreamNet" class="header-logo">
     <p>AI Subtitle Translation – API Key Setup</p>
   </div>
 
@@ -95,13 +95,13 @@ if (t) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>StreamNet TV - Groq API Key</title>
+<title>StreamNet - Groq API Key</title>
 $sharedCss
 </head>
 <body>
 <div class="page">
   <div class="header">
-    <img src="/logo.png" alt="StreamNet TV" class="header-logo">
+    <img src="/logo.png" alt="StreamNet" class="header-logo">
     <p>Set your Groq API Key</p>
   </div>
 
@@ -163,13 +163,13 @@ document.getElementById('apiKey').addEventListener('keydown', function(e) { if (
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<title>StreamNet TV - Gemini API Key</title>
+<title>StreamNet - Gemini API Key</title>
 $sharedCss
 </head>
 <body>
 <div class="page">
   <div class="header">
-    <img src="/logo.png" alt="StreamNet TV" class="header-logo">
+    <img src="/logo.png" alt="StreamNet" class="header-logo">
     <p>Set your Google Gemini API Key</p>
   </div>
 

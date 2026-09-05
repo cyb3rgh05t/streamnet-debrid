@@ -165,6 +165,8 @@ import com.arflix.tv.ui.components.SidebarItem
 import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
 import com.arflix.tv.ui.components.topBarSelectedIndex
+import com.arflix.tv.ui.components.movieGenreNameRes
+import com.arflix.tv.ui.components.tvGenreNameRes
 import com.arflix.tv.ui.focus.arvioManualBringIntoViewBoundary
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
 import com.arflix.tv.ui.focus.isArvioDpadNavigationKey
@@ -242,22 +244,11 @@ private fun cleanOverviewText(value: String): String {
         .ifBlank { "No description available." }
 }
 
-// Genre ID to name mapping (TMDB standard)
-private val movieGenres = mapOf(
-    28 to "Action", 12 to "Adventure", 16 to "Animation", 35 to "Comedy",
-    80 to "Crime", 99 to "Documentary", 18 to "Drama", 10751 to "Family",
-    14 to "Fantasy", 36 to "History", 27 to "Horror", 10402 to "Music",
-    9648 to "Mystery", 10749 to "Romance", 878 to "Sci-Fi", 10770 to "TV Movie",
-    53 to "Thriller", 10752 to "War", 37 to "Western"
-)
-
-private val tvGenres = mapOf(
-    10759 to "Action & Adventure", 16 to "Animation", 35 to "Comedy",
-    80 to "Crime", 99 to "Documentary", 18 to "Drama", 10751 to "Family",
-    10762 to "Kids", 9648 to "Mystery", 10763 to "News", 10764 to "Reality",
-    10765 to "Sci-Fi & Fantasy", 10766 to "Soap", 10767 to "Talk",
-    10768 to "War & Politics", 37 to "Western"
-)
+private fun Context.genreNames(mediaType: MediaType, genreIds: List<Int>): List<String> =
+    genreIds.mapNotNull { id ->
+        val resource = if (mediaType == MediaType.TV) tvGenreNameRes(id) else movieGenreNameRes(id)
+        resource?.let(::getString)
+    }
 
 @Stable
 private class HomeFocusState(
@@ -540,7 +531,7 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
         .readTimeout(20, TimeUnit.SECONDS)
         .build()
     val heroDataSourceFactory =
-        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("StreamNetTV/1.7.0 (Android TV)")
+        OkHttpDataSource.Factory(heroOkHttp).setUserAgent("StreamNet/1.7.0 (Android TV)")
     val cachedHeroDataSourceFactory = CacheDataSource.Factory()
         .setCache(HomeHeroPreviewCache.getInstance(context))
         .setUpstreamDataSourceFactory(heroDataSourceFactory)
@@ -2293,10 +2284,9 @@ private fun HeroSection(
                     }
                 } else {
                     // Get actual genre names from genre IDs (memoized to avoid list allocations per recomposition)
-                    val genreText = remember(currentItem.id, currentItem.genreIds) {
-                        val genreMap = if (currentItem.mediaType == MediaType.TV) tvGenres else movieGenres
-                        currentItem.genreIds.mapNotNull { genreMap[it] }.take(2).joinToString(" / ")
-                    }
+                    val genreText = context.genreNames(currentItem.mediaType, currentItem.genreIds)
+                        .take(2)
+                        .joinToString(" / ")
                     val displayDate = currentItem.releaseDate?.takeIf { it.isNotEmpty() } ?: currentItem.year
                     val hasDuration = currentItem.duration.isNotEmpty() && currentItem.duration != "0m"
                     val hasGenre = genreText.isNotEmpty()
@@ -2684,10 +2674,7 @@ private fun MobileHeroOverlay(
         blurRadius = 8f
     )
 
-    val genreText = remember(item.id, item.genreIds) {
-        val genreMap = if (item.mediaType == MediaType.TV) tvGenres else movieGenres
-        item.genreIds.mapNotNull { genreMap[it] }.take(2).joinToString(" | ")
-    }
+    val genreText = context.genreNames(item.mediaType, item.genreIds).take(2).joinToString(" | ")
     val year = item.releaseDate?.take(4)?.takeIf { it.isNotEmpty() } ?: item.year
     val rating = imdbRatingFor(item)
     val ratingValue = parseRatingValue(rating)
@@ -2919,6 +2906,7 @@ private fun MobileHeroCarousel(
     onSwitchProfile: () -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit
 ) {
+    val context = LocalContext.current
     val isTablet = LocalDeviceType.current == DeviceType.TABLET
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
@@ -2980,10 +2968,7 @@ private fun MobileHeroCarousel(
             modifier = Modifier.fillMaxWidth()
         ) { page ->
             val item = heroItems[page % heroItems.size]
-            val genres = remember(item.id, item.genreIds) {
-                val genreMap = if (item.mediaType == MediaType.TV) tvGenres else movieGenres
-                item.genreIds.mapNotNull { genreMap[it] }.take(3)
-            }
+            val genres = context.genreNames(item.mediaType, item.genreIds).take(3)
             // releaseDate is stored as "d MMM yyyy" by MediaRepository.formatDate()
             val year = remember(item.id, item.releaseDate, item.year) {
                 val rd = item.releaseDate

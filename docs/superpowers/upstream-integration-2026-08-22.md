@@ -52,7 +52,7 @@ The full upstream branch was not merged directly because this fork has intention
 
 - StreamNet branding and auth domain remain in place.
 - Update checks still point to `cyb3rgh05t/streamnet-debrid`.
-- StreamNet User-Agent remains `Mozilla/5.0 (Android TV; StreamNet TV)`.
+- StreamNet User-Agent remains `Mozilla/5.0 (Android TV; StreamNet)`.
 - Orange/Gold accent defaults and CloudSync/IPTV fork behavior were not overwritten.
 
 ## Follow-up Fixes

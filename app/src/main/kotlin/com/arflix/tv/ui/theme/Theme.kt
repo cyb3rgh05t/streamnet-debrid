@@ -12,7 +12,7 @@ import com.arflix.tv.ui.skin.ProvideArvioSkin
 import com.arflix.tv.ui.skin.accentColorFromName
 
 /**
- * StreamNet TV Color scheme holder - Arctic Fuse 2 inspired
+ * StreamNet Color scheme holder - Arctic Fuse 2 inspired
  * Minimal dark theme with light gray (#EDEDED) on pure black (#000000)
  */
 data class ArvioColors(
@@ -82,7 +82,7 @@ fun appBackgroundDark(): Color {
 val LocalArflixColors = LocalArvioColors
 
 /**
- * Main StreamNet TV TV theme - Arctic Fuse 2 inspired
+ * Main StreamNet theme - Arctic Fuse 2 inspired
  * Pure black background, light gray text, white focus states
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -148,7 +148,7 @@ fun ArflixTvTheme(
 )
 
 /**
- * Access custom StreamNet TV colors
+ * Access custom StreamNet colors
  */
 object ArvioTheme {
     val colors: ArvioColors

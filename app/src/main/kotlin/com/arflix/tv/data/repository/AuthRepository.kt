@@ -706,7 +706,7 @@ class AuthRepository @Inject constructor(
         val rawMessage = error?.message?.streamNetBranded() ?: return fallback
         val message = rawMessage.lowercase()
         val cloudPasswordHelp =
-            "Invalid email or password. If this is an existing StreamNet Cloud account, create a new password on the StreamNet TV authentication page and then sign in again."
+            "Invalid email or password. If this is an existing StreamNet Cloud account, create a new password on the StreamNet Cloud authentication page and then sign in again."
         return when {
             "arvio cloud moved" in message || "StreamNet Cloud moved" in message || "password setup" in message -> rawMessage
             Constants.CLOUD_SYNC_ENABLED && "invalid email or password" in message -> cloudPasswordHelp
@@ -1169,8 +1169,8 @@ class AuthRepository @Inject constructor(
     }
 
     private fun String.streamNetBranded(): String =
-        replace("ARVIO", "StreamNet TV", ignoreCase = true)
-            .replace("ARFLIX", "StreamNet TV", ignoreCase = true)
+        replace("ARVIO", "StreamNet", ignoreCase = true)
+            .replace("ARFLIX", "StreamNet", ignoreCase = true)
 
             /*
     private suspend fun callSupabaseRpc(functionName: String, body: String): String {

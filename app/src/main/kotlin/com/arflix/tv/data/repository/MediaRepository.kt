@@ -637,7 +637,7 @@ class MediaRepository @Inject constructor(
         val request = Request.Builder()
             .url("https://v3-cinemeta.strem.io/meta/$typePath/$imdbId.json")
             .header("Accept", "application/json")
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet)"))
             .build()
 
         runCatching {
@@ -760,7 +760,7 @@ class MediaRepository @Inject constructor(
             val request = Request.Builder()
                 .url(url)
                 .header("Accept", "application/json")
-                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet)"))
                 .build()
 
             val fetched = runCatching {
@@ -796,7 +796,7 @@ class MediaRepository @Inject constructor(
         val request = Request.Builder()
             .url("https://v3-cinemeta.strem.io/meta/series/$imdbId.json")
             .header("Accept", "application/json")
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet)"))
             .build()
 
         runCatching {
@@ -2420,7 +2420,7 @@ class MediaRepository @Inject constructor(
                 .url(url)
                 .header("Accept", "application/json")
                 .header("X-API-Key", Constants.VODWISHARR_API_KEY)
-                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+                .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet)"))
                 .build()
             val responseJson = runCatching {
                 okHttpClient.newCall(request).execute().use { response ->
@@ -4325,7 +4325,7 @@ class MediaRepository @Inject constructor(
     private fun fetchUrl(url: String): String? {
         val request = Request.Builder()
             .url(url)
-            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet TV)"))
+            .header("User-Agent", OkHttpProvider.userAgentOr("Mozilla/5.0 (Android TV; StreamNet)"))
             .build()
         return runCatching {
             okHttpClient.newCall(request).execute().use { response ->

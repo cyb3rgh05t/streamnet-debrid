@@ -4,6 +4,20 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.006] - 2026-09-05
+
+### Branding
+
+- App-, Cloudportal-, Datenschutz-, Diagnose- und Integrationsbezeichnungen verwenden einheitlich „StreamNet“ beziehungsweise „StreamNet Cloud“; der geschützte IPTV-Playlistname „StreamNet TV“ bleibt aus Kompatibilitätsgründen unverändert.
+
+### IPTV
+
+- Titel mit Umlauten und weiteren nicht-ASCII-Buchstaben werden bei Xtream-Film- und Serienabgleichen korrekt transliteriert; ausgeschriebene deutsche Umlaute wie „ue“ werden als zusätzlicher Provider-Alias berücksichtigt.
+
+### Lokalisierung
+
+- TMDB-Genres in Home-Heros und Suchfiltern verwenden nun die App-Sprache statt fest eingebauter englischer Bezeichnungen.
+
 ## [2.3.005] - 2026-09-05
 
 ### Metadaten
@@ -216,7 +230,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 ### StreamNet Cloud, Profile und Kontosicherheit
 
 - Wechselndes gemischtes Film- und Serien-Artwork wurde zum Ladebildschirm beim App-Start und zur Profilauswahl hinzugefügt und wechselt alle fünf Sekunden aus einem gemeinsamen Vorladepool.
-- Die Profilauswahl wurde durch Entfernen der Überschrift und des äußeren Profilcontainers vereinfacht; unter dem StreamNet TV-Logo wurde eine kompakte, D-Pad-fokussierte Aktion `myStreamNet Cloud` hinzugefügt.
+- Die Profilauswahl wurde durch Entfernen der Überschrift und des äußeren Profilcontainers vereinfacht; unter dem StreamNet-Logo wurde eine kompakte, D-Pad-fokussierte Aktion `myStreamNet Cloud` hinzugefügt.
 - Sichtbare Verweise auf den Cloud-Dienst wurden in StreamNet Cloud umbenannt und das StreamNet Club-Logo auf den selbst gehosteten Seiten für Anmeldung, Datenschutz, Löschung und Erfolg eingeführt.
 - Die Behandlung von Anmeldung und abgelaufenen Sitzungen wurde verbessert, sodass ungültige StreamNet Cloud-Zugangsdaten und widerrufene Sitzungen klarere Fehler erzeugen und veraltete lokale Authentifizierungen entfernt werden.
 - Die dauerhafte Kontolöschung wurde robuster gemacht, sodass Kontositzungen, Snapshots, Kopplungssitzungen, Nutzungsereignisse, Wiedergabeverlauf und Wiedergabestatus transaktional entfernt werden; PostgreSQL-Kaskadenbedingungen und Regressionstests wurden hinzugefügt.

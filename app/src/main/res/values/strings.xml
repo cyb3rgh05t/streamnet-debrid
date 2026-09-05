@@ -151,7 +151,7 @@
     <string name="volume_boost">Volume Boost</string>
     <string name="dns_provider">DNS Provider</string>
     <string name="custom_user_agent">Custom User-Agent</string>
-    <string name="custom_user_agent_desc">Leave blank to use StreamNet TV defaults. Custom values apply when a source does not provide its own User-Agent.</string>
+    <string name="custom_user_agent_desc">Leave blank to use StreamNet defaults. Custom values apply when a source does not provide its own User-Agent.</string>
     <string name="add_playlist">Add Playlist</string>
     <string name="refresh_iptv">Refresh TV Data</string>
     <string name="delete_iptv">Delete TV Playlists</string>
@@ -334,7 +334,7 @@
 
     <!-- Extracted from code: Settings screen -->
     <string name="settings_home_server">Home Server</string>
-    <string name="settings_app_version_label">StreamNet TV %1$s</string>
+    <string name="settings_app_version_label">StreamNet %1$s</string>
     <string name="settings_label_url">URL</string>
     <string name="settings_home_server_https_note">Use HTTPS where possible. HTTP server URLs are allowed for local networks but are not encrypted.</string>
     <string name="settings_label_server_name">Server name</string>
@@ -373,9 +373,9 @@
     <string name="settings_label_title">Title</string>
     <string name="settings_add_quality_filter">Add Quality Filter</string>
     <string name="settings_edit_quality_filter">Edit Quality Filter</string>
-    <string name="settings_plex_auth_touch_instruction">Open the auth page, sign in, then return to StreamNet TV. This screen will finish automatically.</string>
+    <string name="settings_plex_auth_touch_instruction">Open the auth page, sign in, then return to StreamNet. This screen will finish automatically.</string>
     <string name="settings_plex_auth_tv_instruction">Scan the QR code or open the auth page and confirm this code</string>
-    <string name="settings_jellyfin_auth_instruction">Open your Jellyfin app or web UI, go to Quick Connect, enter this code, then return to StreamNet TV.</string>
+    <string name="settings_jellyfin_auth_instruction">Open your Jellyfin app or web UI, go to Quick Connect, enter this code, then return to StreamNet.</string>
     <string name="settings_quality_filters_subtitle">Device-local filters. Matching streams are excluded.</string>
     <string name="settings_no_filters_yet">No filters configured yet.</string>
     <string name="settings_unnamed_device">Unnamed Device</string>
@@ -423,7 +423,7 @@
     <string name="settings_section_audio">AUDIO</string>
     <string name="settings_section_appearance">APPEARANCE</string>
     <string name="settings_allow_unknown_sources">Allow Unknown Sources</string>
-    <string name="settings_allow_unknown_sources_desc">Allow installs from unknown sources for StreamNet TV so the downloaded update APK can be installed.</string>
+    <string name="settings_allow_unknown_sources_desc">Allow installs from unknown sources for StreamNet so the downloaded update APK can be installed.</string>
     <string name="settings_open_settings">Open Settings</string>
     <string name="settings_overview">Overview</string>
     <string name="settings_focused_setting">Focused setting</string>
@@ -447,7 +447,7 @@
     <string name="settings_desc_accounts">Connected services and tracking controls.</string>
     <string name="settings_desc_cloud_sync">StreamNet Cloud account, manual sync, restore, and data deletion.</string>
     <string name="settings_desc_info_updates">App updates, privacy policy, and diagnostics sharing.</string>
-    <string name="settings_desc_default">Configure StreamNet TV for this profile.</string>
+    <string name="settings_desc_default">Configure StreamNet for this profile.</string>
     <string name="settings_pill_app">App %1$s</string>
     <string name="settings_pill_audio">Audio %1$s</string>
     <string name="settings_pill_default">Default %1$s</string>
@@ -547,7 +547,7 @@
     <string name="settings_play_build">Play build</string>
     <string name="settings_help_choose_title">Choose a setting</string>
     <string name="settings_help_choose_desc">Move into the center panel to edit the selected section.</string>
-    <string name="settings_help_app_language_desc">Changes the interface and metadata language used by StreamNet TV.</string>
+    <string name="settings_help_app_language_desc">Changes the interface and metadata language used by StreamNet.</string>
     <string name="settings_help_default_audio_desc">Preferred audio language when multiple tracks exist.</string>
     <string name="settings_help_default_subtitle_desc">Preferred subtitle language when playback starts.</string>
     <string name="settings_help_secondary_subtitle">Secondary subtitle</string>
@@ -731,8 +731,8 @@
     <string name="settings_update_ready_install">Latest update downloaded and ready to install</string>
     <string name="settings_update_checking">Checking GitHub Releases for a newer APK</string>
     <string name="settings_update_available_format">Update available: %1$s</string>
-    <string name="settings_update_latest">You already have the latest StreamNet TV version</string>
-    <string name="settings_update_check_releases">Check GitHub Releases for the latest StreamNet TV APK</string>
+    <string name="settings_update_latest">You already have the latest StreamNet version</string>
+    <string name="settings_update_check_releases">Check GitHub Releases for the latest StreamNet APK</string>
     <string name="settings_up_to_date">Up to date</string>
     <string name="settings_update_check_failed_short">Check failed</string>
     <string name="settings_update_downloading_short">Downloading</string>
@@ -751,9 +751,9 @@
     <string name="settings_badge_update">UPDATE</string>
     <string name="settings_badge_check">CHECK</string>
     <string name="settings_diagnostics_sharing">Share diagnostics and usage</string>
-    <string name="settings_diagnostics_sharing_desc">Send crash diagnostics when configured and app startup information to help improve StreamNet TV</string>
+    <string name="settings_diagnostics_sharing_desc">Send crash diagnostics when configured and app startup information to help improve StreamNet</string>
     <string name="settings_privacy_policy">Privacy policy</string>
-    <string name="settings_privacy_policy_desc">Read how StreamNet TV processes data, retention policies, data providers, and your privacy rights</string>
+    <string name="settings_privacy_policy_desc">Read how StreamNet processes data, retention policies, data providers, and your privacy rights</string>
     <string name="settings_account_data_deletion">Delete cloud account and data</string>
     <string name="settings_account_data_deletion_desc">Open the secure StreamNet Cloud account deletion page</string>
     <string name="settings_privacy_data_deletion">Privacy and data deletion</string>
@@ -886,7 +886,7 @@
     <string name="telegram_preparing_qr">Preparing QR code...</string>
     <string name="telegram_connect_title">Connect Telegram</string>
     <string name="telegram_connect_desc">Search your channels and groups for video files whenever you open a movie or show.</string>
-    <string name="telegram_disclaimer">StreamNet TV is not responsible for the content streamed through this feature. Only connect your own account and use it fairly — respect copyright and applicable laws.</string>
+    <string name="telegram_disclaimer">StreamNet is not responsible for the content streamed through this feature. Only connect your own account and use it fairly — respect copyright and applicable laws.</string>
     <string name="telegram_scan_title">Scan with Telegram</string>
     <string name="telegram_scan_instructions">Open Telegram on your phone → Settings → Devices → Link Desktop Device</string>
     <string name="telegram_qr_code_desc">Telegram QR code</string>
@@ -922,7 +922,7 @@
     <string name="discord_connecting">Connecting...</string>
     <string name="discord_waiting_for_approval">Waiting for approval...</string>
     <string name="discord_pairing_steps">1. Scan QR code on your phone\n2. Tap \"Authorize\" on Discord\n3. Connects automatically</string>
-    <string name="discord_mobile_pairing_steps">1. Open Discord in the browser\n2. Tap \"Authorize\"\n3. Return to StreamNet TV</string>
+    <string name="discord_mobile_pairing_steps">1. Open Discord in the browser\n2. Tap \"Authorize\"\n3. Return to StreamNet</string>
     <string name="discord_login_on_tv">Log in directly on TV</string>
     <string name="discord_login_in_browser">Open Discord login</string>
     <string name="discord_scroll_up">▲ Scroll Up</string>
@@ -1145,7 +1145,7 @@
     <string name="update_msg_current_to_latest">Current version %1$s -&gt; latest %2$s</string>
     <string name="update_msg_current_uptodate">Current version %1$s is up to date</string>
     <string name="update_msg_preparing">Preparing...</string>
-    <string name="update_msg_ready">The latest StreamNet TV update has been downloaded and is ready to install.</string>
+    <string name="update_msg_ready">The latest StreamNet update has been downloaded and is ready to install.</string>
     <string name="update_msg_installer_hint">The Android package installer should appear. If it does not, you can try pressing Install again.</string>
     <string name="stream_tab_all_sources">All sources</string>
     <string name="stream_title_select_source">Select Source</string>
@@ -1367,6 +1367,21 @@
     <string name="collections_genre_adventure">Adventure</string>
     <string name="collections_genre_superhero">Superhero</string>
     <string name="collections_genre_war_military">War &amp; Military</string>
+    <string name="tmdb_genre_crime">Crime</string>
+    <string name="tmdb_genre_history">History</string>
+    <string name="tmdb_genre_music">Music</string>
+    <string name="tmdb_genre_mystery">Mystery</string>
+    <string name="tmdb_genre_tv_movie">TV Movie</string>
+    <string name="tmdb_genre_war">War</string>
+    <string name="tmdb_genre_western">Western</string>
+    <string name="tmdb_genre_action_adventure">Action &amp; Adventure</string>
+    <string name="tmdb_genre_kids">Kids</string>
+    <string name="tmdb_genre_news">News</string>
+    <string name="tmdb_genre_reality">Reality</string>
+    <string name="tmdb_genre_sci_fi_fantasy">Sci-Fi &amp; Fantasy</string>
+    <string name="tmdb_genre_soap">Soap</string>
+    <string name="tmdb_genre_talk">Talk</string>
+    <string name="tmdb_genre_war_politics">War &amp; Politics</string>
     <string name="collections_decade_20s">20\'s Movies</string>
     <string name="collections_decade_10s">10\'s Movies</string>
     <string name="collections_decade_00s">00\'s Movies</string>
@@ -1449,14 +1464,14 @@
     <string name="catalog_pack_author_version">Author: %1$s • v%2$s</string>
     <string name="catalog_pack_included">Catalogs included (%1$d):</string>
     <string name="catalog_pack_install">Install Pack</string>
-    <string name="crash_title">StreamNet TV encountered an error</string>
+    <string name="crash_title">StreamNet encountered an error</string>
     <string name="crash_tv_message">Scan the QR code below with your phone camera to copy the crash report and open our Discord bug channel.</string>
     <string name="crash_touch_message">We apologize for the interruption. You can report this crash directly in our Discord channel to help us fix it.</string>
-    <string name="crash_qr_hint">Scan to open the StreamNet TV report page, copy the report, and open Discord.</string>
+    <string name="crash_qr_hint">Scan to open the StreamNet report page, copy the report, and open Discord.</string>
     <string name="crash_reference_details">Crash reference details</string>
     <string name="crash_details_copied">Crash details copied. Opening Discord...</string>
     <string name="crash_report_discord">Report on Discord</string>
-    <string name="crash_restart">Restart StreamNet TV</string>
+    <string name="crash_restart">Restart StreamNet</string>
     <string name="previous_page">Previous page</string>
     <string name="next_page">Next page</string>
     <string name="reset_plugins_extensions">Reset Plugins &amp; Extensions</string>

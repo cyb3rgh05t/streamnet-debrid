@@ -4,7 +4,7 @@ Last updated: September 5, 2026
 
 ## Recommendation
 
-Firebase is not required for StreamNet TV, including Play Store releases.
+Firebase is not required for StreamNet, including Play Store releases.
 
 - Google Play Console Android Vitals already reports crashes and ANRs from Play-distributed builds without adding Firebase.
 - The app's existing detailed crash-reporting integration prefers Sentry and can use either hosted Sentry or a self-hosted Sentry installation through its DSN.

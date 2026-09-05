@@ -554,7 +554,7 @@ private fun ComponentActivity.runAfterFirstDraw(block: () -> Unit) {
 }
 
 /**
- * Simple StreamNet TV loading screen - app logo + spinner
+ * Simple StreamNet loading screen - app logo + spinner
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -654,7 +654,7 @@ fun ArvioLoadingScreen(
 }
 
 /**
- * Root composable for the StreamNet TV app
+ * Root composable for the StreamNet app
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable

@@ -53,7 +53,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 /**
- * StreamNet TV TV Application class
+ * StreamNet Application class
  */
 @HiltAndroidApp
 class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFactory {

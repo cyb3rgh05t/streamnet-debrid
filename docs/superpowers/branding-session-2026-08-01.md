@@ -10,7 +10,7 @@ Preserve StreamNet branding while syncing with upstream code and applying UI fix
 
 - File: app/src/main/kotlin/com/arflix/tv/MainActivity.kt
 - Replaced loading logo drawable from `arvio_loading_logo` to `streamnet_tv_logo_full`.
-- Updated content description from `ARVIO` to `StreamNet TV`.
+- Updated content description from `ARVIO` to `StreamNet`.
 - Updated splash progress line colors to StreamNet accent:
   - Base line: `#E5A209` (alpha-adjusted)
   - Sweep line: `#E5A209` (alpha-adjusted)
@@ -19,7 +19,7 @@ Preserve StreamNet branding while syncing with upstream code and applying UI fix
 
 - File: app/src/main/kotlin/com/arflix/tv/ui/components/ArvioLoadingScreen.kt
 - Replaced loading logo drawable from `arvio_loading_logo` to `streamnet_tv_logo_full`.
-- Updated content description from `ARVIO` to `StreamNet TV`.
+- Updated content description from `ARVIO` to `StreamNet`.
 - Switched background usage to theme token `BackgroundDark`.
 - Updated component header comment text to StreamNet wording.
 

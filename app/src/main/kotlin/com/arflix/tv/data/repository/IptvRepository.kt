@@ -98,6 +98,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import java.lang.reflect.Type
 import java.security.KeyStore
 import java.security.MessageDigest
+import java.text.Normalizer
 
 private object IptvRepoDateRegexes {
     val MINUTE_PATTERN: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd:HH-mm")
@@ -292,6 +293,69 @@ internal fun normalizeIptvSortOrder(value: String?): String = when (value?.trim(
     "number" -> "number"
     "name" -> "name"
     else -> "provider"
+}
+
+internal object IptvTitleNormalizer {
+    private val bracketContentRegex = Regex("""\[[^\]]*]""")
+    private val parenContentRegex = Regex("""\([^\)]*\)""")
+    private val seasonTokenRegex = Regex("""\b(s|season)\s*\d{1,2}\b""", RegexOption.IGNORE_CASE)
+    private val episodeTokenRegex = Regex("""\b(e|ep|episode)\s*\d{1,3}\b""", RegexOption.IGNORE_CASE)
+    private val releaseTagRegex = Regex(
+        """\b(2160p|1080p|720p|480p|4k|uhd|fhd|hdr|dv|dovi|hevc|x265|x264|h264|remux|bluray|bdrip|webrip|web[- ]?dl|proper|repack|multi|dubbed|dual[- ]?audio)\b""",
+        RegexOption.IGNORE_CASE,
+    )
+    private val nonAlphaNumericRegex = Regex("[^a-z0-9]+")
+    private val diacriticsRegex = Regex("\\p{Mn}+")
+    private val multiSpaceRegex = Regex("\\s+")
+
+    fun normalize(value: String): String {
+        if (value.isBlank()) return ""
+        val stripped = value
+            .replace(bracketContentRegex, " ")
+            .replace(parenContentRegex, " ")
+            .replace(seasonTokenRegex, " ")
+            .replace(episodeTokenRegex, " ")
+            .replace(releaseTagRegex, " ")
+        return foldLetters(stripped)
+            .lowercase(Locale.US)
+            .replace(nonAlphaNumericRegex, " ")
+            .trim()
+            .replace(multiSpaceRegex, " ")
+    }
+
+    fun foldLetters(value: String): String {
+        if (value.all { it.code < 0x80 }) return value
+        val mapped = StringBuilder(value.length + 8)
+        value.forEach { character ->
+            mapped.append(nonDecomposableReplacement(character) ?: character)
+        }
+        return Normalizer.normalize(mapped, Normalizer.Form.NFD).replace(diacriticsRegex, "")
+    }
+
+    fun foldUmlautTranscription(value: String): String {
+        if (!value.contains("ue") && !value.contains("oe") && !value.contains("ae")) return value
+        return value.replace("ue", "u").replace("oe", "o").replace("ae", "a")
+    }
+
+    private fun nonDecomposableReplacement(character: Char): String? = when (character) {
+        'ß' -> "ss"
+        'ẞ' -> "SS"
+        'ı' -> "i"
+        'İ' -> "I"
+        'ø' -> "o"
+        'Ø' -> "O"
+        'æ' -> "ae"
+        'Æ' -> "AE"
+        'œ' -> "oe"
+        'Œ' -> "OE"
+        'đ', 'ð' -> "d"
+        'Đ', 'Ð' -> "D"
+        'ł' -> "l"
+        'Ł' -> "L"
+        'þ' -> "th"
+        'Þ' -> "TH"
+        else -> null
+    }
 }
 
 internal data class IptvOnlyAddonReconciliation(
@@ -5658,18 +5722,7 @@ class IptvRepository @Inject constructor(
     }
 
     private fun normalizeLookupText(value: String): String {
-        if (value.isBlank()) return ""
-        return value
-            .replace(BRACKET_CONTENT_REGEX, " ")
-            .replace(PAREN_CONTENT_REGEX, " ")
-            .replace(YEAR_PAREN_REGEX, " ")
-            .replace(SEASON_TOKEN_REGEX, " ")
-            .replace(EPISODE_TOKEN_REGEX, " ")
-            .replace(RELEASE_TAG_REGEX, " ")
-            .lowercase(Locale.US)
-            .replace(NON_ALPHA_NUM_REGEX, " ")
-            .trim()
-            .replace(MULTI_SPACE_REGEX, " ")
+        return IptvTitleNormalizer.normalize(value)
     }
 
     private val titleTokenNoise = setOf(
@@ -5771,6 +5824,13 @@ class IptvRepository @Inject constructor(
 
     private fun scoreNameMatch(providerName: String, normalizedInput: String): Int {
         val normalizedProvider = normalizeLookupText(providerName)
+        val direct = scoreNormalizedNameMatch(normalizedProvider, normalizedInput)
+        val alias = IptvTitleNormalizer.foldUmlautTranscription(normalizedProvider)
+        if (alias == normalizedProvider) return direct
+        return maxOf(direct, scoreNormalizedNameMatch(alias, normalizedInput))
+    }
+
+    private fun scoreNormalizedNameMatch(normalizedProvider: String, normalizedInput: String): Int {
         if (normalizedProvider.isBlank() || normalizedInput.isBlank()) return 0
         if (normalizedProvider == normalizedInput) return 120
         if (normalizedProvider.contains(normalizedInput)) return 90
@@ -5799,6 +5859,13 @@ class IptvRepository @Inject constructor(
 
     private fun looseSeriesTitleScore(providerName: String, normalizedInput: String): Int {
         val normalizedProvider = normalizeLookupText(providerName)
+        val direct = looseSeriesTitleScoreNormalized(normalizedProvider, normalizedInput)
+        val alias = IptvTitleNormalizer.foldUmlautTranscription(normalizedProvider)
+        if (alias == normalizedProvider) return direct
+        return maxOf(direct, looseSeriesTitleScoreNormalized(alias, normalizedInput))
+    }
+
+    private fun looseSeriesTitleScoreNormalized(normalizedProvider: String, normalizedInput: String): Int {
         if (normalizedProvider.isBlank() || normalizedInput.isBlank()) return 0
         val providerWords = normalizedProvider.split(' ').filter { it.length >= 3 }.toSet()
         val inputWords = normalizedInput.split(' ').filter { it.length >= 3 }.toSet()
@@ -9402,14 +9469,6 @@ class IptvRepository @Inject constructor(
 
         val BRACKET_CONTENT_REGEX = Regex("""\[[^\]]*]""")
         val PAREN_CONTENT_REGEX = Regex("""\([^\)]*\)""")
-        val YEAR_PAREN_REGEX = Regex("""\((19|20)\d{2}\)""")
-        val SEASON_TOKEN_REGEX = Regex("""\b(s|season)\s*\d{1,2}\b""", RegexOption.IGNORE_CASE)
-        val EPISODE_TOKEN_REGEX = Regex("""\b(e|ep|episode)\s*\d{1,3}\b""", RegexOption.IGNORE_CASE)
-        val RELEASE_TAG_REGEX = Regex(
-            """\b(2160p|1080p|720p|480p|4k|uhd|fhd|hdr|dv|dovi|hevc|x265|x264|h264|remux|bluray|bdrip|webrip|web[- ]?dl|proper|repack|multi|dubbed|dual[- ]?audio)\b""",
-            RegexOption.IGNORE_CASE
-        )
-        val NON_ALPHA_NUM_REGEX = Regex("[^a-z0-9]+")
         val MULTI_SPACE_REGEX = Regex("\\s+")
         val HTTP_URL_REGEX = Regex("""https?://[^\s,;|"]+""", RegexOption.IGNORE_CASE)
         val SEASON_KEY_REGEX = Regex("""\d{1,2}""")

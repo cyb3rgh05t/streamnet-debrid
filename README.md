@@ -31,13 +31,13 @@ Removed/omitted surfaces include the upstream marketing site, browser web app, r
 
 ### TV
 
-| Home                                                             | Live TV                                                     |
-| ---------------------------------------------------------------- | ----------------------------------------------------------- |
-| ![StreamNet TV home screen](screenshots/tv/tv-home.png)          | ![StreamNet TV Live TV screen](screenshots/tv/tv-live.png)  |
-| Profiles                                                         | IPTV VOD                                                    |
-| ![StreamNet TV profile selection](screenshots/tv/tv-profile.png) | ![StreamNet TV IPTV VOD catalog](screenshots/tv/tv-vod.png) |
-| IPTV VOD details                                                 |                                                             |
-| ![StreamNet TV IPTV VOD details](screenshots/tv/tv-vod2.png)     |                                                             |
+| Home                                                          | Live TV                                                  |
+| ------------------------------------------------------------- | -------------------------------------------------------- |
+| ![StreamNet home screen](screenshots/tv/tv-home.png)          | ![StreamNet Live TV screen](screenshots/tv/tv-live.png)  |
+| Profiles                                                      | IPTV VOD                                                 |
+| ![StreamNet profile selection](screenshots/tv/tv-profile.png) | ![StreamNet IPTV VOD catalog](screenshots/tv/tv-vod.png) |
+| IPTV VOD details                                              |                                                          |
+| ![StreamNet IPTV VOD details](screenshots/tv/tv-vod2.png)     |                                                          |
 
 ## Cloud Migration Status
 

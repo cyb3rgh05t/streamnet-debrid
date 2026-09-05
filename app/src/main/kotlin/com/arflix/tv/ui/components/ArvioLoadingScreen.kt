@@ -41,7 +41,7 @@ import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 
 /**
- * Premium StreamNet TV Loading Screen - Optimized for TV Performance
+ * Premium StreamNet Loading Screen - Optimized for TV Performance
  * Removed heavy effects: blur, particles, multiple animated layers
  * Clean, lightweight design that runs smooth on TV hardware
  */

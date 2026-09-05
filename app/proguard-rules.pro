@@ -1,5 +1,5 @@
 # ============================================
-# StreamNet TV ProGuard/R8 Rules
+# StreamNet ProGuard/R8 Rules
 # Production-ready optimization rules
 # ============================================
 

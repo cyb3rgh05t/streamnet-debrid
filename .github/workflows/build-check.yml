@@ -293,7 +293,7 @@ jobs:
       - name: Send German changelog to Telegram
         env:
           CHANGELOG_VERSION: ${{ steps.package.outputs.version_name }}
-          CHANGELOG_TITLE: StreamNet TV Update
+          CHANGELOG_TITLE: StreamNet Update
           CHANGELOG_FILE: CHANGELOG.md
           RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.package.outputs.version_name }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}

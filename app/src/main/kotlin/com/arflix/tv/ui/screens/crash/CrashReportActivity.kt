@@ -116,7 +116,7 @@ fun CrashReportScreen(
 
     val formattedReport = remember(crashId, sentryLink, crashMsg, crashDetails, crashVersion, timeString) {
         """
-        **StreamNet TV Crash Report**
+        **StreamNet Crash Report**
         **Crash ID:** `$crashId`
         **Sentry Link:** $sentryLink
         **Version:** $crashVersion
@@ -239,7 +239,7 @@ fun CrashReportScreen(
                     Button(
                         onClick = {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("StreamNet TV Crash Report", formattedReport)
+                            val clip = ClipData.newPlainText("StreamNet Crash Report", formattedReport)
                             clipboard.setPrimaryClip(clip)
                             Toast.makeText(context, context.getString(R.string.crash_details_copied), Toast.LENGTH_LONG).show()
 
