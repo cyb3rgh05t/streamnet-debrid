@@ -261,6 +261,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Prepare German release notes
+        env:
+          CHANGELOG_VERSION: ${{ steps.package.outputs.version_name }}
+          CHANGELOG_FILE: CHANGELOG.md
+          CHANGELOG_OUTPUT_FILE: release-notes.md
+          TELEGRAM_SKIP_SEND: "true"
+        run: python3 .github/scripts/send_telegram_changelog.py
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ secrets.TOKEN }}
@@ -270,25 +278,26 @@ jobs:
         run: |
           set -euo pipefail
           tag="${VERSION_NAME}"
-
-          gh api \
-            --method POST \
-            "repos/${GH_REPO}/releases/generate-notes" \
-            -f tag_name="$tag" \
-            -f target_commitish="$GITHUB_SHA" \
-            --jq '.body' \
-            > release-notes.md
           test -s release-notes.md
 
           if gh release view "$tag" >/dev/null 2>&1; then
             gh release upload "$tag" release-artifacts/* --clobber
-            current_notes="$(gh release view "$tag" --json body --jq '.body')"
-            if [ -z "${current_notes//[[:space:]]/}" ]; then
-              gh release edit "$tag" --notes-file release-notes.md
-            fi
+            gh release edit "$tag" --notes-file release-notes.md
           else
             gh release create "$tag" release-artifacts/* \
               --target "$GITHUB_SHA" \
               --title "StreamNet Debrid ${VERSION_NAME}" \
               --notes-file release-notes.md
           fi
+
+      - name: Send German changelog to Telegram
+        env:
+          CHANGELOG_VERSION: ${{ steps.package.outputs.version_name }}
+          CHANGELOG_TITLE: StreamNet TV Update
+          CHANGELOG_FILE: CHANGELOG.md
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.package.outputs.version_name }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TELEGRAM_DRY_RUN: "false"
+        run: python3 .github/scripts/send_telegram_changelog.py

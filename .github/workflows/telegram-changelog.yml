@@ -1,0 +1,52 @@
+name: Telegram-Changelog
+run-name: Telegram-Changelog ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version, zum Beispiel 2.3.003"
+        required: true
+        type: string
+      title:
+        description: "Titel der Telegram-Nachricht"
+        required: true
+        default: "StreamNet TV Update"
+        type: string
+      release_url:
+        description: "Optionaler Link zum GitHub-Release oder Download"
+        required: false
+        type: string
+      preview_only:
+        description: "Nur Vorschau im Action-Log, nichts an Telegram senden"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-changelog
+  cancel-in-progress: false
+
+jobs:
+  send:
+    name: Deutschen Changelog senden
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Changelog formatieren und senden
+        env:
+          CHANGELOG_VERSION: ${{ inputs.version }}
+          CHANGELOG_TITLE: ${{ inputs.title }}
+          CHANGELOG_FILE: CHANGELOG.md
+          RELEASE_URL: ${{ inputs.release_url }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TELEGRAM_DRY_RUN: ${{ inputs.preview_only }}
+        run: python3 .github/scripts/send_telegram_changelog.py

@@ -94,6 +94,10 @@ upload.keystore
 *.swp
 *~
 
+# Python caches
+__pycache__/
+*.py[cod]
+
 # Internal planning artifacts (not needed for OSS runtime/build)
 .planning/
 .claude/

@@ -1,247 +1,253 @@
 # Changelog
 
-All notable changes to this project are documented in this file.
+Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unreleased]
+## [Unveröffentlicht]
 
-### TV interface
+## [2.3.003] - 2026-09-05
 
-- Expanded TV playlist cards into separate information and action rows so the StreamNet TV preset remains readable on television layouts.
-- Allowed TV Settings header descriptions to wrap to two lines instead of truncating after one line.
-- Standardized Settings option, catalog, addon, and contextual help descriptions to a maximum of two lines.
-- Corrected diagnostics copy and privacy documentation to distinguish configuration-dependent crash reporting from first-party app-start measurement.
-- Restored the missing Favorites chip in the Netflix-style Live TV category bar while keeping Search and all categories in one horizontally scrolling row.
-- Documented crash-reporting providers, build gates, self-hosting options, app-start measurement, and current verification status.
+### TV-Oberfläche
+
+- TV-Playlist-Karten wurden in separate Informations- und Aktionszeilen erweitert, damit die StreamNet TV-Voreinstellung in TV-Layouts lesbar bleibt.
+- Beschreibungen in Kopfzeilen der TV-Settings können nun zweizeilig umgebrochen werden, statt nach einer Zeile abgeschnitten zu werden.
+- Beschreibungen für Optionen, Kataloge, Add-ons und Kontexthilfen in den Settings wurden auf maximal zwei Zeilen vereinheitlicht.
+- Diagnosetexte und Datenschutzdokumentation wurden korrigiert, um konfigurationsabhängige Absturzberichte von der eigenen Messung der App-Starts abzugrenzen.
+- Der fehlende Favoriten-Chip in der Netflix-artigen Live TV-Kategorieleiste wurde wiederhergestellt; Search und alle Kategorien bleiben dabei in einer horizontal scrollbaren Zeile.
+- Anbieter von Absturzberichten, Build-Bedingungen, Self-Hosting-Optionen, die Messung der App-Starts und der aktuelle Prüfstatus wurden dokumentiert.
+
+### Automatisierung
+
+- GitHub Releases und der eigenständige Telegram-Workflow verwenden automatisch den passenden deutschen Versionsabschnitt aus `CHANGELOG.md`; der Release-Build sendet ihn erst nach erfolgreicher APK-Erstellung und Release-Veröffentlichung an das konfigurierte Telegram-Thema. Vorschaumodus und automatische Aufteilung langer Changelogs bleiben verfügbar.
 
 ## [2.3.002] - 2026-09-04
 
-### Security
+### Sicherheit
 
-- Added an independent, profile-scoped Settings PIN for phone, tablet, and TV. The full Settings area is blocked until the PIN is verified, while PIN hashes and lock state synchronize with timestamp-aware conflict protection.
-- Added controls to set, change, enable, and disable the Settings lock without storing the PIN in plaintext.
+- Eine unabhängige, profilbezogene Settings-PIN für Smartphone, Tablet und TV wurde hinzugefügt. Der gesamte Settings-Bereich bleibt bis zur PIN-Bestätigung gesperrt, während PIN-Hashes und Sperrstatus mit zeitstempelbasierter Konfliktbehandlung synchronisiert werden.
+- Steuerelemente zum Festlegen, Ändern, Aktivieren und Deaktivieren der Settings-Sperre wurden hinzugefügt, ohne die PIN im Klartext zu speichern.
 
-### Interface
+### Oberfläche
 
-- Removed the duplicate enabled state from mobile and tablet IPTV playlist cards and clarified the order of edit, enable, category, reorder, and delete actions.
-- Reordered the TV Settings sidebar to show Profile, Cloud Sync, and Accounts in that order, and Interface, Plugins, Network, and Info & Updates in that order.
-- Applied the selected profile accent throughout the Settings PIN dialog and made the profile status badge report the actual Settings lock state.
-- Added visible accent focus to the profile editor name field and left-side controls, and kept compact cancel/delete actions on one line.
+- Der doppelte Aktivierungsstatus wurde aus IPTV-Playlist-Karten auf Smartphone und Tablet entfernt und die Reihenfolge der Aktionen Bearbeiten, Aktivieren, Kategorie, Neu anordnen und Löschen verdeutlicht.
+- Die Seitenleiste der TV-Settings wurde neu sortiert, sodass Profile, Cloud Sync und Accounts sowie Interface, Plugins, Network und Info & Updates jeweils in dieser Reihenfolge angezeigt werden.
+- Der ausgewählte Profilakzent wird nun im gesamten Settings-PIN-Dialog verwendet und das Profilstatus-Badge zeigt den tatsächlichen Status der Settings-Sperre an.
+- Das Namensfeld im Profileditor und die Steuerelemente auf der linken Seite erhielten einen sichtbaren Akzentfokus; kompakte Aktionen zum Abbrechen und Löschen bleiben in einer Zeile.
 
 ## [2.3.001] - 2026-09-04
 
-### Cloud and account reliability
+### Zuverlässigkeit von Cloud und Konten
 
-- Protected Trakt, Simkl, and MDBList provider choices and credentials with per-profile timestamps so older devices and legacy cloud payloads cannot overwrite newer selections or credential removals.
-- Preserved the preferred tracking provider when another provider is connected and repaired read modes only when their selected provider is unavailable.
-- Debounced rapid Settings cloud updates and contained unexpected push, restore, and authentication errors at the Settings boundary.
-- Prevented failed HTTP responses from being cached and initialized shared networking early enough for startup consumers.
+- Die Auswahl und Zugangsdaten der Anbieter Trakt, Simkl und MDBList wurden mit profilbezogenen Zeitstempeln geschützt, damit ältere Geräte und veraltete Cloud-Nutzdaten neuere Auswahlen oder das Entfernen von Zugangsdaten nicht überschreiben können.
+- Der bevorzugte Tracking-Anbieter bleibt beim Verbinden eines anderen Anbieters erhalten; Lesemodi werden nur repariert, wenn ihr ausgewählter Anbieter nicht verfügbar ist.
+- Schnell aufeinanderfolgende Cloud-Aktualisierungen in den Settings wurden entprellt und unerwartete Fehler beim Übertragen, Wiederherstellen und Authentifizieren an der Settings-Grenze abgefangen.
+- Fehlgeschlagene HTTP-Antworten werden nicht mehr zwischengespeichert und das gemeinsame Netzwerk wird früh genug für Komponenten beim App-Start initialisiert.
 
-### Home Server and Home
+### Home Server und Home
 
-- Limited Plex, Jellyfin, and Emby Home catalogs to real movie and series libraries, excluding collections, box sets, music, photos, and mixed views.
-- Added profile-synced per-server library visibility controls for TV and touch Settings, with stale or disabled catalogs removed from Home.
-- Reorganized Home Server Settings into add, connected-server, library, and server-action sections and corrected the connected-server status badge.
-- Preserved usable cached Home rows during refreshes and added a six-hour stale refresh instead of repeatedly replacing loaded content.
+- Home-Kataloge von Plex, Jellyfin und Emby wurden auf echte Film- und Serienbibliotheken beschränkt; Sammlungen, Boxsets, Musik, Fotos und gemischte Ansichten werden ausgeschlossen.
+- Profilsynchronisierte Steuerelemente für die Bibliothekssichtbarkeit je Server wurden zu den TV- und Touch-Settings hinzugefügt; veraltete oder deaktivierte Kataloge werden aus Home entfernt.
+- Die Home Server-Settings wurden in Bereiche zum Hinzufügen, für verbundene Server, Bibliotheken und Serveraktionen neu gegliedert und das Status-Badge für verbundene Server korrigiert.
+- Nutzbare zwischengespeicherte Home-Zeilen bleiben bei Aktualisierungen erhalten; statt geladene Inhalte wiederholt zu ersetzen, erfolgt nun nach sechs Stunden eine Aktualisierung veralteter Daten.
 
-### IPTV and Live TV
+### IPTV und Live TV
 
-- Added profile-synced StreamNet movie and series category visibility while keeping search, playback sources, and other Xtream playlists unaffected.
-- Reorganized IPTV Settings into a Playlists section with a subsection for every playlist and separate Live and VOD category controls.
-- Preserved the selected Live TV group and channel across playlist refreshes and Settings navigation.
-- Fixed green preview artifacts after leaving fullscreen by enforcing exclusive ExoPlayer surface ownership.
+- Die profilsynchronisierte Sichtbarkeit von StreamNet-Film- und Serienkategorien wurde hinzugefügt, ohne Search, Wiedergabequellen und andere Xtream-Playlists zu beeinflussen.
+- Die IPTV-Settings wurden in einen Playlists-Bereich mit einem Unterbereich für jede Playlist sowie getrennten Steuerelementen für Live- und VOD-Kategorien neu gegliedert.
+- Die ausgewählte Live TV-Gruppe und der ausgewählte Kanal bleiben bei Playlist-Aktualisierungen und der Navigation in den Settings erhalten.
+- Grüne Vorschauartefakte nach dem Verlassen des Vollbildmodus wurden durch die Erzwingung exklusiver ExoPlayer-Surface-Zuständigkeit behoben.
 
-### Interface and updates
+### Oberfläche und Aktualisierungen
 
-- Unified toast height and bottom placement above navigation controls and reused the themed notification surface for IPTV progress.
-- Applied the selected accent theme to Plugin dialogs and localized Plugin status messages and tracker list labels.
-- Kept GitHub release notes visible throughout download, retry, and installation-ready states in the update dialog.
-- Updated the Android release workflow to generate release notes and backfill empty descriptions on existing releases.
-- Improved Home navigation fallback and English trailer fallback without overriding explicitly requested video languages.
+- Höhe und untere Platzierung von Toasts über den Navigationssteuerelementen wurden vereinheitlicht und die thematisierte Benachrichtigungsfläche für den IPTV-Fortschritt wiederverwendet.
+- Das ausgewählte Akzentdesign wurde auf Plugin-Dialoge angewendet und Plugin-Statusmeldungen sowie Beschriftungen der Tracker-Liste wurden lokalisiert.
+- GitHub-Versionshinweise bleiben im Aktualisierungsdialog während Download, erneutem Versuch und Installationsbereitschaft sichtbar.
+- Der Android-Release-Workflow wurde aktualisiert, um Versionshinweise zu erzeugen und leere Beschreibungen bestehender Releases nachzutragen.
+- Die Ausweichnavigation in Home und der englische Trailer-Fallback wurden verbessert, ohne ausdrücklich angeforderte Videosprachen zu überschreiben.
 
-### Validation
+### Validierung
 
-- Added regression coverage for Home Server library filtering, IPTV VOD category visibility, legacy catalog compatibility, and timestamp-aware sync-provider state.
-- Validated the Sideload Kotlin build, enabled Sideload unit-test suite, Debug APK assembly, IDE diagnostics, and whitespace checks.
+- Regressionstests für die Bibliotheksfilterung von Home Server, die Sichtbarkeit von IPTV-VOD-Kategorien, die Kompatibilität alter Kataloge und den zeitstempelbasierten Status des Synchronisierungsanbieters wurden hinzugefügt.
+- Der Sideload-Kotlin-Build, die aktivierte Sideload-Unit-Test-Suite, die Erstellung der Debug APK, IDE-Diagnosen und Whitespace-Prüfungen wurden validiert.
 
-### Settings visual consistency
+### Visuelle Konsistenz der Settings
 
-- Added semantic leading icons throughout TV Settings, including toggles, actions, account integrations, custom playlists, catalogs, and plugin scraper controls.
-- Standardized TV Settings icon sizing, spacing, neutral tint, and selected-theme accent treatment across shared and custom rows.
-- Unified in-app toast styling with the active profile accent, OLED-aware background, and bottom-center placement; Player match results and Telegram/update events now use the same presentation while the app is visible.
-- Removed the redundant inner focus border from Addon switches while preserving the full-row focus indicator and D-pad actions.
-- Applied the selected theme accent to Addon refresh/install actions and the AI model selection dialog.
-- Localized StreamNet credential placeholders and the default Settings input placeholder in English and German.
-- Bumped the Android application to `2.2.005` (`versionCode` 380).
-- Documented implementation behavior and validation in `docs/superpowers/settings-visual-consistency-2026-09-03.md`.
+- In den gesamten TV-Settings wurden vorangestellte semantische Symbole hinzugefügt, darunter für Umschalter, Aktionen, Kontointegrationen, benutzerdefinierte Playlists, Kataloge und Steuerelemente für Plugin-Scraper.
+- Symbolgröße, Abstände, neutrale Tönung und die Akzentdarstellung des ausgewählten Designs wurden in gemeinsamen und benutzerdefinierten Zeilen der TV-Settings vereinheitlicht.
+- Das Styling von In-App-Toasts wurde mit dem aktiven Profilakzent, einem OLED-gerechten Hintergrund und einer Platzierung unten mittig vereinheitlicht; Treffer des Players sowie Telegram-/Aktualisierungsereignisse verwenden nun dieselbe Darstellung, solange die App sichtbar ist.
+- Der überflüssige innere Fokusrahmen wurde von Addon-Umschaltern entfernt, während die Fokusmarkierung der gesamten Zeile und D-Pad-Aktionen erhalten bleiben.
+- Der Akzent des ausgewählten Designs wurde auf Addon-Aktualisierungs-/Installationsaktionen und den Dialog zur Auswahl des AI-Modells angewendet.
+- Platzhalter für StreamNet-Zugangsdaten und der standardmäßige Eingabeplatzhalter der Settings wurden auf Englisch und Deutsch lokalisiert.
+- Die Android-Anwendung wurde auf `2.2.005` (`versionCode` 380) angehoben.
+- Implementierungsverhalten und Validierung wurden in `docs/superpowers/settings-visual-consistency-2026-09-03.md` dokumentiert.
 
-### Playback, IPTV, Search, and portal polish
+### Feinschliff für Wiedergabe, IPTV, Search und Portal
 
-- Automatically selects an embedded forced subtitle matching the active audio language even when normal subtitles are set to Off, while preserving explicit manual subtitle choices.
-- Invalidates Home logo caches when the content language changes so Home and Details prefer the same localized artwork.
-- Added a profile-scoped, cloud-synced IPTV VOD search toggle that controls Xtream movie/series source lookup and cache warmup without affecting Live TV or configured playlists.
-- Improved IPTV-only Home matching with TMDB ID, IMDb ID, and release-year checks before falling back to normalized titles.
-- Kept loaded Home cards visible during pagination and prevented focus restoration from landing on paging placeholders.
-- Improved Xtream catalog reliability by using the long-running IPTV HTTP client and removing short nested lookup timeouts from full-catalog fallbacks.
-- Fixed TV Search filter activation, persistent selection, Anime filtering, and active-accent styling across common remote Enter key variants.
-- Reorganized TV playlist settings with a dedicated section heading, consistent icons and focus styling, and the destructive playlist deletion action last.
-- Made loading feedback immediate during IPTV setup and positioned toast notifications above system navigation insets.
-- Corrected mobile content ordering on the self-hosted Privacy and Cloud account pages while leaving account deletion flow unchanged.
-- Bumped the Android application to `2.2.004` (`versionCode` 379).
-- Documented implementation behavior and validation in `docs/superpowers/playback-iptv-search-polish-2026-09-03.md`.
+- Ein eingebetteter erzwungener Untertitel passend zur aktiven Audiosprache wird nun auch dann automatisch ausgewählt, wenn normale Untertitel auf Off stehen; ausdrückliche manuelle Untertitelauswahlen bleiben erhalten.
+- Home-Logo-Caches werden bei einer Änderung der Inhaltssprache invalidiert, damit Home und Details dasselbe lokalisierte Artwork bevorzugen.
+- Ein profilbezogener, cloud-synchronisierter Schalter für die IPTV-VOD-Suche wurde hinzugefügt, der die Suche nach Xtream-Film-/Serienquellen und das Vorwärmen des Caches steuert, ohne Live TV oder konfigurierte Playlists zu beeinflussen.
+- Der Abgleich in IPTV-only Home wurde durch Prüfungen von TMDB ID, IMDb ID und Erscheinungsjahr verbessert, bevor auf normalisierte Titel zurückgegriffen wird.
+- Geladene Home-Karten bleiben während der Seitennavigation sichtbar und die Fokuswiederherstellung landet nicht mehr auf Platzhaltern für weitere Seiten.
+- Die Zuverlässigkeit des Xtream-Katalogs wurde durch Verwendung des langlebigen IPTV-HTTP-Clients und das Entfernen kurzer, verschachtelter Such-Timeouts aus vollständigen Katalog-Fallbacks verbessert.
+- Aktivierung und dauerhafte Auswahl von TV-Search-Filtern, die Anime-Filterung sowie das Styling mit aktivem Akzent wurden für gängige Enter-Tastenvarianten von Fernbedienungen korrigiert.
+- Die TV-Playlist-Settings wurden mit einer eigenen Bereichsüberschrift, einheitlichen Symbolen und Fokus-Styling neu gegliedert; die destruktive Aktion zum Löschen der Playlist steht nun zuletzt.
+- Während der IPTV-Einrichtung wird Ladefeedback nun sofort angezeigt und Toast-Benachrichtigungen werden oberhalb der Einrückungen der Systemnavigation platziert.
+- Die mobile Inhaltsreihenfolge auf den selbst gehosteten Seiten Privacy und Cloud-Konto wurde korrigiert, ohne den Ablauf der Kontolöschung zu verändern.
+- Die Android-Anwendung wurde auf `2.2.004` (`versionCode` 379) angehoben.
+- Implementierungsverhalten und Validierung wurden in `docs/superpowers/playback-iptv-search-polish-2026-09-03.md` dokumentiert.
 
-### IPTV-only home and Xtream VOD
+### IPTV-only Home und Xtream VOD
 
-- Added a profile-scoped IPTV-only mode for TV, tablet, and phone that filters the Home presentation without deleting configured catalogs or cached data.
-- Added provider-grouped Xtream movie and series rails, including stable unresolved identities for entries without TMDB IDs and lazy metadata resolution when cards are focused or opened.
-- Kept Continue Watching visible while IPTV-only mode is active and while provider availability is still loading.
-- Fixed unresolved Xtream VOD playback classification and progress persistence so negative local identities are not mistaken for Live TV.
-- Allowed the self-hosted watch-history API to synchronize negative identities only for the dedicated `iptv_xtream_vod` source while continuing to reject zero or unrelated negative IDs.
-- Hardened selective IPTV playlist imports and legacy playlist activation behavior, with focused regression coverage.
+- Ein profilbezogener IPTV-only-Modus für TV, Tablet und Smartphone wurde hinzugefügt, der die Home-Darstellung filtert, ohne konfigurierte Kataloge oder zwischengespeicherte Daten zu löschen.
+- Nach Anbietern gruppierte Xtream-Film- und -Serienzeilen wurden hinzugefügt, einschließlich stabiler unaufgelöster Identitäten für Einträge ohne TMDB IDs und verzögerter Metadatenauflösung beim Fokussieren oder Öffnen von Karten.
+- Continue Watching bleibt sichtbar, während der IPTV-only-Modus aktiv ist und während die Anbieterverfügbarkeit noch geladen wird.
+- Die Klassifizierung der Wiedergabe und die Fortschrittsspeicherung für unaufgelöste Xtream VOD-Inhalte wurden korrigiert, damit negative lokale Identitäten nicht mit Live TV verwechselt werden.
+- Die selbst gehostete Wiedergabeverlauf-API darf negative Identitäten nur für die vorgesehene Quelle `iptv_xtream_vod` synchronisieren; null und nicht zugehörige negative IDs werden weiterhin abgelehnt.
+- Selektive IPTV-Playlist-Importe und das Aktivierungsverhalten älterer Playlists wurden robuster gemacht und mit gezielten Regressionstests abgedeckt.
 
-### Touch and Live TV experience
+### Touch- und Live TV-Erlebnis
 
-- Added a larger landscape-tablet Live TV preview and a height-matched TV-style current/upcoming-program panel while keeping categories and the EPG grid visible.
-- Removed the red LIVE badge from phone and tablet EPG cells while retaining it on TV.
-- Applied the selected accent theme to the touch Search field, cursor, loading indicators, and selected filter chips.
-- Refined collection and Home behavior for IPTV-only projection, card focus prefetch, and provider artwork fallback.
+- Eine größere Live TV-Vorschau für Tablets im Querformat und ein höhenangepasstes Panel im TV-Stil für das aktuelle und kommende Programm wurden hinzugefügt; Kategorien und EPG-Raster bleiben sichtbar.
+- Das rote LIVE-Badge wurde aus EPG-Zellen auf Smartphone und Tablet entfernt, auf dem TV bleibt es erhalten.
+- Das ausgewählte Akzentdesign wurde auf das Touch-Search-Feld, den Cursor, Ladeanzeigen und ausgewählte Filter-Chips angewendet.
+- Das Verhalten von Sammlungen und Home wurde für die IPTV-only-Darstellung, das Vorladen beim Kartenfokus und den Artwork-Fallback von Anbietern verfeinert.
 
-### Self-hosted account portal
+### Selbst gehostetes Kontoportal
 
-- Localized known browser-facing authentication, pairing, password, deletion, and Discord errors in German while keeping the backend API contract language-neutral.
-- Unified sign-in, privacy, account deletion, and Discord pages around the StreamNet dark/gold visual system and shared language preference.
-- Rebuilt privacy and account deletion pages with the same standalone language switch and in-shell logo structure as the main account page, without navigation bars.
-- Made the privacy policy mobile-safe, including contained horizontal scrolling for wide data tables and overflow checks across phone and desktop viewports.
-- Added public-page regression tests for German errors, responsive styling, and shared StreamNet branding.
+- Bekannte browserseitige Fehler bei Authentifizierung, Kopplung, Passwort, Löschung und Discord wurden auf Deutsch lokalisiert, während der Vertrag der Backend-API sprachneutral bleibt.
+- Die Seiten für Anmeldung, Datenschutz, Kontolöschung und Discord wurden mit dem dunkel-goldenen visuellen System von StreamNet und einer gemeinsamen Spracheinstellung vereinheitlicht.
+- Die Seiten für Datenschutz und Kontolöschung wurden ohne Navigationsleisten mit demselben eigenständigen Sprachumschalter und derselben Logo-Struktur innerhalb der Oberfläche wie die Hauptkontoseite neu erstellt.
+- Die Datenschutzerklärung wurde für Mobilgeräte optimiert, einschließlich begrenztem horizontalem Scrollen für breite Datentabellen und Überlaufprüfungen in Smartphone- und Desktop-Ansichten.
+- Regressionstests öffentlicher Seiten für deutsche Fehler, responsives Styling und einheitliches StreamNet-Branding wurden hinzugefügt.
 
-### Release
+### Veröffentlichung
 
-- Bumped the Android application to `2.2.003` (`versionCode` 378).
-- Documented implementation boundaries, validation, and merge-preservation guidance in `docs/superpowers/iptv-only-vod-and-portal-2026-09-02.md`.
+- Die Android-Anwendung wurde auf `2.2.003` (`versionCode` 378) angehoben.
+- Implementierungsgrenzen, Validierung und Hinweise zur Beibehaltung bei Merges wurden in `docs/superpowers/iptv-only-vod-and-portal-2026-09-02.md` dokumentiert.
 
-### Cloud session reliability
+### Zuverlässigkeit von Cloud-Sitzungen
 
-- Made TV pairing token delivery atomic so overlapping status polls cannot receive the same refresh token.
-- Prevented a delayed refresh rejection from clearing a newer session that another request already stored.
+- Die Übermittlung von TV-Kopplungstokens erfolgt nun atomar, sodass sich überschneidende Statusabfragen nicht dasselbe Aktualisierungstoken erhalten können.
+- Eine verzögerte Ablehnung der Aktualisierung kann keine neuere Sitzung mehr löschen, die bereits von einer anderen Anfrage gespeichert wurde.
 
-### Live TV category artwork and settings focus
+### Live TV-Kategorie-Artwork und Settings-Fokus
 
-- Added 15 bundled category backdrops and 255 SVG country flags for Live TV, with provider/category-aware mappings and country aliases.
-- Applied non-flag category artwork to Home Favorite TV and Recently Watched TV cards, Home hero, and the IPTV program dialog while preserving remote program artwork as the first choice.
-- Applied category artwork to the TV-mode Netflix Live TV channel cards and info panel; country flags remain card-only and are never stretched across hero/info backgrounds.
-- Kept `STREAMNET RELAX` on the sender-logo fallback without category artwork or country flags.
-- Improved TMDB, TVDB, and Fanart.tv matching with staged title queries, spin-off-aware scoring, `Navy CIS` canonicalization, and retryable negative artwork caching.
-- Reworked TV IPTV category ordering to use the single outer settings scroller, retain focus on the moved category, reset inherited scroll state, and show an accent-colored focused-row selector without hidden rows or page jumps.
-- Added focused regression coverage for category/flag resolution, Home artwork eligibility, IPTV title matching, category ordering, and focus movement.
+- Für Live TV wurden 15 mitgelieferte Kategorie-Hintergründe und 255 SVG-Länderflaggen mit anbieter-/kategoriebezogenen Zuordnungen und Länderaliasen hinzugefügt.
+- Kategorie-Artwork ohne Flaggen wurde auf Home-Karten für Favorite TV und Recently Watched TV, den Home-Hero und den IPTV-Programmdialog angewendet; externes Programm-Artwork bleibt die erste Wahl.
+- Kategorie-Artwork wurde auf die Netflix-artigen Live TV-Senderkarten und das Info-Panel im TV-Modus angewendet; Länderflaggen bleiben auf Karten beschränkt und werden nie über Hero-/Info-Hintergründe gestreckt.
+- `STREAMNET RELAX` bleibt beim Senderlogo-Fallback ohne Kategorie-Artwork oder Länderflaggen erhalten.
+- Der Abgleich mit TMDB, TVDB und Fanart.tv wurde durch gestaffelte Titelabfragen, Spin-off-bewertete Gewichtung, die Kanonisierung von `Navy CIS` und wiederholbares negatives Artwork-Caching verbessert.
+- Die Sortierung von TV-IPTV-Kategorien wurde überarbeitet, um den einzigen äußeren Settings-Scroller zu verwenden, den Fokus auf der verschobenen Kategorie zu halten, den übernommenen Scrollstatus zurückzusetzen und eine akzentfarbene Auswahlmarkierung der fokussierten Zeile ohne ausgeblendete Zeilen oder Seitensprünge anzuzeigen.
+- Gezielte Regressionstests für die Auflösung von Kategorien/Flaggen, die Eignung von Home-Artwork, den IPTV-Titelabgleich, die Kategoriesortierung und die Fokusbewegung wurden hinzugefügt.
 
-### Cloud sessions, TV metadata, and IPTV artwork
+### Cloud-Sitzungen, TV-Metadaten und IPTV-Artwork
 
-- Kept a persisted StreamNet Cloud session during temporary token-refresh or network failures while still signing out sessions that are definitively expired, rejected, or missing a refresh token.
-- Improved TV metadata localization by retaining app-language fields and filling only missing values from English TMDB details.
-- Ranked TV logos by app language, English, then neutral artwork; ranked backdrops by neutral, app language, then English artwork.
-- Cleaned episode suffixes and preserved diacritics during IPTV artwork matching so localized EPG titles resolve more reliably.
-- Searched both TMDB movie and TV results for IPTV artwork and used EPG duration as a soft type hint. Long exact-title programs now prefer a movie result, preventing titles such as `Rambo` from resolving to a same-named TV series.
-- Passed EPG start/end times through Home hero, Home IPTV cards, and Live TV cards, and separated movie-like artwork cache entries from mixed searches.
+- Eine gespeicherte StreamNet Cloud-Sitzung bleibt bei vorübergehenden Fehlern der Token-Aktualisierung oder des Netzwerks bestehen; Sitzungen, die eindeutig abgelaufen oder abgelehnt sind oder kein Aktualisierungstoken besitzen, werden weiterhin abgemeldet.
+- Die Lokalisierung von TV-Metadaten wurde verbessert, indem Felder in der App-Sprache beibehalten und nur fehlende Werte aus englischen TMDB-Details ergänzt werden.
+- TV-Logos werden nach App-Sprache, Englisch und anschließend neutralem Artwork priorisiert; Hintergründe nach neutralem Artwork, App-Sprache und anschließend englischem Artwork.
+- Episodensuffixe wurden bereinigt und diakritische Zeichen beim IPTV-Artwork-Abgleich beibehalten, damit lokalisierte EPG-Titel zuverlässiger aufgelöst werden.
+- Für IPTV-Artwork werden sowohl Film- als auch TV-Ergebnisse von TMDB durchsucht und die EPG-Dauer als weicher Typhinweis verwendet. Programme mit langen, exakt übereinstimmenden Titeln bevorzugen nun ein Filmergebnis, damit Titel wie `Rambo` nicht einer gleichnamigen TV-Serie zugeordnet werden.
+- EPG-Start-/Endzeiten werden an den Home-Hero, Home-IPTV-Karten und Live TV-Karten weitergegeben; filmartige Artwork-Cache-Einträge wurden von gemischten Suchen getrennt.
 
-### Startup, updates, and validation
+### App-Start, Aktualisierungen und Validierung
 
-- Restored the currently playing Live TV channel rather than a merely browsed channel and retained the remembered channel while asynchronous playlists are still loading.
-- Refreshed the series play target on the first real return from the player, so completing episode 9 updates the Details button to episode 10 instead of leaving the stale episode 9 label visible.
-- Kept a newly selected, unstarted Up Next episode in the Home Continue Watching rail when a stale remote entry for the previous episode still exists.
-- Limited automatic signed Android builds to pushes that change `versionCode` or `versionName`; manual workflow runs remain available.
-- Made automatic update checks open newly available, non-ignored releases while manual checks can still reopen an ignored release.
-- Added regression coverage for Cloud startup sessions, localized artwork ordering, ambiguous movie/TV IPTV titles, Live TV restoration, and update-dialog behavior.
-- Validated the official `2.1.105` Android build with the full opt-in Sideload Debug unit-test task and APK assembly.
+- Statt eines lediglich angesehenen Kanals wird wieder der aktuell wiedergegebene Live TV-Kanal hergestellt; der gemerkte Kanal bleibt erhalten, während asynchrone Playlists noch geladen werden.
+- Das Wiedergabeziel einer Serie wird bei der ersten tatsächlichen Rückkehr vom Player aktualisiert, sodass nach Abschluss von Episode 9 der Details-Button auf Episode 10 aktualisiert wird, statt die veraltete Beschriftung für Episode 9 anzuzeigen.
+- Eine neu ausgewählte, noch nicht gestartete Up Next-Episode bleibt in der Continue Watching-Zeile von Home, wenn noch ein veralteter entfernter Eintrag für die vorherige Episode vorhanden ist.
+- Automatische signierte Android-Builds wurden auf Pushes beschränkt, die `versionCode` oder `versionName` ändern; manuelle Workflow-Ausführungen bleiben verfügbar.
+- Automatische Aktualisierungsprüfungen öffnen neu verfügbare, nicht ignorierte Releases; manuelle Prüfungen können weiterhin ein ignoriertes Release erneut öffnen.
+- Regressionstests für Cloud-Sitzungen beim App-Start, die Sortierung lokalisierter Artworks, mehrdeutige Film-/TV-IPTV-Titel, die Wiederherstellung von Live TV und das Verhalten des Aktualisierungsdialogs wurden hinzugefügt.
+- Der offizielle Android-Build `2.1.105` wurde mit der vollständigen optionalen Sideload-Debug-Unit-Test-Aufgabe und der APK-Erstellung validiert.
 
-### Media3 1.10.1 evaluation
+### Evaluierung von Media3 1.10.1
 
-- Promoted the tested Media3 `1.10.1` dependency set to the official `2.1.107` build after evaluation on `test/media3-1.10.1`.
-- Updated the Media3 ExoPlayer, HLS, DASH, OkHttp datasource, UI, session, and common modules to `1.10.1`.
-- Kept Jellyfin's FFmpeg extension at `1.9.0+1` because no matching `1.10.1` artifact is available, and kept the custom Dolby Vision Matroska extractor based on Media3 `1.9.0` pending device playback validation.
-- Confirmed that the Media3 test branch passes Sideload Debug unit tests and builds an APK. The real-device Dolby Vision, DTS/TrueHD/Atmos, HLS, DASH, seeking, subtitles, and fallback checklist remains documented for compatibility tracking.
-- Documented the branch matrix, Cloud/proxy feature flags, expected Media3 benefits, compatibility boundaries, and test checklist in `docs/media3-1.10.1-evaluation.md`.
+- Der getestete Media3-Abhängigkeitssatz `1.10.1` wurde nach der Evaluierung auf `test/media3-1.10.1` in den offiziellen Build `2.1.107` übernommen.
+- Die Media3-Module ExoPlayer, HLS, DASH, OkHttp-Datenquelle, UI, Sitzung und Common wurden auf `1.10.1` aktualisiert.
+- Die FFmpeg-Erweiterung von Jellyfin bleibt auf `1.9.0+1`, da kein passendes Artefakt für `1.10.1` verfügbar ist; der benutzerdefinierte Dolby Vision-Matroska-Extractor auf Basis von Media3 `1.9.0` bleibt bis zur Validierung der Wiedergabe auf Geräten erhalten.
+- Es wurde bestätigt, dass der Media3-Test-Branch die Sideload-Debug-Unit-Tests besteht und eine APK erstellt. Die Checkliste für Dolby Vision, DTS/TrueHD/Atmos, HLS, DASH, Spulen, Untertitel und Fallback auf echten Geräten bleibt zur Kompatibilitätsverfolgung dokumentiert.
+- Branch-Matrix, Cloud-/Proxy-Feature-Flags, erwartete Vorteile von Media3, Kompatibilitätsgrenzen und Testcheckliste wurden in `docs/media3-1.10.1-evaluation.md` dokumentiert.
 
-### APK size and build compatibility
+### APK-Größe und Build-Kompatibilität
 
-- Reduced the default universal APK from 206.58 MB to 115.25 MB by packaging 32-bit and 64-bit ARM libraries while retaining optional x86/x86_64 emulator builds through `-PincludeX86Abis=true`.
-- Converted 109 unchanged avatar, ranking, and sports images to WebP while preserving both custom StreamNet launcher banners byte-for-byte.
-- Enabled release resource shrinking; the validated ARM sideload release is 90.73 MB and retains the StreamNet banners and referenced avatar, ranking, and sports resources.
+- Die standardmäßige universelle APK wurde von 206.58 MB auf 115.25 MB verkleinert, indem 32-Bit- und 64-Bit-ARM-Bibliotheken paketiert wurden; optionale x86/x86_64-Emulator-Builds über `-PincludeX86Abis=true` bleiben verfügbar.
+- 109 unveränderte Avatar-, Ranking- und Sportbilder wurden in WebP konvertiert, wobei beide benutzerdefinierten StreamNet-Launcher-Banner Byte für Byte erhalten blieben.
+- Die Ressourcenverkleinerung für Releases wurde aktiviert; das validierte ARM-Sideload-Release ist 90.73 MB groß und enthält weiterhin die StreamNet-Banner sowie die referenzierten Avatar-, Ranking- und Sportressourcen.
 
-### Settings, updates, and feedback
+### Settings, Aktualisierungen und Rückmeldungen
 
-- Split TV settings into dedicated `Profile > Cloud Sync` and `System > Info & Updates` sections while keeping tracking providers under Accounts.
-- Made update indicators reflect the actual GitHub release check instead of merely showing that self-updates are supported.
-- Added visible Home Server code-pairing phases for approval, server discovery, connection, library loading, and final setup.
-- Moved app toast notifications into a non-interactive overlay window so status and error messages remain visible above open dialogs without blocking touch or D-pad input.
-- Removed the unreliable launch-after-device-start setting, receiver, permission, persisted preference, and cloud-sync field.
+- Die TV-Settings wurden in eigene Bereiche `Profile > Cloud Sync` und `System > Info & Updates` aufgeteilt; Tracking-Anbieter bleiben unter Accounts.
+- Aktualisierungsanzeigen spiegeln nun die tatsächliche GitHub-Release-Prüfung wider, statt lediglich die Unterstützung von Selbstaktualisierungen anzuzeigen.
+- Sichtbare Phasen der Code-Kopplung für Home Server wurden für Genehmigung, Serversuche, Verbindung, Laden der Bibliothek und abschließende Einrichtung hinzugefügt.
+- App-Toast-Benachrichtigungen wurden in ein nicht interaktives Overlay-Fenster verschoben, damit Status- und Fehlermeldungen über geöffneten Dialogen sichtbar bleiben, ohne Touch- oder D-Pad-Eingaben zu blockieren.
+- Die unzuverlässige Einstellung für den Start nach dem Gerätestart sowie Receiver, Berechtigung, gespeicherte Präferenz und Cloud-Sync-Feld wurden entfernt.
 
-### StreamNet Cloud, profiles, and account safety
+### StreamNet Cloud, Profile und Kontosicherheit
 
-- Added rotating mixed movie and series artwork to the startup loading screen and profile selection, changing every five seconds from one shared preload pool.
-- Simplified profile selection by removing the heading and outer profile container, and added a compact, D-pad-focused `myStreamNet Cloud` action beneath the StreamNet TV logo.
-- Rebranded visible cloud-service references as StreamNet Cloud and introduced the StreamNet Club logo across the self-hosted sign-in, privacy, deletion, and success pages.
-- Improved sign-in and expired-session handling so invalid StreamNet Cloud credentials and revoked sessions produce clearer errors and stale local authentication is removed.
-- Hardened permanent account deletion so account sessions, snapshots, pairing sessions, usage events, watch history, and watch state are removed transactionally; added PostgreSQL cascade constraints and regression tests.
+- Wechselndes gemischtes Film- und Serien-Artwork wurde zum Ladebildschirm beim App-Start und zur Profilauswahl hinzugefügt und wechselt alle fünf Sekunden aus einem gemeinsamen Vorladepool.
+- Die Profilauswahl wurde durch Entfernen der Überschrift und des äußeren Profilcontainers vereinfacht; unter dem StreamNet TV-Logo wurde eine kompakte, D-Pad-fokussierte Aktion `myStreamNet Cloud` hinzugefügt.
+- Sichtbare Verweise auf den Cloud-Dienst wurden in StreamNet Cloud umbenannt und das StreamNet Club-Logo auf den selbst gehosteten Seiten für Anmeldung, Datenschutz, Löschung und Erfolg eingeführt.
+- Die Behandlung von Anmeldung und abgelaufenen Sitzungen wurde verbessert, sodass ungültige StreamNet Cloud-Zugangsdaten und widerrufene Sitzungen klarere Fehler erzeugen und veraltete lokale Authentifizierungen entfernt werden.
+- Die dauerhafte Kontolöschung wurde robuster gemacht, sodass Kontositzungen, Snapshots, Kopplungssitzungen, Nutzungsereignisse, Wiedergabeverlauf und Wiedergabestatus transaktional entfernt werden; PostgreSQL-Kaskadenbedingungen und Regressionstests wurden hinzugefügt.
 
-### Home and IPTV interaction
+### Interaktion von Home und IPTV
 
-- Added a themed, D-pad-isolated IPTV program information dialog with backdrop, logo, metadata, current-program details, playback, and favorite actions.
-- Added IPTV program details and favorite toggling to media context menus and kept Home row state stable when guide data changes.
-- Refined mobile error presentation and updated Home startup selection to prefer the first visible configured rail.
+- Ein thematisierter, vom D-Pad isolierter IPTV-Programminformationsdialog mit Hintergrund, Logo, Metadaten, Details zum aktuellen Programm sowie Wiedergabe- und Favoritenaktionen wurde hinzugefügt.
+- IPTV-Programmdetails und das Umschalten von Favoriten wurden zu Medien-Kontextmenüs hinzugefügt; der Status der Home-Zeilen bleibt bei Änderungen der Programmdaten stabil.
+- Die mobile Fehlerdarstellung wurde verfeinert und die Startauswahl von Home so aktualisiert, dass die erste sichtbare konfigurierte Zeile bevorzugt wird.
 
-### Cloud migration and localization
+### Cloud-Migration und Lokalisierung
 
-- Switched production Android release builds to the self-hosted StreamNet backend at `auth.mystreamnet.club`.
-- Documented the verified migration of 10 Netlify accounts and 5 self-hosted snapshots, including multi-profile data and zero orphaned snapshots.
-- Localized hardcoded Android toast notifications through English and German resource variants.
+- Produktive Android-Release-Builds wurden auf das selbst gehostete StreamNet-Backend unter `auth.mystreamnet.club` umgestellt.
+- Die verifizierte Migration von 10 Netlify-Konten und 5 selbst gehosteten Snapshots einschließlich Daten mehrerer Profile und ohne verwaiste Snapshots wurde dokumentiert.
+- Fest codierte Android-Toast-Benachrichtigungen wurden mithilfe englischer und deutscher Ressourcenvarianten lokalisiert.
 
-### Added
+### Hinzugefügt
 
-- Added an IPTV setting to show or hide the Live TV special categories (All Channels and Recently Watched), including TV and mobile settings UI and persisted per-profile behavior.
-- Added a protected StreamNet TV playlist preset that is ready on fresh profiles, keeps its configured host out of the settings UI, and connects with each user's personal username and password.
-- Migrated existing manual StreamNet TV logins to the preset and corrected the playlist capacity badge to count only configured sources out of the three available slots.
+- Eine IPTV-Einstellung zum Ein- oder Ausblenden der Live TV-Sonderkategorien (All Channels und Recently Watched) wurde hinzugefügt, einschließlich Settings-Oberflächen für TV und Mobilgeräte sowie dauerhaftem profilbezogenem Verhalten.
+- Eine geschützte StreamNet TV-Playlist-Voreinstellung wurde hinzugefügt, die bei neuen Profilen bereitsteht, ihren konfigurierten Host nicht in der Settings-Oberfläche anzeigt und sich mit dem persönlichen Benutzernamen und Passwort des jeweiligen Benutzers verbindet.
+- Bestehende manuelle StreamNet TV-Anmeldungen wurden zur Voreinstellung migriert und das Playlist-Kapazitäts-Badge so korrigiert, dass nur konfigurierte Quellen in den drei verfügbaren Plätzen gezählt werden.
 
-### Live TV, IPTV, and focus
+### Live TV, IPTV und Fokus
 
-- Reduced Live TV selector border thickness to 1dp across category sidebar, channel list, search results, and EPG program cells for TV mode.
-- Restored and hardened Live TV startup focus so it lands on the selected/remembered category instead of falling into Search.
-- Enforced explicit-only Search focus in the category sidebar so Search only takes focus when intentionally opened.
-- Restored the Live TV Netflix category and channel rails to the currently playing sender after switching screens or restarting the app.
-- Preserved playlist category ordering and hidden-category preferences across the StreamNet TV preset migration, profiles, and cloud-synced devices.
-- Prevented the mobile Live TV guide from reusing a smaller previous category window while a newly selected category is loading.
-- Updated mini-player side EPG info to follow the currently focused channel while scrolling the channel list up/down.
-- Improved Xtream EPG mapping, description retention, visible-channel retries, and authenticated XMLTV fallback so Home and Live TV show consistent rich guide data.
-- Made manual playlist refresh publish channel changes immediately and force a complete EPG refresh while preserving existing data during transient failures.
-- Refined the TV-mode Live TV hero and channel cards with larger sender logos, TMDB-aware logo backdrops, compact upcoming-program rows, and clearer refresh status.
+- Die Rahmenstärke der Live TV-Auswahl wurde in Kategorieseitenleiste, Senderliste, Suchergebnissen und EPG-Programmzellen des TV-Modus auf 1dp reduziert.
+- Der Startfokus von Live TV wurde wiederhergestellt und robuster gemacht, sodass er auf der ausgewählten/gemerkten Kategorie landet, statt auf Search zurückzufallen.
+- In der Kategorieseitenleiste wurde ein ausschließlich expliziter Search-Fokus erzwungen, sodass Search nur bei absichtlichem Öffnen den Fokus erhält.
+- Die Netflix-artigen Kategorie- und Senderzeilen von Live TV werden nach einem Bildschirmwechsel oder Neustart der App wieder auf den aktuell wiedergegebenen Sender gesetzt.
+- Die Reihenfolge der Playlist-Kategorien und Einstellungen für ausgeblendete Kategorien bleiben bei der Migration der StreamNet TV-Voreinstellung sowie profil- und cloud-synchronisiert geräteübergreifend erhalten.
+- Der mobile Live TV-Programmführer verwendet beim Laden einer neu ausgewählten Kategorie nicht mehr ein kleineres vorheriges Kategoriefenster.
+- Die seitlichen EPG-Informationen des Mini-Players folgen nun dem aktuell fokussierten Sender, während in der Senderliste nach oben/unten gescrollt wird.
+- Xtream-EPG-Zuordnung, Beibehaltung von Beschreibungen, erneute Versuche für sichtbare Sender und authentifizierter XMLTV-Fallback wurden verbessert, damit Home und Live TV konsistente, umfangreiche Programmdaten anzeigen.
+- Eine manuelle Playlist-Aktualisierung veröffentlicht Senderänderungen nun sofort und erzwingt eine vollständige EPG-Aktualisierung, während bestehende Daten bei vorübergehenden Fehlern erhalten bleiben.
+- Der Live TV-Hero und die Senderkarten im TV-Modus wurden mit größeren Senderlogos, TMDB-bewussten Logo-Hintergründen, kompakten Zeilen für kommende Programme und einem klareren Aktualisierungsstatus verfeinert.
 
-### Home and watchlist
+### Home und Watchlist
 
-- Restored automatic update dialogs for newly available, non-ignored app releases after the update setting move.
-- Restyled Library provider and action controls, including My Watchlist, as accent-themed pill buttons with focused and selected states.
-- Disabled Live TV hero autoplay for Favorites and Recently Watched TV rails while preserving artwork, guide information, and manual playback.
-- Matched Home IPTV cards to the Live TV artwork treatment and restored MGM+ service artwork with a valid landscape source.
-- Fixed removing the final watchlist item leaving a stale card visible until navigating away.
-- Synchronized watchlist additions and removals from Home, Details, and Watchlist as authoritative local cloud snapshots, with retryable failure reporting.
-- Marked movies and episodes watched automatically at 90% playback or completion while preserving local, Supabase, Trakt, Simkl, and MDBList synchronization.
-- Prevented manually watched movies and episodes from returning to Continue Watching with stale progress. Exact timestamped removal markers now merge across devices, while the next episode remains eligible for Up Next.
-- Improved Home startup with profile-scoped catalog placeholders, removed trailing skeletons from static collection rails, and kept the mobile profile/search header visible without Continue Watching.
-- Disabled hidden IPTV and collection-preview playback on touch devices and delayed TV preview audio/video reveal until the first rendered frame.
-- Moved bundled collection artwork and converted H.264 intro videos to an immutable StreamNet-owned asset revision for reliable cache invalidation.
-- Localized Continue Watching episode/resume and remaining-time badges in German.
+- Automatische Aktualisierungsdialoge für neu verfügbare, nicht ignorierte App-Releases wurden nach dem Verschieben der Aktualisierungseinstellung wiederhergestellt.
+- Anbieter- und Aktionssteuerelemente der Library, einschließlich My Watchlist, wurden als akzentgestaltete Pillen-Buttons mit fokussiertem und ausgewähltem Status neu gestaltet.
+- Die automatische Wiedergabe des Live TV-Heros wurde für die Zeilen Favorites und Recently Watched TV deaktiviert; Artwork, Programminformationen und manuelle Wiedergabe bleiben erhalten.
+- Home-IPTV-Karten wurden an die Artwork-Darstellung von Live TV angeglichen und das MGM+-Dienst-Artwork mit einer gültigen Quelle im Querformat wiederhergestellt.
+- Es wurde behoben, dass nach dem Entfernen des letzten Watchlist-Eintrags eine veraltete Karte sichtbar blieb, bis die Ansicht verlassen wurde.
+- Hinzufügungen und Entfernungen in der Watchlist aus Home, Details und Watchlist werden als maßgebliche lokale Cloud-Snapshots synchronisiert, mit wiederholbarer Fehlermeldung.
+- Filme und Episoden werden bei 90% Wiedergabefortschritt oder Abschluss automatisch als angesehen markiert; die lokale Synchronisierung sowie die Synchronisierung mit Supabase, Trakt, Simkl und MDBList bleiben erhalten.
+- Manuell als angesehen markierte Filme und Episoden kehren nicht mehr mit veraltetem Fortschritt zu Continue Watching zurück. Exakte zeitgestempelte Entfernungsmarkierungen werden nun geräteübergreifend zusammengeführt, während die nächste Episode weiterhin für Up Next infrage kommt.
+- Der Start von Home wurde mit profilbezogenen Katalogplatzhaltern verbessert, nachlaufende Skelette wurden aus statischen Sammlungszeilen entfernt und die mobile Profil-/Search-Kopfzeile bleibt auch ohne Continue Watching sichtbar.
+- Verdeckte IPTV- und Sammlungsvorschau-Wiedergabe wurde auf Touch-Geräten deaktiviert und die Audio-/Video-Anzeige der TV-Vorschau bis zum ersten gerenderten Frame verzögert.
+- Mitgeliefertes Sammlungs-Artwork und konvertierte H.264-Intro-Videos wurden für eine zuverlässige Cache-Invalidierung auf eine unveränderliche, StreamNet-eigene Asset-Revision verschoben.
+- Episoden-/Fortsetzungs- und Restzeit-Badges von Continue Watching wurden auf Deutsch lokalisiert.
 
-### Player and subtitles
+### Player und Untertitel
 
-- Skipped subtitle timing scans for exact release-name matches and improved detection and fallback for embedded PGS, VobSub, and DVB bitmap subtitles used with AI translation.
-- Persisted movie and episode watched state locally and to the account snapshot before optional external-provider scrobbling.
+- Untertitel-Zeitprüfungen werden bei exakten Übereinstimmungen des Release-Namens übersprungen; Erkennung und Fallback für eingebettete PGS-, VobSub- und DVB-Bitmap-Untertitel zur Verwendung mit AI-Übersetzung wurden verbessert.
+- Der Angesehen-Status von Filmen und Episoden wird lokal und im Konto-Snapshot gespeichert, bevor optionales Scrobbling bei externen Anbietern erfolgt.
 
-### Localization
+### Lokalisierung
 
-- Added new IPTV sort/special-category labels to string resources and added German translations for the new settings text.
-- Added German Continue Watching remaining-time and episode resume labels.
+- Neue Beschriftungen für IPTV-Sortierung/Sonderkategorien wurden zu den String-Ressourcen hinzugefügt und die neuen Settings-Texte erhielten deutsche Übersetzungen.
+- Deutsche Beschriftungen für die Restzeit und Episodenfortsetzung in Continue Watching wurden hinzugefügt.
 
-### Device startup, playback, and launcher integration
+### Gerätestart, Wiedergabe und Launcher-Integration
 
-- Prevented automatic next-episode playback when the next episode is unaired or its TMDB air-date metadata is unavailable; manual episode navigation remains available.
-- Added original-title matching to Telegram movie and series searches so foreign-language filenames and captions resolve reliably alongside English and localized titles.
-- Added compact landscape layouts for small touch phones: the bottom navigation and Live TV mini-player now use fixed responsive dimensions while portrait, tablet, and TV layouts remain unchanged.
-- Aligned Google TV Continue Watching subtitles with the in-app card, including the localized S1E1 start label; launcher artwork, progress, ordering, and deep links remain profile-scoped.
-- Kept Media3/ExoPlayer pinned to `1.9.0`; updates require a new APK build because the vendored Dolby Vision Matroska extractor must be reviewed with every Media3 bump.
+- Die automatische Wiedergabe der nächsten Episode wurde verhindert, wenn diese noch nicht ausgestrahlt wurde oder ihre TMDB-Metadaten zum Ausstrahlungsdatum nicht verfügbar sind; die manuelle Episodennavigation bleibt verfügbar.
+- Der Abgleich von Originaltiteln wurde zu Telegram-Suchen nach Filmen und Serien hinzugefügt, damit fremdsprachige Dateinamen und Beschriftungen neben englischen und lokalisierten Titeln zuverlässig aufgelöst werden.
+- Kompakte Querformat-Layouts für kleine Touch-Smartphones wurden hinzugefügt: Die untere Navigation und der Live TV-Mini-Player verwenden nun feste responsive Abmessungen, während Hochformat-, Tablet- und TV-Layouts unverändert bleiben.
+- Untertitel von Continue Watching auf Google TV wurden an die In-App-Karte angeglichen, einschließlich der lokalisierten S1E1-Startbeschriftung; Launcher-Artwork, Fortschritt, Reihenfolge und Deep Links bleiben profilbezogen.
+- Media3/ExoPlayer bleibt auf `1.9.0` festgesetzt; Aktualisierungen erfordern einen neuen APK-Build, da der mitgelieferte Dolby Vision-Matroska-Extractor bei jeder Anhebung von Media3 überprüft werden muss.
