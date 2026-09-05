@@ -159,7 +159,6 @@ fun AppUpdateModal(
                     .clip(cardShape)
                     .background(ArvioSkin.colors.surface)
                     .border(1.dp, accent.copy(alpha = 0.38f), cardShape)
-                    .then(if (isTouchDevice) Modifier.verticalScroll(rememberScrollState()) else Modifier)
                     .padding(if (isTouchDevice) 16.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
@@ -183,6 +182,15 @@ fun AppUpdateModal(
                         }
                     }
             ) {
+                Column(
+                    modifier = if (isTouchDevice) {
+                        Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    },
+                ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -367,6 +375,7 @@ fun AppUpdateModal(
                             },
                         )
                     }
+                }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))

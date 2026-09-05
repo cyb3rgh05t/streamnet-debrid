@@ -182,6 +182,7 @@ data class HomeUiState(
     val trailerInCards: Boolean = true,
     // Home hero metadata visibility toggles (issue #72)
     val showBudget: Boolean = true,
+    val showCertification: Boolean = true,
     val heroOverviewOverride: String? = null,
     val cardLogoUrls: Map<String, String> = emptyMap(),
     // Previous hero for crossfade (Phase 2.1)
@@ -321,6 +322,7 @@ class HomeViewModel @Inject constructor(
         val releaseDate: String?,
         val imdbRating: String,
         val tmdbRating: String,
+        val certification: String?,
         val budget: Long?,
         val overview: String,
         val primaryNetworkLogo: String? = null,
@@ -721,6 +723,7 @@ class HomeViewModel @Inject constructor(
             releaseDate = snapshot.releaseDate ?: releaseDate,
             imdbRating = snapshot.imdbRating.ifEmpty { imdbRating },
             tmdbRating = snapshot.tmdbRating.ifEmpty { tmdbRating },
+            certification = snapshot.certification ?: certification,
             budget = snapshot.budget ?: budget,
             overview = snapshot.overview.ifBlank { overview },
             primaryNetworkLogo = snapshot.primaryNetworkLogo ?: primaryNetworkLogo
@@ -734,6 +737,7 @@ class HomeViewModel @Inject constructor(
             releaseDate = cached.releaseDate,
             imdbRating = cached.imdbRating,
             tmdbRating = cached.tmdbRating,
+            certification = cached.certification,
             budget = cached.budget,
             overview = cached.overview,
             primaryNetworkLogo = cached.primaryNetworkLogo,
@@ -795,6 +799,7 @@ class HomeViewModel @Inject constructor(
                 releaseDate = details?.releaseDate,
                 imdbRating = details?.imdbRating.orEmpty(),
                 tmdbRating = details?.tmdbRating.orEmpty(),
+                certification = details?.certification,
                 budget = details?.budget,
                 overview = resolvedOverview,
                 primaryNetworkLogo = primaryNetworkLogo,
@@ -2178,6 +2183,7 @@ class HomeViewModel @Inject constructor(
                         trailerDelaySeconds = preferences.trailerDelaySeconds,
                         trailerInCards = preferences.trailerInCards,
                         showBudget = preferences.showBudget,
+                        showCertification = preferences.showCertification,
                         clockFormat = preferences.clockFormat,
                         smoothScrolling = preferences.smoothScrolling
                     )

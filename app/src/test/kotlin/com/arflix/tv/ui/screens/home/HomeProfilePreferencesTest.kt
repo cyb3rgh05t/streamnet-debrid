@@ -64,6 +64,7 @@ class HomeProfilePreferencesTest {
         assertThat(settings.trailerDelaySeconds).isEqualTo(2)
         assertThat(settings.trailerInCards).isTrue()
         assertThat(settings.showBudget).isTrue()
+        assertThat(settings.showCertification).isTrue()
         assertThat(settings.clockFormat).isEqualTo("24h")
         assertThat(settings.smoothScrolling).isFalse()
         assertThat(settings.contentLanguage).isEqualTo("en-US")

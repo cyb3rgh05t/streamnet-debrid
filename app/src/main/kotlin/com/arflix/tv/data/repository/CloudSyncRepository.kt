@@ -740,6 +740,7 @@ class CloudSyncRepository @Inject constructor(
         val clockFormat: String = "24h",
         val accentColor: String? = null,
         val showBudget: Boolean = true,
+        val showCertification: Boolean? = null,
         val showEpisodeRatings: Boolean? = null,
         val showLoadingStats: Boolean? = null,
         val smoothScrolling: Boolean? = null,
@@ -773,6 +774,8 @@ class CloudSyncRepository @Inject constructor(
     private fun accentColorKeyFor(profileId: String) = profileAccentColorKey(profileId)
     private fun showBudgetKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_budget_on_home")
+    private fun showCertificationKeyFor(profileId: String) =
+        profileManager.profileBooleanKeyFor(profileId, "show_certification")
     private fun showEpisodeRatingsKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "show_episode_ratings")
     private fun showLoadingStatsKeyFor(profileId: String) =
@@ -1106,6 +1109,7 @@ class CloudSyncRepository @Inject constructor(
                             ?: prefs[ACCENT_COLOR_KEY]
                             ?: "Orange",
                         showBudget = prefs[showBudgetKeyFor(profile.id)] ?: true,
+                        showCertification = prefs[showCertificationKeyFor(profile.id)] ?: true,
                         showEpisodeRatings = prefs[showEpisodeRatingsKeyFor(profile.id)] ?: true,
                         showLoadingStats = prefs[showLoadingStatsKeyFor(profile.id)] ?: true,
                         smoothScrolling = prefs[smoothScrollingKeyFor(profile.id)] ?: true,
@@ -1982,6 +1986,7 @@ class CloudSyncRepository @Inject constructor(
                             prefs[accentColorKeyFor(profileId)] = it
                         }
                         prefs[showBudgetKeyFor(profileId)] = state.showBudget
+                        state.showCertification?.let { prefs[showCertificationKeyFor(profileId)] = it }
                         state.showEpisodeRatings?.let { prefs[showEpisodeRatingsKeyFor(profileId)] = it }
                         state.showLoadingStats?.let { prefs[showLoadingStatsKeyFor(profileId)] = it }
                         state.smoothScrolling?.let { prefs[smoothScrollingKeyFor(profileId)] = it }

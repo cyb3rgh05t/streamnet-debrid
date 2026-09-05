@@ -34,6 +34,7 @@ data class MediaItem(
     val watchedEpisodes: Int? = null,
     val nextEpisode: NextEpisode? = null,
     // Additional movie-specific fields
+    val certification: String? = null,
     val budget: Long? = null,
     val revenue: Long? = null,
     // TV show status

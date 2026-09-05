@@ -1524,6 +1524,7 @@ fun HomeScreen(
                 contentStartPadding = contentStartPadding,
                 isMobile = isMobile,
                 showBudget = uiState.showBudget,
+                showCertification = uiState.showCertification,
                 onNavigateToDetails = onNavigateToDetails,
                 onNavigateToTv = { channelId, streamUrl -> onNavigateToTv(channelId, streamUrl) },
                 isIptvItem = { item -> viewModel.isIptvItem(item) },
@@ -2127,6 +2128,7 @@ private fun HeroSection(
     // `show_budget_on_home` DataStore key and defaults to true so existing
     // users see no behavior change. Issue #72.
     showBudget: Boolean = true,
+    showCertification: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     if (item.status?.startsWith("iptv:") == true) {
@@ -2311,8 +2313,12 @@ private fun HeroSection(
                     val ratingValue = parseRatingValue(rating)
                     val hasRatingMetadata = ratingValue > 0f
                     val hasBudgetMetadata = showBudget && !budgetText.isNullOrBlank()
+                    val certificationText = currentItem.certification
+                        ?.takeIf { showCertification && it.isNotBlank() }
+                    val hasCertificationMetadata = certificationText != null
                     val hasSecondaryMetadata = primaryNetworkLogo != null ||
                         hasRatingMetadata ||
+                        hasCertificationMetadata ||
                         hasBudgetMetadata
 
                     Column(
@@ -2411,7 +2417,7 @@ private fun HeroSection(
                                             .width(58.dp)
                                     )
 
-                                    if (hasRatingMetadata || hasBudgetMetadata) {
+                                    if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
                                         Text(
                                             text = "|",
                                             style = ArflixTypography.caption.copy(
@@ -2431,6 +2437,30 @@ private fun HeroSection(
                                         logoWidth = 36.dp,
                                         logoHeight = 15.dp,
                                         textShadow = textShadow
+                                    )
+
+                                    if (hasCertificationMetadata || hasBudgetMetadata) {
+                                        Text(
+                                            text = "|",
+                                            style = ArflixTypography.caption.copy(
+                                                fontSize = 12.sp,
+                                                shadow = textShadow
+                                            ),
+                                            color = Color.White.copy(alpha = 0.58f)
+                                        )
+                                    }
+                                }
+
+                                if (hasCertificationMetadata) {
+                                    Text(
+                                        text = certificationText,
+                                        style = ArflixTypography.caption.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            shadow = textShadow
+                                        ),
+                                        color = Color.White.copy(alpha = 0.74f),
+                                        maxLines = 1
                                     )
 
                                     if (hasBudgetMetadata) {
@@ -2556,6 +2586,7 @@ private fun HomeHeroLayer(
     contentStartPadding: androidx.compose.ui.unit.Dp,
     isMobile: Boolean = false,
     showBudget: Boolean = true,
+    showCertification: Boolean = true,
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit = { _, _ -> },
     isIptvItem: (MediaItem) -> Boolean = { false },
@@ -2598,6 +2629,7 @@ private fun HomeHeroLayer(
                         logoUrl = heroLogoUrl,
                         overviewOverride = heroOverviewOverride,
                         showBudget = showBudget,
+                        showCertification = showCertification,
                         scrollIptvFallbackTitle = scrollIptvFallbackTitle,
                         modifier = heroContentModifier
                     )

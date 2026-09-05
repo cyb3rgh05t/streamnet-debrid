@@ -8,6 +8,7 @@ import com.arflix.tv.data.api.FanartApi
 import com.arflix.tv.data.api.TvdbApi
 import com.arflix.tv.data.api.TvdbLoginRequest
 import com.arflix.tv.data.api.TmdbCastMember
+import com.arflix.tv.data.api.TmdbContentRatingsResponse
 import com.arflix.tv.data.api.TmdbCrewMember
 import com.arflix.tv.data.api.TmdbEpisode
 import com.arflix.tv.data.api.TmdbExternalIds
@@ -16,6 +17,7 @@ import com.arflix.tv.data.api.TmdbListResponse
 import com.arflix.tv.data.api.TmdbMediaItem
 import com.arflix.tv.data.api.TmdbMovieDetails
 import com.arflix.tv.data.api.TmdbPersonDetails
+import com.arflix.tv.data.api.TmdbReleaseDatesResponse
 import com.arflix.tv.data.api.TmdbSeasonDetails
 import com.arflix.tv.data.api.TmdbTvDetails
 import com.arflix.tv.data.api.TmdbWatchProviderRegion
@@ -4392,6 +4394,7 @@ private fun TmdbMovieDetails.toMediaItem(): MediaItem {
     val hours = (runtime ?: 0) / 60
     val minutes = (runtime ?: 0) % 60
     val duration = if (hours > 0) "${hours}h ${minutes}m" else "${minutes}m"
+    val certification = germanCertification(releaseDates)
 
     return MediaItem(
         id = id,
@@ -4403,7 +4406,7 @@ private fun TmdbMovieDetails.toMediaItem(): MediaItem {
         year = year,
         releaseDate = formatDate(releaseDate ?: ""),
         duration = duration,
-        rating = if (adult) "R" else "PG-13",
+        rating = certification,
         imdbRating = "",
         tmdbRating = formatTmdbRating(voteAverage),
         mediaType = MediaType.MOVIE,
@@ -4412,6 +4415,7 @@ private fun TmdbMovieDetails.toMediaItem(): MediaItem {
             ?: "",
         backdrop = backdropPath?.let { "${Constants.BACKDROP_BASE_LARGE}$it" },
         originalLanguage = originalLanguage,
+        certification = certification.takeIf { it.isNotEmpty() },
         budget = budget,
         genreIds = genres.map { it.id }
     )
@@ -4421,6 +4425,7 @@ private fun TmdbTvDetails.toMediaItem(): MediaItem {
     val year = firstAirDate?.take(4) ?: ""
     val runtime = episodeRunTime.firstOrNull() ?: 45
     val duration = "${runtime}m"
+    val certification = germanCertification(contentRatings)
     val actualSeasonCount = seasons
         .asSequence()
         .filter { it.seasonNumber > 0 && it.episodeCount > 0 }
@@ -4448,11 +4453,40 @@ private fun TmdbTvDetails.toMediaItem(): MediaItem {
             ?: "",
         backdrop = backdropPath?.let { "${Constants.BACKDROP_BASE_LARGE}$it" },
         originalLanguage = originalLanguage,
+        certification = certification.takeIf { it.isNotEmpty() },
         isOngoing = status == "Returning Series",
         totalEpisodes = actualSeasonCount,
         status = status,
         genreIds = genres.map { it.id }
     )
+}
+
+internal fun germanCertification(releaseDates: TmdbReleaseDatesResponse?): String {
+    val germanDates = releaseDates?.results
+        ?.firstOrNull { it.countryCode.equals("DE", ignoreCase = true) }
+        ?.releaseDates
+        .orEmpty()
+    val preferredTypes = listOf(3, 2, 1, 4, 5, 6)
+    val certification = preferredTypes.firstNotNullOfOrNull { type ->
+        germanDates
+            .asSequence()
+            .filter { it.type == type }
+            .firstNotNullOfOrNull { it.certification.normalizeFskValue() }
+    } ?: germanDates.firstNotNullOfOrNull { it.certification.normalizeFskValue() }
+    return certification?.let { "FSK $it" }.orEmpty()
+}
+
+internal fun germanCertification(contentRatings: TmdbContentRatingsResponse?): String {
+    val certification = contentRatings?.results
+        ?.firstOrNull { it.countryCode.equals("DE", ignoreCase = true) }
+        ?.rating
+        ?.normalizeFskValue()
+    return certification?.let { "FSK $it" }.orEmpty()
+}
+
+private fun String.normalizeFskValue(): String? {
+    val value = trim().uppercase(Locale.US).removePrefix("FSK").trim()
+    return value.takeIf { it in setOf("0", "6", "12", "16", "18") }
 }
 
 private fun TmdbEpisode.toEpisode(): Episode {

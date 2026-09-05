@@ -64,14 +64,16 @@ interface TmdbApi {
     suspend fun getMovieDetails(
         @Path("movie_id") movieId: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String? = null
+        @Query("language") language: String? = null,
+        @Query("append_to_response") appendToResponse: String = "release_dates"
     ): TmdbMovieDetails
 
     @GET("tv/{tv_id}")
     suspend fun getTvDetails(
         @Path("tv_id") tvId: Int,
         @Query("api_key") apiKey: String,
-        @Query("language") language: String? = null
+        @Query("language") language: String? = null,
+        @Query("append_to_response") appendToResponse: String = "content_ratings"
     ): TmdbTvDetails
 
     @GET("tv/{tv_id}/season/{season_number}")
@@ -264,7 +266,22 @@ data class TmdbMovieDetails(
     val genres: List<TmdbGenre> = emptyList(),
     val status: String? = null,
     val adult: Boolean = false,
+    @SerializedName("release_dates") val releaseDates: TmdbReleaseDatesResponse? = null,
     @SerializedName("belongs_to_collection") val belongsToCollection: TmdbCollectionRef? = null
+)
+
+data class TmdbReleaseDatesResponse(
+    val results: List<TmdbReleaseDatesRegion> = emptyList()
+)
+
+data class TmdbReleaseDatesRegion(
+    @SerializedName("iso_3166_1") val countryCode: String = "",
+    @SerializedName("release_dates") val releaseDates: List<TmdbReleaseDate> = emptyList()
+)
+
+data class TmdbReleaseDate(
+    val certification: String = "",
+    val type: Int = 0
 )
 
 /** Reference to a TMDB collection (franchise) returned inside movie/TV details. */
@@ -290,7 +307,17 @@ data class TmdbTvDetails(
     @SerializedName("episode_run_time") val episodeRunTime: List<Int> = emptyList(),
     val status: String? = null,
     val genres: List<TmdbGenre> = emptyList(),
-    val seasons: List<TmdbTvSeason> = emptyList()
+    val seasons: List<TmdbTvSeason> = emptyList(),
+    @SerializedName("content_ratings") val contentRatings: TmdbContentRatingsResponse? = null
+)
+
+data class TmdbContentRatingsResponse(
+    val results: List<TmdbContentRating> = emptyList()
+)
+
+data class TmdbContentRating(
+    @SerializedName("iso_3166_1") val countryCode: String = "",
+    val rating: String = ""
 )
 
 data class TmdbSeasonDetails(

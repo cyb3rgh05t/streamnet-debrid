@@ -13,6 +13,7 @@ internal data class HomeProfilePreferences(
     val trailerDelaySeconds: Int,
     val trailerInCards: Boolean,
     val showBudget: Boolean,
+    val showCertification: Boolean,
     val clockFormat: String,
     val smoothScrolling: Boolean,
     val contentLanguage: String
@@ -32,6 +33,7 @@ internal fun readHomeProfilePreferences(
             ?.toIntOrNull() ?: 2,
         trailerInCards = preferences[booleanPreferencesKey("${prefix}trailer_in_cards")] ?: true,
         showBudget = preferences[booleanPreferencesKey("${prefix}show_budget_on_home")] ?: true,
+        showCertification = preferences[booleanPreferencesKey("${prefix}show_certification")] ?: true,
         clockFormat = preferences[stringPreferencesKey("${prefix}clock_format")] ?: "24h",
         smoothScrolling = preferences[booleanPreferencesKey("${prefix}smooth_scrolling")] ?: false,
         contentLanguage = contentLang

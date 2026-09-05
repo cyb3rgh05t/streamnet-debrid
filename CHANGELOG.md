@@ -4,6 +4,22 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.005] - 2026-09-05
+
+### Metadaten
+
+- Deutsche FSK-Freigaben werden, sofern bei TMDB verfügbar, neben IMDb und Budget in großen Home-Heros und auf Detailseiten angezeigt.
+- FSK und Filmbudget lassen sich profilbezogen in den Einstellungen ein- oder ausblenden; die Optionen werden über den eigenen Cloud-Backend-Snapshot synchronisiert.
+
+### Update-Dialog
+
+- Lange Versionshinweise scrollen auf Smartphones und Tablets innerhalb des Update-Dialogs, während die Aktionsbuttons sichtbar und oberhalb der Systemleiste erreichbar bleiben.
+
+### Neues App-Branding
+
+- Der sichtbare Appname wurde von „StreamNet TV“ auf „StreamNet“ verkürzt.
+- Launcher-Icons, Adaptive- und Monochrom-Icon, Android-TV-Banner sowie die Vektorlogos für Splashscreen, Ladeansicht, Profilauswahl und Bildschirmschoner verwenden das neue StreamNet-Design in allen benötigten Auflösungen.
+
 ## [2.3.004] - 2026-09-05
 
 ### Stabilität und Leistung

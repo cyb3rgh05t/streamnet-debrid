@@ -272,7 +272,7 @@ private fun tvGeneralRowsForSection(section: String): List<Int> {
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(17, 18, 42, 21, 22, 23, 24, 41, 36)
+        "appearance" -> listOf(17, 18, 42, 21, 22, 23, 46, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -1087,6 +1087,7 @@ fun SettingsScreen(
                                                 21 -> viewModel.setOledBlackBackground(!uiState.oledBlackBackground)
                                                 22 -> viewModel.cycleClockFormat()
                                                 23 -> viewModel.setShowBudget(!uiState.showBudget)
+                                                46 -> viewModel.setShowCertification(!uiState.showCertification)
                                                 41 -> viewModel.setShowEpisodeRatings(!uiState.showEpisodeRatings)
                                                  36 -> viewModel.setSmoothScrolling(!uiState.smoothScrolling)
                                                 24 -> viewModel.setSpoilerBlurEnabled(!uiState.spoilerBlurEnabled)
@@ -1663,6 +1664,7 @@ fun SettingsScreen(
                             oledBlackBackground = uiState.oledBlackBackground,
                             clockFormat = uiState.clockFormat,
                             showBudget = uiState.showBudget,
+                            showCertification = uiState.showCertification,
                             volumeBoostDb = uiState.volumeBoostDb,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
                             onSubtitleClick = openSubtitlePicker,
@@ -1696,6 +1698,7 @@ fun SettingsScreen(
                             onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
                             onClockFormatClick = { viewModel.cycleClockFormat() },
                             onShowBudgetToggle = { viewModel.setShowBudget(it) },
+                            onShowCertificationToggle = { viewModel.setShowCertification(it) },
                             showEpisodeRatings = uiState.showEpisodeRatings,
                             onShowEpisodeRatingsToggle = { viewModel.setShowEpisodeRatings(it) },
                             smoothScrolling = uiState.smoothScrolling,
@@ -5325,10 +5328,20 @@ private fun MobileSettingsSubPage(
                     MobileSettingsRow(
                         icon = Icons.Default.Movie,
                         title = stringResource(R.string.show_budget),
+                        subtitle = stringResource(R.string.show_budget_desc),
                         value = if (uiState.showBudget) "On" else "Off",
                         isFocused = false,
                         showDivider = true,
                         onClick = { viewModel.setShowBudget(!uiState.showBudget) }
+                    )
+                    MobileSettingsRow(
+                        icon = Icons.Default.Security,
+                        title = stringResource(R.string.show_certification),
+                        subtitle = stringResource(R.string.show_certification_desc),
+                        value = if (uiState.showCertification) "On" else "Off",
+                        isFocused = false,
+                        showDivider = true,
+                        onClick = { viewModel.setShowCertification(!uiState.showCertification) }
                     )
                     MobileSettingsRow(
                         icon = Icons.Default.Star,
@@ -6433,6 +6446,7 @@ private fun TvGeneralSettingsRows(
     oledBlackBackground: Boolean = false,
     clockFormat: String = "24h",
     showBudget: Boolean = true,
+    showCertification: Boolean = true,
     showEpisodeRatings: Boolean = true,
     smoothScrolling: Boolean = true,
     spoilerBlurEnabled: Boolean = false,
@@ -6456,6 +6470,7 @@ private fun TvGeneralSettingsRows(
     onOledBlackBackgroundToggle: (Boolean) -> Unit = {},
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
+    onShowCertificationToggle: (Boolean) -> Unit = {},
     onShowEpisodeRatingsToggle: (Boolean) -> Unit = {},
     onSmoothScrollingToggle: (Boolean) -> Unit = {},
     onSpoilerBlurToggle: (Boolean) -> Unit = {},
@@ -6593,6 +6608,7 @@ private fun TvGeneralSettingsRows(
                 21 -> SettingsToggleRow(Icons.Default.Palette, stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
                 22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
                 23 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
+                46 -> SettingsToggleRow(Icons.Default.Security, stringResource(R.string.show_certification), stringResource(R.string.show_certification_desc), showCertification, focusedIndex == localIndex, onShowCertificationToggle, Modifier.settingsFocusSlot(localIndex))
                 41 -> SettingsToggleRow(Icons.Default.Star, stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
                 36 -> SettingsToggleRow(Icons.Default.Widgets, stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
                 24 -> SettingsToggleRow(Icons.Default.VisibilityOff, stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))

@@ -1055,6 +1055,7 @@ fun DetailsScreen(
                     isInWatchlist = uiState.isInWatchlist,
                     genres = uiState.genres,
                     budget = uiState.budget,
+                    certification = uiState.certification,
                     seasonProgress = uiState.seasonProgress,
                     playLabel = uiState.playLabel,
                     showPlayFromBeginning = uiState.playPositionMs?.let { it > 0L } == true &&
@@ -1337,6 +1338,7 @@ private fun DetailsContent(
     isInWatchlist: Boolean,
     genres: List<String> = emptyList(),
     budget: String? = null,
+    certification: String? = null,
     seasonProgress: Map<Int, Pair<Int, Int>> = emptyMap(),
     playLabel: String? = null,
     showPlayFromBeginning: Boolean = false,
@@ -2066,8 +2068,11 @@ private fun DetailsContent(
                 val primaryNetworkLogo = item.primaryNetworkLogo?.takeIf { it.isNotBlank() }
                 val budgetText = budget?.trim()?.takeIf { it.isNotEmpty() && item.mediaType == MediaType.MOVIE }
                 val hasBudgetMetadata = !budgetText.isNullOrBlank()
+                val certificationText = certification?.trim()?.takeIf { it.isNotEmpty() }
+                val hasCertificationMetadata = certificationText != null
                 val hasSecondaryMetadata = primaryNetworkLogo != null ||
                     hasRatingMetadata ||
+                    hasCertificationMetadata ||
                     hasBudgetMetadata
                 val overviewMaxHeight = if (isCompactHeight) 68.dp else 72.dp
 
@@ -2151,7 +2156,7 @@ private fun DetailsContent(
                                         .width(52.dp)
                                 )
 
-                                if (hasRatingMetadata || hasBudgetMetadata) {
+                                if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
                                     Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
                                 }
                             }
@@ -2164,6 +2169,23 @@ private fun DetailsContent(
                                     logoWidth = 34.dp,
                                     logoHeight = 14.dp,
                                     textShadow = textShadow
+                                )
+
+                                if (hasCertificationMetadata || hasBudgetMetadata) {
+                                    Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                }
+                            }
+
+                            if (hasCertificationMetadata) {
+                                Text(
+                                    text = certificationText,
+                                    style = ArflixTypography.caption.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        shadow = textShadow
+                                    ),
+                                    color = Color.White.copy(alpha = 0.74f),
+                                    maxLines = 1
                                 )
 
                                 if (hasBudgetMetadata) {

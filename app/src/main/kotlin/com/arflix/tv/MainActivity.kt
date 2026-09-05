@@ -630,7 +630,7 @@ fun ArvioLoadingScreen(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
-                contentDescription = "StreamNet TV",
+                contentDescription = androidx.compose.ui.res.stringResource(R.string.app_name),
                 modifier = Modifier
                     .fillMaxWidth(0.52f)
                     .widthIn(max = 320.dp)

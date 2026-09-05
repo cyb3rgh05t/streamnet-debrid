@@ -89,6 +89,7 @@ data class DetailsUiState(
     val language: String? = null,
     // Budget (movies only)
     val budget: String? = null,
+    val certification: String? = null,
     // Show status
     val showStatus: String? = null,
     // Streaming services from TMDB watch providers
@@ -244,6 +245,7 @@ class DetailsViewModel @Inject constructor(
     private fun autoPlaySingleSourceKey() = profileManager.profileBooleanKey("auto_play_single_source")
     private fun autoPlayMinQualityKey() = profileManager.profileStringKey("auto_play_min_quality")
     private fun showBudgetKey() = profileManager.profileBooleanKey("show_budget_on_home")
+    private fun showCertificationKey() = profileManager.profileBooleanKey("show_certification")
     private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
 
     private fun isBlankRating(value: String): Boolean {
@@ -280,6 +282,7 @@ class DetailsViewModel @Inject constructor(
             isOngoing = primary.isOngoing || fallback.isOngoing,
             totalEpisodes = primary.totalEpisodes ?: fallback.totalEpisodes,
             watchedEpisodes = primary.watchedEpisodes ?: fallback.watchedEpisodes,
+            certification = primary.certification ?: fallback.certification,
             budget = primary.budget ?: fallback.budget,
             revenue = primary.revenue ?: fallback.revenue,
             status = primary.status ?: fallback.status
@@ -303,6 +306,7 @@ class DetailsViewModel @Inject constructor(
                 val autoPlaySingleSource = prefs[autoPlaySingleSourceKey()] ?: true
                 val autoPlayMinQuality = normalizeAutoPlayMinQuality(prefs[autoPlayMinQualityKey()])
                 val showBudget = prefs[showBudgetKey()] ?: true
+                val showCertification = prefs[showCertificationKey()] ?: true
                 val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
 
                 val previousState = _uiState.value
@@ -496,6 +500,7 @@ class DetailsViewModel @Inject constructor(
                     formatBudget(mergedItem.budget)
                 } else null
                 val visibleBudget = if (showBudget) budgetDisplay else null
+                val visibleCertification = if (showCertification) mergedItem.certification else null
 
                 // Get show status
                 val showStatus = if (mediaType == MediaType.TV) mergedItem.status else null
@@ -522,6 +527,7 @@ class DetailsViewModel @Inject constructor(
                     genres = genreNames,
                     language = languageName,
                     budget = visibleBudget,
+                    certification = visibleCertification,
                     showStatus = showStatus
                 )
                 _uiState.value = baseState

@@ -158,7 +158,8 @@
     <string name="skip_profile">Profilauswahl überspringen</string>
     <string name="oled_black_background">OLED Schwarzer Hintergrund</string>
     <string name="clock_format">Uhrzeitformat</string>
-    <string name="show_budget">Budget auf Startseite anzeigen</string>
+    <string name="show_budget">Budget anzeigen</string>
+    <string name="show_certification">FSK anzeigen</string>
     <string name="show_loading_stats">Ladestatistiken anzeigen</string>
     <string name="volume_boost">Lautstärke-Verstärkung</string>
     <string name="dns_provider">DNS-Anbieter</string>
@@ -362,7 +363,7 @@
     <string name="update_msg_ready">Das neueste StreamNet-TV-Update wurde heruntergeladen und kann installiert werden.</string>
     <string name="update_msg_installer_hint">Der Android-Paketinstaller sollte erscheinen. Falls nicht, wähle erneut „Installieren“.</string>
     <!-- Ergänzende Basis-, Wiedergabe- und Einstellungsübersetzungen -->
-    <string name="app_name">StreamNet TV</string>
+    <string name="app_name">StreamNet</string>
     <string name="now_playing">LÄUFT GERADE</string>
     <string name="topbar_tv">TV</string>
     <string name="my_watchlist">Meine Merkliste</string>
@@ -385,7 +386,8 @@
     <string name="trailer_in_cards_desc">TV: Trailer in der fokussierten Karte statt im Vollbild abspielen</string>
     <string name="ui_mode_desc">TV, Tablet oder Telefon erzwingen</string>
     <string name="skip_profile_desc">Nach einem Neustart automatisch das zuletzt verwendete Profil laden</string>
-    <string name="show_budget_desc">Filmbudget im Hero-Banner der Startseite anzeigen</string>
+    <string name="show_budget_desc">Filmbudget in großen Home-Heros und auf Detailseiten anzeigen</string>
+    <string name="show_certification_desc">Deutsche Altersfreigabe in großen Home-Heros und auf Detailseiten anzeigen, wenn verfügbar</string>
     <string name="spoiler_blur">Spoiler weichzeichnen</string>
     <string name="spoiler_blur_desc">Karten ungesehener Episoden weichzeichnen, um Spoiler zu vermeiden</string>
     <string name="accent_color">Akzentfarbe</string>

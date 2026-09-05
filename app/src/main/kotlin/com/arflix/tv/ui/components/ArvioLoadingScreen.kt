@@ -86,7 +86,7 @@ fun ArvioLoadingScreen(
         ) {
             Image(
                 painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
-                contentDescription = "StreamNet TV",
+                contentDescription = stringResource(R.string.app_name),
                 contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .fillMaxWidth(0.58f)
