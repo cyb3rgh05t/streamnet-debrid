@@ -33,6 +33,13 @@ class LiveCategoryIndexTest {
     fun fallbackArtworkPrefersSpecificCategoryMappings() {
         assertThat(liveChannelFallbackArtwork("Streamnet 24/7", null)?.assetPath)
             .endsWith("streamnet_24_7.webp")
+        assertThat(
+            liveChannelFallbackArtwork(
+                groupName = "International Sports",
+                countryCode = null,
+                selectedCategoryName = "ERWACHSENE - ADULT - XXX",
+            )?.assetPath
+        ).endsWith("adult.webp")
         assertThat(liveChannelFallbackArtwork("DE | Sky F1", "DE")?.assetPath)
             .endsWith("sky_f1.webp")
         assertThat(liveChannelFallbackArtwork("Amazon Events", null)?.assetPath)

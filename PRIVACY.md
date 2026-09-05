@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: August 19, 2026
+Last updated: September 5, 2026
 
 ## 1. Scope And Controller
 
@@ -38,7 +38,7 @@ StreamNet TV can send crash stack traces, exception details, app version and bui
 
 ### App-open measurement
 
-At most once per 24 hours, StreamNet TV can send an `app_open` event containing a random install identifier, app version, Android API level, device type, distribution type, and account/profile identifiers when signed in. The backend converts direct identifiers into keyed pseudonymous values before storing the event. This measurement is used only to estimate daily and weekly active use and release adoption; it is not used for advertising or user profiling.
+At most once per 24 hours, StreamNet TV can send an `app_open` event to the self-hosted StreamNet backend containing a random install identifier, app version, Android API level, device type, distribution type, and account ID, email address, and profile ID when signed in. These fields are stored in the first-party `app_usage_events` table. This measurement is used only to estimate daily and weekly active use and release adoption; it is not used for advertising or user profiling.
 
 These activities are based on StreamNet TV's legitimate interests in finding crashes, measuring release health, and maintaining a reliable service (Article 6(1)(f)). You can object at any time by turning **Share diagnostics and usage** off in Settings. Turning it off does not affect playback, accounts, or cloud sync.
 

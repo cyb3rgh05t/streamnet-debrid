@@ -749,7 +749,7 @@
     <string name="settings_badge_update">UPDATE</string>
     <string name="settings_badge_check">CHECK</string>
     <string name="settings_diagnostics_sharing">Share diagnostics and usage</string>
-    <string name="settings_diagnostics_sharing_desc">Send anonymous crash diagnostics and app startup events to help improve StreamNet TV</string>
+    <string name="settings_diagnostics_sharing_desc">Send crash diagnostics when configured and app startup information to help improve StreamNet TV</string>
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_privacy_policy_desc">Read how StreamNet TV processes data, retention policies, data providers, and your privacy rights</string>
     <string name="settings_account_data_deletion">Delete cloud account and data</string>

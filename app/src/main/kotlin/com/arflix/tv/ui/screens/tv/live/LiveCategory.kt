@@ -191,6 +191,7 @@ private fun countryFlagArtwork(code: String): LiveChannelFallbackArtwork {
 }
 
 private val CATEGORY_ARTWORK_RULES = listOf(
+    Regex("\\b(erwachsene|adult|xxx)\\b") to "adult.webp",
     Regex("streamnet\\s*24[\\s/-]*7") to "streamnet_24_7.webp",
     Regex("magenta\\s*tv") to "magenta_tv.webp",
     Regex("sky\\s*(premium|cinema)") to "sky_premium.webp",

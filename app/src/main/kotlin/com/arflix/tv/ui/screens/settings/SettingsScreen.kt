@@ -5977,9 +5977,9 @@ private fun TvSettingsSectionHeader(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = tvSettingsSectionDescription(section),
-                    style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                    style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                     color = TextSecondary.copy(alpha = 0.74f),
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -6050,7 +6050,9 @@ private fun TvSettingsInsightPanel(
             text = tvSettingsSectionDescription(section),
             style = ArflixTypography.caption,
             color = TextSecondary.copy(alpha = 0.7f),
-            lineHeight = 18.sp
+            lineHeight = 18.sp,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
 
         Spacer(modifier = Modifier.height(22.dp))
@@ -6082,7 +6084,9 @@ private fun TvSettingsInsightPanel(
                     text = help.description,
                     style = ArflixTypography.caption,
                     color = TextSecondary.copy(alpha = 0.76f),
-                    lineHeight = 18.sp
+                    lineHeight = 18.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
@@ -8305,66 +8309,78 @@ private fun IptvSettings(
                     color = TextSecondary,
                     modifier = Modifier.padding(start = 4.dp, bottom = 8.dp)
                 )
-                Row(modifier = Modifier.settingsFocusSlot(rowIndex).fillMaxWidth().background(if (focusedIndex == rowIndex) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == rowIndex) 2.dp else 0.dp, color = if (focusedIndex == rowIndex) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onEditPlaylist(index) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(19.dp))
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(playlist.name, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (focusedIndex == rowIndex) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } }, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary.copy(alpha = 0.72f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Column(modifier = Modifier.settingsFocusSlot(rowIndex).fillMaxWidth().background(if (focusedIndex == rowIndex) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == rowIndex) 2.dp else 0.dp, color = if (focusedIndex == rowIndex) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onEditPlaylist(index) }.padding(horizontal = 18.dp, vertical = if (isStreamNetPreset) 18.dp else 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(playlist.name, style = ArflixTypography.cardTitle.copy(fontSize = 17.sp), color = if (focusedIndex == rowIndex) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } }, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary.copy(alpha = 0.72f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        }
                     }
-                    CatalogActionChip(
-                        icon = Icons.Default.List,
-                        label = stringResource(R.string.settings_iptv_live_categories),
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
-                        enabled = isConfigured,
-                        onClick = { onManageCategories(playlist.id) }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    if (isStreamNetPreset) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         CatalogActionChip(
-                            icon = Icons.Default.Movie,
-                            label = stringResource(R.string.settings_iptv_vod_categories),
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                            icon = Icons.Default.List,
+                            label = stringResource(R.string.settings_iptv_live_categories),
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
                             enabled = isConfigured,
-                            onClick = onManageVodCategories
+                            onClick = { onManageCategories(playlist.id) }
                         )
                         Spacer(modifier = Modifier.width(6.dp))
+                        if (isStreamNetPreset) {
+                            CatalogActionChip(
+                                icon = Icons.Default.Movie,
+                                label = stringResource(R.string.settings_iptv_vod_categories),
+                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                                enabled = isConfigured,
+                                onClick = onManageVodCategories
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        CatalogActionChip(
+                            icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 1 + streamNetActionOffset,
+                            enabled = isConfigured,
+                            onClick = { onTogglePlaylist(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = Icons.Default.Edit,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 2 + streamNetActionOffset,
+                            onClick = { onEditPlaylist(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = Icons.Default.ArrowUpward,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 3 + streamNetActionOffset,
+                            enabled = !isStreamNetPreset,
+                            onClick = { onMovePlaylistUp(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = Icons.Default.ArrowDownward,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 4 + streamNetActionOffset,
+                            enabled = !isStreamNetPreset,
+                            onClick = { onMovePlaylistDown(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = Icons.Default.Delete,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 5 + streamNetActionOffset,
+                            isDestructive = true,
+                            enabled = !isStreamNetPreset,
+                            onClick = { onDeletePlaylist(index) }
+                        )
                     }
-                    CatalogActionChip(
-                        icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 1 + streamNetActionOffset,
-                        enabled = isConfigured,
-                        onClick = { onTogglePlaylist(index) }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(
-                        icon = Icons.Default.Edit,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 2 + streamNetActionOffset,
-                        onClick = { onEditPlaylist(index) }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(
-                        icon = Icons.Default.ArrowUpward,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 3 + streamNetActionOffset,
-                        enabled = !isStreamNetPreset,
-                        onClick = { onMovePlaylistUp(index) }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(
-                        icon = Icons.Default.ArrowDownward,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 4 + streamNetActionOffset,
-                        enabled = !isStreamNetPreset,
-                        onClick = { onMovePlaylistDown(index) }
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(
-                        icon = Icons.Default.Delete,
-                        isFocused = focusedIndex == rowIndex && focusedActionIndex == 5 + streamNetActionOffset,
-                        isDestructive = true,
-                        enabled = !isStreamNetPreset,
-                        onClick = { onDeletePlaylist(index) }
-                    )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -9456,7 +9472,7 @@ private fun CatalogsSettings(
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                                 if (!selectionMode) {
                                     CatalogueRowLayoutToggleButton(rowKey = layoutRowKey, enabled = layoutToggleEnabled)
@@ -9584,7 +9600,7 @@ private fun CatalogsSettings(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (isRowFocused || isSelected) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary.copy(alpha = 0.7f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     CatalogActionChip(icon = Icons.Default.Edit, isFocused = isRowFocused && focusedActionIndex == 0, onClick = { onRenameCatalog(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
@@ -9766,7 +9782,7 @@ private fun StremioAddonsSettings(
                             Spacer(modifier = Modifier.width(16.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(addon.name, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(addon.description, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(addon.description, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                             Spacer(modifier = Modifier.width(12.dp))
                             // Toggle switch

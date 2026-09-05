@@ -337,7 +337,7 @@
           <header class="hero">
             <p class="eyebrow">Privacy Policy</p>
             <h1>StreamNet TV Privacy Policy</h1>
-            <p class="updated">Last updated: August 19, 2026</p>
+            <p class="updated">Last updated: September 5, 2026</p>
           </header>
           <div class="content">
             <article class="policy">
@@ -430,12 +430,13 @@
                 </p>
                 <p>
                   At most once per 24 hours, StreamNet TV can send an app_open
-                  event containing a random install identifier, app version,
-                  Android API level, device type, distribution type, and
-                  account/profile identifiers when signed in. Direct identifiers
-                  are converted into keyed pseudonymous values before storage.
-                  This is used only to estimate active use and release adoption,
-                  not for advertising or user profiling.
+                  event to the self-hosted StreamNet backend containing a random
+                  install identifier, app version, Android API level, device
+                  type, distribution type, and account ID, email address, and
+                  profile ID when signed in. These fields are stored in the
+                  first-party app_usage_events table. This is used only to
+                  estimate active use and release adoption, not for advertising
+                  or user profiling.
                 </p>
                 <p>
                   StreamNet no longer relies on Netlify for the primary
@@ -698,7 +699,7 @@
           <header class="hero">
             <p class="eyebrow">Datenschutzerklaerung</p>
             <h1>StreamNet TV Datenschutzerklaerung</h1>
-            <p class="updated">Zuletzt aktualisiert: 19. August 2026</p>
+            <p class="updated">Zuletzt aktualisiert: 5. September 2026</p>
           </header>
           <div class="content">
             <article class="policy">
@@ -795,10 +796,12 @@
                 </p>
                 <p>
                   Hoechstens einmal pro 24 Stunden kann StreamNet TV ein
-                  app_open-Ereignis mit zufaelliger Installations-ID,
-                  App-Version, Android-API-Level, Geraetetyp, Distribution und
-                  Konto-/Profilreferenzen senden. Direkte Kennungen werden vor
-                  Speicherung pseudonymisiert. Die Messung dient nur aktiver
+                  app_open-Ereignis an das selbst gehostete StreamNet-Backend
+                  senden. Es enthaelt eine zufaellige Installations-ID,
+                  App-Version, Android-API-Level, Geraetetyp, Distribution sowie
+                  bei einer Anmeldung Konto-ID, E-Mail-Adresse und Profil-ID.
+                  Diese Felder werden in der First-Party-Tabelle
+                  app_usage_events gespeichert. Die Messung dient nur aktiver
                   Nutzung und Release-Gesundheit, nicht Werbung oder
                   Profilbildung.
                 </p>

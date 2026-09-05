@@ -693,30 +693,29 @@ private fun NetflixCategoryChipRow(
 ) {
     val items = rememberNetflixCategoryItems(tree, hiddenGroups, groupOrder)
     val listState = rememberLazyListState()
-    val selectedIndex = remember(items, selectedId) {
+    val selectedCategoryIndex = remember(items, selectedId) {
         items.indexOfFirst { it.id == selectedId }
-            .takeIf { it >= 0 }
-            ?.plus(1) // Search is the first LazyRow item.
-            ?: 0
     }
-    LaunchedEffect(focusSelectedCategorySignal, selectedIndex) {
+    LaunchedEffect(focusSelectedCategorySignal, selectedCategoryIndex) {
         if (focusSelectedCategorySignal > 0) {
-            runCatching { listState.scrollToItem(selectedIndex) }
+            if (selectedCategoryIndex >= 0) {
+                runCatching { listState.scrollToItem(selectedCategoryIndex + 1) }
+            }
             runCatching { focusRequester.requestFocus() }
         }
     }
     LazyRow(
-        state = listState, modifier = modifier,
+        state = listState,
+        modifier = modifier.padding(horizontal = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        item(key = "__search") {
+        item(key = "search") {
             NetflixChip(
                 label = stringResource(R.string.live_label_search_channels),
                 count = null, isSelected = false, onFocused = onFocused, onClick = onOpenSearch,
                 onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
-                focusRequester = if (items.isEmpty()) focusRequester else null,
+                focusRequester = if (selectedCategoryIndex < 0) focusRequester else null,
                 iconContent = {
                     Icon(imageVector = Icons.Filled.Search, contentDescription = null,
                         tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
@@ -729,6 +728,14 @@ private fun NetflixCategoryChipRow(
                 onFocused = onFocused, onClick = { onSelect(item.id) },
                 onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
                 focusRequester = if (item.id == selectedId) focusRequester else null,
+                iconContent = if (item.id == "fav") {
+                    {
+                        Icon(imageVector = Icons.Filled.Star, contentDescription = null,
+                            tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+                    }
+                } else {
+                    null
+                },
             )
         }
     }

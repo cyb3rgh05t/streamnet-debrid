@@ -1343,7 +1343,7 @@
     <string name="settings_iptv_order_number">Sendernummer</string>
     <string name="settings_iptv_order_name">Alphabetisch (A-Z)</string>
     <string name="settings_diagnostics_sharing">Diagnosen und Nutzung teilen</string>
-    <string name="settings_diagnostics_sharing_desc">Anonyme Absturzdiagnosen und App-Start-Ereignisse senden, um StreamNet TV zu verbessern</string>
+    <string name="settings_diagnostics_sharing_desc">Konfigurierte Absturzdiagnosen und App-Start-Informationen senden, um StreamNet TV zu verbessern</string>
     <string name="settings_privacy_policy">Datenschutzerklärung</string>
     <string name="settings_privacy_policy_desc">Erfahre, wie StreamNet TV Daten, Aufbewahrung, Datenanbieter und deine Datenschutzrechte behandelt</string>
     <string name="settings_account_data_deletion">Cloud-Konto und Daten löschen</string>

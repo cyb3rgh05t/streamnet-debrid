@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### TV interface
+
+- Expanded TV playlist cards into separate information and action rows so the StreamNet TV preset remains readable on television layouts.
+- Allowed TV Settings header descriptions to wrap to two lines instead of truncating after one line.
+- Standardized Settings option, catalog, addon, and contextual help descriptions to a maximum of two lines.
+- Corrected diagnostics copy and privacy documentation to distinguish configuration-dependent crash reporting from first-party app-start measurement.
+- Restored the missing Favorites chip in the Netflix-style Live TV category bar while keeping Search and all categories in one horizontally scrolling row.
+- Documented crash-reporting providers, build gates, self-hosting options, app-start measurement, and current verification status.
+
 ## [2.3.002] - 2026-09-04
 
 ### Security

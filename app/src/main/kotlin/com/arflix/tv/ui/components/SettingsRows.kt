@@ -153,7 +153,7 @@ fun SettingsRow(
                         text = subtitle,
                         style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                         color = TextSecondary,
-                        maxLines = 3,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
                 }
@@ -236,7 +236,7 @@ fun SettingsToggleRow(
                     text = subtitle,
                     style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                     color = TextSecondary,
-                    maxLines = 3,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -375,7 +375,7 @@ fun MobileSettingsRow(
                             text = subtitle,
                             style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp),
                             color = TextSecondary,
-                            maxLines = 4,
+                            maxLines = 2,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
