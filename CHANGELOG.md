@@ -4,6 +4,8 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.008] - 2026-09-06
+
 ### Administration und Updates
 
 - Der App-Update-Dialog zeigt statt des vollständigen Changelogs einen anklickbaren Link zum zugehörigen GitHub-Release.
