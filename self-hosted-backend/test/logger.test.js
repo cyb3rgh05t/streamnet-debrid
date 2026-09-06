@@ -50,6 +50,24 @@ test("highlights server failures as errors", () => {
   assert.equal(details.message, "Request failed");
 });
 
+test("includes safe admin mutation failure reasons", () => {
+  const adminRequest = request(
+    "PATCH",
+    "/admin-api/accounts/id/snapshot",
+    "/admin-api/accounts/:accountId/snapshot",
+  );
+  adminRequest.backendFailureReason = "unknown_profile";
+  const details = requestLogDetails(
+    adminRequest,
+    { statusCode: 400 },
+    4.2,
+  );
+
+  assert.equal(details.level, "warn");
+  assert.equal(details.message, "Admin snapshot updated failed");
+  assert.equal(details.fields.failureReason, "unknown_profile");
+});
+
 test("describes pairing endpoints without assuming a TV device", () => {
   const details = requestLogDetails(
     request("POST", "/tv-auth-complete", "/tv-auth-complete"),

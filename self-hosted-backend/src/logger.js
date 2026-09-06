@@ -121,6 +121,9 @@ export function requestLogDetails(request, reply, elapsedMs) {
       durationLabel: `${elapsedMs.toFixed(1)} ms`,
       requestId: request.id,
       ...(deviceType ? { deviceType } : {}),
+      ...(request.backendFailureReason
+        ? { failureReason: request.backendFailureReason }
+        : {}),
     },
   };
 }

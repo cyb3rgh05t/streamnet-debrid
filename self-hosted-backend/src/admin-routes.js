@@ -15,6 +15,34 @@ const adminLoginWindowMs = 15 * 60_000;
 const adminLoginMaxAttempts = 8;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const mutationFailureReasons = new Map([
+  ["Snapshot payload is invalid", "invalid_snapshot_payload"],
+  ["Mutation request is invalid", "invalid_mutation_request"],
+  ["profileId is invalid", "invalid_profile_id"],
+  ["Unknown profile", "unknown_profile"],
+  ["Addon data must be an object", "invalid_addon_data"],
+  ["Addon data is too large", "addon_data_too_large"],
+  ["Addon id is invalid", "invalid_addon_id"],
+  ["Addon name is invalid", "invalid_addon_name"],
+  ["Playlist data must be an object", "invalid_playlist_data"],
+  ["Playlist data is too large", "playlist_data_too_large"],
+  ["Playlist id is invalid", "invalid_playlist_id"],
+  ["Playlist name is invalid", "invalid_playlist_name"],
+  ["Playlist m3uUrl is required", "playlist_url_required"],
+  ["rootKey is invalid", "invalid_profile_root"],
+  ["field is invalid", "invalid_profile_field"],
+  [
+    "Profile field is not editable through this operation",
+    "profile_field_not_editable",
+  ],
+  ["Field data is too large", "field_data_too_large"],
+  ["Unsafe property name", "unsafe_property_name"],
+  ["Unsupported operation", "unsupported_operation"],
+]);
+
+function mutationFailureReason(error) {
+  return mutationFailureReasons.get(error?.message) || "invalid_mutation_data";
+}
 
 function loginAttemptKey(request) {
   return request.ip || "unknown";
@@ -292,9 +320,11 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       const expectedRevision = request.body?.expectedRevision;
       const reason = String(request.body?.reason || "").trim();
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
+        request.backendFailureReason = "invalid_expected_revision";
         return reply.code(400).send({ error: "expectedRevision is required" });
       }
       if (reason.length < 3 || reason.length > 500) {
+        request.backendFailureReason = "invalid_change_reason";
         return reply.code(400).send({ error: "A change reason is required" });
       }
 
@@ -329,6 +359,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
           );
         } catch (error) {
           await client.query("rollback");
+          request.backendFailureReason = mutationFailureReason(error);
           return reply.code(400).send({ error: error.message });
         }
         const nextRevision = revision + 1;
