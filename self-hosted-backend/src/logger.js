@@ -16,6 +16,12 @@ const routeActions = new Map([
   ["POST /tv-auth-poll", "Device pairing checked"],
   ["POST /tv-auth-complete", "Device pairing completed"],
   ["POST /tv-auth-web", "Device pairing completed"],
+  ["POST /admin-api/login", "Admin sign-in"],
+  ["GET /admin-api/overview", "Admin overview loaded"],
+  ["GET /admin-api/accounts", "Admin account list loaded"],
+  ["GET /admin-api/accounts/:accountId", "Admin account loaded"],
+  ["PATCH /admin-api/accounts/:accountId/snapshot", "Admin snapshot updated"],
+  ["GET /admin-api/audits", "Admin audit loaded"],
 ]);
 
 function envFlag(name, fallback) {

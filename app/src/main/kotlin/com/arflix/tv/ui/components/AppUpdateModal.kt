@@ -49,6 +49,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -90,34 +91,46 @@ fun AppUpdateModal(
     val labelRetryInstall = stringResource(R.string.update_btn_retry_install)
     val labelCancel = stringResource(R.string.cancel)
     val labelRetry = stringResource(R.string.retry)
+    val labelGitHubRelease = stringResource(R.string.update_btn_github_release)
+    val uriHandler = LocalUriHandler.current
+    val update = status.updateOrNull()
+    val releaseUrl = update?.releaseUrl?.takeIf { it.isNotBlank() }
 
     val buttons = remember(
-        status,
+        status, releaseUrl, uriHandler,
         labelClose, labelIgnore, labelDownload, labelInstall,
-        labelHide, labelRetryInstall, labelCancel, labelRetry
+        labelHide, labelRetryInstall, labelCancel, labelRetry, labelGitHubRelease
     ) {
+        val releaseButton = releaseUrl?.let { url ->
+            ActionButtonConfig(labelGitHubRelease, { uriHandler.openUri(url) })
+        }
         when (status) {
             is UpdateStatus.UpdateAvailable -> listOf(
                 ActionButtonConfig(labelClose, onDismiss),
                 ActionButtonConfig(labelIgnore, onIgnore),
+                releaseButton,
                 ActionButtonConfig(labelDownload, onDownload, highlighted = true)
-            )
+            ).filterNotNull()
             is UpdateStatus.ReadyToInstall -> listOf(
                 ActionButtonConfig(labelClose, onDismiss),
+                releaseButton,
                 ActionButtonConfig(labelInstall, onInstall, highlighted = true)
-            )
+            ).filterNotNull()
             is UpdateStatus.Installing -> listOf(
                 ActionButtonConfig(labelHide, onDismiss),
+                releaseButton,
                 ActionButtonConfig(labelRetryInstall, onInstall, highlighted = true)
-            )
+            ).filterNotNull()
             is UpdateStatus.Downloading -> listOf(
                 ActionButtonConfig(labelHide, onDismiss),
+                releaseButton,
                 ActionButtonConfig(labelCancel, onCancelDownload)
-            )
+            ).filterNotNull()
             is UpdateStatus.Failure -> listOf(
                 ActionButtonConfig(labelClose, onDismiss),
+                releaseButton,
                 ActionButtonConfig(labelRetry, onDownload, highlighted = true)
-            )
+            ).filterNotNull()
             else -> listOf(
                 ActionButtonConfig(labelClose, onDismiss)
             )
@@ -127,7 +140,6 @@ fun AppUpdateModal(
     var focusedIndex by remember(buttons) { mutableIntStateOf(buttons.lastIndex) }
     val focusRequester = remember { FocusRequester() }
     val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
-    val update = status.updateOrNull()
     val cardShape = RoundedCornerShape(12.dp)
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
@@ -352,30 +364,6 @@ fun AppUpdateModal(
                     else -> {}
                 }
 
-                update?.notes?.takeIf { it.isNotBlank() }?.let { releaseNotes ->
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(ArvioSkin.colors.surfaceRaised.copy(alpha = 0.62f), RoundedCornerShape(10.dp))
-                            .padding(14.dp),
-                    ) {
-                        androidx.compose.material3.Text(
-                            text = stringResource(R.string.update_release_notes),
-                            style = ArflixTypography.label,
-                            color = accent,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        androidx.compose.material3.Text(
-                            text = releaseNotes.take(1800),
-                            style = ArflixTypography.caption.copy(lineHeight = 17.sp),
-                            color = ArvioSkin.colors.textMuted,
-                            modifier = Modifier
-                                .heightIn(max = if (isTouchDevice) 180.dp else 150.dp)
-                                .verticalScroll(rememberScrollState()),
-                        )
-                    }
-                }
                 }
 
                 Spacer(modifier = Modifier.height(if (isTouchDevice) 16.dp else 18.dp))

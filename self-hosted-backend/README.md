@@ -23,6 +23,35 @@ Password reset and media proxies are intentionally not included yet. Password re
 
 The production APK uses this service as its account and synchronization backend.
 
+## Admin Dashboard
+
+The protected dashboard is served at `PUBLIC_BASE_URL/admin`. It shows database
+health, accounts, profile and snapshot metrics, a redacted payload view, and the
+admin audit log. It can add or replace an account-wide add-on, add or replace a
+profile playlist, and set an allowed profile setting. Every mutation requires
+the current snapshot revision and a reason, then creates a new revision and an
+audit entry in the same PostgreSQL transaction.
+
+Run migration `009_admin_dashboard.sql`, then create the first administrator
+from the server shell. The password is not stored in `.env` and must contain at
+least 14 characters:
+
+```sh
+read -rp "Admin email: " STREAMNET_ADMIN_EMAIL
+read -rsp "Admin password: " STREAMNET_ADMIN_PASSWORD; echo
+export STREAMNET_ADMIN_EMAIL STREAMNET_ADMIN_PASSWORD
+docker compose exec -e STREAMNET_ADMIN_EMAIL -e STREAMNET_ADMIN_PASSWORD streamnet-backend npm run create:admin
+unset STREAMNET_ADMIN_EMAIL STREAMNET_ADMIN_PASSWORD
+```
+
+To intentionally replace an existing administrator password, additionally pass
+`-e STREAMNET_ADMIN_REPLACE_PASSWORD=1`. Admin access uses a separate 30-minute
+JWT purpose and never accepts a normal StreamNet account token. The dashboard
+masks tokens, passwords, API keys, playlist URLs, portal URLs, and MAC addresses.
+Place an IP allowlist or an interactive access proxy in front of `/admin` and
+`/admin-api` when exposing the production host; do not apply that middleware to
+the Android API routes.
+
 ## Upgrade Existing Production Server
 
 The account-deletion and StreamNet Club branding update requires both a new

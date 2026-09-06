@@ -180,6 +180,7 @@ private fun Quality.rank(): Int = when (this) {
     Quality.FHD -> 3
     Quality.HD -> 2
     Quality.SD -> 1
+    Quality.UNKNOWN -> 0
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

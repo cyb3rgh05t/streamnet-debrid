@@ -454,6 +454,7 @@ private fun catchupQualityRank(channel: EnrichedChannel): Int = when (channel.qu
     Quality.FHD -> 3
     Quality.HD -> 2
     Quality.SD -> 1
+    Quality.UNKNOWN -> 0
 }
 
 private fun catchupPlaybackVariant(
@@ -1196,6 +1197,7 @@ fun LiveTvScreen(
         playingCatchupProgram,
         state.snapshot.nowNext,
         indexedGuideNowNextState.value,
+        guideClockMillis,
     ) {
         val live = guideForChannel(playingChannel)
         val catchup = playingCatchupProgram
@@ -1208,7 +1210,7 @@ fun LiveTvScreen(
                 recent = emptyList()
             )
         } else {
-            live
+            live?.atTime(guideClockMillis)
         }
     }
     val previewInfoChannel = remember(
@@ -2159,6 +2161,22 @@ fun LiveTvScreen(
 
     DisposableEffect(Unit) { onDispose { exoPlayer.release() } }
 
+    var playbackQuality by remember(exoPlayer) { mutableStateOf<LivePlaybackQuality?>(null) }
+    DisposableEffect(exoPlayer) {
+        val listener = LivePlaybackQualityListener(exoPlayer) { playbackQuality = it }
+        exoPlayer.addListener(listener)
+        onDispose { exoPlayer.removeListener(listener) }
+    }
+    val playingDisplayChannel = remember(playingChannel, playbackQuality) {
+        playingChannel?.let { it.copy(quality = it.displayQuality(playbackQuality)) }
+    }
+    val previewDisplayChannel = remember(previewInfoChannel, playbackQuality) {
+        previewInfoChannel?.let { it.copy(quality = it.displayQuality(playbackQuality)) }
+    }
+    val guideDisplayChannels = remember(guideChannels, playbackQuality) {
+        guideChannels.map { it.copy(quality = it.displayQuality(playbackQuality)) }
+    }
+
     var playerPositionMs by remember { mutableLongStateOf(0L) }
     var playerDurationMs by remember { mutableLongStateOf(0L) }
     var playerIsPlaying by remember { mutableStateOf(false) }
@@ -2256,6 +2274,7 @@ fun LiveTvScreen(
         exoPlayer.clearMediaItems()
         val mediaItem = MediaItem.Builder()
             .setUri(stream)
+            .setMediaId(playingChannelId.orEmpty())
             .apply {
                 if (isHls) {
                     setMimeType(MimeTypes.APPLICATION_M3U8)
@@ -2542,6 +2561,7 @@ fun LiveTvScreen(
         playingCatchupProgram,
         catchupPlaybackOffsetMs
     ) {
+        val liveWindowRecovery = LiveWindowRecovery(android.os.SystemClock::elapsedRealtime)
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 playerIsBuffering = (playbackState == Player.STATE_BUFFERING)
@@ -2598,6 +2618,18 @@ fun LiveTvScreen(
             override fun onPlayerError(error: PlaybackException) {
                 playerIsBuffering = false
                 val prepared = lastPreparedStreamUrl ?: return
+                if (
+                    error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW &&
+                    liveWindowRecovery.claim(isCatchup = playingCatchupProgram != null)
+                ) {
+                    playbackDiagnostic = null
+                    playerIsBuffering = true
+                    exoPlayer.seekToDefaultPosition()
+                    exoPlayer.prepare()
+                    exoPlayer.playWhenReady = true
+                    System.err.println("[IPTV] Recovered expired live window at default live position")
+                    return
+                }
                 val preparedIsHls = lastPreparedIsHls
                 val nextAttempt = playerRetryCount + 1
                 playerRetryCount = nextAttempt
@@ -2900,14 +2932,14 @@ fun LiveTvScreen(
                     )
                     MiniPlayerRow(
                         exoPlayer = exoPlayer,
-                        channel = previewInfoChannel,
+                        channel = previewDisplayChannel,
                         clockTickMillis = guideClockMillis,
                         nowNext = previewNowNext,
                         onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
                         favoriteSet = favSet,
                         onFullscreenClick = openFullScreenPlayer,
-                        variantCount = previewInfoChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
-                        onOpenVariants = previewInfoChannel?.let { channel -> { openVariantPicker(channel) } },
+                        variantCount = previewDisplayChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = previewDisplayChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
                         landscapeCompact = landscapeCompactMiniPlayer,
                         tabletLandscape = tabletLandscapeMiniPlayer,
@@ -2924,7 +2956,7 @@ fun LiveTvScreen(
                         modifier = Modifier.fillMaxWidth(),
                     )
                     EpgGrid(
-                        channels = guideChannels,
+                        channels = guideDisplayChannels,
                         channelWindowOffset = normalizedGuideStart,
                         totalChannelCount = selectedCategoryTotalCount,
                         clockTickMillis = guideClockMillis,
@@ -2971,7 +3003,7 @@ fun LiveTvScreen(
                     channels = filteredChannels,
                     playingChannelId = playingChannelId,
                     focusedChannelId = focusedChannelId,
-                    playingChannel = playingChannel,
+                    playingChannel = playingDisplayChannel,
                     nowNextMap = remember(state.snapshot.nowNext, effectiveGuideNowNext) {
                         state.snapshot.nowNext + effectiveGuideNowNext
                     },
@@ -3197,7 +3229,7 @@ fun LiveTvScreen(
                         ?: selectedCategoryId
 
                     FullscreenHud(
-                        channel = playingChannel,
+                        channel = playingDisplayChannel,
                         nowNext = currentNowNext,
                         pokeSignal = hudPokeSignal,
                         categoryName = categoryTitle,
@@ -3312,7 +3344,9 @@ fun LiveTvScreen(
                 }
                 FullscreenGuideOverlay(
                     visible = isFullScreen && fullscreenGuideOpen,
-                    channel = guideChannel ?: playingChannel,
+                    channel = (guideChannel ?: playingChannel)?.let {
+                        it.copy(quality = it.displayQuality(playbackQuality))
+                    },
                     guide = guideForChannel(guideChannel ?: playingChannel),
                     selectedProgram = playingCatchupProgram,
                     isTouchDevice = isTouchDevice,

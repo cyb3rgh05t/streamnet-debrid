@@ -348,6 +348,13 @@ sealed class AuthState {
     data class Error(val message: String) : AuthState()
 }
 
+internal fun resolveCloudConnectionState(authState: AuthState, hasAuthenticatedProfile: Boolean): Boolean =
+    when (authState) {
+        is AuthState.Authenticated -> true
+        AuthState.NotAuthenticated -> false
+        AuthState.Loading, is AuthState.Error -> hasAuthenticatedProfile
+    }
+
 internal fun resolveCloudStartupUserId(
     refreshRequired: Boolean,
     refreshTokenAvailable: Boolean,

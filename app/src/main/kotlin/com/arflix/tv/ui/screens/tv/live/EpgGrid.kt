@@ -25,6 +25,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -429,6 +430,16 @@ fun EpgGrid(
         // ─── Body ───────────────────────────────────────────────────
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val totalWidth = halfHourWidth * slots.size
+            val viewportWidth = (maxWidth - channelColumnWidth - 1.dp).coerceAtLeast(0.dp)
+            val renderWindow by remember(hScroll, density, viewportWidth, pxPerMin) {
+                derivedStateOf {
+                    guideRenderWindow(
+                        scrollPx = hScroll.value,
+                        viewportPx = with(density) { viewportWidth.toPx() },
+                        pixelsPerMinute = with(density) { pxPerMin.dp.toPx() },
+                    )
+                }
+            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -571,6 +582,7 @@ fun EpgGrid(
                                     isActive = ch.id == selectedChannelId && focusMode == EpgGridFocusMode.Epg,
                                     epgMode = focusMode == EpgGridFocusMode.Epg,
                                     rowHeight = rowHeight,
+                                    renderWindow = renderWindow,
                                     onClick = { program ->
                                         onExitEpg(ch)
                                         onProgramSelect(ch, program)
@@ -642,6 +654,7 @@ private fun ProgramsRow(
     isActive: Boolean,
     epgMode: Boolean,
     rowHeight: Dp,
+    renderWindow: GuideRenderWindow,
     onClick: (IptvProgram?) -> Unit,
     onFocused: () -> Unit,
     onMoveVertically: (rowIdx: Int, anchorStartMin: Int) -> Boolean,
@@ -709,6 +722,9 @@ private fun ProgramsRow(
         }
         if (placements.isNotEmpty()) {
             placements.forEachIndexed { placementIndex, placement ->
+                if (!epgMode && !renderWindow.intersects(placement.startMin, placement.endMin)) {
+                    return@forEachIndexed
+                }
                 val offset = (placement.startMin * pxPerMin).dp
                 val width = (placement.durationMin * pxPerMin).dp
                 val isCatchupSupported = placement.isCatchupSupported(channel, nowMillis)

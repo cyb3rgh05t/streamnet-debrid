@@ -15,6 +15,7 @@ import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { isValidWatchHistoryIdentity } from "./watch-history.js";
+import { registerAdminRoutes } from "./admin-routes.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -30,6 +31,8 @@ const signupCooldownMs = 5 * 60_000;
 const tvAuthTtlMs = 10 * 60_000;
 const publicDirectory = path.join(process.cwd(), "public");
 const deletionReceipts = new Map();
+
+registerAdminRoutes(app, { pool, jwtKey, publicDirectory });
 
 function randomCode(length) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

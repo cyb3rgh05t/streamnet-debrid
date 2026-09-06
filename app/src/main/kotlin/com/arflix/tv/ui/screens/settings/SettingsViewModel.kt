@@ -2139,19 +2139,19 @@ class SettingsViewModel @Inject constructor(
                     lastObservedIptvM3u = config.m3uUrl
                     lastObservedStalkerUrl = config.stalkerPortalUrl
                     lastObservedIptvConfigSignature = config.syncSignature()
-                    val hasAnyIptvConfig = config.m3uUrl.isNotBlank() ||
-                        config.stalkerPortalUrl.isNotBlank() ||
-                        config.playlists.any { it.enabled && it.m3uUrl.isNotBlank() }
-                    if (!hasAnyIptvConfig) {
+                    if (
+                        config.m3uUrl.isBlank() &&
+                        config.stalkerPortalUrl.isBlank() &&
+                        config.playlists.none { it.enabled && it.m3uUrl.isNotBlank() }
+                    ) {
                         _uiState.value = _uiState.value.copy(
                             iptvChannelCount = 0,
                             iptvError = null,
                             iptvProgressText = null,
                             iptvProgressPercent = 0
                         )
-                    } else if (hasAnyIptvConfig && iptvLoadJob?.isActive != true && _uiState.value.iptvChannelCount == 0) {
-                        // Auto-refresh IPTV on startup/profile switch when configured but not loaded yet.
-                        refreshIptv(showToast = false, force = false)
+                    } else {
+                        loadCachedIptvChannelCount(config.syncSignature())
                     }
                     return@collect
                 }
@@ -2178,6 +2178,17 @@ class SettingsViewModel @Inject constructor(
                         iptvProgressPercent = 0
                     )
                 }
+            }
+        }
+    }
+
+    private fun loadCachedIptvChannelCount(configSignature: String) {
+        launchSettingsTask("iptv_cached_channel_count") {
+            val snapshot = iptvRepository.getMemoryCachedSnapshot()
+                ?: iptvRepository.getCachedSnapshotOrNull()
+                ?: return@launchSettingsTask
+            if (lastObservedIptvConfigSignature == configSignature) {
+                _uiState.value = _uiState.value.copy(iptvChannelCount = snapshot.channels.size)
             }
         }
     }

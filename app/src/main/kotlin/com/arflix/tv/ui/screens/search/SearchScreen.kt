@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -50,10 +51,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
 
@@ -68,6 +71,12 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -131,7 +140,7 @@ fun SearchScreen(
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val accentColor = resolveAccentColor(fallback = Pink)
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val searchBarWidth = if (isTouchDevice) configuration.screenWidthDp.dp - 24.dp
+    val searchBarWidth = if (isTouchDevice) configuration.screenWidthDp.dp - 32.dp
         else (configuration.screenWidthDp.dp * 0.48f).coerceIn(460.dp, 680.dp)
 
     val hasSearchResults = uiState.movieResults.isNotEmpty() || uiState.tvResults.isNotEmpty() || uiState.personResults.isNotEmpty()
@@ -316,8 +325,9 @@ fun SearchScreen(
                 FocusZone.RESULTS -> {
                     if (showFilters && quickFilters.isNotEmpty()) {
                         focusZone = FocusZone.FILTERS
-                        focusedFilterIndex = focusedFilterIndex.coerceIn(0, (quickFilters.size - 1).coerceAtLeast(0))
-                        try { filtersFocusRequester.requestFocus() } catch (_: Exception) {}
+                        val selectedIndex = quickFilters.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                        focusedFilterIndex = if (focusedFilterIndex in quickFilters.indices) focusedFilterIndex else selectedIndex
+                        runCatching { filtersFocusRequester.requestFocus() }
                     } else {
                         focusZone = FocusZone.SEARCH_INPUT
                         searchFocusRequester.requestFocus()
@@ -337,7 +347,7 @@ fun SearchScreen(
         }
     }
 
-    // D-pad handler: manages zone transitions. FILTERS zone lets native focus handle Left/Right.
+    // One D-pad handler owns zone transitions and filter selection.
     val dpadModifier = if (!isTouchDevice) {
         Modifier.onPreviewKeyEvent { event ->
             val isSelectKey = event.key == Key.Enter ||
@@ -363,8 +373,9 @@ fun SearchScreen(
                     FocusZone.RESULTS -> {
                         if (showFilters && quickFilters.isNotEmpty()) {
                             focusZone = FocusZone.FILTERS
-                            focusedFilterIndex = focusedFilterIndex.coerceIn(0, (quickFilters.size - 1).coerceAtLeast(0))
-                            try { filtersFocusRequester.requestFocus() } catch (_: Exception) {}
+                            val selectedIndex = quickFilters.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                            focusedFilterIndex = if (focusedFilterIndex in quickFilters.indices) focusedFilterIndex else selectedIndex
+                            runCatching { filtersFocusRequester.requestFocus() }
                         }
                         else { focusZone = FocusZone.SEARCH_INPUT; searchFocusRequester.requestFocus() }
                         true
@@ -398,8 +409,9 @@ fun SearchScreen(
                         }
                         else if (showFilters && quickFilters.isNotEmpty()) {
                             focusZone = FocusZone.FILTERS
-                            focusedFilterIndex = focusedFilterIndex.coerceIn(0, (quickFilters.size - 1).coerceAtLeast(0))
-                            try { filtersFocusRequester.requestFocus() } catch (_: Exception) {}
+                            val selectedIndex = quickFilters.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                            focusedFilterIndex = if (focusedFilterIndex in quickFilters.indices) focusedFilterIndex else selectedIndex
+                            runCatching { filtersFocusRequester.requestFocus() }
                             true
                         }
                         else { focusZone = FocusZone.SEARCH_INPUT; searchFocusRequester.requestFocus(); true }
@@ -412,8 +424,9 @@ fun SearchScreen(
                         keyboardController?.hide()
                         if (showFilters && quickFilters.isNotEmpty()) {
                             focusZone = FocusZone.FILTERS
-                            focusedFilterIndex = focusedFilterIndex.coerceIn(0, (quickFilters.size - 1).coerceAtLeast(0))
-                            try { filtersFocusRequester.requestFocus() } catch (_: Exception) {}
+                            val selectedIndex = quickFilters.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                            focusedFilterIndex = if (selectedIndex in quickFilters.indices) selectedIndex else 0
+                            runCatching { filtersFocusRequester.requestFocus() }
                         }
                         else if (activeCategories.isNotEmpty() || hasAiResults) {
                             resultsLastNavEventTime = SystemClock.elapsedRealtime()
@@ -457,9 +470,6 @@ fun SearchScreen(
                     FocusZone.FILTERS -> {
                         if (focusedFilterIndex > 0) {
                             focusedFilterIndex--
-                        } else {
-                            focusZone = FocusZone.SEARCH_INPUT
-                            runCatching { searchFocusRequester.requestFocus() }
                         }
                         true
                     }
@@ -502,6 +512,7 @@ fun SearchScreen(
                         }
                         FocusZone.FILTERS -> {
                             quickFilters.getOrNull(focusedFilterIndex)?.onSelect?.invoke()
+                            runCatching { filtersFocusRequester.requestFocus() }
                             true
                         }
                         FocusZone.RESULTS -> {
@@ -521,17 +532,25 @@ fun SearchScreen(
         }
     } else Modifier
 
-    Box(modifier = Modifier.fillMaxSize().background(appBackgroundDark()).then(dpadModifier)) {
+    Box(modifier = Modifier.fillMaxSize().background(appBackgroundDark()).then(dpadModifier).testTag("search-screen")) {
         if (!isTouchDevice) AppTopBar(selectedItem = SidebarItem.SEARCH, isFocused = focusZone == FocusZone.SIDEBAR, focusedIndex = sidebarFocusIndex, profile = currentProfile)
 
-        Column(modifier = Modifier.fillMaxSize().padding(top = if (isTouchDevice) 16.dp else AppTopBarContentTopInset).padding(horizontal = if (isTouchDevice) 12.dp else if (isCompactHeight) 20.dp else 28.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    if (isTouchDevice) Modifier.statusBarsPadding().padding(top = 12.dp)
+                    else Modifier.padding(top = AppTopBarContentTopInset)
+                )
+                .padding(horizontal = if (isTouchDevice) 0.dp else if (isCompactHeight) 20.dp else 28.dp)
+        ) {
             // ── Search Bar ──
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = if (isTouchDevice) 0.dp else 22.dp,
-                        end = if (isTouchDevice) 0.dp else 22.dp,
+                        start = if (isTouchDevice) 16.dp else 22.dp,
+                        end = if (isTouchDevice) 16.dp else 22.dp,
                         bottom = if (isCompactHeight) 6.dp else 8.dp
                     ),
                 horizontalArrangement = Arrangement.Center,
@@ -552,8 +571,9 @@ fun SearchScreen(
                         isSearchEditing = false
                     },
                     onFocused = {
-                        focusZone = FocusZone.SEARCH_INPUT
-                        isSearchInputFocused = true
+                        if (focusZone == FocusZone.SEARCH_INPUT) {
+                            isSearchInputFocused = true
+                        }
                     },
                     onFocusLost = { isSearchInputFocused = false },
                     onStartEditing = {
@@ -571,7 +591,8 @@ fun SearchScreen(
                         keyboardController?.hide()
                         if (showFilters && quickFilters.isNotEmpty()) {
                             focusZone = FocusZone.FILTERS
-                            focusedFilterIndex = 0
+                            val selectedIndex = quickFilters.indexOfFirst { it.isSelected }.coerceAtLeast(0)
+                            focusedFilterIndex = if (selectedIndex in quickFilters.indices) selectedIndex else 0
                             runCatching { filtersFocusRequester.requestFocus() }
                         } else if (activeCategories.isNotEmpty() || hasAiResults) {
                             resultsLastNavEventTime = SystemClock.elapsedRealtime()
@@ -591,7 +612,9 @@ fun SearchScreen(
                     focusedFilterIndex = focusedFilterIndex,
                     filtersFocusRequester = filtersFocusRequester,
                     isTouchDevice = isTouchDevice,
-                    modifier = Modifier.align(Alignment.CenterHorizontally),
+                    modifier = Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .padding(bottom = if (isTouchDevice) 4.dp else 0.dp),
                     isRtl = isRtl,
                     onFocused = { index ->
                         focusZone = FocusZone.FILTERS
@@ -612,9 +635,6 @@ fun SearchScreen(
                     onMoveLeft = {
                         if (focusedFilterIndex > 0) {
                             focusedFilterIndex--
-                        } else {
-                            focusZone = FocusZone.SEARCH_INPUT
-                            runCatching { searchFocusRequester.requestFocus() }
                         }
                     },
                     onMoveRight = {
@@ -713,6 +733,7 @@ private fun SearchInputBar(
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier
                 .fillMaxWidth()
+                .testTag("search-input")
                 .focusRequester(searchFocusRequester)
                 .onFocusChanged {
                     if (it.isFocused) onFocused() else onFocusLost()
@@ -727,6 +748,7 @@ private fun SearchInputBar(
             .width(searchBarWidth)
             .height(54.dp)
             .onPreviewKeyEvent { event ->
+                if (!isFocused) return@onPreviewKeyEvent false
                 if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 when (event.key) {
                     Key.DirectionUp -> { onMoveUp(); true }
@@ -768,6 +790,7 @@ private fun SearchInputBar(
                 keyboardActions = KeyboardActions(onSearch = { onSearch() }),
                 modifier = Modifier
                     .weight(1f)
+                    .testTag("search-input")
                     .focusRequester(textInputFocusRequester),
                 decorationBox = { inner ->
                     if (query.isEmpty()) {
@@ -814,23 +837,19 @@ private fun DiscoverFilterStrip(
     LazyRow(
         state = rowState,
         modifier = modifier
-            .padding(bottom = if (isTouchDevice) 10.dp else 8.dp)
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> { onMoveUp(); true }
-                    Key.DirectionDown -> { onMoveDown(); true }
-                    Key.DirectionLeft -> { if (isRtl) onMoveRight() else onMoveLeft(); true }
-                    Key.DirectionRight -> { if (isRtl) onMoveLeft() else onMoveRight(); true }
-                    Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> false
-                    else -> false
-                }
-            }
+            .padding(bottom = 8.dp)
+            .then(
+                if (!isTouchDevice) {
+                    Modifier
+                        .focusRequester(filtersFocusRequester)
+                        .focusable()
+                } else Modifier
+            )
             .arvioDpadFocusGroup(),
-        horizontalArrangement = Arrangement.spacedBy(if (isTouchDevice) 7.dp else 9.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isTouchDevice) 8.dp else 9.dp),
         contentPadding = PaddingValues(
-            start = if (isTouchDevice) 12.dp else 22.dp,
-            end = if (isTouchDevice) 12.dp else 22.dp,
+            start = if (isTouchDevice) 16.dp else 22.dp,
+            end = if (isTouchDevice) 16.dp else 22.dp,
             top = 4.dp,
             bottom = 4.dp
         )
@@ -841,9 +860,8 @@ private fun DiscoverFilterStrip(
                 isSelected = filter.isSelected,
                 useAccentForSelection = true,
                 isVisuallyFocused = !isTouchDevice && focusZone == FocusZone.FILTERS && focusedFilterIndex == index,
-                modifier = if (index == 0) Modifier.focusRequester(filtersFocusRequester) else Modifier,
-                onFocused = { onFocused(index) },
-                useSystemFocusForVisuals = isTouchDevice,
+                isTouchDevice = isTouchDevice,
+                modifier = Modifier.testTag("search-filter-${filter.key}"),
                 onSelect = filter.onSelect
             )
         }
@@ -857,13 +875,11 @@ private fun GlowChip(
     isSelected: Boolean,
     useAccentForSelection: Boolean = false,
     isVisuallyFocused: Boolean = false,
+    isTouchDevice: Boolean = false,
     modifier: Modifier = Modifier,
-    onFocused: () -> Unit = {},
-    useSystemFocusForVisuals: Boolean = true,
     onSelect: () -> Unit
 ) {
-    var systemFocused by remember { mutableStateOf(false) }
-    val focused = isVisuallyFocused || (useSystemFocusForVisuals && systemFocused)
+    val focused = isVisuallyFocused
     val active = focused || isSelected
     val chipShape = RoundedCornerShape(7.dp)
     val accentColor = resolveAccentColor(fallback = Color.White)
@@ -881,6 +897,11 @@ private fun GlowChip(
     }
     Box(
         modifier = modifier
+            .semantics {
+                selected = isSelected
+                role = Role.Tab
+                if (!isTouchDevice) onClick { onSelect(); true }
+            }
             .padding(vertical = 2.dp)
             .background(
                 color = backgroundColor,
@@ -891,12 +912,7 @@ private fun GlowChip(
                 color = borderColor,
                 shape = chipShape
             )
-            .clickable { onSelect() }
-            .onFocusChanged {
-                systemFocused = it.isFocused
-                if (it.isFocused) onFocused()
-            }
-            .focusable()
+            .then(if (isTouchDevice) Modifier.clickable { onSelect() } else Modifier)
             .padding(horizontal = 17.dp, vertical = 8.dp)
     ) {
         Text(
@@ -933,7 +949,7 @@ private fun RowsLayer(
     val density = LocalDensity.current
     val screenHeight = configuration.screenHeightDp
 
-    val focusBleedPadding = if (isTouchDevice) 14.dp else 22.dp
+    val focusBleedPadding = if (isTouchDevice) 16.dp else 22.dp
 
     val listState = rememberLazyListState()
     var lastAppliedTargetIndex by remember { mutableIntStateOf(-1) }
@@ -942,42 +958,47 @@ private fun RowsLayer(
     // Only move the results viewport in response to actual D-pad navigation.
     // Search result rows update frequently while typing/loading, and snapping the
     // LazyColumn on every target change makes the screen feel unstable.
-    LaunchedEffect(targetIndex, lastNavEventTime) {
-        val currentFirst = listState.firstVisibleItemIndex
-        val initialPlacement = lastAppliedTargetIndex < 0
-        if (currentFirst == targetIndex) {
+    if (!isTouchDevice) {
+        LaunchedEffect(targetIndex, lastNavEventTime) {
+            val currentFirst = listState.firstVisibleItemIndex
+            val initialPlacement = lastAppliedTargetIndex < 0
+            if (currentFirst == targetIndex) {
+                lastAppliedTargetIndex = targetIndex
+                return@LaunchedEffect
+            }
+
+            val recentUserNav = lastNavEventTime > 0L &&
+                (SystemClock.elapsedRealtime() - lastNavEventTime) <= fastScrollThresholdMs
+            if (!initialPlacement && !recentUserNav) return@LaunchedEffect
+
+            val jump = kotlin.math.abs(targetIndex - currentFirst)
+            if (!initialPlacement && jump <= 5) {
+                listState.animateScrollToItem(targetIndex)
+            } else {
+                listState.scrollToItem(targetIndex)
+            }
             lastAppliedTargetIndex = targetIndex
-            return@LaunchedEffect
         }
-
-        val recentUserNav = lastNavEventTime > 0L &&
-            (SystemClock.elapsedRealtime() - lastNavEventTime) <= fastScrollThresholdMs
-        if (!initialPlacement && !recentUserNav) return@LaunchedEffect
-
-        val jump = kotlin.math.abs(targetIndex - currentFirst)
-        if (!initialPlacement && jump <= 5) {
-            listState.animateScrollToItem(targetIndex)
-        } else {
-            listState.scrollToItem(targetIndex)
-        }
-        lastAppliedTargetIndex = targetIndex
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = focusBleedPadding / 2, bottom = maxHeight * 0.6f),
+            contentPadding = PaddingValues(
+                top = if (isTouchDevice) 4.dp else focusBleedPadding / 2,
+                bottom = if (isTouchDevice) 24.dp else maxHeight * 0.6f,
+            ),
             modifier = Modifier.fillMaxSize().arvioDpadFocusGroup(),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
+            verticalArrangement = Arrangement.spacedBy(if (isTouchDevice) 20.dp else 0.dp)
         ) {
             items(categories.size, key = { categories[it].id }) { index ->
                 val category = categories[index]
-                val isCurrentRow = isFocused && index == currentRowIndex
+                val isCurrentRow = !isTouchDevice && isFocused && index == currentRowIndex
                 val rowKey = remember(category.id) { "search:${category.id}" }
                 val rowUsePosterCards = rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
                 val isPortrait = category.isPortrait(rowUsePosterCards)
                 val itemWidth = if (isTouchDevice) {
-                    if (isPortrait) 110.dp else 170.dp
+                    if (isPortrait) 120.dp else 200.dp
                 } else {
                     if (isPortrait) 105.dp else 210.dp
                 }
@@ -993,21 +1014,43 @@ private fun RowsLayer(
                 val rowHeight = baseRowHeight + focusBleedPadding
                 // Fade non-current rows
                 val rowAlpha by animateFloatAsState(
-                    targetValue = if (!isFocused || index <= currentRowIndex) 1f else 0.3f,
+                    targetValue = if (isTouchDevice || !isFocused || index <= currentRowIndex) 1f else 0.3f,
                     animationSpec = tween(250), label = "rowAlpha"
                 )
 
-                Box(modifier = Modifier.fillMaxWidth().height(rowHeight).graphicsLayer { alpha = rowAlpha }) {
+                Box(
+                    modifier = if (isTouchDevice) {
+                        Modifier.fillMaxWidth()
+                    } else {
+                        Modifier.fillMaxWidth().height(rowHeight).graphicsLayer { alpha = rowAlpha }
+                    }
+                ) {
                     Column {
                         Row(
-                            modifier = Modifier.padding(start = focusBleedPadding, bottom = 4.dp, top = 4.dp),
+                            modifier = Modifier.padding(
+                                start = if (isTouchDevice) 16.dp else focusBleedPadding,
+                                bottom = 4.dp,
+                                top = if (isTouchDevice) 0.dp else 4.dp,
+                            ),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
                                 category.title,
-                                style = ArvioSkin.typography.sectionTitle.copy(fontSize = 15.sp),
-                                color = Color.White.copy(alpha = if (isCurrentRow) 0.9f else 0.5f)
+                                style = if (isTouchDevice) {
+                                    ArflixTypography.sectionTitle.copy(
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        shadow = Shadow(
+                                            color = Color.Black.copy(alpha = 0.8f),
+                                            offset = Offset(1f, 1f),
+                                            blurRadius = 4f,
+                                        ),
+                                    )
+                                } else {
+                                    ArvioSkin.typography.sectionTitle.copy(fontSize = 15.sp)
+                                },
+                                color = if (isTouchDevice) Color.White else Color.White.copy(alpha = if (isCurrentRow) 0.9f else 0.5f),
                             )
                         }
 
@@ -1015,8 +1058,9 @@ private fun RowsLayer(
                         var lastScrollIndex by remember(category.id) { mutableIntStateOf(-1) }
                         var lastScrollOffset by remember(category.id) { mutableIntStateOf(Int.MIN_VALUE) }
                         // Scroll to focused item in current row
-                        LaunchedEffect(isCurrentRow, currentItemIndex, lastNavEventTime) {
-                            if (!isCurrentRow) return@LaunchedEffect
+                        if (!isTouchDevice) {
+                            LaunchedEffect(isCurrentRow, currentItemIndex, lastNavEventTime) {
+                                if (!isCurrentRow) return@LaunchedEffect
                             val safeIndex = currentItemIndex.coerceIn(0, (category.items.size - 1).coerceAtLeast(0))
                             val first = rowState.firstVisibleItemIndex
                             val visibleItems = rowState.layoutInfo.visibleItemsInfo
@@ -1054,23 +1098,28 @@ private fun RowsLayer(
                             } else {
                                 rowState.scrollToItem(index = scrollTargetIndex, scrollOffset = extraOffset)
                             }
-                            lastScrollIndex = scrollTargetIndex
-                            lastScrollOffset = extraOffset
+                                lastScrollIndex = scrollTargetIndex
+                                lastScrollOffset = extraOffset
+                            }
                         }
 
                         LazyRow(
                             state = rowState,
                             modifier = Modifier.arvioDpadFocusGroup(),
-                            contentPadding = PaddingValues(
-                                start = focusBleedPadding,
-                                end = itemWidth + 56.dp,
-                                top = 8.dp,
-                                bottom = if (isTouchDevice) 8.dp else (focusBleedPadding + 12.dp)
-                            ),
-                            horizontalArrangement = Arrangement.spacedBy(18.dp)
+                            contentPadding = if (isTouchDevice) {
+                                PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 4.dp)
+                            } else {
+                                PaddingValues(
+                                    start = focusBleedPadding,
+                                    end = itemWidth + 56.dp,
+                                    top = 8.dp,
+                                    bottom = focusBleedPadding + 12.dp,
+                                )
+                            },
+                            horizontalArrangement = Arrangement.spacedBy(if (isTouchDevice) 14.dp else 18.dp)
                         ) {
                             itemsIndexed(category.items, key = { _, item -> "${item.mediaType}_${item.id}" }) { itemIdx, item ->
-                                val itemIsFocused = isCurrentRow && itemIdx == currentItemIndex
+                                val itemIsFocused = !isTouchDevice && isCurrentRow && itemIdx == currentItemIndex
                                 MediaCard(
                                     item = item.copy(
                                         title = buildCardTitle(item),
@@ -1106,13 +1155,13 @@ private fun RowsLayer(
 private fun ContentGrid(items: List<MediaItem>, usePosterCards: Boolean, isLoading: Boolean, isTouchDevice: Boolean, onItemClick: (MediaItem) -> Unit, onLoadMore: () -> Unit) {
     val accentColor = resolveAccentColor(fallback = Pink)
     val screenHeight = LocalConfiguration.current.screenHeightDp
-    val itemWidth = if (usePosterCards) 105.dp else 210.dp
+    val itemWidth = if (usePosterCards) (if (isTouchDevice) 120.dp else 105.dp) else (if (isTouchDevice) 200.dp else 210.dp)
     val gridState = rememberLazyGridState()
     LaunchedEffect(gridState.firstVisibleItemIndex, items.size) { val lv = gridState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0; if (items.isNotEmpty() && lv >= items.size - 8) onLoadMore() }
 
-    val focusBleedPadding = if (isTouchDevice) 14.dp else 24.dp
+    val focusBleedPadding = if (isTouchDevice) 16.dp else 24.dp
     LazyVerticalGrid(state = gridState, columns = GridCells.Adaptive(minSize = itemWidth + focusBleedPadding), contentPadding = PaddingValues(horizontal = focusBleedPadding, vertical = focusBleedPadding),
-        horizontalArrangement = Arrangement.spacedBy(18.dp), verticalArrangement = Arrangement.spacedBy(26.dp), modifier = Modifier.fillMaxSize().arvioDpadFocusGroup()) {
+        horizontalArrangement = Arrangement.spacedBy(if (isTouchDevice) 14.dp else 18.dp), verticalArrangement = Arrangement.spacedBy(if (isTouchDevice) 18.dp else 26.dp), modifier = Modifier.fillMaxSize().arvioDpadFocusGroup()) {
         items(items.size, key = { "${items[it].mediaType}_${items[it].id}" }) { idx ->
             val item = items[idx]
             MediaCard(item = item.copy(
@@ -1122,7 +1171,7 @@ private fun ContentGrid(items: List<MediaItem>, usePosterCards: Boolean, isLoadi
                 year = ""
             ),
                 width = itemWidth, isLandscape = !usePosterCards, showProgress = false, titleMaxLines = 2, subtitleMaxLines = 1,
-                isFocusedOverride = false, enableSystemFocus = true, onFocused = {}, onClick = { onItemClick(item) },
+                isFocusedOverride = false, enableSystemFocus = !isTouchDevice, onFocused = {}, onClick = { onItemClick(item) },
                 modifier = if (isTouchDevice) Modifier.clickable { onItemClick(item) } else Modifier)
         }
         if (isLoading) { item { Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.Center) { LoadingIndicator(color = accentColor, size = 32.dp) } } }

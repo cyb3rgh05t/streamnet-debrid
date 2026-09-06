@@ -682,6 +682,11 @@ fun ArflixApp(
 ) {
     val context = LocalContext.current
     val authState by authRepository.authState.collectAsStateWithLifecycle()
+    val cloudUserProfile by authRepository.userProfile.collectAsStateWithLifecycle()
+    val isCloudConnected = com.arflix.tv.data.repository.resolveCloudConnectionState(
+        authState = authState,
+        hasAuthenticatedProfile = cloudUserProfile != null,
+    )
     val activeProfileState by remember(profileRepository) {
         profileRepository.activeProfile.map { profile ->
             ActiveProfileLoadState.Loaded(profile) as ActiveProfileLoadState
@@ -779,7 +784,7 @@ fun ArflixApp(
                 preloadedLogoCache = preloadedLogoCache,
                 preloadedTrendingBackdropUrls = preloadedTrendingBackdropUrls,
                 currentProfile = activeProfile,
-                isCloudConnected = authState is AuthState.Authenticated,
+                isCloudConnected = isCloudConnected,
                 onSwitchProfile = {
                     appCoroutineScope.launch {
                         traktRepository.clearAllProfileCaches()

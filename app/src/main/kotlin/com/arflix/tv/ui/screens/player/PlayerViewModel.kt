@@ -708,7 +708,7 @@ class PlayerViewModel @Inject constructor(
             val providedIsHubPage = providedStreamCandidate?.url
                 ?.let(::isHubCloudPageUrl) == true
             val preResolvedHubStream = if (providedIsHubPage) {
-                _uiState.value = _uiState.value.copy(streamLoadPhase = "Preparing stream")
+                _uiState.value = _uiState.value.copy(streamLoadPhase = context.getString(R.string.player_preparing_stream))
                 providedStreamCandidate?.let { stream ->
                     runCatching { streamRepository.resolveStreamForPlayback(stream) }.getOrNull()
                 }
@@ -744,7 +744,7 @@ class PlayerViewModel @Inject constructor(
                 // path sat 5-10s with no overlay text (selectedStreamUrl not set yet, so startupPhase
                 // is gated off), unlike the manual selectStream() path which already labels this step.
                 if (providedStream != null) {
-                    _uiState.value = _uiState.value.copy(streamLoadPhase = "Preparing stream")
+                    _uiState.value = _uiState.value.copy(streamLoadPhase = context.getString(R.string.player_preparing_stream))
                 }
                 val resolvedProvidedStream = preResolvedHubStream ?: providedStream?.let { stream ->
                     runCatching { streamRepository.resolveStreamForPlayback(stream) }.getOrNull() ?: stream
@@ -770,9 +770,9 @@ class PlayerViewModel @Inject constructor(
                         isLoadingStreams = false,
                         sourceSearchActive = false,
                         error = if (isMagnet) {
-                            "Selected source is P2P (magnet) and not supported. Choose an HTTP/debrid source."
+                            context.getString(R.string.player_error_magnet_unsupported)
                         } else {
-                            "Failed to open selected source. Try another one."
+                            context.getString(R.string.player_error_source_open_failed)
                         }
                     )
                     return@launch
@@ -1073,18 +1073,20 @@ class PlayerViewModel @Inject constructor(
 
                     val supplementalSourcesStillLoading =
                         homeServerAppendJob?.isActive == true || vodAppendJob?.isActive == true
-                    val errorMessage = if (
+                    val errorMessage = when {
+                        !_uiState.value.selectedStreamUrl.isNullOrBlank() -> _uiState.value.error
                         progressive.isFinal &&
-                        mergedStreams.isEmpty() &&
-                        !hasHomeServerConnections &&
-                        !supplementalSourcesStillLoading
-                    ) {
-                        if (streamingAddonCount == 0) {
-                            "No streaming addons configured.\n\nGo to Settings \u2192 Addons to add a streaming addon, then come back and try again."
-                        } else {
-                            "No streams found for this content. The addons may not have sources for this title."
+                            mergedStreams.isEmpty() &&
+                            !hasHomeServerConnections &&
+                            !supplementalSourcesStillLoading -> {
+                            if (streamingAddonCount == 0) {
+                                "No streaming addons configured.\n\nGo to Settings \u2192 Addons to add a streaming addon, then come back and try again."
+                            } else {
+                                "No streams found for this content. The addons may not have sources for this title."
+                            }
                         }
-                    } else null
+                        else -> null
+                    }
                     if (errorMessage != null && !sourceEmptyReported) {
                         sourceEmptyReported = true
                         AppLogger.recordException(
@@ -2433,7 +2435,7 @@ class PlayerViewModel @Inject constructor(
                 isLoading = true,
                 isLoadingStreams = false,
                 streamProgress = null,
-                streamLoadPhase = "Preparing stream",
+                streamLoadPhase = context.getString(R.string.player_preparing_stream),
                 error = null,
                 isSetupError = false
             )
@@ -2463,7 +2465,7 @@ class PlayerViewModel @Inject constructor(
                     sourceSearchActive = false,
                     streamProgress = null,
                     streamLoadPhase = null,
-                    error = "Failed to resolve stream. Try another source."
+                    error = context.getString(R.string.player_error_stream_resolve_failed)
                 )
                 return@launch
             }
@@ -2489,9 +2491,9 @@ class PlayerViewModel @Inject constructor(
                     streamProgress = null,
                     streamLoadPhase = null,
                     error = if (isP2p) {
-                        "P2P stream requires TorrServer. Install TorrServer and set its URL in Settings > Addons."
+                        context.getString(R.string.player_error_torr_server_required)
                     } else {
-                        "Failed to resolve stream. Try another source."
+                        context.getString(R.string.player_error_stream_resolve_failed)
                     }
                 )
                 return@launch
@@ -2891,11 +2893,11 @@ class PlayerViewModel @Inject constructor(
                     // otherwise the searching indicator just vanishes with no visible outcome.
                     if (_uiState.value.isAiTranslating) {
                         activateAiTranslation()
-                        showMatchToast(
-                            "No well-synced subtitle found" +
-                                (score?.let { " (best ${(it * 100).toInt()}%)" } ?: "") +
-                                " — keeping AI translation"
-                        )
+                        showMatchToast(if (score == null) {
+                            context.getString(R.string.player_match_none_keep_ai)
+                        } else {
+                            context.getString(R.string.player_match_none_best_keep_ai, (score * 100).toInt())
+                        })
                     }
                 },
                 useCache = !isUserAction
@@ -2917,7 +2919,7 @@ class PlayerViewModel @Inject constructor(
         if (!aiSubtitleEnabled || aiApiKey.isBlank()) return false
         if (findAiSourceSubtitle(_uiState.value.subtitles) == null) return false
         activateAiTranslation()
-        showMatchToast("No well-synced subtitle found — using AI translation")
+        showMatchToast(context.getString(R.string.player_match_using_ai))
         return true
     }
 
@@ -3025,16 +3027,17 @@ class PlayerViewModel @Inject constructor(
             val targetLangName = languageCodeToName(targetLang)
             // Include the best (rejected) score so a fast verdict is visibly a real scan result.
             val noMatch = onNoMatch ?: { score ->
-                showMatchToast(
-                    "No well-synced $targetLangName subtitle found" +
-                        (score?.let { " (best ${(it * 100).toInt()}%)" } ?: "")
-                )
+                showMatchToast(if (score == null) {
+                    context.getString(R.string.player_match_none_language, targetLangName)
+                } else {
+                    context.getString(R.string.player_match_none_language_best, targetLangName, (score * 100).toInt())
+                })
             }
             if (targetLang.isBlank() || isSubtitleDisabledPreference(targetLang)) {
                 noMatch(null)
                 return@launch
             }
-            beginMatch("Finding best subtitle…")
+            beginMatch(context.getString(R.string.player_match_finding_best))
 
             // Subtitle sources resolve asynchronously after playback starts: embedded tracks a beat
             // later, addon subtitles when their fetch completes. Wait for both a usable muxed
@@ -3090,7 +3093,7 @@ class PlayerViewModel @Inject constructor(
             if (embedded != null) {
                 endMatch()
                 selectSubtitle(embedded, isUserAction = false)
-                showMatchToast("Matched: embedded $targetLangName subtitle (in sync)")
+                showMatchToast(context.getString(R.string.player_match_embedded, targetLangName))
                 return@launch
             }
 
@@ -3135,8 +3138,15 @@ class PlayerViewModel @Inject constructor(
                         val local = raw?.let { localizeSubtitle(remembered, it, offsetMs) } ?: remembered
                         endMatch()
                         selectSubtitle(local, isUserAction = false)
-                        val offsetNote = if (offsetMs != 0L) " (auto-offset ${formatMatchOffset(offsetMs)})" else ""
-                        showMatchToast("Matched: ${remembered.label} (remembered)$offsetNote")
+                        showMatchToast(if (offsetMs == 0L) {
+                            context.getString(R.string.player_match_remembered, remembered.label)
+                        } else {
+                            context.getString(
+                                R.string.player_match_remembered_offset,
+                                remembered.label,
+                                formatMatchOffset(offsetMs),
+                            )
+                        })
                         return@launch
                     }
                 }
@@ -3152,7 +3162,7 @@ class PlayerViewModel @Inject constructor(
                 selectSubtitle(exactLocal, isUserAction = false)
                 writeCachedMatch(exactNameMatch)
                 Log.i("SubMatch", "exact release-name match - scan skipped: ${exactNameMatch.label}")
-                showMatchToast("Matched: ${exactNameMatch.label} (exact release name)")
+                showMatchToast(context.getString(R.string.player_match_exact_release, exactNameMatch.label))
                 return@launch
             }
 
@@ -3164,14 +3174,17 @@ class PlayerViewModel @Inject constructor(
             }
             val builtInReference = embeddedRefs.firstOrNull { normalizeLanguage(it.lang) == "en" }
                 ?: embeddedRefs.firstOrNull()
-            val sourceLabel = if (builtInReference != null) "Built-in" else "Hearing"
+            val sourceLabel = context.getString(
+                if (builtInReference != null) R.string.player_match_source_embedded
+                else R.string.player_match_source_hearing
+            )
             android.util.Log.i(
                 "SubMatch",
                 "reference source=$sourceLabel embeddedRefs=${embeddedRefs.size} " +
                     "ref=\"${builtInReference?.label ?: "-"}\" (lang=${builtInReference?.lang}) " +
                     "allEmbedded=${subs.count { it.isEmbedded }}"
             )
-            updateMatchStatus("Finding best subtitle ($sourceLabel)…")
+            updateMatchStatus(context.getString(R.string.player_match_finding_source, sourceLabel))
 
             // Keep the raw text alongside the parsed cues: the winning subtitle is later served to
             // ExoPlayer from a local cache file (already downloaded here) instead of re-fetching
@@ -3212,7 +3225,7 @@ class PlayerViewModel @Inject constructor(
                 if (current != null && normalizeLanguage(current.lang) == targetLang) return
                 candidates.firstOrNull()?.let {
                     selectServedLocally(it)
-                    showMatchToast("Selected ${it.label} (sync unverified)")
+                    showMatchToast(context.getString(R.string.player_match_selected_unverified, it.label))
                 }
             }
 
@@ -3256,10 +3269,22 @@ class PlayerViewModel @Inject constructor(
                 // Cache the original (addon) identity + any rescue offset — the local file is
                 // per-session transient, but the offset must be re-applied on the next playback.
                 writeCachedMatch(best.sub, best.offsetMs)
-                val offsetNote = if (best.offsetMs != 0L) " (auto-offset ${formatMatchOffset(best.offsetMs)})" else ""
-                showMatchToast(
-                    "Matched: ${best.sub.label} · ${(best.score * 100).toInt()}% ($sourceLabel)$offsetNote"
-                )
+                showMatchToast(if (best.offsetMs == 0L) {
+                    context.getString(
+                        R.string.player_match_success,
+                        best.sub.label,
+                        (best.score * 100).toInt(),
+                        sourceLabel,
+                    )
+                } else {
+                    context.getString(
+                        R.string.player_match_success_offset,
+                        best.sub.label,
+                        (best.score * 100).toInt(),
+                        sourceLabel,
+                        formatMatchOffset(best.offsetMs),
+                    )
+                })
             } else {
                 // Nothing synced found (or too little dialogue) → let the caller fall back (AI translate).
                 restoreSubtitle(previousSubtitle)
@@ -3547,8 +3572,8 @@ class PlayerViewModel @Inject constructor(
             }
             if (elapsed >= deadline) break
             updateMatchStatus(
-                if (refs.isEmpty()) "Searching for a match ($sourceLabel) — waiting for speech…"
-                else "Searching for a match ($sourceLabel) — (${refs.size})"
+                if (refs.isEmpty()) context.getString(R.string.player_match_waiting_speech, sourceLabel)
+                else context.getString(R.string.player_match_search_count, sourceLabel, refs.size)
             )
             delay(300)
         }
@@ -3637,8 +3662,8 @@ class PlayerViewModel @Inject constructor(
                 break
             }
             updateMatchStatus(
-                if (samples.isEmpty()) "Searching for a match ($sourceLabel) — waiting for speech…"
-                else "Searching for a match ($sourceLabel) — scanning subtitles… (${samples.size})"
+                if (samples.isEmpty()) context.getString(R.string.player_match_waiting_speech, sourceLabel)
+                else context.getString(R.string.player_match_scanning_count, sourceLabel, samples.size)
             )
             delay(300)
         }
@@ -4496,7 +4521,7 @@ class PlayerViewModel @Inject constructor(
             streams = sortedStreams,
             isLoadingStreams = false,
             sourceSearchActive = sourceLookupStillActive(currentJob),
-            error = null,
+            error = _uiState.value.error.takeUnless { shouldAutoplayHomeServer },
             isSetupError = false,
             streamProgress = null,
             streamLoadPhase = null
@@ -4558,7 +4583,7 @@ class PlayerViewModel @Inject constructor(
             streams = sortedStreams,
             isLoadingStreams = false,
             sourceSearchActive = sourceLookupStillActive(currentJob),
-            error = null,
+            error = _uiState.value.error.takeUnless { shouldAutoplayVod },
             isSetupError = false,
             streamProgress = null,
             streamLoadPhase = null

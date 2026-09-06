@@ -46,3 +46,18 @@ test("public pages share the responsive StreamNet portal style", async () => {
   assert.match(pages[0], /streamnet:lang/);
   assert.match(pages[1], /streamnet:lang/);
 });
+
+test("admin dashboard keeps secrets in session scope and renders untrusted data as text", async () => {
+  const [page, script, stylesheet] = await Promise.all([
+    readFile(new URL("../public/admin.html", import.meta.url), "utf8"),
+    readFile(new URL("../public/admin.js", import.meta.url), "utf8"),
+    readFile(new URL("../public/admin.css", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(page, /noindex,nofollow,noarchive/);
+  assert.match(page, /\/admin\/admin\.js/);
+  assert.match(script, /sessionStorage/);
+  assert.doesNotMatch(script, /localStorage|innerHTML/);
+  assert.match(script, /textContent/);
+  assert.match(stylesheet, /@media \(max-width: 720px\)/);
+});

@@ -10,6 +10,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +36,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -307,6 +311,15 @@ fun MobileSettingsRow(
     showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
+    val safeValue = value.orEmpty()
+    val onLabel = stringResource(R.string.on)
+    val offLabel = stringResource(R.string.off)
+    val checked = when {
+        safeValue == "On" || safeValue == onLabel -> true
+        safeValue == "Off" || safeValue == offLabel -> false
+        else -> null
+    }
+    val effectiveToggle = isToggle || checked != null
     val alpha = if (enabled) 1f else 0.4f
     val accentColor = resolveAccentColor(fallback = Pink)
     val interactionSource = remember { MutableInteractionSource() }
@@ -332,11 +345,25 @@ fun MobileSettingsRow(
                         coroutineScope.launch { bringIntoViewRequester.bringIntoView() }
                     }
                 }
-                .clickable(
-                    enabled = enabled,
-                    interactionSource = interactionSource,
-                    indication = null
-                ) { onClick() }
+                .then(
+                    if (effectiveToggle && checked != null) {
+                        Modifier
+                            .toggleable(
+                                value = checked,
+                                enabled = enabled,
+                                role = Role.Switch,
+                                interactionSource = interactionSource,
+                                indication = null,
+                            ) { onClick() }
+                            .semantics { stateDescription = if (checked) onLabel else offLabel }
+                    } else {
+                        Modifier.clickable(
+                            enabled = enabled,
+                            interactionSource = interactionSource,
+                            indication = null,
+                        ) { onClick() }
+                    }
+                )
                 .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -381,22 +408,20 @@ fun MobileSettingsRow(
                     }
                 }
             }
-            val safeValue = value.orEmpty()
             val isOpenLabel = safeValue.equals("Open", ignoreCase = true) || safeValue == stringResource(R.string.settings_open)
             if (safeValue.isNotEmpty() || isExternalLink || actionIcon != null) {
                 Spacer(modifier = Modifier.width(16.dp))
-                if (isToggle && (safeValue == "On" || safeValue == "Off")) {
-                    val isChecked = safeValue == "On"
+                if (effectiveToggle && checked != null) {
                     Box(
                         modifier = Modifier
                             .width(44.dp)
                             .height(24.dp)
                             .background(
-                                color = if (isChecked) accentColor else Color.White.copy(alpha = 0.2f),
+                                color = if (checked) accentColor else Color.White.copy(alpha = 0.2f),
                                 shape = RoundedCornerShape(13.dp)
                             )
                             .padding(3.dp),
-                        contentAlignment = if (isChecked) Alignment.CenterEnd else Alignment.CenterStart
+                        contentAlignment = if (checked) Alignment.CenterEnd else Alignment.CenterStart
                     ) {
                         Box(
                             modifier = Modifier

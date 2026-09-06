@@ -263,6 +263,11 @@ fun PlayerScreen(
 ) {
     val playerAccent = LocalAccentColorOverride.current ?: Color.White
     val context = LocalContext.current
+    val languageDisplayLocale = context.resources.configuration.let { configuration ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) configuration.locales[0]
+        else @Suppress("DEPRECATION") configuration.locale
+    }
+    val unknownLanguageLabel = stringResource(R.string.player_language_unknown)
     val activity = remember(context) { context.findActivity() }
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val latestUiState by rememberUpdatedState(uiState)
@@ -536,12 +541,24 @@ fun PlayerScreen(
         })
     }
     var useVideoFrameSubtitleViewport by remember { mutableStateOf(false) }
-    val subtitleGroups = remember(uiState.subtitles, uiState.preferredSubtitleLang, uiState.secondarySubtitleLang, uiState.selectedStream, uiState.isAiAvailable, uiState.aiTargetLanguageName) {
+    val subtitleGroups = remember(
+        uiState.subtitles,
+        uiState.preferredSubtitleLang,
+        uiState.secondarySubtitleLang,
+        uiState.selectedStream,
+        uiState.isAiAvailable,
+        uiState.aiTargetLanguageName,
+        languageDisplayLocale,
+        unknownLanguageLabel,
+    ) {
         val streamSource = uiState.selectedStream?.source ?: ""
-        val primaryName = getFullLanguageName(uiState.preferredSubtitleLang)
-        val secondaryName = getFullLanguageName(uiState.secondarySubtitleLang)
+        val primaryName = getFullLanguageName(uiState.preferredSubtitleLang, languageDisplayLocale, unknownLanguageLabel)
+        val secondaryName = getFullLanguageName(uiState.secondarySubtitleLang, languageDisplayLocale, unknownLanguageLabel)
         val groups = uiState.subtitles.mapIndexed { idx, sub -> Pair(idx, sub) }
-            .groupBy { (_, sub) -> getFullLanguageName(sub.lang).ifBlank { sub.lang.ifBlank { "Unknown" } } }
+            .groupBy { (_, sub) ->
+                getFullLanguageName(sub.lang, languageDisplayLocale, unknownLanguageLabel)
+                    .ifBlank { sub.lang.ifBlank { unknownLanguageLabel } }
+            }
             .entries
             .sortedWith(compareBy(
                 { (langName, _) ->
@@ -785,7 +802,7 @@ fun PlayerScreen(
     fun tryAdvanceToNextStream(
         skipAddonId: String? = null,
         recordCurrentFailure: Boolean = true,
-        reason: String = "Source didn't start"
+        reason: String = context.getString(R.string.player_error_source_did_not_start)
     ): Boolean {
         val streams = uiState.streams
         return if (streams.size <= 1) {
@@ -819,12 +836,11 @@ fun PlayerScreen(
                 currentStreamIndex = nextIndex
                 triedStreamIndexes = triedStreamIndexes + nextIndex
                 val next = streams[nextIndex]
-                switchNotice = buildString {
-                    append(reason)
-                    append(" — switching")
-                    val desc = listOf(next.quality, next.size).filter { it.isNotBlank() }.joinToString(" · ")
-                    if (desc.isNotBlank()) append(" to $desc")
-                    append("…")
+                val desc = listOf(next.quality, next.size).filter { it.isNotBlank() }.joinToString(" · ")
+                switchNotice = if (desc.isBlank()) {
+                    context.getString(R.string.player_switching_source, reason)
+                } else {
+                    context.getString(R.string.player_switching_source_to, reason, desc)
                 }
                 switchNoticeUntilMs = System.currentTimeMillis() + 3_500L
                 userSelectedSourceManually = false
@@ -868,7 +884,7 @@ fun PlayerScreen(
             playbackIssueReported = true
             pendingStartupFailover = false
             viewModel.reportPlaybackError(
-                pendingStartupFailoverMessage ?: "Source failed during startup. Try another source."
+                pendingStartupFailoverMessage ?: context.getString(R.string.player_error_startup_failed)
             )
         }
     }
@@ -1314,7 +1330,7 @@ fun PlayerScreen(
                             if (!hasPlaybackStarted &&
                                 allowStartupSourceFallback &&
                                 !userSelectedSourceManually &&
-                                tryAdvanceToNextStream(deadAddonId, reason = classifyPlaybackFailure(error))
+                                tryAdvanceToNextStream(deadAddonId, reason = classifyPlaybackFailure(context, error))
                             ) {
                                 return
                             }
@@ -1327,7 +1343,7 @@ fun PlayerScreen(
                                 sourceSearchStillActive
                             ) {
                                 pendingStartupFailover = true
-                                pendingStartupFailoverMessage = playbackErrorMessageFor(error, hasPlaybackStarted)
+                                pendingStartupFailoverMessage = playbackErrorMessageFor(context, error, hasPlaybackStarted)
                                 if (!pendingStartupFailureRecorded) {
                                     pendingStartupFailureRecorded = true
                                     viewModel.onSelectedStreamPlaybackFailure()
@@ -1341,7 +1357,7 @@ fun PlayerScreen(
                             if (!playbackIssueReported) {
                                 playbackIssueReported = true
                                 viewModel.onSelectedStreamPlaybackFailure()
-                                viewModel.reportPlaybackError(playbackErrorMessageFor(error, hasPlaybackStarted))
+                                viewModel.reportPlaybackError(playbackErrorMessageFor(context, error, hasPlaybackStarted))
                             }
                         }
                     }
@@ -1412,7 +1428,8 @@ fun PlayerScreen(
                                         null
                                     }
                                     val lang = format.language ?: matched?.lang ?: "und"
-                                    val label = format.label ?: matched?.label ?: getFullLanguageName(lang)
+                                    val label = format.label ?: matched?.label
+                                        ?: getFullLanguageName(lang, languageDisplayLocale, unknownLanguageLabel)
                                     // Forced/signage detection: the container flag OR a name hint —
                                     // release groups often ship promo/"songs & signs" tracks without
                                     // setting the flag, so the name is a second signal.
@@ -2286,7 +2303,7 @@ fun PlayerScreen(
                         if (allowMidPlaybackSourceFallback &&
                             !userSelectedSourceManually &&
                             longRebufferCount >= 1 &&
-                            tryAdvanceToNextStream(reason = "Buffering too slow")
+                            tryAdvanceToNextStream(reason = context.getString(R.string.player_error_buffering_slow))
                         ) {
                             continue
                         }
@@ -2332,9 +2349,9 @@ fun PlayerScreen(
                     // to load (uncached/slow host); READY without a frame = the device couldn't
                     // decode the video (codec/resolution). The user sees which it is.
                     val startupReason = if (exoPlayer.playbackState == Player.STATE_READY) {
-                        "Video can't play on this device"
+                        context.getString(R.string.player_error_video_device)
                     } else {
-                        "Source too slow to load"
+                        context.getString(R.string.player_error_source_slow)
                     }
                     if (allowStartupSourceFallback &&
                         !userSelectedSourceManually &&
@@ -2353,9 +2370,9 @@ fun PlayerScreen(
                     viewModel.onSelectedStreamPlaybackFailure()
                     viewModel.reportPlaybackError(
                         if (autoAdvanceAttempts > 0 || startupSameSourceRetryCount > 0) {
-                            "Source did not start after retries. Try another source."
+                            context.getString(R.string.player_error_start_retries)
                         } else {
-                            "Source did not start in time. Try another source."
+                            context.getString(R.string.player_error_start_timeout)
                         }
                     )
                 }
@@ -2437,7 +2454,7 @@ fun PlayerScreen(
                         }
                         if (allowStartupSourceFallback &&
                             !userSelectedSourceManually &&
-                            tryAdvanceToNextStream(reason = "No video — device can't decode this format")
+                            tryAdvanceToNextStream(reason = context.getString(R.string.player_error_no_video_decode))
                         ) {
                             continue
                         }
@@ -2445,7 +2462,7 @@ fun PlayerScreen(
                         playbackIssueReported = true
                         viewModel.onSelectedStreamPlaybackFailure()
                         viewModel.reportPlaybackError(
-                            "Video could not render on this device. Try another source."
+                            context.getString(R.string.player_error_video_render)
                         )
                     }
                 }
@@ -3431,7 +3448,7 @@ fun PlayerScreen(
                     color = androidx.compose.ui.graphics.Color(0xFF7EC8F0)
                 )
                 Text(
-                    text = uiState.matchStatusText.ifBlank { "Searching for a match…" },
+                    text = uiState.matchStatusText.ifBlank { stringResource(R.string.player_match_searching) },
                     style = androidx.compose.material3.MaterialTheme.typography.labelLarge,
                     color = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.9f)
                 )
@@ -3673,7 +3690,11 @@ fun PlayerScreen(
                                     subtitleLangIndex = if (idx >= 0) idx + 1 else 0
                                     subtitleTrackIndex = 0
                                 } else {
-                                    val langName = getFullLanguageName(selected.lang)
+                                    val langName = getFullLanguageName(
+                                        selected.lang,
+                                        languageDisplayLocale,
+                                        unknownLanguageLabel,
+                                    )
                                     val idx = subtitleGroups.indexOfFirst { (name, _) -> name.equals(langName, ignoreCase = true) }
                                     subtitleLangIndex = if (idx >= 0) idx + 1 else 0
                                     subtitleTrackIndex = subtitleGroups.getOrNull(subtitleLangIndex - 1)?.second
@@ -4067,7 +4088,7 @@ fun PlayerScreen(
             // episode's metadata would require an extra TMDB round-trip during playback.
             // Fall back to a generic "Episode N" label — the show title, S/E number, and
             // backdrop image still give users enough context to decide Continue/Cancel.
-            episodeTitle = "Episode ${pendingNextIdentity?.displayEpisode ?: 0}",
+            episodeTitle = stringResource(R.string.episode, pendingNextIdentity?.displayEpisode ?: 0),
             seasonNumber = pendingNextIdentity?.displaySeason ?: 0,
             episodeNumber = pendingNextIdentity?.displayEpisode ?: 0,
             episodeImage = uiState.backdropUrl,
@@ -4651,12 +4672,11 @@ private fun findPreferredAudioTrackIndex(
     audioTracks: List<AudioTrackInfo>,
     preferredCode: String
 ): Int? {
-    val prefName = getFullLanguageName(preferredCode)
-    if (prefName == "Unknown") return null
-    val labelHints = nativeAudioLanguageHints(preferredCode) + prefName.lowercase()
+    val preferredTag = canonicalLanguageTag(preferredCode) ?: return null
+    val englishName = Locale.forLanguageTag(preferredTag).getDisplayLanguage(Locale.ENGLISH).lowercase()
+    val labelHints = nativeAudioLanguageHints(preferredCode) + englishName
     val index = audioTracks.indexOfFirst { track ->
-        val trackLangName = getFullLanguageName(track.language)
-        if (trackLangName != "Unknown" && trackLangName.equals(prefName, ignoreCase = true)) {
+        if (canonicalLanguageTag(track.language) == preferredTag) {
             return@indexOfFirst true
         }
         val label = track.label?.lowercase()?.trim().orEmpty()
@@ -4671,16 +4691,16 @@ private fun findPreferredAudioTrackIndex(
  * to avoid false positives; covers the languages most affected by untagged tracks.
  */
 private fun nativeAudioLanguageHints(preferredCode: String): List<String> {
-    return when (getFullLanguageName(preferredCode)) {
-        "Polish" -> listOf("polski", "polskie", "polsku", "lektor", "dubbing pl")
-        "Russian" -> listOf("русский", "русская", "rus")
-        "Ukrainian" -> listOf("українська", "ukr")
-        "German" -> listOf("deutsch")
-        "French" -> listOf("français", "francais")
-        "Spanish" -> listOf("español", "espanol", "castellano")
-        "Italian" -> listOf("italiano")
-        "Portuguese" -> listOf("português", "portugues")
-        "Czech" -> listOf("čeština", "cesky", "dabing")
+    return when (canonicalLanguageTag(preferredCode)) {
+        "pl" -> listOf("polski", "polskie", "polsku", "lektor", "dubbing pl")
+        "ru" -> listOf("русский", "русская", "rus")
+        "uk" -> listOf("українська", "ukr")
+        "de" -> listOf("deutsch")
+        "fr" -> listOf("français", "francais")
+        "es" -> listOf("español", "espanol", "castellano")
+        "it" -> listOf("italiano")
+        "pt", "pt-BR" -> listOf("português", "portugues")
+        "cs" -> listOf("čeština", "cesky", "dabing")
         else -> emptyList()
     }
 }
@@ -4698,56 +4718,61 @@ private fun isBitmapSubtitleMime(mimeType: String?): Boolean {
 }
 
 /**
- * Language code to full name mapping
+ * Normalize common ISO aliases and provider labels to a language tag.
  */
-private fun getFullLanguageName(code: String?): String {
-    if (code == null) return "Unknown"
-    val normalizedCode = code.lowercase().trim()
+private fun canonicalLanguageTag(code: String?): String? {
+    val normalizedCode = code?.lowercase()?.trim().orEmpty()
     return when {
-        normalizedCode == "en" || normalizedCode == "eng" || normalizedCode == "english" -> "English"
-        normalizedCode == "es" || normalizedCode == "spa" || normalizedCode == "spanish" -> "Spanish"
-        normalizedCode == "nl" || normalizedCode == "nld" || normalizedCode == "dut" || normalizedCode == "dutch" -> "Dutch"
-        normalizedCode == "de" || normalizedCode == "ger" || normalizedCode == "deu" || normalizedCode == "german" -> "German"
-        normalizedCode == "fr" || normalizedCode == "fra" || normalizedCode == "fre" || normalizedCode == "french" -> "French"
-        normalizedCode == "it" || normalizedCode == "ita" || normalizedCode == "italian" -> "Italian"
-        normalizedCode == "pt" || normalizedCode == "por" || normalizedCode == "portuguese" -> "Portuguese"
-        normalizedCode == "pt-br" || normalizedCode == "pob" -> "Portuguese (Brazil)"
-        normalizedCode == "ru" || normalizedCode == "rus" || normalizedCode == "russian" -> "Russian"
-        normalizedCode == "ja" || normalizedCode == "jpn" || normalizedCode == "japanese" -> "Japanese"
-        normalizedCode == "ko" || normalizedCode == "kor" || normalizedCode == "korean" -> "Korean"
-        normalizedCode == "zh" || normalizedCode == "chi" || normalizedCode == "zho" || normalizedCode == "chinese" -> "Chinese"
-        normalizedCode == "ar" || normalizedCode == "ara" || normalizedCode == "arabic" -> "Arabic"
-        normalizedCode == "hi" || normalizedCode == "hin" || normalizedCode == "hindi" -> "Hindi"
-        normalizedCode == "tr" || normalizedCode == "tur" || normalizedCode == "turkish" -> "Turkish"
-        normalizedCode == "pl" || normalizedCode == "pol" || normalizedCode == "polish" -> "Polish"
-        normalizedCode == "sv" || normalizedCode == "swe" || normalizedCode == "swedish" -> "Swedish"
-        normalizedCode == "no" || normalizedCode == "nor" || normalizedCode == "norwegian" -> "Norwegian"
-        normalizedCode == "da" || normalizedCode == "dan" || normalizedCode == "danish" -> "Danish"
-        normalizedCode == "fi" || normalizedCode == "fin" || normalizedCode == "finnish" -> "Finnish"
-        normalizedCode == "cs" || normalizedCode == "cze" || normalizedCode == "ces" || normalizedCode == "czech" -> "Czech"
-        normalizedCode == "hu" || normalizedCode == "hun" || normalizedCode == "hungarian" -> "Hungarian"
-        normalizedCode == "ro" || normalizedCode == "ron" || normalizedCode == "rum" || normalizedCode == "romanian" -> "Romanian"
-        normalizedCode == "el" || normalizedCode == "gre" || normalizedCode == "ell" || normalizedCode == "greek" -> "Greek"
-        normalizedCode == "he" || normalizedCode == "heb" || normalizedCode == "hebrew" -> "Hebrew"
-        normalizedCode == "th" || normalizedCode == "tha" || normalizedCode == "thai" -> "Thai"
-        normalizedCode == "vi" || normalizedCode == "vie" || normalizedCode == "vietnamese" -> "Vietnamese"
-        normalizedCode == "id" || normalizedCode == "ind" || normalizedCode == "indonesian" -> "Indonesian"
-        normalizedCode == "ms" || normalizedCode == "msa" || normalizedCode == "may" || normalizedCode == "malay" -> "Malay"
-        normalizedCode == "uk" || normalizedCode == "ukr" || normalizedCode == "ukrainian" -> "Ukrainian"
-        normalizedCode == "bg" || normalizedCode == "bul" || normalizedCode == "bulgarian" -> "Bulgarian"
-        normalizedCode == "hr" || normalizedCode == "hrv" || normalizedCode == "croatian" -> "Croatian"
-        normalizedCode == "sr" || normalizedCode == "srp" || normalizedCode == "serbian" -> "Serbian"
-        normalizedCode == "sk" || normalizedCode == "slo" || normalizedCode == "slk" || normalizedCode == "slovak" -> "Slovak"
-        normalizedCode == "sl" || normalizedCode == "slv" || normalizedCode == "slovenian" -> "Slovenian"
-        normalizedCode == "et" || normalizedCode == "est" || normalizedCode == "estonian" -> "Estonian"
-        normalizedCode == "lv" || normalizedCode == "lav" || normalizedCode == "latvian" -> "Latvian"
-        normalizedCode == "lt" || normalizedCode == "lit" || normalizedCode == "lithuanian" -> "Lithuanian"
-        normalizedCode == "fa" || normalizedCode == "per" || normalizedCode == "fas" || normalizedCode == "persian" -> "Persian"
-        normalizedCode == "kur" || normalizedCode == "ku" || normalizedCode == "kurdish" -> "Kurdish"
-        normalizedCode == "mon" || normalizedCode == "mn" || normalizedCode == "mongolian" -> "Mongolian"
-        normalizedCode == "und" || normalizedCode == "unknown" -> "Unknown"
-        else -> code.uppercase()
+        normalizedCode in setOf("en", "eng", "english") -> "en"
+        normalizedCode in setOf("es", "spa", "spanish") -> "es"
+        normalizedCode in setOf("nl", "nld", "dut", "dutch") -> "nl"
+        normalizedCode in setOf("de", "ger", "deu", "german") -> "de"
+        normalizedCode in setOf("fr", "fra", "fre", "french") -> "fr"
+        normalizedCode in setOf("it", "ita", "italian") -> "it"
+        normalizedCode in setOf("pt", "por", "portuguese") -> "pt"
+        normalizedCode in setOf("pt-br", "pob") -> "pt-BR"
+        normalizedCode in setOf("ru", "rus", "russian") -> "ru"
+        normalizedCode in setOf("ja", "jpn", "japanese") -> "ja"
+        normalizedCode in setOf("ko", "kor", "korean") -> "ko"
+        normalizedCode in setOf("zh", "chi", "zho", "chinese") -> "zh"
+        normalizedCode in setOf("ar", "ara", "arabic") -> "ar"
+        normalizedCode in setOf("hi", "hin", "hindi") -> "hi"
+        normalizedCode in setOf("tr", "tur", "turkish") -> "tr"
+        normalizedCode in setOf("pl", "pol", "polish") -> "pl"
+        normalizedCode in setOf("sv", "swe", "swedish") -> "sv"
+        normalizedCode in setOf("no", "nor", "norwegian") -> "no"
+        normalizedCode in setOf("da", "dan", "danish") -> "da"
+        normalizedCode in setOf("fi", "fin", "finnish") -> "fi"
+        normalizedCode in setOf("cs", "cze", "ces", "czech") -> "cs"
+        normalizedCode in setOf("hu", "hun", "hungarian") -> "hu"
+        normalizedCode in setOf("ro", "ron", "rum", "romanian") -> "ro"
+        normalizedCode in setOf("el", "gre", "ell", "greek") -> "el"
+        normalizedCode in setOf("he", "heb", "hebrew") -> "he"
+        normalizedCode in setOf("th", "tha", "thai") -> "th"
+        normalizedCode in setOf("vi", "vie", "vietnamese") -> "vi"
+        normalizedCode in setOf("id", "ind", "indonesian") -> "id"
+        normalizedCode in setOf("ms", "msa", "may", "malay") -> "ms"
+        normalizedCode in setOf("uk", "ukr", "ukrainian") -> "uk"
+        normalizedCode in setOf("bg", "bul", "bulgarian") -> "bg"
+        normalizedCode in setOf("hr", "hrv", "croatian") -> "hr"
+        normalizedCode in setOf("sr", "srp", "serbian") -> "sr"
+        normalizedCode in setOf("sk", "slo", "slk", "slovak") -> "sk"
+        normalizedCode in setOf("sl", "slv", "slovenian") -> "sl"
+        normalizedCode in setOf("et", "est", "estonian") -> "et"
+        normalizedCode in setOf("lv", "lav", "latvian") -> "lv"
+        normalizedCode in setOf("lt", "lit", "lithuanian") -> "lt"
+        normalizedCode in setOf("fa", "per", "fas", "persian") -> "fa"
+        normalizedCode in setOf("kur", "ku", "kurdish") -> "ku"
+        normalizedCode in setOf("mon", "mn", "mongolian") -> "mn"
+        normalizedCode.isBlank() || normalizedCode in setOf("und", "unknown") -> null
+        else -> normalizedCode
     }
+}
+
+private fun getFullLanguageName(code: String?, displayLocale: Locale, unknownLabel: String): String {
+    val languageTag = canonicalLanguageTag(code) ?: return unknownLabel
+    return Locale.forLanguageTag(languageTag).getDisplayName(displayLocale)
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(displayLocale) else it.toString() }
 }
 
 @Composable
@@ -4833,6 +4858,15 @@ private fun SubtitleMenu(
     onClose: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val context = LocalContext.current
+    val languageDisplayLocale = context.resources.configuration.let { configuration ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) configuration.locales[0]
+        else @Suppress("DEPRECATION") configuration.locale
+    }
+    val unknownLanguageLabel = stringResource(R.string.player_language_unknown)
+    val liveAudioLabel = stringResource(R.string.player_live_audio)
+    val builtInLabel = stringResource(R.string.player_subtitle_builtin)
+    val forcedLabel = stringResource(R.string.player_subtitle_forced)
     val langListState = rememberLazyListState()
     val trackListState = rememberLazyListState()
     val audioListState = rememberLazyListState()
@@ -4915,7 +4949,7 @@ private fun SubtitleMenu(
                             ) {
                                 item {
                                     LangPanelItem(
-                                        name = "Off",
+                                        name = stringResource(R.string.off),
                                         count = 0,
                                         isFocused = subtitlePanelFocus == 0 && subtitleLangIndex == 0,
                                         isActivePanel = subtitleLangIndex == 0,
@@ -4963,7 +4997,7 @@ private fun SubtitleMenu(
                                     )
                                 }
                             } else {
-                                val isLiveAudioGroup = selectedGroup.first == "Live Audio"
+                                val isLiveAudioGroup = selectedGroup.first == liveAudioLabel
                                 val isMatchGroup = matchLanguageName.isNotBlank() &&
                                     selectedGroup.first.equals(matchLanguageName, ignoreCase = true)
                                 val isAiGroup = isAiAvailable && aiTargetLanguageName.isNotBlank() &&
@@ -4982,9 +5016,13 @@ private fun SubtitleMenu(
                                         // First: "Find Best Match" — timing scan, works without AI.
                                         item {
                                             TrackMenuItem(
-                                                label = if (isFindingBestMatch) "Scanning…" else "Find Best Match",
-                                                subtitle = "Auto",
-                                                subtitleDetail = "Auto-pick the best-synced subtitle",
+                                                label = if (isFindingBestMatch) {
+                                                    stringResource(R.string.player_match_scanning)
+                                                } else {
+                                                    stringResource(R.string.player_find_best_match)
+                                                },
+                                                subtitle = stringResource(R.string.auto),
+                                                subtitleDetail = stringResource(R.string.ai_find_best_match_desc),
                                                 isSelected = isFindingBestMatch,
                                                 isFocused = subtitlePanelFocus == 1 && subtitleTrackIndex == 0,
                                                 onClick = { /* D-pad only */ }
@@ -5006,7 +5044,11 @@ private fun SubtitleMenu(
                                     }
                                     itemsIndexed(selectedGroup.second) { idx, (_, subtitle) ->
                                         val score = subtitleMatchScore(streamSource, subtitle)
-                                        val langName = getFullLanguageName(subtitle.lang)
+                                        val langName = getFullLanguageName(
+                                            subtitle.lang,
+                                            languageDisplayLocale,
+                                            unknownLanguageLabel,
+                                        )
                                         val offsetNote = matchedOffsetMsFor(selectedSubtitle, subtitle.id)
                                             ?.let { " · ${formatMatchOffset(it)}" } ?: ""
                                         // Built-in tracks show no match % — muxed is assumed synced,
@@ -5015,16 +5057,20 @@ private fun SubtitleMenu(
                                         val badge: String?
                                         val detail: String?
                                         if (subtitle.isEmbedded && subtitle.url.isBlank()) {
-                                            val langFullName = getFullLanguageName(subtitle.lang)
+                                            val langFullName = getFullLanguageName(
+                                                subtitle.lang,
+                                                languageDisplayLocale,
+                                                unknownLanguageLabel,
+                                            )
                                             val trackLabel = subtitle.label.takeIf { it.isNotBlank() &&
                                                 !it.equals(langFullName, ignoreCase = true) }
                                             badge = listOfNotNull(
-                                                "Built-in", trackLabel, if (subtitle.isForced) "Forced" else null
+                                                builtInLabel, trackLabel, if (subtitle.isForced) forcedLabel else null
                                             ).joinToString(" · ")
                                             detail = null
                                         } else {
                                             badge = listOfNotNull(
-                                                subtitle.provider.ifBlank { null }, if (subtitle.isForced) "Forced" else null
+                                                subtitle.provider.ifBlank { null }, if (subtitle.isForced) forcedLabel else null
                                             ).joinToString(" · ").ifBlank { null }
                                             detail = subtitle.id
                                                 .replace(PlayerScreenRegexes.BRACKET_REGEX, "").trim()
@@ -5062,7 +5108,11 @@ private fun SubtitleMenu(
                                 }
                             } else {
                                 itemsIndexed(audioTracks, key = { _, track -> audioTrackKey(track) }) { index, track ->
-                                    val languageName = getFullLanguageName(track.language)
+                                    val languageName = getFullLanguageName(
+                                        track.language,
+                                        languageDisplayLocale,
+                                        unknownLanguageLabel,
+                                    )
                                     val trackLabel = track.label?.takeIf { it.isNotBlank() } ?: languageName
                                     val codecInfo = detectAudioCodecLabel(track.codec, trackLabel)
                                     val channelInfo = when (track.channelCount) {
@@ -5139,7 +5189,7 @@ private fun SubtitleMenu(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = if (mobileTab == 0) "Subtitles" else "Audio",
+                        text = if (mobileTab == 0) stringResource(R.string.subtitles) else stringResource(R.string.audio),
                         style = ArflixTypography.body.copy(
                             fontSize = 16.sp,
                             fontWeight = FontWeight.SemiBold
@@ -5171,7 +5221,10 @@ private fun SubtitleMenu(
                         .padding(horizontal = 16.dp, vertical = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf("Subtitles" to 0, "Audio" to 1).forEach { (label, tabIndex) ->
+                    listOf(
+                        stringResource(R.string.subtitles) to 0,
+                        stringResource(R.string.audio) to 1,
+                    ).forEach { (label, tabIndex) ->
                         val selected = mobileTab == tabIndex
                         Box(
                             modifier = Modifier
@@ -5225,7 +5278,7 @@ private fun SubtitleMenu(
                         // "Off" option
                         item {
                             MobileTrackItem(
-                                name = "Off",
+                                name = stringResource(R.string.off),
                                 description = null,
                                 isSelected = selectedSubtitle == null && !isLiveAudioTranslating,
                                 onClick = { onSelectSubtitle(0) }
@@ -5241,7 +5294,7 @@ private fun SubtitleMenu(
 
                         // Grouped by language
                         subtitleGroups.forEach { (langName, indexedSubs) ->
-                            val isLiveAudioGroup = langName == "Live Audio"
+                            val isLiveAudioGroup = langName == liveAudioLabel
                             val isMatchGroup = matchLanguageName.isNotBlank() &&
                                 langName.equals(matchLanguageName, ignoreCase = true)
                             val isAiGroup = isAiAvailable && aiTargetLanguageName.isNotBlank() &&
@@ -5262,7 +5315,7 @@ private fun SubtitleMenu(
                             if (isLiveAudioGroup) {
                                 item(key = "mobile_live_audio_item") {
                                     MobileTrackItem(
-                                        name = "Translate Audio",
+                                        name = stringResource(R.string.player_translate_audio),
                                         description = "AI",
                                         isSelected = isLiveAudioTranslating,
                                         onClick = { onToggleLiveAudio(); onClose() }
@@ -5279,8 +5332,12 @@ private fun SubtitleMenu(
                             if (isMatchGroup) {
                                 item(key = "mobile_find_best_match_item") {
                                     MobileTrackItem(
-                                        name = if (isFindingBestMatch) "Scanning…" else "Find Best Match",
-                                        description = "Auto",
+                                        name = if (isFindingBestMatch) {
+                                            stringResource(R.string.player_match_scanning)
+                                        } else {
+                                            stringResource(R.string.player_find_best_match)
+                                        },
+                                        description = stringResource(R.string.auto),
                                         isSelected = isFindingBestMatch,
                                         onClick = { onFindBestMatch(); onClose() }
                                     )
@@ -5313,7 +5370,11 @@ private fun SubtitleMenu(
                             indexedSubs.forEach { (originalIndex, sub) ->
                                 item(key = "mobile_${sub.id}") {
                                     val score = subtitleMatchScore(streamSource, sub)
-                                    val langFullName = getFullLanguageName(sub.lang)
+                                    val langFullName = getFullLanguageName(
+                                        sub.lang,
+                                        languageDisplayLocale,
+                                        unknownLanguageLabel,
+                                    )
                                     val offsetNote = matchedOffsetMsFor(selectedSubtitle, sub.id)
                                         ?.let { " · ${formatMatchOffset(it)}" } ?: ""
                                     // No fake % on built-in tracks; only addon subs carry a real score.
@@ -5323,11 +5384,11 @@ private fun SubtitleMenu(
                                             val trackLabel = sub.label.takeIf { it.isNotBlank() &&
                                                 !it.equals(langFullName, ignoreCase = true) }
                                             listOfNotNull(
-                                                "Built-in", trackLabel, if (sub.isForced) "Forced" else null
+                                                builtInLabel, trackLabel, if (sub.isForced) forcedLabel else null
                                             ).joinToString(" · ")
                                         }
                                         else -> listOfNotNull(
-                                            sub.provider.ifBlank { null }, if (sub.isForced) "Forced" else null
+                                            sub.provider.ifBlank { null }, if (sub.isForced) forcedLabel else null
                                         ).joinToString(" · ").ifBlank { null }
                                     }
                                     MobileTrackItem(
@@ -5359,7 +5420,11 @@ private fun SubtitleMenu(
                             }
                         } else {
                             itemsIndexed(audioTracks, key = { _, track -> audioTrackKey(track) }) { index, track ->
-                                val languageName = getFullLanguageName(track.language)
+                                val languageName = getFullLanguageName(
+                                    track.language,
+                                    languageDisplayLocale,
+                                    unknownLanguageLabel,
+                                )
                                 val trackLabel = track.label?.takeIf { it.isNotBlank() } ?: languageName
                                 val codecInfo = detectAudioCodecLabel(track.codec, trackLabel)
                                 val channelInfo = when (track.channelCount) {
@@ -5611,8 +5676,13 @@ private fun SubtitleMenuItem(
     isFocused: Boolean,
     onClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val displayLocale = context.resources.configuration.let { configuration ->
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) configuration.locales[0]
+        else @Suppress("DEPRECATION") configuration.locale
+    }
     TrackMenuItem(
-        label = getFullLanguageName(label),
+        label = getFullLanguageName(label, displayLocale, stringResource(R.string.player_language_unknown)),
         subtitle = null,
         isSelected = isSelected,
         isFocused = isFocused,
@@ -5882,6 +5952,7 @@ private fun estimateInitialStartupTimeoutMs(
 }
 
 private fun playbackErrorMessageFor(
+    context: Context,
     error: androidx.media3.common.PlaybackException,
     hasPlaybackStarted: Boolean
 ): String {
@@ -5890,27 +5961,27 @@ private fun playbackErrorMessageFor(
         androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED,
         androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED,
         androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ->
-            "Codec not supported by this device"
+            context.getString(R.string.player_error_codec_unsupported)
 
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT,
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
         androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT ->
-            "Network timeout while loading source"
+            context.getString(R.string.player_error_network_timeout)
 
         androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-            "Source server rejected playback request"
+            context.getString(R.string.player_error_server_rejected)
 
         androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED,
         androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
-            "Source format is invalid or unsupported"
+            context.getString(R.string.player_error_source_format_invalid)
 
-        else -> "Source failed to play"
+        else -> context.getString(R.string.player_error_source_play_failed)
     }
 
     return if (hasPlaybackStarted) {
-        "$reason. Try another source."
+        context.getString(R.string.player_error_try_another, reason)
     } else {
-        "$reason during startup. Trying another source may work."
+        context.getString(R.string.player_error_during_startup, reason)
     }
 }
 
@@ -5921,7 +5992,7 @@ private fun playbackErrorMessageFor(
  * decode/unsupported vs invalid-content vs timeout/offline, so the user gets a real clue instead of
  * a generic "failed".
  */
-private fun classifyPlaybackFailure(error: androidx.media3.common.PlaybackException): String {
+private fun classifyPlaybackFailure(context: Context, error: androidx.media3.common.PlaybackException): String {
     // Walk the cause chain looking for an HTTP status — the most actionable signal.
     var cause: Throwable? = error
     var httpStatus = -1
@@ -5933,12 +6004,12 @@ private fun classifyPlaybackFailure(error: androidx.media3.common.PlaybackExcept
     }
     if (httpStatus > 0) {
         return when (httpStatus) {
-            403 -> "Source blocked"
-            404 -> "Source removed"
-            410 -> "Source expired"
-            429 -> "Source rate-limited"
-            in 500..599 -> "Source unavailable"
-            else -> "Source error ($httpStatus)"
+            403 -> context.getString(R.string.player_error_source_blocked)
+            404 -> context.getString(R.string.player_error_source_removed)
+            410 -> context.getString(R.string.player_error_source_expired)
+            429 -> context.getString(R.string.player_error_source_rate_limited)
+            in 500..599 -> context.getString(R.string.player_error_source_unavailable)
+            else -> context.getString(R.string.player_error_http_status, httpStatus)
         }
     }
 
@@ -5951,23 +6022,23 @@ private fun classifyPlaybackFailure(error: androidx.media3.common.PlaybackExcept
         "no address associated with hostname" in msg
 
     return when {
-        isDns -> "Source offline"
+        isDns -> context.getString(R.string.player_error_source_offline)
         error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_QUERY_FAILED ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FORMAT_EXCEEDS_CAPABILITIES ->
-            "Video format not supported by this device"
+            context.getString(R.string.player_error_format_unsupported)
         error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED ->
-            "Unplayable content"
+            context.getString(R.string.player_error_unplayable)
         error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT ||
             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT ||
             "timeout" in msg || "timed out" in msg || "sockettimeout" in msg ->
-            "Source too slow to load"
+            context.getString(R.string.player_error_source_slow)
         error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS ->
-            "Source rejected request"
-        else -> "Playback error"
+            context.getString(R.string.player_error_source_rejected)
+        else -> context.getString(R.string.player_playback_error)
     }
 }
 

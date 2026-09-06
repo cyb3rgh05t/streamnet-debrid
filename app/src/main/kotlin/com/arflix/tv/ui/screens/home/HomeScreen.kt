@@ -1025,7 +1025,6 @@ fun HomeScreen(
                 val categoriesSnapshot = latestDisplayCategories
                 if (categoriesSnapshot.isEmpty() || focusState.isSidebarFocused) return@collectLatest
                 if (focusSnapshot.focusedItemKey.isBlank()) return@collectLatest
-                if (focusSnapshot.focusedItemKey == focusSnapshot.heroItemKey) return@collectLatest
                 categoriesSnapshot.getOrNull(focusSnapshot.rowIndex)
                     ?.items
                     ?.getOrNull(focusSnapshot.itemIndex)

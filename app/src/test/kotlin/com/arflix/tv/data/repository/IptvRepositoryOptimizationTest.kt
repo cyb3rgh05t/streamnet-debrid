@@ -263,6 +263,7 @@ class IptvRepositoryOptimizationTest {
             java.lang.Boolean.TYPE,
             java.lang.Boolean.TYPE,
             java.lang.Long::class.java,
+            Function0::class.java,
         )
         method.isAccessible = true
 
@@ -275,6 +276,7 @@ class IptvRepositoryOptimizationTest {
                 true,
                 false,
                 null,
+                {},
             )
             fail("Expected EpgNotModifiedException to be thrown")
         } catch (e: java.lang.reflect.InvocationTargetException) {

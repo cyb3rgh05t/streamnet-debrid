@@ -4,6 +4,26 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+### Administration und Updates
+
+- Der App-Update-Dialog zeigt statt des vollständigen Changelogs einen anklickbaren Link zum zugehörigen GitHub-Release.
+- Das Self-hosted Backend enthält ein separates Admin-Dashboard für Datenbankkennzahlen, Accounts, Profile, maskierte Cloud-Snapshots und auditierte Remote-Änderungen an Add-ons, Playlists und Profilfeldern.
+
+### Live TV und Programmführer
+
+- XMLTV-Anfragen werden pro Anbieter begrenzt, bei Rate-Limits beziehungsweise Authentifizierungsfehlern abgekühlt und beim Verlassen des Screens zuverlässig abgebrochen.
+- Der Programmführer rendert nur das sichtbare Zeitfenster, führt laufende Sendungen anhand der aktuellen Uhrzeit fort und kann Live-Wiedergabe nach einem Behind-live-window-Fehler kontrolliert wiederherstellen.
+- Unbekannte Senderqualität bleibt ohne irreführendes SD-Badge und wird für den laufenden Stream anhand der tatsächlichen Videoauflösung ergänzt.
+- Der Netflix-artige Live-TV-Infobereich verwendet dieselbe Artwork-Priorität wie die Senderkarten: Programm-Fanart, Kategorie beziehungsweise Länderflagge und zuletzt Senderlogo auf dem Senderfarbverlauf.
+
+### Home, Suche und Wiedergabe
+
+- Das initial fokussierte erste Home-Item startet nun ebenfalls die Detailauflösung, damit vorhandenes Fanart zuverlässig im großen Hero erscheint.
+- Favorite-/Recent-TV-Logos werden ohne Clearlogo-Überlagerung eingepasst; Bildanfragen und Kartenübergänge wurden für stabileres Artwork verfeinert.
+- Die TV-Suche verwendet einen eindeutigen D-Pad-Fokuspfad und semantische Tabs; Touch-Ergebnisse behalten natürliche, responsive Zeilen.
+- Playerfehler, Quellenwechsel sowie Audio-, Sprach- und Untertitelabgleich sind vollständig auf Deutsch und Englisch lokalisiert und unterscheiden konkrete Netzwerk-, Format-, Codec- und Quellenfehler.
+- Ein bestehendes Cloud-Profil bleibt während vorübergehender Authentifizierungsfehler als verbunden sichtbar; der Profilwechsel verwendet aus allen Screens denselben stabilen Navigationspfad.
+
 ## [2.3.007] - 2026-09-05
 
 ### Update-Dialog

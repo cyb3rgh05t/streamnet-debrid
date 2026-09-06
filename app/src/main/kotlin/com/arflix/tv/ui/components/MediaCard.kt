@@ -41,6 +41,7 @@ import androidx.tv.material3.Text
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import coil.size.Precision
+import coil.size.Scale
 import com.arflix.tv.R
 import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.MediaItem
@@ -130,6 +131,7 @@ fun MediaCard(
     // hovered tile animates its GIF. Regular media items keep the existing
     // behavior (landscape uses backdrop art, poster uses image).
     val isCollectionTile = item.status?.startsWith("collection:") == true
+    val isChannelLogo = item.status?.startsWith("iptv:") == true
     val baseImageUrl = if (isCollectionTile) {
         item.image.takeIf { it.isNotBlank() } ?: item.backdrop?.takeIf { it.isNotBlank() }
     } else if (isLandscape) {
@@ -169,14 +171,15 @@ fun MediaCard(
     val context = LocalContext.current
     val density = LocalDensity.current
     // Performance: Removed context/density from keys - they're stable CompositionLocals
-    val imageRequest = remember(rawImageUrl, width, aspectRatio) {
+    val imageRequest = remember(rawImageUrl, width, aspectRatio, isChannelLogo) {
         if (rawImageUrl == null) return@remember null
         val widthPx = with(density) { width.roundToPx() }
         val heightPx = (widthPx / aspectRatio).toInt().coerceAtLeast(1)
-        val cacheKey = "$rawImageUrl|${widthPx}x$heightPx"
+        val cacheKey = "$rawImageUrl|${widthPx}x$heightPx" + if (isChannelLogo) "|channel-logo" else ""
         ImageRequest.Builder(context)
             .data(rawImageUrl)
             .size(widthPx, heightPx)
+            .scale(if (isChannelLogo) Scale.FIT else Scale.FILL)
             .precision(Precision.INEXACT)
             .allowHardware(true)
             .memoryCacheKey(cacheKey)
@@ -184,8 +187,9 @@ fun MediaCard(
             .crossfade(false)
             .build()
     }
+            var channelLogoFailed by remember(imageRequest) { mutableStateOf(false) }
     // Performance: Removed context/density from keys
-    val effectiveLogoImageUrl = logoImageUrl.takeIf { showLogoImage }
+            val effectiveLogoImageUrl = logoImageUrl.takeIf { showLogoImage && !isChannelLogo }
     val logoRequest = remember(effectiveLogoImageUrl) {
         val logoWidthPx = with(density) { 220.dp.roundToPx() }.coerceAtLeast(1)
         val logoHeightPx = with(density) { 64.dp.roundToPx() }.coerceAtLeast(1)
@@ -242,8 +246,10 @@ fun MediaCard(
                     AsyncImage(
                         model = imageRequest,
                         contentDescription = item.title,
-                        contentScale = if (isCompanyCollectionTile) ContentScale.Fit else ContentScale.Crop,
+                        contentScale = if (isCompanyCollectionTile || isChannelLogo) ContentScale.Fit else ContentScale.Crop,
+                        onError = { if (isChannelLogo) channelLogoFailed = true },
                         onSuccess = { success ->
+                            if (isChannelLogo) channelLogoFailed = false
                             if (isCompanyCollectionTile) {
                                 companyGradient = logoBrandGradient(success.result.drawable)
                             }
@@ -255,12 +261,18 @@ fun MediaCard(
                                     Modifier
                                         .background(companyCardBrush!!)
                                         .padding(horizontal = 28.dp, vertical = 20.dp)
+                                } else if (isChannelLogo) {
+                                    Modifier.padding(
+                                        horizontal = width * 0.1f,
+                                        vertical = (width / aspectRatio) * 0.12f,
+                                    )
                                 } else {
                                     Modifier
                                 }
                             ),
                     )
-                } else {
+                }
+                if (imageRequest == null || channelLogoFailed) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()

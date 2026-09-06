@@ -34,6 +34,9 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.Call
@@ -651,6 +654,7 @@ class IptvRepository @Inject constructor(
     private val emptyShortEpgCooldownUntil = ConcurrentHashMap<String, Long>()
     private val visibleXmlEpgCooldownUntil = ConcurrentHashMap<String, Long>()
     private val visibleXmlEpgInFlight = AtomicBoolean(false)
+    private val guideRequestBudget = IptvGuideRequestBudget()
 
     private val guideKeyCandidatesCache = java.util.Collections.synchronizedMap(
         object : java.util.LinkedHashMap<String, Set<String>>(512, 0.75f, true) {
@@ -2351,7 +2355,12 @@ class IptvRepository @Inject constructor(
                             // 300 s: some providers (like TX-4K) serve a 100 MB
                             // XMLTV dump that needs 2-3 min on a TV's WiFi.
                             // 90 s was aborting before the file finished.
-                            withTimeoutOrNull(300_000L) { fetchAndParseEpg(epgUrl, candidateChannels) }
+                            withTimeoutOrNull(300_000L) {
+                                val jobContext = currentCoroutineContext()
+                                runInterruptible(Dispatchers.IO) {
+                                    fetchAndParseEpg(epgUrl, candidateChannels) { jobContext.ensureActive() }
+                                }
+                            }
                                 ?: throw java.util.concurrent.TimeoutException(context.getString(R.string.epg_timeout, epgUrl.take(80)))
                         }
                         if (attempt.isSuccess) {
@@ -3206,14 +3215,18 @@ class IptvRepository @Inject constructor(
             var isCached = false
             val parsed = runCatching {
                 withTimeoutOrNull(12_000L) {
-                    fetchAndParseEpg(
-                        url = candidate.url,
-                        channels = candidateChannels,
-                        client = visibleEpgHttpClient,
-                        allowRetry = false,
-                        stopAfterRichCurrentPrograms = true,
-                        parseDeadlineElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime() + 11_500L,
-                    )
+                    val jobContext = currentCoroutineContext()
+                    runInterruptible(Dispatchers.IO) {
+                        fetchAndParseEpg(
+                            url = candidate.url,
+                            channels = candidateChannels,
+                            client = visibleEpgHttpClient,
+                            allowRetry = false,
+                            stopAfterRichCurrentPrograms = true,
+                            parseDeadlineElapsedRealtimeMs = android.os.SystemClock.elapsedRealtime() + 11_500L,
+                            checkActive = { jobContext.ensureActive() },
+                        )
+                    }
                 } ?: emptyMap()
             }.recover { error ->
                 if (error is EpgNotModifiedException) {
@@ -6137,6 +6150,19 @@ class IptvRepository @Inject constructor(
         url: String,
         type: Type,
         client: OkHttpClient = iptvHttpClient
+    ): T? = if (client === xtreamGuideHttpClient || client === xtreamCatchupGuideHttpClient) {
+        guideRequestBudget.request(url) {
+            requestJsonUnbudgeted(url, type, client, guideRequest = true)
+        }
+    } else {
+        requestJsonUnbudgeted(url, type, client)
+    }
+
+    private suspend fun <T> requestJsonUnbudgeted(
+        url: String,
+        type: Type,
+        client: OkHttpClient,
+        guideRequest: Boolean = false,
     ): T? = suspendCancellableCoroutine { continuation ->
         val request = Request.Builder()
             .url(url)
@@ -6162,6 +6188,9 @@ class IptvRepository @Inject constructor(
                     return
                 }
                 response.use {
+                    if (guideRequest) {
+                        guideRequestBudget.onResponse(url, it.code, it.header("Retry-After")?.toLongOrNull())
+                    }
                     if (!it.isSuccessful) {
                         continuation.resume(null)
                         return
@@ -6240,7 +6269,9 @@ class IptvRepository @Inject constructor(
         allowRetry: Boolean = true,
         stopAfterRichCurrentPrograms: Boolean = false,
         parseDeadlineElapsedRealtimeMs: Long? = null,
+        checkActive: () -> Unit = {},
     ): Map<String, IptvNowNext> {
+        checkActive()
         val hasDbEntries = currentEpgIndexKey.isNotBlank() && runCatching {
             epgIndex.countPrograms(currentEpgIndexKey)
         }.getOrDefault(0) > 0
@@ -6283,6 +6314,7 @@ class IptvRepository @Inject constructor(
             }
         }
         response.use { safeResponse ->
+            checkActive()
             if (safeResponse.isSuccessful) {
                 val etag = safeResponse.header("ETag")?.trim()
                 val lastModified = safeResponse.header("Last-Modified")?.trim()
@@ -6310,9 +6342,12 @@ class IptvRepository @Inject constructor(
                     channels = channels,
                     stopAfterRichCurrentPrograms = stopAfterRichCurrentPrograms,
                     deadlineElapsedRealtimeMs = parseDeadlineElapsedRealtimeMs,
+                    checkActive = checkActive,
                 )
             } catch (streamError: Exception) {
+                if (streamError is CancellationException) throw streamError
                 if (!allowRetry) throw streamError
+                checkActive()
                 // Streaming parse failed – the network stream is consumed, so we
                 // cannot retry from it.  Check if we got a useful partial result
                 // or need to re-download.  Re-download and spool to disk for retries.
@@ -6323,24 +6358,41 @@ class IptvRepository @Inject constructor(
                         epgRequest(url, primaryUserAgent, forceFull = true)
                     ).execute()
                     retryResponse.use { rr ->
+                        checkActive()
                         val retryStream = rr.body?.byteStream()
                             ?: throw IllegalStateException(context.getString(R.string.epg_retry_empty))
                         BufferedInputStream(prepareInputStream(retryStream, url)).use { input ->
                             BufferedOutputStream(tmpFile.outputStream()).use { output ->
-                                input.copyTo(output, DEFAULT_BUFFER_SIZE)
+                                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                                while (true) {
+                                    checkActive()
+                                    val count = input.read(buffer)
+                                    if (count < 0) break
+                                    output.write(buffer, 0, count)
+                                }
                             }
                         }
                     }
 
                     try {
                         return FileInputStream(tmpFile).use { input ->
-                            parseXmlTvNowNext(BufferedInputStream(input), channels)
+                            parseXmlTvNowNext(
+                                input = BufferedInputStream(input),
+                                channels = channels,
+                                checkActive = checkActive,
+                            )
                         }
-                    } catch (_: Exception) {
+                    } catch (retryError: Exception) {
+                        if (retryError is CancellationException) throw retryError
+                        checkActive()
                         // Final fallback: SAX parser (different engine).
                         return FileInputStream(tmpFile).use { input ->
                             val sanitized2 = BackslashEscapeSanitizingInputStream(BufferedInputStream(input))
-                            parseXmlTvNowNextWithSax(BufferedInputStream(sanitized2), channels)
+                            parseXmlTvNowNextWithSax(
+                                input = BufferedInputStream(sanitized2),
+                                channels = channels,
+                                checkActive = checkActive,
+                            )
                         }
                     }
                 } finally {
@@ -6880,7 +6932,10 @@ class IptvRepository @Inject constructor(
                                             System.err.println("[EPG] Sample response for stream_id=$sid: channelId=${sample.channelId} epgId=${sample.epgId} streamId=${sample.streamId} start=${sample.start} startTs=${sample.startTimestamp} title=${sample.title?.take(40)}")
                                         }
                                     }
-                                } catch (_: Exception) { hadError = true }
+                                } catch (error: Exception) {
+                                    if (error is CancellationException) throw error
+                                    hadError = true
+                                }
                                 onStreamProcessed(sid, hadError)
                             }
                         }
@@ -6936,7 +6991,8 @@ class IptvRepository @Inject constructor(
                                 if (listings.isNotEmpty()) {
                                     listingsResult.addAll(listings)
                                 }
-                            } catch (_: Exception) {
+                            } catch (error: Exception) {
+                                if (error is CancellationException) throw error
                                 hadError = true
                             }
                             onStreamProcessed(sid, hadError)
@@ -7422,6 +7478,7 @@ class IptvRepository @Inject constructor(
         channels: List<IptvChannel>,
         stopAfterRichCurrentPrograms: Boolean = false,
         deadlineElapsedRealtimeMs: Long? = null,
+        checkActive: () -> Unit = {},
     ): Map<String, IptvNowNext> {
         if (channels.isEmpty()) return emptyMap()
 
@@ -7458,6 +7515,9 @@ class IptvRepository @Inject constructor(
 
         while (eventType != XmlPullParser.END_DOCUMENT) {
             parsedEvents++
+            if ((parsedEvents and 0xFF) == 0) {
+                checkActive()
+            }
             if (parsedEvents % 512 == 0 &&
                 deadlineElapsedRealtimeMs != null &&
                 android.os.SystemClock.elapsedRealtime() >= deadlineElapsedRealtimeMs
@@ -7484,10 +7544,24 @@ class IptvRepository @Inject constructor(
                         }
                         "programme" -> {
                             val rawKey = normalizeChannelKey(parser.getAttributeValue(null, "channel") ?: "")
-                            val start = parseXmlTvDate(parser.getAttributeValue(null, "start"))
-                            val stop = parseXmlTvDate(parser.getAttributeValue(null, "stop"))
+                            val resolved = xmlChannelResolveCache.getOrPut(rawKey) {
+                                resolveXmlTvChannels(rawKey, xmlChannelNameMap, keyLookup)
+                            }
+                            val start = if (resolved.isNotEmpty()) {
+                                parseXmlTvDate(parser.getAttributeValue(null, "start"))
+                            } else {
+                                0L
+                            }
+                            val stop = if (resolved.isNotEmpty()) {
+                                parseXmlTvDate(parser.getAttributeValue(null, "stop"))
+                            } else {
+                                0L
+                            }
                             // Skip programmes that ended before the recent cutoff
-                            if ((stop > 0L && stop <= recentCutoff) || (start > 0L && start >= futureCutoff)) {
+                            if (resolved.isEmpty() ||
+                                (stop > 0L && stop <= recentCutoff) ||
+                                (start > 0L && start >= futureCutoff)
+                            ) {
                                 currentChannelKey = null
                             } else {
                                 currentChannelKey = rawKey
@@ -7565,7 +7639,8 @@ class IptvRepository @Inject constructor(
 
     private fun parseXmlTvNowNextWithSax(
         input: InputStream,
-        channels: List<IptvChannel>
+        channels: List<IptvChannel>,
+        checkActive: () -> Unit = {},
     ): Map<String, IptvNowNext> {
         if (channels.isEmpty()) return emptyMap()
 
@@ -7603,8 +7678,13 @@ class IptvRepository @Inject constructor(
         val textBuffer = StringBuilder(128)
 
         val handler = object : DefaultHandler() {
+            private var parsedElements = 0
+
             override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
-                val name = (localName ?: qName ?: "").lowercase(Locale.US)
+                if ((parsedElements++ and 0xFF) == 0) {
+                    checkActive()
+                }
+                val name = (localName?.takeIf { it.isNotEmpty() } ?: qName ?: "").lowercase(Locale.US)
                 when (name) {
                     "channel" -> {
                         currentXmlChannelId = normalizeChannelKey(attributes?.getValue("id").orEmpty())
@@ -7651,7 +7731,7 @@ class IptvRepository @Inject constructor(
             }
 
             override fun endElement(uri: String?, localName: String?, qName: String?) {
-                val name = (localName ?: qName ?: "").lowercase(Locale.US)
+                val name = (localName?.takeIf { it.isNotEmpty() } ?: qName ?: "").lowercase(Locale.US)
                 when (name) {
                     "display-name" -> {
                         if (readingDisplayName) {

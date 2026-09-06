@@ -6,6 +6,30 @@ import org.junit.Test
 
 class CloudStartupSessionTest {
     @Test
+    fun `connected cloud UI remains connected during transient auth states`() {
+        assertEquals(true, resolveCloudConnectionState(AuthState.Loading, hasAuthenticatedProfile = true))
+        assertEquals(
+            true,
+            resolveCloudConnectionState(AuthState.Error("temporary"), hasAuthenticatedProfile = true),
+        )
+    }
+
+    @Test
+    fun `connected cloud UI clears only after explicit unauthenticated state`() {
+        assertEquals(
+            false,
+            resolveCloudConnectionState(AuthState.NotAuthenticated, hasAuthenticatedProfile = true),
+        )
+        assertEquals(
+            true,
+            resolveCloudConnectionState(
+                AuthState.Authenticated("user-1", "user@example.com", null),
+                hasAuthenticatedProfile = false,
+            )
+        )
+    }
+
+    @Test
     fun `transient refresh failure keeps persisted session`() {
         assertEquals(
             "user-1",

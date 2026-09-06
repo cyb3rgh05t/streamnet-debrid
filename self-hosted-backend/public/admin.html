@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <title>StreamNet Admin</title>
+    <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/admin/admin.css" />
+    <script src="/admin/admin.js" defer></script>
+  </head>
+  <body>
+    <main id="login-view" class="login-shell">
+      <section class="login-panel" aria-labelledby="login-title">
+        <img
+          src="/assets/streamnet-club-logo.svg"
+          alt="StreamNet"
+          class="login-logo"
+        />
+        <p class="eyebrow">CONTROL ROOM</p>
+        <h1 id="login-title">Admin Dashboard</h1>
+        <p class="muted">
+          Geschützter Zugriff auf Accounts und Cloud-Snapshots.
+        </p>
+        <form id="login-form" class="form-stack">
+          <label
+            >E-Mail<input
+              id="login-email"
+              type="email"
+              autocomplete="username"
+              required
+          /></label>
+          <label
+            >Passwort<input
+              id="login-password"
+              type="password"
+              autocomplete="current-password"
+              required
+          /></label>
+          <button class="button primary" type="submit">Anmelden</button>
+          <p id="login-error" class="message error" role="alert"></p>
+        </form>
+      </section>
+    </main>
+
+    <div id="dashboard-view" class="app-shell hidden">
+      <aside class="sidebar">
+        <img
+          src="/assets/streamnet-club-logo.svg"
+          alt="StreamNet"
+          class="brand-logo"
+        />
+        <nav aria-label="Admin Navigation">
+          <button class="nav-item active" data-view="accounts">Accounts</button>
+          <button class="nav-item" data-view="audits">Audit-Protokoll</button>
+        </nav>
+        <div class="admin-session">
+          <span id="admin-email"></span>
+          <button id="logout-button" class="text-button" type="button">
+            Abmelden
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">STREAMNET CLOUD</p>
+            <h1 id="page-title">Accounts</h1>
+          </div>
+          <span id="connection-status" class="status-pill">Verbunden</span>
+        </header>
+
+        <section id="accounts-view">
+          <div
+            id="metrics"
+            class="metrics"
+            aria-label="Datenbankübersicht"
+          ></div>
+          <div class="toolbar">
+            <label class="search-field">
+              <span>Account suchen</span>
+              <input
+                id="account-search"
+                type="search"
+                placeholder="E-Mail-Adresse"
+                autocomplete="off"
+              />
+            </label>
+            <button id="refresh-button" class="button secondary" type="button">
+              Aktualisieren
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Account</th>
+                  <th>Profile</th>
+                  <th>Revision</th>
+                  <th>Letzter Sync</th>
+                </tr>
+              </thead>
+              <tbody id="accounts-body"></tbody>
+            </table>
+          </div>
+          <p id="accounts-empty" class="empty hidden">
+            Keine Accounts gefunden.
+          </p>
+        </section>
+
+        <section id="account-view" class="hidden">
+          <button
+            id="back-button"
+            class="text-button back-button"
+            type="button"
+          >
+            ← Zurück zu Accounts
+          </button>
+          <div id="account-heading" class="account-heading"></div>
+          <div id="account-stats" class="metrics compact"></div>
+
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">PROFILSTATUS</p>
+              <h2>Profile</h2>
+            </div>
+            <span id="snapshot-revision" class="revision-pill"></span>
+          </div>
+          <div id="profiles-grid" class="profiles-grid"></div>
+
+          <div class="split-layout">
+            <section class="editor-panel" aria-labelledby="editor-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">REMOTE CHANGE</p>
+                  <h2 id="editor-title">Payload ändern</h2>
+                </div>
+              </div>
+              <form id="mutation-form" class="form-stack">
+                <label
+                  >Profil<select id="mutation-profile" required></select
+                ></label>
+                <label
+                  >Operation
+                  <select id="mutation-operation">
+                    <option value="upsert_addon">
+                      Add-on hinzufügen / ersetzen
+                    </option>
+                    <option value="upsert_playlist">
+                      Playlist hinzufügen / ersetzen
+                    </option>
+                    <option value="set_profile_field">Profilfeld setzen</option>
+                  </select>
+                </label>
+                <div id="field-controls" class="field-controls hidden">
+                  <label
+                    >Bereich
+                    <select id="mutation-root">
+                      <option value="profileSettingsById">
+                        Profileinstellungen
+                      </option>
+                      <option value="iptvByProfile">IPTV-Einstellungen</option>
+                    </select>
+                  </label>
+                  <label
+                    >Feld<input id="mutation-field" placeholder="accentColor"
+                  /></label>
+                </div>
+                <label
+                  >Daten als JSON<textarea
+                    id="mutation-data"
+                    rows="11"
+                    spellcheck="false"
+                  ></textarea>
+                </label>
+                <label
+                  >Änderungsgrund<input
+                    id="mutation-reason"
+                    maxlength="500"
+                    required
+                    placeholder="Warum ist diese Änderung nötig?"
+                /></label>
+                <div id="mutation-warning" class="warning"></div>
+                <button class="button primary" type="submit">
+                  Änderung anwenden
+                </button>
+                <p id="mutation-message" class="message" role="status"></p>
+              </form>
+            </section>
+
+            <section class="payload-panel" aria-labelledby="payload-title">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">REDACTED</p>
+                  <h2 id="payload-title">Snapshot</h2>
+                </div>
+                <button id="copy-payload" class="text-button" type="button">
+                  JSON kopieren
+                </button>
+              </div>
+              <pre id="payload-json"></pre>
+            </section>
+          </div>
+        </section>
+
+        <section id="audits-view" class="hidden">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">NACHVOLLZIEHBAR</p>
+              <h2>Letzte Änderungen</h2>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Zeit</th>
+                  <th>Account</th>
+                  <th>Operation</th>
+                  <th>Profil</th>
+                  <th>Revision</th>
+                  <th>Grund</th>
+                </tr>
+              </thead>
+              <tbody id="audits-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <div id="global-message" class="toast hidden" role="status"></div>
+      </main>
+    </div>
+  </body>
+</html>

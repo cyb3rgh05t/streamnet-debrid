@@ -1166,30 +1166,30 @@ fun SettingsScreen(
                                                                 showIptvInput = true
                                                             }
                                                             isStreamNetPreset && iptvActionIndex == 0 -> {
-                                                                openIptvCategories(playlist.id)
-                                                            }
-                                                            isStreamNetPreset && iptvActionIndex == 1 -> {
-                                                                openIptvVodCategories()
-                                                            }
-                                                            isStreamNetPreset && iptvActionIndex == 2 -> {
-                                                                updated[idx] = playlist.copy(enabled = !playlist.enabled)
-                                                                viewModel.saveIptvPlaylists(updated)
-                                                            }
-                                                            isStreamNetPreset -> {
                                                                 editingIptvIndex = idx
                                                                 showIptvInput = true
                                                             }
+                                                            isStreamNetPreset && iptvActionIndex == 1 -> {
+                                                                updated[idx] = playlist.copy(enabled = !playlist.enabled)
+                                                                viewModel.saveIptvPlaylists(updated)
+                                                            }
+                                                            isStreamNetPreset && iptvActionIndex == 2 -> {
+                                                                openIptvCategories(playlist.id)
+                                                            }
+                                                            isStreamNetPreset -> {
+                                                                openIptvVodCategories()
+                                                            }
                                                             else -> when (iptvActionIndex) {
                                                             0 -> {
-                                                                openIptvCategories(playlist.id)
+                                                                editingIptvIndex = idx
+                                                                showIptvInput = true
                                                             }
                                                             1 -> {
                                                                 updated[idx] = playlist.copy(enabled = !playlist.enabled)
                                                                 viewModel.saveIptvPlaylists(updated)
                                                             }
                                                             2 -> {
-                                                                editingIptvIndex = idx
-                                                                showIptvInput = true
+                                                                openIptvCategories(playlist.id)
                                                             }
                                                             3 -> {
                                                                 if (idx > 0) {
@@ -8315,7 +8315,6 @@ private fun IptvSettings(
             playlists.forEachIndexed { index, playlist ->
                 val rowIndex = index + 1
                 val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
-                val streamNetActionOffset = if (isStreamNetPreset) 1 else 0
                 val isConfigured = playlist.m3uUrl.isNotBlank()
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
                 val focusRingColor = resolveAccentColor(fallback = Pink)
@@ -8345,9 +8344,22 @@ private fun IptvSettings(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         CatalogActionChip(
+                            icon = Icons.Default.Edit,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
+                            onClick = { onEditPlaylist(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                            enabled = isConfigured,
+                            onClick = { onTogglePlaylist(index) }
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
                             icon = Icons.Default.List,
                             label = stringResource(R.string.settings_iptv_live_categories),
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
+                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 2,
                             enabled = isConfigured,
                             onClick = { onManageCategories(playlist.id) }
                         )
@@ -8356,46 +8368,30 @@ private fun IptvSettings(
                             CatalogActionChip(
                                 icon = Icons.Default.Movie,
                                 label = stringResource(R.string.settings_iptv_vod_categories),
-                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
+                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 3,
                                 enabled = isConfigured,
                                 onClick = onManageVodCategories
                             )
+                        } else {
+                            CatalogActionChip(
+                                icon = Icons.Default.ArrowUpward,
+                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 3,
+                                onClick = { onMovePlaylistUp(index) }
+                            )
                             Spacer(modifier = Modifier.width(6.dp))
+                            CatalogActionChip(
+                                icon = Icons.Default.ArrowDownward,
+                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 4,
+                                onClick = { onMovePlaylistDown(index) }
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            CatalogActionChip(
+                                icon = Icons.Default.Delete,
+                                isFocused = focusedIndex == rowIndex && focusedActionIndex == 5,
+                                isDestructive = true,
+                                onClick = { onDeletePlaylist(index) }
+                            )
                         }
-                        CatalogActionChip(
-                            icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 1 + streamNetActionOffset,
-                            enabled = isConfigured,
-                            onClick = { onTogglePlaylist(index) }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        CatalogActionChip(
-                            icon = Icons.Default.Edit,
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 2 + streamNetActionOffset,
-                            onClick = { onEditPlaylist(index) }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        CatalogActionChip(
-                            icon = Icons.Default.ArrowUpward,
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 3 + streamNetActionOffset,
-                            enabled = !isStreamNetPreset,
-                            onClick = { onMovePlaylistUp(index) }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        CatalogActionChip(
-                            icon = Icons.Default.ArrowDownward,
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 4 + streamNetActionOffset,
-                            enabled = !isStreamNetPreset,
-                            onClick = { onMovePlaylistDown(index) }
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        CatalogActionChip(
-                            icon = Icons.Default.Delete,
-                            isFocused = focusedIndex == rowIndex && focusedActionIndex == 5 + streamNetActionOffset,
-                            isDestructive = true,
-                            enabled = !isStreamNetPreset,
-                            onClick = { onDeletePlaylist(index) }
-                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(10.dp))

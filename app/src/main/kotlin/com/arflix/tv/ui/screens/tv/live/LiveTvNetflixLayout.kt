@@ -217,9 +217,7 @@ internal fun LiveTvNetflixLayout(
                 nowNext = previewNowNext,
                 isFavorite = previewChannel?.id?.let { it in favoriteSet } == true,
                 backdropUrl = previewBackdropUrl,
-                fallbackBackdropUrl = previewFallbackArtwork
-                    ?.takeUnless { it.isCountryFlag }
-                    ?.assetPath,
+                fallbackBackdropUrl = previewFallbackArtwork?.assetPath,
                 programLogoUrl = previewProgramLogoUrl,
                 playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
                 isPlaylistRefreshing = isPlaylistRefreshing,
@@ -416,25 +414,53 @@ private fun HeroInfoPanel(
 ) {
     val effectiveBackdropUrl = backdropUrl?.takeIf { it.isNotBlank() }
         ?: fallbackBackdropUrl?.takeIf { it.isNotBlank() }
+    val backgroundLogoUrl = remember(channel?.logo) { safeChannelLogoUrl(channel?.logo) }
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HeroCornerRadius))
             .background(LiveColors.PanelDeep),
     ) {
+        if (channel != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                channel.brandBg.copy(alpha = 0.72f),
+                                LiveColors.PanelDeep,
+                            )
+                        )
+                    )
+            )
+        }
         if (!effectiveBackdropUrl.isNullOrBlank()) {
             AsyncImage(
                 model = effectiveBackdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 alignment = Alignment.TopCenter,
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f },
             )
-            Box(modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(colors = listOf(
-                    LiveColors.PanelDeep.copy(alpha = 0.55f),
-                    LiveColors.PanelDeep.copy(alpha = 0.85f),
-                    LiveColors.PanelDeep.copy(alpha = 0.95f),
-                ))
-            ))
+        } else if (!backgroundLogoUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backgroundLogoUrl,
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = 0.26f
+                        scaleX = 1.16f
+                        scaleY = 1.16f
+                    },
+            )
         }
+        Box(modifier = Modifier.fillMaxSize().background(
+            Brush.verticalGradient(colors = listOf(
+                LiveColors.PanelDeep.copy(alpha = 0.55f),
+                LiveColors.PanelDeep.copy(alpha = 0.85f),
+                LiveColors.PanelDeep.copy(alpha = 0.95f),
+            ))
+        ))
         Column(
             modifier = Modifier
                 .fillMaxSize()

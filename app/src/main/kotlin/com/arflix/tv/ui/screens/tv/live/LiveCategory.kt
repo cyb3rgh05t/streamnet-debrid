@@ -14,7 +14,7 @@ enum class Genre {
 
 /** Picture quality tier derived from channel name / group. */
 enum class Quality(val label: String) {
-    SD("SD"), HD("HD"), FHD("FHD"), K4("4K");
+    SD("SD"), HD("HD"), FHD("FHD"), K4("4K"), UNKNOWN("");
 }
 
 /**
@@ -265,22 +265,29 @@ fun genreFromText(text: String): Genre {
     }
 }
 
-/** Parse a quality tier out of channel/group name. */
+private val SD_QUALITY_TOKEN = Regex("""\b(?:SD|480[PI]?|576[PI]?)\b""")
+
+/** Parse a quality tier out of channel/group name, without guessing missing quality. */
 fun qualityFromText(text: String): Quality {
     val t = text.uppercase()
     return when {
         "4K" in t || "UHD" in t || "2160" in t -> Quality.K4
         "FHD" in t || "1080" in t -> Quality.FHD
         "HD" in t || "720" in t -> Quality.HD
-        else -> Quality.SD
+        SD_QUALITY_TOKEN.containsMatchIn(t) -> Quality.SD
+        else -> Quality.UNKNOWN
     }
 }
 
 private fun qualityFromLabel(label: String?): Quality? {
     val normalized = label?.trim()?.takeIf { it.isNotBlank() } ?: return null
     val quality = qualityFromText(normalized)
-    return if (quality != Quality.SD || normalized.equals("SD", ignoreCase = true)) quality else null
+    return quality.takeUnless { it == Quality.UNKNOWN }
 }
+
+private fun IptvChannel.metadataQuality(): Quality = qualityFromLabel(qualityLabel)
+    ?: qualityFromText(name).takeUnless { it == Quality.UNKNOWN }
+    ?: qualityFromText(group)
 
 /** Extract a 2-letter bucket code from a group/channel name. Accepts ISO
  *  country codes or language prefixes (EN, JA, …) commonly used in IPTV. */
@@ -328,9 +335,7 @@ private fun IptvChannel.traits(): ChannelTraits {
         ?: countryFromText(group)
         ?: countryFromText(name)
     val genre = genreFromText(combined)
-    val quality = qualityFromLabel(qualityLabel)
-        ?: qualityFromText(name).takeUnless { it == Quality.SD }
-        ?: qualityFromText(group)
+    val quality = metadataQuality()
     val lang = this.language
         ?.trim()
         ?.uppercase()
@@ -382,7 +387,7 @@ fun IptvChannel.enrichForFastStartup(number: Int): EnrichedChannel {
         ?.takeIf { it.length == 2 }
         ?: rawCountry
         ?: "EN"
-    val quality = qualityFromLabel(qualityLabel) ?: qualityFromText(name)
+    val quality = metadataQuality()
     val brand = LiveColors.BrandGeneral
     return EnrichedChannel(
         source = this,

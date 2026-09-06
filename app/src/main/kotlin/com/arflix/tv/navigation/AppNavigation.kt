@@ -119,6 +119,13 @@ sealed class Screen(val route: String) {
     }
 }
 
+internal fun NavHostController.navigateToProfileSelection() {
+    navigate(Screen.ProfileSelection.route) {
+        popUpTo(graph.id) { inclusive = false }
+        launchSingleTop = true
+    }
+}
+
 /**
  * Main navigation graph
  */
@@ -218,9 +225,7 @@ fun AppNavigation(
                 },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onExitApp = onExitApp
             )
@@ -239,9 +244,7 @@ fun AppNavigation(
                 onNavigateToSettings = { navigateTopLevel(Screen.Settings.route) },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onBack = { navigateHome() }
             )
@@ -262,9 +265,7 @@ fun AppNavigation(
                 },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onBack = { navigateHome() }
             )
@@ -292,9 +293,7 @@ fun AppNavigation(
                 onNavigateToIptvSettings = { navigateTopLevel(Screen.Settings.createRoute(initialSection = "iptv")) },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -335,9 +334,7 @@ fun AppNavigation(
                 onNavigateToTelegramSettings = { navController.navigate(Screen.TelegramSettings.route) },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onBack = { navController.popBackStack() }
             )
@@ -476,9 +473,7 @@ fun AppNavigation(
                 },
                 onSwitchProfile = {
                     onSwitchProfile()
-                    navController.navigate(Screen.ProfileSelection.route) {
-                        popUpTo(Screen.Home.route) { inclusive = true }
-                    }
+                    navController.navigateToProfileSelection()
                 },
                 onBack = { navController.popBackStack() }
             )

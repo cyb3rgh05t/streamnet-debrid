@@ -59,11 +59,11 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Theaters
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -262,8 +262,6 @@ fun DetailsScreen(
     var showStreamSelector by remember { mutableStateOf(false) }
     var showTrailerPlayer by remember { mutableStateOf(false) }
     KeepScreenOn(active = showTrailerPlayer)
-    var pendingAutoPlayRequest by remember { mutableStateOf<PendingAutoPlayRequest?>(null) }
-    var autoPlayWaitTick by remember { mutableIntStateOf(0) }
     var pendingSourceStartPositionMs by remember { mutableStateOf<Long?>(null) }
 
     // Episode Context Menu state
@@ -294,11 +292,16 @@ fun DetailsScreen(
             tmdbEpisode = tmdbEpisode
         )
         viewModel.loadStreams(imdbId, identity)
-        autoPlayWaitTick = 0
-        pendingAutoPlayRequest = PendingAutoPlayRequest(
-            identity = identity,
-            startPositionMs = startPositionMs,
-            requestedAtMs = SystemClock.elapsedRealtime()
+        viewModel.recordPlayedEpisode(mediaId, identity)
+        onNavigateToPlayer(
+            mediaType,
+            mediaId,
+            identity,
+            uiState.imdbId,
+            null,
+            null,
+            null,
+            startPositionMs
         )
     }
 
@@ -388,59 +391,6 @@ fun DetailsScreen(
     LaunchedEffect(Unit) {
         focusRequester.requestFocus()
         suppressSelectUntilMs = SystemClock.elapsedRealtime() + 150L
-    }
-
-    LaunchedEffect(
-        pendingAutoPlayRequest,
-        uiState.isLoadingStreams,
-        uiState.streams,
-        uiState.autoPlayMinQuality,
-        autoPlayWaitTick
-    ) {
-        val request = pendingAutoPlayRequest ?: return@LaunchedEffect
-
-        val validStreams = uiState.streams.filter(::isAutoPlayableStream)
-        val minThreshold = minQualityThreshold(uiState.autoPlayMinQuality)
-        val selectedStream = bestAutoPlayStream(validStreams, minThreshold)
-        val shouldWaitForSources = shouldWaitForAutoPlaySources(
-            isLoadingStreams = uiState.isLoadingStreams,
-            selectedStream = selectedStream,
-            elapsedMs = SystemClock.elapsedRealtime() - request.requestedAtMs
-        )
-
-        when {
-            selectedStream != null && !shouldWaitForSources -> {
-                val identity = request.identity
-                viewModel.recordPlayedEpisode(mediaId, identity)
-                onNavigateToPlayer(
-                    mediaType,
-                    mediaId,
-                    identity,
-                    uiState.imdbId,
-                    selectedStream.url?.takeIf { it.isNotBlank() },
-                    selectedStream.addonId.takeIf { it.isNotBlank() },
-                    selectedStream.source.takeIf { it.isNotBlank() },
-                    request.startPositionMs
-                )
-                pendingAutoPlayRequest = null
-            }
-            shouldWaitForSources -> {
-                delay(AUTOPLAY_SOURCE_RECHECK_MS)
-                autoPlayWaitTick += 1
-            }
-            uiState.isLoadingStreams -> Unit
-            validStreams.isNotEmpty() || uiState.streams.isNotEmpty() -> {
-                showStreamSelector = true
-                pendingAutoPlayRequest = null
-            }
-            else -> {
-                // When no streams found, show the StreamSelector with its
-                // friendly "no addons" / "no sources" empty state instead of
-                // navigating to the player which would show a scary error.
-                showStreamSelector = true
-                pendingAutoPlayRequest = null
-            }
-        }
     }
 
     // Place episode focus for whichever season is actually loaded. Keyed on currentSeason (which
@@ -1249,12 +1199,6 @@ private enum class FocusSection {
     BUTTONS, EPISODES, SEASONS, RATINGS, CAST, REVIEWS, SIMILAR, COLLECTION
 }
 
-private data class PendingAutoPlayRequest(
-    val identity: EpisodeIdentity?,
-    val startPositionMs: Long?,
-    val requestedAtMs: Long
-)
-
 private fun handleLeft(
     section: FocusSection,
     buttonIdx: Int, episodeIdx: Int, ratingsIdx: Int, seasonIdx: Int, castIdx: Int, reviewIdx: Int, similarIdx: Int,
@@ -1632,7 +1576,7 @@ private fun DetailsContent(
                             onClick = { onButtonClick(1 + actionOffset) }
                         )
                         MobileIconActionButton(
-                            icon = Icons.Default.Movie,
+                            icon = Icons.Default.Theaters,
                             contentDescription = stringResource(R.string.trailer),
                             enabled = hasTrailer,
                             modifier = Modifier
@@ -2288,7 +2232,7 @@ private fun DetailsContent(
                     .graphicsLayer { alpha = if (hasTrailer) 1f else 0.4f }
                 ) {
                     PremiumActionButton(
-                        icon = Icons.Default.Movie,
+                        icon = Icons.Default.Theaters,
                         text = stringResource(R.string.trailer),
                         isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 2 + actionOffset,
                         isIconOnly = true
@@ -4303,6 +4247,7 @@ private fun CircularCastCard(
     isFocused: Boolean,
     onClick: () -> Unit
 ) {
+    val accent = resolveAccentColor(fallback = ArvioSkin.colors.focusOutline)
     // Animated scale for focus
     val scale by animateFloatAsState(
         targetValue = if (isFocused) 1.08f else 1f,
@@ -4338,7 +4283,7 @@ private fun CircularCastCard(
                     if (isFocused) {
                         Modifier.border(
                             width = borderWidth,
-                            color = ArvioSkin.colors.focusOutline,
+                            color = accent,
                             shape = CircleShape
                         )
                     } else Modifier
@@ -4376,7 +4321,7 @@ private fun CircularCastCard(
                 fontSize = 11.sp,
                 fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium
             ),
-            color = if (isFocused) Color.White else Color.White.copy(alpha = 0.8f),
+            color = if (isFocused) accent else Color.White.copy(alpha = 0.8f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             textAlign = TextAlign.Center,
