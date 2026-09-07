@@ -55,6 +55,29 @@ test("server-side push merge keeps newer admin profile fields", () => {
   assert.equal(merged.fieldUpdatedAt["i:kids:sortOrder"], 2000);
 });
 
+test("server-side push merge keeps newer admin addon state", () => {
+  const current = {
+    addons: [{ id: "opensubtitles", isEnabled: true }],
+    addonsByProfile: {
+      kids: [{ id: "opensubtitles", isEnabled: true }],
+    },
+    addonsUpdatedAt: 2000,
+  };
+  const incoming = {
+    addons: [{ id: "opensubtitles", isEnabled: false }],
+    addonsByProfile: {
+      kids: [{ id: "opensubtitles", isEnabled: false }],
+    },
+    addonsUpdatedAt: 1000,
+  };
+
+  const merged = mergePushPayloadByFieldTimestamps(incoming, current);
+
+  assert.equal(merged.addons[0].isEnabled, true);
+  assert.equal(merged.addonsByProfile.kids[0].isEnabled, true);
+  assert.equal(merged.addonsUpdatedAt, 2000);
+});
+
 test("server-side push merge keeps newer incoming profile fields", () => {
   const current = {
     profileSettingsById: { kids: { liveTvLayoutMode: "classic" } },

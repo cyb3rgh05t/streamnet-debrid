@@ -114,6 +114,21 @@ export function mergePushPayloadByFieldTimestamps(
     return incomingPayload;
   }
   const incoming = cloneJson(incomingPayload);
+  const incomingAddonsUpdatedAt = Number(incoming.addonsUpdatedAt || 0);
+  const currentAddonsUpdatedAt = Number(currentPayload.addonsUpdatedAt || 0);
+  if (currentAddonsUpdatedAt > incomingAddonsUpdatedAt) {
+    if (Object.hasOwn(currentPayload, "addons")) {
+      incoming.addons = cloneJson(currentPayload.addons);
+    } else {
+      delete incoming.addons;
+    }
+    if (Object.hasOwn(currentPayload, "addonsByProfile")) {
+      incoming.addonsByProfile = cloneJson(currentPayload.addonsByProfile);
+    } else {
+      delete incoming.addonsByProfile;
+    }
+    incoming.addonsUpdatedAt = currentAddonsUpdatedAt;
+  }
   const incomingTs = isPlainObject(incoming.fieldUpdatedAt)
     ? incoming.fieldUpdatedAt
     : {};

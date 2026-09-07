@@ -63,18 +63,23 @@ test("applies small admin mutations to large existing snapshots", () => {
 });
 
 test("upserts a playlist only for the selected profile", () => {
-  const result = applyAdminSnapshotMutation(snapshot(), {
-    operation: "upsert_playlist",
-    profileId: "kids",
-    data: {
-      id: "family-tv",
-      name: "Family TV",
-      m3uUrl: "https://provider.example/list.m3u",
+  const result = applyAdminSnapshotMutation(
+    snapshot(),
+    {
+      operation: "upsert_playlist",
+      profileId: "kids",
+      data: {
+        id: "family-tv",
+        name: "Family TV",
+        m3uUrl: "https://provider.example/list.m3u",
+      },
     },
-  });
+    2345,
+  );
 
   assert.equal(result.iptvByProfile.kids.playlists[0].id, "family-tv");
   assert.equal(result.iptvByProfile.kids.playlists[0].importVod, true);
+  assert.equal(result.fieldUpdatedAt["i:kids:playlists"], 2345);
   assert.deepEqual(result.iptvByProfile["living-room"].playlists, []);
 });
 
@@ -139,14 +144,19 @@ test("removes a playlist only from the selected profile", () => {
     m3uUrl: "https://provider.example/list.m3u",
   });
   value.iptvByProfile.kids.m3uUrl = "https://provider.example/list.m3u";
-  const result = applyAdminSnapshotMutation(value, {
-    operation: "delete_playlist",
-    profileId: "kids",
-    data: { id: "family-tv" },
-  });
+  const result = applyAdminSnapshotMutation(
+    value,
+    {
+      operation: "delete_playlist",
+      profileId: "kids",
+      data: { id: "family-tv" },
+    },
+    3456,
+  );
 
   assert.deepEqual(result.iptvByProfile.kids.playlists, []);
   assert.equal(result.iptvByProfile.kids.m3uUrl, "");
+  assert.equal(result.fieldUpdatedAt["i:kids:playlists"], 3456);
 });
 
 test("removes a profile and its scoped data, but keeps at least one profile", () => {
@@ -176,23 +186,34 @@ test("removes a profile and its scoped data, but keeps at least one profile", ()
 
 test("edits the whole payload while preserving redacted secret values", () => {
   const value = snapshot();
+  value.addons = [{ id: "opensubtitles", isEnabled: false }];
   value.iptvByProfile.kids.m3uUrl = "https://user:pass@example/list.m3u";
   value.profiles[1].name = "Kids";
 
   const edited = JSON.parse(JSON.stringify(value));
+  edited.addons[0].isEnabled = true;
   edited.profiles[1].name = "Kids Room";
   edited.iptvByProfile.kids.m3uUrl = "[REDACTED]";
+  edited.iptvByProfile.kids.sortOrder = "name";
 
-  const result = applyAdminSnapshotMutation(value, {
-    operation: "edit_payload",
-    data: edited,
-  });
+  const result = applyAdminSnapshotMutation(
+    value,
+    {
+      operation: "edit_payload",
+      data: edited,
+    },
+    5678,
+  );
 
+  assert.equal(result.addons[0].isEnabled, true);
+  assert.equal(result.addonsUpdatedAt, 5678);
   assert.equal(result.profiles[1].name, "Kids Room");
   assert.equal(
     result.iptvByProfile.kids.m3uUrl,
     "https://user:pass@example/list.m3u",
   );
+  assert.equal(result.iptvByProfile.kids.sortOrder, "name");
+  assert.equal(result.fieldUpdatedAt["i:kids:sortOrder"], 5678);
 });
 
 test("rejects a payload edit that removes every profile", () => {

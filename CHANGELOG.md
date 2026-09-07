@@ -6,7 +6,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ### Admin-Backend
 
-- App-Pushes führen profilbezogene Felder serverseitig nach `fieldUpdatedAt` mit dem aktuellen DB-Snapshot zusammen, damit ein Gerät direkt nach einer Admin-Änderung nicht wieder alte lokale Profil- oder IPTV-Felder speichern kann.
+- Der Snapshot-Editor stempelt geänderte Add-ons, Profil- und IPTV-Felder mit den passenden Sync-Zeitstempeln; App-Pushes führen Add-ons und profilbezogene Felder serverseitig mit dem aktuellen DB-Snapshot zusammen, damit ein Gerät direkt nach einer Admin-Änderung nicht wieder alte lokale Werte speichern kann.
 
 ## [2.3.012] - 2026-09-07
 

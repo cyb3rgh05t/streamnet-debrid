@@ -74,6 +74,38 @@ function stampFieldUpdatedAt(payload, rootKey, profileId, field, now) {
   payload.fieldUpdatedAt[`${prefix}:${profileId}:${field}`] = now;
 }
 
+function jsonEqual(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function stampEditedProfileFields(current, edited, rootKey, prefix, now) {
+  const currentRoot = isPlainObject(current[rootKey]) ? current[rootKey] : {};
+  const editedRoot = isPlainObject(edited[rootKey]) ? edited[rootKey] : {};
+  for (const [profileId, editedProfile] of Object.entries(editedRoot)) {
+    if (!isPlainObject(editedProfile)) continue;
+    const currentProfile = isPlainObject(currentRoot[profileId])
+      ? currentRoot[profileId]
+      : {};
+    for (const [field, value] of Object.entries(editedProfile)) {
+      if (!jsonEqual(currentProfile[field], value)) {
+        if (!isPlainObject(edited.fieldUpdatedAt)) edited.fieldUpdatedAt = {};
+        edited.fieldUpdatedAt[`${prefix}:${profileId}:${field}`] = now;
+      }
+    }
+  }
+}
+
+function stampEditedPayloadTimestamps(current, edited, now) {
+  if (
+    !jsonEqual(current.addons, edited.addons) ||
+    !jsonEqual(current.addonsByProfile, edited.addonsByProfile)
+  ) {
+    edited.addonsUpdatedAt = now;
+  }
+  stampEditedProfileFields(current, edited, "profileSettingsById", "p", now);
+  stampEditedProfileFields(current, edited, "iptvByProfile", "i", now);
+}
+
 function normalizeAddon(data) {
   if (!isPlainObject(data)) throw new Error("Addon data must be an object");
   const addon = cloneJson(data, "Addon data");
@@ -190,6 +222,7 @@ export function applyAdminSnapshotMutation(
       throw new Error("Payload must include at least one profile");
     }
     const merged = mergeRedactedPreservingSecrets(payload, edited);
+    stampEditedPayloadTimestamps(payload, merged, now);
     merged.updatedAt = now;
     return merged;
   }
@@ -211,8 +244,11 @@ export function applyAdminSnapshotMutation(
     const playlist = normalizePlaylist(data);
     const iptv = objectAt(payload, "iptvByProfile", profileId);
     iptv.playlists = upsertById(iptv.playlists, playlist);
+    stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "playlists", now);
     if (!iptv.m3uUrl) iptv.m3uUrl = playlist.m3uUrl;
     if (!iptv.epgUrl && playlist.epgUrl) iptv.epgUrl = playlist.epgUrl;
+    stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "m3uUrl", now);
+    stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "epgUrl", now);
   } else if (operation === "delete_addon") {
     const addonId = cleanIdentifier(data?.id, "Addon id");
     if (isPlainObject(payload.addonsByProfile)) {
@@ -231,9 +267,14 @@ export function applyAdminSnapshotMutation(
       ? iptv.playlists.find((item) => item?.id === playlistId)
       : null;
     iptv.playlists = removeById(iptv.playlists, playlistId);
+    stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "playlists", now);
     if (removed && iptv.m3uUrl === removed.m3uUrl) iptv.m3uUrl = "";
     if (removed && iptv.epgUrl && iptv.epgUrl === removed.epgUrl)
       iptv.epgUrl = "";
+    if (removed) {
+      stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "m3uUrl", now);
+      stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "epgUrl", now);
+    }
   } else if (operation === "delete_profile") {
     const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
     if (profiles.length <= 1) {
