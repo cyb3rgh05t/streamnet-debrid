@@ -53,11 +53,40 @@
         />
         <nav aria-label="Admin Navigation">
           <button class="nav-item active" data-view="accounts">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
             Accounts
           </button>
           <button class="nav-item" data-view="audits">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 15l2 2 4-4"/></svg>
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path
+                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+              />
+              <path d="M14 2v6h6" />
+              <path d="M9 15l2 2 4-4" />
+            </svg>
             Audit-Protokoll
           </button>
         </nav>
@@ -122,11 +151,39 @@
             class="text-button back-button"
             type="button"
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M19 12H5" />
+              <path d="M12 19l-7-7 7-7" />
+            </svg>
             Zurück zu Accounts
           </button>
           <div id="account-heading" class="account-heading"></div>
           <div id="account-stats" class="metrics compact"></div>
+          <div class="account-actions">
+            <button
+              id="revoke-sessions-button"
+              class="button secondary"
+              type="button"
+            >
+              Alle Sitzungen abmelden
+            </button>
+            <button
+              id="delete-account-button"
+              class="button danger"
+              type="button"
+            >
+              Konto löschen
+            </button>
+          </div>
 
           <div class="section-heading">
             <div>
@@ -150,18 +207,106 @@
                   >Profil<select id="mutation-profile" required></select
                 ></label>
                 <label
-                  >Operation
+                  >Aktion
                   <select id="mutation-operation">
                     <option value="upsert_addon">
                       Add-on hinzufügen / ersetzen
                     </option>
+                    <option value="delete_addon">Add-on entfernen</option>
                     <option value="upsert_playlist">
                       Playlist hinzufügen / ersetzen
                     </option>
-                    <option value="set_profile_field">Profilfeld setzen</option>
+                    <option value="delete_playlist">Playlist entfernen</option>
+                    <option value="set_profile_field">
+                      Profilfeld setzen (erweitert)
+                    </option>
                   </select>
                 </label>
-                <div id="field-controls" class="field-controls hidden">
+
+                <div id="fields-upsert_addon" class="op-fields hidden">
+                  <label
+                    >Add-on-ID<input
+                      id="addon-id"
+                      placeholder="mein-addon"
+                  /></label>
+                  <label
+                    >Name<input id="addon-name" placeholder="Mein Add-on"
+                  /></label>
+                  <label
+                    >Manifest-URL<input
+                      id="addon-url"
+                      type="url"
+                      placeholder="https://.../manifest.json"
+                  /></label>
+                  <label
+                    >Version<input id="addon-version" placeholder="1.0.0"
+                  /></label>
+                  <label
+                    >Beschreibung (optional)<textarea
+                      id="addon-description"
+                      rows="2"
+                    ></textarea
+                  ></label>
+                  <label class="checkbox-field"
+                    ><input id="addon-enabled" type="checkbox" checked />
+                    Aktiviert</label
+                  >
+                </div>
+
+                <div id="fields-delete_addon" class="op-fields hidden">
+                  <label
+                    >Add-on<select id="delete-addon-select"></select
+                  ></label>
+                </div>
+
+                <div id="fields-upsert_playlist" class="op-fields hidden">
+                  <label
+                    >Playlist-ID<input
+                      id="playlist-id"
+                      placeholder="meine-playlist"
+                  /></label>
+                  <label
+                    >Name<input id="playlist-name" placeholder="Meine Playlist"
+                  /></label>
+                  <label
+                    >M3U-URL<input
+                      id="playlist-m3u"
+                      type="url"
+                      placeholder="https://.../list.m3u"
+                  /></label>
+                  <label
+                    >EPG-URL (optional)<input
+                      id="playlist-epg"
+                      type="url"
+                      placeholder="https://.../epg.xml"
+                  /></label>
+                  <div class="checkbox-grid">
+                    <label class="checkbox-field"
+                      ><input id="playlist-enabled" type="checkbox" checked />
+                      Aktiviert</label
+                    >
+                    <label class="checkbox-field"
+                      ><input id="playlist-live" type="checkbox" checked />
+                      Live-TV importieren</label
+                    >
+                    <label class="checkbox-field"
+                      ><input id="playlist-vod" type="checkbox" checked />
+                      Filme importieren</label
+                    >
+                    <label class="checkbox-field"
+                      ><input id="playlist-series" type="checkbox" checked />
+                      Serien importieren</label
+                    >
+                  </div>
+                </div>
+
+                <div id="fields-delete_playlist" class="op-fields hidden">
+                  <label
+                    >Playlist<select id="delete-playlist-select"></select
+                  ></label>
+                </div>
+
+                <div id="fields-set_profile_field" class="op-fields hidden">
                   <label
                     >Bereich
                     <select id="mutation-root">
@@ -174,14 +319,15 @@
                   <label
                     >Feld<input id="mutation-field" placeholder="accentColor"
                   /></label>
+                  <label
+                    >Wert als JSON<textarea
+                      id="mutation-data"
+                      rows="6"
+                      spellcheck="false"
+                    ></textarea>
+                  </label>
                 </div>
-                <label
-                  >Daten als JSON<textarea
-                    id="mutation-data"
-                    rows="11"
-                    spellcheck="false"
-                  ></textarea>
-                </label>
+
                 <label
                   >Änderungsgrund<input
                     id="mutation-reason"

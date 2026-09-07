@@ -431,11 +431,9 @@ textarea {
   color: #17110a;
   border-color: var(--accent);
   background: linear-gradient(135deg, var(--accent), var(--accent-dark));
-  box-shadow: 0 8px 22px rgba(229, 162, 9, 0.22);
 }
 .button.primary:hover {
   filter: brightness(1.05);
-  box-shadow: 0 10px 26px rgba(229, 162, 9, 0.3);
 }
 .button.secondary {
   align-self: end;
@@ -551,6 +549,21 @@ tbody tr[data-account-id]:focus {
 .account-heading h2 {
   font-size: 24px;
 }
+.account-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+.button.danger {
+  color: var(--danger);
+  border-color: rgba(255, 135, 120, 0.35);
+  background: var(--danger-soft);
+}
+.button.danger:hover {
+  border-color: var(--danger);
+  background: rgba(255, 135, 120, 0.16);
+}
 .section-heading {
   margin: 28px 0 13px;
 }
@@ -560,6 +573,8 @@ tbody tr[data-account-id]:focus {
   gap: 10px;
 }
 .profile-row {
+  display: flex;
+  flex-direction: column;
   min-height: 122px;
   padding: 16px;
   background: var(--surface);
@@ -584,6 +599,12 @@ tbody tr[data-account-id]:focus {
 .profile-counts b {
   color: var(--text);
 }
+.profile-row .text-button {
+  margin-top: auto;
+  padding-top: 12px;
+  font-size: 12px;
+  color: var(--danger);
+}
 
 .split-layout {
   display: grid;
@@ -604,10 +625,25 @@ tbody tr[data-account-id]:focus {
 .payload-panel .section-heading {
   margin-top: 0;
 }
-.field-controls {
+.field-controls,
+.checkbox-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+.op-fields {
+  display: grid;
+  gap: 15px;
+}
+.checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+.checkbox-field input {
+  width: auto;
 }
 .warning {
   padding: 12px 14px;
@@ -758,7 +794,8 @@ pre {
   .toolbar {
     align-items: end;
   }
-  .field-controls {
+  .field-controls,
+  .checkbox-grid {
     grid-template-columns: 1fr;
   }
   .login-panel {

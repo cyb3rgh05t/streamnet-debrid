@@ -121,6 +121,23 @@ function upsertById(items, item) {
   return next;
 }
 
+function removeById(items, id) {
+  return (Array.isArray(items) ? items : []).filter(
+    (item) => item?.id !== id,
+  );
+}
+
+const profileScopedRoots = [
+  "profileSettingsById",
+  "iptvByProfile",
+  "catalogsByProfile",
+  "hiddenCustomByProfile",
+  "addonsByProfile",
+  "watchlistByProfile",
+  "watchlistRemovedByProfile",
+  "catalogsUpdatedAtByProfile",
+];
+
 export function applyAdminSnapshotMutation(
   payloadValue,
   request,
@@ -151,6 +168,38 @@ export function applyAdminSnapshotMutation(
     iptv.playlists = upsertById(iptv.playlists, playlist);
     if (!iptv.m3uUrl) iptv.m3uUrl = playlist.m3uUrl;
     if (!iptv.epgUrl && playlist.epgUrl) iptv.epgUrl = playlist.epgUrl;
+  } else if (operation === "delete_addon") {
+    const addonId = cleanIdentifier(data?.id, "Addon id");
+    if (isPlainObject(payload.addonsByProfile)) {
+      for (const id of Object.keys(payload.addonsByProfile)) {
+        payload.addonsByProfile[id] = removeById(
+          payload.addonsByProfile[id],
+          addonId,
+        );
+      }
+    }
+    payload.addonsUpdatedAt = now;
+  } else if (operation === "delete_playlist") {
+    const playlistId = cleanIdentifier(data?.id, "Playlist id");
+    const iptv = objectAt(payload, "iptvByProfile", profileId);
+    const removed = Array.isArray(iptv.playlists)
+      ? iptv.playlists.find((item) => item?.id === playlistId)
+      : null;
+    iptv.playlists = removeById(iptv.playlists, playlistId);
+    if (removed && iptv.m3uUrl === removed.m3uUrl) iptv.m3uUrl = "";
+    if (removed && iptv.epgUrl && iptv.epgUrl === removed.epgUrl)
+      iptv.epgUrl = "";
+  } else if (operation === "delete_profile") {
+    const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
+    if (profiles.length <= 1) {
+      throw new Error("Cannot delete the only profile");
+    }
+    payload.profiles = profiles.filter(
+      (profile) => String(profile?.id || "") !== profileId,
+    );
+    for (const rootKey of profileScopedRoots) {
+      if (isPlainObject(payload[rootKey])) delete payload[rootKey][profileId];
+    }
   } else if (operation === "set_profile_field") {
     const rootKey = cleanIdentifier(request.rootKey, "rootKey");
     const field = cleanIdentifier(request.field, "field");
@@ -187,32 +236,50 @@ export function summarizeAdminPayload(payloadValue) {
     Array.isArray(payload.profiles) ? payload.profiles : []
   ).map((profile) => {
     const id = String(profile?.id || "");
+    const playlists = Array.isArray(payload.iptvByProfile?.[id]?.playlists)
+      ? payload.iptvByProfile[id].playlists
+      : [];
     return {
       id,
       name: String(profile?.name || id || "Unnamed"),
       addonCount: Array.isArray(payload.addonsByProfile?.[id])
         ? payload.addonsByProfile[id].length
         : 0,
-      playlistCount: Array.isArray(payload.iptvByProfile?.[id]?.playlists)
-        ? payload.iptvByProfile[id].playlists.length
-        : 0,
+      playlistCount: playlists.length,
       catalogCount: Array.isArray(payload.catalogsByProfile?.[id])
         ? payload.catalogsByProfile[id].length
         : 0,
       watchlistCount: Array.isArray(payload.watchlistByProfile?.[id])
         ? payload.watchlistByProfile[id].length
         : 0,
+      playlists: playlists.map((playlist) => ({
+        id: String(playlist?.id || ""),
+        name: String(playlist?.name || playlist?.id || "Unnamed"),
+        enabled: playlist?.enabled !== false,
+      })),
     };
   });
+  const addonsById = new Map();
+  for (const items of Object.values(payload.addonsByProfile || {})) {
+    if (!Array.isArray(items)) continue;
+    for (const addon of items) {
+      const id = String(addon?.id || "");
+      if (id && !addonsById.has(id)) {
+        addonsById.set(id, {
+          id,
+          name: String(addon?.name || id),
+          isEnabled: addon?.isEnabled !== false,
+        });
+      }
+    }
+  }
   return {
     profiles,
     profileCount: profiles.length,
-    addonCount: new Set(
-      Object.values(payload.addonsByProfile || {})
-        .flatMap((items) => (Array.isArray(items) ? items : []))
-        .map((addon) => addon?.id)
-        .filter(Boolean),
-    ).size,
+    addons: [...addonsById.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
+    addonCount: addonsById.size,
     playlistCount: Object.values(payload.iptvByProfile || {}).reduce(
       (total, state) =>
         total + (Array.isArray(state?.playlists) ? state.playlists.length : 0),

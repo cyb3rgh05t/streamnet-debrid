@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { normalizeAndValidateEmail } from "./email.js";
 import { verifyScryptPassword } from "./passwords.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
+import { deleteAccountData } from "./account-deletion.js";
 import {
   applyAdminSnapshotMutation,
   summarizeAdminPayload,
@@ -37,6 +38,7 @@ const mutationFailureReasons = new Map([
   ],
   ["Field data is too large", "field_data_too_large"],
   ["Unsafe property name", "unsafe_property_name"],
+  ["Cannot delete the only profile", "cannot_delete_last_profile"],
   ["Unsupported operation", "unsupported_operation"],
 ]);
 
@@ -133,6 +135,16 @@ function auditDetails(request) {
     rootKey: request.rootKey || null,
     field: request.field || null,
   };
+}
+
+function requireReason(request, reply) {
+  const reason = String(request.body?.reason || "").trim();
+  if (reason.length < 3 || reason.length > 500) {
+    request.backendFailureReason = "invalid_change_reason";
+    reply.code(400).send({ error: "A change reason is required" });
+    return null;
+  }
+  return reason;
 }
 
 function setAdminSecurityHeaders(reply) {
@@ -411,6 +423,119 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       }
     },
   );
+
+  app.post(
+    "/admin-api/accounts/:accountId/sessions/revoke-all",
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      const admin = await authenticatedAdmin(request, pool, jwtKey);
+      const accountId = validAccountId(request, reply);
+      if (!accountId) return;
+      const reason = requireReason(request, reply);
+      if (!reason) return;
+
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        const accountResult = await client.query(
+          "select id from accounts where id = $1 for update",
+          [accountId],
+        );
+        if (!accountResult.rows[0]) {
+          await client.query("rollback");
+          return reply.code(404).send({ error: "Account not found" });
+        }
+        const revoked = await client.query(
+          `update account_sessions set revoked_at = now()
+            where account_id = $1 and revoked_at is null
+          returning id`,
+          [accountId],
+        );
+        const revisionResult = await client.query(
+          "select revision from account_sync_snapshots where account_id = $1",
+          [accountId],
+        );
+        const revision = Number(revisionResult.rows[0]?.revision || 0);
+        const auditId = crypto.randomUUID();
+        await client.query(
+          `insert into admin_audit_logs (
+           id, admin_id, account_id, operation, profile_id, reason,
+           details, revision_before, revision_after, request_ip, user_agent
+         ) values ($1, $2, $3, 'revoke_sessions', null, $4, $5::jsonb, $6, $6, $7, $8)`,
+          [
+            auditId,
+            admin.id,
+            accountId,
+            reason,
+            JSON.stringify({ revokedCount: revoked.rowCount }),
+            revision,
+            request.ip || null,
+            String(request.headers["user-agent"] || "").slice(0, 500) || null,
+          ],
+        );
+        await client.query("commit");
+        return { accepted: true, revoked_count: revoked.rowCount };
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      } finally {
+        client.release();
+      }
+    },
+  );
+
+  app.delete("/admin-api/accounts/:accountId", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    const admin = await authenticatedAdmin(request, pool, jwtKey);
+    const accountId = validAccountId(request, reply);
+    if (!accountId) return;
+    const reason = requireReason(request, reply);
+    if (!reason) return;
+
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      const accountResult = await client.query(
+        "select id, email, email_normalized from accounts where id = $1 for update",
+        [accountId],
+      );
+      const account = accountResult.rows[0];
+      if (!account) {
+        await client.query("rollback");
+        return reply.code(404).send({ error: "Account not found" });
+      }
+      const revisionResult = await client.query(
+        "select revision from account_sync_snapshots where account_id = $1",
+        [accountId],
+      );
+      const revision = Number(revisionResult.rows[0]?.revision || 0);
+      const auditId = crypto.randomUUID();
+      await client.query(
+        `insert into admin_audit_logs (
+           id, admin_id, account_id, operation, profile_id, reason,
+           details, revision_before, revision_after, request_ip, user_agent
+         ) values ($1, $2, $3, 'delete_account', null, $4, $5::jsonb, $6, $6, $7, $8)`,
+        [
+          auditId,
+          admin.id,
+          accountId,
+          reason,
+          JSON.stringify({ email: account.email }),
+          revision,
+          request.ip || null,
+          String(request.headers["user-agent"] || "").slice(0, 500) || null,
+        ],
+      );
+      await deleteAccountData(client, account);
+      await client.query("commit");
+      return { accepted: true, audit_id: auditId };
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  });
 
   app.get("/admin-api/audits", async (request, reply) => {
     reply.header("Cache-Control", "no-store");

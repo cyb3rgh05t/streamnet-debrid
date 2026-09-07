@@ -82,6 +82,63 @@ test("allows only bounded profile fields and rejects unknown profiles", () => {
   );
 });
 
+test("removes an addon from every profile it was shared with", () => {
+  const value = snapshot();
+  value.addonsByProfile["living-room"] = [{ id: "example", name: "Example" }];
+  value.addonsByProfile.kids = [{ id: "example", name: "Example" }];
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "delete_addon",
+    profileId: "kids",
+    data: { id: "example" },
+  });
+
+  assert.deepEqual(result.addonsByProfile["living-room"], []);
+  assert.deepEqual(result.addonsByProfile.kids, []);
+});
+
+test("removes a playlist only from the selected profile", () => {
+  const value = snapshot();
+  value.iptvByProfile.kids.playlists.push({
+    id: "family-tv",
+    name: "Family TV",
+    m3uUrl: "https://provider.example/list.m3u",
+  });
+  value.iptvByProfile.kids.m3uUrl = "https://provider.example/list.m3u";
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "delete_playlist",
+    profileId: "kids",
+    data: { id: "family-tv" },
+  });
+
+  assert.deepEqual(result.iptvByProfile.kids.playlists, []);
+  assert.equal(result.iptvByProfile.kids.m3uUrl, "");
+});
+
+test("removes a profile and its scoped data, but keeps at least one profile", () => {
+  const value = snapshot();
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "delete_profile",
+    profileId: "kids",
+    data: {},
+  });
+
+  assert.deepEqual(
+    result.profiles.map((profile) => profile.id),
+    ["living-room"],
+  );
+  assert.equal(result.addonsByProfile.kids, undefined);
+  assert.equal(result.watchlistByProfile.kids, undefined);
+
+  assert.throws(
+    () =>
+      applyAdminSnapshotMutation(
+        { profiles: [{ id: "solo", name: "Solo" }] },
+        { operation: "delete_profile", profileId: "solo", data: {} },
+      ),
+    /Cannot delete the only profile/,
+  );
+});
+
 test("redacts credentials recursively while retaining useful structure", () => {
   const redacted = redactAdminPayload({
     profile: { name: "Kids", apiKey: "secret" },
@@ -97,13 +154,23 @@ test("summarizes profile-scoped objects without exposing secrets", () => {
   const value = snapshot();
   value.iptvByProfile.kids.playlists.push({
     id: "family-tv",
+    name: "Family TV",
     m3uUrl: "https://provider.example/list.m3u",
   });
+  value.addonsByProfile.kids = [
+    { id: "example", name: "Example", isEnabled: true },
+  ];
   const summary = summarizeAdminPayload(value);
 
   assert.equal(summary.profileCount, 2);
   assert.equal(summary.playlistCount, 1);
   assert.equal(summary.profiles[1].watchlistCount, 1);
+  assert.deepEqual(summary.profiles[1].playlists, [
+    { id: "family-tv", name: "Family TV", enabled: true },
+  ]);
+  assert.deepEqual(summary.addons, [
+    { id: "example", name: "Example", isEnabled: true },
+  ]);
   assert.equal(
     summary.payload.iptvByProfile.kids.playlists[0].m3uUrl,
     "[REDACTED]",

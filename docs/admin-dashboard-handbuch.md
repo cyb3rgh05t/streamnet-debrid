@@ -185,6 +185,14 @@ Bei Erfolg wird die Revision um eins erhöht, `source` auf `admin` gesetzt und
 ein Audit-Eintrag geschrieben. Alle Schritte laufen in einer gemeinsamen
 PostgreSQL-Transaktion.
 
+### Formularfelder statt JSON
+
+Add-on und Playlist werden über normale Formularfelder eingegeben (ID, Name,
+URL, Version/Beschreibung bzw. M3U-/EPG-URL und Aktivierungs-Kästchen). Ein
+JSON-Editor ist dafür nicht mehr nötig. Nur die Operation „Profilfeld setzen“
+bleibt als erweiterte Funktion mit einem rohen JSON-Wertfeld bestehen, weil sie
+absichtlich beliebige Profilfelder unterstützt.
+
 ### Add-on hinzufügen / ersetzen
 
 Die Operation `upsert_addon` sucht anhand von `id` nach einem vorhandenen
@@ -266,6 +274,44 @@ Android-Version tatsächlich verstanden wird. Ein Tippfehler kann daher ein
 wirkungsloses zusätzliches Feld erzeugen. Vor dem Schreiben sollte der genaue
 Feldname aus dem Cloudvertrag geprüft werden.
 
+### Add-on entfernen
+
+Die Operation `delete_addon` entfernt ein Add-on anhand seiner ID aus allen
+Profilen, in denen es installiert ist (Add-ons sind geteilter Account-Status).
+Das gewünschte Add-on wird aus einer Auswahlliste ausgewählt, keine ID-Eingabe
+nötig.
+
+### Playlist entfernen
+
+Die Operation `delete_playlist` entfernt eine Playlist anhand ihrer ID nur aus
+dem ausgewählten Profil. Zeigen die alten Kompatibilitätsfelder `m3uUrl`/
+`epgUrl` des Profils auf die gelöschte Playlist, werden sie geleert.
+
+### Profil löschen
+
+Auf jeder Profilkarte steht ein Button „Profil löschen“ zur Verfügung. Er
+entfernt das Profil sowie sämtliche profilgebundenen Daten (Einstellungen,
+IPTV-Konfiguration, Kataloge, Add-on-Zuordnung, Merkliste) aus dem Snapshot.
+Das letzte verbleibende Profil eines Accounts kann nicht gelöscht werden.
+
+## Sitzungen und Konto
+
+### Alle Sitzungen abmelden
+
+Der Button „Alle Sitzungen abmelden“ in der Account-Detailansicht widerruft
+alle noch gültigen Refresh-Sessions dieses Accounts sofort. Betroffene Geräte
+müssen sich beim nächsten Zugriff erneut anmelden. Der Admin muss vorher einen
+Änderungsgrund angeben; einzelne Sitzungen/Geräte bleiben weiterhin nicht
+einzeln sichtbar oder gezielt widerrufbar.
+
+### Konto löschen
+
+Der Button „Konto löschen“ entfernt den Account unwiderruflich inklusive
+Snapshot, Sessions, Watch History/State und Nutzungsereignissen (derselbe Pfad
+wie die Selbstlöschung in der App). Zur Bestätigung muss die exakte
+E-Mail-Adresse des Accounts eingegeben werden, danach ein Änderungsgrund. Diese
+Aktion kann nicht rückgängig gemacht werden.
+
 ### Revisionskonflikt
 
 Hat ein Gerät oder ein anderer Admin den Snapshot seit dem Öffnen geändert,
@@ -295,14 +341,18 @@ Revision noch einen erfolgreichen Audit-Eintrag.
 
 Das Dashboard kann derzeit nicht:
 
-- einzelne Account-Sessions oder Geräte anzeigen;
-- Sessions gezielt widerrufen oder einen Account remote abmelden;
-- Accounts, Profile, Add-ons oder Playlists löschen;
+- einzelne Account-Sessions oder Geräte anzeigen oder gezielt eine einzelne
+  Sitzung widerrufen (nur „alle Sitzungen abmelden“ ist möglich);
 - Passwörter von StreamNet-Accounts ändern;
 - Watch History oder Watch State bearbeiten;
 - beliebiges Snapshot-JSON ersetzen;
-- beliebige SQL-Abfragen ausführen;
-- unmaskierte Zugangsdaten anzeigen;
+- beliebige SQL-Abfragen ausführen — bewusst nicht eingebaut, da ein
+  ungefiltertes SQL-Fenster ein zu hohes Risiko für versehentlichen
+  Datenverlust und Injection wäre; für Ad-hoc-Abfragen direkt per `psql` auf
+  dem Server arbeiten;
+- unmaskierte Zugangsdaten anzeigen — bewusst nicht eingebaut, damit eine
+  kompromittierte Admin-Sitzung oder ein Screenshot keine Playlist-/API-Zugangsdaten
+  offenlegt;
 - eindeutig anzeigen, welche Nutzer gerade online sind.
 
 ## Sicherer Umgang

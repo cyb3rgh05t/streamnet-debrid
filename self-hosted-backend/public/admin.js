@@ -117,6 +117,17 @@ function showToast(message, error = false) {
   );
 }
 
+function promptReason(message) {
+  const reason = window.prompt(message);
+  if (reason === null) return null;
+  const trimmed = reason.trim();
+  if (trimmed.length < 3 || trimmed.length > 500) {
+    showToast("Bitte einen Grund mit 3-500 Zeichen angeben.", true);
+    return null;
+  }
+  return trimmed;
+}
+
 function renderMetrics(metrics) {
   const definitions = [
     ["accounts", "Accounts", metrics.accounts],
@@ -250,7 +261,43 @@ async function openAccount(accountId) {
     : "Kein Cloud-Snapshot vorhanden.";
   renderProfiles(snapshot?.profiles || []);
   byId("mutation-form").classList.toggle("hidden", !snapshot);
-  if (snapshot) setOperationTemplate();
+  if (snapshot) updateOperationFields();
+}
+
+async function deleteProfile(profileId, profileName) {
+  const reason = promptReason(
+    `Warum soll das Profil "${profileName}" gelöscht werden?`,
+  );
+  if (!reason) return;
+  if (
+    !window.confirm(`Profil "${profileName}" wirklich unwiderruflich löschen?`)
+  )
+    return;
+  try {
+    await api(
+      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/snapshot`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          operation: "delete_profile",
+          profileId,
+          data: {},
+          reason,
+          expectedRevision: state.selectedAccount.snapshot.revision,
+        }),
+      },
+    );
+    showToast(`Profil "${profileName}" gelöscht.`);
+    await openAccount(state.selectedAccount.account.id);
+  } catch (error) {
+    showToast(
+      error.status === 409
+        ? "Der Snapshot wurde inzwischen geändert. Bitte erneut versuchen."
+        : error.message,
+      true,
+    );
+    if (error.status === 409) await openAccount(state.selectedAccount.account.id);
+  }
 }
 
 function renderProfiles(profiles) {
@@ -281,7 +328,19 @@ function renderProfiles(profiles) {
       count.append(number);
       counts.append(count);
     }
-    row.append(title, id, counts);
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "text-button";
+    deleteButton.textContent = "Profil löschen";
+    if (profiles.length <= 1) {
+      deleteButton.disabled = true;
+      deleteButton.title = "Das letzte Profil kann nicht gelöscht werden.";
+    } else {
+      deleteButton.addEventListener("click", () =>
+        deleteProfile(profile.id, profile.name),
+      );
+    }
+    row.append(title, id, counts, deleteButton);
     grid.append(row);
 
     const option = document.createElement("option");
@@ -291,46 +350,107 @@ function renderProfiles(profiles) {
   }
 }
 
-const operationTemplates = {
-  upsert_addon: {
-    id: "example-addon",
-    name: "Example Add-on",
-    version: "1.0.0",
-    description: "",
-    isEnabled: true,
-    type: "CUSTOM",
-    runtimeKind: "STREMIO",
-    installSource: "DIRECT_URL",
-    url: "https://example.com/manifest.json",
-  },
-  upsert_playlist: {
-    id: "playlist-id",
-    name: "Playlist name",
-    m3uUrl: "https://provider.example/list.m3u",
-    epgUrl: "https://provider.example/epg.xml",
-    enabled: true,
-    importLiveTv: true,
-    importVod: true,
-    importSeries: true,
-  },
-  set_profile_field: "Orange",
+const operationFields = [
+  "upsert_addon",
+  "delete_addon",
+  "upsert_playlist",
+  "delete_playlist",
+  "set_profile_field",
+];
+
+const operationWarnings = {
+  upsert_addon:
+    "Add-ons sind geteilter Account-Status und werden für alle vorhandenen Profile gespeichert. Die Änderung erzeugt sofort eine neue Cloud-Revision.",
+  delete_addon:
+    "Das Add-on wird aus allen Profilen entfernt, in denen es installiert ist.",
+  upsert_playlist:
+    "Diese Änderung gilt nur für das gewählte Profil und erzeugt sofort eine neue Cloud-Revision.",
+  delete_playlist: "Die Playlist wird nur aus dem gewählten Profil entfernt.",
+  set_profile_field:
+    "Erweiterte Funktion: Der Wert wird als rohes JSON in das gewählte Profilfeld geschrieben.",
 };
 
-function setOperationTemplate() {
+function populateAddonSelect() {
+  const select = byId("delete-addon-select");
+  select.replaceChildren();
+  const addons = state.selectedAccount?.snapshot?.addons || [];
+  if (!addons.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Keine Add-ons vorhanden";
+    select.append(option);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  for (const addon of addons) {
+    const option = document.createElement("option");
+    option.value = addon.id;
+    option.textContent = addon.isEnabled
+      ? addon.name
+      : `${addon.name} (deaktiviert)`;
+    select.append(option);
+  }
+}
+
+function populatePlaylistSelect() {
+  const select = byId("delete-playlist-select");
+  select.replaceChildren();
+  const profileId = byId("mutation-profile").value;
+  const profile = state.selectedAccount?.snapshot?.profiles?.find(
+    (candidate) => candidate.id === profileId,
+  );
+  const playlists = profile?.playlists || [];
+  if (!playlists.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "Keine Playlists vorhanden";
+    select.append(option);
+    select.disabled = true;
+    return;
+  }
+  select.disabled = false;
+  for (const playlist of playlists) {
+    const option = document.createElement("option");
+    option.value = playlist.id;
+    option.textContent = playlist.enabled
+      ? playlist.name
+      : `${playlist.name} (deaktiviert)`;
+    select.append(option);
+  }
+}
+
+function updateOperationFields() {
   const operation = byId("mutation-operation").value;
-  byId("field-controls").classList.toggle(
-    "hidden",
-    operation !== "set_profile_field",
-  );
-  byId("mutation-data").value = JSON.stringify(
-    operationTemplates[operation],
-    null,
-    2,
-  );
-  byId("mutation-warning").textContent =
-    operation === "upsert_addon"
-      ? "Add-ons sind geteilter Account-Status und werden für alle vorhandenen Profile gespeichert. Die Änderung erzeugt sofort eine neue Cloud-Revision."
-      : "Diese Änderung gilt nur für das gewählte Profil und erzeugt sofort eine neue Cloud-Revision.";
+  for (const id of operationFields) {
+    byId(`fields-${id}`).classList.toggle("hidden", id !== operation);
+  }
+  byId("mutation-warning").textContent = operationWarnings[operation] || "";
+  if (operation === "delete_addon") populateAddonSelect();
+  if (operation === "delete_playlist") populatePlaylistSelect();
+  if (operation === "upsert_addon") {
+    byId("addon-id").value = "";
+    byId("addon-name").value = "";
+    byId("addon-url").value = "";
+    byId("addon-version").value = "1.0.0";
+    byId("addon-description").value = "";
+    byId("addon-enabled").checked = true;
+  }
+  if (operation === "upsert_playlist") {
+    byId("playlist-id").value = "";
+    byId("playlist-name").value = "";
+    byId("playlist-m3u").value = "";
+    byId("playlist-epg").value = "";
+    byId("playlist-enabled").checked = true;
+    byId("playlist-live").checked = true;
+    byId("playlist-vod").checked = true;
+    byId("playlist-series").checked = true;
+  }
+  if (operation === "set_profile_field") {
+    byId("mutation-root").value = "profileSettingsById";
+    byId("mutation-field").value = "";
+    byId("mutation-data").value = "";
+  }
 }
 
 function setButtonBusy(button, busy, busyLabel) {
@@ -362,13 +482,37 @@ async function submitMutation(event) {
     const request = {
       operation,
       profileId: byId("mutation-profile").value,
-      data: JSON.parse(byId("mutation-data").value),
       reason: byId("mutation-reason").value,
       expectedRevision: state.selectedAccount.snapshot.revision,
     };
-    if (operation === "set_profile_field") {
+    if (operation === "upsert_addon") {
+      request.data = {
+        id: byId("addon-id").value.trim(),
+        name: byId("addon-name").value.trim(),
+        url: byId("addon-url").value.trim(),
+        version: byId("addon-version").value.trim() || "1.0.0",
+        description: byId("addon-description").value.trim(),
+        isEnabled: byId("addon-enabled").checked,
+      };
+    } else if (operation === "delete_addon") {
+      request.data = { id: byId("delete-addon-select").value };
+    } else if (operation === "upsert_playlist") {
+      request.data = {
+        id: byId("playlist-id").value.trim(),
+        name: byId("playlist-name").value.trim(),
+        m3uUrl: byId("playlist-m3u").value.trim(),
+        epgUrl: byId("playlist-epg").value.trim(),
+        enabled: byId("playlist-enabled").checked,
+        importLiveTv: byId("playlist-live").checked,
+        importVod: byId("playlist-vod").checked,
+        importSeries: byId("playlist-series").checked,
+      };
+    } else if (operation === "delete_playlist") {
+      request.data = { id: byId("delete-playlist-select").value };
+    } else if (operation === "set_profile_field") {
       request.rootKey = byId("mutation-root").value;
       request.field = byId("mutation-field").value;
+      request.data = JSON.parse(byId("mutation-data").value || "null");
     }
     await api(
       `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/snapshot`,
@@ -459,8 +603,61 @@ byId("refresh-button").addEventListener("click", (event) => {
     .finally(() => setButtonBusy(button, false));
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
-byId("mutation-operation").addEventListener("change", setOperationTemplate);
+byId("mutation-operation").addEventListener("change", updateOperationFields);
+byId("mutation-profile").addEventListener("change", () => {
+  if (byId("mutation-operation").value === "delete_playlist")
+    populatePlaylistSelect();
+});
 byId("mutation-form").addEventListener("submit", submitMutation);
+byId("revoke-sessions-button").addEventListener("click", async (event) => {
+  const reason = promptReason(
+    "Warum sollen alle Sitzungen abgemeldet werden?",
+  );
+  if (!reason) return;
+  const button = event.currentTarget;
+  setButtonBusy(button, true, "Wird abgemeldet…");
+  try {
+    const result = await api(
+      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/revoke-all`,
+      { method: "POST", body: JSON.stringify({ reason }) },
+    );
+    showToast(`${result.revoked_count} Sitzung(en) abgemeldet.`);
+    await openAccount(state.selectedAccount.account.id);
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
+  }
+});
+byId("delete-account-button").addEventListener("click", async (event) => {
+  const account = state.selectedAccount.account;
+  const typed = window.prompt(
+    `Zum Bestätigen bitte die E-Mail-Adresse "${account.email}" eingeben:`,
+  );
+  if (typed !== account.email) {
+    if (typed !== null)
+      showToast("E-Mail-Adresse stimmt nicht überein.", true);
+    return;
+  }
+  const reason = promptReason(
+    "Warum soll dieses Konto endgültig gelöscht werden?",
+  );
+  if (!reason) return;
+  const button = event.currentTarget;
+  setButtonBusy(button, true, "Wird gelöscht…");
+  try {
+    await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, {
+      method: "DELETE",
+      body: JSON.stringify({ reason }),
+    });
+    showToast(`Konto ${account.email} wurde gelöscht.`);
+    selectView("accounts");
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
+  }
+});
 byId("copy-payload").addEventListener("click", async () => {
   await navigator.clipboard.writeText(byId("payload-json").textContent);
   showToast("Maskiertes JSON kopiert.");

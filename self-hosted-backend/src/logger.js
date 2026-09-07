@@ -21,6 +21,11 @@ const routeActions = new Map([
   ["GET /admin-api/accounts", "Admin account list loaded"],
   ["GET /admin-api/accounts/:accountId", "Admin account loaded"],
   ["PATCH /admin-api/accounts/:accountId/snapshot", "Admin snapshot updated"],
+  [
+    "POST /admin-api/accounts/:accountId/sessions/revoke-all",
+    "Admin revoked account sessions",
+  ],
+  ["DELETE /admin-api/accounts/:accountId", "Admin deleted account"],
   ["GET /admin-api/audits", "Admin audit loaded"],
 ]);
 
