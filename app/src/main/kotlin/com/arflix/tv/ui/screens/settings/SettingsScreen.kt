@@ -11114,6 +11114,7 @@ private fun nextTrackingMode(
     state: SettingsUiState
 ): com.arflix.tv.data.repository.sync.TrackingReadMode {
     val choices = buildList {
+        add(com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO)
         if (state.isTraktAuthenticated && state.isSimklConnected) {
             add(com.arflix.tv.data.repository.sync.TrackingReadMode.BOTH)
         }
@@ -11121,7 +11122,6 @@ private fun nextTrackingMode(
         if (state.isSimklConnected) add(com.arflix.tv.data.repository.sync.TrackingReadMode.SIMKL)
         if (state.isMdbListConnected) add(com.arflix.tv.data.repository.sync.TrackingReadMode.MDBLIST)
     }.distinct()
-    if (choices.isEmpty()) return com.arflix.tv.data.repository.sync.TrackingReadMode.AUTO
     val index = choices.indexOf(current)
     return choices[(index + 1).mod(choices.size)]
 }

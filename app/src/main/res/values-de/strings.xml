@@ -1493,5 +1493,5 @@
     <string name="tracking_update_simkl_desc">Fortschritt und Gesehen-Änderungen an Simkl senden.</string>
     <string name="tracking_update_simkl_connect">Verbinde Simkl, um dies zu aktivieren.</string>
     <string name="tracking_data_routing">DATENQUELLEN</string>
-    <string name="tracking_mode_automatic">Automatisch</string>
+    <string name="tracking_mode_automatic">Cloud</string>
 </resources>

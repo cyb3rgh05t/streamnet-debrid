@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.010] - 2026-09-07
+
+### Trakt, Merkliste und Cloud-Routing
+
+- Die Routing-Option „Automatisch“ heißt nun „Cloud“, damit klar ist, dass die App-eigene Merkliste, Wiedergabefortschritte und Gesehen-Markierungen lokal gespeichert und über StreamNet Cloud synchronisiert werden.
+- Die Merkliste bleibt im Cloud-Modus die StreamNet-Merkliste; verbundene Dienste wie Trakt ersetzen sie nicht mehr beim Öffnen der Watchlist durch einen automatischen Pull.
+- Die Quellen für Merkliste, Weiter ansehen und Gesehen-Verlauf lassen sich wieder zuverlässig zwischen Cloud, Trakt, Simkl, Trakt + Simkl und MDBList umschalten, abhängig von den verbundenen Diensten.
+- Trakt-, Simkl- und Library-Schaltflächen in der Merkliste verwenden nun den aktiven App-Akzent statt fester Anbieterfarben oder weißer Fokusrahmen.
+
 ## [2.3.009] - 2026-09-07
 
 ### Gesehen-Status und Cloud-Synchronisation

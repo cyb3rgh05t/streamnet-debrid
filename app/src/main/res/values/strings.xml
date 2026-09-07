@@ -1567,7 +1567,7 @@
     <string name="tracking_update_simkl_desc">Send progress and watched changes to Simkl.</string>
     <string name="tracking_update_simkl_connect">Connect Simkl to enable this.</string>
     <string name="tracking_data_routing">Data routing</string>
-    <string name="tracking_mode_automatic">Automatic</string>
+    <string name="tracking_mode_automatic">Cloud</string>
 
 </resources>
 

@@ -773,19 +773,13 @@ private fun ProviderTabs(
         horizontalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         itemsIndexed(providers, key = { _, provider -> provider.id }) { index, provider ->
-            val accent = when {
-                provider.isHomeServer -> providerAccent(provider.homeServerKind)
-                provider.label == "Trakt" -> Color(0xFFED1C24)
-                provider.label == "Simkl" -> Color(0xFF00A7B5)
-                else -> uiAccent
-            }
             SelectablePill(
                 label = provider.label,
                 selected = index == selectedIndex,
                 focused = index == focusedIndex,
-                accent = accent,
+                accent = uiAccent,
                 modifier = Modifier.clickable(enabled = isMobile) { onSelect(index) },
-                leading = if (provider.isWatchlist) null else accent,
+                leading = if (provider.isWatchlist) null else uiAccent,
                 compact = true
             )
         }
@@ -959,6 +953,7 @@ private fun LibrarySidebar(
     focusedIndex: Int,
     onSelect: (Int, HomeServerCatalogCandidate) -> Unit
 ) {
+    val uiAccent = resolveAccentColor(fallback = Pink)
     Column(
         modifier = Modifier
             .width(184.dp)
@@ -993,8 +988,8 @@ private fun LibrarySidebar(
                         .height(44.dp)
                         .background(
                             when {
-                                selected -> Color.White.copy(alpha = if (focused) 0.14f else 0.1f)
-                                focused -> Color.White.copy(alpha = 0.06f)
+                                selected -> uiAccent.copy(alpha = if (focused) 0.18f else 0.12f)
+                                focused -> uiAccent.copy(alpha = 0.08f)
                                 else -> Color.Transparent
                             },
                             RoundedCornerShape(6.dp)
@@ -1002,8 +997,8 @@ private fun LibrarySidebar(
                         .border(
                             if (focused) 2.dp else 1.dp,
                             when {
-                                focused -> Color.White
-                                selected -> Color.White.copy(alpha = 0.3f)
+                                focused -> uiAccent
+                                selected -> uiAccent.copy(alpha = 0.45f)
                                 else -> Color.Transparent
                             },
                             RoundedCornerShape(6.dp)
@@ -1394,13 +1389,6 @@ private fun SelectablePill(
             )
         }
     }
-}
-
-private fun providerAccent(provider: HomeServerKind?): Color = when (provider) {
-    HomeServerKind.PLEX -> Color(0xFFE5A00D)
-    HomeServerKind.JELLYFIN -> Color(0xFF9B5DE5)
-    HomeServerKind.EMBY -> Color(0xFF52B54B)
-    else -> Color.White
 }
 
 @Composable

@@ -11,6 +11,34 @@ class SyncProviderStoreStateTest {
     }
 
     @Test
+    fun `automatic watchlist mode stays local automatic when trakt is connected`() {
+        assertThat(
+            resolvedTrackingReadMode(
+                TrackingFeature.WATCHLIST,
+                TrackingReadMode.AUTO,
+                hasTrakt = true,
+                hasSimkl = false,
+                hasMdbList = false,
+                preferredProvider = SyncProvider.TRAKT
+            )
+        ).isEqualTo(TrackingReadMode.AUTO)
+    }
+
+    @Test
+    fun `automatic watched mode still resolves to connected tracker`() {
+        assertThat(
+            resolvedTrackingReadMode(
+                TrackingFeature.WATCHED,
+                TrackingReadMode.AUTO,
+                hasTrakt = true,
+                hasSimkl = false,
+                hasMdbList = false,
+                preferredProvider = SyncProvider.TRAKT
+            )
+        ).isEqualTo(TrackingReadMode.TRAKT)
+    }
+
+    @Test
     fun `legacy cloud selection does not overwrite a local choice`() {
         assertThat(shouldApplyCloudTrackingSelection(null, null, hasLocalSelection = true)).isFalse()
         assertThat(shouldApplyCloudTrackingSelection(null, null, hasLocalSelection = false)).isTrue()
