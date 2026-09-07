@@ -14,68 +14,20 @@ nächste Dashboard-Anfrage zurück zur Anmeldung.
 Nach acht fehlgeschlagenen Anmeldeversuchen von derselben IP-Adresse wird die
 Anmeldung für den Rest eines 15-Minuten-Zeitfensters gesperrt.
 
-## Aktive Sessions
+## Oberfläche
 
-### Woher kommt die Zahl?
+Das Dashboard ist dunkel gehalten und nutzt durchgehend den StreamNet-Gold-Akzent
+(`#e5a209`). Beim Laden von Daten läuft oben ein schmaler Fortschrittsbalken,
+Buttons zeigen während einer laufenden Anfrage einen kleinen Spinner und sind
+währenddessen gesperrt.
 
-Die Kennzahl wird aus der PostgreSQL-Tabelle `account_sessions` berechnet. Das
-Dashboard zählt alle Zeilen, für die gleichzeitig gilt:
+Alle Dropdown-Felder (Profil, Aktion, Bereich, Add-on-/Playlist-Auswahl) sind
+als eigene, akzentfarbene Komponenten umgesetzt statt als native
+Browser-Auswahlfelder — Öffnen/Schließen per Klick, Pfeiltasten, Enter und
+Escape funktionieren wie gewohnt.
 
-- `revoked_at` ist leer: Die Session wurde nicht widerrufen.
-- `expires_at` liegt in der Zukunft: Der Refresh-Token ist noch gültig.
-
-In der Übersicht ist dies die Summe für alle StreamNet-Accounts. In den
-Account-Details ist es die Summe für den ausgewählten Account.
-
-### Was ist eine Session technisch?
-
-Eine Session entspricht einer gültigen StreamNet-Refresh-Anmeldung. Bei einer
-Anmeldung oder Account-Erstellung speichert das Backend einen gehashten
-Refresh-Token in `account_sessions`. Der Klartext-Token wird nicht in der
-Datenbank gespeichert.
-
-Das kurzlebige Access-Token ist standardmäßig 15 Minuten gültig. Wenn die App
-es mit dem Refresh-Token erneuert, widerruft das Backend die bisherige
-Session-Zeile und legt eine neue gültige Zeile mit einem neuen Refresh-Token an.
-Die Zahl bleibt bei einer normalen Token-Erneuerung daher üblicherweise gleich.
-
-Die Refresh-Laufzeit beträgt standardmäßig 30 Tage. Sie kann auf dem Server mit
-`REFRESH_TOKEN_TTL_DAYS` geändert werden.
-
-### Was bedeutet die Zahl praktisch?
-
-`1 aktive Session` bedeutet: Es existiert genau eine noch verwendbare
-Refresh-Anmeldung, mit der dieser Account neue Access-Tokens erhalten kann.
-
-Die Kennzahl bedeutet ausdrücklich nicht:
-
-- dass die App gerade geöffnet ist;
-- dass das Gerät gerade online ist;
-- dass gerade ein Stream läuft;
-- dass exakt so viele physische Geräte existieren;
-- dass es sich um angemeldete Administratoren handelt.
-
-Mehrere Geräte oder mehrere getrennte Anmeldungen können mehrere aktive
-Sessions erzeugen. Auch ein neu installiertes oder zurückgesetztes Gerät kann
-eine weitere Session erzeugen, wenn die alte Session serverseitig noch gültig
-ist.
-
-Die aktuelle App-Abmeldung löscht die Tokens auf dem Gerät, widerruft die
-zugehörige Datenbank-Session aber nicht beim Backend. Auch eine Deinstallation
-informiert den Server nicht. Solche nicht mehr verwendeten Sessions werden
-daher weiterhin gezählt, bis sie ablaufen oder der Account gelöscht wird. Die
-Zahl kann deshalb höher als die Anzahl tatsächlich verwendeter Geräte sein.
-
-Das Admin-Dashboard bietet derzeit weder eine Liste einzelner Sessions noch
-eine Schaltfläche zum Widerrufen. Die Kennzahl ist ein Anmeldeindikator, keine
-zuverlässige Echtzeit-Anwesenheitsanzeige.
-
-Nicht in „Aktive Sessions“ enthalten sind:
-
-- die 30-minütige Admin-Sitzung im Browser;
-- kurzlebige Access-JWTs;
-- offene oder abgelaufene TV-Pairing-Vorgänge;
-- Discord-Autorisierungssitzungen.
+Zähler auf den Profilkarten (Add-ons, Playlists, Kataloge, Merkliste) werden
+als kleine Badges dargestellt.
 
 ## Übersichtskennzahlen
 
@@ -95,14 +47,15 @@ kann die Zahl kleiner als „Accounts“ sein.
 
 ### Kennzahl „Aktive Sessions“
 
-Summe aller noch gültigen und nicht widerrufenen Refresh-Anmeldungen. Details
-und Einschränkungen stehen im Abschnitt „Aktive Sessions“.
+Summe aller noch gültigen und nicht widerrufenen Refresh-Anmeldungen über alle
+Accounts. Details und Einschränkungen stehen im Abschnitt „Aktive Sessions“.
 
 ### Events · 24 h
 
 Anzahl aller Einträge in `app_usage_events`, die in den letzten 24 Stunden
-angelegt wurden. Die App sendet derzeit insbesondere das Ereignis `app_open`.
-Das ist eine Ereignisanzahl und keine Anzahl eindeutiger Nutzer oder Geräte.
+angelegt wurden. Die App sendet unter anderem das Ereignis `app_open` sowie
+Gerätemetadaten (`platform`, `device_type`). Das ist eine Ereignisanzahl und
+keine Anzahl eindeutiger Nutzer oder Geräte.
 
 ### Verlaufseinträge
 
@@ -144,12 +97,12 @@ Backend geladen. Ein Klick auf eine Tabellenzeile öffnet die Account-Details.
 - **Snapshot aktualisiert:** Zeitpunkt der letzten Cloud-Snapshot-Änderung.
 - **Erstellt:** Erstellungszeitpunkt des Accounts.
 
-Die frühere Kennzahl „Watch State“ wurde entfernt, weil sie strukturell immer
-0 war: Die App schreibt den Gesehen-Status ausschließlich in den
-Cloud-Snapshot (siehe Profilzähler und Payload), die separate
-`watch_state`-Tabelle wird nur von einem inzwischen deaktivierten
-Legacy-Sync-Pfad befüllt (aktiv nur, solange `CLOUD_SYNC_ENABLED` in der App
-ausgeschaltet ist).
+Es gibt bewusst keine Kennzahl „Watch State“: Die App schreibt den
+Gesehen-Status ausschließlich in den Cloud-Snapshot (siehe Profilzähler und
+Payload). Die separate `watch_state`-Tabelle wird nur von einem inzwischen
+deaktivierten Legacy-Sync-Pfad befüllt (`TraktSyncService.executeSupabaseCall`
+wirft sofort, solange `CLOUD_SYNC_ENABLED` in der App aktiv ist) und bleibt
+deshalb strukturell immer bei 0 — eine Anzeige wäre irreführend.
 
 ### Geräte
 
@@ -158,20 +111,45 @@ Gerätetypen (Mobile, Tablet, TV, Web) zuletzt App-Nutzungsereignisse für
 diesen Account eingegangen sind, inklusive Zeitpunkt des letzten Ereignisses.
 Grundlage ist die Tabelle `app_usage_events` (Feld `device_type`), die die App
 bei Ereignissen wie `app_open` mitschickt. Das ist ein Nutzungsindikator, kein
-Beweis für eine aktuell laufende Sitzung auf diesem Gerät.
+Beweis für eine aktuell laufende Sitzung auf diesem Gerät. Hat ein Account
+keine solchen Ereignisse, wird die Zeile ausgeblendet.
+
+### Sitzungen und Konto (Danger Zone)
+
+- **Alle Sitzungen abmelden:** Widerruft sofort alle noch gültigen
+  Refresh-Sessions dieses Accounts. Betroffene Geräte müssen sich beim
+  nächsten Zugriff erneut anmelden. Erfordert einen Änderungsgrund (Eingabe
+  per Dialog). Einzelne Sitzungen/Geräte bleiben weiterhin nicht einzeln
+  sichtbar oder gezielt widerrufbar — nur „alle“ ist möglich.
+- **Konto löschen:** Entfernt den Account unwiderruflich inklusive Snapshot,
+  Sessions, Watch History/State und Nutzungsereignissen (derselbe Codepfad wie
+  die Selbstlöschung in der App, siehe `deleteAccountData`). Zur Bestätigung
+  muss die exakte E-Mail-Adresse des Accounts eingegeben werden, danach ein
+  Änderungsgrund. Nicht rückgängig zu machen.
+
+Beide Aktionen schreiben einen Audit-Eintrag (`revoke_sessions` bzw.
+`delete_account`), auch ohne begleitende Snapshot-Revisionsänderung.
 
 ### Profile
 
-Für jedes Profil werden Name, interne Profil-ID und folgende Zähler angezeigt:
+Für jedes Profil werden Name, interne Profil-ID und folgende Zähler als Badges
+angezeigt:
 
 - **Add-ons:** Add-on-Einträge, die dem Profil im Snapshot zugeordnet sind.
 - **Playlists:** IPTV-Playlists dieses Profils.
 - **Kataloge:** gespeicherte Katalogkonfigurationen dieses Profils.
 - **Merkliste:** Einträge der profilbezogenen Watchlist.
 
-Die angezeigte Snapshot-Revision ist die Grundlage für sichere Änderungen. Sie
+Jede Profilkarte hat einen Button „Profil löschen“ (siehe unten). Die
+angezeigte Snapshot-Revision ist die Grundlage für sichere Änderungen. Sie
 verhindert, dass das Dashboard unbemerkt einen neueren Sync eines Geräts
 überschreibt.
+
+**Profil löschen:** Entfernt das Profil sowie sämtliche profilgebundenen Daten
+(Einstellungen, IPTV-Konfiguration, Kataloge, Add-on-Zuordnung, Merkliste) aus
+dem Snapshot. Erfordert Bestätigung per Dialog und einen Änderungsgrund. Das
+letzte verbleibende Profil eines Accounts kann nicht gelöscht werden (Button
+ist dann deaktiviert).
 
 ### Maskierter Snapshot
 
@@ -186,28 +164,78 @@ keine unmaskierten Geheimnisse an.
 
 ## Payload ändern
 
-Änderungen laufen über einzelne Operationen (Add-on, Playlist, Profilfeld,
-Löschen) oder über den erweiterten JSON-Editor für die gesamte Payload. Es
-gibt weiterhin keine direkte SQL-Ausführung.
+Änderungen laufen entweder über einzelne, formularbasierte Operationen
+(Add-on, Playlist, Profilfeld) oder über den erweiterten JSON-Editor für die
+gesamte Payload. Es gibt weiterhin keine direkte SQL-Ausführung.
 
 Jede Änderung benötigt:
 
 1. ein vorhandenes Zielprofil (außer beim erweiterten Payload-Editor);
-2. gültiges JSON im Datenfeld;
+2. die entsprechenden Formularfelder bzw. gültiges JSON;
 3. einen Änderungsgrund mit 3 bis 500 Zeichen;
 4. die beim Öffnen geladene Snapshot-Revision.
 
 Bei Erfolg wird die Revision um eins erhöht, `source` auf `admin` gesetzt und
 ein Audit-Eintrag geschrieben. Alle Schritte laufen in einer gemeinsamen
-PostgreSQL-Transaktion.
+PostgreSQL-Transaktion. Hat ein Gerät oder ein anderer Admin den Snapshot seit
+dem Öffnen geändert, stimmt die erwartete Revision nicht mehr. Das Backend
+antwortet dann mit einem Konflikt, nimmt keine Änderung vor und das Dashboard
+lädt den Account neu.
 
-### Formularfelder statt JSON
+### Add-on hinzufügen / ersetzen
 
-Add-on und Playlist werden über normale Formularfelder eingegeben (ID, Name,
-URL, Version/Beschreibung bzw. M3U-/EPG-URL und Aktivierungs-Kästchen). Ein
-JSON-Editor ist dafür nicht mehr nötig. Nur die Operation „Profilfeld setzen“
-bleibt als erweiterte Funktion mit einem rohen JSON-Wertfeld bestehen, weil sie
-absichtlich beliebige Profilfelder unterstützt.
+Formularfelder statt JSON: Add-on-ID, Name, Manifest-URL, Version (Standard
+`1.0.0`), optionale Beschreibung, Aktiviert-Kästchen. Andere technische Felder
+(`type`, `runtimeKind`, `installSource`, `isInstalled`) werden vom Backend mit
+sinnvollen Standardwerten belegt (`CUSTOM` / `STREMIO` / `DIRECT_URL` /
+`true`).
+
+Obwohl im Formular ein Profil gewählt wird, sind Add-ons im Android-Vertrag
+**accountweit geteilt**. Das Dashboard schreibt das Add-on deshalb in alle
+vorhandenen Profile dieses Accounts. Eine vorhandene ID wird komplett ersetzt,
+nicht feldweise zusammengeführt.
+
+### Add-on entfernen
+
+Wählt ein vorhandenes Add-on aus einer Auswahlliste (keine manuelle
+ID-Eingabe). Entfernt es aus allen Profilen, in denen es installiert ist —
+konsistent mit dem geteilten Add-on-Status oben.
+
+### Playlist hinzufügen / ersetzen
+
+Formularfelder: Playlist-ID, Name, M3U-URL (Pflichtfeld), optionale EPG-URL,
+Kästchen für Aktiviert / Live-TV importieren / Filme importieren / Serien
+importieren. Gilt **nur für das ausgewählte Profil**. Eine vorhandene
+Playlist mit derselben ID wird ersetzt, andernfalls angehängt. Die alten
+Kompatibilitätsfelder `m3uUrl`/`epgUrl` des Profilzustands werden nur gefüllt,
+wenn sie dort bisher leer sind.
+
+### Playlist entfernen
+
+Wählt eine vorhandene Playlist des ausgewählten Profils aus einer
+Auswahlliste. Zeigen die Kompatibilitätsfelder `m3uUrl`/`epgUrl` des Profils
+auf die gelöschte Playlist, werden sie geleert.
+
+### Profilfeld setzen (erweitert)
+
+Setzt genau ein Feld für das ausgewählte Profil. Erlaubte Bereiche sind:
+
+- `profileSettingsById` für allgemeine Profileinstellungen;
+- `iptvByProfile` für IPTV-Einstellungen.
+
+Der Feldname muss dem tatsächlichen Android-Cloudvertrag entsprechen. Der Wert
+im JSON-Feld darf ein String, eine Zahl, ein Boolean, `null`, ein Array oder ein
+Objekt sein, zum Beispiel `"Orange"`, `true` oder `4`.
+
+Das Feld `playlists` ist über diese Operation gesperrt; dafür muss „Playlist
+hinzufügen / ersetzen“ verwendet werden. Gefährliche JavaScript-
+Eigenschaftsnamen (`__proto__`, `constructor`, `prototype`) werden abgewiesen.
+Der gesamte übermittelte Datenblock ist auf 64 KiB begrenzt.
+
+Diese Funktion prüft nicht, ob ein frei angegebener Feldname von der aktuellen
+Android-Version tatsächlich verstanden wird. Ein Tippfehler kann daher ein
+wirkungsloses zusätzliches Feld erzeugen. Vor dem Schreiben sollte der genaue
+Feldname aus dem Cloudvertrag geprüft werden.
 
 ### Gesamte Payload bearbeiten (erweitert)
 
@@ -225,133 +253,6 @@ Reihenfolge einer Liste beim Bearbeiten verändert, kann ein maskierter Wert
 dem falschen Eintrag zugeordnet werden. Die Payload darf maximal 512 KiB groß
 sein und muss mindestens ein Profil enthalten.
 
-### Add-on hinzufügen / ersetzen
-
-Die Operation `upsert_addon` sucht anhand von `id` nach einem vorhandenen
-Add-on. Bei gleicher ID wird es vollständig ersetzt, andernfalls hinzugefügt.
-
-Obwohl im Formular ein Profil gewählt wird, sind Add-ons im Android-Vertrag
-accountweit geteilt. Das Dashboard schreibt das Add-on deshalb in alle
-vorhandenen Profile.
-
-Wichtige Felder:
-
-- `id`: stabile eindeutige Kennung, maximal 200 Zeichen;
-- `name`: sichtbarer Name, maximal 200 Zeichen;
-- `version`: Versionsangabe, standardmäßig `1.0.0`;
-- `description`: optionale Beschreibung;
-- `isEnabled`: `false` deaktiviert das Add-on, sonst wird es aktiviert;
-- `type`: standardmäßig `CUSTOM`;
-- `runtimeKind`: standardmäßig `STREMIO`;
-- `installSource`: standardmäßig `DIRECT_URL`;
-- `url`: Manifest- oder Installationsadresse, sofern der Add-on-Typ sie nutzt.
-
-`isInstalled` wird vom Backend immer auf `true` gesetzt. Vorhandene Einträge
-mit derselben ID werden nicht feldweise zusammengeführt, sondern durch das
-übermittelte Objekt ersetzt.
-
-### Playlist hinzufügen / ersetzen
-
-Die Operation `upsert_playlist` gilt nur für das ausgewählte Profil. Eine
-vorhandene Playlist mit derselben `id` wird ersetzt, andernfalls wird sie
-angehängt.
-
-Wichtige Felder:
-
-- `id`: stabile eindeutige Kennung, maximal 200 Zeichen;
-- `name`: sichtbarer Name, maximal 200 Zeichen;
-- `m3uUrl`: Pflichtfeld mit der Playlist-Adresse;
-- `epgUrl`: optionale primäre EPG-Adresse;
-- `epgUrls`: optionale Liste mehrerer EPG-Adressen;
-- `enabled`: `false` deaktiviert die Playlist;
-- `importLiveTv`: `false` deaktiviert Live-TV-Import;
-- `importVod`: `false` deaktiviert Filmimport;
-- `importSeries`: `false` deaktiviert Serienimport.
-
-Fehlt `epgUrls`, wird bei vorhandener `epgUrl` automatisch eine Liste mit
-dieser Adresse erzeugt. Die alten Kompatibilitätsfelder `m3uUrl` und `epgUrl`
-des Profilzustands werden nur gefüllt, wenn sie dort bisher leer sind.
-
-### Profilfeld setzen
-
-Die Operation `set_profile_field` setzt genau ein Feld für das ausgewählte
-Profil. Erlaubte Bereiche sind:
-
-- `profileSettingsById` für allgemeine Profileinstellungen;
-- `iptvByProfile` für IPTV-Einstellungen.
-
-Der Feldname muss dem tatsächlichen Android-Cloudvertrag entsprechen. Der Wert
-im JSON-Feld darf ein String, eine Zahl, ein Boolean, `null`, ein Array oder ein
-Objekt sein. Beispiele:
-
-```json
-"Orange"
-```
-
-```json
-true
-```
-
-```json
-4
-```
-
-Das Feld `playlists` ist über diese allgemeine Operation gesperrt; dafür muss
-„Playlist hinzufügen / ersetzen“ verwendet werden. Gefährliche JavaScript-
-Eigenschaftsnamen werden abgewiesen. Der gesamte übermittelte Datenblock ist
-auf 64 KiB begrenzt.
-
-Diese Funktion prüft nicht, ob ein frei angegebener Feldname von der aktuellen
-Android-Version tatsächlich verstanden wird. Ein Tippfehler kann daher ein
-wirkungsloses zusätzliches Feld erzeugen. Vor dem Schreiben sollte der genaue
-Feldname aus dem Cloudvertrag geprüft werden.
-
-### Add-on entfernen
-
-Die Operation `delete_addon` entfernt ein Add-on anhand seiner ID aus allen
-Profilen, in denen es installiert ist (Add-ons sind geteilter Account-Status).
-Das gewünschte Add-on wird aus einer Auswahlliste ausgewählt, keine ID-Eingabe
-nötig.
-
-### Playlist entfernen
-
-Die Operation `delete_playlist` entfernt eine Playlist anhand ihrer ID nur aus
-dem ausgewählten Profil. Zeigen die alten Kompatibilitätsfelder `m3uUrl`/
-`epgUrl` des Profils auf die gelöschte Playlist, werden sie geleert.
-
-### Profil löschen
-
-Auf jeder Profilkarte steht ein Button „Profil löschen“ zur Verfügung. Er
-entfernt das Profil sowie sämtliche profilgebundenen Daten (Einstellungen,
-IPTV-Konfiguration, Kataloge, Add-on-Zuordnung, Merkliste) aus dem Snapshot.
-Das letzte verbleibende Profil eines Accounts kann nicht gelöscht werden.
-
-## Sitzungen und Konto
-
-### Alle Sitzungen abmelden
-
-Der Button „Alle Sitzungen abmelden“ in der Account-Detailansicht widerruft
-alle noch gültigen Refresh-Sessions dieses Accounts sofort. Betroffene Geräte
-müssen sich beim nächsten Zugriff erneut anmelden. Der Admin muss vorher einen
-Änderungsgrund angeben; einzelne Sitzungen/Geräte bleiben weiterhin nicht
-einzeln sichtbar oder gezielt widerrufbar.
-
-### Konto löschen
-
-Der Button „Konto löschen“ entfernt den Account unwiderruflich inklusive
-Snapshot, Sessions, Watch History/State und Nutzungsereignissen (derselbe Pfad
-wie die Selbstlöschung in der App). Zur Bestätigung muss die exakte
-E-Mail-Adresse des Accounts eingegeben werden, danach ein Änderungsgrund. Diese
-Aktion kann nicht rückgängig gemacht werden.
-
-### Revisionskonflikt
-
-Hat ein Gerät oder ein anderer Admin den Snapshot seit dem Öffnen geändert,
-stimmt die erwartete Revision nicht mehr. Das Backend antwortet dann mit einem
-Konflikt, nimmt keine Änderung vor und das Dashboard lädt den Account neu.
-Danach müssen die aktuellen Daten geprüft und die Änderung bewusst erneut
-eingegeben werden.
-
 ## Audit-Protokoll
 
 Das Audit-Protokoll zeigt standardmäßig die letzten 50 Änderungen, neueste
@@ -359,15 +260,18 @@ zuerst. Pro Eintrag werden angezeigt:
 
 - Zeitpunkt;
 - betroffener Account;
-- Operation;
-- Profil-ID;
+- Operation (z. B. `upsert_addon`, `delete_playlist`, `delete_profile`,
+  `edit_payload`, `revoke_sessions`, `delete_account`);
+- Profil-ID (leer bei accountweiten Aktionen);
 - Revision vor und nach der Änderung;
 - verpflichtender Änderungsgrund.
 
 Zusätzlich speichert das Backend intern Admin-ID, ausgewählte Detailangaben,
 Anfrage-IP und User-Agent. Ein Audit-Eintrag wird in derselben Transaktion wie
-die Snapshot-Änderung erzeugt. Scheitert die Änderung, gibt es weder eine neue
-Revision noch einen erfolgreichen Audit-Eintrag.
+die zugehörige Änderung erzeugt. Scheitert die Änderung, gibt es weder eine
+neue Revision noch einen erfolgreichen Audit-Eintrag. Wird ein Account
+gelöscht, verweisen seine (und alle historischen) Audit-Einträge danach ohne
+Account-Bezug auf „Gelöscht“.
 
 ## Was derzeit nicht möglich ist
 
@@ -383,9 +287,10 @@ Das Dashboard kann derzeit nicht:
   Datenverlust und Injection wäre; für Ad-hoc-Abfragen direkt per `psql` auf
   dem Server arbeiten;
 - unmaskierte Zugangsdaten anzeigen — bewusst nicht eingebaut, damit eine
-  kompromittierte Admin-Sitzung oder ein Screenshot keine Playlist-/API-Zugangsdaten
-  offenlegt;
-- eindeutig anzeigen, welche Nutzer gerade online sind.
+  kompromittierte Admin-Sitzung oder ein Screenshot keine
+  Playlist-/API-Zugangsdaten offenlegt;
+- eindeutig anzeigen, welche Nutzer gerade online sind (die Geräte-Badges sind
+  ein Nutzungsindikator, keine Echtzeit-Anwesenheitsanzeige).
 
 ## Passwort-Reset für StreamNet-Cloud-Accounts (offener Punkt)
 
@@ -409,3 +314,8 @@ Admin-Eingriff auf Datenbankebene behoben werden (kein Dashboard-Feature).
 - Danach auf einem betroffenen Gerät einen Cloud-Pull beziehungsweise normalen
   App-Sync abwarten und die Wirkung kontrollieren.
 - Playlist- und Add-on-URLs trotz Maskierung als Geheimnisse behandeln.
+- Beim erweiterten Payload-Editor: `[REDACTED]`-Werte niemals durch echten
+  Klartext ersetzen, wenn keine echte Änderung beabsichtigt ist, und die
+  Reihenfolge bestehender Listen nicht verändern.
+- „Konto löschen“ und „Profil löschen“ sind endgültig — vor der Ausführung
+  Account/Profil-Zugehörigkeit doppelt prüfen.
