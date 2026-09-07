@@ -206,6 +206,8 @@ test("edits the whole payload while preserving redacted secret values", () => {
   );
 
   assert.equal(result.addons[0].isEnabled, true);
+  assert.equal(result.addonsByProfile.kids[0].isEnabled, true);
+  assert.equal(result.addonsByProfile["living-room"][0].isEnabled, true);
   assert.equal(result.addonsUpdatedAt, 5678);
   assert.equal(result.profiles[1].name, "Kids Room");
   assert.equal(

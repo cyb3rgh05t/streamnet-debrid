@@ -106,6 +106,18 @@ function stampEditedPayloadTimestamps(current, edited, now) {
   stampEditedProfileFields(current, edited, "iptvByProfile", "i", now);
 }
 
+function mirrorEditedTopLevelAddonsToProfiles(current, edited) {
+  if (jsonEqual(current.addons, edited.addons) || !Array.isArray(edited.addons)) {
+    return;
+  }
+  const sharedAddons = cloneJson(edited.addons, "Payload addons");
+  const ids = profileIds(edited);
+  edited.addonsByProfile = {};
+  for (const profileId of ids) {
+    edited.addonsByProfile[profileId] = cloneJson(sharedAddons, "Payload addons");
+  }
+}
+
 function normalizeAddon(data) {
   if (!isPlainObject(data)) throw new Error("Addon data must be an object");
   const addon = cloneJson(data, "Addon data");
@@ -222,6 +234,7 @@ export function applyAdminSnapshotMutation(
       throw new Error("Payload must include at least one profile");
     }
     const merged = mergeRedactedPreservingSecrets(payload, edited);
+    mirrorEditedTopLevelAddonsToProfiles(payload, merged);
     stampEditedPayloadTimestamps(payload, merged, now);
     merged.updatedAt = now;
     return merged;
