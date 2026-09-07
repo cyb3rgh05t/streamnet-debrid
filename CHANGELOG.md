@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+### Offline-Downloads
+
+- Der leere Downloads-Screen nutzt nun wie die Bibliothek eine freie Center-Message ohne gerahmte Box.
+
 ## [2.4.001] - 2026-09-07
 
 ### Offline-Downloads

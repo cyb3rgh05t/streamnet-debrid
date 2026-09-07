@@ -306,9 +306,7 @@ private fun EmptyOfflineDownloads(accent: Color) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(190.dp)
-            .background(Color.White.copy(alpha = 0.045f), RoundedCornerShape(18.dp))
-            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(18.dp)),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
