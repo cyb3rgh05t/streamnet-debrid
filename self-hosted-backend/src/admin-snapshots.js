@@ -68,6 +68,12 @@ function objectAt(payload, rootKey, profileId) {
   return payload[rootKey][profileId];
 }
 
+function stampFieldUpdatedAt(payload, rootKey, profileId, field, now) {
+  if (!isPlainObject(payload.fieldUpdatedAt)) payload.fieldUpdatedAt = {};
+  const prefix = rootKey === "iptvByProfile" ? "i" : "p";
+  payload.fieldUpdatedAt[`${prefix}:${profileId}:${field}`] = now;
+}
+
 function normalizeAddon(data) {
   if (!isPlainObject(data)) throw new Error("Addon data must be an object");
   const addon = cloneJson(data, "Addon data");
@@ -248,6 +254,7 @@ export function applyAdminSnapshotMutation(
     const clonedValue = cloneJson(data, "Field data");
     assertSafeKeys(clonedValue);
     objectAt(payload, rootKey, profileId)[field] = clonedValue;
+    stampFieldUpdatedAt(payload, rootKey, profileId, field, now);
   } else {
     throw new Error("Unsupported operation");
   }

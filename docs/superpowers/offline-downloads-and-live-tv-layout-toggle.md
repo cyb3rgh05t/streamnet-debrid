@@ -173,14 +173,13 @@ Ergaenzt in `2.3.011`:
   profilbezogene Layout- und Textgroessenfelder auch bei grossen Snapshots per
   Admin-Panel gesetzt werden koennen.
 
-### Wichtiger Architekturhinweis
+### Architekturstand
 
-Der klassische Pfad ist derzeit an `useTouchRail` gebunden. Fuer eine echte
-TV-Umschaltung sollte er nicht einfach als Touch-Layout auf TV erzwungen werden,
-sondern in eine eigene klassische Layoutfunktion extrahiert werden, z. B.
-`LiveTvClassicLayout`. Dann kann dieselbe Guide-Struktur auf Touch und TV
-kontrolliert genutzt werden, ohne die Touch-spezifischen Groessen und
-Fullscreen-Regeln falsch auf TV anzuwenden.
+Der klassische Pfad ist seit Version `2.3.012` in `LiveTvClassicLayout`
+ausgelagert. `LiveTvScreen` entscheidet nur noch zwischen dem klassischen Layout
+und `LiveTvNetflixLayout`. Das klassische Layout kapselt Provider-Auswahl,
+MiniPlayer/Hero, Touch-Kategorie-Rail, TV-Kategorie-Sidebar und `EpgGrid`, sodass
+Klassik- und StreamNet-/Netflix-Layout getrennt weiterentwickelt werden koennen.
 
 ### Tests
 

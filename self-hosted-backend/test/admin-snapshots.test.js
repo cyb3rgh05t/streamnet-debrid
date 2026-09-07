@@ -45,15 +45,20 @@ test("applies small admin mutations to large existing snapshots", () => {
   const value = snapshot();
   value.largeGuideCache = "x".repeat(700 * 1024);
 
-  const result = applyAdminSnapshotMutation(value, {
-    operation: "set_profile_field",
-    profileId: "kids",
-    rootKey: "profileSettingsById",
-    field: "liveTvLayoutMode",
-    data: "classic",
-  });
+  const result = applyAdminSnapshotMutation(
+    value,
+    {
+      operation: "set_profile_field",
+      profileId: "kids",
+      rootKey: "profileSettingsById",
+      field: "liveTvLayoutMode",
+      data: "classic",
+    },
+    1234,
+  );
 
   assert.equal(result.profileSettingsById.kids.liveTvLayoutMode, "classic");
+  assert.equal(result.fieldUpdatedAt["p:kids:liveTvLayoutMode"], 1234);
   assert.equal(result.largeGuideCache.length, 700 * 1024);
 });
 
@@ -74,6 +79,20 @@ test("upserts a playlist only for the selected profile", () => {
 });
 
 test("allows only bounded profile fields and rejects unknown profiles", () => {
+  const result = applyAdminSnapshotMutation(
+    snapshot(),
+    {
+      operation: "set_profile_field",
+      profileId: "kids",
+      rootKey: "iptvByProfile",
+      field: "sortOrder",
+      data: "name",
+    },
+    4321,
+  );
+  assert.equal(result.iptvByProfile.kids.sortOrder, "name");
+  assert.equal(result.fieldUpdatedAt["i:kids:sortOrder"], 4321);
+
   assert.throws(
     () =>
       applyAdminSnapshotMutation(snapshot(), {

@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.012] - 2026-09-07
+
+### Live TV
+
+- Das klassische Live-TV-Layout ist in eine eigene `LiveTvClassicLayout`-Komponente ausgelagert, damit Klassik- und StreamNet-/Netflix-Layout getrennt weiterentwickelt werden können.
+
+### Admin-Backend
+
+- Admin-Änderungen an profilbezogenen Feldern schreiben nun denselben `fieldUpdatedAt`-Zeitstempelvertrag wie die App, damit Geräte diese Änderungen nicht beim nächsten Push als stale überschreiben.
+
 ## [2.3.011] - 2026-09-07
 
 ### Live TV
