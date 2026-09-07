@@ -57,11 +57,7 @@ test("includes safe admin mutation failure reasons", () => {
     "/admin-api/accounts/:accountId/snapshot",
   );
   adminRequest.backendFailureReason = "unknown_profile";
-  const details = requestLogDetails(
-    adminRequest,
-    { statusCode: 400 },
-    4.2,
-  );
+  const details = requestLogDetails(adminRequest, { statusCode: 400 }, 4.2);
 
   assert.equal(details.level, "warn");
   assert.equal(details.message, "Admin snapshot updated failed");
