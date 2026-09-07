@@ -431,7 +431,7 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
-    fun `newer local set is kept over a stale cloud (unpushed local change)`() {
+    fun `newer local set keeps local values and adds remote-only addons`() {
         val cloud = addon(id = "torrentio", name = "Torrentio")
         val localFlix = addon(id = "flix", name = "FlixStreams")
 
@@ -443,7 +443,41 @@ class CloudSyncRepositoryAddonMergeTest {
         )
 
         assertFalse(preserved)
-        assertEquals(listOf("flix"), merged.map { it.id })
+        assertEquals(listOf("flix", "torrentio"), merged.map { it.id })
+    }
+
+    @Test
+    fun `newer local set keeps local addon value when ids match`() {
+        val cloud = addon(id = "flix", name = "Cloud Flix", isEnabled = false)
+        val local = addon(id = "flix", name = "Local Flix", isEnabled = true)
+
+        val (merged, preserved) = reconcileAddonsWithCloud(
+            cloudAddons = listOf(cloud),
+            localAddons = listOf(local),
+            cloudAddonsUpdatedAt = 50L,
+            localAddonsUpdatedAt = 100L
+        )
+
+        assertFalse(preserved)
+        assertEquals(listOf("Local Flix"), merged.map { it.name })
+        assertEquals(true, merged.single().isEnabled)
+    }
+
+    @Test
+    fun `forced cloud pull applies cloud addons even when local timestamp is newer`() {
+        val cloudUsenet = addon(id = "com.usenet.streamer.p.vanholsting", name = "NZB Treasure")
+        val localOpenSubtitles = addon(id = "opensubtitles", name = "OpenSubtitles", type = AddonType.SUBTITLE)
+
+        val (merged, preserved) = reconcileAddonsWithCloud(
+            cloudAddons = listOf(localOpenSubtitles, cloudUsenet),
+            localAddons = listOf(localOpenSubtitles),
+            cloudAddonsUpdatedAt = 50L,
+            localAddonsUpdatedAt = 100L,
+            forceApplyRemote = true
+        )
+
+        assertFalse(preserved)
+        assertEquals(listOf("opensubtitles", "com.usenet.streamer.p.vanholsting"), merged.map { it.id })
     }
 
     private fun addon(

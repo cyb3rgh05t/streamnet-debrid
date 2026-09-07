@@ -272,6 +272,7 @@ fun TvScreen(
     onNavigateToHome: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     onNavigateToWatchlist: () -> Unit = {},
+    onNavigateToOffline: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onSwitchProfile: () -> Unit = {},
     onBack: () -> Unit = {}
@@ -921,6 +922,7 @@ fun TvScreen(
                                     SidebarItem.SEARCH -> onNavigateToSearch()
                                     SidebarItem.HOME -> onNavigateToHome()
                                     SidebarItem.WATCHLIST -> onNavigateToWatchlist()
+                                    SidebarItem.OFFLINE -> onNavigateToOffline()
                                     SidebarItem.TV -> Unit
                                     SidebarItem.SETTINGS -> onNavigateToSettings()
                                     null -> Unit

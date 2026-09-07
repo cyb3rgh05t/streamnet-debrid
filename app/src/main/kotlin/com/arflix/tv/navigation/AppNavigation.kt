@@ -23,6 +23,7 @@ import com.arflix.tv.data.repository.AuthState
 import com.arflix.tv.ui.screens.details.DetailsScreen
 import com.arflix.tv.ui.screens.home.HomeScreen
 import com.arflix.tv.ui.screens.login.LoginScreen
+import com.arflix.tv.ui.screens.offline.OfflineDownloadsScreen
 import com.arflix.tv.ui.screens.player.PlayerScreen
 import com.arflix.tv.ui.screens.collections.CollectionDetailsScreen
 import com.arflix.tv.ui.screens.search.SearchScreen
@@ -41,6 +42,7 @@ sealed class Screen(val route: String) {
     data object Home : Screen("home")
     data object Search : Screen("search")
     data object Watchlist : Screen("watchlist")
+    data object Offline : Screen("offline")
     data object CollectionDetails : Screen("collections/{catalogId}") {
         fun createRoute(catalogId: String): String {
             return "collections/${android.net.Uri.encode(catalogId)}"
@@ -81,7 +83,7 @@ sealed class Screen(val route: String) {
         }
     }
 
-    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&tmdbSeasonNumber={tmdbSeasonNumber}&tmdbEpisodeNumber={tmdbEpisodeNumber}&kitsuId={kitsuId}&kitsuEpisodeNumber={kitsuEpisodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}") {
+    data object Player : Screen("player/{mediaType}/{mediaId}?seasonNumber={seasonNumber}&episodeNumber={episodeNumber}&tmdbSeasonNumber={tmdbSeasonNumber}&tmdbEpisodeNumber={tmdbEpisodeNumber}&kitsuId={kitsuId}&kitsuEpisodeNumber={kitsuEpisodeNumber}&imdbId={imdbId}&streamUrl={streamUrl}&preferredAddonId={preferredAddonId}&preferredSourceName={preferredSourceName}&preferredBingeGroup={preferredBingeGroup}&startPositionMs={startPositionMs}&isLiveStream={isLiveStream}&offlineDownloadId={offlineDownloadId}") {
         fun createRoute(
             mediaType: MediaType,
             mediaId: Int,
@@ -97,7 +99,8 @@ sealed class Screen(val route: String) {
             preferredSourceName: String? = null,
             preferredBingeGroup: String? = null,
             startPositionMs: Long? = null,
-            isLiveStream: Boolean = false
+            isLiveStream: Boolean = false,
+            offlineDownloadId: String? = null
         ): String {
             val base = "player/${mediaType.name.lowercase()}/$mediaId"
             val params = mutableListOf<String>()
@@ -114,6 +117,7 @@ sealed class Screen(val route: String) {
             preferredBingeGroup?.let { params.add("preferredBingeGroup=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             startPositionMs?.let { params.add("startPositionMs=$it") }
             if (isLiveStream) params.add("isLiveStream=true")
+            offlineDownloadId?.let { params.add("offlineDownloadId=${java.net.URLEncoder.encode(it, "UTF-8")}") }
             return if (params.isNotEmpty()) "$base?${params.joinToString("&")}" else base
         }
     }
@@ -205,6 +209,9 @@ fun AppNavigation(
                 onNavigateToWatchlist = {
                     navigateTopLevel(Screen.Watchlist.route)
                 },
+                onNavigateToOffline = {
+                    navigateTopLevel(Screen.Offline.route)
+                },
                 onNavigateToTv = { channelId, streamUrl ->
                     navigateTopLevel(Screen.Tv.createRoute(channelId, streamUrl))
                 },
@@ -240,6 +247,7 @@ fun AppNavigation(
                 },
                 onNavigateToHome = { navigateHome() },
                 onNavigateToWatchlist = { navigateTopLevel(Screen.Watchlist.route) },
+                onNavigateToOffline = { navigateTopLevel(Screen.Offline.route) },
                 onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
                 onNavigateToSettings = { navigateTopLevel(Screen.Settings.route) },
                 onSwitchProfile = {
@@ -259,6 +267,7 @@ fun AppNavigation(
                 },
                 onNavigateToHome = { navigateHome() },
                 onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
+                onNavigateToOffline = { navigateTopLevel(Screen.Offline.route) },
                 onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
                 onNavigateToSettings = { section ->
                     navigateTopLevel(Screen.Settings.createRoute(initialSection = section))
@@ -266,6 +275,39 @@ fun AppNavigation(
                 onSwitchProfile = {
                     onSwitchProfile()
                     navController.navigateToProfileSelection()
+                },
+                onBack = { navigateHome() }
+            )
+        }
+
+        composable(Screen.Offline.route) {
+            OfflineDownloadsScreen(
+                currentProfile = currentProfile,
+                onNavigateToHome = { navigateHome() },
+                onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
+                onNavigateToWatchlist = { navigateTopLevel(Screen.Watchlist.route) },
+                onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
+                onNavigateToSettings = { navigateTopLevel(Screen.Settings.route) },
+                onSwitchProfile = {
+                    onSwitchProfile()
+                    navController.navigateToProfileSelection()
+                },
+                onPlayOfflineDownload = { download ->
+                    val type = download.mediaType ?: return@OfflineDownloadsScreen
+                    navController.navigate(
+                        Screen.Player.createRoute(
+                            mediaType = type,
+                            mediaId = download.mediaId,
+                            seasonNumber = download.seasonNumber,
+                            episodeNumber = download.episodeNumber,
+                            tmdbSeasonNumber = download.tmdbSeasonNumber,
+                            tmdbEpisodeNumber = download.tmdbEpisodeNumber,
+                            streamUrl = download.streamUrl,
+                            preferredAddonId = download.addonId,
+                            preferredSourceName = download.sourceName,
+                            offlineDownloadId = download.id
+                        )
+                    )
                 },
                 onBack = { navigateHome() }
             )
@@ -289,6 +331,7 @@ fun AppNavigation(
                 onNavigateToHome = { navigateHome() },
                 onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
                 onNavigateToWatchlist = { navigateTopLevel(Screen.Watchlist.route) },
+                onNavigateToOffline = { navigateTopLevel(Screen.Offline.route) },
                 onNavigateToSettings = { navigateTopLevel(Screen.Settings.route) },
                 onNavigateToIptvSettings = { navigateTopLevel(Screen.Settings.createRoute(initialSection = "iptv")) },
                 onSwitchProfile = {
@@ -331,7 +374,25 @@ fun AppNavigation(
                 onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
                 onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
                 onNavigateToWatchlist = { navigateTopLevel(Screen.Watchlist.route) },
+                onNavigateToOffline = { navigateTopLevel(Screen.Offline.route) },
                 onNavigateToTelegramSettings = { navController.navigate(Screen.TelegramSettings.route) },
+                onPlayOfflineDownload = { download ->
+                    val type = download.mediaType ?: return@SettingsScreen
+                    navController.navigate(
+                        Screen.Player.createRoute(
+                            mediaType = type,
+                            mediaId = download.mediaId,
+                            seasonNumber = download.seasonNumber,
+                            episodeNumber = download.episodeNumber,
+                            tmdbSeasonNumber = download.tmdbSeasonNumber,
+                            tmdbEpisodeNumber = download.tmdbEpisodeNumber,
+                            streamUrl = download.streamUrl,
+                            preferredAddonId = download.addonId,
+                            preferredSourceName = download.sourceName,
+                            offlineDownloadId = download.id
+                        )
+                    )
+                },
                 onSwitchProfile = {
                     onSwitchProfile()
                     navController.navigateToProfileSelection()
@@ -468,6 +529,9 @@ fun AppNavigation(
                 onNavigateToWatchlist = {
                     navigateTopLevel(Screen.Watchlist.route)
                 },
+                onNavigateToOffline = {
+                    navigateTopLevel(Screen.Offline.route)
+                },
                 onNavigateToSettings = {
                     navigateTopLevel(Screen.Settings.route)
                 },
@@ -536,6 +600,10 @@ fun AppNavigation(
                 navArgument("isLiveStream") {
                     type = NavType.BoolType
                     defaultValue = false
+                },
+                navArgument("offlineDownloadId") {
+                    type = NavType.StringType
+                    defaultValue = ""
                 }
             )
         ) { backStackEntry ->
@@ -556,6 +624,7 @@ fun AppNavigation(
             val preferredBingeGroup = backStackEntry.arguments?.getString("preferredBingeGroup")?.takeIf { it.isNotBlank() }
             val startPositionMs = backStackEntry.arguments?.getLong("startPositionMs")?.takeIf { it >= 0L }
             val isLiveStream = backStackEntry.arguments?.getBoolean("isLiveStream") ?: false
+            val offlineDownloadId = backStackEntry.arguments?.getString("offlineDownloadId")?.takeIf { it.isNotBlank() }
             val mediaType = if (mediaTypeStr == "tv") MediaType.TV else MediaType.MOVIE
 
             PlayerScreen(
@@ -574,6 +643,7 @@ fun AppNavigation(
                 preferredBingeGroup = preferredBingeGroup,
                 startPositionMs = startPositionMs,
                 isLiveStream = isLiveStream,
+                offlineDownloadId = offlineDownloadId,
                 onBack = { navController.popBackStack() },
                 onPlayNext = { nextIdentity, nextPreferredAddonId, nextPreferredSourceName, nextPreferredBingeGroup ->
                     // Navigate to next episode

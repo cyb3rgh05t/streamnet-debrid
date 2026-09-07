@@ -179,6 +179,7 @@ fun WatchlistScreen(
     onNavigateToDetails: (MediaType, Int) -> Unit = { _, _ -> },
     onNavigateToHome: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
+    onNavigateToOffline: () -> Unit = {},
     onNavigateToTv: () -> Unit = {},
     onNavigateToSettings: (String) -> Unit = {},
     onSwitchProfile: () -> Unit = {},
@@ -574,6 +575,7 @@ fun WatchlistScreen(
                                             SidebarItem.SEARCH -> onNavigateToSearch()
                                             SidebarItem.HOME -> onNavigateToHome()
                                             SidebarItem.WATCHLIST -> Unit
+                                            SidebarItem.OFFLINE -> onNavigateToOffline()
                                             SidebarItem.TV -> onNavigateToTv()
                                             SidebarItem.SETTINGS -> onNavigateToSettings("")
                                             null -> Unit

@@ -28,6 +28,7 @@ import com.arflix.tv.data.repository.providerScopedStreamIdentity
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
+import com.arflix.tv.data.repository.offline.OfflineDownloadRepository
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.AnimeMapper
 import com.arflix.tv.util.AnimeSeasonStructure
@@ -203,7 +204,8 @@ class DetailsViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository,
     private val watchlistRepository: WatchlistRepository,
     private val cloudSyncRepository: CloudSyncRepository,
-    private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository
+    private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
+    private val offlineDownloadRepository: OfflineDownloadRepository
 ) : ViewModel() {
 
     companion object {
@@ -1354,6 +1356,45 @@ class DetailsViewModel @Inject constructor(
             toastMessage = message,
             toastType = type
         )
+    }
+
+    fun startOfflineDownload(
+        mediaType: MediaType,
+        mediaId: Int,
+        episode: Episode?,
+        stream: StreamSource
+    ) {
+        viewModelScope.launch {
+            val item = _uiState.value.item
+            val title = buildString {
+                append(item?.title?.takeIf { it.isNotBlank() } ?: stream.source.ifBlank { stream.addonName })
+                episode?.let { ep ->
+                    append(" S")
+                    append(ep.identity.displaySeason.toString().padStart(2, '0'))
+                    append('E')
+                    append(ep.identity.displayEpisode.toString().padStart(2, '0'))
+                }
+            }
+            val subtitle = episode?.name?.takeIf { it.isNotBlank() }
+            val episodeKey = episode?.identity?.let { identity ->
+                "s${identity.displaySeason}e${identity.displayEpisode}:tmdb${identity.tmdbSeason}x${identity.tmdbEpisode}"
+            }
+            val result = offlineDownloadRepository.enqueue(
+                mediaType = mediaType,
+                mediaId = mediaId,
+                episodeKey = episodeKey,
+                title = title,
+                subtitle = subtitle,
+                posterUrl = item?.image,
+                backdropUrl = item?.backdrop,
+                stream = stream
+            )
+            if (result.isSuccess) {
+                showToast(context.getString(R.string.offline_download_started), ToastType.SUCCESS)
+            } else {
+                showToast(context.getString(R.string.offline_download_unavailable), ToastType.ERROR)
+            }
+        }
     }
 
     private fun isPendingDebridStream(stream: StreamSource): Boolean {

@@ -57,6 +57,8 @@ import com.arflix.tv.data.repository.TvDeviceAuthStatusType
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.TraktSyncService
 import com.arflix.tv.data.repository.WatchlistRepository
+import com.arflix.tv.data.repository.offline.OfflineDownloadItem
+import com.arflix.tv.data.repository.offline.OfflineDownloadRepository
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.data.repository.SyncProgress
 import com.arflix.tv.data.repository.SyncStatus
@@ -218,6 +220,7 @@ data class SettingsUiState(
     val iptvExcludedVodCategoryIds: List<String> = emptyList(),
     val iptvExcludedSeriesCategoryIds: List<String> = emptyList(),
     val isIptvVodCategoriesLoading: Boolean = false,
+    val offlineDownloads: List<OfflineDownloadItem> = emptyList(),
     // App updates
     val isSelfUpdateSupported: Boolean = true,
     val updateStatus: com.arflix.tv.updater.UpdateStatus = com.arflix.tv.updater.UpdateStatus.Idle,
@@ -312,7 +315,8 @@ class SettingsViewModel @Inject constructor(
     private val mdbListRepository: com.arflix.tv.data.repository.MdbListRepository,
     private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore,
     private val watchHistoryRepository: com.arflix.tv.data.repository.WatchHistoryRepository,
-    private val simklAuthManager: com.arflix.tv.data.repository.simkl.SimklAuthManager
+    private val simklAuthManager: com.arflix.tv.data.repository.simkl.SimklAuthManager,
+    private val offlineDownloadRepository: OfflineDownloadRepository
 ) : ViewModel() {
     private val usesDirectCloudAuth: Boolean
         get() = shouldUseDirectCloudAuth(detectPhysicalDeviceType(context))
@@ -493,6 +497,7 @@ class SettingsViewModel @Inject constructor(
         observeAuthState()
         observeIptvConfig()
         observeIptvGroupPrefs()
+        observeOfflineDownloads()
         initializeCatalogs()
         observeCatalogs()
         initializeUpdaterState()
@@ -512,6 +517,26 @@ class SettingsViewModel @Inject constructor(
                 )
             }
         }
+    }
+
+    private fun observeOfflineDownloads() {
+        viewModelScope.launch {
+            offlineDownloadRepository.downloads.collect { downloads ->
+                _uiState.value = _uiState.value.copy(offlineDownloads = downloads)
+            }
+        }
+    }
+
+    fun removeOfflineDownload(id: String) {
+        offlineDownloadRepository.remove(id)
+    }
+
+    fun pauseOfflineDownload(id: String) {
+        offlineDownloadRepository.pause(id)
+    }
+
+    fun resumeOfflineDownload(id: String) {
+        offlineDownloadRepository.resume(id)
     }
 
     private fun initializeUpdaterState() {

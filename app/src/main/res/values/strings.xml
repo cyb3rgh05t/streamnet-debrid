@@ -994,6 +994,31 @@
 
     <!-- Extracted from code: Details, Home, Search and Player -->
     <string name="details_toast_debrid_downloading">This debrid torrent is still being downloaded. Try another source or wait a bit.</string>
+    <string name="offline_download_action">Download</string>
+    <string name="offline_download_action_pause">Pause</string>
+    <string name="offline_download_action_resume">Resume</string>
+    <string name="offline_download_notification_channel">Downloads</string>
+    <string name="offline_download_started">Download started</string>
+    <string name="offline_download_unavailable">This source cannot be downloaded.</string>
+    <string name="offline_downloads_title">DOWNLOADS</string>
+    <string name="offline_downloads_section">Downloads</string>
+    <string name="offline_downloads_empty_title">No downloads yet</string>
+    <string name="offline_downloads_empty_desc">Start downloads from a movie or episode source.</string>
+    <string name="offline_download_status_completed">Completed</string>
+    <string name="offline_download_status_downloading">Downloading %1$d%%</string>
+    <string name="offline_download_status_failed">Failed</string>
+    <string name="offline_download_status_queued">Queued</string>
+    <string name="offline_download_status_removing">Removing</string>
+    <string name="offline_download_status_restarting">Restarting</string>
+    <string name="offline_download_status_paused">Paused</string>
+    <string name="offline_download_status_unknown">Unknown status</string>
+    <string name="offline_download_status_active_count">%1$d active</string>
+    <string name="offline_download_status_completed_count">%1$d completed</string>
+    <string name="offline_download_finished_toast">Download finished: %1$s</string>
+    <string name="offline_download_playback_missing">This offline download is no longer available. Delete it and download it again.</string>
+    <string name="offline_download_playback_incomplete">This offline download is not ready to play yet.</string>
+    <string name="settings_desc_offline_downloads">Manage movie and episode downloads, progress and cached files.</string>
+    <string name="settings_pill_offline_downloads">%1$d downloads</string>
     <string name="details_episode_code_short">S%1$d:E%2$d</string>
     <string name="details_label_tv_series">TV Series</string>
     <string name="details_btn_mark_watched">Mark Watched</string>

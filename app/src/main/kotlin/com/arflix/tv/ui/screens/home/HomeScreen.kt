@@ -797,6 +797,7 @@ fun HomeScreen(
     onNavigateToCollection: (String) -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     onNavigateToWatchlist: () -> Unit = {},
+    onNavigateToOffline: () -> Unit = {},
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit = { _, _ -> },
     onNavigateToPlayer: (MediaType, Int, String, String?, String?) -> Unit = { _, _, _, _, _ -> },
     onNavigateToSettings: () -> Unit = {},
@@ -1481,6 +1482,7 @@ fun HomeScreen(
             onNavigateToCollection = onNavigateToCollection,
             onNavigateToSearch = onNavigateToSearch,
             onNavigateToWatchlist = onNavigateToWatchlist,
+            onNavigateToOffline = onNavigateToOffline,
             onNavigateToTv = onNavigateToTv,
             getIptvStreamUrl = { itemId -> viewModel.getIptvStreamUrl(itemId) },
             lookupIptvProgramBackdrop = viewModel::lookupIptvProgramBackdrop,
@@ -3075,6 +3077,7 @@ private fun HomeInputLayer(
     onNavigateToCollection: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     onNavigateToWatchlist: () -> Unit,
+    onNavigateToOffline: () -> Unit,
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit,
     getIptvStreamUrl: (itemId: Int) -> String?,
     lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
@@ -3289,6 +3292,7 @@ private fun HomeInputLayer(
                                     SidebarItem.SEARCH -> onNavigateToSearch()
                                     SidebarItem.HOME -> Unit
                                     SidebarItem.WATCHLIST -> onNavigateToWatchlist()
+                                    SidebarItem.OFFLINE -> onNavigateToOffline()
                                     SidebarItem.TV -> onNavigateToTv(null, null)
                                     SidebarItem.SETTINGS -> onNavigateToSettings()
                                     null -> Unit

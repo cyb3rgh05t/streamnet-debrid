@@ -107,12 +107,15 @@ import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.data.repository.WatchHistoryRepository
 import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.data.repository.isEnabledVodStreamingAddon
+import com.arflix.tv.data.repository.offline.OfflineDownloadRepository
 import com.arflix.tv.data.repository.toLauncherContinueWatchingRequest
 import com.arflix.tv.navigation.AppNavigation
 import com.arflix.tv.navigation.Screen
+import com.arflix.tv.ui.components.AppToastBus
 import com.arflix.tv.ui.screens.login.LoginScreen
 import com.arflix.tv.ui.startup.StartupViewModel
 import com.arflix.tv.ui.theme.ArflixTvTheme
+import com.arflix.tv.ui.components.ToastType
 import com.arflix.tv.updater.AppUpdateRepository
 import com.arflix.tv.updater.UpdatePreferences
 import com.arflix.tv.updater.UpdateStatus
@@ -177,6 +180,9 @@ class MainActivity : ComponentActivity() {
     // everything is already resident.
     @Inject
     lateinit var iptvRepository: Lazy<com.arflix.tv.data.repository.IptvRepository>
+
+    @Inject
+    lateinit var offlineDownloadRepository: Lazy<OfflineDownloadRepository>
 
     @Inject
     lateinit var appUpdateRepository: AppUpdateRepository
@@ -413,6 +419,7 @@ class MainActivity : ComponentActivity() {
                         watchlistRepository = watchlistRepository.get(),
                         iptvRepository = iptvRepository.get(),
                         launcherContinueWatchingRepository = launcherContinueWatchingRepository.get(),
+                        offlineDownloadRepository = offlineDownloadRepository.get(),
                         oledBlackBackground = oledBlackBackground,
                         skipProfileSelection = skipProfileSelection,
                         pendingLauncherRequest = pendingLauncherRequest,
@@ -667,6 +674,7 @@ fun ArflixApp(
     watchlistRepository: WatchlistRepository,
     iptvRepository: com.arflix.tv.data.repository.IptvRepository,
     launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
+    offlineDownloadRepository: OfflineDownloadRepository,
     oledBlackBackground: Boolean = false,
     skipProfileSelection: Boolean? = null,
     pendingLauncherRequest: LauncherContinueWatchingRequest? = null,
@@ -733,6 +741,15 @@ fun ArflixApp(
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
     var iptvFullscreen by remember { mutableStateOf(false) }
+    LaunchedEffect(offlineDownloadRepository) {
+        offlineDownloadRepository.completionEvents.collect { event ->
+            AppToastBus.show(
+                message = context.getString(R.string.offline_download_finished_toast, event.download.title),
+                type = ToastType.SUCCESS,
+                durationMs = 4_000L
+            )
+        }
+    }
     LaunchedEffect(currentRoute) {
         if (currentRoute?.startsWith("tv") != true) {
             iptvFullscreen = false

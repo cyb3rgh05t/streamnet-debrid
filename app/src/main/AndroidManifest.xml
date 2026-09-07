@@ -7,6 +7,7 @@
     <!-- Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <!-- ARVIO only uses Discord Rich Presence, not the SDK's voice stack. -->
     <uses-permission
@@ -68,6 +69,15 @@
         <service
             android:name="com.discord.socialsdk.ForegroundService"
             tools:node="remove" />
+
+        <service
+            android:name=".data.repository.offline.OfflineDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync">
+            <intent-filter>
+                <action android:name="androidx.media3.exoplayer.downloadService.action.RESTART" />
+            </intent-filter>
+        </service>
 
         <profileable
             android:shell="true"

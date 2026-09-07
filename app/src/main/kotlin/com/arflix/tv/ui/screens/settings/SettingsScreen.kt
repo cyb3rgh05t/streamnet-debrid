@@ -202,6 +202,7 @@ import com.arflix.tv.data.repository.HomeServerKind
 import com.arflix.tv.data.repository.isHomeServerVideoLibraryType
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.IptvPlaylistEntry
+import com.arflix.tv.data.repository.offline.OfflineDownloadItem
 import com.arflix.tv.data.repository.configuredIptvPlaylistCount
 import com.arflix.tv.data.repository.isStreamNetTvPlaylist
 import com.arflix.tv.ui.screens.profile.PinEntryDialog
@@ -362,7 +363,9 @@ fun SettingsScreen(
     onNavigateToSearch: () -> Unit = {},
     onNavigateToTv: () -> Unit = {},
     onNavigateToWatchlist: () -> Unit = {},
+    onNavigateToOffline: () -> Unit = {},
     onNavigateToTelegramSettings: () -> Unit = {},
+    onPlayOfflineDownload: (OfflineDownloadItem) -> Unit = {},
     onSwitchProfile: () -> Unit = {},
     onBack: () -> Unit = {}
 ) {
@@ -406,6 +409,7 @@ fun SettingsScreen(
             add("ai_subtitles")
             add("iptv")
             add("stremio")
+            add("offline_downloads")
             add("catalogs")
             add("home_server")
             add("appearance")
@@ -470,6 +474,8 @@ fun SettingsScreen(
     // Sub-focus for IPTV playlist rows: 0 = categories, 1 = enable, 2 = edit, 3 = up, 4 = down, 5 = delete
     // For IPTV category rows: 0 = visibility, 1 = up, 2 = down
     var iptvActionIndex by remember { mutableIntStateOf(0) }
+    // Sub-focus for offline download rows: 0 = primary action, 1 = delete
+    var offlineDownloadActionIndex by remember { mutableIntStateOf(0) }
     var showIptvCategoriesSettings by remember { mutableStateOf(false) }
     var showIptvVodCategoriesDialog by remember { mutableStateOf(false) }
     // Rename dialog state
@@ -559,6 +565,7 @@ fun SettingsScreen(
             "home_server" -> if (uiState.homeServerConnections.isEmpty()) 1 else homeServerSettingsEntries.size + 3
             "catalogs" -> uiState.catalogs.size + 2 // Add + Import + restore hidden + catalogs
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
+            "offline_downloads" -> uiState.offlineDownloads.size.coerceAtLeast(1) - 1
             "plugins" -> pluginsMaxIndex
             "accounts" -> 9 // Accounts, tracking routing, telegram and discord
             "cloud_sync" -> 3 // Cloud account, sync, pull and account deletion
@@ -929,11 +936,14 @@ fun SettingsScreen(
                                         iptvActionIndex--
                                     } else if (currentSection == "catalogs" && contentFocusIndex > 2 && catalogActionIndex > 0) {
                                         catalogActionIndex--
+                                    } else if (currentSection == "offline_downloads" && contentFocusIndex in uiState.offlineDownloads.indices && offlineDownloadActionIndex > 0) {
+                                        offlineDownloadActionIndex--
                                     } else {
                                         activeZone = Zone.SECTION
                                         addonActionIndex = 0
                                         iptvActionIndex = 0
                                         catalogActionIndex = 0
+                                        offlineDownloadActionIndex = 0
                                     }
                                 }
                                 Zone.SECTION -> {
@@ -959,6 +969,7 @@ fun SettingsScreen(
                                     addonActionIndex = 0
                                     iptvActionIndex = 0
                                     catalogActionIndex = 0
+                                    offlineDownloadActionIndex = 0
                                 }
                                 Zone.CONTENT -> {
                                     if (currentSection == "stremio" &&
@@ -974,6 +985,8 @@ fun SettingsScreen(
                                         val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 3)
                                         val maxAction = if (catalog?.let(::hasCatalogUnpackAction) == true) 5 else 4
                                         if (catalogActionIndex < maxAction) catalogActionIndex++
+                                    } else if (currentSection == "offline_downloads" && contentFocusIndex in uiState.offlineDownloads.indices && offlineDownloadActionIndex < 1) {
+                                        offlineDownloadActionIndex++
                                     }
                                 }
                             }
@@ -989,6 +1002,7 @@ fun SettingsScreen(
                                         addonActionIndex = 0
                                         iptvActionIndex = 0
                                         catalogActionIndex = 0
+                                        offlineDownloadActionIndex = 0
                                         showIptvCategoriesSettings = false
                                     } else {
                                         activeZone = Zone.SIDEBAR
@@ -1001,6 +1015,7 @@ fun SettingsScreen(
                                         addonActionIndex = 0 // Reset to toggle when changing rows
                                         iptvActionIndex = 0
                                         catalogActionIndex = 0
+                                        offlineDownloadActionIndex = 0
                                     } else {
                                         activeZone = Zone.SECTION
                                     }
@@ -1021,6 +1036,7 @@ fun SettingsScreen(
                                         addonActionIndex = 0
                                         iptvActionIndex = 0
                                         catalogActionIndex = 0
+                                        offlineDownloadActionIndex = 0
                                         showIptvCategoriesSettings = false
                                     }
                                 }
@@ -1031,6 +1047,7 @@ fun SettingsScreen(
                                         addonActionIndex = 0 // Reset to toggle when changing rows
                                         iptvActionIndex = 0
                                         catalogActionIndex = 0
+                                        offlineDownloadActionIndex = 0
                                     }
                                 }
                             }
@@ -1047,6 +1064,7 @@ fun SettingsScreen(
                                             SidebarItem.HOME -> onNavigateToHome()
                                             SidebarItem.TV -> onNavigateToTv()
                                             SidebarItem.WATCHLIST -> onNavigateToWatchlist()
+                                            SidebarItem.OFFLINE -> onNavigateToOffline()
                                             SidebarItem.SETTINGS -> { /* Already here */ }
                                             null -> Unit
                                         }
@@ -1415,6 +1433,17 @@ fun SettingsScreen(
                                                 }
                                             }
                                         }
+                                        "offline_downloads" -> {
+                                            uiState.offlineDownloads.getOrNull(contentFocusIndex)?.let { download ->
+                                                when {
+                                                    offlineDownloadActionIndex == 1 -> viewModel.removeOfflineDownload(download.id)
+                                                    download.canPlay -> onPlayOfflineDownload(download)
+                                                    download.canPause -> viewModel.pauseOfflineDownload(download.id)
+                                                    download.canResume -> viewModel.resumeOfflineDownload(download.id)
+                                                    else -> viewModel.removeOfflineDownload(download.id)
+                                                }
+                                            }
+                                        }
                                         "info_updates" -> {
                                             when (contentFocusIndex) {
                                                 0 -> {
@@ -1579,6 +1608,7 @@ fun SettingsScreen(
                                     "profiles" -> Icons.Default.SwitchAccount
                                     "network" -> Icons.Default.Settings
                                     "iptv" -> Icons.Default.LiveTv
+                                    "offline_downloads" -> Icons.Default.Download
                                     "home_server" -> Icons.Default.Cloud
                                     "catalogs" -> Icons.Default.Widgets
                                     "stremio" -> Icons.Default.Extension
@@ -1596,6 +1626,7 @@ fun SettingsScreen(
                                     "profiles" -> stringResource(R.string.profiles)
                                     "network" -> stringResource(R.string.network)
                                     "iptv" -> stringResource(R.string.iptv)
+                                    "offline_downloads" -> stringResource(R.string.offline_downloads_section)
                                     "home_server" -> stringResource(R.string.settings_home_server)
                                     "catalogs" -> stringResource(R.string.catalogs)
                                     "stremio" -> stringResource(R.string.addons)
@@ -1982,6 +2013,15 @@ fun SettingsScreen(
                             onDeleteAddon = { viewModel.removeAddon(it) },
                             onAddCustomAddon = { showCustomAddonInput = true },
                             onRefreshAddons = { viewModel.refreshAddons() }
+                        )
+                        "offline_downloads" -> OfflineDownloadsSettings(
+                            offlineDownloads = uiState.offlineDownloads,
+                            focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
+                            focusedActionIndex = if (activeZone == Zone.CONTENT) offlineDownloadActionIndex else -1,
+                            onPlayOfflineDownload = onPlayOfflineDownload,
+                            onPauseOfflineDownload = { viewModel.pauseOfflineDownload(it) },
+                            onResumeOfflineDownload = { viewModel.resumeOfflineDownload(it) },
+                            onRemoveOfflineDownload = { viewModel.removeOfflineDownload(it) }
                         )
                         "plugins" -> {
                             com.arflix.tv.ui.screens.plugin.PluginScreen(
@@ -5897,7 +5937,7 @@ private fun tvSettingsSidebarGroup(section: String): String {
     return when (section) {
         "accounts", "cloud_sync", "profiles" -> stringResource(R.string.settings_group_profile)
         "playback", "language", "subtitles", "ai_subtitles" -> stringResource(R.string.playback)
-        "iptv", "stremio", "catalogs", "home_server" -> stringResource(R.string.sources)
+        "iptv", "stremio", "offline_downloads", "catalogs", "home_server" -> stringResource(R.string.sources)
         else -> stringResource(R.string.settings_group_system)
     }
 }
@@ -6182,6 +6222,7 @@ private fun tvSettingsSectionTitle(section: String): String {
         "home_server" -> stringResource(R.string.settings_home_server)
         "catalogs" -> stringResource(R.string.catalogs)
         "stremio" -> stringResource(R.string.addons)
+        "offline_downloads" -> stringResource(R.string.offline_downloads_section)
         "accounts" -> stringResource(R.string.accounts)
         "cloud_sync" -> stringResource(R.string.settings_cloud_sync_title)
         "info_updates" -> stringResource(R.string.settings_info_updates_title)
@@ -6203,6 +6244,7 @@ private fun tvSettingsSectionDescription(section: String): String {
         "home_server" -> stringResource(R.string.settings_desc_home_server)
         "catalogs" -> stringResource(R.string.settings_desc_catalogs)
         "stremio" -> stringResource(R.string.settings_desc_stremio)
+        "offline_downloads" -> stringResource(R.string.settings_desc_offline_downloads)
         "accounts" -> stringResource(R.string.settings_desc_accounts)
         "cloud_sync" -> stringResource(R.string.settings_desc_cloud_sync)
         "info_updates" -> stringResource(R.string.settings_desc_info_updates)
@@ -6263,6 +6305,10 @@ private fun tvSettingsSectionPills(
         )
         "catalogs" -> listOf(stringResource(R.string.settings_pill_catalogs, uiState.catalogs.size), stringResource(R.string.settings_cloud_synced))
         "stremio" -> listOf(stringResource(R.string.settings_pill_installed, addonCount), stringResource(R.string.settings_profile_scoped))
+        "offline_downloads" -> listOf(
+            stringResource(R.string.settings_pill_offline_downloads, uiState.offlineDownloads.size),
+            offlineDownloadSummary(uiState.offlineDownloads)
+        )
         "accounts" -> listOf(
             if (uiState.isTraktAuthenticated) stringResource(R.string.settings_trakt_connected) else stringResource(R.string.settings_trakt_off)
         )
@@ -6333,6 +6379,10 @@ private fun tvSettingsPanelFacts(
         "stremio" -> listOf(
             stringResource(R.string.addons) to addonCount.toString(),
             stringResource(R.string.settings_fact_scope) to stringResource(R.string.settings_current_profile)
+        )
+        "offline_downloads" -> listOf(
+            stringResource(R.string.offline_downloads_section) to uiState.offlineDownloads.size.toString(),
+            stringResource(R.string.settings_fact_status) to offlineDownloadSummary(uiState.offlineDownloads)
         )
         "accounts" -> listOf(
             stringResource(R.string.settings_fact_trakt) to if (uiState.isTraktAuthenticated) stringResource(R.string.connected) else stringResource(R.string.settings_disconnected)
@@ -6410,6 +6460,7 @@ private fun tvSettingsFocusedHelp(section: String, focusedIndex: Int): TvSetting
             else -> TvSettingsHelp(stringResource(R.string.settings_help_catalog_row), stringResource(R.string.settings_help_catalog_row_desc))
         }
         "stremio" -> TvSettingsHelp(stringResource(R.string.settings_help_addon), stringResource(R.string.settings_help_addon_desc))
+        "offline_downloads" -> TvSettingsHelp(stringResource(R.string.offline_downloads_section), stringResource(R.string.settings_desc_offline_downloads))
         "accounts" -> when (focusedIndex) {
             0 -> TvSettingsHelp(stringResource(R.string.settings_help_trakt), stringResource(R.string.settings_help_trakt_desc))
             9 -> TvSettingsHelp(stringResource(R.string.discord_rpc_title), stringResource(R.string.discord_help_desc))
@@ -10286,6 +10337,237 @@ private fun InfoUpdatesSettings(
             onToggle = onDiagnosticsSharingToggle,
             modifier = Modifier.settingsFocusSlot(2)
         )
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun OfflineDownloadsSettings(
+    offlineDownloads: List<OfflineDownloadItem>,
+    focusedIndex: Int,
+    focusedActionIndex: Int,
+    onPlayOfflineDownload: (OfflineDownloadItem) -> Unit,
+    onPauseOfflineDownload: (String) -> Unit,
+    onResumeOfflineDownload: (String) -> Unit,
+    onRemoveOfflineDownload: (String) -> Unit
+) {
+    Column {
+        if (offlineDownloads.isEmpty()) {
+            SettingsActionRow(
+                icon = Icons.Default.Download,
+                title = stringResource(R.string.offline_downloads_empty_title),
+                description = stringResource(R.string.offline_downloads_empty_desc),
+                actionLabel = stringResource(R.string.settings_badge_empty),
+                isFocused = focusedIndex == 0,
+                onClick = {},
+                modifier = Modifier.settingsFocusSlot(0)
+            )
+        } else {
+            offlineDownloads.forEachIndexed { index, download ->
+                OfflineDownloadSettingsRow(
+                    download = download,
+                    isFocused = focusedIndex == index,
+                    focusedActionIndex = if (focusedIndex == index) focusedActionIndex else -1,
+                    onClick = {
+                        when {
+                            download.canPlay -> onPlayOfflineDownload(download)
+                            download.canPause -> onPauseOfflineDownload(download.id)
+                            download.canResume -> onResumeOfflineDownload(download.id)
+                            else -> onRemoveOfflineDownload(download.id)
+                        }
+                    },
+                    onRemove = { onRemoveOfflineDownload(download.id) },
+                    modifier = Modifier.settingsFocusSlot(index)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalTvMaterial3Api::class)
+@Composable
+private fun OfflineDownloadSettingsRow(
+    download: OfflineDownloadItem,
+    isFocused: Boolean,
+    focusedActionIndex: Int,
+    onClick: () -> Unit,
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusRingColor = resolveAccentColor(fallback = Pink)
+    val focusContentColor = contrastingContentColor(focusRingColor)
+    val progress = download.settingsProgress()
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .background(
+                if (isFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
+                RoundedCornerShape(12.dp)
+            )
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) focusRingColor else Color.Transparent,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Icon(
+                imageVector = Icons.Default.Download,
+                contentDescription = null,
+                tint = if (isFocused) focusRingColor else TextSecondary,
+                modifier = Modifier.size(19.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = download.title,
+                    style = ArflixTypography.cardTitle.copy(fontSize = 16.sp),
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = download.settingsDescription(),
+                    style = ArflixTypography.caption.copy(fontSize = 13.sp),
+                    color = TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(9.dp))
+                SettingsOfflineDownloadProgressBar(
+                    progress = progress,
+                    accent = focusRingColor,
+                    trackColor = Color.White.copy(alpha = if (isFocused) 0.18f else 0.10f)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            SettingsOfflineActionChip(
+                label = download.primaryActionLabel(),
+                isFocused = isFocused && focusedActionIndex == 0,
+                accent = focusRingColor,
+                contentColor = focusContentColor,
+                filledWhenFocused = true,
+                onClick = onClick
+            )
+            SettingsOfflineActionChip(
+                label = stringResource(R.string.delete),
+                isFocused = isFocused && focusedActionIndex == 1,
+                accent = focusRingColor,
+                contentColor = focusContentColor,
+                filledWhenFocused = true,
+                onClick = onRemove
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsOfflineActionChip(
+    label: String,
+    isFocused: Boolean,
+    accent: Color,
+    contentColor: Color,
+    filledWhenFocused: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clickable { onClick() }
+            .background(
+                if (isFocused && filledWhenFocused) accent else accent.copy(alpha = 0.14f),
+                RoundedCornerShape(999.dp)
+            )
+            .border(1.dp, accent.copy(alpha = if (isFocused && filledWhenFocused) 0.85f else 0.32f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label.uppercase(),
+            style = ArflixTypography.label.copy(fontSize = 11.sp, letterSpacing = 0.5.sp),
+            color = if (isFocused && filledWhenFocused) contentColor else accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+@Composable
+private fun SettingsOfflineDownloadProgressBar(
+    progress: Float,
+    accent: Color,
+    trackColor: Color
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(6.dp)
+            .background(trackColor, RoundedCornerShape(999.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth(progress.coerceIn(0f, 1f))
+                .height(6.dp)
+                .background(accent, RoundedCornerShape(999.dp))
+        )
+    }
+}
+
+private fun OfflineDownloadItem.settingsProgress(): Float = when {
+    stateKey == "completed" -> 1f
+    percent > 0f -> (percent / 100f).coerceIn(0f, 1f)
+    else -> 0f
+}
+
+@Composable
+private fun OfflineDownloadItem.primaryActionLabel(): String = when {
+    canPlay -> stringResource(R.string.play)
+    canPause -> stringResource(R.string.offline_download_action_pause)
+    canResume -> stringResource(R.string.offline_download_action_resume)
+    else -> stringResource(R.string.delete)
+}
+
+@Composable
+private fun OfflineDownloadItem.settingsDescription(): String {
+    val state = when (stateKey) {
+        "completed" -> stringResource(R.string.offline_download_status_completed)
+        "downloading" -> stringResource(R.string.offline_download_status_downloading, percent.toInt().coerceIn(0, 100))
+        "failed" -> stringResource(R.string.offline_download_status_failed)
+        "queued" -> stringResource(R.string.offline_download_status_queued)
+        "removing" -> stringResource(R.string.offline_download_status_removing)
+        "restarting" -> stringResource(R.string.offline_download_status_restarting)
+        "paused" -> stringResource(R.string.offline_download_status_paused)
+        else -> stringResource(R.string.offline_download_status_unknown)
+    }
+    return listOf(subtitle, state, formatDownloadBytes(bytesDownloaded))
+        .filter { it.isNotBlank() }
+        .joinToString(" • ")
+}
+
+private fun formatDownloadBytes(bytes: Long): String {
+    if (bytes <= 0L) return ""
+    val gib = bytes / (1024.0 * 1024.0 * 1024.0)
+    if (gib >= 1.0) return "%.1f GB".format(gib)
+    val mib = bytes / (1024.0 * 1024.0)
+    return "%.0f MB".format(mib)
+}
+
+@Composable
+private fun offlineDownloadSummary(downloads: List<OfflineDownloadItem>): String {
+    if (downloads.isEmpty()) return stringResource(R.string.settings_idle)
+    val active = downloads.count { it.stateKey == "downloading" || it.stateKey == "queued" || it.stateKey == "restarting" }
+    val completed = downloads.count { it.stateKey == "completed" }
+    return when {
+        active > 0 -> stringResource(R.string.offline_download_status_active_count, active)
+        completed > 0 -> stringResource(R.string.offline_download_status_completed_count, completed)
+        else -> stringResource(R.string.offline_download_status_unknown)
     }
 }
 

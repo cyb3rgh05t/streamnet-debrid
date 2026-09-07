@@ -228,6 +228,7 @@ fun DetailsScreen(
     onNavigateToHome: () -> Unit = {},
     onNavigateToSearch: () -> Unit = {},
     onNavigateToWatchlist: () -> Unit = {},
+    onNavigateToOffline: () -> Unit = {},
     onNavigateToTv: () -> Unit = {},
     onNavigateToSettings: () -> Unit = {},
     onSwitchProfile: () -> Unit = {},
@@ -830,6 +831,7 @@ fun DetailsScreen(
                                         SidebarItem.SEARCH -> onNavigateToSearch()
                                         SidebarItem.HOME -> onNavigateToHome()
                                         SidebarItem.WATCHLIST -> onNavigateToWatchlist()
+                                        SidebarItem.OFFLINE -> onNavigateToOffline()
                                         SidebarItem.TV -> onNavigateToTv()
                                         SidebarItem.SETTINGS -> onNavigateToSettings()
                                         null -> Unit
@@ -1152,6 +1154,17 @@ fun DetailsScreen(
                     stream.source.takeIf { it.isNotBlank() },
                     pendingSourceStartPositionMs.also { pendingSourceStartPositionMs = null }
                 )
+            },
+            onDownload = { stream ->
+                if (isPendingDebridStream(stream)) {
+                    viewModel.showToast(
+                        context.getString(R.string.details_toast_debrid_downloading),
+                        ToastType.ERROR
+                    )
+                    return@StreamSelector
+                }
+                val ep = uiState.episodes.getOrNull(episodeIndex)
+                viewModel.startOfflineDownload(mediaType, mediaId, ep, stream)
             },
             onClose = { showStreamSelector = false }
         )

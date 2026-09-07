@@ -4,6 +4,41 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.001] - 2026-09-07
+
+### Offline-Downloads
+
+- Erster VOD-/Serien-Download-Slice: Die Quellen-Auswahl bietet eine Download-Aktion, die die konkret aufgelöste Stream-Quelle an einen Media3-`DownloadService` übergibt.
+- Im TV-Modus ist die Download-Aktion in der Quellenzeile per D-Pad erreichbar: Rechts wählt den Download-Button, OK startet den Download.
+- Ein neues `OfflineDownloadRepository` verwaltet Media3-`DownloadManager`, `SimpleCache`, Download-IDs und MIME-Erkennung für MP4/HLS/DASH-nahe Quellen.
+- Unter „Quellen“ gibt es eine eigene Rubrik „Offline-Downloads“ mit Status, Fortschritt, geladener Größe und Entfernen einzelner Downloads.
+- Offline-Downloads haben nun zusätzlich eine eigene Hauptseite in TV-Topbar und Mobile-Bottom-Navigation, aufgebaut als nutzerfreundliche Download-Bibliothek.
+- Die Offline-Hauptseite zeigt Downloads jetzt als bibliotheksartige Kacheln im Grid statt als breite Listenzeilen.
+- Der Downloads-Screen startet auf TV kompakter unter der Topbar und nutzt wie die Bibliothek eine akzentgerahmte Titel-Pill statt eines freistehenden großen Headers.
+- TV-Download-Kacheln verwenden nun ein 16:9-Landscape-Fanart-Layout mit seitlichem Fokus-Puffer, damit der Fokusrahmen nicht abgeschnitten wird.
+- Neue Offline-Downloads speichern Poster- und Backdrop-URLs in den Download-Metadaten; die Offline-Hauptseite nutzt bevorzugt Backdrops als Fanart.
+- Die Offline-Hauptseite repariert fehlende Fanart für ältere Downloads nachträglich über TMDB-Details, sofern MediaType und TMDB-ID in den Download-Metadaten vorhanden sind.
+- Offline-Download-Kacheln und Download-Einstellungen zeigen nun neben Abspielen/Pause/Fortsetzen wieder eine sichtbare Löschen-Aktion.
+- Auf der Offline-Hauptseite sind die Kachel-Aktionen per TV-D-Pad auswählbar: Links/Rechts wechselt zwischen Primäraktion und Löschen, OK führt die markierte Aktion aus.
+- Die Links/Rechts-Navigation der Offline-Kachel-Aktionen folgt nun der sichtbaren Position der Chips: links zu Löschen, rechts zurück zur Primäraktion.
+- In den Download-Einstellungen ist die Löschen-Aktion pro Download-Zeile nun ebenfalls per TV-D-Pad anwählbar.
+- Offline-Download-Karten zeigen eine akzentfarbene Fortschrittsleiste und stärker akzentgebundene Aktionsflächen; das Progress-/Statuslabel nutzt normale Textfarben, damit die Kachel nicht überakzentuiert wirkt.
+- Die Offline-Seite nutzt nun eine eigene TV-D-Pad-Fokuslogik mit sauberem Listenfokus, Scroll-Nachführung und ohne versehentlichen Sprung zur Profilauswahl beim Abspielen.
+- Die Offline-Seite verwendet nun die gemeinsamen App-Typografie-Tokens statt eigener Fontgrößen, damit Header, Statuszeilen und Aktionen optisch zu den anderen Screens passen.
+- Die Download-Einstellungen zeigen pro Offline-Download jetzt ebenfalls eine akzentfarbene Fortschrittsleiste.
+- Download-Status wird zusätzlich aus Media3s DownloadIndex aktualisiert, damit Fortschritt und Fertig-/Fehlerzustände in der App weiterlaufen.
+- Wenn ein Offline-Download fertig wird, zeigt die App nun screenübergreifend einen globalen Toast an.
+- Fertige Offline-Downloads können aus der neuen Rubrik direkt abgespielt werden; der Player nutzt dafür den Media3-Downloadcache mit dem gespeicherten Download-Key.
+- Offline-Playback prüft vor dem Player-Start, ob der gewählte Download noch existiert und wirklich abspielbereit ist; fehlende oder unvollständige Downloads landen nun im bestehenden Player-Fehlerdialog statt in einem kaputten Playback-Start.
+- Offline-Playback-Fehler während des Player-Starts lösen keinen Online-Source-Failover mehr aus, sondern werden als Offline-Cache-/Download-Problem gemeldet.
+- Aktive Offline-Downloads lassen sich in der Offline-Rubrik pausieren und pausierte Downloads wieder fortsetzen.
+- Android-Manifest, Foreground-Service-Permission und Benachrichtigungskanal für Offline-Downloads wurden vorbereitet.
+
+### Cloud-Synchronisation
+
+- Erzwungenes Cloud-Herunterladen überschreibt nun auch den lokalen Addon-Zeitstempel-Schutz, damit remote vorhandene Addons wie NZB Treasure auf TV-Geräten wieder übernommen werden.
+- Automatisches Cloud-Sync ergänzt remote-only Addons nun auch dann, wenn der lokale Addon-Zeitstempel neuer ist; vorhandene lokale Addons behalten dabei ihre lokalen Aktivierungswerte.
+
 ## [2.3.013] - 2026-09-07
 
 ### IPTV

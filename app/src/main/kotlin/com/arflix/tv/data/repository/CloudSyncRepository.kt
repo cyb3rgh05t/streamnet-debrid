@@ -60,21 +60,28 @@ internal fun reconcileAddonsWithCloud(
     cloudAddons: List<Addon>,
     localAddons: List<Addon>,
     cloudAddonsUpdatedAt: Long = 0L,
-    localAddonsUpdatedAt: Long = 0L
+    localAddonsUpdatedAt: Long = 0L,
+    forceApplyRemote: Boolean = false
 ): Pair<List<Addon>, Boolean> {
     val cloud = cloudAddons.filter { it.id.trim().isNotBlank() }
     if (cloud.isEmpty()) {
         // Intentional removal of everything (STRICTLY newer set-timestamp) → honor it; otherwise
         // this is a blank/partial pull (or a fresh install with default addons) → keep local.
-        return if (cloudAddonsUpdatedAt > localAddonsUpdatedAt) {
+        return if (forceApplyRemote || cloudAddonsUpdatedAt > localAddonsUpdatedAt) {
             emptyList<Addon>() to false
         } else {
             localAddons to false
         }
     }
-    // A local set-change newer than the cloud's hasn't been pushed yet — keep it so a stale pull
-    // can't revert a just-made local add/remove.
-    if (localAddonsUpdatedAt > cloudAddonsUpdatedAt) return localAddons to false
+    // A local set-change newer than the cloud's shouldn't be overwritten field-for-field, but
+    // cloud-only add-ons must still arrive automatically. This covers a TV that has a newer local
+    // add-on timestamp yet is missing an add-on added from another device.
+    if (!forceApplyRemote && localAddonsUpdatedAt > cloudAddonsUpdatedAt) {
+        val merged = LinkedHashMap<String, Addon>()
+        localAddons.filter { it.id.trim().isNotBlank() }.forEach { merged[it.id.trim()] = it }
+        cloud.forEach { addon -> merged.putIfAbsent(addon.id.trim(), addon) }
+        return merged.values.toList() to false
+    }
     val reconciled = LinkedHashMap<String, Addon>()
     cloud.forEach { reconciled[it.id.trim()] = it }
     return reconciled.values.toList() to false
@@ -2297,7 +2304,13 @@ class CloudSyncRepository @Inject constructor(
                 val map: Map<String, List<Addon>> = gson.fromJson(json, type) ?: emptyMap()
                 val sharedAddons = mergeAddonsForSharedRestore(map.values)
                 val localAddons = streamRepository.installedAddons.first()
-                val (resolvedAddons, _) = reconcileAddonsWithCloud(sharedAddons, localAddons, cloudAddonsTs, localAddonsTs)
+                val (resolvedAddons, _) = reconcileAddonsWithCloud(
+                    cloudAddons = sharedAddons,
+                    localAddons = localAddons,
+                    cloudAddonsUpdatedAt = cloudAddonsTs,
+                    localAddonsUpdatedAt = localAddonsTs,
+                    forceApplyRemote = forceApplyRemote
+                )
                 // Apply the reconciled list even when it is empty — an intentional "removed all"
                 // must propagate (reconcile only returns empty when the cloud set is genuinely newer;
                 // opensubtitles is re-enforced downstream so playback isn't left with nothing).
@@ -2309,7 +2322,13 @@ class CloudSyncRepository @Inject constructor(
                     val type = TypeToken.getParameterized(List::class.java, Addon::class.java).type
                     val addons: List<Addon> = gson.fromJson(json, type) ?: emptyList()
                     val localAddons = streamRepository.installedAddons.first()
-                    val (resolvedAddons, _) = reconcileAddonsWithCloud(addons, localAddons, cloudAddonsTs, localAddonsTs)
+                    val (resolvedAddons, _) = reconcileAddonsWithCloud(
+                        cloudAddons = addons,
+                        localAddons = localAddons,
+                        cloudAddonsUpdatedAt = cloudAddonsTs,
+                        localAddonsUpdatedAt = localAddonsTs,
+                        forceApplyRemote = forceApplyRemote
+                    )
                     streamRepository.replaceSharedAddonsFromCloud(resolvedAddons)
                     appliedCloudAddons = true
                 }

@@ -6,6 +6,7 @@ import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.ProfileRepository
 import com.arflix.tv.data.repository.StreamRepository
+import com.arflix.tv.data.repository.offline.OfflineDownloadRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -18,5 +19,6 @@ interface RepositoryAccessEntryPoint {
     fun profileRepository(): ProfileRepository
     fun profileManager(): ProfileManager
     fun cloudSyncInvalidationBus(): CloudSyncInvalidationBus
+    fun offlineDownloadRepository(): OfflineDownloadRepository
     fun tmdbApi(): TmdbApi
 }

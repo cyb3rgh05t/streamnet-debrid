@@ -42,6 +42,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.HighQuality
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -228,6 +229,7 @@ fun StreamSelector(
     loadingPluginNames: Set<String> = emptySet(),
     onFocusedStream: (StreamSource) -> Unit = {},
     onSelect: (StreamSource) -> Unit = {},
+    onDownload: (StreamSource) -> Unit = {},
     onClose: () -> Unit = {}
 ) {
     val isRtlLayoutDirection = androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl
@@ -238,6 +240,7 @@ fun StreamSelector(
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var focusedFilterIndex by remember { mutableIntStateOf(0) }
     var selectedFilterIndex by remember { mutableIntStateOf(0) }
+    var focusedStreamActionIndex by remember { mutableIntStateOf(0) } // 0 = play, 1 = download
     var focusZone by remember { mutableStateOf("streams") } // "streams" or "addons"
     val listState = rememberTvLazyListState()
     val addonListState = rememberTvLazyListState()
@@ -266,6 +269,7 @@ fun StreamSelector(
             selectedTabIndex = 0
             focusedFilterIndex = 0
             selectedFilterIndex = 0
+            focusedStreamActionIndex = 0
             focusZone = "streams"
         }
     }
@@ -438,6 +442,7 @@ fun StreamSelector(
                                 } else {
                                     if (focusedIndex > 0) {
                                         focusedIndex--
+                                        focusedStreamActionIndex = 0
                                     }
                                 }
                                 true
@@ -450,21 +455,31 @@ fun StreamSelector(
                                         focusedIndex = 0  // Reset stream selection
                                     }
                                 } else {
-                                    if (focusedIndex < flatStreams.size - 1) focusedIndex++
+                                    if (focusedIndex < flatStreams.size - 1) {
+                                        focusedIndex++
+                                        focusedStreamActionIndex = 0
+                                    }
                                 }
                                 true
                             }
                             Key.DirectionLeft -> {
                                 when {
+                                    focusZone == "streams" && focusedStreamActionIndex > 0 -> {
+                                        focusedStreamActionIndex--
+                                    }
                                     focusZone == "addons" -> {
                                         focusZone = "streams"
                                         focusedIndex = focusedIndex.coerceAtMost((flatStreams.size - 1).coerceAtLeast(0))
+                                        focusedStreamActionIndex = 0
                                     }
                                 }
                                 true
                             }
                             Key.DirectionRight -> {
                                 when {
+                                    focusZone == "streams" && focusedStreamActionIndex == 0 -> {
+                                        focusedStreamActionIndex = 1
+                                    }
                                     focusZone == "streams" && tabLabels.size > 1 -> {
                                         focusZone = "addons"
                                         focusedTabIndex = selectedTabIndex
@@ -479,7 +494,7 @@ fun StreamSelector(
                                     focusedIndex = 0
                                 } else {
                                     flatStreams.getOrNull(focusedIndex)?.let { stream ->
-                                        onSelect(stream)
+                                        if (focusedStreamActionIndex == 1) onDownload(stream) else onSelect(stream)
                                     }
                                 }
                                 true
@@ -508,6 +523,7 @@ fun StreamSelector(
                     listState = listState,
                     addonListState = addonListState,
                     focusedIndex = focusedIndex,
+                    focusedActionIndex = focusedStreamActionIndex,
                     streamsFocused = focusZone == "streams",
                     count4K = count4K,
                     count1080 = count1080,
@@ -522,13 +538,16 @@ fun StreamSelector(
                         selectedFilterIndex = index
                         focusedFilterIndex = index
                         focusedIndex = 0
+                        focusedStreamActionIndex = 0
                     },
                     onAddonSelected = { index ->
                         selectedTabIndex = index
                         focusedTabIndex = index
                         focusedIndex = 0
+                        focusedStreamActionIndex = 0
                     },
-                    onSelect = onSelect
+                    onSelect = onSelect,
+                    onDownload = onDownload
                 )
             } else {
                 // Mobile single-column layout
@@ -706,7 +725,8 @@ fun StreamSelector(
                                 MobileStreamCard(
                                     presentation = presentation,
                                     isSelected = isSelectedSource(presentation.stream, selectedStream),
-                                    onClick = { onSelect(presentation.stream) }
+                                    onClick = { onSelect(presentation.stream) },
+                                    onDownload = { onDownload(presentation.stream) }
                                 )
                             }
                         }
@@ -738,6 +758,7 @@ private fun OledSourceSelectorTv(
     listState: TvLazyListState,
     addonListState: TvLazyListState,
     focusedIndex: Int,
+    focusedActionIndex: Int,
     streamsFocused: Boolean,
     count4K: Int,
     count1080: Int,
@@ -750,7 +771,8 @@ private fun OledSourceSelectorTv(
     loadingPluginNames: Set<String>,
     onFilterSelected: (Int) -> Unit,
     onAddonSelected: (Int) -> Unit,
-    onSelect: (StreamSource) -> Unit
+    onSelect: (StreamSource) -> Unit,
+    onDownload: (StreamSource) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -891,8 +913,10 @@ private fun OledSourceSelectorTv(
                                 OledSourceRow(
                                     presentation = presentation,
                                     isFocused = streamsFocused && index == focusedIndex,
+                                    isDownloadFocused = streamsFocused && index == focusedIndex && focusedActionIndex == 1,
                                     isSelected = isSelectedSource(presentation.stream, selectedStream),
-                                    onClick = { onSelect(presentation.stream) }
+                                    onClick = { onSelect(presentation.stream) },
+                                    onDownload = { onDownload(presentation.stream) }
                                 )
                             }
                         }
@@ -1931,8 +1955,10 @@ private fun SourceEmptyState(
 private fun OledSourceRow(
     presentation: SourcePresentation,
     isFocused: Boolean,
+    isDownloadFocused: Boolean,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDownload: () -> Unit
 ) {
     val accentColor = resolveAccentColor(AccentYellow)
     Column(
@@ -2007,6 +2033,12 @@ private fun OledSourceRow(
                             )
                         }
                     }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    SourceDownloadButton(
+                        onClick = onDownload,
+                        accentColor = accentColor,
+                        isFocused = isDownloadFocused
+                    )
                 }
                 Spacer(modifier = Modifier.height(5.dp))
                 Text(
@@ -2215,8 +2247,10 @@ private fun OledTextBadge(
 private fun MobileStreamCard(
     presentation: SourcePresentation,
     isSelected: Boolean,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onDownload: () -> Unit
 ) {
+    val accentColor = resolveAccentColor(AccentYellow)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2277,23 +2311,51 @@ private fun MobileStreamCard(
             }
         }
 
-        if (isSelected) {
-            Spacer(modifier = Modifier.width(10.dp))
-            Box(
-                modifier = Modifier
-                    .size(20.dp)
-                    .background(Color.White.copy(alpha = 0.14f), CircleShape)
-                    .border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Check,
-                    contentDescription = stringResource(R.string.selected),
-                    tint = Color.White,
-                    modifier = Modifier.size(14.dp)
-                )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            SourceDownloadButton(onClick = onDownload, accentColor = accentColor)
+            if (isSelected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Box(
+                    modifier = Modifier
+                        .size(20.dp)
+                        .background(Color.White.copy(alpha = 0.14f), CircleShape)
+                        .border(1.dp, Color.White.copy(alpha = 0.9f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = stringResource(R.string.selected),
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun SourceDownloadButton(
+    onClick: () -> Unit,
+    accentColor: Color,
+    isFocused: Boolean = false
+) {
+    Box(
+        modifier = Modifier
+            .size(if (isFocused) 38.dp else 34.dp)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (isFocused) accentColor else accentColor.copy(alpha = 0.16f))
+            .border(1.dp, accentColor.copy(alpha = if (isFocused) 0.95f else 0.55f), RoundedCornerShape(10.dp))
+            .clickable { onClick() },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Default.Download,
+            contentDescription = stringResource(R.string.offline_download_action),
+            tint = if (isFocused) Color.Black else accentColor,
+            modifier = Modifier.size(18.dp)
+        )
     }
 }
 

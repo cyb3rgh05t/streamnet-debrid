@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 394
-        versionName = "2.3.013"
+        versionCode = 395
+        versionName = "2.4.001"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -374,6 +374,7 @@ ksp {
     implementation("androidx.media3:media3-ui:$media3Version")
     implementation("androidx.media3:media3-session:$media3Version")
     implementation("androidx.media3:media3-common:$media3Version")
+    implementation("androidx.media3:media3-database:$media3Version")
     // FFmpeg extension for software decoding of DTS/TrueHD/Atmos/HEVC/DV.
     // Keep this only in the sideload build. The Play Store build must comply
     // with 16 KB memory page support, and the current prebuilt native library

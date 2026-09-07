@@ -142,6 +142,8 @@ import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.data.model.Subtitle
+import com.arflix.tv.data.repository.offline.OfflineDownloadComponents
+import com.arflix.tv.di.RepositoryAccessEntryPoint
 import com.arflix.tv.ui.components.KeepScreenOn
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.Toast
@@ -257,6 +259,7 @@ fun PlayerScreen(
     preferredBingeGroup: String? = null,
     startPositionMs: Long? = null,
     isLiveStream: Boolean = false,
+    offlineDownloadId: String? = null,
     viewModel: PlayerViewModel = hiltViewModel(),
     onBack: () -> Unit = {},
     onPlayNext: (EpisodeIdentity, String?, String?, String?) -> Unit = { _, _, _, _ -> }
@@ -278,6 +281,10 @@ fun PlayerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val castManager = remember(context) {
         EntryPointAccessors.fromApplication(context.applicationContext, CastManagerEntryPoint::class.java).castManager()
+    }
+    val offlineDownloadRepository = remember(context) {
+        EntryPointAccessors.fromApplication(context.applicationContext, RepositoryAccessEntryPoint::class.java)
+            .offlineDownloadRepository()
     }
     val castState by castManager.castState.collectAsStateWithLifecycle()
     val isCasting = castState is CastManager.CastState.Casting
@@ -758,7 +765,7 @@ fun PlayerScreen(
     }
 
     // Load media
-    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs, isLiveStream) {
+    LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber, imdbId, preferredAddonId, preferredSourceName, preferredBingeGroup, startPositionMs, isLiveStream, offlineDownloadId) {
         playbackIssueReported = false
         startupRecoverAttempted = false
         startupHardFailureReported = false
@@ -940,6 +947,12 @@ fun PlayerScreen(
             .setUpstreamDataSourceFactory(fileCapableDataSourceFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
     }
+    val offlineCacheDataSourceFactory = remember(context, fileCapableDataSourceFactory) {
+        CacheDataSource.Factory()
+            .setCache(OfflineDownloadComponents.downloadCache(context))
+            .setUpstreamDataSourceFactory(fileCapableDataSourceFactory)
+            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
+    }
     // Dolby Vision compatibility (see com.arflix.tv.player.dv): on devices
     // whose display/decoder can't do DV, profile-7 remux MKVs are rewritten on the fly to their
     // HDR10 HEVC base layer. The policy is probed once; the per-prepare decision (user toggle +
@@ -989,6 +1002,11 @@ fun PlayerScreen(
         (dvStripExtractorsFactory?.let { DefaultMediaSourceFactory(context, it) }
             ?: DefaultMediaSourceFactory(context))
             .setDataSourceFactory(cacheDataSourceFactory)
+    }
+    val offlineMediaSourceFactory = remember(offlineCacheDataSourceFactory, dvStripExtractorsFactory) {
+        (dvStripExtractorsFactory?.let { DefaultMediaSourceFactory(context, it) }
+            ?: DefaultMediaSourceFactory(context))
+            .setDataSourceFactory(offlineCacheDataSourceFactory)
     }
     // "Preload Subtitles" mode: sidecar subtitle configs only merge through a
     // DefaultMediaSourceFactory, but the cached one above would route heavy/debrid video through
@@ -1198,6 +1216,13 @@ fun PlayerScreen(
                             error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_TIMEOUT
 
                         if (isSourceError) {
+                            if (!offlineDownloadId.isNullOrBlank()) {
+                                if (!playbackIssueReported) {
+                                    playbackIssueReported = true
+                                    viewModel.reportPlaybackError(context.getString(R.string.offline_download_playback_missing))
+                                }
+                                return
+                            }
                             val sourceLikelyDv = isLikelyDolbyVisionStream(latestUiState.selectedStream)
                             if (!hasPlaybackStarted && sourceLikelyDv && dvStartupFallbackStage < 2) {
                                 val selector = this@apply.trackSelector as? androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -1734,6 +1759,20 @@ fun PlayerScreen(
         if (BuildConfig.DEBUG) {
         }
         if (url != null) {
+            val offlineId = offlineDownloadId?.takeIf { it.isNotBlank() }
+            if (offlineId != null) {
+                val offlineDownload = offlineDownloadRepository.getDownload(offlineId)
+                when {
+                    offlineDownload == null -> {
+                        viewModel.reportPlaybackError(context.getString(R.string.offline_download_playback_missing))
+                        return@LaunchedEffect
+                    }
+                    !offlineDownload.canPlay -> {
+                        viewModel.reportPlaybackError(context.getString(R.string.offline_download_playback_incomplete))
+                        return@LaunchedEffect
+                    }
+                }
+            }
             // Track when stream was selected (before any blocking probes)
             streamSelectedTime = System.currentTimeMillis()
             val prepareStartMs = streamSelectedTime ?: System.currentTimeMillis()
@@ -1847,6 +1886,10 @@ fun PlayerScreen(
             val urlLower = url.lowercase()
             val isDashStream = urlLower.contains(".mpd") || urlLower.contains("/dash") || urlLower.contains("format=dash")
             val mediaItemBuilder = MediaItem.Builder().setUri(Uri.parse(url))
+            offlineDownloadId?.takeIf { it.isNotBlank() }?.let { cacheKey ->
+                mediaItemBuilder.setMediaId(cacheKey)
+                mediaItemBuilder.setCustomCacheKey(cacheKey)
+            }
             if (isHlsStream) {
                 mediaItemBuilder.setMimeType(MimeTypes.APPLICATION_M3U8)
             }
@@ -1866,6 +1909,8 @@ fun PlayerScreen(
             val isHeavy = isLikelyHeavyStream(latestUiState.selectedStream)
             val isRemoteHttp = urlLower.startsWith("http://") || urlLower.startsWith("https://")
             val mediaSource: MediaSource = when {
+                !offlineDownloadId.isNullOrBlank() ->
+                    offlineMediaSourceFactory.createMediaSource(mediaItem)
                 // Sidecar subtitle configs only merge through a DefaultMediaSourceFactory; the
                 // preload variant streams video uncached (like directProgressiveFactory) and
                 // resolves HLS/DASH from the MIME hints set above.
