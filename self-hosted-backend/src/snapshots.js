@@ -106,7 +106,10 @@ function setMergeFieldValue(root, key, value) {
   }
 }
 
-export function mergePushPayloadByFieldTimestamps(incomingPayload, currentPayload) {
+export function mergePushPayloadByFieldTimestamps(
+  incomingPayload,
+  currentPayload,
+) {
   if (!isPlainObject(incomingPayload) || !isPlainObject(currentPayload)) {
     return incomingPayload;
   }
@@ -124,7 +127,8 @@ export function mergePushPayloadByFieldTimestamps(incomingPayload, currentPayloa
     const currentTime = Number(currentTs[key] || 0);
     if (currentTime > incomingTime) {
       const value = mergeFieldValue(currentPayload, key);
-      if (value !== undefined) setMergeFieldValue(incoming, key, cloneJson(value));
+      if (value !== undefined)
+        setMergeFieldValue(incoming, key, cloneJson(value));
       if (currentTime > 0) mergedTs[key] = currentTime;
     } else if (incomingTime > 0) {
       mergedTs[key] = incomingTime;
