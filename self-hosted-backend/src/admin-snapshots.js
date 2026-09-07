@@ -2,6 +2,7 @@ const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
   /password|token|secret|authorization|cookie|credential|api[_-]?key|m3uurl|epgurl|transporturl|portalurl|macaddress|avatar|image/i;
 const allowedProfileRoots = new Set(["profileSettingsById", "iptvByProfile"]);
+const adminSnapshotMaxBytes = 8 * 1024 * 1024;
 
 function isPlainObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -168,12 +169,16 @@ export function applyAdminSnapshotMutation(
   if (!isPlainObject(payloadValue))
     throw new Error("Snapshot payload is invalid");
   if (!isPlainObject(request)) throw new Error("Mutation request is invalid");
-  const payload = cloneJson(payloadValue, "Snapshot payload");
+  const payload = cloneJson(
+    payloadValue,
+    "Snapshot payload",
+    adminSnapshotMaxBytes,
+  );
   const operation = String(request.operation || "").trim();
   const data = request.data;
 
   if (operation === "edit_payload") {
-    const edited = cloneJson(data, "Payload data", 512 * 1024);
+    const edited = cloneJson(data, "Payload data", adminSnapshotMaxBytes);
     assertSafeKeys(edited);
     if (!Array.isArray(edited.profiles) || edited.profiles.length === 0) {
       throw new Error("Payload must include at least one profile");

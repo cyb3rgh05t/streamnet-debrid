@@ -41,6 +41,22 @@ test("upserts an account-wide addon and advances sync timestamps", () => {
   );
 });
 
+test("applies small admin mutations to large existing snapshots", () => {
+  const value = snapshot();
+  value.largeGuideCache = "x".repeat(700 * 1024);
+
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "set_profile_field",
+    profileId: "kids",
+    rootKey: "profileSettingsById",
+    field: "liveTvLayoutMode",
+    data: "classic",
+  });
+
+  assert.equal(result.profileSettingsById.kids.liveTvLayoutMode, "classic");
+  assert.equal(result.largeGuideCache.length, 700 * 1024);
+});
+
 test("upserts a playlist only for the selected profile", () => {
   const result = applyAdminSnapshotMutation(snapshot(), {
     operation: "upsert_playlist",

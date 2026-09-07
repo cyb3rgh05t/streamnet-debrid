@@ -270,6 +270,7 @@ fun DetailsScreen(
     var showSeasonContextMenu by remember { mutableStateOf(false) }
     var contextMenuSeason by remember { mutableIntStateOf(1) }
     var seasonSelectDownAtMs by remember { mutableLongStateOf(0L) }
+    var episodeSelectDownAtMs by remember { mutableLongStateOf(0L) }
     val resumeRefreshGate = remember(mediaType, mediaId, initialSeason, initialEpisode) {
         DetailsResumeRefreshGate()
     }
@@ -539,6 +540,17 @@ fun DetailsScreen(
         }
     }
 
+    val onEpisodeLongClickRemembered = remember {
+        { idx: Int ->
+            currentUiState.value.episodes.getOrNull(idx)?.let { episode ->
+                episodeIndex = idx
+                contextMenuEpisode = episode
+                showEpisodeContextMenu = true
+            }
+            Unit
+        }
+    }
+
     val onCastClickRemembered = remember {
         { idx: Int ->
             val member = currentUiState.value.cast.getOrNull(idx)
@@ -804,6 +816,12 @@ fun DetailsScreen(
                                 }
                                 return@onPreviewKeyEvent true
                             }
+                            if (!isSidebarFocused && focusedSection == FocusSection.EPISODES) {
+                                if (episodeSelectDownAtMs == 0L) {
+                                    episodeSelectDownAtMs = SystemClock.elapsedRealtime()
+                                }
+                                return@onPreviewKeyEvent true
+                            }
                             if (isSidebarFocused) {
                                 if (hasProfile && sidebarFocusIndex == 0) {
                                     onSwitchProfile()
@@ -887,20 +905,7 @@ fun DetailsScreen(
                                         }
                                     }
                                 }
-                                FocusSection.EPISODES -> {
-                                    val ep = uiState.episodes.getOrNull(episodeIndex)
-                                    if (ep != null) {
-                                        if (!uiState.autoPlaySingleSource) {
-                                            showStreamSelector = true
-                                            viewModel.loadStreams(uiState.imdbId, ep.identity)
-                                        } else {
-                                            requestFastAutoPlay(
-                                                uiState.imdbId, ep.seasonNumber, ep.episodeNumber, null,
-                                                ep.tmdbSeasonNumber, ep.tmdbEpisodeNumber
-                                            )
-                                        }
-                                    }
-                                }
+                                FocusSection.EPISODES -> Unit
                                 FocusSection.SEASONS -> {
                                     episodeIndex = 0
                                     ratingsIndex = 0
@@ -943,7 +948,26 @@ fun DetailsScreen(
                         else -> false
                     }
                 } else if (event.type == KeyEventType.KeyUp && (event.key == Key.Enter || event.key == Key.DirectionCenter)) {
-                    if (!isSidebarFocused && focusedSection == FocusSection.SEASONS && seasonSelectDownAtMs > 0L) {
+                    if (!isSidebarFocused && focusedSection == FocusSection.EPISODES && episodeSelectDownAtMs > 0L) {
+                        val heldMs = SystemClock.elapsedRealtime() - episodeSelectDownAtMs
+                        episodeSelectDownAtMs = 0L
+                        val ep = uiState.episodes.getOrNull(episodeIndex)
+                        if (ep != null && heldMs >= 900L) {
+                            contextMenuEpisode = ep
+                            showEpisodeContextMenu = true
+                        } else if (ep != null) {
+                            if (!uiState.autoPlaySingleSource) {
+                                showStreamSelector = true
+                                viewModel.loadStreams(uiState.imdbId, ep.identity)
+                            } else {
+                                requestFastAutoPlay(
+                                    uiState.imdbId, ep.seasonNumber, ep.episodeNumber, null,
+                                    ep.tmdbSeasonNumber, ep.tmdbEpisodeNumber
+                                )
+                            }
+                        }
+                        true
+                    } else if (!isSidebarFocused && focusedSection == FocusSection.SEASONS && seasonSelectDownAtMs > 0L) {
                         val heldMs = SystemClock.elapsedRealtime() - seasonSelectDownAtMs
                         seasonSelectDownAtMs = 0L
                         if (heldMs >= 900L) {
@@ -1024,6 +1048,7 @@ fun DetailsScreen(
                     onSeasonClick = onSeasonClickRemembered,
                     onSeasonLongClick = onSeasonLongClickRemembered,
                     onEpisodeClick = onEpisodeClickRemembered,
+                    onEpisodeLongClick = onEpisodeLongClickRemembered,
                     onCastClick = onCastClickRemembered,
                     onSimilarClick = onSimilarClickRemembered,
                     onCollectionClick = onCollectionClickRemembered
@@ -1298,6 +1323,7 @@ private fun DetailsContent(
     onSeasonClick: (Int) -> Unit = {},
     onSeasonLongClick: ((Int) -> Unit)? = null,
     onEpisodeClick: (Int) -> Unit = {},
+    onEpisodeLongClick: (Int) -> Unit = {},
     onCastClick: (Int) -> Unit = {},
     spoilerBlurEnabled: Boolean = false,
     onSimilarClick: (Int) -> Unit = {},
@@ -1683,7 +1709,8 @@ private fun DetailsContent(
                                 episode = episode,
                                 isFocused = false,
                                 spoilerBlurEnabled = spoilerBlurEnabled,
-                                onClick = { onEpisodeClick(index) }
+                                onClick = { onEpisodeClick(index) },
+                                onLongClick = { onEpisodeLongClick(index) }
                             )
                         }
                     }
@@ -3785,7 +3812,8 @@ private fun EpisodeCard(
     cardWidth: androidx.compose.ui.unit.Dp = 300.dp,
     isFocused: Boolean,
     spoilerBlurEnabled: Boolean = false,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onLongClick: (() -> Unit)? = null
 ) {
     val aspectRatio = 16f / 9f
     val context = LocalContext.current
@@ -3850,6 +3878,7 @@ private fun EpisodeCard(
         enableSystemFocus = false,
         isFocusedOverride = isFocused,
         onClick = onClick,
+        onLongClick = onLongClick,
     ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
             AsyncImage(

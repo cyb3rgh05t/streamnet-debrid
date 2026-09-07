@@ -91,6 +91,8 @@ import com.arflix.tv.data.repository.HomeServerLibrarySort
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarHeight
 import com.arflix.tv.ui.components.CardLayoutMode
+import com.arflix.tv.ui.components.ContextActions
+import com.arflix.tv.ui.components.ContextMenu
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.SidebarItem
@@ -212,6 +214,8 @@ fun WatchlistScreen(
     var sortFocusIndex by remember { mutableIntStateOf(0) }
     var selectedProviderId by remember { mutableStateOf(WATCHLIST_PROVIDER_ID) }
     var trackerSearchQuery by remember { mutableStateOf("") }
+    var contextMenuItem by remember { mutableStateOf<MediaItem?>(null) }
+    var contextMenuCanRemoveWatchlist by remember { mutableStateOf(false) }
     val longPressThresholdMs = 500L
     val watchlistColumnState = rememberLazyListState()
     val libraryGridState = rememberLazyGridState()
@@ -676,6 +680,10 @@ fun WatchlistScreen(
                     onItemFocused = { focusedItemIndex = it },
                     onItemVisible = viewModel::ensureLogo,
                     onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
+                    onItemLongPress = { item ->
+                        contextMenuItem = item
+                        contextMenuCanRemoveWatchlist = false
+                    },
                     onLoadMore = {
                         if (isHomeServerMode) viewModel.loadMoreLibrary() else viewModel.loadMoreActiveSource()
                     }
@@ -693,9 +701,32 @@ fun WatchlistScreen(
                     listState = watchlistColumnState,
                     onItemFocused = { index -> focusedItemIndex = index },
                     onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
-                    onItemLongPress = viewModel::removeFromWatchlist
+                    onItemLongPress = { item ->
+                        contextMenuItem = item
+                        contextMenuCanRemoveWatchlist = true
+                    }
                 )
             }
+        }
+
+        contextMenuItem?.let { item ->
+            ContextMenu(
+                isVisible = true,
+                title = item.title,
+                subtitle = item.year.takeIf { it.isNotBlank() } ?: item.releaseDate,
+                actions = buildList {
+                    add(ContextActions.viewDetails)
+                    if (contextMenuCanRemoveWatchlist) add(ContextActions.removeWatchlist)
+                },
+                onAction = { action ->
+                    when (action.id) {
+                        "view_details" -> onNavigateToDetails(item.mediaType, item.id)
+                        "remove_watchlist" -> viewModel.removeFromWatchlist(item)
+                    }
+                    contextMenuItem = null
+                },
+                onDismiss = { contextMenuItem = null }
+            )
         }
 
         uiState.toastMessage?.let { message ->
@@ -816,6 +847,7 @@ private fun ColumnScope.HomeLibraryContent(
     onItemFocused: (Int) -> Unit,
     onItemVisible: (MediaItem) -> Unit,
     onItemClick: (MediaItem) -> Unit,
+    onItemLongPress: (MediaItem) -> Unit,
     onLoadMore: () -> Unit
 ) {
     if (isMobile && libraries.isNotEmpty()) {
@@ -839,6 +871,7 @@ private fun ColumnScope.HomeLibraryContent(
             onItemFocused = onItemFocused,
             onItemVisible = onItemVisible,
             onItemClick = onItemClick,
+            onItemLongPress = onItemLongPress,
             onLoadMore = onLoadMore
         )
     } else {
@@ -865,6 +898,7 @@ private fun ColumnScope.HomeLibraryContent(
                     onItemFocused = onItemFocused,
                     onItemVisible = onItemVisible,
                     onItemClick = onItemClick,
+                    onItemLongPress = onItemLongPress,
                     onLoadMore = onLoadMore
                 )
             }
@@ -1166,6 +1200,7 @@ private fun ColumnScope.LibraryResults(
     onItemFocused: (Int) -> Unit,
     onItemVisible: (MediaItem) -> Unit,
     onItemClick: (MediaItem) -> Unit,
+    onItemLongPress: (MediaItem) -> Unit,
     onLoadMore: () -> Unit
 ) {
     when {
@@ -1223,7 +1258,8 @@ private fun ColumnScope.LibraryResults(
                             isFocusedOverride = index == focusedItemIndex,
                             enableSystemFocus = false,
                             onFocused = { onItemFocused(index) },
-                            onClick = { onItemClick(item) }
+                            onClick = { onItemClick(item) },
+                            onLongClick = { onItemLongPress(item) }
                         )
                     }
                     if (state.isLoadingMore) {

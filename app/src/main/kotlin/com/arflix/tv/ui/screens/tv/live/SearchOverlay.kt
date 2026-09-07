@@ -48,6 +48,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.ImeAction
@@ -82,7 +83,17 @@ fun SearchOverlay(
     var results by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     val focusRequester = remember { FocusRequester() }
     val firstResultFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    fun focusSearchInput() {
+        runCatching { focusRequester.requestFocus() }
+        keyboardController?.show()
+    }
+    LaunchedEffect(Unit) {
+        repeat(5) { attempt ->
+            focusSearchInput()
+            if (attempt < 4) delay(60L)
+        }
+    }
 
     // Resolved up front so they can be used inside the non-composable search LaunchedEffect.
     val nowFormat = stringResource(R.string.live_search_now)
@@ -212,15 +223,26 @@ fun SearchOverlay(
                     modifier = Modifier
                         .weight(1f)
                         .focusRequester(focusRequester)
+                        .focusable()
+                        .pointerInput(Unit) {
+                            detectTapGestures(onTap = { focusSearchInput() })
+                        }
                         .onPreviewKeyEvent { ev ->
-                            if (ev.type == KeyEventType.KeyDown &&
-                                ev.key == Key.DirectionDown &&
-                                results.isNotEmpty()
-                            ) {
-                                runCatching { firstResultFocus.requestFocus() }
-                                true
-                            } else {
-                                false
+                            if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (ev.key) {
+                                Key.DirectionDown -> {
+                                    if (results.isNotEmpty()) {
+                                        runCatching { firstResultFocus.requestFocus() }
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                                Key.DirectionCenter, Key.Enter -> {
+                                    focusSearchInput()
+                                    true
+                                }
+                                else -> false
                             }
                         }
                         .onKeyEvent { ev ->

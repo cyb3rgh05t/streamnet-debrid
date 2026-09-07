@@ -141,6 +141,20 @@
     <string name="frame_rate">Match Frame Rate</string>
     <string name="quality_filters">Quality Regex Filters</string>
     <string name="card_layout">Card Layout</string>
+    <string name="live_tv_layout">Live TV Layout</string>
+    <string name="live_tv_layout_desc">Choose the TV-mode Live TV interface</string>
+    <string name="live_tv_layout_streamnet">Netflix</string>
+    <string name="live_tv_layout_classic">Classic</string>
+    <string name="live_tv_netflix_title_size">Netflix EPG title size</string>
+    <string name="live_tv_netflix_description_size">Netflix EPG description size</string>
+    <string name="live_tv_classic_title_size">Classic EPG title size</string>
+    <string name="live_tv_classic_description_size">Classic EPG description size</string>
+    <string name="live_tv_info_title_size_desc">Adjust current programme title size</string>
+    <string name="live_tv_info_description_size_desc">Adjust synopsis size without changing the EPG grid</string>
+    <string name="live_tv_text_size_small">Small</string>
+    <string name="live_tv_text_size_normal">Normal</string>
+    <string name="live_tv_text_size_large">Large</string>
+    <string name="live_tv_text_size_extra_large">Extra Large</string>
     <string name="ui_mode">UI Mode</string>
     <string name="skip_profile">Skip Profile Selection</string>
     <string name="oled_black_background">OLED Black Background</string>
@@ -1252,6 +1266,13 @@
     <string name="watchlist_simkl_completed">Completed</string>
     <string name="watchlist_simkl_on_hold">On hold</string>
     <string name="watchlist_simkl_dropped">Dropped</string>
+    <string name="context_action_play">Play</string>
+    <string name="context_action_mark_unwatched">Mark as Unwatched</string>
+    <string name="context_action_view_details">View Details</string>
+    <string name="context_action_mark_season_watched">Mark Season Watched</string>
+    <string name="context_action_mark_season_unwatched">Mark Season Unwatched</string>
+    <string name="context_title_season">Season %1$d</string>
+    <string name="context_quick_actions">Quick Actions</string>
 
 
     <!-- Extracted from code (data layer): shared labels and errors -->

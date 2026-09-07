@@ -113,6 +113,11 @@ data class SettingsUiState(
     val defaultAudioLanguage: String = "Auto (Original)",
     val audioLanguageOptions: List<String> = emptyList(),
     val cardLayoutMode: String = CARD_LAYOUT_MODE_LANDSCAPE,
+    val liveTvLayoutMode: String = "streamnet",
+    val liveTvNetflixTitleSize: String = "Normal",
+    val liveTvNetflixDescriptionSize: String = "Normal",
+    val liveTvClassicTitleSize: String = "Normal",
+    val liveTvClassicDescriptionSize: String = "Normal",
     val frameRateMatchingMode: String = "Off",
     val autoPlayNext: Boolean = true,
     val autoPlaySingleSource: Boolean = true,
@@ -335,6 +340,11 @@ class SettingsViewModel @Inject constructor(
     private fun subtitleUsageKey() = profileManager.profileStringKey("subtitle_usage_v1")
     private fun cardLayoutModeKey() = profileManager.profileStringKey("card_layout_mode")
     private fun cardLayoutModeKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "card_layout_mode")
+    private fun liveTvLayoutModeKey() = profileManager.profileStringKey("live_tv_layout_mode")
+    private fun liveTvNetflixTitleSizeKey() = profileManager.profileStringKey("live_tv_netflix_title_size")
+    private fun liveTvNetflixDescriptionSizeKey() = profileManager.profileStringKey("live_tv_netflix_description_size")
+    private fun liveTvClassicTitleSizeKey() = profileManager.profileStringKey("live_tv_classic_title_size")
+    private fun liveTvClassicDescriptionSizeKey() = profileManager.profileStringKey("live_tv_classic_description_size")
     private fun frameRateMatchingModeKey() = profileManager.profileStringKey("frame_rate_matching_mode")
     private fun frameRateMatchingModeKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "frame_rate_matching_mode")
     private fun autoPlayNextKey() = profileManager.profileBooleanKey("auto_play_next")
@@ -595,6 +605,11 @@ class SettingsViewModel @Inject constructor(
             var defaultSub = prefs[defaultSubtitleKey()] ?: "Off"
             val defaultAudio = prefs[defaultAudioLanguageKey()] ?: "Auto (Original)"
             val cardLayoutMode = normalizeCardLayoutMode(prefs[cardLayoutModeKey()])
+            val liveTvLayoutMode = normalizeLiveTvLayoutMode(prefs[liveTvLayoutModeKey()])
+            val liveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(prefs[liveTvNetflixTitleSizeKey()])
+            val liveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(prefs[liveTvNetflixDescriptionSizeKey()])
+            val liveTvClassicTitleSize = normalizeLiveTvInfoTextSize(prefs[liveTvClassicTitleSizeKey()])
+            val liveTvClassicDescriptionSize = normalizeLiveTvInfoTextSize(prefs[liveTvClassicDescriptionSizeKey()])
             val frameRateMode = normalizeFrameRateMode(prefs[frameRateMatchingModeKey()])
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
@@ -723,6 +738,11 @@ class SettingsViewModel @Inject constructor(
                 defaultAudioLanguage = defaultAudio,
                 audioLanguageOptions = audioLanguageOptions,
                 cardLayoutMode = cardLayoutMode,
+                liveTvLayoutMode = liveTvLayoutMode,
+                liveTvNetflixTitleSize = liveTvNetflixTitleSize,
+                liveTvNetflixDescriptionSize = liveTvNetflixDescriptionSize,
+                liveTvClassicTitleSize = liveTvClassicTitleSize,
+                liveTvClassicDescriptionSize = liveTvClassicDescriptionSize,
                 frameRateMatchingMode = frameRateMode,
                 autoPlayNext = autoPlay,
                 autoPlaySingleSource = autoPlaySingleSource,
@@ -1408,6 +1428,77 @@ class SettingsViewModel @Inject constructor(
             }
             _uiState.value = _uiState.value.copy(cardLayoutMode = normalized)
             syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun toggleLiveTvLayoutMode() {
+        val next = if (_uiState.value.liveTvLayoutMode == "classic") "streamnet" else "classic"
+        viewModelScope.launch {
+            context.settingsDataStore.edit { prefs ->
+                prefs[liveTvLayoutModeKey()] = next
+            }
+            _uiState.value = _uiState.value.copy(liveTvLayoutMode = next)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    private fun normalizeLiveTvLayoutMode(value: String?): String {
+        return when (value?.lowercase()) {
+            "classic" -> "classic"
+            else -> "streamnet"
+        }
+    }
+
+    fun cycleLiveTvNetflixTitleSize() = cycleLiveTvInfoTextSize(liveTvNetflixTitleSizeKey()) {
+        _uiState.value.copy(liveTvNetflixTitleSize = it)
+    }
+
+    fun cycleLiveTvNetflixDescriptionSize() = cycleLiveTvInfoTextSize(liveTvNetflixDescriptionSizeKey()) {
+        _uiState.value.copy(liveTvNetflixDescriptionSize = it)
+    }
+
+    fun cycleLiveTvClassicTitleSize() = cycleLiveTvInfoTextSize(liveTvClassicTitleSizeKey()) {
+        _uiState.value.copy(liveTvClassicTitleSize = it)
+    }
+
+    fun cycleLiveTvClassicDescriptionSize() = cycleLiveTvInfoTextSize(liveTvClassicDescriptionSizeKey()) {
+        _uiState.value.copy(liveTvClassicDescriptionSize = it)
+    }
+
+    private fun cycleLiveTvInfoTextSize(
+        key: androidx.datastore.preferences.core.Preferences.Key<String>,
+        update: (String) -> SettingsUiState
+    ) {
+        val next = nextLiveTvInfoTextSize(_uiState.value.run {
+            when (key) {
+                liveTvNetflixTitleSizeKey() -> liveTvNetflixTitleSize
+                liveTvNetflixDescriptionSizeKey() -> liveTvNetflixDescriptionSize
+                liveTvClassicTitleSizeKey() -> liveTvClassicTitleSize
+                else -> liveTvClassicDescriptionSize
+            }
+        })
+        viewModelScope.launch {
+            context.settingsDataStore.edit { prefs -> prefs[key] = next }
+            _uiState.value = update(next)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    private fun normalizeLiveTvInfoTextSize(value: String?): String {
+        return when (value?.lowercase()) {
+            "small" -> "Small"
+            "large" -> "Large"
+            "extra large", "extra_large", "xlarge", "xl" -> "Extra Large"
+            else -> "Normal"
+        }
+    }
+
+    private fun nextLiveTvInfoTextSize(value: String): String {
+        return when (normalizeLiveTvInfoTextSize(value)) {
+            "Small" -> "Normal"
+            "Normal" -> "Large"
+            "Large" -> "Extra Large"
+            else -> "Small"
         }
     }
 

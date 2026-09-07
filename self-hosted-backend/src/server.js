@@ -394,6 +394,7 @@ app.get("/assets/:asset", async (request, reply) => {
     !new Set([
       "streamnet-logo.svg",
       "streamnet-club-logo.svg",
+      "streamnetapp-logo.svg",
       "streamnet-icon.svg",
     ]).has(asset)
   ) {

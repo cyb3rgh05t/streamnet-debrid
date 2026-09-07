@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arflix.tv.ui.skin.resolveAccentColor
@@ -145,3 +146,23 @@ object LiveDims {
 val LocalLiveColors = staticCompositionLocalOf { LiveColors }
 val LocalLiveType   = staticCompositionLocalOf { LiveType }
 val LocalLiveDims   = staticCompositionLocalOf { LiveDims }
+
+internal fun liveTvInfoTitleFontSize(mode: String): TextUnit = when (mode.lowercase()) {
+    "small" -> 11.sp
+    "large" -> 15.sp
+    "extra large", "extra_large", "xlarge", "xl" -> 17.sp
+    else -> 13.sp
+}
+
+internal fun liveTvInfoDescriptionFontSize(mode: String): TextUnit = when (mode.lowercase()) {
+    "small" -> 8.sp
+    "large" -> 11.sp
+    "extra large", "extra_large", "xlarge", "xl" -> 12.sp
+    else -> 9.sp
+}
+
+internal fun liveTvInfoDescriptionMaxLines(mode: String): Int = when (mode.lowercase()) {
+    "large" -> 3
+    "extra large", "extra_large", "xlarge", "xl" -> 2
+    else -> 4
+}

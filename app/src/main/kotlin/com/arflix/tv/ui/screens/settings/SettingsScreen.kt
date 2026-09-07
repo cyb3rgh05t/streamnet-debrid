@@ -272,7 +272,7 @@ private fun tvGeneralRowsForSection(section: String): List<Int> {
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(17, 18, 42, 21, 22, 23, 46, 24, 41, 36)
+        "appearance" -> listOf(18, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -1074,6 +1074,11 @@ fun SettingsScreen(
                                                 15 -> viewModel.cycleFrameRateMatchingMode()
                                                 16 -> showQualityFiltersModal = true
                                                 17 -> viewModel.toggleCardLayoutMode()
+                                                47 -> viewModel.toggleLiveTvLayoutMode()
+                                                48 -> viewModel.cycleLiveTvNetflixTitleSize()
+                                                49 -> viewModel.cycleLiveTvNetflixDescriptionSize()
+                                                50 -> viewModel.cycleLiveTvClassicTitleSize()
+                                                51 -> viewModel.cycleLiveTvClassicDescriptionSize()
                                                 18 -> openUiModeWarningDialog()
                                                 19 -> viewModel.setSkipProfileSelection(!uiState.skipProfileSelection)
                                                 44 -> if (uiState.settingsLockEnabled) {
@@ -1646,6 +1651,11 @@ fun SettingsScreen(
                             defaultAudioLanguage = uiState.defaultAudioLanguage,
                             dnsProvider = uiState.dnsProvider,
                             cardLayoutMode = uiState.cardLayoutMode,
+                            liveTvLayoutMode = uiState.liveTvLayoutMode,
+                            liveTvNetflixTitleSize = uiState.liveTvNetflixTitleSize,
+                            liveTvNetflixDescriptionSize = uiState.liveTvNetflixDescriptionSize,
+                            liveTvClassicTitleSize = uiState.liveTvClassicTitleSize,
+                            liveTvClassicDescriptionSize = uiState.liveTvClassicDescriptionSize,
                             frameRateMatchingMode = uiState.frameRateMatchingMode,
                             autoPlayNext = uiState.autoPlayNext,
                             autoPlaySingleSource = uiState.autoPlaySingleSource,
@@ -1671,6 +1681,11 @@ fun SettingsScreen(
                             onSecondarySubtitleClick = openSecondarySubtitlePicker,
                             onAudioLanguageClick = openAudioLanguagePicker,
                             onCardLayoutToggle = { viewModel.toggleCardLayoutMode() },
+                            onLiveTvLayoutToggle = { viewModel.toggleLiveTvLayoutMode() },
+                            onLiveTvNetflixTitleSizeClick = { viewModel.cycleLiveTvNetflixTitleSize() },
+                            onLiveTvNetflixDescriptionSizeClick = { viewModel.cycleLiveTvNetflixDescriptionSize() },
+                            onLiveTvClassicTitleSizeClick = { viewModel.cycleLiveTvClassicTitleSize() },
+                            onLiveTvClassicDescriptionSizeClick = { viewModel.cycleLiveTvClassicDescriptionSize() },
                             onFrameRateMatchingClick = { viewModel.cycleFrameRateMatchingMode() },
                             onDnsProviderClick = openDnsProviderPicker,
                             onAutoPlayToggle = { viewModel.setAutoPlayNext(it) },
@@ -6422,6 +6437,14 @@ private fun formatCompactCount(value: Int): String {
 }
 
 @Composable
+private fun liveTvInfoTextSizeLabel(value: String): String = when (value) {
+    "Small" -> stringResource(R.string.live_tv_text_size_small)
+    "Large" -> stringResource(R.string.live_tv_text_size_large)
+    "Extra Large" -> stringResource(R.string.live_tv_text_size_extra_large)
+    else -> stringResource(R.string.live_tv_text_size_normal)
+}
+
+@Composable
 private fun TvGeneralSettingsRows(
     section: String,
     defaultSubtitle: String,
@@ -6430,6 +6453,11 @@ private fun TvGeneralSettingsRows(
     contentLanguage: String = "en-US",
     dnsProvider: String,
     cardLayoutMode: String,
+    liveTvLayoutMode: String = "streamnet",
+    liveTvNetflixTitleSize: String = "Normal",
+    liveTvNetflixDescriptionSize: String = "Normal",
+    liveTvClassicTitleSize: String = "Normal",
+    liveTvClassicDescriptionSize: String = "Normal",
     frameRateMatchingMode: String,
     autoPlayNext: Boolean,
     autoPlaySingleSource: Boolean,
@@ -6457,6 +6485,11 @@ private fun TvGeneralSettingsRows(
     onSecondarySubtitleClick: () -> Unit = {},
     onAudioLanguageClick: () -> Unit,
     onCardLayoutToggle: () -> Unit,
+    onLiveTvLayoutToggle: () -> Unit = {},
+    onLiveTvNetflixTitleSizeClick: () -> Unit = {},
+    onLiveTvNetflixDescriptionSizeClick: () -> Unit = {},
+    onLiveTvClassicTitleSizeClick: () -> Unit = {},
+    onLiveTvClassicDescriptionSizeClick: () -> Unit = {},
     onFrameRateMatchingClick: () -> Unit,
     onDnsProviderClick: () -> Unit,
     onAutoPlayToggle: (Boolean) -> Unit,
@@ -6572,6 +6605,19 @@ private fun TvGeneralSettingsRows(
                 15 -> SettingsRow(Icons.Default.Movie, stringResource(R.string.frame_rate), stringResource(R.string.frame_rate_desc), frameRateMatchingMode, focusedIndex == localIndex, onFrameRateMatchingClick, Modifier.settingsFocusSlot(localIndex))
                 16 -> SettingsRow(Icons.Default.HighQuality, stringResource(R.string.quality_filters), stringResource(R.string.quality_filters_desc), qualityFilterValue, focusedIndex == localIndex, onQualityFiltersClick, Modifier.settingsFocusSlot(localIndex))
                 17 -> SettingsRow(Icons.Default.Widgets, stringResource(R.string.card_layout), stringResource(R.string.card_layout_desc), cardLayoutMode, focusedIndex == localIndex, onCardLayoutToggle, Modifier.settingsFocusSlot(localIndex))
+                47 -> SettingsRow(
+                    Icons.Default.LiveTv,
+                    stringResource(R.string.live_tv_layout),
+                    stringResource(R.string.live_tv_layout_desc),
+                    if (liveTvLayoutMode == "classic") stringResource(R.string.live_tv_layout_classic) else stringResource(R.string.live_tv_layout_streamnet),
+                    focusedIndex == localIndex,
+                    onLiveTvLayoutToggle,
+                    Modifier.settingsFocusSlot(localIndex)
+                )
+                48 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.live_tv_netflix_title_size), stringResource(R.string.live_tv_info_title_size_desc), liveTvInfoTextSizeLabel(liveTvNetflixTitleSize), focusedIndex == localIndex, onLiveTvNetflixTitleSizeClick, Modifier.settingsFocusSlot(localIndex))
+                49 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.live_tv_netflix_description_size), stringResource(R.string.live_tv_info_description_size_desc), liveTvInfoTextSizeLabel(liveTvNetflixDescriptionSize), focusedIndex == localIndex, onLiveTvNetflixDescriptionSizeClick, Modifier.settingsFocusSlot(localIndex))
+                50 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.live_tv_classic_title_size), stringResource(R.string.live_tv_info_title_size_desc), liveTvInfoTextSizeLabel(liveTvClassicTitleSize), focusedIndex == localIndex, onLiveTvClassicTitleSizeClick, Modifier.settingsFocusSlot(localIndex))
+                51 -> SettingsRow(Icons.Default.Subtitles, stringResource(R.string.live_tv_classic_description_size), stringResource(R.string.live_tv_info_description_size_desc), liveTvInfoTextSizeLabel(liveTvClassicDescriptionSize), focusedIndex == localIndex, onLiveTvClassicDescriptionSizeClick, Modifier.settingsFocusSlot(localIndex))
                 18 -> SettingsRow(
                     icon = Icons.Default.Settings,
                     title = stringResource(R.string.ui_mode),

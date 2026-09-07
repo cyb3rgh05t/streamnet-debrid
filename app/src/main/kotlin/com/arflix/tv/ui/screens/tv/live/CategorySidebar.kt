@@ -654,6 +654,7 @@ private fun SidebarRow(
     labelSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     focusRequester: FocusRequester? = null,
 ) {
+    val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
     var consumedLongPress by remember { mutableStateOf(false) }
     var selectPressed by remember { mutableStateOf(false) }
@@ -689,6 +690,20 @@ private fun SidebarRow(
                     if (it.isFocused) onFocused?.invoke()
                 }
                 .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    when (ev.key) {
+                        Key.DirectionUp -> {
+                            focusManager.moveFocus(FocusDirection.Up)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        else -> false
+                    }
+                }
                 .border(
                     width = if (focused) 1.dp else 0.dp,
                     color = if (focused) LiveColors.FocusRing else Color.Transparent,

@@ -41,7 +41,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -86,7 +85,6 @@ fun ProgramCell(
     val isTouchDevice = deviceType.isTouchDevice()
     val currentOnClick by rememberUpdatedState(onClick)
     val narrowCell = width < 92.dp
-    val compactCell = width < 136.dp
     var focused by remember { mutableStateOf(false) }
     val baseBg = when {
         isNow -> LiveColors.FocusBg
@@ -212,58 +210,16 @@ fun ProgramCell(
         }
         Column(
             modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.Center,
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                val nowMs = clockTickMillis
-                if (shouldShowEpgLiveBadge(isNow, narrowCell, isTouchDevice)) {
-                    Badge(stringResource(R.string.live_badge_live), Color.White, LiveColors.LiveRed)
-                    Spacer(Modifier.size(6.dp))
-                } else if (isPast && isCatchupSupported && !narrowCell) {
-                    Badge(stringResource(R.string.live_badge_archive), LiveColors.Bg, LiveColors.Accent)
-                    Spacer(Modifier.size(6.dp))
-                } else if (!isPast && !narrowCell) {
-                    val isNewTag = (nowMs - program.startUtcMillis) in 0..24L * 60 * 60 * 1000L &&
-                        !program.isLive(nowMs)
-                    if (isNewTag) {
-                        Badge(stringResource(R.string.live_badge_new), LiveColors.Bg, LiveColors.Accent)
-                        Spacer(Modifier.size(6.dp))
-                    }
-                }
                 Text(
                     text = program.title,
                     style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 11.sp),
-                    maxLines = 1,
+                    maxLines = if (narrowCell) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-            }
-            if (!compactCell && !program.description.isNullOrBlank()) {
-                Text(
-                    text = program.description!!,
-                    style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim, fontSize = 9.sp),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (!narrowCell) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = formatClock(program.startUtcMillis),
-                        style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
-                    )
-                    val mins = ((program.endUtcMillis - program.startUtcMillis) / 60_000L)
-                        .coerceAtLeast(0L)
-                    if (mins > 0) {
-                        Text(
-                            text = stringResource(R.string.live_label_duration_min, mins),
-                            style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 9.sp),
-                        )
-                    }
-                }
             }
         }
     }

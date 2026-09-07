@@ -770,6 +770,11 @@ class CloudSyncRepository @Inject constructor(
         val subtitleOffset: String = "Bottom",
         val subtitleStylized: Boolean = true,
         val cardLayoutMode: String = CARD_LAYOUT_MODE_LANDSCAPE,
+        val liveTvLayoutMode: String = "streamnet",
+        val liveTvNetflixTitleSize: String = "Normal",
+        val liveTvNetflixDescriptionSize: String = "Normal",
+        val liveTvClassicTitleSize: String = "Normal",
+        val liveTvClassicDescriptionSize: String = "Normal",
         val frameRateMatchingMode: String = "Off",
         val autoPlayNext: Boolean = true,
         val autoPlaySingleSource: Boolean = true,
@@ -860,6 +865,16 @@ class CloudSyncRepository @Inject constructor(
         profileManager.profileStringKeyFor(profileId, "default_audio_language")
     private fun cardLayoutModeKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "card_layout_mode")
+    private fun liveTvLayoutModeKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "live_tv_layout_mode")
+    private fun liveTvNetflixTitleSizeKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "live_tv_netflix_title_size")
+    private fun liveTvNetflixDescriptionSizeKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "live_tv_netflix_description_size")
+    private fun liveTvClassicTitleSizeKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "live_tv_classic_title_size")
+    private fun liveTvClassicDescriptionSizeKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "live_tv_classic_description_size")
     private fun frameRateMatchingModeKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "frame_rate_matching_mode")
     private fun autoPlayNextKeyFor(profileId: String) =
@@ -888,6 +903,11 @@ class CloudSyncRepository @Inject constructor(
     private fun defaultSubtitleKey() = profileManager.profileStringKey("default_subtitle")
     private fun defaultAudioLanguageKey() = profileManager.profileStringKey("default_audio_language")
     private fun cardLayoutModeKey() = profileManager.profileStringKey("card_layout_mode")
+    private fun liveTvLayoutModeKey() = profileManager.profileStringKey("live_tv_layout_mode")
+    private fun liveTvNetflixTitleSizeKey() = profileManager.profileStringKey("live_tv_netflix_title_size")
+    private fun liveTvNetflixDescriptionSizeKey() = profileManager.profileStringKey("live_tv_netflix_description_size")
+    private fun liveTvClassicTitleSizeKey() = profileManager.profileStringKey("live_tv_classic_title_size")
+    private fun liveTvClassicDescriptionSizeKey() = profileManager.profileStringKey("live_tv_classic_description_size")
     private fun frameRateMatchingModeKey() = profileManager.profileStringKey("frame_rate_matching_mode")
     private fun autoPlayNextKey() = profileManager.profileBooleanKey("auto_play_next")
     private fun autoPlaySingleSourceKey() = profileManager.profileBooleanKey("auto_play_single_source")
@@ -910,6 +930,22 @@ class CloudSyncRepository @Inject constructor(
     }
 
     // ── Normalize helpers ──
+
+    private fun normalizeLiveTvLayoutMode(raw: String?): String {
+        return when (raw?.trim()?.lowercase()) {
+            "classic" -> "classic"
+            else -> "streamnet"
+        }
+    }
+
+    private fun normalizeLiveTvInfoTextSize(raw: String?): String {
+        return when (raw?.trim()?.lowercase()) {
+            "small" -> "Small"
+            "large" -> "Large"
+            "extra large", "extra_large", "xlarge", "xl" -> "Extra Large"
+            else -> "Normal"
+        }
+    }
 
     private fun normalizeFrameRateMode(raw: String?): String {
         return when (raw?.trim()?.lowercase()) {
@@ -1173,6 +1209,11 @@ class CloudSyncRepository @Inject constructor(
                         cardLayoutMode = normalizeCardLayoutMode(
                             prefs[cardLayoutModeKeyFor(profile.id)] ?: CARD_LAYOUT_MODE_LANDSCAPE
                         ),
+                        liveTvLayoutMode = normalizeLiveTvLayoutMode(prefs[liveTvLayoutModeKeyFor(profile.id)]),
+                        liveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(prefs[liveTvNetflixTitleSizeKeyFor(profile.id)]),
+                        liveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(prefs[liveTvNetflixDescriptionSizeKeyFor(profile.id)]),
+                        liveTvClassicTitleSize = normalizeLiveTvInfoTextSize(prefs[liveTvClassicTitleSizeKeyFor(profile.id)]),
+                        liveTvClassicDescriptionSize = normalizeLiveTvInfoTextSize(prefs[liveTvClassicDescriptionSizeKeyFor(profile.id)]),
                         frameRateMatchingMode = normalizeFrameRateMode(
                             prefs[frameRateMatchingModeKeyFor(profile.id)] ?: "Off"
                         ),
@@ -1193,6 +1234,11 @@ class CloudSyncRepository @Inject constructor(
         root.put("defaultSubtitle", prefs[defaultSubtitleKey()] ?: "Off")
         root.put("defaultAudioLanguage", prefs[defaultAudioLanguageKey()] ?: "Auto (Original)")
         root.put("cardLayoutMode", normalizeCardLayoutMode(prefs[cardLayoutModeKey()] ?: CARD_LAYOUT_MODE_LANDSCAPE))
+        root.put("liveTvLayoutMode", normalizeLiveTvLayoutMode(prefs[liveTvLayoutModeKey()]))
+        root.put("liveTvNetflixTitleSize", normalizeLiveTvInfoTextSize(prefs[liveTvNetflixTitleSizeKey()]))
+        root.put("liveTvNetflixDescriptionSize", normalizeLiveTvInfoTextSize(prefs[liveTvNetflixDescriptionSizeKey()]))
+        root.put("liveTvClassicTitleSize", normalizeLiveTvInfoTextSize(prefs[liveTvClassicTitleSizeKey()]))
+        root.put("liveTvClassicDescriptionSize", normalizeLiveTvInfoTextSize(prefs[liveTvClassicDescriptionSizeKey()]))
         root.put("frameRateMatchingMode", prefs[frameRateMatchingModeKey()] ?: "Off")
         root.put("autoPlayNext", prefs[autoPlayNextKey()] ?: true)
         root.put("autoPlaySingleSource", prefs[autoPlaySingleSourceKey()] ?: true)
@@ -1930,6 +1976,11 @@ class CloudSyncRepository @Inject constructor(
         val fallbackDefaultSubtitle = root.optString("defaultSubtitle", "Off")
         val fallbackDefaultAudioLanguage = root.optString("defaultAudioLanguage", "Auto (Original)")
         val fallbackCardLayoutMode = normalizeCardLayoutMode(root.optString("cardLayoutMode", CARD_LAYOUT_MODE_LANDSCAPE))
+        val fallbackLiveTvLayoutMode = normalizeLiveTvLayoutMode(root.optString("liveTvLayoutMode", "streamnet"))
+        val fallbackLiveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixTitleSize", "Normal"))
+        val fallbackLiveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixDescriptionSize", "Normal"))
+        val fallbackLiveTvClassicTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicTitleSize", "Normal"))
+        val fallbackLiveTvClassicDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicDescriptionSize", "Normal"))
         val fallbackFrameRateMatchingMode = normalizeFrameRateMode(root.optString("frameRateMatchingMode", "Off"))
         val fallbackAutoPlayNext = root.optBoolean("autoPlayNext", true)
         val fallbackAutoPlaySingleSource = root.optBoolean("autoPlaySingleSource", true)
@@ -2071,6 +2122,11 @@ class CloudSyncRepository @Inject constructor(
                         }
                         val normalizedProfileLayout = normalizeCardLayoutMode(state.cardLayoutMode)
                         prefs[cardLayoutModeKeyFor(profileId)] = normalizedProfileLayout
+                        prefs[liveTvLayoutModeKeyFor(profileId)] = normalizeLiveTvLayoutMode(state.liveTvLayoutMode)
+                        prefs[liveTvNetflixTitleSizeKeyFor(profileId)] = normalizeLiveTvInfoTextSize(state.liveTvNetflixTitleSize)
+                        prefs[liveTvNetflixDescriptionSizeKeyFor(profileId)] = normalizeLiveTvInfoTextSize(state.liveTvNetflixDescriptionSize)
+                        prefs[liveTvClassicTitleSizeKeyFor(profileId)] = normalizeLiveTvInfoTextSize(state.liveTvClassicTitleSize)
+                        prefs[liveTvClassicDescriptionSizeKeyFor(profileId)] = normalizeLiveTvInfoTextSize(state.liveTvClassicDescriptionSize)
                         state.catalogueRowLayoutModes.forEach { (rowKey, mode) ->
                             prefs[profileCatalogueRowLayoutModeKey(profileId, rowKey)] = normalizeCardLayoutMode(mode)
                         }
@@ -2110,6 +2166,11 @@ class CloudSyncRepository @Inject constructor(
                 }
                 prefs[defaultAudioLanguageKeyFor(activeProfileId)] = fallbackDefaultAudioLanguage
                 prefs[cardLayoutModeKeyFor(activeProfileId)] = fallbackCardLayoutMode
+                prefs[liveTvLayoutModeKeyFor(activeProfileId)] = fallbackLiveTvLayoutMode
+                prefs[liveTvNetflixTitleSizeKeyFor(activeProfileId)] = fallbackLiveTvNetflixTitleSize
+                prefs[liveTvNetflixDescriptionSizeKeyFor(activeProfileId)] = fallbackLiveTvNetflixDescriptionSize
+                prefs[liveTvClassicTitleSizeKeyFor(activeProfileId)] = fallbackLiveTvClassicTitleSize
+                prefs[liveTvClassicDescriptionSizeKeyFor(activeProfileId)] = fallbackLiveTvClassicDescriptionSize
                 prefs[frameRateMatchingModeKeyFor(activeProfileId)] = fallbackFrameRateMatchingMode
                 prefs[autoPlayNextKeyFor(activeProfileId)] = fallbackAutoPlayNext
                 prefs[autoPlaySingleSourceKeyFor(activeProfileId)] = fallbackAutoPlaySingleSource

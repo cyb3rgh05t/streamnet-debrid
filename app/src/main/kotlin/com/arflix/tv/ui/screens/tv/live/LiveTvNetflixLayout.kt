@@ -111,6 +111,8 @@ internal fun LiveTvNetflixLayout(
     isBuffering: Boolean = false,
     lookupBackdrop: suspend (IptvProgram) -> String? = { null },
     lookupLogo: suspend (IptvProgram) -> String? = { null },
+    titleTextSize: String = "Normal",
+    descriptionTextSize: String = "Normal",
     onSelectCategory: (String) -> Unit,
     onOpenSearch: () -> Unit,
     onCategoryFocused: () -> Unit,
@@ -221,6 +223,8 @@ internal fun LiveTvNetflixLayout(
                 programLogoUrl = previewProgramLogoUrl,
                 playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
                 isPlaylistRefreshing = isPlaylistRefreshing,
+                titleTextSize = titleTextSize,
+                descriptionTextSize = descriptionTextSize,
                 onRefreshPlaylist = onRefreshPlaylist,
                 onMoveUp = onMoveUpFromCategory,
                 emptyMessage = emptyCategoryMessage,
@@ -407,6 +411,8 @@ private fun HeroInfoPanel(
     programLogoUrl: String?,
     playlistLastRefreshedAtMillis: Long?,
     isPlaylistRefreshing: Boolean,
+    titleTextSize: String,
+    descriptionTextSize: String,
     onRefreshPlaylist: () -> Unit,
     onMoveUp: () -> Unit,
     emptyMessage: String?,
@@ -523,7 +529,10 @@ private fun HeroInfoPanel(
                         text = emptyMessage
                             ?: nowProgram?.title
                             ?: stringResource(R.string.live_empty_no_programme),
-                        style = LiveType.ProgramTitle.copy(color = LiveColors.Fg, fontSize = 13.sp),
+                        style = LiveType.ProgramTitle.copy(
+                            color = LiveColors.Fg,
+                            fontSize = liveTvInfoTitleFontSize(titleTextSize)
+                        ),
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                 }
@@ -537,8 +546,11 @@ private fun HeroInfoPanel(
                 if (desc.isNotBlank()) {
                     Text(
                         text = desc,
-                        style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
-                        maxLines = 4,
+                        style = LiveType.BodySynopsis.copy(
+                            color = LiveColors.FgDim,
+                            fontSize = liveTvInfoDescriptionFontSize(descriptionTextSize)
+                        ),
+                        maxLines = liveTvInfoDescriptionMaxLines(descriptionTextSize),
                         overflow = TextOverflow.Ellipsis,
                     )
                 }

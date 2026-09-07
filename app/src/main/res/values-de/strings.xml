@@ -154,6 +154,20 @@
     <string name="frame_rate">Bildrate anpassen</string>
     <string name="quality_filters">Qualitäts-Filter (Regex)</string>
     <string name="card_layout">Kartenlayout</string>
+    <string name="live_tv_layout">Live-TV-Layout</string>
+    <string name="live_tv_layout_desc">TV-Oberfläche für Live TV auswählen</string>
+    <string name="live_tv_layout_streamnet">Netflix</string>
+    <string name="live_tv_layout_classic">Klassisch</string>
+    <string name="live_tv_netflix_title_size">Netflix Guide-Titelgröße</string>
+    <string name="live_tv_netflix_description_size">Netflix Guide-Beschreibungsgröße</string>
+    <string name="live_tv_classic_title_size">Klassik Guide-Titelgröße</string>
+    <string name="live_tv_classic_description_size">Klassik Guide-Beschreibungsgröße</string>
+    <string name="live_tv_info_title_size_desc">Titelgröße der laufenden Sendung anpassen</string>
+    <string name="live_tv_info_description_size_desc">Beschreibung vergrößern, ohne das EPG-Raster zu ändern</string>
+    <string name="live_tv_text_size_small">Klein</string>
+    <string name="live_tv_text_size_normal">Normal</string>
+    <string name="live_tv_text_size_large">Groß</string>
+    <string name="live_tv_text_size_extra_large">Sehr groß</string>
     <string name="ui_mode">UI-Modus</string>
     <string name="skip_profile">Profilauswahl überspringen</string>
     <string name="oled_black_background">OLED Schwarzer Hintergrund</string>
@@ -1163,6 +1177,13 @@
     <string name="watchlist_simkl_completed">Abgeschlossen</string>
     <string name="watchlist_simkl_on_hold">Pausiert</string>
     <string name="watchlist_simkl_dropped">Abgebrochen</string>
+    <string name="context_action_play">Abspielen</string>
+    <string name="context_action_mark_unwatched">Als ungesehen markieren</string>
+    <string name="context_action_view_details">Details anzeigen</string>
+    <string name="context_action_mark_season_watched">Staffel als gesehen markieren</string>
+    <string name="context_action_mark_season_unwatched">Staffel als ungesehen markieren</string>
+    <string name="context_title_season">Staffel %1$d</string>
+    <string name="context_quick_actions">Schnellaktionen</string>
 
     <!-- Datenebene und ViewModels -->
     <string name="continue_season_episode">S%1$dE%2$d fortsetzen</string>

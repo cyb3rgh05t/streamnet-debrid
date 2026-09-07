@@ -56,6 +56,7 @@ test("admin dashboard keeps secrets in session scope and renders untrusted data 
 
   assert.match(page, /noindex,nofollow,noarchive/);
   assert.match(page, /\/admin\/admin\.js/);
+  assert.match(page, /\/assets\/streamnetapp-logo\.svg/);
   assert.match(script, /sessionStorage/);
   assert.doesNotMatch(script, /localStorage|innerHTML/);
   assert.match(script, /textContent/);

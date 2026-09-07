@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,6 +38,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -46,6 +50,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
+import coil.compose.AsyncImage
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
@@ -106,11 +111,17 @@ fun MiniPlayerRow(
     onFullscreenClick: (() -> Unit)? = null,
     variantCount: Int = 1,
     onOpenVariants: (() -> Unit)? = null,
+    backdropUrl: String? = null,
+    programLogoUrl: String? = null,
+    titleTextSize: String = "Normal",
+    descriptionTextSize: String = "Normal",
     compact: Boolean = false,
     landscapeCompact: Boolean = false,
     tabletLandscape: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val useTvHeroLayout = !isTouchDevice && !compact && !landscapeCompact && !tabletLandscape
     if (landscapeCompact) {
         val spec = landscapePhoneMiniPlayerSpec()
         Row(
@@ -132,6 +143,10 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
+                backdropUrl = backdropUrl,
+                programLogoUrl = programLogoUrl,
+                titleTextSize = titleTextSize,
+                descriptionTextSize = descriptionTextSize,
                 landscapeCompact = true,
                 modifier = Modifier.weight(1f).heightIn(min = spec.videoHeightDp.dp),
             )
@@ -158,6 +173,10 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
+                backdropUrl = backdropUrl,
+                programLogoUrl = programLogoUrl,
+                titleTextSize = titleTextSize,
+                descriptionTextSize = descriptionTextSize,
                 modifier = Modifier.fillMaxWidth(),
             )
         }
@@ -165,15 +184,27 @@ fun MiniPlayerRow(
         Row(
             modifier = modifier
                 .fillMaxWidth()
-                .padding(start = 10.dp, end = 14.dp, top = 6.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                .then(if (useTvHeroLayout) Modifier.height(200.dp) else Modifier)
+                .padding(
+                    start = if (useTvHeroLayout) 24.dp else 10.dp,
+                    end = if (useTvHeroLayout) 24.dp else 14.dp,
+                    top = if (useTvHeroLayout) 12.dp else 6.dp,
+                    bottom = if (useTvHeroLayout) 8.dp else 6.dp,
+                ),
+            horizontalArrangement = Arrangement.spacedBy(if (useTvHeroLayout) 20.dp else 10.dp),
             verticalAlignment = Alignment.Top,
         ) {
             VideoCard(
                 exoPlayer = exoPlayer,
                 channel = channel,
                 tabletLandscape = tabletLandscape,
+                tvHeroLayout = useTvHeroLayout,
                 onFullscreenClick = onFullscreenClick,
+                modifier = if (useTvHeroLayout) {
+                    Modifier.fillMaxHeight().aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
+                } else {
+                    Modifier
+                },
             )
             InfoColumn(
                 channel = channel,
@@ -183,11 +214,17 @@ fun MiniPlayerRow(
                 onFavoriteToggle = onFavoriteToggle,
                 variantCount = variantCount,
                 onOpenVariants = onOpenVariants,
+                backdropUrl = backdropUrl,
+                programLogoUrl = programLogoUrl,
+                titleTextSize = titleTextSize,
+                descriptionTextSize = descriptionTextSize,
                 tabletLandscape = tabletLandscape,
+                tvHeroLayout = useTvHeroLayout,
                 modifier = Modifier
                     .weight(1f)
                     .then(
-                        if (tabletLandscape) Modifier.height(TabletLandscapeVideoHeight)
+                        if (useTvHeroLayout) Modifier.fillMaxHeight()
+                        else if (tabletLandscape) Modifier.height(TabletLandscapeVideoHeight)
                         else Modifier
                     ),
             )
@@ -203,6 +240,7 @@ private fun VideoCard(
     compact: Boolean = false,
     landscapeCompact: Boolean = false,
     tabletLandscape: Boolean = false,
+    tvHeroLayout: Boolean = false,
     onFullscreenClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -214,6 +252,7 @@ private fun VideoCard(
         modifier = modifier
             .then(
                 when {
+                    tvHeroLayout -> Modifier
                     compact -> Modifier.aspectRatio(16f / 9f)
                     landscapeSpec != null -> Modifier.size(landscapeSpec.videoWidthDp.dp, landscapeSpec.videoHeightDp.dp)
                     tabletLandscape -> Modifier.size(TabletLandscapeVideoWidth, TabletLandscapeVideoHeight)
@@ -333,8 +372,13 @@ private fun InfoColumn(
     onFavoriteToggle: (String) -> Unit,
     variantCount: Int,
     onOpenVariants: (() -> Unit)?,
+    backdropUrl: String? = null,
+    programLogoUrl: String? = null,
+    titleTextSize: String = "Normal",
+    descriptionTextSize: String = "Normal",
     landscapeCompact: Boolean = false,
     tabletLandscape: Boolean = false,
+    tvHeroLayout: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (tabletLandscape) {
@@ -349,13 +393,72 @@ private fun InfoColumn(
         )
         return
     }
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(if (landscapeCompact) 5.dp else 8.dp),
+    Box(
+        modifier = modifier.then(
+            if (tvHeroLayout) {
+                Modifier
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(LiveColors.PanelDeep)
+            } else {
+                Modifier
+            }
+        ),
     ) {
-        ChannelIdentityRow(channel = channel, variantCount = variantCount, onOpenVariants = onOpenVariants)
-        NowCard(channel = channel, clockTickMillis = clockTickMillis, nowNext = nowNext, landscapeCompact = landscapeCompact)
-        if (!landscapeCompact) NextRow(nowNext = nowNext)
+        if (tvHeroLayout && !backdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.42f },
+            )
+        } else if (tvHeroLayout && channel != null) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(channel.brandBg.copy(alpha = 0.55f), LiveColors.PanelDeep)
+                        )
+                    )
+            )
+        }
+        if (tvHeroLayout) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                LiveColors.PanelDeep.copy(alpha = 0.38f),
+                                LiveColors.PanelDeep.copy(alpha = 0.92f),
+                            )
+                        )
+                    )
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(
+                    horizontal = if (tvHeroLayout) 18.dp else 0.dp,
+                    vertical = if (tvHeroLayout) 12.dp else 0.dp,
+                ),
+            verticalArrangement = Arrangement.spacedBy(if (landscapeCompact) 5.dp else if (tvHeroLayout) 10.dp else 8.dp),
+        ) {
+            ChannelIdentityRow(channel = channel, variantCount = variantCount, onOpenVariants = onOpenVariants)
+            NowCard(
+                channel = channel,
+                clockTickMillis = clockTickMillis,
+                nowNext = nowNext,
+                backdropUrl = null,
+                programLogoUrl = programLogoUrl,
+                titleTextSize = titleTextSize,
+                descriptionTextSize = descriptionTextSize,
+                landscapeCompact = landscapeCompact,
+                tvHeroLayout = tvHeroLayout
+            )
+            if (!landscapeCompact) NextRow(nowNext = nowNext)
+        }
     }
 }
 
@@ -588,59 +691,112 @@ private fun LangBadge(text: String) {
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun NowCard(channel: EnrichedChannel?, clockTickMillis: Long, nowNext: IptvNowNext?, landscapeCompact: Boolean = false) {
+private fun NowCard(
+    channel: EnrichedChannel?,
+    clockTickMillis: Long,
+    nowNext: IptvNowNext?,
+    backdropUrl: String? = null,
+    programLogoUrl: String? = null,
+    titleTextSize: String = "Normal",
+    descriptionTextSize: String = "Normal",
+    landscapeCompact: Boolean = false,
+    tvHeroLayout: Boolean = false,
+) {
     val now = nowNext?.now
     val landscapeSpec = if (landscapeCompact) landscapePhoneMiniPlayerSpec() else null
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(LiveDims.CardRadius))
-            .background(LiveColors.PanelRaised)
-            .padding(horizontal = if (landscapeCompact) 8.dp else 10.dp, vertical = if (landscapeCompact) 5.dp else 8.dp),
-        verticalArrangement = Arrangement.spacedBy(if (landscapeCompact) 2.dp else 4.dp),
+            .background(if (tvHeroLayout) Color.Transparent else LiveColors.PanelRaised),
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
-            Text(
-                text = formatTimeWindow(now),
-                style = LiveType.TimeMono.copy(color = LiveColors.Fg),
+        if (tvHeroLayout && !backdropUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = backdropUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = 0.38f }
             )
-            Spacer(Modifier.weight(1f))
-            val remaining = remainingLabel(now)
-            if (remaining.isNotBlank()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                LiveColors.PanelDeep.copy(alpha = 0.42f),
+                                LiveColors.PanelDeep.copy(alpha = 0.86f)
+                            )
+                        )
+                    )
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = if (landscapeCompact) 8.dp else 10.dp, vertical = if (landscapeCompact) 5.dp else 8.dp),
+            verticalArrangement = Arrangement.spacedBy(if (landscapeCompact) 2.dp else 4.dp),
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(stringResource(R.string.live_badge_now), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
                 Text(
-                    text = remaining,
-                    style = LiveType.TimeMono.copy(color = LiveColors.Accent),
+                    text = formatTimeWindow(now),
+                    style = LiveType.TimeMono.copy(color = LiveColors.Fg),
+                )
+                Spacer(Modifier.weight(1f))
+                val remaining = remainingLabel(now)
+                if (remaining.isNotBlank()) {
+                    Text(
+                        text = remaining,
+                        style = LiveType.TimeMono.copy(color = LiveColors.Accent),
+                    )
+                }
+            }
+            if (tvHeroLayout && !programLogoUrl.isNullOrBlank() && now != null) {
+                AsyncImage(
+                    model = programLogoUrl,
+                    contentDescription = now.title,
+                    contentScale = ContentScale.Fit,
+                    alignment = Alignment.CenterStart,
+                    modifier = Modifier.fillMaxWidth().height(32.dp),
+                )
+            } else {
+                Text(
+                    text = now?.title ?: stringResource(R.string.live_empty_no_programme),
+                    style = LiveType.ProgramTitle.copy(
+                        color = LiveColors.Fg,
+                        fontSize = liveTvInfoTitleFontSize(titleTextSize)
+                    ),
+                    maxLines = if (landscapeCompact) 1 else 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-        }
-        Text(
-            text = now?.title ?: stringResource(R.string.live_empty_no_programme),
-            style = LiveType.ProgramTitle.copy(color = LiveColors.Fg),
-            maxLines = if (landscapeCompact) 1 else 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        val description = now?.description?.takeIf { it.isNotBlank() }
-            ?: if (now == null) stringResource(R.string.live_empty_no_programme_description) else null
-        if (landscapeSpec?.showDescription != false && !description.isNullOrBlank()) {
-            Text(
-                text = description,
-                style = LiveType.BodySynopsis.copy(color = LiveColors.FgDim),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        val progress = progressOf(now?.takeIf { clockTickMillis >= 0L })
-        if (progress != null) {
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-                color = LiveColors.Accent,
-                trackColor = LiveColors.Panel,
-            )
+            val description = now?.description?.takeIf { it.isNotBlank() }
+                ?: if (now == null) stringResource(R.string.live_empty_no_programme_description) else null
+            if (landscapeSpec?.showDescription != false && !description.isNullOrBlank()) {
+                Text(
+                    text = description,
+                    style = LiveType.BodySynopsis.copy(
+                        color = LiveColors.FgDim,
+                        fontSize = liveTvInfoDescriptionFontSize(descriptionTextSize)
+                    ),
+                    maxLines = if (tvHeroLayout) liveTvInfoDescriptionMaxLines(descriptionTextSize).coerceAtMost(2) else 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+            val progress = progressOf(now?.takeIf { clockTickMillis >= 0L })
+            if (progress != null) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
+                    color = LiveColors.Accent,
+                    trackColor = LiveColors.Panel,
+                )
+            }
         }
     }
 }

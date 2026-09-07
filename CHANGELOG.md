@@ -4,6 +4,26 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.011] - 2026-09-07
+
+### Live TV
+
+- TV-Geräte können unter Oberfläche zwischen dem StreamNet-Live-TV-Layout und einem klassischen Layout mit Kategorie-Sidebar, Hero und EPG-Raster wechseln; die Auswahl sowie getrennte Schriftgrößen für Netflix- und Klassik-Infopanels werden profilbezogen über StreamNet Cloud synchronisiert.
+- Das klassische Layout verwendet die TV-fähige Kategorie-Sidebar statt Touch-Pills, unterstützt stufige Zurück-Navigation bis zur Topbar und stabilisiert D-Pad-Fokus für Kategorien, Senderliste, EPG und Suche.
+- Der klassische Hero wurde kompakter gestaltet, zeigt Programmartwork im gesamten Infopanel, verzichtet auf sichtbare Rahmen und lässt mehr Platz für das EPG-Raster.
+- EPG-Programmbalken wurden beruhigt und zeigen nur noch den Programmtitel ohne Live-/Archiv-/Neu-Badges, Zeiten, Dauer oder Beschreibung.
+
+### Merkliste und Details
+
+- Long-Press auf Episoden öffnet auf Mobile/Tablet das vorhandene Episoden-Aktionsmenü; auf TV entscheidet OK-Halten zuverlässig zwischen Popup und Streamstart.
+- Long-Press in der Merkliste und in Bibliotheken öffnet ein Kontextmenü statt sofort zu löschen; lokale Merkliste bietet zusätzlich „Von der Merkliste entfernen“.
+- Kontextmenü-Aktionen sind deutsch und englisch lokalisiert.
+
+### Admin-Backend
+
+- Das Admin-Dashboard kann große Cloud-Snapshots wieder mit kleinen Delta-Änderungen bearbeiten, ohne an zu niedrigen Snapshot-Größenlimits zu scheitern.
+- Das neue Admin-Logo `streamnetapp-logo.svg` wird über die Self-hosted-Backend-Asset-Route ausgeliefert.
+
 ## [2.3.010] - 2026-09-07
 
 ### Trakt, Merkliste und Cloud-Routing

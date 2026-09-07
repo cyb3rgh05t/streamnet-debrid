@@ -93,6 +93,20 @@ object ContextActions {
     val markSeasonUnwatched = ContextAction("mark_season_unwatched", "Mark Season Unwatched", Icons.Default.Clear, TextSecondary)
 }
 
+@Composable
+private fun localizedContextActionLabel(action: ContextAction): String = when (action.id) {
+    "play" -> stringResource(R.string.context_action_play)
+    "sources" -> stringResource(R.string.stream_title_select_source)
+    "mark_watched" -> stringResource(R.string.component_mark_watched)
+    "mark_unwatched" -> stringResource(R.string.context_action_mark_unwatched)
+    "add_watchlist" -> stringResource(R.string.add_to_watchlist)
+    "remove_watchlist" -> stringResource(R.string.remove_from_watchlist)
+    "view_details" -> stringResource(R.string.context_action_view_details)
+    "mark_season_watched" -> stringResource(R.string.context_action_mark_season_watched)
+    "mark_season_unwatched" -> stringResource(R.string.context_action_mark_season_unwatched)
+    else -> action.label
+}
+
 /**
  * Context menu popup for media items and episodes
  */
@@ -210,6 +224,7 @@ fun ContextMenu(
                         actions.forEachIndexed { index, action ->
                             ContextMenuItem(
                                 action = action,
+                                label = localizedContextActionLabel(action),
                                 isFocused = index == focusedIndex,
                                 accentColor = accentColor
                             )
@@ -332,6 +347,7 @@ fun ContextMenu(
 
                         // Action items
                         actions.forEachIndexed { index, action ->
+                            val label = localizedContextActionLabel(action)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -348,7 +364,7 @@ fun ContextMenu(
                                     modifier = Modifier.size(24.dp)
                                 )
                                 Text(
-                                    text = action.label,
+                                    text = label,
                                     style = ArflixTypography.body,
                                     color = TextPrimary
                                 )
@@ -375,6 +391,7 @@ fun ContextMenu(
 @Composable
 private fun ContextMenuItem(
     action: ContextAction,
+    label: String,
     isFocused: Boolean,
     accentColor: Color
 ) {
@@ -404,7 +421,7 @@ private fun ContextMenuItem(
         Spacer(modifier = Modifier.width(16.dp))
 
         Text(
-            text = action.label,
+            text = label,
             style = ArflixTypography.body,
             color = if (isFocused) focusedContentColor else TextPrimary
         )
@@ -476,8 +493,8 @@ fun SeasonContextMenu(
 ) {
     ContextMenu(
         isVisible = isVisible,
-        title = "Season $seasonNumber",
-        subtitle = "Quick Actions",
+        title = stringResource(R.string.context_title_season, seasonNumber),
+        subtitle = stringResource(R.string.context_quick_actions),
         actions = listOf(
             ContextActions.markSeasonWatched,
             ContextActions.markSeasonUnwatched
