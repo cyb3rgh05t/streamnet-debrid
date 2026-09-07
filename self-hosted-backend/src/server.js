@@ -11,7 +11,11 @@ import {
   verifyScryptPassword,
 } from "./passwords.js";
 import { normalizeAndValidateEmail } from "./email.js";
-import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
+import {
+  mergePushPayloadByFieldTimestamps,
+  payloadMetrics,
+  payloadUpdatedAtMillis,
+} from "./snapshots.js";
 import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { isValidWatchHistoryIdentity } from "./watch-history.js";
@@ -934,6 +938,10 @@ app.post("/account-sync-push", async (request, reply) => {
         current: current ? { payload: current.payload, revision } : null,
       });
     }
+    const storedPayload = mergePushPayloadByFieldTimestamps(
+      payload,
+      current?.payload,
+    );
     const nextRevision = revision + 1;
     await client.query(
       `insert into account_sync_snapshots (account_id, payload, revision, payload_updated_at, source)
@@ -941,16 +949,16 @@ app.post("/account-sync-push", async (request, reply) => {
        on conflict (account_id) do update set payload = excluded.payload, revision = excluded.revision, payload_updated_at = excluded.payload_updated_at, source = excluded.source, updated_at = now()`,
       [
         account.id,
-        JSON.stringify(payload),
+        JSON.stringify(storedPayload),
         nextRevision,
-        payloadUpdatedAtMillis(payload),
+        payloadUpdatedAtMillis(storedPayload),
       ],
     );
     await client.query("commit");
     return {
       accepted: true,
       revision: nextRevision,
-      ...payloadMetrics(payload),
+      ...payloadMetrics(storedPayload),
     };
   } catch (error) {
     await client.query("rollback");

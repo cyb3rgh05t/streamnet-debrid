@@ -53,3 +53,83 @@ export function payloadUpdatedAtMillis(payload) {
   const updatedAt = Number(payload?.updatedAt || 0);
   return Number.isSafeInteger(updatedAt) && updatedAt > 0 ? updatedAt : null;
 }
+
+function isPlainObject(value) {
+  return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+function cloneJson(value) {
+  return JSON.parse(JSON.stringify(value));
+}
+
+function mergeFieldValue(root, key) {
+  if (key.startsWith("g:")) {
+    const field = key.slice(2);
+    return Object.hasOwn(root, field) ? root[field] : undefined;
+  }
+  if (key.startsWith("i:")) {
+    const [, profileId, field] = key.split(":");
+    const profile = root?.iptvByProfile?.[profileId];
+    return isPlainObject(profile) && Object.hasOwn(profile, field)
+      ? profile[field]
+      : undefined;
+  }
+  if (key.startsWith("p:")) {
+    const [, profileId, field] = key.split(":");
+    const profile = root?.profileSettingsById?.[profileId];
+    return isPlainObject(profile) && Object.hasOwn(profile, field)
+      ? profile[field]
+      : undefined;
+  }
+  return undefined;
+}
+
+function setMergeFieldValue(root, key, value) {
+  if (key.startsWith("g:")) {
+    root[key.slice(2)] = value;
+    return;
+  }
+  if (key.startsWith("i:")) {
+    const [, profileId, field] = key.split(":");
+    if (!isPlainObject(root.iptvByProfile)) root.iptvByProfile = {};
+    if (!isPlainObject(root.iptvByProfile[profileId]))
+      root.iptvByProfile[profileId] = {};
+    root.iptvByProfile[profileId][field] = value;
+    return;
+  }
+  if (key.startsWith("p:")) {
+    const [, profileId, field] = key.split(":");
+    if (!isPlainObject(root.profileSettingsById)) root.profileSettingsById = {};
+    if (!isPlainObject(root.profileSettingsById[profileId]))
+      root.profileSettingsById[profileId] = {};
+    root.profileSettingsById[profileId][field] = value;
+  }
+}
+
+export function mergePushPayloadByFieldTimestamps(incomingPayload, currentPayload) {
+  if (!isPlainObject(incomingPayload) || !isPlainObject(currentPayload)) {
+    return incomingPayload;
+  }
+  const incoming = cloneJson(incomingPayload);
+  const incomingTs = isPlainObject(incoming.fieldUpdatedAt)
+    ? incoming.fieldUpdatedAt
+    : {};
+  const currentTs = isPlainObject(currentPayload.fieldUpdatedAt)
+    ? currentPayload.fieldUpdatedAt
+    : {};
+  const mergedTs = { ...incomingTs };
+  const keys = new Set([...Object.keys(incomingTs), ...Object.keys(currentTs)]);
+  for (const key of keys) {
+    const incomingTime = Number(incomingTs[key] || 0);
+    const currentTime = Number(currentTs[key] || 0);
+    if (currentTime > incomingTime) {
+      const value = mergeFieldValue(currentPayload, key);
+      if (value !== undefined) setMergeFieldValue(incoming, key, cloneJson(value));
+      if (currentTime > 0) mergedTs[key] = currentTime;
+    } else if (incomingTime > 0) {
+      mergedTs[key] = incomingTime;
+    }
+  }
+  incoming.fieldUpdatedAt = mergedTs;
+  return incoming;
+}
