@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +67,8 @@ fun ProgramCell(
     program: IptvProgram,
     clockTickMillis: Long,
     width: androidx.compose.ui.unit.Dp,
+    pinnedTitleInset: androidx.compose.ui.unit.Dp = 0.dp,
+    pinnedTitleWidth: androidx.compose.ui.unit.Dp = width,
     isNow: Boolean,
     isPast: Boolean,
     isFocusTarget: Boolean,
@@ -208,17 +211,21 @@ fun ProgramCell(
                     )
             )
         }
-        Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        val titleInset = pinnedTitleInset.coerceAtMost((width - 18.dp).coerceAtLeast(0.dp))
+        val titleWidth = pinnedTitleWidth.coerceAtMost((width - titleInset).coerceAtLeast(0.dp))
+        if (titleWidth > 18.dp) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .offset(x = titleInset)
+                    .width(titleWidth)
+            ) {
                 Text(
                     text = program.title,
                     style = LiveType.CellTitle.copy(color = LiveColors.Fg, fontSize = 11.sp),
                     maxLines = if (narrowCell) 1 else 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                 )
             }
         }

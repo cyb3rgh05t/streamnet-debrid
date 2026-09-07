@@ -572,12 +572,17 @@ fun EpgGrid(
                             )
 
                             // 3. EPG programs row (scrolls horizontally using the shared hScroll)
-                            Box(
+                            BoxWithConstraints(
                                 modifier = Modifier
                                     .weight(1f)
                                     .fillMaxHeight()
-                                    .horizontalScroll(hScroll)
                             ) {
+                                val viewportWidth = maxWidth
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxHeight()
+                                        .horizontalScroll(hScroll)
+                                ) {
                                 val rowPrograms = remember(
                                     ch.id,
                                     nowNext[ch.id],
@@ -612,6 +617,8 @@ fun EpgGrid(
                                     windowEndMillis = windowEndMillis,
                                     totalWidth = totalWidth,
                                     pxPerMin = pxPerMin,
+                                    hScrollOffsetPx = hScroll.value,
+                                    viewportWidth = viewportWidth,
                                     stripe = idx % 2 == 1,
                                     isActive = ch.id == selectedChannelId && focusMode == EpgGridFocusMode.Epg,
                                     epgMode = focusMode == EpgGridFocusMode.Epg,
@@ -639,6 +646,7 @@ fun EpgGrid(
                                     focusRequesters = programFocusRequesters,
                                     focusTargets = programFocusTargets,
                                 )
+                                }
                             }
                         }
                     }
@@ -684,6 +692,8 @@ private fun ProgramsRow(
     windowEndMillis: Long,
     totalWidth: Dp,
     pxPerMin: Float,
+    hScrollOffsetPx: Int,
+    viewportWidth: Dp,
     stripe: Boolean,
     isActive: Boolean,
     epgMode: Boolean,
@@ -698,6 +708,8 @@ private fun ProgramsRow(
     focusTargets: MutableMap<String, List<ProgramFocusTarget>>,
 ) {
     val nowMillis = clockTickMillis
+    val density = LocalDensity.current
+    val scrollOffset = with(density) { hScrollOffsetPx.toDp() }
     Box(
         modifier = Modifier
             .width(totalWidth)
@@ -761,6 +773,10 @@ private fun ProgramsRow(
                 }
                 val offset = (placement.startMin * pxPerMin).dp
                 val width = (placement.durationMin * pxPerMin).dp
+                val visibleStart = (scrollOffset - offset).coerceIn(0.dp, width)
+                val visibleEnd = (scrollOffset + viewportWidth - offset).coerceIn(0.dp, width)
+                val pinnedTitleInset = visibleStart
+                val pinnedTitleWidth = (visibleEnd - visibleStart).coerceAtLeast(0.dp)
                 val isCatchupSupported = placement.isCatchupSupported(channel, nowMillis)
                 val focusableIndex = focusableIndexByPlacementIndex[placementIndex] ?: -1
                 val isFocusable = focusableIndex >= 0
@@ -770,6 +786,8 @@ private fun ProgramsRow(
                     program = placement.program,
                     clockTickMillis = clockTickMillis,
                     width = width,
+                    pinnedTitleInset = pinnedTitleInset,
+                    pinnedTitleWidth = pinnedTitleWidth,
                     isNow = placementIsNow,
                     isPast = placementIsPast,
                     isFocusTarget = placementIsNow,

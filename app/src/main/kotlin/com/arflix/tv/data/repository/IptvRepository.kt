@@ -412,7 +412,9 @@ data class IptvPlaylistEntry(
     val epgUrls: List<String> = emptyList(),
     val importLiveTv: Boolean = true,
     val importVod: Boolean = true,
-    val importSeries: Boolean = true
+    val importSeries: Boolean = true,
+    val expiresAtEpochSeconds: Long = 0L,
+    val expirationCheckedAtMillis: Long = 0L
 )
 
 internal fun decodePlaylistJsonCompat(raw: String, gson: Gson = Gson()): List<IptvPlaylistEntry> =
@@ -433,6 +435,8 @@ internal fun decodePlaylistJsonCompat(raw: String, gson: Gson = Gson()): List<Ip
                     importLiveTv = json.booleanOrDefault("importLiveTv", true),
                     importVod = json.booleanOrDefault("importVod", true),
                     importSeries = json.booleanOrDefault("importSeries", true),
+                    expiresAtEpochSeconds = json.longOrDefault("expiresAtEpochSeconds", 0L),
+                    expirationCheckedAtMillis = json.longOrDefault("expirationCheckedAtMillis", 0L),
                 )
             }
             .orEmpty()
@@ -443,6 +447,9 @@ private fun JsonObject.booleanOrDefault(name: String, default: Boolean): Boolean
 
 private fun JsonObject.stringOrDefault(name: String): String =
     get(name)?.takeUnless { it.isJsonNull }?.asString.orEmpty()
+
+private fun JsonObject.longOrDefault(name: String, default: Long): Long =
+    runCatching { get(name)?.takeUnless { it.isJsonNull }?.asLong ?: default }.getOrDefault(default)
 
 internal const val STREAMNET_TV_PLAYLIST_ID = "streamnet_tv"
 internal const val STREAMNET_TV_PLAYLIST_NAME = "StreamNet TV"
@@ -1358,7 +1365,50 @@ class IptvRepository @Inject constructor(
             epgUrls = epgUrls,
             importLiveTv = runCatching { playlist.importLiveTv }.getOrDefault(true),
             importVod = runCatching { playlist.importVod }.getOrDefault(true),
-            importSeries = runCatching { playlist.importSeries }.getOrDefault(true)
+            importSeries = runCatching { playlist.importSeries }.getOrDefault(true),
+            expiresAtEpochSeconds = runCatching { playlist.expiresAtEpochSeconds }.getOrDefault(0L).coerceAtLeast(0L),
+            expirationCheckedAtMillis = runCatching { playlist.expirationCheckedAtMillis }.getOrDefault(0L).coerceAtLeast(0L)
+        )
+    }
+
+    suspend fun refreshPlaylistAccountInfo(playlists: List<IptvPlaylistEntry>): List<IptvPlaylistEntry> = coroutineScope {
+        playlists.map { playlist ->
+            async { refreshPlaylistAccountInfo(playlist) }
+        }.awaitAll()
+    }
+
+    private suspend fun refreshPlaylistAccountInfo(playlist: IptvPlaylistEntry): IptvPlaylistEntry {
+        if (playlist.m3uUrl.isBlank()) return playlist
+        val now = System.currentTimeMillis()
+        if (playlist.expirationCheckedAtMillis > 0L && now - playlist.expirationCheckedAtMillis < 12 * 60 * 60_000L) {
+            return playlist
+        }
+        val creds = resolveXtreamCredentials(playlist) ?: return playlist
+        val url = validatedIptvHttpUrl("${creds.baseUrl}/player_api.php", "Xtream account URL")
+            .newBuilder()
+            .addQueryParameter("username", creds.username)
+            .addQueryParameter("password", creds.password)
+            .build()
+            .toString()
+        val info: JsonObject = requestJson(
+            url,
+            JsonObject::class.java,
+            client = iptvCatalogHttpClient
+        ) ?: return playlist
+        val userInfo = info.getAsJsonObject("user_info")
+        val expiresAt = runCatching {
+            userInfo?.get("exp_date")
+                ?.takeUnless { it.isJsonNull }
+                ?.asString
+                ?.trim()
+                ?.takeUnless { it.equals("null", ignoreCase = true) }
+                ?.toLongOrNull()
+                ?.coerceAtLeast(0L)
+                ?: 0L
+        }.getOrDefault(0L)
+        return playlist.copy(
+            expiresAtEpochSeconds = expiresAt,
+            expirationCheckedAtMillis = now
         )
     }
 

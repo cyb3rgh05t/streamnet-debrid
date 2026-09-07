@@ -107,14 +107,20 @@ function stampEditedPayloadTimestamps(current, edited, now) {
 }
 
 function mirrorEditedTopLevelAddonsToProfiles(current, edited) {
-  if (jsonEqual(current.addons, edited.addons) || !Array.isArray(edited.addons)) {
+  if (
+    jsonEqual(current.addons, edited.addons) ||
+    !Array.isArray(edited.addons)
+  ) {
     return;
   }
   const sharedAddons = cloneJson(edited.addons, "Payload addons");
   const ids = profileIds(edited);
   edited.addonsByProfile = {};
   for (const profileId of ids) {
-    edited.addonsByProfile[profileId] = cloneJson(sharedAddons, "Payload addons");
+    edited.addonsByProfile[profileId] = cloneJson(
+      sharedAddons,
+      "Payload addons",
+    );
   }
 }
 

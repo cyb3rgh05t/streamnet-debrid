@@ -233,6 +233,8 @@ import kotlin.math.abs
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
 import com.arflix.tv.network.OkHttpProvider
+import java.text.DateFormat
+import java.util.Date
 
 /**
  * Per-section registry of [BringIntoViewRequester]s keyed by the row's
@@ -8221,16 +8223,31 @@ private fun IptvSettings(
                 val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
                 val isConfigured = playlist.m3uUrl.isNotBlank()
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
+                val subtitle = playlist.settingsPlaylistSubtitle(
+                    isStreamNetPreset = isStreamNetPreset,
+                    isConfigured = isConfigured,
+                    epgSourceCount = epgSourceCount
+                )
+                val expirationText = playlist.settingsPlaylistExpirationText()
+                val expirationColor = resolveAccentColor(fallback = Pink)
                 MobileSettingsCategory(title = playlist.name.uppercase()) {
                     MobileSettingsRow(
                         icon = Icons.Default.LiveTv,
                         title = playlist.name,
-                        subtitle = if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } },
+                        subtitle = subtitle,
                         value = "",
                         actionIcon = Icons.Default.Edit,
                         isFocused = false,
                         onClick = { onEditPlaylist(index) },
                     )
+                    if (isConfigured) {
+                        Text(
+                            text = expirationText,
+                            style = ArflixTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                            color = expirationColor,
+                            modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 4.dp)
+                        )
+                    }
                     MobileSettingsRow(
                         icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
                         title = stringResource(R.string.settings_enabled),
@@ -8363,7 +8380,13 @@ private fun IptvSettings(
                 val isStreamNetPreset = isStreamNetTvPlaylist(playlist)
                 val isConfigured = playlist.m3uUrl.isNotBlank()
                 val epgSourceCount = playlist.settingsEpgInput().lineSequence().count { it.isNotBlank() }
+                val subtitle = playlist.settingsPlaylistSubtitle(
+                    isStreamNetPreset = isStreamNetPreset,
+                    isConfigured = isConfigured,
+                    epgSourceCount = epgSourceCount
+                )
                 val focusRingColor = resolveAccentColor(fallback = Pink)
+                val expirationText = playlist.settingsPlaylistExpirationText()
                 Text(
                     text = playlist.name.uppercase(),
                     style = ArflixTypography.caption.copy(fontSize = 12.sp),
@@ -8380,7 +8403,17 @@ private fun IptvSettings(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(playlist.name, style = ArflixTypography.cardTitle.copy(fontSize = 17.sp), color = if (focusedIndex == rowIndex) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Spacer(modifier = Modifier.height(4.dp))
-                            Text(if (isStreamNetPreset) stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready) else buildString { append(playlist.m3uUrl.take(56)); when { epgSourceCount > 1 -> append(" • $epgSourceCount EPGs"); epgSourceCount == 1 -> append(" • EPG") } }, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary.copy(alpha = 0.72f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp), color = TextSecondary.copy(alpha = 0.72f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                            if (isConfigured) {
+                                Spacer(modifier = Modifier.height(5.dp))
+                                Text(
+                                    expirationText,
+                                    style = ArflixTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                                    color = focusRingColor,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.height(14.dp))
@@ -11547,6 +11580,38 @@ private fun IptvPlaylistEntry.settingsEpgInput(): String {
         .filter { it.isNotBlank() }
         .distinct()
         .joinToString("\n")
+}
+
+@Composable
+private fun IptvPlaylistEntry.settingsPlaylistSubtitle(
+    isStreamNetPreset: Boolean,
+    isConfigured: Boolean,
+    epgSourceCount: Int
+): String {
+    val base = if (isStreamNetPreset) {
+        stringResource(if (isConfigured) R.string.settings_streamnet_tv_connected else R.string.settings_streamnet_tv_ready)
+    } else {
+        buildString {
+            append(m3uUrl.take(56))
+            when {
+                epgSourceCount > 1 -> append(" • $epgSourceCount EPGs")
+                epgSourceCount == 1 -> append(" • EPG")
+            }
+        }
+    }
+    return base
+}
+
+@Composable
+private fun IptvPlaylistEntry.settingsPlaylistExpirationText(): String {
+    val value = if (expiresAtEpochSeconds > 0L) {
+        runCatching {
+            DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(expiresAtEpochSeconds * 1000L))
+        }.getOrElse { stringResource(R.string.settings_playlist_expiration_unlimited) }
+    } else {
+        stringResource(R.string.settings_playlist_expiration_unlimited)
+    }
+    return stringResource(R.string.settings_playlist_expiration, value)
 }
 
 private fun splitSettingsEpgInput(raw: String): List<String> {

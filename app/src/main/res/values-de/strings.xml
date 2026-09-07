@@ -513,6 +513,8 @@
     <string name="settings_ph_enter_value">%1$s eingeben...</string>
     <string name="settings_streamnet_tv_ready">Bereit für deine persönliche Anmeldung</string>
     <string name="settings_streamnet_tv_connected">Mit persönlichem StreamNet-Login verbunden</string>
+    <string name="settings_playlist_expiration">Ablauf: %1$s</string>
+    <string name="settings_playlist_expiration_unlimited">Unbegrenzt</string>
     <string name="toast_streamnet_tv_unavailable">StreamNet TV ist in diesem Build nicht konfiguriert.</string>
     <string name="toast_streamnet_credentials_required">Gib deinen StreamNet-Benutzernamen und dein StreamNet-Passwort ein.</string>
     <string name="toast_iptv_playlist_limit">Entferne eine andere Playlist, bevor du StreamNet TV aktivierst. Es können bis zu drei Playlists eingerichtet werden.</string>

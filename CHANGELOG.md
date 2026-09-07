@@ -4,9 +4,36 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.013] - 2026-09-07
+
+### IPTV
+
+- Playlist-Karten in den Einstellungen zeigen fuer Xtream-Listen das Ablaufdatum aus `player_api.php` an; fehlende oder unbegrenzte Angaben erscheinen als „Unbegrenzt“.
+- Das Playlist-Ablaufdatum steht nun als eigene akzentfarbene Zeile unter der Beschreibung statt inline im Beschreibungstext.
+
+### Live TV
+
+- Lange EPG-Balken zeigen den Sendungstitel im sichtbaren Teil ihres eigenen Balkens; wenn nur noch wenig Platz bleibt, wird der Titel sauber mit Ellipsis gekürzt.
+- TV-Geräte können unter Oberfläche zwischen dem StreamNet-Live-TV-Layout und einem klassischen Layout mit Kategorie-Sidebar, Hero und EPG-Raster wechseln; die Auswahl sowie getrennte Schriftgrößen für Netflix- und Klassik-Infopanels werden profilbezogen über StreamNet Cloud synchronisiert.
+- Das klassische Layout verwendet die TV-fähige Kategorie-Sidebar statt Touch-Pills, unterstützt stufige Zurück-Navigation bis zur Topbar und stabilisiert D-Pad-Fokus für Kategorien, Senderliste, EPG und Suche.
+- Der klassische Hero wurde kompakter gestaltet, zeigt Programmartwork im gesamten Infopanel, verzichtet auf sichtbare Rahmen und lässt mehr Platz für das EPG-Raster.
+- EPG-Programmbalken wurden beruhigt und zeigen nur noch den Programmtitel ohne Live-/Archiv-/Neu-Badges, Zeiten, Dauer oder Beschreibung.
+- Das klassische Live-TV-Layout ist in eine eigene `LiveTvClassicLayout`-Komponente ausgelagert, damit Klassik- und StreamNet-/Netflix-Layout getrennt weiterentwickelt werden können.
+
+### Merkliste und Details
+
+- Long-Press auf Episoden öffnet auf Mobile/Tablet das vorhandene Episoden-Aktionsmenü; auf TV entscheidet OK-Halten zuverlässig zwischen Popup und Streamstart.
+- Long-Press in der Merkliste und in Bibliotheken öffnet ein Kontextmenü statt sofort zu löschen; lokale Merkliste bietet zusätzlich „Von der Merkliste entfernen“.
+- Kontextmenü-Aktionen sind deutsch und englisch lokalisiert.
+- Das Episoden-Kontextmenü nutzt nun denselben dunklen, akzentgerahmten Popup-Stil wie die Home-Kontextmenüs.
+
 ### Admin-Backend
 
 - Der Snapshot-Editor stempelt geänderte Add-ons, Profil- und IPTV-Felder mit den passenden Sync-Zeitstempeln; App-Pushes führen Add-ons und profilbezogene Felder serverseitig mit dem aktuellen DB-Snapshot zusammen, damit ein Gerät direkt nach einer Admin-Änderung nicht wieder alte lokale Werte speichern kann.
+- Top-Level-Addon-Änderungen aus dem Snapshot-Editor werden in die profilbezogenen Addon-Snapshots gespiegelt, damit Geräte den geänderten Addon-Status beim nächsten Pull übernehmen.
+- Das Admin-Dashboard kann große Cloud-Snapshots wieder mit kleinen Delta-Änderungen bearbeiten, ohne an zu niedrigen Snapshot-Größenlimits zu scheitern.
+- Das neue Admin-Logo `streamnetapp-logo.svg` wird über die Self-hosted-Backend-Asset-Route ausgeliefert.
+- Admin-Änderungen an profilbezogenen Feldern schreiben nun denselben `fieldUpdatedAt`-Zeitstempelvertrag wie die App, damit Geräte diese Änderungen nicht beim nächsten Push als stale überschreiben.
 
 ## [2.3.012] - 2026-09-07
 

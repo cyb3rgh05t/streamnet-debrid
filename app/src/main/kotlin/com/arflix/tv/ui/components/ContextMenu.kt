@@ -56,10 +56,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.BackgroundCard
 import com.arflix.tv.ui.theme.BackgroundElevated
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
@@ -149,7 +151,8 @@ fun ContextMenu(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.56f))
+                    .zIndex(50f)
+                    .background(Color.Black.copy(alpha = 0.5f))
                     .focusRequester(focusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -182,17 +185,18 @@ fun ContextMenu(
                 Column(
                     modifier = Modifier
                         .padding(top = 110.dp)
-                        .width(360.dp)
-                        .background(BackgroundElevated, RoundedCornerShape(18.dp))
-                        .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(18.dp))
-                        .padding(20.dp),
+                        .width(340.dp)
+                        .background(BackgroundCard, RoundedCornerShape(14.dp))
+                        .border(1.dp, accentColor.copy(alpha = 0.55f), RoundedCornerShape(14.dp))
+                        .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Title
                     Text(
                         text = title,
                         style = ArflixTypography.sectionTitle,
-                        color = TextPrimary
+                        color = TextPrimary,
+                        maxLines = 2
                     )
 
                     // Subtitle
@@ -204,16 +208,6 @@ fun ContextMenu(
                             color = TextSecondary
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Divider
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(TextSecondary.copy(alpha = 0.2f))
-                    )
 
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -231,28 +225,13 @@ fun ContextMenu(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    // Close hint
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier
-                            .background(TextSecondary.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = null,
-                            tint = TextSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = stringResource(R.string.context_press_back_cancel),
-                            style = ArflixTypography.caption,
-                            color = TextSecondary
-                        )
-                    }
+                    Text(
+                        text = stringResource(R.string.press_back_to_close),
+                        style = ArflixTypography.caption,
+                        color = TextSecondary.copy(alpha = 0.5f)
+                    )
                 }
             }
         }

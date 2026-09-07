@@ -407,6 +407,7 @@ class SettingsViewModel @Inject constructor(
     private var plexHomeServerDisplayName: String? = null
     private var iptvLoadJob: Job? = null
     private var iptvGroupLoadJob: Job? = null
+    private var iptvPlaylistAccountInfoJob: Job? = null
     private var catalogSearchJob: Job? = null
     private var settingsCloudSyncJob: Job? = null
     private var aiKeyServer: AiKeyConfigServer? = null
@@ -2244,6 +2245,7 @@ class SettingsViewModel @Inject constructor(
                     } else {
                         loadCachedIptvChannelCount(config.syncSignature())
                     }
+                    refreshIptvPlaylistAccountInfoIfNeeded(config.playlists)
                     return@collect
                 }
 
@@ -2258,6 +2260,7 @@ class SettingsViewModel @Inject constructor(
                     if (iptvLoadJob?.isActive != true) {
                         refreshIptv(showToast = false, force = false)
                     }
+                    refreshIptvPlaylistAccountInfoIfNeeded(config.playlists)
                 } else if (!hasAnyConfig) {
                     lastObservedIptvM3u = ""
                     lastObservedStalkerUrl = ""
@@ -2269,6 +2272,22 @@ class SettingsViewModel @Inject constructor(
                         iptvProgressPercent = 0
                     )
                 }
+            }
+        }
+    }
+
+    private fun refreshIptvPlaylistAccountInfoIfNeeded(playlists: List<IptvPlaylistEntry>) {
+        val now = System.currentTimeMillis()
+        val hasStaleXtreamPlaylist = playlists.any { playlist ->
+            playlist.m3uUrl.isNotBlank() &&
+                (playlist.expirationCheckedAtMillis <= 0L || now - playlist.expirationCheckedAtMillis >= 12 * 60 * 60_000L)
+        }
+        if (!hasStaleXtreamPlaylist || iptvPlaylistAccountInfoJob?.isActive == true) return
+        iptvPlaylistAccountInfoJob = viewModelScope.launch {
+            val refreshed = iptvRepository.refreshPlaylistAccountInfo(playlists)
+            if (refreshed != playlists) {
+                iptvRepository.savePlaylists(refreshed)
+                syncLocalStateToCloud(silent = true)
             }
         }
     }
@@ -2653,6 +2672,7 @@ class SettingsViewModel @Inject constructor(
                 toastMessage = context.getString(R.string.toast_iptv_playlists_updated),
                 toastType = ToastType.SUCCESS
             )
+            refreshIptvPlaylistAccountInfoIfNeeded(playlists)
             syncLocalStateToCloud(silent = true)
         }
     }
