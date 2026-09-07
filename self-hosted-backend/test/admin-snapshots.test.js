@@ -139,6 +139,38 @@ test("removes a profile and its scoped data, but keeps at least one profile", ()
   );
 });
 
+test("edits the whole payload while preserving redacted secret values", () => {
+  const value = snapshot();
+  value.iptvByProfile.kids.m3uUrl = "https://user:pass@example/list.m3u";
+  value.profiles[1].name = "Kids";
+
+  const edited = JSON.parse(JSON.stringify(value));
+  edited.profiles[1].name = "Kids Room";
+  edited.iptvByProfile.kids.m3uUrl = "[REDACTED]";
+
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "edit_payload",
+    data: edited,
+  });
+
+  assert.equal(result.profiles[1].name, "Kids Room");
+  assert.equal(
+    result.iptvByProfile.kids.m3uUrl,
+    "https://user:pass@example/list.m3u",
+  );
+});
+
+test("rejects a payload edit that removes every profile", () => {
+  assert.throws(
+    () =>
+      applyAdminSnapshotMutation(snapshot(), {
+        operation: "edit_payload",
+        data: { profiles: [] },
+      }),
+    /Payload must include at least one profile/,
+  );
+});
+
 test("redacts credentials recursively while retaining useful structure", () => {
   const redacted = redactAdminPayload({
     profile: { name: "Kids", apiKey: "secret" },

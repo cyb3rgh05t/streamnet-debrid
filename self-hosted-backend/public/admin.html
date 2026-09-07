@@ -225,9 +225,7 @@
 
                 <div id="fields-upsert_addon" class="op-fields hidden">
                   <label
-                    >Add-on-ID<input
-                      id="addon-id"
-                      placeholder="mein-addon"
+                    >Add-on-ID<input id="addon-id" placeholder="mein-addon"
                   /></label>
                   <label
                     >Name<input id="addon-name" placeholder="Mein Add-on"
@@ -245,8 +243,8 @@
                     >Beschreibung (optional)<textarea
                       id="addon-description"
                       rows="2"
-                    ></textarea
-                  ></label>
+                    ></textarea>
+                  </label>
                   <label class="checkbox-field"
                     ><input id="addon-enabled" type="checkbox" checked />
                     Aktiviert</label
@@ -290,8 +288,8 @@
                       Live-TV importieren</label
                     >
                     <label class="checkbox-field"
-                      ><input id="playlist-vod" type="checkbox" checked />
-                      Filme importieren</label
+                      ><input id="playlist-vod" type="checkbox" checked /> Filme
+                      importieren</label
                     >
                     <label class="checkbox-field"
                       ><input id="playlist-series" type="checkbox" checked />
@@ -349,11 +347,62 @@
                   <p class="eyebrow">REDACTED</p>
                   <h2 id="payload-title">Snapshot</h2>
                 </div>
-                <button id="copy-payload" class="text-button" type="button">
-                  JSON kopieren
-                </button>
+                <div class="payload-actions">
+                  <button id="copy-payload" class="text-button" type="button">
+                    JSON kopieren
+                  </button>
+                  <button
+                    id="edit-payload-button"
+                    class="text-button"
+                    type="button"
+                  >
+                    Bearbeiten
+                  </button>
+                </div>
               </div>
               <pre id="payload-json"></pre>
+              <form id="payload-edit-form" class="form-stack hidden">
+                <div class="warning">
+                  Erweiterte Funktion: Werte, die als „[REDACTED]“ angezeigt
+                  werden (z.&nbsp;B. Passwörter, Tokens, Playlist-URLs), bleiben
+                  beim Speichern unverändert erhalten. Um solche Werte zu
+                  ändern, bitte die Add-on-/Playlist-Formulare oder „Profilfeld
+                  setzen“ verwenden. Die Reihenfolge bestehender Listen bitte
+                  nicht ändern, sonst können maskierte Werte falsch zugeordnet
+                  werden.
+                </div>
+                <label
+                  >JSON<textarea
+                    id="payload-edit-data"
+                    rows="18"
+                    spellcheck="false"
+                  ></textarea
+                ></label>
+                <label
+                  >Änderungsgrund<input
+                    id="payload-edit-reason"
+                    maxlength="500"
+                    required
+                    placeholder="Warum ist diese Änderung nötig?"
+                /></label>
+                <div class="payload-edit-buttons">
+                  <button class="button primary" type="submit">
+                    Payload speichern
+                  </button>
+                  <button
+                    id="payload-edit-cancel"
+                    class="button secondary"
+                    type="button"
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+                <p
+                  id="payload-edit-message"
+                  class="message"
+                  role="status"
+                ></p>
+              </form>
             </section>
           </div>
         </section>

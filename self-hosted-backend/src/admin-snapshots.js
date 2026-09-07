@@ -21,14 +21,14 @@ function cleanIdentifier(value, field) {
   return normalized;
 }
 
-function cloneJson(value, field = "data") {
+function cloneJson(value, field = "data", maxBytes = 64 * 1024) {
   let serialized;
   try {
     serialized = JSON.stringify(value);
   } catch {
     throw new Error(`${field} must be valid JSON`);
   }
-  if (serialized === undefined || serialized.length > 64 * 1024) {
+  if (serialized === undefined || serialized.length > maxBytes) {
     throw new Error(`${field} is too large`);
   }
   return JSON.parse(serialized);
@@ -122,9 +122,7 @@ function upsertById(items, item) {
 }
 
 function removeById(items, id) {
-  return (Array.isArray(items) ? items : []).filter(
-    (item) => item?.id !== id,
-  );
+  return (Array.isArray(items) ? items : []).filter((item) => item?.id !== id);
 }
 
 const profileScopedRoots = [
@@ -138,6 +136,30 @@ const profileScopedRoots = [
   "catalogsUpdatedAtByProfile",
 ];
 
+const redactedSentinel = "[REDACTED]";
+
+// Wherever the edited tree still shows the sentinel, keep the real stored value so a
+// masked view can never overwrite actual secrets (passwords, tokens, playlist URLs, ...).
+function mergeRedactedPreservingSecrets(current, edited) {
+  if (edited === redactedSentinel) return current;
+  if (Array.isArray(edited)) {
+    const currentArray = Array.isArray(current) ? current : [];
+    return edited.map((item, index) =>
+      mergeRedactedPreservingSecrets(currentArray[index], item),
+    );
+  }
+  if (isPlainObject(edited)) {
+    const currentObject = isPlainObject(current) ? current : {};
+    const result = {};
+    for (const [key, value] of Object.entries(edited)) {
+      if (blockedPropertyNames.has(key)) continue;
+      result[key] = mergeRedactedPreservingSecrets(currentObject[key], value);
+    }
+    return result;
+  }
+  return edited;
+}
+
 export function applyAdminSnapshotMutation(
   payloadValue,
   request,
@@ -148,8 +170,20 @@ export function applyAdminSnapshotMutation(
   if (!isPlainObject(request)) throw new Error("Mutation request is invalid");
   const payload = cloneJson(payloadValue, "Snapshot payload");
   const operation = String(request.operation || "").trim();
-  const profileId = requireProfile(payload, request.profileId);
   const data = request.data;
+
+  if (operation === "edit_payload") {
+    const edited = cloneJson(data, "Payload data", 512 * 1024);
+    assertSafeKeys(edited);
+    if (!Array.isArray(edited.profiles) || edited.profiles.length === 0) {
+      throw new Error("Payload must include at least one profile");
+    }
+    const merged = mergeRedactedPreservingSecrets(payload, edited);
+    merged.updatedAt = now;
+    return merged;
+  }
+
+  const profileId = requireProfile(payload, request.profileId);
 
   if (operation === "upsert_addon") {
     const addon = normalizeAddon(data);

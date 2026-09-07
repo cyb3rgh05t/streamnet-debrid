@@ -248,7 +248,11 @@ async function openAccount(accountId) {
   stats.replaceChildren(
     metricNode("sessions", "Aktive Sessions", data.account.active_sessions),
     metricNode("history", "Watch History", data.account.watch_history_items),
-    metricNode("events", "Watch State", data.account.watch_state_items),
+    metricNode(
+      "snapshots",
+      "Snapshot aktualisiert",
+      formatDate(data.snapshot?.updated_at),
+    ),
     metricNode("created", "Erstellt", formatDate(data.account.created_at)),
   );
 
@@ -259,6 +263,9 @@ async function openAccount(accountId) {
   byId("payload-json").textContent = snapshot
     ? JSON.stringify(snapshot.payload, null, 2)
     : "Kein Cloud-Snapshot vorhanden.";
+  byId("payload-json").classList.remove("hidden");
+  byId("payload-edit-form").classList.add("hidden");
+  byId("edit-payload-button").classList.toggle("hidden", !snapshot);
   renderProfiles(snapshot?.profiles || []);
   byId("mutation-form").classList.toggle("hidden", !snapshot);
   if (snapshot) updateOperationFields();
@@ -296,7 +303,8 @@ async function deleteProfile(profileId, profileName) {
         : error.message,
       true,
     );
-    if (error.status === 409) await openAccount(state.selectedAccount.account.id);
+    if (error.status === 409)
+      await openAccount(state.selectedAccount.account.id);
   }
 }
 
@@ -321,12 +329,12 @@ function renderProfiles(profiles) {
       ["Kataloge", profile.catalogCount],
       ["Merkliste", profile.watchlistCount],
     ]) {
-      const count = document.createElement("span");
-      count.textContent = `${label}: `;
+      const badge = document.createElement("span");
+      badge.className = "count-badge";
       const number = document.createElement("b");
       number.textContent = value;
-      count.append(number);
-      counts.append(count);
+      badge.append(number, document.createTextNode(` ${label}`));
+      counts.append(badge);
     }
     const deleteButton = document.createElement("button");
     deleteButton.type = "button";
@@ -610,9 +618,7 @@ byId("mutation-profile").addEventListener("change", () => {
 });
 byId("mutation-form").addEventListener("submit", submitMutation);
 byId("revoke-sessions-button").addEventListener("click", async (event) => {
-  const reason = promptReason(
-    "Warum sollen alle Sitzungen abgemeldet werden?",
-  );
+  const reason = promptReason("Warum sollen alle Sitzungen abgemeldet werden?");
   if (!reason) return;
   const button = event.currentTarget;
   setButtonBusy(button, true, "Wird abgemeldet…");
@@ -635,8 +641,7 @@ byId("delete-account-button").addEventListener("click", async (event) => {
     `Zum Bestätigen bitte die E-Mail-Adresse "${account.email}" eingeben:`,
   );
   if (typed !== account.email) {
-    if (typed !== null)
-      showToast("E-Mail-Adresse stimmt nicht überein.", true);
+    if (typed !== null) showToast("E-Mail-Adresse stimmt nicht überein.", true);
     return;
   }
   const reason = promptReason(
@@ -661,6 +666,60 @@ byId("delete-account-button").addEventListener("click", async (event) => {
 byId("copy-payload").addEventListener("click", async () => {
   await navigator.clipboard.writeText(byId("payload-json").textContent);
   showToast("Maskiertes JSON kopiert.");
+});
+byId("edit-payload-button").addEventListener("click", () => {
+  const snapshot = state.selectedAccount?.snapshot;
+  if (!snapshot) return;
+  byId("payload-json").classList.add("hidden");
+  byId("payload-edit-data").value = JSON.stringify(snapshot.payload, null, 2);
+  byId("payload-edit-message").textContent = "";
+  byId("payload-edit-message").className = "message";
+  byId("payload-edit-form").classList.remove("hidden");
+});
+byId("payload-edit-cancel").addEventListener("click", () => {
+  byId("payload-edit-form").classList.add("hidden");
+  byId("payload-json").classList.remove("hidden");
+});
+byId("payload-edit-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const message = byId("payload-edit-message");
+  const submitButton = event.target.querySelector('button[type="submit"]');
+  message.className = "message";
+  message.textContent = "Änderung wird geprüft…";
+  setButtonBusy(submitButton, true, "Wird gespeichert…");
+  try {
+    let data;
+    try {
+      data = JSON.parse(byId("payload-edit-data").value);
+    } catch {
+      throw new Error("Ungültiges JSON.");
+    }
+    await api(
+      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/snapshot`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({
+          operation: "edit_payload",
+          data,
+          reason: byId("payload-edit-reason").value,
+          expectedRevision: state.selectedAccount.snapshot.revision,
+        }),
+      },
+    );
+    byId("payload-edit-reason").value = "";
+    showToast("Payload gespeichert und protokolliert.");
+    await openAccount(state.selectedAccount.account.id);
+  } catch (error) {
+    message.className = "message error";
+    message.textContent =
+      error.status === 409
+        ? "Der Snapshot wurde inzwischen geändert. Die Ansicht wurde neu geladen."
+        : error.message;
+    if (error.status === 409)
+      await openAccount(state.selectedAccount.account.id);
+  } finally {
+    setButtonBusy(submitButton, false);
+  }
 });
 byId("account-search").addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);

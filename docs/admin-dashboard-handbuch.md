@@ -141,9 +141,15 @@ Backend geladen. Ein Klick auf eine Tabellenzeile öffnet die Account-Details.
 
 - **Aktive Sessions:** Gültige Refresh-Anmeldungen dieses Accounts.
 - **Watch History:** Anzahl seiner Wiedergabeverlaufseinträge.
-- **Watch State:** Anzahl separater Zustandszeilen, zum Beispiel als gesehen
-  markierte Filme, als gesehen markierte Episoden und Synchronisationsstatus.
+- **Snapshot aktualisiert:** Zeitpunkt der letzten Cloud-Snapshot-Änderung.
 - **Erstellt:** Erstellungszeitpunkt des Accounts.
+
+Die frühere Kennzahl „Watch State“ wurde entfernt, weil sie strukturell immer
+0 war: Die App schreibt den Gesehen-Status ausschließlich in den
+Cloud-Snapshot (siehe Profilzähler und Payload), die separate
+`watch_state`-Tabelle wird nur von einem inzwischen deaktivierten
+Legacy-Sync-Pfad befüllt (aktiv nur, solange `CLOUD_SYNC_ENABLED` in der App
+ausgeschaltet ist).
 
 ### Profile
 
@@ -171,12 +177,13 @@ keine unmaskierten Geheimnisse an.
 
 ## Payload ändern
 
-Änderungen sind absichtlich auf drei Operationen beschränkt. Es gibt keinen
-beliebigen JSON-Editor und keine direkte SQL-Ausführung.
+Änderungen laufen über einzelne Operationen (Add-on, Playlist, Profilfeld,
+Löschen) oder über den erweiterten JSON-Editor für die gesamte Payload. Es
+gibt weiterhin keine direkte SQL-Ausführung.
 
 Jede Änderung benötigt:
 
-1. ein vorhandenes Zielprofil;
+1. ein vorhandenes Zielprofil (außer beim erweiterten Payload-Editor);
 2. gültiges JSON im Datenfeld;
 3. einen Änderungsgrund mit 3 bis 500 Zeichen;
 4. die beim Öffnen geladene Snapshot-Revision.
@@ -192,6 +199,22 @@ URL, Version/Beschreibung bzw. M3U-/EPG-URL und Aktivierungs-Kästchen). Ein
 JSON-Editor ist dafür nicht mehr nötig. Nur die Operation „Profilfeld setzen“
 bleibt als erweiterte Funktion mit einem rohen JSON-Wertfeld bestehen, weil sie
 absichtlich beliebige Profilfelder unterstützt.
+
+### Gesamte Payload bearbeiten (erweitert)
+
+Über „Bearbeiten“ im Snapshot-Panel lässt sich die komplette, maskierte
+Payload als JSON öffnen und verändern. Beim Speichern gilt eine wichtige
+Sicherheitsregel: Jeder Wert, der im JSON weiterhin als `"[REDACTED]"`
+angezeigt wird, bleibt unverändert auf dem tatsächlich gespeicherten Wert
+(Passwort, Token, Playlist-URL usw.) — das Dashboard überschreibt echte
+Geheimnisse also nie mit dem Platzhaltertext. Um einen maskierten Wert
+wirklich zu ändern, müssen die dedizierten Add-on-/Playlist-Formulare oder
+„Profilfeld setzen“ verwendet werden.
+
+Die Zuordnung erfolgt bei Listen (z. B. Playlists) über den Index; wird die
+Reihenfolge einer Liste beim Bearbeiten verändert, kann ein maskierter Wert
+dem falschen Eintrag zugeordnet werden. Die Payload darf maximal 512 KiB groß
+sein und muss mindestens ein Profil enthalten.
 
 ### Add-on hinzufügen / ersetzen
 
@@ -343,9 +366,9 @@ Das Dashboard kann derzeit nicht:
 
 - einzelne Account-Sessions oder Geräte anzeigen oder gezielt eine einzelne
   Sitzung widerrufen (nur „alle Sitzungen abmelden“ ist möglich);
-- Passwörter von StreamNet-Accounts ändern;
+- Passwörter von StreamNet-Accounts zurücksetzen (siehe Hinweis unten, noch
+  nicht im Backend implementiert);
 - Watch History oder Watch State bearbeiten;
-- beliebiges Snapshot-JSON ersetzen;
 - beliebige SQL-Abfragen ausführen — bewusst nicht eingebaut, da ein
   ungefiltertes SQL-Fenster ein zu hohes Risiko für versehentlichen
   Datenverlust und Injection wäre; für Ad-hoc-Abfragen direkt per `psql` auf
@@ -354,6 +377,17 @@ Das Dashboard kann derzeit nicht:
   kompromittierte Admin-Sitzung oder ein Screenshot keine Playlist-/API-Zugangsdaten
   offenlegt;
 - eindeutig anzeigen, welche Nutzer gerade online sind.
+
+## Passwort-Reset für StreamNet-Cloud-Accounts (offener Punkt)
+
+Die Login-Seite (`index.html`) zeigt einen „Passwort vergessen?“-Link und ruft
+dafür `/cloud-auth-reset` sowie `/auth-password-complete` auf. Diese beiden
+Endpunkte existieren im aktuellen Self-hosted-Backend noch nicht — ein Klick
+darauf schlägt derzeit fehl. Das ist kein Bug, sondern ein dokumentierter,
+offener Punkt: Laut `self-hosted-backend/README.md` wird Passwort-Reset erst
+nach Einrichtung eines E-Mail-Versands (z. B. via SMTP oder einem Anbieter wie
+Resend) ergänzt. Bis dahin kann ein vergessenes Passwort nur durch einen
+Admin-Eingriff auf Datenbankebene behoben werden (kein Dashboard-Feature).
 
 ## Sicherer Umgang
 

@@ -38,6 +38,12 @@ const mutationFailureReasons = new Map([
   ],
   ["Field data is too large", "field_data_too_large"],
   ["Unsafe property name", "unsafe_property_name"],
+  ["Payload data must be valid JSON", "invalid_payload_data"],
+  ["Payload data is too large", "payload_data_too_large"],
+  [
+    "Payload must include at least one profile",
+    "invalid_payload_profiles",
+  ],
   ["Cannot delete the only profile", "cannot_delete_last_profile"],
   ["Unsupported operation", "unsupported_operation"],
 ]);

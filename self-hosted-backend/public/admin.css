@@ -396,6 +396,26 @@ textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 36px;
+  background-color: #14110e;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23e5a209' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  background-size: 14px;
+  cursor: pointer;
+}
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+select option {
+  background: var(--surface-raised);
+  color: var(--text);
+}
 textarea {
   resize: vertical;
   font:
@@ -590,14 +610,25 @@ tbody tr[data-account-id]:focus {
   margin-bottom: 12px;
 }
 .profile-counts {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 9px;
-  color: var(--muted);
-  font-size: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
-.profile-counts b {
-  color: var(--text);
+.count-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.count-badge b {
+  color: var(--accent);
+  font-family: Consolas, monospace;
 }
 .profile-row .text-button {
   margin-top: auto;
@@ -624,6 +655,14 @@ tbody tr[data-account-id]:focus {
 .editor-panel .section-heading,
 .payload-panel .section-heading {
   margin-top: 0;
+}
+.payload-actions {
+  display: flex;
+  gap: 14px;
+}
+.payload-edit-buttons {
+  display: flex;
+  gap: 10px;
 }
 .field-controls,
 .checkbox-grid {
