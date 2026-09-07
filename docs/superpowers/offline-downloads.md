@@ -1,4 +1,4 @@
-# Offline-Downloads und Live-TV-Layoutwahl
+# Offline-Downloads
 
 Stand: 2026-09-07
 
@@ -108,89 +108,8 @@ oder Download-Wunschlisten synchronisieren, nicht die Mediendateien.
 - Automatische Downloads ganzer Staffeln
 - Provider-spezifische Umgehungen fuer kurzlebige oder nicht direkte Links
 
-## Feature 2: Live-TV-Layoutwahl
-
-Status: In Version `2.3.011` fuer den TV-Modus umgesetzt.
-
-### Ist es machbar?
-
-Ja. `LiveTvScreen` enthaelt aktuell beide Layoutpfade:
-
-- Touch/Mobile/Tablet nutzt die klassische Struktur mit `ProviderSelector`,
-  `MiniPlayerRow`, `TouchCategoryRail` und `EpgGrid`.
-- TV nutzt standardmaessig `LiveTvNetflixLayout`, kann aber auf das klassische
-  Layout umgeschaltet werden.
-
-Die klassische Upstream-nahe View existiert also noch als Codepfad. Eine
-Oberflaechen-Einstellung kann auf TV-Geraeten entscheiden, ob der TV-Zweig
-weiterhin `LiveTvNetflixLayout` nutzt oder die klassische Guide-Ansicht rendert.
-
-### Empfohlene Einstellung
-
-Bereich: `Einstellungen > Oberflaeche` im TV-Modus. Mobile und Tablet zeigen
-diese Einstellung nicht an und behalten immer die Touch-optimierte klassische
-Ansicht.
-
-Name: `Live-TV-Layout`
-
-Werte:
-
-- `StreamNet`: aktuelles StreamNet-/Netflix-artiges TV-Layout
-- `Klassisch`: Kategorie-Sidebar, kompakter Hero und EPG-Raster
-
-Default bleibt `StreamNet`, damit bestehende Installationen unveraendert
-aussehen.
-
-### Technische Umsetzung
-
-1. Neues Enum oder String-Konstante einfuehren:
-   - `streamnet`
-   - `classic`
-2. Profilbezogenen Settings-Key in `SettingsViewModel` speichern:
-   `live_tv_layout_mode`.
-3. Wert in `SettingsUiState` aufnehmen.
-4. TV-Settings unter `Oberflaeche` um eine Zeile erweitern. Mobile/Tablet
-   erhalten keine Zeile.
-5. Einstellung ueber Cloud-Snapshot synchronisieren, damit alle TV-Geraete eines
-   Profils dieselbe Layoutwahl bekommen. Touch-Geraete ignorieren den Wert.
-6. `LiveTvScreen` liest den Wert und entscheidet:
-   - Touch bleibt weiterhin klassische Touch-Ansicht.
-   - TV + `streamnet` nutzt `LiveTvNetflixLayout`.
-   - TV + `classic` nutzt den klassischen Guide-Zweig.
-7. Fokus- und Startup-Restore pruefen:
-   - letzter Sender
-   - letzte Kategorie
-   - Fullscreen Rueckkehr
-   - Favoriten/Recent
-   - EPG-Fokus und Senderliste
-
-Ergaenzt in `2.3.011`:
-
-- Getrennte Schriftgroessen fuer Netflix-Infotitel, Netflix-Infobeschreibung,
-  Klassik-Infotitel und Klassik-Infobeschreibung.
-- Stufige Zurueck-Navigation im klassischen TV-Layout.
-- Admin-Backend-Grenzen fuer grosse Cloud-Snapshots korrigiert, damit
-  profilbezogene Layout- und Textgroessenfelder auch bei grossen Snapshots per
-  Admin-Panel gesetzt werden koennen.
-
-### Architekturstand
-
-Der klassische Pfad ist seit Version `2.3.012` in `LiveTvClassicLayout`
-ausgelagert. `LiveTvScreen` entscheidet nur noch zwischen dem klassischen Layout
-und `LiveTvNetflixLayout`. Das klassische Layout kapselt Provider-Auswahl,
-MiniPlayer/Hero, Touch-Kategorie-Rail, TV-Kategorie-Sidebar und `EpgGrid`, sodass
-Klassik- und StreamNet-/Netflix-Layout getrennt weiterentwickelt werden koennen.
-
-### Tests
-
-- Unit-Test fuer Layoutentscheidung: Touch immer klassisch, TV je nach Setting.
-- Settings-Test: Toggle rotiert `StreamNet -> Klassisch -> StreamNet`.
-- Cloud-Sync-Test: `live_tv_layout_mode` wird exportiert und importiert.
-- Manuelle TV-Tests fuer D-Pad, Kategorie, EPG, Senderstart, Fullscreen.
-
 ## Prioritaet
 
-Die Live-TV-Layoutwahl ist deutlich kleiner und risikoaermer als
 Offline-Downloads. Sie eignet sich als naechster direkter Implementierungsslice.
 Offline-Downloads sollten danach als eigenes groesseres Feature mit Media3-
 Downloadservice, Speicherverwaltung und Quellenvalidierung umgesetzt werden.
