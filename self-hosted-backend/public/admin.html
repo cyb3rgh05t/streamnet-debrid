@@ -14,7 +14,7 @@
     <main id="login-view" class="login-shell">
       <section class="login-panel" aria-labelledby="login-title">
         <img
-          src="/assets/streamnet-club-logo.svg"
+          src="/assets/streamnetapp-logo.svg"
           alt="StreamNet"
           class="login-logo"
         />
@@ -167,6 +167,7 @@
             Zurück zu Accounts
           </button>
           <div id="account-heading" class="account-heading"></div>
+          <div id="account-devices" class="device-badges hidden"></div>
           <div id="account-stats" class="metrics compact"></div>
           <div class="account-actions">
             <button
@@ -376,8 +377,8 @@
                     id="payload-edit-data"
                     rows="18"
                     spellcheck="false"
-                  ></textarea
-                ></label>
+                  ></textarea>
+                </label>
                 <label
                   >Änderungsgrund<input
                     id="payload-edit-reason"
@@ -397,11 +398,7 @@
                     Abbrechen
                   </button>
                 </div>
-                <p
-                  id="payload-edit-message"
-                  class="message"
-                  role="status"
-                ></p>
+                <p id="payload-edit-message" class="message" role="status"></p>
               </form>
             </section>
           </div>

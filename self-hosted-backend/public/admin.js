@@ -31,6 +31,109 @@ function svgIcon(markup) {
   return document.importNode(doc.documentElement, true);
 }
 
+const chevronIconMarkup =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+// Skins a native <select> with an accent-themed dropdown while keeping the
+// original element as the source of truth for value/change events.
+function enhanceSelect(select) {
+  if (select.dataset.enhanced) return;
+  select.dataset.enhanced = "true";
+
+  const wrapper = document.createElement("div");
+  wrapper.className = "custom-select";
+  select.parentNode.insertBefore(wrapper, select);
+  select.classList.add("native-select");
+  wrapper.append(select);
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "custom-select-trigger";
+  const label = document.createElement("span");
+  trigger.append(label, svgIcon(chevronIconMarkup));
+  wrapper.append(trigger);
+
+  const listbox = document.createElement("div");
+  listbox.className = "custom-select-list hidden";
+  wrapper.append(listbox);
+
+  function syncTrigger() {
+    const option = select.options[select.selectedIndex];
+    label.textContent = option ? option.textContent : "";
+    trigger.disabled = select.disabled;
+  }
+
+  function buildOptions() {
+    listbox.replaceChildren();
+    [...select.options].forEach((option, index) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "custom-select-option";
+      item.textContent = option.textContent;
+      item.disabled = option.disabled;
+      if (index === select.selectedIndex) item.classList.add("selected");
+      item.addEventListener("click", () => {
+        select.selectedIndex = index;
+        select.dispatchEvent(new Event("change", { bubbles: true }));
+        closeList();
+      });
+      listbox.append(item);
+    });
+  }
+
+  function openList() {
+    if (select.disabled) return;
+    buildOptions();
+    listbox.classList.remove("hidden");
+    trigger.classList.add("open");
+  }
+
+  function closeList() {
+    listbox.classList.add("hidden");
+    trigger.classList.remove("open");
+    syncTrigger();
+  }
+
+  trigger.addEventListener("click", () => {
+    if (listbox.classList.contains("hidden")) openList();
+    else closeList();
+  });
+  trigger.addEventListener("keydown", (event) => {
+    if (["ArrowDown", "ArrowUp", "Enter", " "].includes(event.key)) {
+      event.preventDefault();
+      openList();
+      listbox.querySelector(".custom-select-option:not(:disabled)")?.focus();
+    }
+  });
+  listbox.addEventListener("keydown", (event) => {
+    const options = [
+      ...listbox.querySelectorAll(".custom-select-option:not(:disabled)"),
+    ];
+    const currentIndex = options.indexOf(document.activeElement);
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      options[(currentIndex + 1) % options.length]?.focus();
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      options[(currentIndex - 1 + options.length) % options.length]?.focus();
+    } else if (event.key === "Escape") {
+      closeList();
+      trigger.focus();
+    }
+  });
+  document.addEventListener("click", (event) => {
+    if (!wrapper.contains(event.target)) closeList();
+  });
+
+  new MutationObserver(syncTrigger).observe(select, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ["disabled"],
+  });
+  syncTrigger();
+}
+
 function setLoading(active) {
   state.pendingRequests += active ? 1 : -1;
   if (state.pendingRequests < 0) state.pendingRequests = 0;
@@ -223,6 +326,31 @@ function metricNode(icon, label, value) {
   return node;
 }
 
+const deviceTypeLabels = {
+  phone: "Mobile",
+  tablet: "Tablet",
+  tv: "TV",
+  web: "Web",
+};
+
+function renderDeviceBadges(devices) {
+  const container = byId("account-devices");
+  container.replaceChildren();
+  container.classList.toggle("hidden", devices.length === 0);
+  for (const device of devices) {
+    const badge = document.createElement("span");
+    badge.className = "count-badge";
+    const label = document.createElement("b");
+    label.textContent =
+      deviceTypeLabels[device.device_type] || device.device_type;
+    badge.append(
+      label,
+      document.createTextNode(` · zuletzt ${formatDate(device.last_seen)}`),
+    );
+    container.append(badge);
+  }
+}
+
 async function openAccount(accountId) {
   const data = await api(
     `/admin-api/accounts/${encodeURIComponent(accountId)}`,
@@ -243,6 +371,8 @@ async function openAccount(accountId) {
   id.textContent = data.account.id;
   headingText.append(title, id);
   heading.append(headingText);
+
+  renderDeviceBadges(data.account.devices || []);
 
   const stats = byId("account-stats");
   stats.replaceChildren(
@@ -731,6 +861,7 @@ byId("account-search").addEventListener("input", () => {
 document.querySelectorAll(".nav-item").forEach((item) => {
   item.addEventListener("click", () => selectView(item.dataset.view));
 });
+document.querySelectorAll("select").forEach(enhanceSelect);
 
 if (state.token) {
   showDashboard();

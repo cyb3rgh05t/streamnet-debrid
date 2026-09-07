@@ -151,6 +151,15 @@ Cloud-Snapshot (siehe Profilzähler und Payload), die separate
 Legacy-Sync-Pfad befüllt (aktiv nur, solange `CLOUD_SYNC_ENABLED` in der App
 ausgeschaltet ist).
 
+### Geräte
+
+Direkt unter dem Account-Namen zeigt eine Reihe von Badges, von welchen
+Gerätetypen (Mobile, Tablet, TV, Web) zuletzt App-Nutzungsereignisse für
+diesen Account eingegangen sind, inklusive Zeitpunkt des letzten Ereignisses.
+Grundlage ist die Tabelle `app_usage_events` (Feld `device_type`), die die App
+bei Ereignissen wie `app_open` mitschickt. Das ist ein Nutzungsindikator, kein
+Beweis für eine aktuell laufende Sitzung auf diesem Gerät.
+
 ### Profile
 
 Für jedes Profil werden Name, interne Profil-ID und folgende Zähler angezeigt:

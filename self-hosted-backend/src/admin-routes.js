@@ -40,10 +40,7 @@ const mutationFailureReasons = new Map([
   ["Unsafe property name", "unsafe_property_name"],
   ["Payload data must be valid JSON", "invalid_payload_data"],
   ["Payload data is too large", "payload_data_too_large"],
-  [
-    "Payload must include at least one profile",
-    "invalid_payload_profiles",
-  ],
+  ["Payload must include at least one profile", "invalid_payload_profiles"],
   ["Cannot delete the only profile", "cannot_delete_last_profile"],
   ["Unsupported operation", "unsupported_operation"],
 ]);
@@ -290,18 +287,29 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     await authenticatedAdmin(request, pool, jwtKey);
     const accountId = validAccountId(request, reply);
     if (!accountId) return;
-    const result = await pool.query(
-      `select accounts.id, accounts.email, accounts.created_at, accounts.updated_at,
-              snapshots.payload, snapshots.revision, snapshots.source,
-              snapshots.payload_updated_at, snapshots.updated_at as snapshot_updated_at,
-              (select count(*)::int from account_sessions where account_id = accounts.id and revoked_at is null and expires_at > now()) as active_sessions,
-              (select count(*)::int from watch_history where account_id = accounts.id) as watch_history_items,
-              (select count(*)::int from watch_state where account_id = accounts.id) as watch_state_items
-         from accounts
-         left join account_sync_snapshots snapshots on snapshots.account_id = accounts.id
-        where accounts.id = $1`,
-      [accountId],
-    );
+    const [result, devicesResult] = await Promise.all([
+      pool.query(
+        `select accounts.id, accounts.email, accounts.created_at, accounts.updated_at,
+                snapshots.payload, snapshots.revision, snapshots.source,
+                snapshots.payload_updated_at, snapshots.updated_at as snapshot_updated_at,
+                (select count(*)::int from account_sessions where account_id = accounts.id and revoked_at is null and expires_at > now()) as active_sessions,
+                (select count(*)::int from watch_history where account_id = accounts.id) as watch_history_items,
+                (select count(*)::int from watch_state where account_id = accounts.id) as watch_state_items
+           from accounts
+           left join account_sync_snapshots snapshots on snapshots.account_id = accounts.id
+          where accounts.id = $1`,
+        [accountId],
+      ),
+      pool.query(
+        `select device_type, max(created_at) as last_seen
+           from app_usage_events
+          where account_id = $1 and coalesce(device_type, '') <> ''
+          group by device_type
+          order by last_seen desc
+          limit 10`,
+        [accountId],
+      ),
+    ]);
     const account = result.rows[0];
     if (!account) return reply.code(404).send({ error: "Account not found" });
     const summary = summarizeAdminPayload(account.payload);
@@ -314,6 +322,10 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         active_sessions: Number(account.active_sessions),
         watch_history_items: Number(account.watch_history_items),
         watch_state_items: Number(account.watch_state_items),
+        devices: devicesResult.rows.map((row) => ({
+          device_type: row.device_type,
+          last_seen: row.last_seen,
+        })),
       },
       snapshot: account.payload
         ? {
