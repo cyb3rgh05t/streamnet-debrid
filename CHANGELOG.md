@@ -4,6 +4,19 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.3.009] - 2026-09-07
+
+### Gesehen-Status und Cloud-Synchronisation
+
+- Manuell als gesehen oder ungesehen markierte Filme und Episoden behalten ihren Status nach dem Verlassen und erneuten Öffnen der Detailseite.
+- Profilbezogene Änderungszeitpunkte sorgen dafür, dass beim Zusammenführen mehrerer Geräte die neueste Gesehen-/Ungesehen-Aktion gewinnt, statt entfernte grüne Haken aus einem älteren Cloud-Snapshot wiederherzustellen.
+- Einzelne Episoden, Filme und vollständige Staffelaktionen verwenden denselben synchronisierten Statusvertrag; ältere Cloud-Snapshots bleiben kompatibel.
+
+### Cloud-Anmeldung
+
+- Eine gespeicherte Cloud-Anmeldung bleibt auf der Profilauswahl bei vorübergehenden Start-, Netzwerk- oder Prüfproblemen als verbunden sichtbar.
+- Nur eine tatsächlich fehlende oder vom Backend mit `401` beziehungsweise `403` abgewiesene Session zeigt wieder den Cloud-Verbinden-Button.
+
 ## [2.3.008] - 2026-09-06
 
 ### Administration und Updates

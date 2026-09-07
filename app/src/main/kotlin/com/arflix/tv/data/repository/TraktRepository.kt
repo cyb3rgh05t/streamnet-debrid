@@ -104,6 +104,8 @@ class TraktRepository @Inject constructor(
     private fun localContinueWatchingKey() = profileManager.profileStringKey("local_continue_watching_v1")
     private fun localWatchedMoviesKey() = profileManager.profileStringKey("local_watched_movies_v1")
     private fun localWatchedEpisodesKey() = profileManager.profileStringKey("local_watched_episodes_v1")
+    private fun localWatchedMovieChangesKey() = profileManager.profileStringKey("local_watched_movie_changes_v1")
+    private fun localWatchedEpisodeChangesKey() = profileManager.profileStringKey("local_watched_episode_changes_v1")
 
     data class CloudTraktToken(
         val accessToken: String?,
@@ -529,6 +531,25 @@ class TraktRepository @Inject constructor(
         return out
     }
 
+    suspend fun exportLocalWatchedMovieChangesForProfiles(profileIds: List<String>): Map<String, String> =
+        exportWatchedChangesForProfiles(profileIds, "local_watched_movie_changes_v1")
+
+    suspend fun exportLocalWatchedEpisodeChangesForProfiles(profileIds: List<String>): Map<String, String> =
+        exportWatchedChangesForProfiles(profileIds, "local_watched_episode_changes_v1")
+
+    private suspend fun exportWatchedChangesForProfiles(
+        profileIds: List<String>,
+        keySuffix: String
+    ): Map<String, String> {
+        val prefs = context.traktDataStore.data.first()
+        return buildMap {
+            profileIds.forEach { profileId ->
+                val key = profileManager.profileStringKeyFor(profileId, keySuffix)
+                prefs[key]?.takeIf { it.isNotBlank() }?.let { put(profileId, it) }
+            }
+        }
+    }
+
     suspend fun importLocalWatchedEpisodesForProfiles(values: Map<String, List<String>>) {
         context.traktDataStore.edit { prefs ->
             values.forEach { (profileId, keys) ->
@@ -538,6 +559,22 @@ class TraktRepository @Inject constructor(
                 } else {
                     prefs[key] = gson.toJson(keys.distinct())
                 }
+            }
+        }
+    }
+
+    suspend fun importLocalWatchedChangesForProfiles(
+        movieChanges: Map<String, String>,
+        episodeChanges: Map<String, String>
+    ) {
+        context.traktDataStore.edit { prefs ->
+            movieChanges.forEach { (profileId, changes) ->
+                val key = profileManager.profileStringKeyFor(profileId, "local_watched_movie_changes_v1")
+                if (changes.isBlank()) prefs.remove(key) else prefs[key] = changes
+            }
+            episodeChanges.forEach { (profileId, changes) ->
+                val key = profileManager.profileStringKeyFor(profileId, "local_watched_episode_changes_v1")
+                if (changes.isBlank()) prefs.remove(key) else prefs[key] = changes
             }
         }
     }
@@ -676,6 +713,7 @@ class TraktRepository @Inject constructor(
         // OPTIMISTIC UPDATE: Update caches immediately so the UI responds instantly
         updateWatchedCache(tmdbId, null, null, true)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(tmdbId, null, null)
         removeFromContinueWatchingCache(tmdbId, null, null, MediaType.MOVIE)
 
         // Then sync to backend in background
@@ -700,6 +738,7 @@ class TraktRepository @Inject constructor(
         ensureProfileCacheScope()
         updateWatchedCache(tmdbId, null, null, true)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(tmdbId, null, null)
         removeFromContinueWatchingCache(tmdbId, null, null, MediaType.MOVIE)
 
         try {
@@ -719,6 +758,7 @@ class TraktRepository @Inject constructor(
         // OPTIMISTIC UPDATE: Update cache immediately so the UI responds instantly
         updateWatchedCache(tmdbId, null, null, false)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(tmdbId, null, null)
 
         // Then sync to backend in background
         try {
@@ -744,6 +784,7 @@ class TraktRepository @Inject constructor(
         updateWatchedCache(showTmdbId, season, episode, true)
         updateShowWatchedCache(showTmdbId, season, episode, true)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(showTmdbId, season, episode)
         removeFromContinueWatchingCache(showTmdbId, season, episode)
 
         // Then sync to backend in background (don't block UI on network)
@@ -772,6 +813,7 @@ class TraktRepository @Inject constructor(
         updateWatchedCache(showTmdbId, season, episode, true)
         updateShowWatchedCache(showTmdbId, season, episode, true)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(showTmdbId, season, episode)
         removeFromContinueWatchingCache(showTmdbId, season, episode)
 
         try {
@@ -794,6 +836,7 @@ class TraktRepository @Inject constructor(
         updateWatchedCache(showTmdbId, season, episode, false)
         updateShowWatchedCache(showTmdbId, season, episode, false)
         persistLocalWatchedSnapshotForCurrentProfile()
+        recordLocalWatchedChange(showTmdbId, season, episode)
 
         // Then sync to backend in background (skip if batch Trakt removal already handled it)
         if (syncTrakt) {
@@ -2453,6 +2496,21 @@ class TraktRepository @Inject constructor(
             } else {
                 prefs[localWatchedEpisodesKey()] = gson.toJson(episodeKeys)
             }
+        }
+    }
+
+    private suspend fun recordLocalWatchedChange(tmdbId: Int, season: Int?, episode: Int?) {
+        val isMovie = season == null || episode == null
+        val storageKey = if (isMovie) localWatchedMovieChangesKey() else localWatchedEpisodeChangesKey()
+        val itemKey = if (isMovie) {
+            tmdbId.toString()
+        } else {
+            buildEpisodeKey(null, null, tmdbId, season, episode) ?: return
+        }
+        context.traktDataStore.edit { prefs ->
+            val changes = parseDismissedMap(prefs[storageKey]).toMutableMap()
+            changes[itemKey] = System.currentTimeMillis()
+            prefs[storageKey] = encodeDismissedMap(changes)
         }
     }
 
@@ -4209,6 +4267,7 @@ class TraktRepository @Inject constructor(
         episodes.forEach { ep ->
             updateWatchedCache(showTmdbId, seasonNumber, ep, true)
             updateShowWatchedCache(showTmdbId, seasonNumber, ep, true)
+            recordLocalWatchedChange(showTmdbId, seasonNumber, ep)
         }
         persistLocalWatchedSnapshotForCurrentProfile()
         return synced || providers.isEmpty()
@@ -4316,6 +4375,7 @@ class TraktRepository @Inject constructor(
         episodes.forEach { ep ->
             updateWatchedCache(showTmdbId, seasonNumber, ep, false)
             updateShowWatchedCache(showTmdbId, seasonNumber, ep, false)
+            recordLocalWatchedChange(showTmdbId, seasonNumber, ep)
         }
         persistLocalWatchedSnapshotForCurrentProfile()
         return synced || providers.isEmpty()

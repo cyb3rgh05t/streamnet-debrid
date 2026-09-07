@@ -372,6 +372,13 @@ internal fun shouldClearRejectedCloudSession(
     currentRefreshToken: String?,
 ): Boolean = currentRefreshToken.isNullOrBlank() || currentRefreshToken == rejectedRefreshToken
 
+internal fun resolveCloudStartupFailureState(hasPersistedIdentity: Boolean): AuthState =
+    if (hasPersistedIdentity) {
+        AuthState.Error("Cloud session check temporarily unavailable")
+    } else {
+        AuthState.NotAuthenticated
+    }
+
 /**
  * Repository for Supabase authentication and user profile management
  */
@@ -420,6 +427,7 @@ class AuthRepository @Inject constructor(
      * Note: Supabase SDK requires main thread for initialization (lifecycle observers)
      */
     suspend fun checkAuthState() {
+        var hasPersistedIdentity = false
         try {
             val prefs = context.authDataStore.data.first()
             val accessToken = prefs[PrefsKeys.ACCESS_TOKEN]
@@ -429,6 +437,10 @@ class AuthRepository @Inject constructor(
 
             val hasAccessToken = !accessToken.isNullOrBlank()
             val hasRefreshToken = !refreshToken.isNullOrBlank()
+            hasPersistedIdentity = !cachedUserId.isNullOrBlank() && (hasAccessToken || hasRefreshToken)
+            if (hasPersistedIdentity) {
+                _userProfile.value = UserProfile(id = cachedUserId!!, email = cachedEmail.orEmpty())
+            }
 
             if (Constants.CLOUD_SYNC_ENABLED) {
                 val shouldRefreshCloudToken = !hasAccessToken || isJwtExpired(accessToken ?: "")
@@ -480,7 +492,8 @@ class AuthRepository @Inject constructor(
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
-            _authState.value = AuthState.NotAuthenticated
+            AppLogger.e("Auth", "Cloud session check failed", e)
+            _authState.value = resolveCloudStartupFailureState(hasPersistedIdentity)
         }
     }
 

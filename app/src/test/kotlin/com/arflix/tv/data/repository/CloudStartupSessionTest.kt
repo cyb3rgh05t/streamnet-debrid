@@ -78,4 +78,16 @@ class CloudStartupSessionTest {
     fun `stale rejection preserves concurrently refreshed session`() {
         assertEquals(false, shouldClearRejectedCloudSession("token-1", "token-2"))
     }
+
+    @Test
+    fun `startup exception does not present a persisted session as signed out`() {
+        assertEquals(
+            true,
+            resolveCloudStartupFailureState(hasPersistedIdentity = true) is AuthState.Error,
+        )
+        assertEquals(
+            AuthState.NotAuthenticated,
+            resolveCloudStartupFailureState(hasPersistedIdentity = false),
+        )
+    }
 }

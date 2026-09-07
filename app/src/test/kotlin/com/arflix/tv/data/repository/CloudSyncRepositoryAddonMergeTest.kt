@@ -241,6 +241,43 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `newer local unwatched action removes stale remote watched state`() {
+        val local = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray()))
+            .put("localWatchedEpisodesByProfile", JSONObject().put("main", org.json.JSONArray()))
+            .put("localWatchedMovieChangesByProfile", JSONObject().put("main", "1,300"))
+            .put("localWatchedEpisodeChangesByProfile", JSONObject().put("main", "10:1:1,300"))
+            .toString()
+        val remote = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray(listOf(1))))
+            .put("localWatchedEpisodesByProfile", JSONObject().put("main", org.json.JSONArray(listOf("10:1:1"))))
+            .put("localWatchedMovieChangesByProfile", JSONObject().put("main", "1,100"))
+            .put("localWatchedEpisodeChangesByProfile", JSONObject().put("main", "10:1:1,100"))
+            .toString()
+
+        val merged = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+
+        assertEquals(0, merged.getJSONObject("localWatchedMoviesByProfile").getJSONArray("main").length())
+        assertEquals(0, merged.getJSONObject("localWatchedEpisodesByProfile").getJSONArray("main").length())
+    }
+
+    @Test
+    fun `newer local watched action beats an older remote unwatched action`() {
+        val local = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray(listOf(1))))
+            .put("localWatchedMovieChangesByProfile", JSONObject().put("main", "1,300"))
+            .toString()
+        val remote = JSONObject()
+            .put("localWatchedMoviesByProfile", JSONObject().put("main", org.json.JSONArray()))
+            .put("localWatchedMovieChangesByProfile", JSONObject().put("main", "1,100"))
+            .toString()
+
+        val merged = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+
+        assertEquals(1, merged.getJSONObject("localWatchedMoviesByProfile").getJSONArray("main").getInt(0))
+    }
+
+    @Test
     fun `removed watchlist item is not resurrected by a device that still holds it`() {
         val local = JSONObject()
             .put("watchlistByProfile", JSONObject().put("main", org.json.JSONArray()

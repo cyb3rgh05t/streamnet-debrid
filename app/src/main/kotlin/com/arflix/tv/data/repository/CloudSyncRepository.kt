@@ -144,8 +144,22 @@ internal fun mergeLocalHistoryByTimestamp(
         val remote = JSONObject(remotePayload)
         mergeDismissedContinueWatching(local, remote)
         mergeLocalContinueWatching(local, remote, gson)
-        mergeProfileIntLists(local, remote, "localWatchedMoviesByProfile")
-        mergeProfileStringLists(local, remote, "localWatchedEpisodesByProfile")
+        mergeWatchedState(
+            local,
+            remote,
+            "localWatchedMoviesByProfile",
+            "localWatchedMovieChangesByProfile",
+            ::decodeIntArray,
+            { it.toString() },
+        )
+        mergeWatchedState(
+            local,
+            remote,
+            "localWatchedEpisodesByProfile",
+            "localWatchedEpisodeChangesByProfile",
+            ::decodeStringArray,
+            { it },
+        )
         local.toString()
     }.getOrDefault(localPayload)
 }
@@ -361,6 +375,8 @@ private fun preserveRemoteOnlyProfileState(
         "localContinueWatchingByProfile",
         "localWatchedMoviesByProfile",
         "localWatchedEpisodesByProfile",
+        "localWatchedMovieChangesByProfile",
+        "localWatchedEpisodeChangesByProfile",
         "addonsByProfile",
         "catalogsByProfile",
         "hiddenPreinstalledByProfile",
@@ -469,37 +485,62 @@ private fun decodeContinueWatchingItems(array: JSONArray?, gson: Gson): List<Con
     }.getOrDefault(emptyList())
 }
 
-private fun mergeProfileIntLists(local: JSONObject, remote: JSONObject, key: String) {
-    val localProfiles = local.optJSONObject(key) ?: JSONObject()
-    val remoteProfiles = remote.optJSONObject(key) ?: JSONObject()
+private fun <T> mergeWatchedState(
+    local: JSONObject,
+    remote: JSONObject,
+    listKey: String,
+    changesKey: String,
+    decodeList: (JSONArray?) -> List<T>,
+    itemKey: (T) -> String,
+) {
+    val localProfiles = local.optJSONObject(listKey) ?: JSONObject()
+    val remoteProfiles = remote.optJSONObject(listKey) ?: JSONObject()
+    val localChanges = local.optJSONObject(changesKey) ?: JSONObject()
+    val remoteChanges = remote.optJSONObject(changesKey) ?: JSONObject()
     val mergedProfiles = JSONObject()
-    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
-        val merged = LinkedHashSet<Int>()
-        decodeIntArray(remoteProfiles.optJSONArray(profileId)).forEach(merged::add)
-        decodeIntArray(localProfiles.optJSONArray(profileId)).forEach(merged::add)
-        if (merged.isNotEmpty()) {
-            mergedProfiles.put(profileId, JSONArray(merged.toList()))
+    val mergedChanges = JSONObject()
+    val profileIds = LinkedHashSet<String>().apply {
+        addAll(profileIdsFor(localProfiles, remoteProfiles))
+        addAll(profileIdsFor(localChanges, remoteChanges))
+    }
+    profileIds.forEach { profileId ->
+        val localItems = decodeList(localProfiles.optJSONArray(profileId)).associateBy(itemKey)
+        val remoteItems = decodeList(remoteProfiles.optJSONArray(profileId)).associateBy(itemKey)
+        val localTimestamps = decodeDismissedContinueWatching(localChanges.optString(profileId))
+        val remoteTimestamps = decodeDismissedContinueWatching(remoteChanges.optString(profileId))
+        val keys = LinkedHashSet<String>().apply {
+            addAll(remoteItems.keys)
+            addAll(localItems.keys)
+            addAll(remoteTimestamps.keys)
+            addAll(localTimestamps.keys)
+        }
+        val surviving = keys.mapNotNull { key ->
+            val localTimestamp = localTimestamps[key] ?: 0L
+            val remoteTimestamp = remoteTimestamps[key] ?: 0L
+            when {
+                localTimestamp > remoteTimestamp -> localItems[key]
+                remoteTimestamp > localTimestamp -> remoteItems[key]
+                else -> localItems[key] ?: remoteItems[key]
+            }
+        }
+        mergedProfiles.put(profileId, JSONArray(surviving))
+        val timestamps = keys.mapNotNull { key ->
+            max(localTimestamps[key] ?: 0L, remoteTimestamps[key] ?: 0L)
+                .takeIf { it > 0L }
+                ?.let { key to it }
+        }.toMap()
+        if (timestamps.isNotEmpty()) {
+            mergedChanges.put(
+                profileId,
+                timestamps.entries.joinToString("|") { (key, value) -> "$key,$value" },
+            )
         }
     }
-    if (mergedProfiles.length() > 0) {
-        local.put(key, mergedProfiles)
+    if (profileIds.isNotEmpty()) {
+        local.put(listKey, mergedProfiles)
     }
-}
-
-private fun mergeProfileStringLists(local: JSONObject, remote: JSONObject, key: String) {
-    val localProfiles = local.optJSONObject(key) ?: JSONObject()
-    val remoteProfiles = remote.optJSONObject(key) ?: JSONObject()
-    val mergedProfiles = JSONObject()
-    profileIdsFor(localProfiles, remoteProfiles).forEach { profileId ->
-        val merged = LinkedHashSet<String>()
-        decodeStringArray(remoteProfiles.optJSONArray(profileId)).forEach(merged::add)
-        decodeStringArray(localProfiles.optJSONArray(profileId)).forEach(merged::add)
-        if (merged.isNotEmpty()) {
-            mergedProfiles.put(profileId, JSONArray(merged.toList()))
-        }
-    }
-    if (mergedProfiles.length() > 0) {
-        local.put(key, mergedProfiles)
+    if (mergedChanges.length() > 0) {
+        local.put(changesKey, mergedChanges)
     }
 }
 
@@ -1232,6 +1273,22 @@ class CloudSyncRepository @Inject constructor(
         root.put(
             "localWatchedEpisodesByProfile",
             JSONObject(gson.toJson(localWatchedEpisodesByProfile))
+        )
+        root.put(
+            "localWatchedMovieChangesByProfile",
+            JSONObject(
+                gson.toJson(
+                    traktRepository.exportLocalWatchedMovieChangesForProfiles(profiles.map { it.id })
+                )
+            )
+        )
+        root.put(
+            "localWatchedEpisodeChangesByProfile",
+            JSONObject(
+                gson.toJson(
+                    traktRepository.exportLocalWatchedEpisodeChangesForProfiles(profiles.map { it.id })
+                )
+            )
         )
 
         // Addons are shared account state. Keep the per-profile payload shape
@@ -2448,6 +2505,21 @@ class CloudSyncRepository @Inject constructor(
                 val map: Map<String, List<String>> = gson.fromJson(json, type) ?: emptyMap()
                 traktRepository.importLocalWatchedEpisodesForProfiles(map)
             }
+
+            val changesType = TypeToken.getParameterized(
+                Map::class.java,
+                String::class.java,
+                String::class.java
+            ).type
+            val movieChanges: Map<String, String> = root
+                .optJSONObject("localWatchedMovieChangesByProfile")
+                ?.let { gson.fromJson(it.toString(), changesType) }
+                ?: emptyMap()
+            val episodeChanges: Map<String, String> = root
+                .optJSONObject("localWatchedEpisodeChangesByProfile")
+                ?.let { gson.fromJson(it.toString(), changesType) }
+                ?: emptyMap()
+            traktRepository.importLocalWatchedChangesForProfiles(movieChanges, episodeChanges)
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_local_watched")) }
 
         traktRepository.clearAllProfileCaches()
