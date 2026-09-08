@@ -335,29 +335,7 @@ nav {
   width: min(430px, 100%);
 }
 .search-field input {
-  padding-left: 36px;
-}
-.search-field::after {
-  content: "";
-  position: absolute;
-  left: 12px;
-  top: 34px;
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--muted);
-  border-radius: 50%;
-  pointer-events: none;
-}
-.search-field::before {
-  content: "";
-  position: absolute;
-  left: 24px;
-  top: 47px;
-  width: 7px;
-  height: 2px;
-  background: var(--muted);
-  transform: rotate(45deg);
-  pointer-events: none;
+  padding-left: 12px;
 }
 .form-stack {
   display: grid;
@@ -830,7 +808,37 @@ tbody tr[data-account-id]:focus {
   color: var(--text);
 }
 .checkbox-field input {
-  width: auto;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex: none;
+  appearance: none;
+  padding: 0;
+  border-radius: 999px;
+  background: #0f0d0b;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+.checkbox-field input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition:
+    left 0.16s var(--ease),
+    background 0.16s var(--ease);
+}
+.checkbox-field input:checked {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.checkbox-field input:checked::after {
+  left: 21px;
+  background: var(--accent);
 }
 .warning {
   padding: 12px 14px;
@@ -857,13 +865,27 @@ pre {
   overflow-wrap: anywhere;
 }
 .message {
-  min-height: 18px;
+  display: none;
   margin: 0;
-  color: var(--ok);
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: var(--surface-raised);
   font-size: 12px;
+}
+.message:not(:empty) {
+  display: block;
+}
+.message.success {
+  color: var(--ok);
+  border-color: rgba(104, 216, 155, 0.3);
+  background: var(--ok-soft);
 }
 .message.error {
   color: var(--danger);
+  border-color: rgba(255, 135, 120, 0.35);
+  background: var(--danger-soft);
 }
 .toast {
   position: fixed;

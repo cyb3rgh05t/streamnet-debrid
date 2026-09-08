@@ -167,6 +167,27 @@ test("upserts a playlist only for the selected profile", () => {
   assert.deepEqual(result.iptvByProfile["living-room"].playlists, []);
 });
 
+test("derives playlist id and name when admin only provides urls", () => {
+  const result = applyAdminSnapshotMutation(
+    snapshot(),
+    {
+      operation: "upsert_playlist",
+      profileId: "kids",
+      data: {
+        m3uUrl: "https://provider.example/family-tv.m3u",
+        epgUrl: "https://provider.example/guide.xml",
+      },
+    },
+    2346,
+  );
+
+  const playlist = result.iptvByProfile.kids.playlists[0];
+  assert.match(playlist.id, /^family-tv-[a-f0-9]{8}$/);
+  assert.equal(playlist.name, "family tv");
+  assert.equal(playlist.epgUrls[0], "https://provider.example/guide.xml");
+  assert.equal(result.fieldUpdatedAt["i:kids:playlists"], 2346);
+});
+
 test("allows only bounded profile fields and rejects unknown profiles", () => {
   const result = applyAdminSnapshotMutation(
     snapshot(),

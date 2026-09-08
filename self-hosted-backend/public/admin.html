@@ -240,17 +240,14 @@
                       Playlist hinzufügen / ersetzen
                     </option>
                     <option value="delete_playlist">Playlist entfernen</option>
-                    <option value="set_profile_field">
-                      Einstellung setzen
-                    </option>
                   </select>
                 </label>
 
                 <div id="fields-upsert_addon" class="op-fields hidden">
                   <div class="quick-panel">
-                    Stremio- oder Manifest-Link einfügen. ID und Name werden
-                    automatisch vorgeschlagen und das Add-on wird accountweit
-                    für alle Profile gespeichert.
+                    Stremio- oder Manifest-Link einfügen. Der Server lädt das
+                    Manifest wie die App und speichert das Add-on accountweit
+                    für alle Profile.
                   </div>
                   <label
                     >Manifest- oder Stremio-Link<input
@@ -258,28 +255,6 @@
                       type="url"
                       placeholder="stremio://.../manifest.json oder https://.../manifest.json"
                   /></label>
-                  <button
-                    id="addon-url-normalize"
-                    class="text-button"
-                    type="button"
-                  >
-                    ID und Name aus Link übernehmen
-                  </button>
-                  <label
-                    >Add-on-ID<input id="addon-id" placeholder="mein-addon"
-                  /></label>
-                  <label
-                    >Name<input id="addon-name" placeholder="Mein Add-on"
-                  /></label>
-                  <label
-                    >Version<input id="addon-version" placeholder="1.0.0"
-                  /></label>
-                  <label
-                    >Beschreibung (optional)<textarea
-                      id="addon-description"
-                      rows="2"
-                    ></textarea>
-                  </label>
                   <label class="checkbox-field"
                     ><input id="addon-enabled" type="checkbox" checked />
                     Aktiviert</label
@@ -298,11 +273,6 @@
                     und Serien werden beim nächsten Cloud-Pull auf den Geräten
                     übernommen.
                   </div>
-                  <label
-                    >Playlist-ID<input
-                      id="playlist-id"
-                      placeholder="meine-playlist"
-                  /></label>
                   <label
                     >Name<input id="playlist-name" placeholder="Meine Playlist"
                   /></label>
@@ -344,83 +314,6 @@
                   ></label>
                 </div>
 
-                <div id="fields-set_profile_field" class="op-fields hidden">
-                  <label
-                    >Schnellauswahl
-                    <select id="setting-preset">
-                      <option value="">Manuell ausfüllen</option>
-                      <option value="profileSettingsById|accentColor|\"Orange\"">
-                        Profil: Akzentfarbe Orange
-                      </option>
-                      <option value="profileSettingsById|liveTvLayoutMode|\"streamnet\"">
-                        Profil: Live-TV Layout StreamNet
-                      </option>
-                      <option value="profileSettingsById|liveTvLayoutMode|\"classic\"">
-                        Profil: Live-TV Layout Klassisch
-                      </option>
-                      <option value="profileSettingsById|smoothScrolling|true">
-                        Profil: Sanftes Scrollen an
-                      </option>
-                      <option value="profileSettingsById|smoothScrolling|false">
-                        Profil: Sanftes Scrollen aus
-                      </option>
-                      <option value="profileSettingsById|showBudget|true">
-                        Profil: Budget anzeigen
-                      </option>
-                      <option value="profileSettingsById|showBudget|false">
-                        Profil: Budget ausblenden
-                      </option>
-                      <option value="profileSettingsById|showCertification|true">
-                        Profil: FSK anzeigen
-                      </option>
-                      <option value="profileSettingsById|showCertification|false">
-                        Profil: FSK ausblenden
-                      </option>
-                      <option value="iptvByProfile|iptvOnlyMode|true">
-                        IPTV: IPTV-only Home an
-                      </option>
-                      <option value="iptvByProfile|iptvOnlyMode|false">
-                        IPTV: IPTV-only Home aus
-                      </option>
-                      <option value="iptvByProfile|vodSearchEnabled|true">
-                        IPTV: VOD-Suche an
-                      </option>
-                      <option value="iptvByProfile|vodSearchEnabled|false">
-                        IPTV: VOD-Suche aus
-                      </option>
-                      <option value="iptvByProfile|sortOrder|\"provider\"">
-                        IPTV: Sortierung nach Provider
-                      </option>
-                      <option value="iptvByProfile|sortOrder|\"name\"">
-                        IPTV: Sortierung nach Name
-                      </option>
-                    </select>
-                  </label>
-                  <label
-                    >Bereich
-                    <select id="mutation-root">
-                      <option value="profileSettingsById">
-                        Profileinstellungen
-                      </option>
-                      <option value="iptvByProfile">IPTV-Einstellungen</option>
-                    </select>
-                  </label>
-                  <label
-                    >Feld<input id="mutation-field" placeholder="accentColor"
-                  /></label>
-                  <label
-                    >Wert als JSON<textarea
-                      id="mutation-data"
-                      rows="6"
-                      spellcheck="false"
-                    ></textarea>
-                  </label>
-                  <div class="quick-panel">
-                    Diese Aktion setzt einzelne Snapshot-Felder remote und
-                    schreibt automatisch den passenden Sync-Zeitstempel.
-                  </div>
-                </div>
-
                 <label
                   >Änderungsgrund<input
                     id="mutation-reason"
@@ -440,6 +333,34 @@
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">REDACTED</p>
+
+                  <div class="section-heading">
+                    <div>
+                      <p class="eyebrow">PROTOKOLL</p>
+                      <h2>Account-Änderungen</h2>
+                    </div>
+                  </div>
+                  <div id="account-audits" class="table-wrap hidden">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Zeit</th>
+                          <th>Operation</th>
+                          <th>Profil</th>
+                          <th>Revision</th>
+                          <th>Grund</th>
+                        </tr>
+                      </thead>
+                      <tbody id="account-audits-body"></tbody>
+                    </table>
+                  </div>
+                  <p id="account-audits-empty" class="empty hidden">
+                    Keine protokollierten Änderungen für diesen Account.
+                  </p>
+                  <div
+                    id="account-audits-pagination"
+                    class="pagination-bar"
+                  ></div>
                   <h2 id="payload-title">Snapshot</h2>
                 </div>
                 <div class="payload-actions">

@@ -6,6 +6,7 @@ const state = {
   pendingRequests: 0,
   accounts: { limit: 10, offset: 0, total: 0 },
   audits: { limit: 10, offset: 0, total: 0 },
+  accountAudits: { limit: 10, offset: 0, total: 0 },
 };
 
 const byId = (id) => document.getElementById(id);
@@ -224,8 +225,14 @@ function showToast(message, error = false) {
   window.clearTimeout(showToast.timer);
   showToast.timer = window.setTimeout(
     () => toast.classList.add("hidden"),
-    4200,
+    error ? 9000 : 6500,
   );
+}
+
+function setMessage(node, text, type = "info") {
+  node.className = `message ${type}`;
+  node.textContent = text;
+  if (text) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
 function promptReason(message) {
@@ -256,48 +263,11 @@ function normalizeStremioManifestUrl(value) {
   return query ? `${manifestBase}?${query}` : manifestBase;
 }
 
-function addonIdFromManifestUrl(value) {
-  try {
-    const url = new URL(value);
-    const parts = url.pathname
-      .split("/")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .filter((part) => part.toLowerCase() !== "manifest.json");
-    const candidate =
-      parts.at(-1) || url.hostname.split(".")[0] || "stremio-addon";
-    return (
-      candidate
-        .replace(/[^a-z0-9._-]+/gi, "-")
-        .replace(/^-+|-+$/g, "")
-        .slice(0, 80) || "stremio-addon"
-    );
-  } catch {
-    return "";
-  }
-}
-
-function addonNameFromId(id) {
-  return (
-    String(id || "")
-      .replace(/[._-]+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (char) => char.toUpperCase()) || "Stremio Add-on"
-  );
-}
-
-function applyAddonLinkSuggestion(force = false) {
+function normalizeAddonLinkField() {
   const input = byId("addon-url");
   const normalized = normalizeStremioManifestUrl(input.value);
   if (!normalized) return;
   input.value = normalized;
-  const id = addonIdFromManifestUrl(normalized);
-  if (id && (force || !byId("addon-id").value.trim())) {
-    byId("addon-id").value = id;
-  }
-  if (id && (force || !byId("addon-name").value.trim())) {
-    byId("addon-name").value = addonNameFromId(id);
-  }
 }
 
 function renderMetrics(metrics) {
@@ -526,6 +496,8 @@ async function openAccount(accountId) {
   renderProfiles(snapshot?.profiles || []);
   byId("mutation-form").classList.toggle("hidden", !snapshot);
   if (snapshot) updateOperationFields();
+  state.accountAudits.offset = 0;
+  await loadAccountAudits(data.account.id);
 }
 
 async function deleteProfile(profileId, profileName) {
@@ -620,19 +592,16 @@ const operationFields = [
   "delete_addon",
   "upsert_playlist",
   "delete_playlist",
-  "set_profile_field",
 ];
 
 const operationWarnings = {
   upsert_addon:
-    "Add-ons sind geteilter Account-Status und werden für alle vorhandenen Profile gespeichert. Die Änderung erzeugt sofort eine neue Cloud-Revision.",
+    "URL einfügen reicht. Das Manifest wird geladen und das Add-on accountweit für alle Profile gespeichert.",
   delete_addon:
     "Das Add-on wird aus allen Profilen entfernt, in denen es installiert ist.",
   upsert_playlist:
     "Diese Änderung gilt nur für das gewählte Profil und erzeugt sofort eine neue Cloud-Revision.",
   delete_playlist: "Die Playlist wird nur aus dem gewählten Profil entfernt.",
-  set_profile_field:
-    "Erweiterte Funktion: Der Wert wird als rohes JSON in das gewählte Profilfeld geschrieben.",
 };
 
 function populateAddonSelect() {
@@ -694,15 +663,10 @@ function updateOperationFields() {
   if (operation === "delete_addon") populateAddonSelect();
   if (operation === "delete_playlist") populatePlaylistSelect();
   if (operation === "upsert_addon") {
-    byId("addon-id").value = "";
-    byId("addon-name").value = "";
     byId("addon-url").value = "";
-    byId("addon-version").value = "1.0.0";
-    byId("addon-description").value = "";
     byId("addon-enabled").checked = true;
   }
   if (operation === "upsert_playlist") {
-    byId("playlist-id").value = "";
     byId("playlist-name").value = "";
     byId("playlist-m3u").value = "";
     byId("playlist-epg").value = "";
@@ -711,21 +675,6 @@ function updateOperationFields() {
     byId("playlist-vod").checked = true;
     byId("playlist-series").checked = true;
   }
-  if (operation === "set_profile_field") {
-    byId("setting-preset").value = "";
-    byId("mutation-root").value = "profileSettingsById";
-    byId("mutation-field").value = "";
-    byId("mutation-data").value = "";
-  }
-}
-
-function applySettingPreset() {
-  const value = byId("setting-preset").value;
-  if (!value) return;
-  const [rootKey, field, jsonValue] = value.split("|", 3);
-  byId("mutation-root").value = rootKey;
-  byId("mutation-field").value = field;
-  byId("mutation-data").value = jsonValue;
 }
 
 function setButtonBusy(button, busy, busyLabel) {
@@ -749,8 +698,7 @@ async function submitMutation(event) {
   event.preventDefault();
   const message = byId("mutation-message");
   const submitButton = event.target.querySelector('button[type="submit"]');
-  message.className = "message";
-  message.textContent = "Änderung wird geprüft…";
+  setMessage(message, "Änderung wird geprüft…", "info");
   setButtonBusy(submitButton, true, "Wird gespeichert…");
   try {
     const operation = byId("mutation-operation").value;
@@ -761,20 +709,15 @@ async function submitMutation(event) {
       expectedRevision: state.selectedAccount.snapshot.revision,
     };
     if (operation === "upsert_addon") {
-      applyAddonLinkSuggestion(false);
+      normalizeAddonLinkField();
       request.data = {
-        id: byId("addon-id").value.trim(),
-        name: byId("addon-name").value.trim(),
         url: byId("addon-url").value.trim(),
-        version: byId("addon-version").value.trim() || "1.0.0",
-        description: byId("addon-description").value.trim(),
         isEnabled: byId("addon-enabled").checked,
       };
     } else if (operation === "delete_addon") {
       request.data = { id: byId("delete-addon-select").value };
     } else if (operation === "upsert_playlist") {
       request.data = {
-        id: byId("playlist-id").value.trim(),
         name: byId("playlist-name").value.trim(),
         m3uUrl: byId("playlist-m3u").value.trim(),
         epgUrl: byId("playlist-epg").value.trim(),
@@ -785,29 +728,96 @@ async function submitMutation(event) {
       };
     } else if (operation === "delete_playlist") {
       request.data = { id: byId("delete-playlist-select").value };
-    } else if (operation === "set_profile_field") {
-      request.rootKey = byId("mutation-root").value;
-      request.field = byId("mutation-field").value;
-      request.data = JSON.parse(byId("mutation-data").value || "null");
     }
-    await api(
-      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/snapshot`,
-      { method: "PATCH", body: JSON.stringify(request) },
-    );
-    message.textContent = "Änderung gespeichert und protokolliert.";
+    await saveSnapshotMutation(request, message);
+    setMessage(message, "Gespeichert und protokolliert.", "success");
+    showToast("Änderung gespeichert.");
     byId("mutation-reason").value = "";
     await openAccount(state.selectedAccount.account.id);
   } catch (error) {
-    message.className = "message error";
-    message.textContent =
-      error.status === 409
-        ? "Der Snapshot wurde inzwischen geändert. Die Ansicht wurde neu geladen."
-        : error.message;
+    setMessage(message, error.message, "error");
+    showToast(error.message, true);
     if (error.status === 409)
       await openAccount(state.selectedAccount.account.id);
   } finally {
     setButtonBusy(submitButton, false);
   }
+}
+
+async function saveSnapshotMutation(request, message) {
+  const accountId = state.selectedAccount.account.id;
+  const path = `/admin-api/accounts/${encodeURIComponent(accountId)}/snapshot`;
+  try {
+    return await api(path, { method: "PATCH", body: JSON.stringify(request) });
+  } catch (error) {
+    if (error.status !== 409) throw error;
+    setMessage(
+      message,
+      "Snapshot wurde parallel geändert. Neue Revision wird geladen und die Änderung wird erneut gespeichert…",
+      "info",
+    );
+    const fresh = await api(
+      `/admin-api/accounts/${encodeURIComponent(accountId)}`,
+    );
+    state.selectedAccount = fresh;
+    request.expectedRevision = fresh.snapshot.revision;
+    try {
+      return await api(path, {
+        method: "PATCH",
+        body: JSON.stringify(request),
+      });
+    } catch (retryError) {
+      if (retryError.status === 409) {
+        retryError.message =
+          "Der Snapshot wurde erneut parallel geändert. Bitte die Ansicht prüfen und noch einmal speichern.";
+      }
+      throw retryError;
+    }
+  }
+}
+
+function renderAuditRows(body, audits, includeAccount) {
+  body.replaceChildren();
+  for (const audit of audits) {
+    const row = document.createElement("tr");
+    const cells = [
+      formatDate(audit.created_at),
+      ...(includeAccount
+        ? [audit.account_email || audit.account_id || "Gelöscht"]
+        : []),
+      audit.operation,
+      audit.profile_id,
+      `${audit.revision_before} → ${audit.revision_after}`,
+      audit.reason,
+    ];
+    row.append(...cells.map((value) => textCell(value)));
+    body.append(row);
+  }
+}
+
+async function loadAccountAudits(accountId) {
+  const result = await api(
+    `/admin-api/audits?account_id=${encodeURIComponent(accountId)}&limit=${state.accountAudits.limit}&offset=${state.accountAudits.offset}`,
+  );
+  state.accountAudits.total = result.total;
+  state.accountAudits.limit = result.limit;
+  state.accountAudits.offset = result.offset;
+  renderAuditRows(byId("account-audits-body"), result.audits, false);
+  byId("account-audits").classList.toggle("hidden", result.audits.length === 0);
+  byId("account-audits-empty").classList.toggle(
+    "hidden",
+    result.audits.length !== 0,
+  );
+  renderPagination(
+    "account-audits-pagination",
+    state.accountAudits,
+    (offset) => {
+      state.accountAudits.offset = offset;
+      loadAccountAudits(accountId).catch((error) =>
+        showToast(error.message, true),
+      );
+    },
+  );
 }
 
 async function loadAudits() {
@@ -818,20 +828,8 @@ async function loadAudits() {
   state.audits.limit = result.limit;
   state.audits.offset = result.offset;
   const body = byId("audits-body");
-  body.replaceChildren();
   byId("audits-empty").classList.toggle("hidden", result.audits.length !== 0);
-  for (const audit of result.audits) {
-    const row = document.createElement("tr");
-    row.append(
-      textCell(formatDate(audit.created_at)),
-      textCell(audit.account_email || audit.account_id || "Gelöscht"),
-      textCell(audit.operation),
-      textCell(audit.profile_id),
-      textCell(`${audit.revision_before} → ${audit.revision_after}`),
-      textCell(audit.reason),
-    );
-    body.append(row);
-  }
+  renderAuditRows(body, result.audits, true);
   renderPagination("audits-pagination", state.audits, (offset) => {
     state.audits.offset = offset;
     loadAudits().catch((error) => showToast(error.message, true));
@@ -890,13 +888,7 @@ byId("refresh-button").addEventListener("click", (event) => {
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
-byId("setting-preset").addEventListener("change", applySettingPreset);
-byId("addon-url-normalize").addEventListener("click", () =>
-  applyAddonLinkSuggestion(true),
-);
-byId("addon-url").addEventListener("blur", () =>
-  applyAddonLinkSuggestion(false),
-);
+byId("addon-url").addEventListener("blur", () => normalizeAddonLinkField());
 byId("mutation-profile").addEventListener("change", () => {
   if (byId("mutation-operation").value === "delete_playlist")
     populatePlaylistSelect();

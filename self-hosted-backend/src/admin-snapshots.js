@@ -306,10 +306,17 @@ function normalizePlaylist(data) {
   if (!isPlainObject(data)) throw new Error("Playlist data must be an object");
   const playlist = cloneJson(data, "Playlist data");
   assertSafeKeys(playlist);
-  playlist.id = cleanIdentifier(playlist.id, "Playlist id");
-  playlist.name = cleanIdentifier(playlist.name, "Playlist name");
   playlist.m3uUrl = String(playlist.m3uUrl || "").trim();
   if (!playlist.m3uUrl) throw new Error("Playlist m3uUrl is required");
+  const fallbackName = playlistNameFromUrl(playlist.m3uUrl);
+  playlist.name = cleanIdentifier(
+    playlist.name || fallbackName,
+    "Playlist name",
+  );
+  playlist.id = cleanIdentifier(
+    playlist.id || playlistIdFromNameAndUrl(playlist.name, playlist.m3uUrl),
+    "Playlist id",
+  );
   playlist.epgUrl = String(playlist.epgUrl || "").trim();
   playlist.enabled = playlist.enabled !== false;
   playlist.epgUrls = Array.isArray(playlist.epgUrls)
@@ -324,6 +331,40 @@ function normalizePlaylist(data) {
   playlist.importVod = playlist.importVod !== false;
   playlist.importSeries = playlist.importSeries !== false;
   return playlist;
+}
+
+function playlistNameFromUrl(value) {
+  try {
+    const url = new URL(value);
+    const lastPath =
+      url.pathname.split("/").filter(Boolean).at(-1) || "Playlist";
+    return (
+      lastPath.replace(/\.(m3u8?|txt|xml)$/i, "").replace(/[._-]+/g, " ") ||
+      "Playlist"
+    );
+  } catch {
+    return "Playlist";
+  }
+}
+
+function playlistIdFromNameAndUrl(name, url) {
+  const slug =
+    String(name || "playlist")
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60) || "playlist";
+  const hash = crypto
+    .createHash("sha256")
+    .update(
+      String(url || "")
+        .trim()
+        .toLowerCase(),
+    )
+    .digest("hex")
+    .slice(0, 8);
+  return `${slug}-${hash}`;
 }
 
 function upsertById(items, item) {
