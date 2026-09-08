@@ -61,7 +61,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -329,7 +333,7 @@ private fun HeroVideoCard(
             .clip(RoundedCornerShape(HeroCornerRadius))
             .background(LiveColors.PanelDeep)
             .border(
-                width = if (focused) 3.dp else 0.dp,
+                width = if (focused) 2.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(HeroCornerRadius),
             )
@@ -479,7 +483,11 @@ private fun HeroInfoPanel(
                     channel?.name?.takeIf { it.isNotBlank() }?.let { channelName ->
                         Text(
                             text = channelName,
-                            style = LiveType.ChannelName.copy(color = LiveColors.Fg, fontSize = 12.sp),
+                            style = LiveType.ChannelName.copy(
+                                color = LiveColors.Accent,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Black,
+                            ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -487,7 +495,7 @@ private fun HeroInfoPanel(
                     if (!group.isNullOrBlank()) {
                         Text(
                             text = liveCategoryLabel(group),
-                            style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 9.sp),
+                            style = LiveType.SectionTag.copy(color = LiveColors.FgDim, fontSize = 9.sp),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -594,7 +602,7 @@ private fun HeroInfoPanel(
                 ) {
                     Text(
                         text = stringResource(R.string.live_label_upcoming).uppercase(),
-                        style = LiveType.SectionTag.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+                        style = LiveType.SectionTag.copy(color = LiveColors.Accent, fontSize = 8.sp),
                     )
                     upcoming.forEach { program ->
                         Row(
@@ -604,7 +612,7 @@ private fun HeroInfoPanel(
                         ) {
                             Text(
                                 text = formatClock(program.startUtcMillis),
-                                style = LiveType.TimeMono.copy(color = LiveColors.Accent, fontSize = 9.sp),
+                                style = LiveType.TimeMono.copy(color = LiveColors.FgDim, fontSize = 9.sp),
                                 modifier = Modifier.width(40.dp),
                             )
                             Text(
@@ -618,7 +626,7 @@ private fun HeroInfoPanel(
                                 .coerceAtLeast(0L)
                             Text(
                                 text = stringResource(R.string.live_label_starts_in_min, startsInMinutes),
-                                style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp),
+                                style = LiveType.TimeMono.copy(color = LiveColors.Accent, fontSize = 8.sp),
                             )
                         }
                     }
@@ -660,7 +668,7 @@ private fun PlaylistRefreshControl(
             .clip(RoundedCornerShape(6.dp))
             .background(if (focused) LiveColors.PanelRaised else LiveColors.Panel.copy(alpha = 0.72f))
             .border(
-                width = if (focused) 2.dp else 1.dp,
+                width = if (focused) 1.5.dp else 1.dp,
                 color = if (focused) LiveColors.FocusRing else LiveColors.Divider,
                 shape = RoundedCornerShape(6.dp),
             )
@@ -800,7 +808,7 @@ private fun NetflixChip(
             .height(36.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
-            .border(width = if (focused) 2.dp else 0.dp,
+            .border(width = if (focused) 1.5.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
                 shape = RoundedCornerShape(999.dp))
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
@@ -1033,7 +1041,7 @@ private fun NetflixChannelCard(
                 else -> LiveColors.PanelDeep
             })
             .border(
-                width = if (focused) 2.dp else if (isPlaying) 1.dp else 0.dp,
+                width = if (focused) 1.5.dp else if (isPlaying) 1.dp else 0.dp,
                 color = when {
                     focused -> LiveColors.FocusRing
                     isPlaying -> LiveColors.Accent.copy(alpha = 0.55f)
@@ -1125,13 +1133,37 @@ private fun NetflixChannelCard(
                     )
                 )
         )
-        ChannelLogo(
-            channel = channel,
-            size = 64.dp,
-            showBackground = false,
-            imagePadding = 1.dp,
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 5.dp),
-        )
+        if (!backgroundLogoUrl.isNullOrBlank()) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 7.dp, end = 7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                if (isFavorite) {
+                    Icon(
+                        imageVector = Icons.Filled.Star,
+                        contentDescription = null,
+                        tint = LiveColors.Accent,
+                        modifier = Modifier.size(13.dp),
+                    )
+                }
+                AsyncImage(
+                    model = backgroundLogoUrl,
+                    contentDescription = channel.name,
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(if (!cardBackdropUrl.isNullOrBlank()) 38.dp else 58.dp),
+                )
+            }
+        } else if (isFavorite) {
+            Icon(
+                imageVector = Icons.Filled.Star,
+                contentDescription = null,
+                tint = LiveColors.Accent,
+                modifier = Modifier.align(Alignment.TopEnd).padding(7.dp).size(13.dp),
+            )
+        }
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -1144,15 +1176,6 @@ private fun NetflixChannelCard(
                 style = LiveType.Badge.copy(color = Color.White, fontSize = 7.sp),
             )
         }
-        if (isFavorite) {
-            Icon(
-                imageVector = Icons.Filled.Star,
-                contentDescription = null,
-                tint = LiveColors.Accent,
-                modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(12.dp),
-            )
-        }
-
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -1162,7 +1185,11 @@ private fun NetflixChannelCard(
         ) {
             Text(
                 text = channel.name,
-                style = LiveType.ChannelName.copy(color = Color.White.copy(alpha = 0.78f), fontSize = 8.sp),
+                style = LiveType.ChannelName.copy(
+                    color = LiveColors.Accent,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Black,
+                ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -1195,8 +1222,16 @@ private fun NetflixChannelCard(
             val nextTitle = nowNext?.next?.title
             if (!nextTitle.isNullOrBlank()) {
                 Text(
-                    text = "${stringResource(R.string.live_badge_next)}  $nextTitle",
-                    style = LiveType.CellTitle.copy(color = Color.White.copy(alpha = 0.55f), fontSize = 7.sp),
+                    text = buildAnnotatedString {
+                        withStyle(SpanStyle(color = LiveColors.Accent, fontWeight = FontWeight.Bold)) {
+                            append(stringResource(R.string.live_badge_next))
+                        }
+                        append("  ")
+                        withStyle(SpanStyle(color = Color.White.copy(alpha = 0.62f))) {
+                            append(nextTitle)
+                        }
+                    },
+                    style = LiveType.CellTitle.copy(fontSize = 7.sp),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )

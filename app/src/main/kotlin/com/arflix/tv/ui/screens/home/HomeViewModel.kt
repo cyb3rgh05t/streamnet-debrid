@@ -99,6 +99,7 @@ internal fun isLogoCacheLanguageCurrent(cachedLanguage: String?, contentLanguage
         normalizeLogoCacheLanguage(cachedLanguage) == normalizeLogoCacheLanguage(contentLanguage)
 
 private const val RECENT_TV_HOME_ITEM_LIMIT = 10
+private const val HOME_TV_GUIDE_WINDOW_MS = 48L * 60L * 60_000L
 internal fun isIptvLiveHomeCategory(categoryId: String): Boolean =
     categoryId == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
         categoryId == HomeViewModel.RECENT_TV_CATEGORY_ID
@@ -1180,6 +1181,34 @@ class HomeViewModel @Inject constructor(
         )
     }
 
+    private fun hasHomeGuideData(item: com.arflix.tv.data.model.IptvNowNext?): Boolean =
+        item?.now != null ||
+            item?.next != null ||
+            item?.later != null ||
+            item?.upcoming?.isNotEmpty() == true ||
+            item?.recent?.isNotEmpty() == true
+
+    private fun mergeHomeGuideSlices(
+        primary: com.arflix.tv.data.model.IptvNowNext?,
+        secondary: com.arflix.tv.data.model.IptvNowNext?,
+    ): com.arflix.tv.data.model.IptvNowNext? {
+        if (!hasHomeGuideData(primary)) return secondary
+        if (!hasHomeGuideData(secondary)) return primary
+        primary ?: return secondary
+        secondary ?: return primary
+        return com.arflix.tv.data.model.IptvNowNext(
+            now = primary.now ?: secondary.now,
+            next = primary.next ?: secondary.next,
+            later = primary.later ?: secondary.later,
+            upcoming = (primary.upcoming + secondary.upcoming)
+                .distinctBy { "${it.startUtcMillis}:${it.endUtcMillis}:${it.title}" }
+                .sortedBy { it.startUtcMillis },
+            recent = (primary.recent + secondary.recent)
+                .distinctBy { "${it.startUtcMillis}:${it.endUtcMillis}:${it.title}" }
+                .sortedBy { it.startUtcMillis },
+        )
+    }
+
     private suspend fun buildTvCategories(): Map<String, Category> {
         val snapshot = iptvRepository.getMemoryCachedSnapshot()
             ?: iptvRepository.getCachedSnapshotOrNull()
@@ -1193,11 +1222,25 @@ class HomeViewModel @Inject constructor(
 
         iptvRepository.reDeriveCachedNowNext(relevantIds)
         val freshSnapshot = iptvRepository.getMemoryCachedSnapshot() ?: snapshot
+        val nowMs = System.currentTimeMillis()
+        val indexedGuide = iptvRepository.indexedGuideWindow(
+            channelIds = relevantIds,
+            startMs = nowMs - HOME_TV_GUIDE_WINDOW_MS,
+            endMs = nowMs + HOME_TV_GUIDE_WINDOW_MS,
+        )
+        val homeNowNext = buildMap {
+            relevantIds.forEach { channelId ->
+                mergeHomeGuideSlices(
+                    primary = indexedGuide[channelId],
+                    secondary = freshSnapshot.nowNext[channelId],
+                )?.let { put(channelId, it) }
+            }
+        }
         val channelsById = freshSnapshot.channels.associateBy { it.id }
 
         fun category(id: String, title: String, channels: List<com.arflix.tv.data.model.IptvChannel>): Category? {
             val items = channels.map { channel ->
-                iptvChannelToMediaItem(channel, freshSnapshot.nowNext[channel.id])
+                iptvChannelToMediaItem(channel, homeNowNext[channel.id])
             }
             return items.takeIf { it.isNotEmpty() }?.let { Category(id = id, title = title, items = it) }
         }

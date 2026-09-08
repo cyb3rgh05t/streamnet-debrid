@@ -114,9 +114,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -4719,6 +4722,7 @@ private fun IptvHomeCard(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val isMobile = LocalDeviceType.current.isTouchDevice()
     var logoGradient by remember(item.image, item.title) {
         mutableStateOf(iptvLogoFallbackGradient(item.title))
     }
@@ -4745,6 +4749,8 @@ private fun IptvHomeCard(
         iptvHomeCategoryBackdrop(item.subtitle)
     }
     val hasProgramBackdrop = !backdropUrl.isNullOrBlank()
+    val programBackdropAlpha = if (hasProgramBackdrop && !isMobile) 0.64f else 0.9f
+    val programScrimMidAlpha = if (hasProgramBackdrop && !isMobile) 0.58f else 0.32f
     val start = item.liveProgramStartMs
     val end = item.liveProgramEndMs
     val progress = if (start != null && end != null && end > start) {
@@ -4785,7 +4791,7 @@ private fun IptvHomeCard(
                         model = backdropUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().alpha(0.9f),
+                        modifier = Modifier.fillMaxSize().alpha(programBackdropAlpha),
                     )
                 } else if (!categoryBackdropUrl.isNullOrBlank()) {
                     AsyncImage(
@@ -4817,7 +4823,7 @@ private fun IptvHomeCard(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            0.58f to Color(0xFF12151A).copy(alpha = if (hasProgramBackdrop) 0.32f else 0.52f),
+                            0.58f to Color(0xFF12151A).copy(alpha = if (hasProgramBackdrop) programScrimMidAlpha else 0.52f),
                             1f to Color(0xFF12151A).copy(alpha = 0.98f),
                         )
                     )
@@ -4834,7 +4840,7 @@ private fun IptvHomeCard(
                             .align(Alignment.TopEnd)
                             .padding(top = 7.dp, end = 7.dp)
                             .size(if (hasProgramBackdrop) 38.dp else 58.dp)
-                            .alpha(if (hasProgramBackdrop) 0.72f else 1f),
+                            .alpha(1f),
                     )
                 }
                 Box(
@@ -4850,7 +4856,7 @@ private fun IptvHomeCard(
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(item.title, style = ArflixTypography.caption.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.78f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(item.title, style = ArflixTypography.caption.copy(fontSize = 10.sp, fontWeight = FontWeight.Black), color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(item.liveProgramTitle ?: stringResource(R.string.live_status_guide_pending), style = ArflixTypography.caption.copy(fontSize = 9.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (start != null && end != null) {
@@ -4868,7 +4874,20 @@ private fun IptvHomeCard(
                     }
                 }
                 item.liveNextProgramTitle?.takeIf { it.isNotBlank() }?.let {
-                    Text("${stringResource(R.string.live_badge_next)}  $it", style = ArflixTypography.caption.copy(fontSize = 7.sp), color = Color.White.copy(alpha = 0.55f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        text = buildAnnotatedString {
+                            withStyle(SpanStyle(color = accent, fontWeight = FontWeight.Bold)) {
+                                append(stringResource(R.string.live_badge_next))
+                            }
+                            append("  ")
+                            withStyle(SpanStyle(color = Color.White.copy(alpha = 0.62f))) {
+                                append(it)
+                            }
+                        },
+                        style = ArflixTypography.caption.copy(fontSize = 7.sp),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                 }
             }
         }

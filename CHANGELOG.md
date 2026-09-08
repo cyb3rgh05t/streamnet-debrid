@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.005] - 2026-09-08
+
+### Live TV und Home
+
+- Favorite-TV- und Recently-Watched-TV-Home-Rails nutzen für Programmartwork wieder denselben frischeren Guide-Window-Pfad wie das Live-TV-Netflix-Layout, damit Home und Live-TV nicht unterschiedliche Fanart-Hintergründe für dieselbe laufende Sendung wählen.
+- IPTV-Homekarten dunkeln Programmartwork auf TV stärker ab, behalten Senderlogos aber voll deckend und zeigen Sendername sowie „Danach“ akzentbetont.
+- Live-TV-Netflix-Karten übernehmen den Home-Look für Senderlogos und Favoritenstern, nutzen akzentbetonte Sendernamen und Danach-Labels sowie dünnere Focusrings.
+- Im Live-TV-Netflix-Hero ist die Sendergruppe wieder neutral gefärbt; Danach-Zeilen zeigen das Label und relative Zeiten im Akzent, Startzeiten in normaler Textfarbe.
+
 ## [2.4.004] - 2026-09-08
 
 ### Mobile UI und Home
