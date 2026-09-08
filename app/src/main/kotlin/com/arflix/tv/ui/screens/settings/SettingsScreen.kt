@@ -9618,7 +9618,11 @@ private fun CatalogsSettings(
                                     Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                                 if (!selectionMode) {
-                                    CatalogueRowLayoutToggleButton(rowKey = layoutRowKey, enabled = layoutToggleEnabled)
+                                    CatalogueRowLayoutToggleButton(
+                                        rowKey = layoutRowKey,
+                                        enabled = layoutToggleEnabled,
+                                        modeOverride = if (!layoutToggleEnabled) com.arflix.tv.ui.components.CardLayoutMode.LANDSCAPE else null,
+                                    )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     if (catalog.packId != null && catalog.isBulkDeletablePack) {
                                         Box(
@@ -9751,14 +9755,19 @@ private fun CatalogsSettings(
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogActionChip(icon = Icons.Default.ArrowDownward, isFocused = isRowFocused && focusedActionIndex == 2, onClick = { onMoveCatalogDown(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
-                    CatalogueRowLayoutToggleButton(rowKey = layoutRowKey, enabled = layoutToggleEnabled, forceFocused = isRowFocused && focusedActionIndex == 3)
+                    CatalogueRowLayoutToggleButton(
+                        rowKey = layoutRowKey,
+                        enabled = layoutToggleEnabled,
+                        forceFocused = isRowFocused && focusedActionIndex == 3,
+                        modeOverride = if (!layoutToggleEnabled) com.arflix.tv.ui.components.CardLayoutMode.LANDSCAPE else null,
+                    )
                     Spacer(modifier = Modifier.width(6.dp))
                     if (hasCatalogUnpackAction(catalog)) {
                         CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, onClick = { onUnpackCatalog(catalog) })
                         Spacer(modifier = Modifier.width(6.dp))
                     }
                     CatalogActionChip(
-                        icon = Icons.Default.VisibilityOff,
+                        icon = Icons.Default.Visibility,
                         isFocused = isRowFocused && focusedActionIndex == if (hasCatalogUnpackAction(catalog)) 5 else 4,
                         isDestructive = false,
                         enabled = true,

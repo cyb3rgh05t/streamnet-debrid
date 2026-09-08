@@ -178,8 +178,10 @@ internal fun LiveTvNetflixLayout(
     }
     val previewBackdropUrl by produceState<String?>(
         initialValue = null,
-        key1 = previewChannel?.id,
-        key2 = previewNowNext?.now?.startUtcMillis,
+        previewChannel?.id,
+        previewNowNext?.now?.startUtcMillis,
+        previewNowNext?.now?.endUtcMillis,
+        previewNowNext?.now?.title,
     ) {
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
@@ -188,8 +190,10 @@ internal fun LiveTvNetflixLayout(
     }
     val previewProgramLogoUrl by produceState<String?>(
         initialValue = null,
-        key1 = previewChannel?.id,
-        key2 = previewNowNext?.now?.startUtcMillis,
+        previewChannel?.id,
+        previewNowNext?.now?.startUtcMillis,
+        previewNowNext?.now?.endUtcMillis,
+        previewNowNext?.now?.title,
     ) {
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
@@ -1019,8 +1023,10 @@ private fun NetflixChannelCard(
     // Async TMDB backdrop for the current program; cached by TvViewModel.
     val cardBackdropUrl by produceState<String?>(
         initialValue = null,
-        key1 = channel.id,
-        key2 = now?.startUtcMillis,
+        channel.id,
+        now?.startUtcMillis,
+        now?.endUtcMillis,
+        now?.title,
     ) {
         value = null
         val program = now?.takeIf { it.title.isNotBlank() } ?: return@produceState

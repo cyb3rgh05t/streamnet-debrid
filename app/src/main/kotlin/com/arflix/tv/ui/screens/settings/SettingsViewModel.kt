@@ -64,6 +64,7 @@ import com.arflix.tv.data.repository.SyncProgress
 import com.arflix.tv.data.repository.SyncStatus
 import com.arflix.tv.data.repository.SyncResult
 import com.arflix.tv.ui.components.CARD_LAYOUT_MODE_LANDSCAPE
+import com.arflix.tv.ui.components.catalogueRowLayoutPreferencePrefixFor
 import com.arflix.tv.ui.components.normalizeCardLayoutMode
 import com.arflix.tv.updater.ApkDownloader
 import com.arflix.tv.updater.ApkInstaller
@@ -1451,6 +1452,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             context.settingsDataStore.edit { prefs ->
                 prefs[cardLayoutModeKey()] = normalized
+                val rowPrefix = catalogueRowLayoutPreferencePrefixFor(profileManager.getProfileIdSync())
+                prefs.asMap().keys
+                    .filter { it.name.startsWith(rowPrefix) }
+                    .forEach { key -> prefs.remove(key) }
             }
             _uiState.value = _uiState.value.copy(cardLayoutMode = normalized)
             syncLocalStateToCloud(silent = true)

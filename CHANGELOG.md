@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.006] - 2026-09-08
+
+### TV UI und Kartenlayout
+
+- Das globale Kartenlayout setzt beim Wechsel zwischen Landscape und Poster die individuellen Row-Overrides des aktiven Profils zurück; konfigurierbare Kataloge folgen dadurch direkt der neuen globalen Auswahl und können anschließend wieder einzeln angepasst werden.
+- Favorite-TV und Recently-Watched-TV bleiben auch auf TV bei globalem Poster-Modus feste Landscape-Rails.
+- Deaktivierte Katalog-Layout-Icons zeigen unabhängig vom gespeicherten Modus korrekt die feste Landscape-Ausrichtung; sichtbare Kataloge zeigen ein normales Auge statt eines durchgestrichenen Auges.
+- Live-TV-Netflix aktualisiert Programm-Logo und Programmartwork zuverlässig gemeinsam bei wechselndem Titel, Ende oder Startzeitpunkt; Sendergruppe, Danach-Zeiten und Focusrings wurden visuell abgestimmt.
+
 ## [2.4.005] - 2026-09-08
 
 ### Live TV und Home

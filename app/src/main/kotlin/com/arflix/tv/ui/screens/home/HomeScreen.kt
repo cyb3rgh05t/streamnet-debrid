@@ -3934,7 +3934,8 @@ private fun TvHomeRowsLayer(
 
     val density = LocalDensity.current
     val rowLayoutModes = renderedCategories.map { category ->
-        rememberCatalogueRowLayoutMode("home:${category.id}") == CardLayoutMode.POSTER
+        !isFixedLandscapeHomeCategory(category.id) &&
+            rememberCatalogueRowLayoutMode("home:${category.id}") == CardLayoutMode.POSTER
     }
     val categoryHeightsPx = remember(renderedCategories, rowLayoutModes, density) {
         renderedCategories.mapIndexed { idx, _ ->
@@ -4054,7 +4055,8 @@ private fun TvHomeRowsLayer(
                     val actualRowIndex = rowWindowStart + index
                     val rowIsFocused = !focusState.isSidebarFocused && actualRowIndex == focusState.currentRowIndex
                     val rowKey = remember(category.id) { "home:${category.id}" }
-                    val rowUsePosterCards = rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
+                    val rowUsePosterCards = !isFixedLandscapeHomeCategory(category.id) &&
+                        rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
                     val rowHeight = if (rowUsePosterCards) 245.dp else 202.dp
                     val onRowLoadMore = remember(category.id) {
                         { onLoadMoreCategory(category.id) }

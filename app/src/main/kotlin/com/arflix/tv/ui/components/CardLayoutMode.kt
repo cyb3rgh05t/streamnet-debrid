@@ -173,12 +173,13 @@ fun CatalogueRowLayoutToggleButton(
     rowKey: String,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    forceFocused: Boolean = false
+    forceFocused: Boolean = false,
+    modeOverride: CardLayoutMode? = null,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val normalizedRowKey = remember(rowKey) { normalizeCatalogueRowLayoutKey(rowKey) }
-    val mode = rememberCatalogueRowLayoutMode(normalizedRowKey)
+    val mode = modeOverride ?: rememberCatalogueRowLayoutMode(normalizedRowKey)
     val shape = rememberArvioCardShape(8.dp)
 
     ArvioFocusableSurface(
