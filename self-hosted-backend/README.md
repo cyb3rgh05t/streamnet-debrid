@@ -16,10 +16,16 @@ Password reset and media proxies are intentionally not included yet. Password re
 ## Local or Server Setup
 
 1. Copy `.env.example` to `.env` and set your real domain, passwords, JWT secret, and Google Web Client ID if Google sign-in is required.
-2. This Compose file is preconfigured for the existing Traefik network `proxy`, entrypoint `https`, and certificate resolver `dns-cloudflare`. Change those values only if your server uses different names.
-3. Pull the published backend image and start PostgreSQL and the API with `docker compose pull && docker compose up -d`.
-4. Run migrations with `docker compose exec streamnet-backend npm run migrate`.
-5. Check `https://your-domain/health` through Traefik.
+2. Keep or adjust `STREAMNET_POSTGRES_DATA_DIR=/opt/appdata/streamnet-backend/postgres` and `STREAMNET_BACKEND_LOG_DIR=/opt/appdata/streamnet-backend/logs`. These host folders are bind-mounted into the containers so database files and rotated backend logs are visible without entering the containers.
+3. Create the local mount folders before first start: `sudo mkdir -p /opt/appdata/streamnet-backend/postgres /opt/appdata/streamnet-backend/logs`.
+4. This Compose file is preconfigured for the existing Traefik network `proxy`, entrypoint `https`, and certificate resolver `dns-cloudflare`. Change those values only if your server uses different names.
+5. Pull the published backend image and start PostgreSQL and the API with `docker compose pull && docker compose up -d`.
+6. Run migrations with `docker compose exec streamnet-backend npm run migrate`.
+7. Check `https://your-domain/health` through Traefik.
+
+The `/opt/appdata/streamnet-backend/` directory contains live server state. Back
+it up intentionally, protect it like credentials, and do not copy it into public
+artifacts.
 
 The production APK uses this service as its account and synchronization backend.
 
@@ -88,6 +94,14 @@ docker compose ps
 docker compose logs --tail=100 streamnet-backend
 ```
 
+If the server was previously using Docker named volumes (`postgres_data` or
+`backend_logs`), do not switch directly to the bind mounts without exporting and
+restoring the database first. A fresh empty
+`/opt/appdata/streamnet-backend/postgres` folder makes PostgreSQL initialize an
+empty cluster. Use `pg_dump` from the old running stack, start the new
+bind-mounted stack, then restore the dump into the new database. Keep the old
+named volume until the restored service has passed login and sync checks.
+
 For deterministic rollout and rollback, set `STREAMNET_BACKEND_IMAGE` in `.env`
 to the workflow-produced `sha-<commit>` GHCR tag instead of `latest`, then run
 the pull and restart commands above. The web account pages and
@@ -110,17 +124,23 @@ and request bodies are not included.
 - `LOG_PRETTY=true` enables readable output. Set it to `false` for JSON logs.
 - `LOG_COLOR=true` enables ANSI colors. Disable it when the log viewer does not
   support colors.
-- Compose also writes structured logs to the persistent `backend_logs` volume.
+- Compose also writes structured logs to `/opt/appdata/streamnet-backend/logs`
+  by default.
   `LOG_FILE=/app/logs/backend.log` enables the file target, which rotates daily
   or at 10 MB and retains 14 older files. Override this with
   `LOG_FILE_FREQUENCY`, `LOG_FILE_MAX_SIZE`, and `LOG_FILE_RETAINED_COUNT`.
 
-Inspect or export the current file from the running container:
+Inspect the current files directly on the host:
 
 ```sh
-docker compose exec streamnet-backend sh -c 'ls -lh /app/logs && tail -n 100 "$(ls -1t /app/logs/backend*.log | head -n 1)"'
-docker compose cp streamnet-backend:/app/logs ./streamnet-backend-logs
+ls -lh /opt/appdata/streamnet-backend/logs
+tail -n 100 "$(ls -1t /opt/appdata/streamnet-backend/logs/backend*.log | head -n 1)"
 ```
+
+PostgreSQL stores its live data files in
+`/opt/appdata/streamnet-backend/postgres` by default. Prefer logical backups
+with `pg_dump` for migration or restore work; do not edit live database files by
+hand.
 
 The API router deliberately has no Authelia middleware. Android TV and mobile calls authenticate with bearer tokens and cannot complete an interactive browser login. Keep Authelia on human-facing admin services, not on this API.
 

@@ -4,8 +4,8 @@ const state = {
   selectedAccount: null,
   searchTimer: null,
   pendingRequests: 0,
-  accounts: { limit: 25, offset: 0, total: 0 },
-  audits: { limit: 25, offset: 0, total: 0 },
+  accounts: { limit: 10, offset: 0, total: 0 },
+  audits: { limit: 10, offset: 0, total: 0 },
 };
 
 const byId = (id) => document.getElementById(id);
@@ -304,6 +304,7 @@ function renderMetrics(metrics) {
   const definitions = [
     ["accounts", "Accounts", metrics.accounts],
     ["snapshots", "Snapshots", metrics.snapshots],
+    ["sessions", "Geräte online", metrics.online_devices],
     ["sessions", "Gültige Logins", metrics.active_sessions],
     ["events", "Events · 24 h", metrics.events_24h],
     ["history", "Verlaufseinträge", metrics.watch_history_items],
@@ -414,7 +415,7 @@ function renderPagination(containerId, page, onPage) {
   const container = byId(containerId);
   container.replaceChildren();
   const total = Number(page.total || 0);
-  const limit = Number(page.limit || 25);
+  const limit = Number(page.limit || 10);
   const offset = Number(page.offset || 0);
   if (total <= limit && offset === 0) {
     container.classList.add("hidden");

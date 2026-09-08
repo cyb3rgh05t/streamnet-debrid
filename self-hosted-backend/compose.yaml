@@ -5,7 +5,9 @@ services:
     environment:
       LOG_FILE: /app/logs/backend.log
     volumes:
-      - backend_logs:/app/logs
+      - type: bind
+        source: ${STREAMNET_BACKEND_LOG_DIR:-/opt/appdata/streamnet-backend/logs}
+        target: /app/logs
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,7 +31,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - type: bind
+        source: ${STREAMNET_POSTGRES_DATA_DIR:-/opt/appdata/streamnet-backend/postgres}
+        target: /var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
@@ -38,13 +42,8 @@ services:
       timeout: 5s
       retries: 20
     restart: unless-stopped
-
 networks:
   internal:
     internal: true
   proxy:
     external: true
-
-volumes:
-  postgres_data:
-  backend_logs:

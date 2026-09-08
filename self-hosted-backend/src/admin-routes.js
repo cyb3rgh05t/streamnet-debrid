@@ -240,6 +240,14 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          (select count(*)::int from accounts) as accounts,
          (select count(*)::int from account_sync_snapshots) as snapshots,
          (select count(*)::int from account_sessions where revoked_at is null and expires_at > now()) as active_sessions,
+         (select count(*)::int
+            from (
+              select distinct on (install_id) install_id, created_at
+                from app_usage_events
+               where coalesce(install_id, '') <> ''
+               order by install_id, created_at desc
+            ) latest_events
+           where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes') as online_devices,
          (select count(*)::int from app_usage_events where created_at >= now() - interval '24 hours') as events_24h,
          (select count(*)::int from watch_history) as watch_history_items,
          (select count(*)::int from watch_state) as watch_state_items,

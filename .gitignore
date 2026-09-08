@@ -81,6 +81,7 @@ secrets.properties
 *.secrets.properties
 keystore.properties
 migration-export/
+self-hosted-backend/data/
 
 # Signing keys
 release.keystore
