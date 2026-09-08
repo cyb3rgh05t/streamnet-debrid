@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.003] - 2026-09-08
+
+### Live TV und Bibliothek
+
+- Bibliotheks- und Offline-Empty-States verwenden nun dieselbe ungerahmte, accent-gethemte Center-Komponente.
+- Live-TV-Layoutmodus sowie Netflix-/Classic-Infotextgrößen schreiben beim Ändern explizite profilbezogene Cloud-Feldzeitstempel, damit die Einstellungen zuverlässig zwischen Geräten und Profilen synchronisiert werden.
+- Mobile-/Tablet-Live-TV rendert wieder den vollständigen Touch-Pfad mit MiniPlayer, Kategorien, Channels und EPG; die ClassicView-Auswahl ist ausschließlich für TV-Geräte aktiv.
+- Der mobile MiniPlayer beansprucht nicht mehr die gesamte Parent-Höhe, sodass Kategorie-, Channel- und EPG-Bereich wieder sichtbar bleiben.
+- Watchlist- und Library-Empty-States verwenden lokalisierte deutsche/englische Texte und den aktiven Accent für das gemeinsame Empty-State-Icon.
+
 ## [2.4.002] - 2026-09-07
 
 ### Offline-Downloads

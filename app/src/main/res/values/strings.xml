@@ -64,6 +64,11 @@
     <string name="add_to_watchlist">Add to Watchlist</string>
     <string name="remove_from_watchlist">Remove from Watchlist</string>
     <string name="empty_watchlist">Your watchlist is empty</string>
+    <string name="library_unavailable">Library unavailable</string>
+    <string name="library_empty">This library is empty</string>
+    <string name="library_no_matching_titles">No matching titles</string>
+    <string name="library_choose_another">Choose another library</string>
+    <string name="library_try_different_search">Try a different search</string>
     <string name="add_later">Add movies and shows to watch later</string>
 
     <!-- Subtitles / audio -->

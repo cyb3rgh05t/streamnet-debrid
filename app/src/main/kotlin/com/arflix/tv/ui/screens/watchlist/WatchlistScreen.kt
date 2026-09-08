@@ -93,6 +93,7 @@ import com.arflix.tv.ui.components.AppTopBarHeight
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.ContextActions
 import com.arflix.tv.ui.components.ContextMenu
+import com.arflix.tv.ui.components.EmptyContentState
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.SidebarItem
@@ -1208,12 +1209,12 @@ private fun ColumnScope.LibraryResults(
     when {
         state.isLoading && state.items.isEmpty() -> CenteredLoading()
         state.error != null && state.items.isEmpty() -> LibraryMessage(
-            title = tr("Library unavailable"),
+            title = stringResource(R.string.library_unavailable),
             subtitle = state.error
         )
         state.items.isEmpty() -> LibraryMessage(
-            title = if (state.searchQuery.isBlank()) tr("This library is empty") else tr("No matching titles"),
-            subtitle = if (state.searchQuery.isBlank()) tr("Choose another library") else tr("Try a different search")
+            title = if (state.searchQuery.isBlank()) stringResource(R.string.library_empty) else stringResource(R.string.library_no_matching_titles),
+            subtitle = if (state.searchQuery.isBlank()) stringResource(R.string.library_choose_another) else stringResource(R.string.library_try_different_search)
         )
         else -> {
             val contentAlpha by animateFloatAsState(
@@ -1312,30 +1313,12 @@ private fun ColumnScope.WatchlistContent(
     when {
         uiState.isLoading -> CenteredLoading()
         totalItems == 0 -> {
-            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.Bookmark,
-                        contentDescription = null,
-                        tint = Color.White.copy(alpha = 0.2f),
-                        modifier = Modifier.size(80.dp)
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = tr("Your watchlist is empty"),
-                        style = ArflixTypography.body,
-                        color = Color.White.copy(alpha = 0.5f),
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = tr("Add movies and shows for later"),
-                        style = ArflixTypography.caption,
-                        color = Color.White.copy(alpha = 0.3f),
-                        textAlign = TextAlign.Center
-                    )
-                }
-            }
+            EmptyContentState(
+                title = stringResource(R.string.empty_watchlist),
+                subtitle = stringResource(R.string.add_later),
+                icon = Icons.Outlined.Bookmark,
+                modifier = Modifier.weight(1f).fillMaxWidth(),
+            )
         }
         else -> {
             LazyColumn(
@@ -1439,13 +1422,11 @@ private fun CenteredLoading() {
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun LibraryMessage(title: String, subtitle: String) {
-    Box(modifier = Modifier.fillMaxWidth().fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(text = title, style = ArflixTypography.sectionTitle, color = TextPrimary)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(text = subtitle, style = ArflixTypography.caption, color = Color.White.copy(alpha = 0.45f))
-        }
-    }
+    EmptyContentState(
+        title = title,
+        subtitle = subtitle,
+        icon = Icons.Outlined.Bookmark,
+    )
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)

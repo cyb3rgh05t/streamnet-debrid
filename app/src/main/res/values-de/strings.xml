@@ -97,6 +97,11 @@
     <string name="no_results">Keine Ergebnisse gefunden</string>
     <string name="no_results_for">Keine Ergebnisse gefunden für</string>
     <string name="empty_watchlist">Deine Merkliste ist leer</string>
+    <string name="library_unavailable">Bibliothek nicht verfügbar</string>
+    <string name="library_empty">Diese Bibliothek ist leer</string>
+    <string name="library_no_matching_titles">Keine passenden Titel</string>
+    <string name="library_choose_another">Wähle eine andere Bibliothek</string>
+    <string name="library_try_different_search">Versuche eine andere Suche</string>
     <string name="add_later">Füge Filme und Serien für später hinzu</string>
     <string name="sources_available">Quellen verfügbar</string>
     <string name="ends_at">Endet um</string>

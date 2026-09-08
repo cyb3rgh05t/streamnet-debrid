@@ -180,7 +180,9 @@ internal fun LiveTvClassicLayout(
                 onExitEpg = onExitEpg,
                 onRequestPreviousChannels = onRequestPreviousChannels,
                 onRequestNextChannels = onRequestNextChannels,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
             )
         } else {
             Row(modifier = Modifier.fillMaxSize()) {

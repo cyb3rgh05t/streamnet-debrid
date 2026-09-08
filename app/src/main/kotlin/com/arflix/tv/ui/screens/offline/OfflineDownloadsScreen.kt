@@ -61,6 +61,7 @@ import com.arflix.tv.R
 import com.arflix.tv.data.repository.offline.OfflineDownloadItem
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarHeight
+import com.arflix.tv.ui.components.EmptyContentState
 import com.arflix.tv.ui.components.MobileContentTopInset
 import com.arflix.tv.ui.components.SidebarItem
 import com.arflix.tv.ui.components.topBarFocusedItem
@@ -303,28 +304,11 @@ private fun OfflineDownloadsTitlePill(accent: Color) {
 
 @Composable
 private fun EmptyOfflineDownloads(accent: Color) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(Icons.Default.Download, contentDescription = null, tint = accent, modifier = Modifier.size(38.dp))
-            Spacer(modifier = Modifier.height(14.dp))
-            Text(
-                text = stringResource(R.string.offline_downloads_empty_title),
-                style = ArflixTypography.cardTitle,
-                color = TextPrimary
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.offline_downloads_empty_desc),
-                style = ArflixTypography.caption,
-                color = TextSecondary
-            )
-        }
-    }
+    EmptyContentState(
+        title = stringResource(R.string.offline_downloads_empty_title),
+        subtitle = stringResource(R.string.offline_downloads_empty_desc),
+        icon = Icons.Default.Download,
+    )
 }
 
 @Composable

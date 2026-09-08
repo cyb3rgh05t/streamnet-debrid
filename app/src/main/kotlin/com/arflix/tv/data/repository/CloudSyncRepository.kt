@@ -1068,6 +1068,16 @@ class CloudSyncRepository @Inject constructor(
         return runCatching { if (raw.isNullOrBlank()) JSONObject() else JSONObject(raw) }.getOrDefault(JSONObject())
     }
 
+    suspend fun markProfileSettingDirty(fieldName: String) {
+        val profileId = profileManager.getProfileId()
+        val key = "p:$profileId:$fieldName"
+        val timestamps = loadJsonMap(cloudSyncFieldTsKey)
+        timestamps.put(key, System.currentTimeMillis())
+        context.settingsDataStore.edit { prefs ->
+            prefs[cloudSyncFieldTsKey] = timestamps.toString()
+        }
+    }
+
     /**
      * Diff current local field values in [localRoot] against the stored baseline; stamp changed
      * fields with now() and persist the timestamp + baseline maps. Returns the timestamp map so the

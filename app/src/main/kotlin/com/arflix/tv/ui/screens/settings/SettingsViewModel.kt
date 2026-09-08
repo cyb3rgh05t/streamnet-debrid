@@ -1463,6 +1463,7 @@ class SettingsViewModel @Inject constructor(
             context.settingsDataStore.edit { prefs ->
                 prefs[liveTvLayoutModeKey()] = next
             }
+            cloudSyncRepository.markProfileSettingDirty("live_tv_layout_mode")
             _uiState.value = _uiState.value.copy(liveTvLayoutMode = next)
             syncLocalStateToCloud(silent = true)
         }
@@ -1505,6 +1506,13 @@ class SettingsViewModel @Inject constructor(
         })
         viewModelScope.launch {
             context.settingsDataStore.edit { prefs -> prefs[key] = next }
+            val fieldName = when (key) {
+                liveTvNetflixTitleSizeKey() -> "live_tv_netflix_title_size"
+                liveTvNetflixDescriptionSizeKey() -> "live_tv_netflix_description_size"
+                liveTvClassicTitleSizeKey() -> "live_tv_classic_title_size"
+                else -> "live_tv_classic_description_size"
+            }
+            cloudSyncRepository.markProfileSettingDirty(fieldName)
             _uiState.value = update(next)
             syncLocalStateToCloud(silent = true)
         }

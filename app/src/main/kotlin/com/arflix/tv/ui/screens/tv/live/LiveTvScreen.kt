@@ -537,7 +537,7 @@ fun LiveTvScreen(
         context.settingsDataStore.data.map { preferences -> preferences[liveTvClassicDescriptionSizeKey] ?: "Normal" }
     }.collectAsStateWithLifecycle(initialValue = "Normal")
     val useTouchRail = isTouchDevice
-    val useClassicLayout = isTouchDevice || liveTvLayoutMode == "classic"
+    val useClassicLayout = !isTouchDevice && liveTvLayoutMode == "classic"
     val miniPlayerLayout = liveTvMiniPlayerLayout(
         isTouchDevice = isTouchDevice,
         smallestScreenWidthDp = configuration.smallestScreenWidthDp,
@@ -3023,7 +3023,74 @@ fun LiveTvScreen(
             // so the two regions read as one surface instead of a hovering
             // chip row. The content itself gets an internal top padding so
             // nothing important renders under the opaque chips.
-            if (useClassicLayout) {
+            if (useTouchRail) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = contentTopPadding),
+                ) {
+                    MiniPlayerRow(
+                        exoPlayer = exoPlayer,
+                        channel = playingDisplayChannel,
+                        clockTickMillis = guideClockMillis,
+                        nowNext = currentNowNext,
+                        onFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
+                        favoriteSet = favSet,
+                        onFullscreenClick = openFullScreenPlayer,
+                        variantCount = playingChannel?.let { variantCountFor(it, variantGroups) } ?: 1,
+                        onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
+                        compact = compactTouchLayout,
+                        landscapeCompact = landscapeCompactMiniPlayer,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    TouchCategoryRail(
+                        tree = visibleEnrichedState.value.tree,
+                        selectedId = selectedCategoryId,
+                        onSelect = { id ->
+                            noteGuideUserNavigation()
+                            selectedCategoryId = id
+                        },
+                        onOpenSearch = { searchOpen = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    EpgGrid(
+                        channels = guideDisplayChannels,
+                        channelWindowOffset = normalizedGuideStart,
+                        totalChannelCount = selectedCategoryTotalCount,
+                        clockTickMillis = guideClockMillis,
+                        nowNext = effectiveGuideNowNext,
+                        epgLoadingChannelIds = state.epgLoadingChannelIds,
+                        epgAttemptedChannelIds = state.epgAttemptedChannelIds,
+                        isGuideBackfillLoading = false,
+                        hasGuideSource = state.hasPotentialGuideSource,
+                        selectedChannelId = selectedDisplayChannelId,
+                        focusSelectedChannelSignal = focusSelectedChannelSignal,
+                        focusEpgSignal = focusEpgSignal,
+                        focusMode = if (focusZone == LiveTvFocusZone.EPG) EpgGridFocusMode.Epg else EpgGridFocusMode.ChannelList,
+                        scrollResetKey = "$selectedProviderId|$selectedCategoryId|$filteredChannelsWindowKey|$normalizedGuideStart",
+                        compact = compactTouchLayout,
+                        gridFocused = focusZone == LiveTvFocusZone.EPG,
+                        onChannelSelect = { channel, _ ->
+                            focusZone = LiveTvFocusZone.CHANNEL_LIST
+                            selectChannel(channel)
+                        },
+                        onProgramSelect = { channel, program -> playProgramInMini(channel, program) },
+                        onChannelFocused = { channel -> commitFocusedChannel(channel) },
+                        onChannelFavoriteToggle = { viewModel.toggleFavoriteChannel(it) },
+                        favorites = favSet,
+                        variantCountFor = { channel -> variantCountFor(channel, variantGroups) },
+                        onOpenVariants = { channel -> openVariantPicker(channel) },
+                        onMoveLeftFromChannels = { focusPlaylistSearch() },
+                        onEnterEpg = { channel -> focusEpg(channel.id) },
+                        onExitEpg = { channel -> focusChannelList(channel?.id ?: focusedChannelId ?: playingChannelId) },
+                        onRequestPreviousChannels = ::requestGuideWindowBefore,
+                        onRequestNextChannels = ::requestGuideWindowAfter,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    )
+                }
+            } else if (useClassicLayout) {
                 LiveTvClassicLayout(
                     providerFilters = providerFilters,
                     selectedProviderId = selectedProviderId,

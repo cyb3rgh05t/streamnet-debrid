@@ -438,7 +438,7 @@ private fun InfoColumn(
         }
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .then(if (tvHeroLayout) Modifier.fillMaxSize() else Modifier.fillMaxWidth())
                 .padding(
                     horizontal = if (tvHeroLayout) 18.dp else 0.dp,
                     vertical = if (tvHeroLayout) 12.dp else 0.dp,
