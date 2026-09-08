@@ -33,10 +33,13 @@ the current snapshot revision and a reason, then creates a new revision and an
 audit entry in the same PostgreSQL transaction.
 
 For remote Stremio add-ons, paste either a `stremio://...` install link, a bare
-host/path, or a full `https://.../manifest.json` URL. The dashboard normalizes it
-to the manifest URL, suggests ID/name values, and writes the account-wide add-on
-snapshot used by all profiles. Common profile and IPTV settings are available as
-presets; manual JSON remains available for advanced single-field changes.
+host/path, or a full `https://.../manifest.json` URL. The server fetches the
+manifest and builds the same account-wide add-on snapshot shape used by the
+Android settings install path, including manifest metadata, resources, catalogs,
+logo, transport URL, and stable instance ID. Common profile and IPTV settings are
+available as presets; manual JSON remains available for advanced single-field
+changes. Account and audit tables are paginated, and account details show the
+latest known device per install ID with profile, app version, and online status.
 
 Run migration `009_admin_dashboard.sql`, then create the first administrator
 from the server shell. The password is not stored in `.env` and must contain at

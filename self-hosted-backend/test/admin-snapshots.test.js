@@ -2,9 +2,35 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applyAdminSnapshotMutation,
+  hydrateAdminStremioAddon,
   redactAdminPayload,
   summarizeAdminPayload,
 } from "../src/admin-snapshots.js";
+
+const addonManifest = () => ({
+  id: "org.example.addon",
+  name: "Example Addon",
+  version: "2.1.0",
+  description: "Example streams",
+  logo: "https://example.test/logo.png",
+  background: "https://example.test/background.jpg",
+  types: ["movie", "series"],
+  resources: [
+    "stream",
+    { name: "catalog", types: ["Movie"], idPrefixes: ["tt"] },
+  ],
+  catalogs: [
+    {
+      type: "movie",
+      id: "popular",
+      name: "Popular",
+      genres: ["Action"],
+      extra: [{ name: "genre", isRequired: false, options: ["Action"] }],
+    },
+  ],
+  idPrefixes: ["tt"],
+  behaviorHints: { configurable: true, p2p: true },
+});
 
 const snapshot = () => ({
   profiles: [
@@ -27,6 +53,7 @@ test("upserts an account-wide addon and advances sync timestamps", () => {
         id: "example",
         name: "Example",
         url: "https://secret.example/manifest.json",
+        manifest: addonManifest(),
       },
     },
     1234,
@@ -34,34 +61,54 @@ test("upserts an account-wide addon and advances sync timestamps", () => {
 
   assert.equal(result.addonsUpdatedAt, 1234);
   assert.equal(result.updatedAt, 1234);
-  assert.equal(result.addonsByProfile["living-room"][0].isInstalled, true);
+  const addon = result.addonsByProfile["living-room"][0];
+  assert.equal(addon.id, "org.example.addon_c3dad99e9c79");
+  assert.equal(addon.name, "Example");
+  assert.equal(addon.version, "2.1.0");
+  assert.equal(addon.isInstalled, true);
+  assert.equal(addon.type, "CUSTOM");
+  assert.equal(addon.logo, "https://example.test/logo.png");
+  assert.equal(addon.manifest.resources[1].types[0], "movie");
+  assert.equal(addon.manifest.catalogs[0].extra[0].name, "genre");
   assert.deepEqual(
     result.addonsByProfile.kids,
     result.addonsByProfile["living-room"],
   );
 });
 
-test("normalizes remote Stremio addon links and derives metadata", () => {
+test("hydrates remote Stremio addon links like Android settings installs", async () => {
+  const hydrated = await hydrateAdminStremioAddon(
+    {
+      url: "stremio://torrentio.example/config/manifest.jsonv?token=abc#install",
+    },
+    async (url) => {
+      assert.equal(
+        url,
+        "https://torrentio.example/config/manifest.json?token=abc",
+      );
+      return {
+        ok: true,
+        text: async () => JSON.stringify(addonManifest()),
+      };
+    },
+  );
+
   const result = applyAdminSnapshotMutation(
     snapshot(),
-    {
-      operation: "upsert_addon",
-      profileId: "kids",
-      data: {
-        url: "stremio://torrentio.example/config/manifest.jsonv?token=abc#install",
-      },
-    },
+    { operation: "upsert_addon", profileId: "kids", data: hydrated },
     2222,
   );
 
   const addon = result.addonsByProfile.kids[0];
-  assert.equal(addon.id, "config");
-  assert.equal(addon.name, "Config");
+  assert.equal(addon.id, "org.example.addon_64efb9b24896");
+  assert.equal(addon.name, "Example Addon");
   assert.equal(
     addon.url,
     "https://torrentio.example/config/manifest.json?token=abc",
   );
   assert.equal(addon.transportUrl, "https://torrentio.example/config");
+  assert.equal(addon.manifest.id, "org.example.addon");
+  assert.equal(addon.manifest.behaviorHints.p2p, true);
   assert.equal(addon.runtimeKind, "STREMIO");
   assert.equal(addon.installSource, "DIRECT_URL");
 });

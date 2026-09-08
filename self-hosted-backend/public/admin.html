@@ -133,6 +133,7 @@
                 <tr>
                   <th>Account</th>
                   <th>Profile</th>
+                  <th>Online</th>
                   <th>Revision</th>
                   <th>Letzter Sync</th>
                 </tr>
@@ -143,6 +144,7 @@
           <p id="accounts-empty" class="empty hidden">
             Keine Accounts gefunden.
           </p>
+          <div id="accounts-pagination" class="pagination-bar"></div>
         </section>
 
         <section id="account-view" class="hidden">
@@ -167,8 +169,28 @@
             Zurück zu Accounts
           </button>
           <div id="account-heading" class="account-heading"></div>
-          <div id="account-devices" class="device-badges hidden"></div>
           <div id="account-stats" class="metrics compact"></div>
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">GERÄTE</p>
+              <h2>Online & zuletzt gesehen</h2>
+            </div>
+          </div>
+          <div id="account-devices" class="table-wrap hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Gerät</th>
+                  <th>Profil</th>
+                  <th>App</th>
+                  <th>Letztes Event</th>
+                  <th>Zuletzt gesehen</th>
+                </tr>
+              </thead>
+              <tbody id="account-devices-body"></tbody>
+            </table>
+          </div>
           <div class="account-actions">
             <button
               id="revoke-sessions-button"
@@ -501,6 +523,7 @@
           <p id="audits-empty" class="empty hidden">
             Noch keine Änderungen protokolliert.
           </p>
+          <div id="audits-pagination" class="pagination-bar"></div>
         </section>
 
         <div id="global-message" class="toast hidden" role="status"></div>

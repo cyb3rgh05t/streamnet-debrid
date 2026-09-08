@@ -1,8 +1,11 @@
+import crypto from "node:crypto";
+
 const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
   /password|token|secret|authorization|cookie|credential|api[_-]?key|m3uurl|epgurl|transporturl|portalurl|macaddress|avatar|image/i;
 const allowedProfileRoots = new Set(["profileSettingsById", "iptvByProfile"]);
 const adminSnapshotMaxBytes = 8 * 1024 * 1024;
+const addonManifestMaxBytes = 1024 * 1024;
 
 function isPlainObject(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
@@ -22,7 +25,7 @@ function cleanIdentifier(value, field) {
   return normalized;
 }
 
-function normalizeStremioManifestUrl(value) {
+export function normalizeStremioInstallUrl(value) {
   let clean = String(value || "").trim();
   if (!clean) throw new Error("Addon manifest URL is required");
   if (clean.startsWith("stremio://")) {
@@ -32,6 +35,11 @@ function normalizeStremioManifestUrl(value) {
   if (!/^https?:\/\//i.test(clean)) clean = `https://${clean}`;
   clean = clean.split("#", 1)[0].trim();
   clean = clean.replace(/\/manifest\.json[^/?]*(?=\?|$)/i, "/manifest.json");
+  return clean;
+}
+
+export function stremioManifestUrl(value) {
+  const clean = normalizeStremioInstallUrl(value);
   const [base, query = ""] = clean.split("?", 2);
   const manifestBase = base.replace(/\/+$/, "").endsWith("/manifest.json")
     ? base.replace(/\/+$/, "")
@@ -46,30 +54,143 @@ function addonTransportUrl(manifestUrl) {
     .replace(/\/+$/, "");
 }
 
-function addonIdFromUrl(manifestUrl) {
-  const url = new URL(manifestUrl);
-  const pathParts = url.pathname
-    .split("/")
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .filter((part) => part.toLowerCase() !== "manifest.json");
-  const candidate =
-    pathParts.at(-1) || url.hostname.split(".")[0] || "stremio-addon";
-  return (
-    candidate
-      .replace(/[^a-z0-9._-]+/gi, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 80) || "stremio-addon"
-  );
+function addonInstanceId(manifestId, installUrl) {
+  const digest = crypto
+    .createHash("sha256")
+    .update(installUrl.trim().toLowerCase())
+    .digest("hex")
+    .slice(0, 12);
+  return `${manifestId}_${digest}`;
 }
 
-function addonNameFromId(id) {
-  return (
-    id
-      .replace(/[._-]+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (char) => char.toUpperCase()) || "Stremio Add-on"
+function stringList(value) {
+  return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string")
+    : [];
+}
+
+function convertAddonManifest(manifest) {
+  if (!isPlainObject(manifest)) throw new Error("Addon manifest is invalid");
+  const id = cleanIdentifier(manifest.id, "Addon manifest id");
+  const name = cleanIdentifier(manifest.name, "Addon manifest name");
+  const version = String(manifest.version || "").trim();
+  if (!version) throw new Error("Addon manifest version is invalid");
+  return {
+    id,
+    name,
+    version,
+    description: String(manifest.description || ""),
+    logo: typeof manifest.logo === "string" ? manifest.logo : null,
+    background:
+      typeof manifest.background === "string" ? manifest.background : null,
+    types: stringList(manifest.types),
+    resources: Array.isArray(manifest.resources)
+      ? manifest.resources
+          .map((resource) => {
+            if (typeof resource === "string") {
+              return { name: resource.trim().toLowerCase() };
+            }
+            if (!isPlainObject(resource)) return null;
+            const name = String(resource.name || "")
+              .trim()
+              .toLowerCase();
+            if (!name) return null;
+            return {
+              name,
+              types: stringList(resource.types).map((item) =>
+                item.trim().toLowerCase(),
+              ),
+              idPrefixes: stringList(resource.idPrefixes),
+            };
+          })
+          .filter(Boolean)
+      : [],
+    catalogs: Array.isArray(manifest.catalogs)
+      ? manifest.catalogs.filter(isPlainObject).map((catalog) => ({
+          type: String(catalog.type || ""),
+          id: String(catalog.id || ""),
+          name: String(catalog.name || ""),
+          genres: Array.isArray(catalog.genres) ? catalog.genres : null,
+          extra: Array.isArray(catalog.extra)
+            ? catalog.extra.filter(isPlainObject).map((extra) => ({
+                name: String(extra.name || ""),
+                isRequired: extra.isRequired === true,
+                options: Array.isArray(extra.options) ? extra.options : null,
+              }))
+            : null,
+        }))
+      : [],
+    idPrefixes: Array.isArray(manifest.idPrefixes) ? manifest.idPrefixes : null,
+    behaviorHints: isPlainObject(manifest.behaviorHints)
+      ? {
+          adult: manifest.behaviorHints.adult === true,
+          p2p: manifest.behaviorHints.p2p === true,
+          configurable: manifest.behaviorHints.configurable === true,
+          configurationRequired:
+            manifest.behaviorHints.configurationRequired === true,
+        }
+      : null,
+  };
+}
+
+function addonTypeFromManifest(manifest) {
+  const names = new Set(
+    (manifest.resources || []).map((resource) => resource.name),
   );
+  return names.has("subtitles") && !names.has("stream") ? "SUBTITLE" : "CUSTOM";
+}
+
+function buildAddonFromManifest(data) {
+  const installUrl = normalizeStremioInstallUrl(data.url || data.manifestUrl);
+  const manifestUrl = stremioManifestUrl(installUrl);
+  const manifest = convertAddonManifest(data.manifest);
+  const customName = String(data.name || data.customName || "").trim();
+  return {
+    id: addonInstanceId(manifest.id, installUrl),
+    name: customName || manifest.name,
+    version: manifest.version,
+    description: manifest.description,
+    isInstalled: true,
+    isEnabled: data.isEnabled !== false,
+    type: addonTypeFromManifest(manifest),
+    runtimeKind: "STREMIO",
+    installSource: "DIRECT_URL",
+    url: installUrl,
+    logo: manifest.logo,
+    manifest,
+    transportUrl: addonTransportUrl(manifestUrl),
+  };
+}
+
+export async function hydrateAdminStremioAddon(data, fetchImpl = fetch) {
+  if (!isPlainObject(data)) throw new Error("Addon data must be an object");
+  const installUrl = normalizeStremioInstallUrl(data.url || data.manifestUrl);
+  const manifestUrl = stremioManifestUrl(installUrl);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
+  let response;
+  try {
+    response = await fetchImpl(manifestUrl, {
+      headers: { accept: "application/json" },
+      signal: controller.signal,
+    });
+  } catch {
+    throw new Error("Addon manifest fetch failed");
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response?.ok) throw new Error("Addon manifest fetch failed");
+  const text = await response.text();
+  if (text.length > addonManifestMaxBytes) {
+    throw new Error("Addon manifest is too large");
+  }
+  let manifest;
+  try {
+    manifest = JSON.parse(text);
+  } catch {
+    throw new Error("Addon manifest is invalid");
+  }
+  return buildAddonFromManifest({ ...data, url: installUrl, manifest });
 }
 
 function cloneJson(value, field = "data", maxBytes = 64 * 1024) {
@@ -178,27 +299,7 @@ function normalizeAddon(data) {
   if (!isPlainObject(data)) throw new Error("Addon data must be an object");
   const addon = cloneJson(data, "Addon data");
   assertSafeKeys(addon);
-  addon.url = normalizeStremioManifestUrl(addon.url || addon.manifestUrl);
-  addon.transportUrl = addonTransportUrl(addon.url);
-  addon.id = cleanIdentifier(addon.id || addonIdFromUrl(addon.url), "Addon id");
-  addon.name = cleanIdentifier(
-    addon.name || addonNameFromId(addon.id),
-    "Addon name",
-  );
-  addon.version = String(addon.version || "1.0.0").trim();
-  addon.description = String(addon.description || "");
-  addon.isInstalled = true;
-  addon.isEnabled = addon.isEnabled !== false;
-  addon.type = String(addon.type || "CUSTOM")
-    .trim()
-    .toUpperCase();
-  addon.runtimeKind = String(addon.runtimeKind || "STREMIO")
-    .trim()
-    .toUpperCase();
-  addon.installSource = String(addon.installSource || "DIRECT_URL")
-    .trim()
-    .toUpperCase();
-  return addon;
+  return buildAddonFromManifest(addon);
 }
 
 function normalizePlaylist(data) {

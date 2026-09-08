@@ -4,6 +4,8 @@ const state = {
   selectedAccount: null,
   searchTimer: null,
   pendingRequests: 0,
+  accounts: { limit: 25, offset: 0, total: 0 },
+  audits: { limit: 25, offset: 0, total: 0 },
 };
 
 const byId = (id) => document.getElementById(id);
@@ -208,6 +210,12 @@ function formatBytes(value) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+function shortInstallId(value) {
+  const raw = String(value || "");
+  if (raw.length <= 12) return raw || "—";
+  return `${raw.slice(0, 6)}…${raw.slice(-4)}`;
+}
+
 function showToast(message, error = false) {
   const toast = byId("global-message");
   toast.textContent = message;
@@ -296,7 +304,7 @@ function renderMetrics(metrics) {
   const definitions = [
     ["accounts", "Accounts", metrics.accounts],
     ["snapshots", "Snapshots", metrics.snapshots],
-    ["sessions", "Aktive Sessions", metrics.active_sessions],
+    ["sessions", "Gültige Logins", metrics.active_sessions],
     ["events", "Events · 24 h", metrics.events_24h],
     ["history", "Verlaufseinträge", metrics.watch_history_items],
     ["database", "Datenbank", formatBytes(metrics.database_bytes)],
@@ -328,11 +336,18 @@ async function loadOverview() {
   const [metrics, accountResult] = await Promise.all([
     api("/admin-api/overview"),
     api(
-      `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}`,
+      `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}`,
     ),
   ]);
+  state.accounts.total = accountResult.total;
+  state.accounts.limit = accountResult.limit;
+  state.accounts.offset = accountResult.offset;
   renderMetrics(metrics);
   renderAccounts(accountResult.accounts);
+  renderPagination("accounts-pagination", state.accounts, (offset) => {
+    state.accounts.offset = offset;
+    loadOverview().catch((error) => showToast(error.message, true));
+  });
 }
 
 function renderAccounts(accounts) {
@@ -354,6 +369,7 @@ function renderAccounts(accounts) {
     row.append(
       accountCell,
       textCell(account.profile_count),
+      textCell(account.online_device_count || 0),
       textCell(account.revision),
       textCell(formatDate(account.snapshot_updated_at)),
     );
@@ -394,21 +410,71 @@ const deviceTypeLabels = {
   web: "Web",
 };
 
+function renderPagination(containerId, page, onPage) {
+  const container = byId(containerId);
+  container.replaceChildren();
+  const total = Number(page.total || 0);
+  const limit = Number(page.limit || 25);
+  const offset = Number(page.offset || 0);
+  if (total <= limit && offset === 0) {
+    container.classList.add("hidden");
+    return;
+  }
+  container.classList.remove("hidden");
+  const start = total === 0 ? 0 : offset + 1;
+  const end = Math.min(offset + limit, total);
+  const label = document.createElement("span");
+  label.textContent = `${start}-${end} von ${total}`;
+  const previous = document.createElement("button");
+  previous.type = "button";
+  previous.className = "button secondary";
+  previous.textContent = "Zurück";
+  previous.disabled = offset <= 0;
+  previous.addEventListener("click", () => onPage(Math.max(0, offset - limit)));
+  const next = document.createElement("button");
+  next.type = "button";
+  next.className = "button secondary";
+  next.textContent = "Weiter";
+  next.disabled = offset + limit >= total;
+  next.addEventListener("click", () => onPage(offset + limit));
+  container.append(label, previous, next);
+}
+
 function renderDeviceBadges(devices) {
   const container = byId("account-devices");
-  container.replaceChildren();
+  const body = byId("account-devices-body");
+  body.replaceChildren();
   container.classList.toggle("hidden", devices.length === 0);
   for (const device of devices) {
-    const badge = document.createElement("span");
-    badge.className = "count-badge";
-    const label = document.createElement("b");
-    label.textContent =
-      deviceTypeLabels[device.device_type] || device.device_type;
-    badge.append(
-      label,
-      document.createTextNode(` · zuletzt ${formatDate(device.last_seen)}`),
+    const row = document.createElement("tr");
+    const status = document.createElement("span");
+    status.className = `device-status${device.online ? " online" : ""}`;
+    status.textContent = device.online ? "Online" : "Offline";
+    const deviceLabel = [
+      deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt",
+      device.platform,
+      shortInstallId(device.install_id),
+    ]
+      .filter(Boolean)
+      .join(" · ");
+    const appLabel = [
+      device.app_version,
+      device.app_version_code ? `(${device.app_version_code})` : "",
+      device.distribution,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    const statusCell = document.createElement("td");
+    statusCell.append(status);
+    row.append(
+      statusCell,
+      textCell(deviceLabel),
+      textCell(device.profile_id || "—"),
+      textCell(appLabel || "—"),
+      textCell(device.event_name || "—"),
+      textCell(formatDate(device.last_seen)),
     );
-    container.append(badge);
+    body.append(row);
   }
 }
 
@@ -437,7 +503,7 @@ async function openAccount(accountId) {
 
   const stats = byId("account-stats");
   stats.replaceChildren(
-    metricNode("sessions", "Aktive Sessions", data.account.active_sessions),
+    metricNode("sessions", "Gültige Logins", data.account.active_sessions),
     metricNode("history", "Watch History", data.account.watch_history_items),
     metricNode(
       "snapshots",
@@ -745,7 +811,12 @@ async function submitMutation(event) {
 }
 
 async function loadAudits() {
-  const result = await api("/admin-api/audits");
+  const result = await api(
+    `/admin-api/audits?limit=${state.audits.limit}&offset=${state.audits.offset}`,
+  );
+  state.audits.total = result.total;
+  state.audits.limit = result.limit;
+  state.audits.offset = result.offset;
   const body = byId("audits-body");
   body.replaceChildren();
   byId("audits-empty").classList.toggle("hidden", result.audits.length !== 0);
@@ -761,6 +832,10 @@ async function loadAudits() {
     );
     body.append(row);
   }
+  renderPagination("audits-pagination", state.audits, (offset) => {
+    state.audits.offset = offset;
+    loadAudits().catch((error) => showToast(error.message, true));
+  });
 }
 
 function selectView(view) {
@@ -808,6 +883,7 @@ byId("logout-button").addEventListener("click", logout);
 byId("refresh-button").addEventListener("click", (event) => {
   const button = event.currentTarget;
   setButtonBusy(button, true, "Aktualisieren…");
+  state.accounts.offset = 0;
   loadOverview()
     .catch((error) => showToast(error.message, true))
     .finally(() => setButtonBusy(button, false));
@@ -932,6 +1008,7 @@ byId("payload-edit-form").addEventListener("submit", async (event) => {
 });
 byId("account-search").addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);
+  state.accounts.offset = 0;
   state.searchTimer = window.setTimeout(
     () => loadOverview().catch((error) => showToast(error.message, true)),
     250,

@@ -676,6 +676,43 @@ tbody tr[data-account-id]:focus {
   gap: 8px;
   margin-bottom: 18px;
 }
+.compact-heading {
+  margin-top: 12px;
+}
+.device-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-weight: 700;
+}
+.device-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.device-status.online {
+  color: var(--ok);
+}
+.device-status.online::before {
+  background: var(--ok);
+  box-shadow: 0 0 0 3px rgba(104, 216, 155, 0.16);
+}
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.pagination-bar .button {
+  min-height: 34px;
+  padding: 0 12px;
+}
 .account-actions {
   display: flex;
   flex-wrap: wrap;

@@ -8,12 +8,14 @@ import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
 import {
   applyAdminSnapshotMutation,
+  hydrateAdminStremioAddon,
   summarizeAdminPayload,
 } from "./admin-snapshots.js";
 
 const adminLoginAttempts = new Map();
 const adminLoginWindowMs = 15 * 60_000;
 const adminLoginMaxAttempts = 8;
+const onlineDeviceWindowMinutes = 10;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const mutationFailureReasons = new Map([
@@ -25,6 +27,13 @@ const mutationFailureReasons = new Map([
   ["Addon data is too large", "addon_data_too_large"],
   ["Addon id is invalid", "invalid_addon_id"],
   ["Addon name is invalid", "invalid_addon_name"],
+  ["Addon manifest URL is required", "addon_manifest_url_required"],
+  ["Addon manifest fetch failed", "addon_manifest_fetch_failed"],
+  ["Addon manifest is invalid", "invalid_addon_manifest"],
+  ["Addon manifest is too large", "addon_manifest_too_large"],
+  ["Addon manifest id is invalid", "invalid_addon_manifest_id"],
+  ["Addon manifest name is invalid", "invalid_addon_manifest_name"],
+  ["Addon manifest version is invalid", "invalid_addon_manifest_version"],
   ["Playlist data must be an object", "invalid_playlist_data"],
   ["Playlist data is too large", "playlist_data_too_large"],
   ["Playlist id is invalid", "invalid_playlist_id"],
@@ -256,7 +265,18 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         `select accounts.id, accounts.email, accounts.created_at, accounts.updated_at,
                 snapshots.revision, snapshots.updated_at as snapshot_updated_at,
                 case when jsonb_typeof(snapshots.payload->'profiles') = 'array'
-                  then jsonb_array_length(snapshots.payload->'profiles') else 0 end as profile_count
+                  then jsonb_array_length(snapshots.payload->'profiles') else 0 end as profile_count,
+                (
+                  select count(*)::int
+                    from (
+                      select distinct on (events.install_id) events.install_id, events.created_at
+                        from app_usage_events events
+                       where events.account_id = accounts.id
+                         and coalesce(events.install_id, '') <> ''
+                       order by events.install_id, events.created_at desc
+                    ) latest_events
+                   where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
+                ) as online_device_count
            from accounts
            left join account_sync_snapshots snapshots on snapshots.account_id = accounts.id
           where ($1 = '' or accounts.email_normalized like '%' || $1 || '%')
@@ -275,6 +295,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         ...row,
         revision: row.revision === null ? null : Number(row.revision),
         profile_count: Number(row.profile_count),
+        online_device_count: Number(row.online_device_count),
       })),
       total: Number(count.rows[0].total),
       limit,
@@ -301,12 +322,19 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         [accountId],
       ),
       pool.query(
-        `select device_type, max(created_at) as last_seen
-           from app_usage_events
-          where account_id = $1 and coalesce(device_type, '') <> ''
-          group by device_type
-          order by last_seen desc
-          limit 10`,
+        `select install_id, profile_id, platform, device_type, app_version,
+                app_version_code, distribution, event_name, last_seen,
+                last_seen >= now() - interval '${onlineDeviceWindowMinutes} minutes' as online
+           from (
+             select distinct on (install_id)
+                    install_id, profile_id, platform, device_type, app_version,
+                    app_version_code, distribution, event_name, created_at as last_seen
+               from app_usage_events
+              where account_id = $1 and coalesce(install_id, '') <> ''
+              order by install_id, created_at desc
+           ) latest_events
+          order by online desc, last_seen desc
+          limit 50`,
         [accountId],
       ),
     ]);
@@ -323,8 +351,16 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         watch_history_items: Number(account.watch_history_items),
         watch_state_items: Number(account.watch_state_items),
         devices: devicesResult.rows.map((row) => ({
+          install_id: row.install_id,
+          profile_id: row.profile_id,
+          platform: row.platform,
           device_type: row.device_type,
+          app_version: row.app_version,
+          app_version_code: row.app_version_code,
+          distribution: row.distribution,
+          event_name: row.event_name,
           last_seen: row.last_seen,
+          online: row.online === true,
         })),
       },
       snapshot: account.payload
@@ -382,10 +418,23 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         }
 
         let nextPayload;
+        const mutationBody = { ...request.body };
+        if (mutationBody.operation === "upsert_addon") {
+          try {
+            mutationBody.data = await hydrateAdminStremioAddon(
+              mutationBody.data,
+            );
+          } catch (error) {
+            await client.query("rollback");
+            request.backendFailureReason = mutationFailureReason(error);
+            return reply.code(400).send({ error: error.message });
+          }
+        }
+
         try {
           nextPayload = applyAdminSnapshotMutation(
             current.payload,
-            request.body,
+            mutationBody,
           );
         } catch (error) {
           await client.query("rollback");
@@ -416,10 +465,10 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
             auditId,
             admin.id,
             accountId,
-            request.body.operation,
-            request.body.profileId,
+            mutationBody.operation,
+            mutationBody.profileId,
             reason,
-            JSON.stringify(auditDetails(request.body)),
+            JSON.stringify(auditDetails(mutationBody)),
             revision,
             nextRevision,
             request.ip || null,
@@ -559,26 +608,38 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     const limit = parseLimit(request.query?.limit, 50, 100);
+    const offset = parseOffset(request.query?.offset);
     const accountId = String(request.query?.account_id || "").trim();
-    const result = await pool.query(
-      `select audit.id, audit.operation, audit.profile_id, audit.reason,
-              audit.details, audit.revision_before, audit.revision_after,
-              audit.created_at, audit.account_id, accounts.email as account_email,
-              admins.email as admin_email
-         from admin_audit_logs audit
-         join admin_accounts admins on admins.id = audit.admin_id
-         left join accounts on accounts.id = audit.account_id
-        where ($1 = '' or audit.account_id::text = $1)
-        order by audit.created_at desc
-        limit $2`,
-      [accountId, limit],
-    );
+    const [result, count] = await Promise.all([
+      pool.query(
+        `select audit.id, audit.operation, audit.profile_id, audit.reason,
+                audit.details, audit.revision_before, audit.revision_after,
+                audit.created_at, audit.account_id, accounts.email as account_email,
+                admins.email as admin_email
+           from admin_audit_logs audit
+           join admin_accounts admins on admins.id = audit.admin_id
+           left join accounts on accounts.id = audit.account_id
+          where ($1 = '' or audit.account_id::text = $1)
+          order by audit.created_at desc
+          limit $2 offset $3`,
+        [accountId, limit, offset],
+      ),
+      pool.query(
+        `select count(*)::int as total
+           from admin_audit_logs audit
+          where ($1 = '' or audit.account_id::text = $1)`,
+        [accountId],
+      ),
+    ]);
     return {
       audits: result.rows.map((row) => ({
         ...row,
         revision_before: Number(row.revision_before),
         revision_after: Number(row.revision_after),
       })),
+      total: Number(count.rows[0].total),
+      limit,
+      offset,
     };
   });
 }
