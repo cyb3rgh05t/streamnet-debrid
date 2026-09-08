@@ -115,6 +115,13 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `favorite and recent TV rows are fixed landscape rails`() {
+        assertThat(isFixedLandscapeHomeCategory(HomeViewModel.FAVORITE_TV_CATEGORY_ID)).isTrue()
+        assertThat(isFixedLandscapeHomeCategory(HomeViewModel.RECENT_TV_CATEGORY_ID)).isTrue()
+        assertThat(isFixedLandscapeHomeCategory("trending_movies")).isFalse()
+    }
+
+    @Test
     fun `IPTV hero never auto plays on touch devices`() {
         assertThat(
             shouldPlayIptvHomeHero(

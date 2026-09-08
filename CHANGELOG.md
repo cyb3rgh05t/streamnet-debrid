@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.004] - 2026-09-08
+
+### Mobile UI und Home
+
+- Mobile-Bottom-Navigation zeigt nur noch Icons ohne Textlabels; Fokusfläche, Fokusrahmen und Auswahlpunkt verwenden den aktiven Theme-Akzent, während die Icons ihre normalen Farben behalten.
+- Favorite-TV- und Recently-Watched-TV-Home-Rails bleiben immer im Landscape-Layout und der Layout-Umschalter ist in den Katalog-Einstellungen für diese festen Rails deaktiviert.
+- IPTV-Homekarten zeigen Programm-Fanart deutlicher und behandeln das Senderlogo nur noch als kompakten Hinweis, damit Favorite-/Recent-TV-Rails visuell näher am korrekten Live-TV-Netflix-Layout liegen.
+
 ## [2.4.003] - 2026-09-08
 
 ### Live TV und Bibliothek

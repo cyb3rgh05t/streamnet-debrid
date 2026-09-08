@@ -210,6 +210,7 @@ import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppNotificationSurface
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
 import com.arflix.tv.ui.components.CatalogueRowLayoutToggleButton
+import com.arflix.tv.ui.screens.home.isFixedLandscapeHomeCategory
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.util.PinUtil
 import com.arflix.tv.util.tr
@@ -1317,7 +1318,7 @@ fun SettingsScreen(
                                                         1 -> viewModel.moveCatalogUp(catalog.id)
                                                         2 -> viewModel.moveCatalogDown(catalog.id)
                                                         3 -> scope.launch {
-                                                            if (catalog.kind != CatalogKind.COLLECTION_RAIL) {
+                                                            if (catalog.canToggleCatalogueLayout()) {
                                                                 toggleCatalogueRowLayoutMode(context, catalogueLayoutRowKey(catalog))
                                                             }
                                                         }
@@ -9566,7 +9567,7 @@ private fun CatalogsSettings(
                             "Pack: ${catalog.effectivePackName} • $baseSubtitle"
                         }
                         val isSelected = selectedIds.contains(catalog.id)
-                        val layoutToggleEnabled = catalog.kind != CatalogKind.COLLECTION_RAIL
+                        val layoutToggleEnabled = catalog.canToggleCatalogueLayout()
                         val layoutRowKey = remember(catalog.id, catalog.kind) { catalogueLayoutRowKey(catalog) }
                         Column {
                             if (showPackHeader) {
@@ -9733,7 +9734,7 @@ private fun CatalogsSettings(
                     stringResource(R.string.catalog_pack_label, catalog.effectivePackName, baseSubtitle)
                 }
                 val isSelected = selectedIds.contains(catalog.id)
-                val layoutToggleEnabled = catalog.kind != CatalogKind.COLLECTION_RAIL
+                val layoutToggleEnabled = catalog.canToggleCatalogueLayout()
                 val layoutRowKey = remember(catalog.id, catalog.kind) { catalogueLayoutRowKey(catalog) }
                 val focusRingColor = resolveAccentColor(fallback = Pink)
                 Row(modifier = Modifier.settingsFocusSlot(rowFocusIndex).fillMaxWidth().background(if (isSelected) Pink.copy(alpha = 0.2f) else if (isRowFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (isRowFocused) 2.dp else 0.dp, color = if (isRowFocused) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onRenameCatalog(catalog) }.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -9772,6 +9773,9 @@ private fun CatalogsSettings(
 
 private fun hasCatalogUnpackAction(catalog: CatalogConfig): Boolean =
     catalog.packId != null && catalog.isBulkDeletablePack
+
+private fun CatalogConfig.canToggleCatalogueLayout(): Boolean =
+    kind != CatalogKind.COLLECTION_RAIL && !isFixedLandscapeHomeCategory(id)
 
 
 private fun catalogueLayoutRowKey(catalog: CatalogConfig): String {

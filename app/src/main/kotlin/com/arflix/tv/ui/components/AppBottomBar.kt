@@ -45,12 +45,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.annotation.StringRes
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.sp
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Icon
-import androidx.tv.material3.Text
 import com.arflix.tv.R
-import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.appBackgroundDark
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
@@ -70,7 +68,6 @@ internal data class AppBottomBarSpec(
     val iconVerticalPaddingDp: Int,
     val iconSizeDp: Int,
     val indicatorSizeDp: Int,
-    val labelFontSizeSp: Int,
 )
 
 internal fun appBottomBarMode(
@@ -90,26 +87,24 @@ internal fun appBottomBarMode(
 
 internal fun appBottomBarSpec(mode: AppBottomBarMode): AppBottomBarSpec = when (mode) {
     AppBottomBarMode.LANDSCAPE_COMPACT -> AppBottomBarSpec(
-        itemHeightDp = 48,
+        itemHeightDp = 42,
         rowVerticalPaddingDp = 2,
         itemVerticalPaddingDp = 0,
         itemSpacingDp = 1,
-        iconHorizontalPaddingDp = 10,
-        iconVerticalPaddingDp = 2,
+        iconHorizontalPaddingDp = 12,
+        iconVerticalPaddingDp = 3,
         iconSizeDp = 20,
         indicatorSizeDp = 3,
-        labelFontSizeSp = 8,
     )
     AppBottomBarMode.STANDARD -> AppBottomBarSpec(
-        itemHeightDp = null,
-        rowVerticalPaddingDp = 6,
+        itemHeightDp = 50,
+        rowVerticalPaddingDp = 5,
         itemVerticalPaddingDp = 2,
         itemSpacingDp = 2,
-        iconHorizontalPaddingDp = 14,
-        iconVerticalPaddingDp = 4,
+        iconHorizontalPaddingDp = 16,
+        iconVerticalPaddingDp = 5,
         iconSizeDp = 24,
         indicatorSizeDp = 4,
-        labelFontSizeSp = 10,
     )
 }
 
@@ -126,7 +121,7 @@ internal fun appBottomBarOverlayOffset(): Dp {
         )
     ) {
         AppBottomBarMode.LANDSCAPE_COMPACT -> 53.dp
-        AppBottomBarMode.STANDARD -> 72.dp
+        AppBottomBarMode.STANDARD -> 60.dp
     }
 }
 
@@ -160,6 +155,7 @@ fun AppBottomBar(
         screenHeightDp = configuration.screenHeightDp,
     )
     val spec = appBottomBarSpec(mode)
+    val accent = resolveAccentColor(fallback = TextPrimary)
 
     Column(modifier = modifier.fillMaxWidth()) {
         Box(
@@ -173,7 +169,7 @@ fun AppBottomBar(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(appBackgroundDark().copy(alpha = 0.95f))
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = spec.rowVerticalPaddingDp.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -191,10 +187,10 @@ fun AppBottomBar(
                         )
                         .clip(RoundedCornerShape(8.dp))
                         .then(
-                            if (isFocused) Modifier.border(2.dp, Color.White.copy(alpha = 0.7f), RoundedCornerShape(8.dp))
+                            if (isFocused) Modifier.border(2.dp, accent.copy(alpha = 0.82f), RoundedCornerShape(8.dp))
                             else Modifier
                         )
-                        .background(if (isFocused) Color.White.copy(alpha = 0.1f) else Color.Transparent)
+                        .background(if (isFocused) accent.copy(alpha = 0.14f) else Color.Transparent)
                         .focusable()
                         .onFocusChanged { isFocused = it.isFocused }
                         .onKeyEvent { event ->
@@ -206,15 +202,15 @@ fun AppBottomBar(
                         .clickable { onNavigate(item.route) }
                         .padding(vertical = spec.itemVerticalPaddingDp.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                    verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically)
                 ) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(
                                 when {
-                                    isFocused -> Color.White.copy(alpha = 0.18f)
-                                    isSelected -> Color.White.copy(alpha = 0.12f)
+                                    isFocused -> accent.copy(alpha = 0.24f)
+                                    isSelected -> accent.copy(alpha = 0.16f)
                                     else -> Color.Transparent
                                 }
                             )
@@ -240,22 +236,11 @@ fun AppBottomBar(
                             modifier = Modifier
                                 .size(spec.indicatorSizeDp.dp)
                                 .clip(CircleShape)
-                                .background(if (isFocused) Color.White else TextPrimary)
+                                .background(accent)
                         )
                     } else {
                         Spacer(modifier = Modifier.size(spec.indicatorSizeDp.dp))
                     }
-                    Text(
-                        text = label,
-                        style = ArflixTypography.caption.copy(fontSize = spec.labelFontSizeSp.sp),
-                        color = when {
-                            isFocused -> Color.White
-                            isSelected -> TextPrimary
-                            else -> TextSecondary.copy(alpha = 0.6f)
-                        },
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
                 }
             }
         }

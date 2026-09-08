@@ -470,6 +470,10 @@ private fun isActionableHomeItem(item: MediaItem?): Boolean {
         !item.isPlaceholder
 }
 
+internal fun isFixedLandscapeHomeCategory(categoryId: String): Boolean =
+    categoryId == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
+        categoryId == HomeViewModel.RECENT_TV_CATEGORY_ID
+
 internal fun shouldPlayIptvHomeHero(
     isTouchDevice: Boolean,
     userHasNavigated: Boolean,
@@ -3675,10 +3679,9 @@ private fun MobileHomeRowsLayer(
             val isContinueWatching = category.id == "continue_watching"
             val isRanked = category.title.contains("Top 10", ignoreCase = true)
             val isCollectionRow = category.id.startsWith("collection_row_")
-            val isIptvCategory = category.id == HomeViewModel.FAVORITE_TV_CATEGORY_ID ||
-                category.id == HomeViewModel.RECENT_TV_CATEGORY_ID
+            val isIptvCategory = isFixedLandscapeHomeCategory(category.id)
             val rowKey = remember(category.id) { "home:${category.id}" }
-            val rowUsePosterCards = rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
+            val rowUsePosterCards = !isIptvCategory && rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
             val isPortrait = category.isPortrait(rowUsePosterCards)
             val rowMobileItemWidth = if (isPortrait) 120.dp else 200.dp
             val rowState = rememberLazyListState()
@@ -3727,7 +3730,7 @@ private fun MobileHomeRowsLayer(
                 val isPortrait = if (isCollectionRow) {
                     category.items.firstOrNull()?.collectionTileShape == CollectionTileShape.POSTER
                 } else {
-                    rowUsePosterCards
+                    rowUsePosterCards && !isIptvCategory
                 }
                 val itemsToRender = remember(category.items) {
                     if (category.items.isEmpty()) {
@@ -4741,6 +4744,7 @@ private fun IptvHomeCard(
     val categoryBackdropUrl = remember(item.subtitle) {
         iptvHomeCategoryBackdrop(item.subtitle)
     }
+    val hasProgramBackdrop = !backdropUrl.isNullOrBlank()
     val start = item.liveProgramStartMs
     val end = item.liveProgramEndMs
     val progress = if (start != null && end != null && end > start) {
@@ -4781,14 +4785,14 @@ private fun IptvHomeCard(
                         model = backdropUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().alpha(0.62f),
+                        modifier = Modifier.fillMaxSize().alpha(0.9f),
                     )
                 } else if (!categoryBackdropUrl.isNullOrBlank()) {
                     AsyncImage(
                         model = categoryBackdropUrl,
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().alpha(0.62f),
+                        modifier = Modifier.fillMaxSize().alpha(0.7f),
                     )
                 } else if (item.image.isNotBlank()) {
                     AsyncImage(
@@ -4813,7 +4817,7 @@ private fun IptvHomeCard(
                     Modifier.fillMaxSize().background(
                         Brush.verticalGradient(
                             0f to Color.Transparent,
-                            0.52f to Color(0xFF12151A).copy(alpha = 0.52f),
+                            0.58f to Color(0xFF12151A).copy(alpha = if (hasProgramBackdrop) 0.32f else 0.52f),
                             1f to Color(0xFF12151A).copy(alpha = 0.98f),
                         )
                     )
@@ -4826,7 +4830,11 @@ private fun IptvHomeCard(
                         onSuccess = { success ->
                             logoGradient = iptvLogoGradient(success.result.drawable, item.title)
                         },
-                        modifier = Modifier.size(58.dp).align(Alignment.TopCenter).padding(top = 7.dp),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 7.dp, end = 7.dp)
+                            .size(if (hasProgramBackdrop) 38.dp else 58.dp)
+                            .alpha(if (hasProgramBackdrop) 0.72f else 1f),
                     )
                 }
                 Box(
