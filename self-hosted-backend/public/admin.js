@@ -235,15 +235,110 @@ function setMessage(node, text, type = "info") {
   if (text) node.scrollIntoView({ block: "nearest", behavior: "smooth" });
 }
 
-function promptReason(message) {
-  const reason = window.prompt(message);
-  if (reason === null) return null;
-  const trimmed = reason.trim();
-  if (trimmed.length < 3 || trimmed.length > 500) {
-    showToast("Bitte einen Grund mit 3-500 Zeichen angeben.", true);
-    return null;
-  }
-  return trimmed;
+function openAdminDialog(options) {
+  return new Promise((resolve) => {
+    const backdrop = byId("admin-dialog");
+    const panel = backdrop.querySelector(".dialog-panel");
+    const title = byId("dialog-title");
+    const eyebrow = byId("dialog-eyebrow");
+    const message = byId("dialog-message");
+    const inputWrap = byId("dialog-input-wrap");
+    const inputLabel = byId("dialog-input-label");
+    const input = byId("dialog-input");
+    const error = byId("dialog-error");
+    const cancel = byId("dialog-cancel");
+    const confirm = byId("dialog-confirm");
+    const needsInput = options.input !== false;
+
+    panel.classList.toggle("danger", options.danger === true);
+    title.textContent = options.title || "Aktion bestätigen";
+    eyebrow.textContent = options.eyebrow || "BESTÄTIGUNG";
+    message.textContent = options.message || "";
+    inputWrap.classList.toggle("hidden", !needsInput);
+    inputLabel.textContent = options.inputLabel || "Eingabe";
+    input.type = options.inputType || "text";
+    input.value = "";
+    input.placeholder = options.placeholder || "";
+    error.textContent = "";
+    confirm.textContent = options.confirmLabel || "Bestätigen";
+    cancel.textContent = options.cancelLabel || "Abbrechen";
+    backdrop.classList.remove("hidden");
+
+    const cleanup = (value) => {
+      backdrop.classList.add("hidden");
+      confirm.removeEventListener("click", onConfirm);
+      cancel.removeEventListener("click", onCancel);
+      backdrop.removeEventListener("click", onBackdropClick);
+      document.removeEventListener("keydown", onKeyDown);
+      resolve(value);
+    };
+    const validate = () => {
+      if (!needsInput) return true;
+      const value = input.value.trim();
+      if (
+        options.requiredText !== undefined &&
+        value !== options.requiredText
+      ) {
+        error.textContent =
+          options.requiredTextError || "Die Eingabe stimmt nicht überein.";
+        return false;
+      }
+      if (options.minLength && value.length < options.minLength) {
+        error.textContent = `Bitte mindestens ${options.minLength} Zeichen eingeben.`;
+        return false;
+      }
+      if (options.maxLength && value.length > options.maxLength) {
+        error.textContent = `Bitte maximal ${options.maxLength} Zeichen eingeben.`;
+        return false;
+      }
+      return true;
+    };
+    function onConfirm() {
+      if (!validate()) return;
+      cleanup(needsInput ? input.value.trim() : true);
+    }
+    function onCancel() {
+      cleanup(null);
+    }
+    function onBackdropClick(event) {
+      if (event.target === backdrop) onCancel();
+    }
+    function onKeyDown(event) {
+      if (event.key === "Escape") onCancel();
+      if (event.key === "Enter" && document.activeElement === input)
+        onConfirm();
+    }
+
+    confirm.addEventListener("click", onConfirm);
+    cancel.addEventListener("click", onCancel);
+    backdrop.addEventListener("click", onBackdropClick);
+    document.addEventListener("keydown", onKeyDown);
+    window.setTimeout(() => (needsInput ? input : confirm).focus(), 0);
+  });
+}
+
+async function promptReason(message, danger = false) {
+  return openAdminDialog({
+    title: "Änderungsgrund",
+    eyebrow: "PROTOKOLL",
+    message,
+    inputLabel: "Grund",
+    placeholder: "Kurz beschreiben, warum diese Änderung nötig ist",
+    minLength: 3,
+    maxLength: 500,
+    confirmLabel: "Weiter",
+    danger,
+  });
+}
+
+async function confirmAction({ title, message, confirmLabel, danger = false }) {
+  return openAdminDialog({
+    title,
+    message,
+    confirmLabel,
+    danger,
+    input: false,
+  });
 }
 
 function normalizeStremioManifestUrl(value) {
@@ -501,14 +596,18 @@ async function openAccount(accountId) {
 }
 
 async function deleteProfile(profileId, profileName) {
-  const reason = promptReason(
+  const reason = await promptReason(
     `Warum soll das Profil "${profileName}" gelöscht werden?`,
+    true,
   );
   if (!reason) return;
-  if (
-    !window.confirm(`Profil "${profileName}" wirklich unwiderruflich löschen?`)
-  )
-    return;
+  const confirmed = await confirmAction({
+    title: "Profil löschen",
+    message: `Profil "${profileName}" wirklich unwiderruflich löschen?`,
+    confirmLabel: "Profil löschen",
+    danger: true,
+  });
+  if (!confirmed) return;
   try {
     await api(
       `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/snapshot`,
@@ -895,7 +994,9 @@ byId("mutation-profile").addEventListener("change", () => {
 });
 byId("mutation-form").addEventListener("submit", submitMutation);
 byId("revoke-sessions-button").addEventListener("click", async (event) => {
-  const reason = promptReason("Warum sollen alle Sitzungen abgemeldet werden?");
+  const reason = await promptReason(
+    "Warum sollen alle gültigen Logins dieses Accounts abgemeldet werden?",
+  );
   if (!reason) return;
   const button = event.currentTarget;
   setButtonBusy(button, true, "Wird abgemeldet…");
@@ -914,15 +1015,23 @@ byId("revoke-sessions-button").addEventListener("click", async (event) => {
 });
 byId("delete-account-button").addEventListener("click", async (event) => {
   const account = state.selectedAccount.account;
-  const typed = window.prompt(
-    `Zum Bestätigen bitte die E-Mail-Adresse "${account.email}" eingeben:`,
-  );
+  const typed = await openAdminDialog({
+    title: "Konto löschen",
+    eyebrow: "GEFÄHRLICH",
+    message: `Zum Bestätigen bitte die E-Mail-Adresse "${account.email}" eingeben.`,
+    inputLabel: "E-Mail-Adresse",
+    requiredText: account.email,
+    requiredTextError: "E-Mail-Adresse stimmt nicht überein.",
+    confirmLabel: "Weiter",
+    danger: true,
+  });
   if (typed !== account.email) {
     if (typed !== null) showToast("E-Mail-Adresse stimmt nicht überein.", true);
     return;
   }
-  const reason = promptReason(
+  const reason = await promptReason(
     "Warum soll dieses Konto endgültig gelöscht werden?",
+    true,
   );
   if (!reason) return;
   const button = event.currentTarget;

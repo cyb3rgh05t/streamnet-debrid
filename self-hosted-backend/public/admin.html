@@ -217,6 +217,33 @@
           </div>
           <div id="profiles-grid" class="profiles-grid"></div>
 
+          <section class="detail-panel" aria-labelledby="account-audits-title">
+            <div class="section-heading compact-heading">
+              <div>
+                <p class="eyebrow">PROTOKOLL</p>
+                <h2 id="account-audits-title">Account-Änderungen</h2>
+              </div>
+            </div>
+            <div id="account-audits" class="table-wrap hidden">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zeit</th>
+                    <th>Operation</th>
+                    <th>Profil</th>
+                    <th>Revision</th>
+                    <th>Grund</th>
+                  </tr>
+                </thead>
+                <tbody id="account-audits-body"></tbody>
+              </table>
+            </div>
+            <p id="account-audits-empty" class="empty hidden">
+              Keine protokollierten Änderungen für diesen Account.
+            </p>
+            <div id="account-audits-pagination" class="pagination-bar"></div>
+          </section>
+
           <div class="split-layout">
             <section class="editor-panel" aria-labelledby="editor-title">
               <div class="section-heading">
@@ -333,34 +360,6 @@
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">REDACTED</p>
-
-                  <div class="section-heading">
-                    <div>
-                      <p class="eyebrow">PROTOKOLL</p>
-                      <h2>Account-Änderungen</h2>
-                    </div>
-                  </div>
-                  <div id="account-audits" class="table-wrap hidden">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Zeit</th>
-                          <th>Operation</th>
-                          <th>Profil</th>
-                          <th>Revision</th>
-                          <th>Grund</th>
-                        </tr>
-                      </thead>
-                      <tbody id="account-audits-body"></tbody>
-                    </table>
-                  </div>
-                  <p id="account-audits-empty" class="empty hidden">
-                    Keine protokollierten Änderungen für diesen Account.
-                  </p>
-                  <div
-                    id="account-audits-pagination"
-                    class="pagination-bar"
-                  ></div>
                   <h2 id="payload-title">Snapshot</h2>
                 </div>
                 <div class="payload-actions">
@@ -382,10 +381,9 @@
                   Erweiterte Funktion: Werte, die als „[REDACTED]“ angezeigt
                   werden (z.&nbsp;B. Passwörter, Tokens, Playlist-URLs), bleiben
                   beim Speichern unverändert erhalten. Um solche Werte zu
-                  ändern, bitte die Add-on-/Playlist-Formulare oder „Profilfeld
-                  setzen“ verwenden. Die Reihenfolge bestehender Listen bitte
-                  nicht ändern, sonst können maskierte Werte falsch zugeordnet
-                  werden.
+                  ändern, bitte die Add-on-/Playlist-Formulare verwenden. Die
+                  Reihenfolge bestehender Listen bitte nicht ändern, sonst
+                  können maskierte Werte falsch zugeordnet werden.
                 </div>
                 <label
                   >JSON<textarea
@@ -446,6 +444,39 @@
           </p>
           <div id="audits-pagination" class="pagination-bar"></div>
         </section>
+
+        <div
+          id="admin-dialog"
+          class="dialog-backdrop hidden"
+          role="presentation"
+        >
+          <section
+            class="dialog-panel"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="dialog-title"
+            aria-describedby="dialog-message"
+          >
+            <div>
+              <p id="dialog-eyebrow" class="eyebrow">BESTÄTIGUNG</p>
+              <h2 id="dialog-title">Aktion bestätigen</h2>
+            </div>
+            <p id="dialog-message" class="muted"></p>
+            <label id="dialog-input-wrap" class="hidden">
+              <span id="dialog-input-label">Eingabe</span>
+              <input id="dialog-input" autocomplete="off" />
+            </label>
+            <p id="dialog-error" class="message error" role="alert"></p>
+            <div class="dialog-actions">
+              <button id="dialog-cancel" class="button secondary" type="button">
+                Abbrechen
+              </button>
+              <button id="dialog-confirm" class="button primary" type="button">
+                Bestätigen
+              </button>
+            </div>
+          </section>
+        </div>
 
         <div id="global-message" class="toast hidden" role="status"></div>
       </main>
