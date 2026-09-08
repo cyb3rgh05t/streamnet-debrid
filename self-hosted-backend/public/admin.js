@@ -307,7 +307,6 @@ function renderMetrics(metrics) {
     ["sessions", "Geräte online", metrics.online_devices],
     ["sessions", "Gültige Logins", metrics.active_sessions],
     ["events", "Events · 24 h", metrics.events_24h],
-    ["history", "Verlaufseinträge", metrics.watch_history_items],
     ["database", "Datenbank", formatBytes(metrics.database_bytes)],
   ];
   const container = byId("metrics");
