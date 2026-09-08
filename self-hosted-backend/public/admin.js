@@ -231,6 +231,67 @@ function promptReason(message) {
   return trimmed;
 }
 
+function normalizeStremioManifestUrl(value) {
+  let clean = String(value || "").trim();
+  if (!clean) return "";
+  if (clean.startsWith("stremio://")) {
+    const payload = clean.slice("stremio://".length).trim();
+    clean = /^https?:\/\//i.test(payload) ? payload : `https://${payload}`;
+  }
+  if (!/^https?:\/\//i.test(clean)) clean = `https://${clean}`;
+  clean = clean.split("#", 1)[0].trim();
+  clean = clean.replace(/\/manifest\.json[^/?]*(?=\?|$)/i, "/manifest.json");
+  const [base, query = ""] = clean.split("?", 2);
+  const manifestBase = base.replace(/\/+$/, "").endsWith("/manifest.json")
+    ? base.replace(/\/+$/, "")
+    : `${base.replace(/\/+$/, "")}/manifest.json`;
+  return query ? `${manifestBase}?${query}` : manifestBase;
+}
+
+function addonIdFromManifestUrl(value) {
+  try {
+    const url = new URL(value);
+    const parts = url.pathname
+      .split("/")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .filter((part) => part.toLowerCase() !== "manifest.json");
+    const candidate =
+      parts.at(-1) || url.hostname.split(".")[0] || "stremio-addon";
+    return (
+      candidate
+        .replace(/[^a-z0-9._-]+/gi, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 80) || "stremio-addon"
+    );
+  } catch {
+    return "";
+  }
+}
+
+function addonNameFromId(id) {
+  return (
+    String(id || "")
+      .replace(/[._-]+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || "Stremio Add-on"
+  );
+}
+
+function applyAddonLinkSuggestion(force = false) {
+  const input = byId("addon-url");
+  const normalized = normalizeStremioManifestUrl(input.value);
+  if (!normalized) return;
+  input.value = normalized;
+  const id = addonIdFromManifestUrl(normalized);
+  if (id && (force || !byId("addon-id").value.trim())) {
+    byId("addon-id").value = id;
+  }
+  if (id && (force || !byId("addon-name").value.trim())) {
+    byId("addon-name").value = addonNameFromId(id);
+  }
+}
+
 function renderMetrics(metrics) {
   const definitions = [
     ["accounts", "Accounts", metrics.accounts],
@@ -585,10 +646,20 @@ function updateOperationFields() {
     byId("playlist-series").checked = true;
   }
   if (operation === "set_profile_field") {
+    byId("setting-preset").value = "";
     byId("mutation-root").value = "profileSettingsById";
     byId("mutation-field").value = "";
     byId("mutation-data").value = "";
   }
+}
+
+function applySettingPreset() {
+  const value = byId("setting-preset").value;
+  if (!value) return;
+  const [rootKey, field, jsonValue] = value.split("|", 3);
+  byId("mutation-root").value = rootKey;
+  byId("mutation-field").value = field;
+  byId("mutation-data").value = jsonValue;
 }
 
 function setButtonBusy(button, busy, busyLabel) {
@@ -624,6 +695,7 @@ async function submitMutation(event) {
       expectedRevision: state.selectedAccount.snapshot.revision,
     };
     if (operation === "upsert_addon") {
+      applyAddonLinkSuggestion(false);
       request.data = {
         id: byId("addon-id").value.trim(),
         name: byId("addon-name").value.trim(),
@@ -742,6 +814,13 @@ byId("refresh-button").addEventListener("click", (event) => {
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
+byId("setting-preset").addEventListener("change", applySettingPreset);
+byId("addon-url-normalize").addEventListener("click", () =>
+  applyAddonLinkSuggestion(true),
+);
+byId("addon-url").addEventListener("blur", () =>
+  applyAddonLinkSuggestion(false),
+);
 byId("mutation-profile").addEventListener("change", () => {
   if (byId("mutation-operation").value === "delete_playlist")
     populatePlaylistSelect();

@@ -22,6 +22,56 @@ function cleanIdentifier(value, field) {
   return normalized;
 }
 
+function normalizeStremioManifestUrl(value) {
+  let clean = String(value || "").trim();
+  if (!clean) throw new Error("Addon manifest URL is required");
+  if (clean.startsWith("stremio://")) {
+    const payload = clean.slice("stremio://".length).trim();
+    clean = /^https?:\/\//i.test(payload) ? payload : `https://${payload}`;
+  }
+  if (!/^https?:\/\//i.test(clean)) clean = `https://${clean}`;
+  clean = clean.split("#", 1)[0].trim();
+  clean = clean.replace(/\/manifest\.json[^/?]*(?=\?|$)/i, "/manifest.json");
+  const [base, query = ""] = clean.split("?", 2);
+  const manifestBase = base.replace(/\/+$/, "").endsWith("/manifest.json")
+    ? base.replace(/\/+$/, "")
+    : `${base.replace(/\/+$/, "")}/manifest.json`;
+  return query ? `${manifestBase}?${query}` : manifestBase;
+}
+
+function addonTransportUrl(manifestUrl) {
+  return manifestUrl
+    .split("?", 1)[0]
+    .replace(/\/manifest\.json$/i, "")
+    .replace(/\/+$/, "");
+}
+
+function addonIdFromUrl(manifestUrl) {
+  const url = new URL(manifestUrl);
+  const pathParts = url.pathname
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .filter((part) => part.toLowerCase() !== "manifest.json");
+  const candidate =
+    pathParts.at(-1) || url.hostname.split(".")[0] || "stremio-addon";
+  return (
+    candidate
+      .replace(/[^a-z0-9._-]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "stremio-addon"
+  );
+}
+
+function addonNameFromId(id) {
+  return (
+    id
+      .replace(/[._-]+/g, " ")
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase()) || "Stremio Add-on"
+  );
+}
+
 function cloneJson(value, field = "data", maxBytes = 64 * 1024) {
   let serialized;
   try {
@@ -128,8 +178,13 @@ function normalizeAddon(data) {
   if (!isPlainObject(data)) throw new Error("Addon data must be an object");
   const addon = cloneJson(data, "Addon data");
   assertSafeKeys(addon);
-  addon.id = cleanIdentifier(addon.id, "Addon id");
-  addon.name = cleanIdentifier(addon.name, "Addon name");
+  addon.url = normalizeStremioManifestUrl(addon.url || addon.manifestUrl);
+  addon.transportUrl = addonTransportUrl(addon.url);
+  addon.id = cleanIdentifier(addon.id || addonIdFromUrl(addon.url), "Addon id");
+  addon.name = cleanIdentifier(
+    addon.name || addonNameFromId(addon.id),
+    "Addon name",
+  );
   addon.version = String(addon.version || "1.0.0").trim();
   addon.description = String(addon.description || "");
   addon.isInstalled = true;

@@ -364,6 +364,15 @@ nav {
   gap: 15px;
   margin-top: 22px;
 }
+.quick-panel {
+  padding: 12px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  background: var(--accent-soft);
+  font-size: 12px;
+  line-height: 1.5;
+}
 label {
   display: grid;
   gap: 7px;

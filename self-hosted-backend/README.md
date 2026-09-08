@@ -32,6 +32,12 @@ profile playlist, and set an allowed profile setting. Every mutation requires
 the current snapshot revision and a reason, then creates a new revision and an
 audit entry in the same PostgreSQL transaction.
 
+For remote Stremio add-ons, paste either a `stremio://...` install link, a bare
+host/path, or a full `https://.../manifest.json` URL. The dashboard normalizes it
+to the manifest URL, suggests ID/name values, and writes the account-wide add-on
+snapshot used by all profiles. Common profile and IPTV settings are available as
+presets; manual JSON remains available for advanced single-field changes.
+
 Run migration `009_admin_dashboard.sql`, then create the first administrator
 from the server shell. The password is not stored in `.env` and must contain at
 least 14 characters:

@@ -41,6 +41,43 @@ test("upserts an account-wide addon and advances sync timestamps", () => {
   );
 });
 
+test("normalizes remote Stremio addon links and derives metadata", () => {
+  const result = applyAdminSnapshotMutation(
+    snapshot(),
+    {
+      operation: "upsert_addon",
+      profileId: "kids",
+      data: {
+        url: "stremio://torrentio.example/config/manifest.jsonv?token=abc#install",
+      },
+    },
+    2222,
+  );
+
+  const addon = result.addonsByProfile.kids[0];
+  assert.equal(addon.id, "config");
+  assert.equal(addon.name, "Config");
+  assert.equal(
+    addon.url,
+    "https://torrentio.example/config/manifest.json?token=abc",
+  );
+  assert.equal(addon.transportUrl, "https://torrentio.example/config");
+  assert.equal(addon.runtimeKind, "STREMIO");
+  assert.equal(addon.installSource, "DIRECT_URL");
+});
+
+test("requires a remote Stremio addon URL", () => {
+  assert.throws(
+    () =>
+      applyAdminSnapshotMutation(snapshot(), {
+        operation: "upsert_addon",
+        profileId: "kids",
+        data: { id: "empty", name: "Empty" },
+      }),
+    /Addon manifest URL is required/,
+  );
+});
+
 test("applies small admin mutations to large existing snapshots", () => {
   const value = snapshot();
   value.largeGuideCache = "x".repeat(700 * 1024);
