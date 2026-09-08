@@ -487,7 +487,6 @@ app.get("/", async (request, reply) => {
     .replace(
       "</body>",
       `<script>
-        document.getElementById("forgot").style.display = "none";
         const statusNode = document.getElementById("status");
         const pageLanguage = () => document.documentElement.lang === "de" ? "de" : "en";
         const showSuccessPage = (pairing) => {
