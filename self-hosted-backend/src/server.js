@@ -32,6 +32,8 @@ const app = Fastify({
 registerRequestLogging(app);
 const signupAttemptsByEmail = new Map();
 const signupCooldownMs = 5 * 60_000;
+const passwordResetAttemptsByEmail = new Map();
+const passwordResetCooldownMs = 5 * 60_000;
 const tvAuthTtlMs = 10 * 60_000;
 const publicDirectory = path.join(process.cwd(), "public");
 const deletionReceipts = new Map();
@@ -69,6 +71,52 @@ async function issueSession(account) {
     expires_in: config.accessTokenTtlSeconds,
     user: { id: account.id, email: account.email },
   };
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+async function sendPasswordResetEmail(account, token) {
+  if (!config.resendApiKey) {
+    const error = new Error("Password reset mail delivery is not configured");
+    error.statusCode = 503;
+    throw error;
+  }
+  const resetUrl = `${config.publicBaseUrl}/?mode=recovery&token=${encodeURIComponent(token)}`;
+  const response = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${config.resendApiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: config.emailFrom,
+      to: [account.email],
+      subject: "StreamNet Cloud password reset",
+      html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
+        <h2>Reset your StreamNet Cloud password</h2>
+        <p>This link is valid for ${config.passwordResetTtlMinutes} minutes and can be used once.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;background:#e5a209;color:#18120a;padding:12px 18px;text-decoration:none;border-radius:6px">Choose a new password</a></p>
+        <p>If you did not request this, you can ignore this email.</p>
+        <p style="color:#666;font-size:12px">${escapeHtml(resetUrl)}</p>
+      </body></html>`,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => "");
+    const error = new Error(
+      `Resend rejected password reset mail (${response.status})`,
+    );
+    error.providerResponse = body.slice(0, 500);
+    error.statusCode = 502;
+    throw error;
+  }
 }
 
 async function authenticatedAccount(request) {
@@ -543,6 +591,94 @@ app.post("/auth-login", async (request, reply) => {
     return reply.code(401).send({ error: "Invalid email or password" });
   }
   return issueSession(account);
+});
+
+app.post("/cloud-auth-reset", async (request, reply) => {
+  const email = normalizeAndValidateEmail(request.body?.email);
+  if (!email)
+    return reply.code(400).send({ error: "Enter a valid email address" });
+
+  const previousAttempt = passwordResetAttemptsByEmail.get(email) || 0;
+  if (Date.now() - previousAttempt < passwordResetCooldownMs) {
+    return reply
+      .code(429)
+      .send({ error: "Please wait before requesting another password reset" });
+  }
+  passwordResetAttemptsByEmail.set(email, Date.now());
+
+  const result = await pool.query(
+    "select id, email, email_normalized from accounts where email_normalized = $1",
+    [email],
+  );
+  const account = result.rows[0];
+  if (!account) return { account_exists: false, email_sent: false };
+
+  const token = newRefreshToken();
+  await pool.query(
+    `insert into password_reset_tokens (account_id, token_hash, expires_at)
+     values ($1, $2, now() + ($3 * interval '1 minute'))`,
+    [account.id, hashToken(token), config.passwordResetTtlMinutes],
+  );
+  try {
+    await sendPasswordResetEmail(account, token);
+    return { account_exists: true, email_sent: true };
+  } catch (error) {
+    await pool.query(
+      "delete from password_reset_tokens where token_hash = $1",
+      [hashToken(token)],
+    );
+    throw error;
+  }
+});
+
+app.post("/auth-password-complete", async (request, reply) => {
+  const token = String(request.body?.token || "").trim();
+  const password = String(request.body?.password || "");
+  if (!token || password.length < 6) {
+    return reply
+      .code(400)
+      .send({ error: "Password must be at least 6 characters" });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query("begin");
+    const result = await client.query(
+      `select password_reset_tokens.id as token_id, password_reset_tokens.account_id
+         from password_reset_tokens
+        where token_hash = $1 and used_at is null and expires_at > now()
+        for update`,
+      [hashToken(token)],
+    );
+    const reset = result.rows[0];
+    if (!reset) {
+      await client.query("rollback");
+      return reply
+        .code(400)
+        .send({ error: "This password link is no longer valid" });
+    }
+    await client.query(
+      `update accounts
+          set password_hash = $1, password_hash_scheme = 'scrypt_v1', updated_at = now()
+        where id = $2`,
+      [await hashScryptPassword(password), reset.account_id],
+    );
+    await client.query(
+      "update account_sessions set revoked_at = now() where account_id = $1 and revoked_at is null",
+      [reset.account_id],
+    );
+    await client.query(
+      "update password_reset_tokens set used_at = now() where id = $1",
+      [reset.token_id],
+    );
+    await client.query("commit");
+    return { ok: true };
+  } catch (error) {
+    await client.query("rollback");
+    throw error;
+  } finally {
+    client.release();
+  }
 });
 
 app.post("/cloud-auth-email", async (request, reply) => {

@@ -11,4 +11,8 @@ export const config = {
   port: Number(process.env.PORT || 3000),
   accessTokenTtlSeconds: Number(process.env.ACCESS_TOKEN_TTL_SECONDS || 900),
   refreshTokenTtlDays: Number(process.env.REFRESH_TOKEN_TTL_DAYS || 30),
+  resendApiKey: process.env.RESEND_API_KEY?.trim() || "",
+  emailFrom:
+    process.env.EMAIL_FROM?.trim() || "StreamNet Cloud <noreply@example.com>",
+  passwordResetTtlMinutes: Number(process.env.PASSWORD_RESET_TTL_MINUTES || 30),
 };

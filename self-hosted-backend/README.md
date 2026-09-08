@@ -6,12 +6,12 @@ This is the self-hosted StreamNet backend. The production Android build uses it 
 
 - PostgreSQL schema and repeatable migration runner.
 - StreamNet `scrypt` password hashing and verification.
-- `auth-login`, `auth-refresh`, `cloud-auth-email`, TV QR pairing, `account-sync-pull`, and `account-sync-push`.
+- `auth-login`, `auth-refresh`, `cloud-auth-email`, password reset through Resend, TV QR pairing, `account-sync-pull`, and `account-sync-push`.
 - Self-hosted app usage analytics and Discord device pairing with the existing StreamNet callback pages.
 - Revision-based snapshot compare-and-set compatible with the Android conflict retry.
 - Traefik-compatible Docker Compose configuration with domain, certificate resolver, and published container image from `.env`.
 
-Password reset and media proxies are intentionally not included yet. Password reset will be added after SMTP delivery is configured.
+Password reset uses the Resend HTTP API. Configure `RESEND_API_KEY`, a verified `EMAIL_FROM` identity, and optionally `PASSWORD_RESET_TTL_MINUTES` in the server `.env`. Reset tokens are stored only as hashes, expire automatically, are single-use, and revoke existing account sessions after a successful password change.
 
 ## Local or Server Setup
 
@@ -150,7 +150,7 @@ The API router deliberately has no Authelia middleware. Android TV and mobile ca
 
 The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory.
 
-Password reset remains unavailable on the self-hosted page until its server-side replacement is complete. Account deletion is available at `https://auth.mystreamnet.club/delete-account`; it requires a fresh sign-in and an exact `DELETE` confirmation, revokes the account sessions, removes the cloud snapshot, and removes pending TV pairing sessions. It does not fall back to Netlify.
+Account deletion is available at `https://auth.mystreamnet.club/delete-account`; it requires a fresh sign-in and an exact `DELETE` confirmation, revokes the account sessions, removes the cloud snapshot, and removes pending TV pairing sessions. It does not fall back to Netlify.
 
 ## First API Test
 
@@ -207,7 +207,7 @@ Build the APK with:
 ./gradlew :app:assembleSideloadSelfHosted
 ```
 
-Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in with a migrated account, validate Cloud Sync, profile restoration, TV pairing, Discord pairing, and account deletion. The production release uses the same backend endpoint. Password reset remains unavailable.
+Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` alongside the production app. Sign in with a migrated account, validate Cloud Sync, profile restoration, TV pairing, Discord pairing, account deletion, and password reset. The production release uses the same backend endpoint.
 
 ## Container Publishing
 

@@ -1640,7 +1640,7 @@
           await saveNewPassword();
           setStatus(t("status.passwordUpdated"), "ok");
           setTimeout(() => {
-            window.location.href = "https://streamnet-sync.netlify.app";
+            window.location.href = `${window.location.origin}/`;
           }, 1200);
         } catch (err) {
           setStatus(err.message || String(err), "error");
