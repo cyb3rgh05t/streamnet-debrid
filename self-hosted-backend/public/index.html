@@ -435,6 +435,17 @@
         background: linear-gradient(135deg, #efaf14, #d88419);
       }
 
+      .btn.reset-action {
+        color: var(--accent-1);
+        border-color: rgba(229, 162, 9, 0.4);
+        background: rgba(229, 162, 9, 0.06);
+      }
+      .btn.reset-action:hover {
+        color: #18120a;
+        border-color: var(--accent-1);
+        background: var(--accent-1);
+      }
+
       .small {
         margin-top: 16px;
         font-size: 12px;
@@ -784,15 +795,6 @@
                 autocomplete="current-password"
                 data-i18n-placeholder="placeholders.password"
               />
-              <div class="linkrow">
-                <button
-                  class="linkbtn"
-                  id="forgot"
-                  type="button"
-                  data-i18n="actions.forgot"
-                ></button>
-              </div>
-
               <div class="actions">
                 <button
                   class="btn primary"
@@ -803,6 +805,12 @@
                   class="btn"
                   id="signup"
                   data-i18n="actions.signUp"
+                ></button>
+                <button
+                  class="btn reset-action"
+                  id="forgot"
+                  type="button"
+                  data-i18n="actions.forgot"
                 ></button>
                 <button
                   class="btn"
