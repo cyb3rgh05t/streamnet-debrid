@@ -199,6 +199,31 @@ internal fun mergeTvDetailsLanguageFallback(
     )
 }
 
+internal fun mergeMovieDetailsLanguageFallback(
+    localized: TmdbMovieDetails,
+    english: TmdbMovieDetails?,
+): TmdbMovieDetails {
+    if (english == null) return localized
+    return localized.copy(
+        title = localized.title.ifBlank { english.title },
+        overview = localized.overview?.takeIf { it.isNotBlank() } ?: english.overview,
+        posterPath = localized.posterPath?.takeIf { it.isNotBlank() } ?: english.posterPath,
+        backdropPath = localized.backdropPath?.takeIf { it.isNotBlank() } ?: english.backdropPath,
+    )
+}
+
+internal fun mergeEpisodeLanguageFallback(
+    localized: TmdbEpisode,
+    english: TmdbEpisode?,
+): TmdbEpisode {
+    if (english == null) return localized
+    return localized.copy(
+        name = localized.name.ifBlank { english.name },
+        overview = localized.overview?.takeIf { it.isNotBlank() } ?: english.overview,
+        stillPath = localized.stillPath?.takeIf { it.isNotBlank() } ?: english.stillPath,
+    )
+}
+
 internal object HomeServerLibraryIdentity {
     fun stableNativeId(sourceRef: String, itemId: String): Int {
         return -("$sourceRef:$itemId".hashCode() and Int.MAX_VALUE).coerceAtLeast(1)
@@ -3203,7 +3228,18 @@ class MediaRepository @Inject constructor(
             val detailsDeferred = async { tmdbApi.getMovieDetails(movieId, apiKey, language = contentLanguage) }
             val externalIdsDeferred = async { resolveExternalIds(MediaType.MOVIE, movieId) }
 
-            val details = detailsDeferred.await()
+            val localizedDetails = detailsDeferred.await()
+            val englishDetails = if (
+                !contentLanguage.startsWith("en", ignoreCase = true) &&
+                (localizedDetails.overview.isNullOrBlank() ||
+                    localizedDetails.posterPath.isNullOrBlank() ||
+                    localizedDetails.backdropPath.isNullOrBlank())
+            ) {
+                runCatching { tmdbApi.getMovieDetails(movieId, apiKey, language = "en-US") }.getOrNull()
+            } else {
+                null
+            }
+            val details = mergeMovieDetailsLanguageFallback(localizedDetails, englishDetails)
             val imdbId = externalIdsDeferred.await()?.imdbId?.also { cacheImdbId(MediaType.MOVIE, movieId, it) }
             val imdbRating = imdbId?.let { getImdbRating(MediaType.MOVIE, movieId, it) }
             details.toMediaItem().copy(imdbRating = imdbRating.orEmpty())
@@ -3507,7 +3543,12 @@ class MediaRepository @Inject constructor(
 
         val season = tmdbApi.getTvSeason(tvId, seasonNumber, apiKey, language = contentLanguage)
         val needsArtworkFallback = season.episodes.any { it.stillPath.isNullOrBlank() }
-        val englishSeason = if (needsArtworkFallback && contentLanguage != "en-US") {
+        val needsLanguageFallback = season.episodes.any {
+            it.name.isBlank() || it.overview.isNullOrBlank() || it.stillPath.isNullOrBlank()
+        }
+        val englishSeason = if (
+            needsLanguageFallback && !contentLanguage.startsWith("en", ignoreCase = true)
+        ) {
             runCatching {
                 tmdbApi.getTvSeason(tvId, seasonNumber, apiKey, language = "en-US")
             }.getOrNull()
@@ -3533,9 +3574,12 @@ class MediaRepository @Inject constructor(
 
         val episodes = season.episodes.map { episode ->
             val episodeKey = "show_tmdb:$tvId:$seasonNumber:${episode.episodeNumber}"
-            episode.toEpisode().copy(
-                stillPath = episode.stillPath?.let { "${Constants.IMAGE_BASE}$it" }
-                    ?: englishStillPaths[episode.episodeNumber]?.stillPath?.let { "${Constants.IMAGE_BASE}$it" }
+            val mergedEpisode = mergeEpisodeLanguageFallback(
+                localized = episode,
+                english = englishStillPaths[episode.episodeNumber],
+            )
+            mergedEpisode.toEpisode().copy(
+                stillPath = mergedEpisode.stillPath?.let { "${Constants.IMAGE_BASE}$it" }
                     ?: englishSeriesBackdrop,
                 imdbRating = episodeImdbRatings[seasonNumber to episode.episodeNumber].orEmpty(),
                 isWatched = episodeKey in watchedEpisodes

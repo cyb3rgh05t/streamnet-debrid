@@ -190,6 +190,39 @@ private fun Addon.isVodStreamingAddon(): Boolean =
         type != AddonType.SUBTITLE &&
         true
 
+internal fun overviewLooksIncomplete(overview: String): Boolean {
+    val value = overview.trim()
+    return value.isBlank() || value.endsWith("...") || value.length < 140
+}
+
+internal fun selectBestOverview(
+    item: MediaItem,
+    candidateOverview: String,
+    searchMatches: List<MediaItem>,
+): String {
+    val base = candidateOverview.trim()
+    if (!overviewLooksIncomplete(base) || item.title.isBlank()) return base
+
+    val bestMatch = searchMatches
+        .filter { it.overview.isNotBlank() }
+        .maxByOrNull { match ->
+            val idBonus = if (match.id == item.id) 2_000 else 0
+            val titleBonus = if (match.title.equals(item.title, ignoreCase = true)) 1_000 else 0
+            val typeBonus = if (match.mediaType == item.mediaType) 120 else 0
+            val qualityBonus = if (!overviewLooksIncomplete(match.overview)) 80 else 0
+            idBonus + titleBonus + typeBonus + qualityBonus + match.overview.length
+        }
+    val improved = bestMatch?.overview?.trim().orEmpty()
+    return if (
+        improved.isNotBlank() &&
+        (improved.length > base.length || (!improved.endsWith("...") && base.endsWith("...")))
+    ) {
+        improved
+    } else {
+        base
+    }
+}
+
 @HiltViewModel
 class DetailsViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -289,6 +322,18 @@ class DetailsViewModel @Inject constructor(
             revenue = primary.revenue ?: fallback.revenue,
             status = primary.status ?: fallback.status
         )
+    }
+
+    private suspend fun resolveBestOverview(item: MediaItem): String {
+        if (!overviewLooksIncomplete(item.overview) || item.title.isBlank()) return item.overview.trim()
+        val searchMatches = try {
+            mediaRepository.search(item.title)
+        } catch (error: CancellationException) {
+            throw error
+        } catch (_: Exception) {
+            emptyList()
+        }
+        return selectBestOverview(item, item.overview, searchMatches)
     }
 
     fun loadDetails(mediaType: MediaType, mediaId: Int, initialSeason: Int? = null, initialEpisode: Int? = null) {
@@ -478,7 +523,9 @@ class DetailsViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                val mergedItem = mergeItem(item, initialItem)
+                val mergedItem = mergeItem(item, initialItem).let { merged ->
+                    merged.copy(overview = resolveBestOverview(merged))
+                }
                 val hasTrustedTvDetails = mediaType != MediaType.TV || loadedItem != null || cachedFullItem != null
 
                 // Get total seasons for TV shows (stored in totalEpisodes field)

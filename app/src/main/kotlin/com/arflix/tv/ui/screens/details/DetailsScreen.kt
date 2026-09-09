@@ -1647,7 +1647,7 @@ private fun DetailsContent(
 
                     // Description
                     Text(
-                        text = item.overview,
+                        text = item.overview.ifBlank { stringResource(R.string.no_description_available) },
                         style = ArflixTypography.body.copy(
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
@@ -2197,7 +2197,9 @@ private fun DetailsContent(
 
                 Spacer(modifier = Modifier.height(6.dp))
 
-                val displayOverview = item.overview
+                val displayOverview = item.overview.ifBlank {
+                    stringResource(R.string.no_description_available)
+                }
 
                 AutoScrollingSynopsis(
                     text = displayOverview,
