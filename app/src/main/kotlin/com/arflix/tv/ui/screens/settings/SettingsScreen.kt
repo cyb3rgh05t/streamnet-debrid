@@ -2291,7 +2291,7 @@ fun SettingsScreen(
                     InputField(
                         label = stringResource(R.string.settings_label_epg_sources),
                         value = iptvEditEpg,
-                        placeholder = "https://provider.com/xmltv.xml\nhttps://backup.com/epg.xml.gz",
+                        placeholder = stringResource(R.string.settings_ph_epg_sources),
                         helper = stringResource(R.string.settings_helper_epg_one_per_line),
                         singleLine = false,
                         onValueChange = { iptvEditEpg = it }

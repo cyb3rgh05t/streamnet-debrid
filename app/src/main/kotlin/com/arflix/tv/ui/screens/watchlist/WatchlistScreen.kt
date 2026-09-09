@@ -801,7 +801,19 @@ private fun ProviderTabs(
     onFilterSelect: (Int) -> Unit
 ) {
     val uiAccent = resolveAccentColor(fallback = Pink)
+    val tabListState = rememberLazyListState()
+    val focusedTabIndex = when {
+        focusedIndex >= 0 -> focusedIndex
+        showLibraryControls && focusedFilterIndex >= 0 -> providers.size + focusedFilterIndex
+        else -> -1
+    }
+    LaunchedEffect(focusedTabIndex) {
+        if (focusedTabIndex >= 0) {
+            tabListState.animateScrollToItem(focusedTabIndex)
+        }
+    }
     LazyRow(
+        state = tabListState,
         modifier = Modifier.fillMaxWidth(),
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 1.dp),
         horizontalArrangement = Arrangement.spacedBy(7.dp)

@@ -105,6 +105,7 @@ enum class CollectionTab { MOVIES, SERIES }
  * [stringResource] at the @Composable display point (see CollectionDetailsScreen).
  */
 private const val COLLECTION_LOAD_FAILED_ERROR = "__collection_load_failed__"
+private const val COLLECTION_NOT_FOUND_ERROR = "__collection_not_found__"
 
 data class CollectionDetailsUiState(
     val catalog: CatalogConfig? = null,
@@ -179,7 +180,7 @@ class CollectionDetailsViewModel @Inject constructor(
                 _uiState.value = CollectionDetailsUiState(
                     isLoadingMovies = false,
                     isLoadingSeries = false,
-                    error = "Collection not found"
+                    error = COLLECTION_NOT_FOUND_ERROR
                 )
                 return@launch
             }
@@ -667,6 +668,7 @@ fun CollectionDetailsScreen(
             emptyMessage = when (uiState.error) {
                 null -> stringResource(R.string.collection_empty)
                 COLLECTION_LOAD_FAILED_ERROR -> stringResource(R.string.collection_failed_load)
+                COLLECTION_NOT_FOUND_ERROR -> stringResource(R.string.collection_not_found)
                 else -> uiState.error!!
             },
             topContentPadding = if (isMobile) 18.dp else if (usePosterCards) 22.dp else 10.dp

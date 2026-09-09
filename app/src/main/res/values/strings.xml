@@ -391,6 +391,7 @@
     <string name="settings_label_xtream_pass">Xtream Password (Optional)</string>
     <string name="settings_label_epg_sources">EPG Sources (Optional)</string>
     <string name="settings_helper_epg_one_per_line">One URL per line. Commas, semicolons, and pipes are also accepted.</string>
+    <string name="settings_ph_epg_sources">https://provider.com/xmltv.xml\nhttps://backup.com/epg.xml.gz</string>
     <string name="settings_label_title">Title</string>
     <string name="settings_add_quality_filter">Add Quality Filter</string>
     <string name="settings_edit_quality_filter">Edit Quality Filter</string>
@@ -1053,6 +1054,14 @@
     <string name="player_cd_pip">Picture in Picture</string>
     <string name="player_cd_volume">Volume</string>
     <string name="player_cd_aspect">Aspect: %1$s</string>
+    <string name="player_aspect_auto">Auto</string>
+    <string name="player_aspect_fit">Fit to Screen</string>
+    <string name="player_aspect_stretch">Stretch</string>
+    <string name="player_aspect_crop">Crop</string>
+    <string name="player_lock_controls">Lock controls</string>
+    <string name="player_unlock_controls">Unlock controls</string>
+    <string name="player_brightness">Brightness</string>
+    <string name="player_brightness_auto">Auto</string>
     <string name="player_quick_settings">Quick settings</string>
     <string name="player_picture_format">Picture format</string>
     <string name="live_player_settings">Live TV settings</string>

@@ -532,6 +532,7 @@
     <string name="settings_label_xtream_pass">Xtream-Passwort (optional)</string>
     <string name="settings_label_epg_sources">EPG-Quellen (optional)</string>
     <string name="settings_helper_epg_one_per_line">Eine URL pro Zeile. Kommas, Semikolons und senkrechte Striche werden ebenfalls akzeptiert.</string>
+    <string name="settings_ph_epg_sources">https://anbieter.de/xmltv.xml\nhttps://backup.de/epg.xml.gz</string>
     <string name="settings_label_title">Titel</string>
     <string name="settings_add_quality_filter">Qualitätsfilter hinzufügen</string>
     <string name="settings_edit_quality_filter">Qualitätsfilter bearbeiten</string>
@@ -1020,6 +1021,14 @@
     <string name="player_cd_pip">Bild-in-Bild</string>
     <string name="player_cd_volume">Lautstärke</string>
     <string name="player_cd_aspect">Seitenverhältnis: %1$s</string>
+    <string name="player_aspect_auto">Automatisch</string>
+    <string name="player_aspect_fit">Einpassen</string>
+    <string name="player_aspect_stretch">Strecken</string>
+    <string name="player_aspect_crop">Zuschneiden</string>
+    <string name="player_lock_controls">Bedienung sperren</string>
+    <string name="player_unlock_controls">Bedienung entsperren</string>
+    <string name="player_brightness">Helligkeit</string>
+    <string name="player_brightness_auto">Automatisch</string>
     <string name="player_quick_settings">Schnelleinstellungen</string>
     <string name="player_picture_format">Bildformat</string>
     <string name="live_player_settings">Live-TV-Einstellungen</string>

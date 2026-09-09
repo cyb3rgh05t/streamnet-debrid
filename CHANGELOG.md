@@ -4,6 +4,25 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.007] - 2026-09-09
+
+### Metadaten und Details
+
+- Filme laden fehlende deutsche Beschreibungen, Poster und Hintergründe automatisch aus dem englischen TMDB-Eintrag nach.
+- Episoden ergänzen fehlende Namen, Beschreibungen und Vorschaubilder aus den englischen Staffelmetadaten.
+- Die Detailansicht ersetzt leere oder unvollständige Beschreibungen durch die beste verfügbare Fassung und zeigt andernfalls einen lokalisierten Hinweis statt eines leeren Feldes.
+
+### Mobile Player
+
+- Das Bildformat kann zwischen Automatisch, Einpassen, Strecken und Zuschneiden gewechselt werden.
+- Touch-Geräte können die Player-Bedienung sperren; im gesperrten Zustand blendet ein Tap nur die dezente Entsperraktion ein.
+- Vertikales Wischen regelt links die Bildschirmhelligkeit und rechts die Lautstärke. Bei null Prozent Helligkeit folgt das Playerfenster wieder der Systemeinstellung.
+
+### Bibliothek und Lokalisierung
+
+- Die Provider- und Filterleiste der Bibliothek scrollt auf TV automatisch zum fokussierten Eintrag, damit D-Pad-Fokus sichtbar bleibt.
+- Verbleibende Collection-Fehlertexte und EPG-Beispielwerte verwenden deutsche beziehungsweise englische Ressourcen statt fest codierter Texte.
+
 ## [2.4.006] - 2026-09-08
 
 ### TV UI und Kartenlayout

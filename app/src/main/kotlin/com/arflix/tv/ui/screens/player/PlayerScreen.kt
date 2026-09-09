@@ -10,6 +10,8 @@ import android.content.pm.ActivityInfo
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
+import android.view.WindowManager
 import com.arflix.tv.BuildConfig
 import androidx.activity.compose.BackHandler
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -30,6 +32,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +56,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BrightnessAuto
+import androidx.compose.material.icons.filled.Brightness6
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -62,6 +67,8 @@ import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Forward10
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Replay10
@@ -220,6 +227,25 @@ import androidx.core.content.ContextCompat
 private const val PIP_ACTION_REWIND = "com.arflix.tv.pip.REWIND"
 private const val PIP_ACTION_PLAY_PAUSE = "com.arflix.tv.pip.PLAY_PAUSE"
 private const val PIP_ACTION_FORWARD = "com.arflix.tv.pip.FORWARD"
+
+internal enum class PlayerAspectMode(val resizeMode: Int) {
+    AUTO(AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    STRETCH(AspectRatioFrameLayout.RESIZE_MODE_FILL),
+    CROP(AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+}
+
+internal fun PlayerAspectMode.next(): PlayerAspectMode = when (this) {
+    PlayerAspectMode.AUTO -> PlayerAspectMode.FIT
+    PlayerAspectMode.FIT -> PlayerAspectMode.STRETCH
+    PlayerAspectMode.STRETCH -> PlayerAspectMode.CROP
+    PlayerAspectMode.CROP -> PlayerAspectMode.AUTO
+}
+
+internal fun resolvePlayerBrightness(start: Float, dragPixels: Float, viewportHeight: Float): Float {
+    if (viewportHeight <= 0f) return start.coerceIn(0f, 1f)
+    return (start - dragPixels / viewportHeight).coerceIn(0f, 1f)
+}
 
 private fun isSafePlaybackHeader(name: String, value: String): Boolean {
     return name.isNotBlank() &&
@@ -402,8 +428,26 @@ fun PlayerScreen(
     var showVolumeIndicator by remember { mutableStateOf(false) }
     var showAspectIndicator by remember { mutableStateOf(false) }
     var aspectIndicatorTrigger by remember { mutableIntStateOf(0) }
+    var currentBrightness by remember { mutableFloatStateOf(0f) }
+    var showBrightnessIndicator by remember { mutableStateOf(false) }
+    var touchLocked by remember { mutableStateOf(false) }
+    var showUnlockControl by remember { mutableStateOf(false) }
+    var unlockControlTrigger by remember { mutableIntStateOf(0) }
     var isMuted by remember { mutableStateOf(false) }
     var volumeBeforeMute by remember { mutableIntStateOf(currentVolume) }
+
+    DisposableEffect(activity) {
+        val window = activity?.window
+        val originalBrightness = window?.attributes?.screenBrightness
+            ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+        onDispose {
+            window?.let {
+                val attributes = it.attributes
+                attributes.screenBrightness = originalBrightness
+                it.attributes = attributes
+            }
+        }
+    }
 
     // Focus requesters for TV navigation
     val playButtonFocusRequester = remember { FocusRequester() }
@@ -418,6 +462,7 @@ fun PlayerScreen(
     val skipIntroFocusRequester = remember { FocusRequester() }
     val subtitleSettingsBtnFocusRequester = remember { FocusRequester() }
     val pipButtonFocusRequester = remember { FocusRequester() }
+    val lockButtonFocusRequester = remember { FocusRequester() }
 
     // Focus state - 0=Play, 1=Subtitles
     var focusedButton by remember { mutableIntStateOf(0) }
@@ -531,7 +576,7 @@ fun PlayerScreen(
         showNextEpisodePrompt = false
         onBack()
     }
-    var playerResizeMode by remember { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var playerAspectMode by remember { mutableStateOf(PlayerAspectMode.AUTO) }
     var subtitleMenuIndex by remember { mutableIntStateOf(0) }
     var subtitleMenuTab by remember { mutableIntStateOf(0) } // 0 = Subtitles, 1 = Audio
     var subtitleLangIndex by remember { mutableIntStateOf(0) }
@@ -2257,10 +2302,22 @@ fun PlayerScreen(
             showAspectIndicator = false
         }
     }
+    LaunchedEffect(touchLocked, unlockControlTrigger) {
+        if (touchLocked && showUnlockControl) {
+            kotlinx.coroutines.delay(1800)
+            showUnlockControl = false
+        }
+    }
     LaunchedEffect(showVolumeIndicator) {
         if (showVolumeIndicator) {
             kotlinx.coroutines.delay(1500)
             showVolumeIndicator = false
+        }
+    }
+    LaunchedEffect(showBrightnessIndicator, currentBrightness) {
+        if (showBrightnessIndicator) {
+            kotlinx.coroutines.delay(1500)
+            showBrightnessIndicator = false
         }
     }
 
@@ -2755,17 +2812,14 @@ fun PlayerScreen(
     val subtitleStylePref = uiState.subtitleStyle
     val subtitleFontPref = uiState.subtitleFont
     val subtitleStylizedPref = uiState.subtitleStylized
-    val aspectModeLabel = when (playerResizeMode) {
-        AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> "Zoom"
-        AspectRatioFrameLayout.RESIZE_MODE_FILL -> "Fill"
-        else -> "Fit"
+    val aspectModeLabel = when (playerAspectMode) {
+        PlayerAspectMode.AUTO -> stringResource(R.string.player_aspect_auto)
+        PlayerAspectMode.FIT -> stringResource(R.string.player_aspect_fit)
+        PlayerAspectMode.STRETCH -> stringResource(R.string.player_aspect_stretch)
+        PlayerAspectMode.CROP -> stringResource(R.string.player_aspect_crop)
     }
     val cycleAspectRatio: () -> Unit = {
-        playerResizeMode = when (playerResizeMode) {
-            AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-            else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-        }
+        playerAspectMode = playerAspectMode.next()
         aspectIndicatorTrigger++
     }
     val activateQuickSetting: (Int) -> Unit = { index ->
@@ -2808,15 +2862,18 @@ fun PlayerScreen(
                 if (isTouchDevice) {
                     // isCasting is a key so the handler restarts when casting changes,
                     // picking up the updated queueControlsSeek lambda.
-                    Modifier.pointerInput(isCasting) {
+                    Modifier.pointerInput(isCasting, touchLocked) {
                         detectTapGestures(
                             onTap = {
-                                if (uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
+                                if (touchLocked) {
+                                    showUnlockControl = true
+                                    unlockControlTrigger++
+                                } else if (uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
                                     showControls = !showControls
                                 }
                             },
                             onDoubleTap = { offset ->
-                                if (uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
+                                if (!touchLocked && uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
                                     val halfWidth = size.width / 2
                                     if (offset.x < halfWidth) {
                                         // Double-tap left side: rewind 10 seconds
@@ -2827,6 +2884,58 @@ fun PlayerScreen(
                                     }
                                 }
                             }
+                        )
+                    }.pointerInput(touchLocked, activity) {
+                        var adjustBrightness = false
+                        var accumulatedDrag = 0f
+                        var startBrightness = 0.5f
+                        var startVolume = 0
+                        detectVerticalDragGestures(
+                            onDragStart = { offset ->
+                                if (touchLocked || uiState.error != null) return@detectVerticalDragGestures
+                                adjustBrightness = offset.x < size.width / 2f
+                                accumulatedDrag = 0f
+                                if (adjustBrightness) {
+                                    val windowBrightness = activity?.window?.attributes?.screenBrightness ?: -1f
+                                    startBrightness = if (windowBrightness >= 0f) {
+                                        windowBrightness
+                                    } else {
+                                        runCatching {
+                                            Settings.System.getInt(
+                                                context.contentResolver,
+                                                Settings.System.SCREEN_BRIGHTNESS,
+                                            ) / 255f
+                                        }.getOrDefault(0.5f)
+                                    }.coerceIn(0f, 1f)
+                                } else {
+                                    startVolume = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+                                }
+                            },
+                            onVerticalDrag = { change, dragAmount ->
+                                change.consume()
+                                if (touchLocked || uiState.error != null) return@detectVerticalDragGestures
+                                accumulatedDrag += dragAmount
+                                if (adjustBrightness) {
+                                    val brightness = resolvePlayerBrightness(startBrightness, accumulatedDrag, size.height.toFloat())
+                                    val attributes = activity?.window?.attributes
+                                    if (attributes != null) {
+                                        attributes.screenBrightness = if (brightness <= 0.01f) {
+                                            WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                                        } else {
+                                            brightness
+                                        }
+                                        activity.window.attributes = attributes
+                                    }
+                                    currentBrightness = brightness
+                                    showBrightnessIndicator = true
+                                } else {
+                                    val volumeDelta = kotlin.math.round(-accumulatedDrag / size.height * maxVolume).toInt()
+                                    val volume = (startVolume + volumeDelta).coerceIn(0, maxVolume)
+                                    audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, volume, 0)
+                                    currentVolume = volume
+                                    showVolumeIndicator = true
+                                }
+                            },
                         )
                     }
                 } else {
@@ -3302,7 +3411,7 @@ fun PlayerScreen(
                         player = exoPlayer
                         useController = false
                         setKeepContentOnPlayerReset(true)
-                        resizeMode = playerResizeMode
+                        resizeMode = playerAspectMode.resizeMode
 
                         // Enable subtitle view with styling based on user preference
                         subtitleView?.apply {
@@ -3323,7 +3432,7 @@ fun PlayerScreen(
                 update = { playerView ->
                     playerView.keepScreenOn = true
                     playerView.player = exoPlayer
-                    playerView.resizeMode = playerResizeMode
+                    playerView.resizeMode = playerAspectMode.resizeMode
                     playerView.setUseVideoFrameForSubtitles(useVideoFrameSubtitleViewport)
                     playerView.subtitleView?.apply {
                         applySubtitleAppearance(
@@ -3524,7 +3633,7 @@ fun PlayerScreen(
 
         // Netflix-style Controls Overlay
         AnimatedVisibility(
-            visible = hasPlaybackStarted && showControls && !showSubtitleMenu && !showSourceMenu && !isInPipMode,
+            visible = hasPlaybackStarted && showControls && !touchLocked && !showSubtitleMenu && !showSourceMenu && !isInPipMode,
             enter = fadeIn(androidx.compose.animation.core.tween(150)),
             exit = fadeOut(androidx.compose.animation.core.tween(200))
         ) {
@@ -3889,6 +3998,27 @@ fun PlayerScreen(
                                 onDownKey = { trackbarFocusRequester.requestFocus() }
                             )
                         }
+
+                        if (isTouchDevice) {
+                            Spacer(modifier = Modifier.width(gap))
+                            PlayerIconButton(
+                                icon = Icons.Default.Lock,
+                                contentDescription = stringResource(R.string.player_lock_controls),
+                                focusRequester = lockButtonFocusRequester,
+                                size = smallBtn,
+                                iconSize = smallIcon,
+                                onFocusChanged = {},
+                                onClick = {
+                                    touchLocked = true
+                                    showUnlockControl = true
+                                    unlockControlTrigger++
+                                    showControls = false
+                                },
+                                onLeftKey = { pipButtonFocusRequester.requestFocus() },
+                                onRightKey = { subtitleButtonFocusRequester.requestFocus() },
+                                onDownKey = { trackbarFocusRequester.requestFocus() },
+                            )
+                        }
                     }
 
 
@@ -4193,6 +4323,39 @@ fun PlayerScreen(
             }
         }
 
+        AnimatedVisibility(
+            visible = showBrightnessIndicator,
+            enter = fadeIn(animTween(150)),
+            exit = fadeOut(animTween(200)),
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = 48.dp),
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                    .padding(16.dp),
+            ) {
+                Icon(
+                    imageVector = if (currentBrightness <= 0.01f) Icons.Default.BrightnessAuto else Icons.Default.Brightness6,
+                    contentDescription = stringResource(R.string.player_brightness),
+                    tint = Color.White,
+                    modifier = Modifier.size(32.dp),
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = if (currentBrightness <= 0.01f) {
+                        stringResource(R.string.player_brightness_auto)
+                    } else {
+                        "${(currentBrightness * 100).toInt()}%"
+                    },
+                    style = ArflixTypography.caption,
+                    color = Color.White,
+                )
+            }
+        }
+
         // Aspect ratio indicator - brief center popup
         AnimatedVisibility(
             visible = showAspectIndicator,
@@ -4209,6 +4372,33 @@ fun PlayerScreen(
                     text = aspectModeLabel,
                     style = ArflixTypography.body.copy(fontSize = 18.sp, fontWeight = FontWeight.Medium),
                     color = Color.White
+                )
+            }
+        }
+
+        AnimatedVisibility(
+            visible = isTouchDevice && touchLocked && showUnlockControl,
+            enter = fadeIn(animTween(120)),
+            exit = fadeOut(animTween(180)),
+            modifier = Modifier.align(Alignment.Center).zIndex(12f),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .clickable {
+                        touchLocked = false
+                        showUnlockControl = false
+                        showControls = true
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.LockOpen,
+                    contentDescription = stringResource(R.string.player_unlock_controls),
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp),
                 )
             }
         }
