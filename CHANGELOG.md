@@ -4,6 +4,21 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.4.008] - 2026-09-09
+
+### Player und Live-TV
+
+- VOD- und Live-TV-Player bieten konsistente Bildformat-Modi: Automatisch, Einpassen, Strecken und Zuschneiden.
+- Picture-in-Picture ist im VOD- und Live-TV-Player für Touch-Geräte und TV-D-Pad verfügbar.
+- Die Player-Bedienung kann auf Touch-Geräten gesperrt werden; das mittige Entsperr-Icon nutzt den aktiven Akzent und blendet sich automatisch aus.
+- Das Live-TV-HUD wurde an die VOD-Steuerungsleiste angeglichen: ohne sichtbare Seek-Kreisbuttons, mit sauber ausgerichteten Sender-/Programm-Aktionen und Streamdetails im Settings-Dialog.
+- Live-TV-Qualitätsbadges zeigen kompakt UHD, FHD, HD oder SD; die detaillierte Auflösung bleibt in den Streaminformationen.
+
+### Touch-UI und Theming
+
+- Mobile Untertitel-/Audio-Popups, Settings-Dialoge und Texteingabe-Dialoge verwenden nun den aktiven StreamNet-Akzent für Rahmen, Tabs und Auswahlzustände.
+- Live-TV-Kategorie-Pills behalten auch ohne Fokus einen dezenten Akzent-Rahmen; der Fokus bleibt für Touch und D-Pad deutlich hervorgehoben.
+
 ## [2.4.007] - 2026-09-09
 
 ### Metadaten und Details

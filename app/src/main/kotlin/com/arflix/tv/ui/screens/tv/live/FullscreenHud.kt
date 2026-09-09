@@ -30,13 +30,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.AspectRatio
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.PictureInPicture
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -71,6 +71,8 @@ import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
+import com.arflix.tv.ui.skin.LocalAccentColorOverride
+import com.arflix.tv.util.LocalDeviceType
 import kotlinx.coroutines.delay
 import java.time.Instant
 import java.time.LocalDateTime
@@ -112,11 +114,17 @@ fun FullscreenHud(
     onSettingsDismiss: (() -> Unit)? = null,
     onReloadClick: (() -> Unit)? = null,
     onPictureModeClick: (() -> Unit)? = null,
+    onPipClick: (() -> Unit)? = null,
     onVisibilityChanged: ((Boolean) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     var visible by remember { mutableStateOf(true) }
     var lastPoke by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var hudLocked by remember { mutableStateOf(false) }
+    var unlockVisible by remember { mutableStateOf(false) }
+    var unlockTrigger by remember { mutableLongStateOf(0L) }
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val hudAccent = LocalAccentColorOverride.current ?: LiveColors.Accent
 
     androidx.compose.runtime.DisposableEffect(onVisibilityChanged) {
         onDispose {
@@ -132,6 +140,12 @@ fun FullscreenHud(
         if (!settingsVisible && System.currentTimeMillis() - lastPoke >= 5_000) {
             visible = false
             onVisibilityChanged?.invoke(false)
+        }
+    }
+    LaunchedEffect(hudLocked, unlockTrigger) {
+        if (hudLocked && unlockVisible) {
+            delay(1800L)
+            unlockVisible = false
         }
     }
 
@@ -163,7 +177,7 @@ fun FullscreenHud(
     }
 
     AnimatedVisibility(
-        visible = visible,
+        visible = visible && !hudLocked,
         enter = fadeIn(tween(200)),
         exit = fadeOut(tween(200)),
         modifier = modifier
@@ -508,13 +522,6 @@ fun FullscreenHud(
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        // Rewind (<<)
-                        HudIconButton(
-                            icon = Icons.Filled.FastRewind,
-                            contentDescription = stringResource(R.string.rewind),
-                            onClick = { onRewindClick?.invoke() },
-                        )
-
                         // Central Play/Pause button (Instant local state toggle!)
                         HudIconButton(
                             icon = if (localIsPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
@@ -525,13 +532,6 @@ fun FullscreenHud(
                                 localIsPlaying = !localIsPlaying
                                 onPlayPauseClick?.invoke()
                             },
-                        )
-
-                        // Fast Forward (>>)
-                        HudIconButton(
-                            icon = Icons.Filled.FastForward,
-                            contentDescription = stringResource(R.string.fast_forward),
-                            onClick = { onFastForwardClick?.invoke() },
                         )
 
                     }
@@ -550,7 +550,7 @@ fun FullscreenHud(
                             )
                         }
 
-                        // Guide button at far right
+                        // Programme button at far right
                         if (onGuideClick != null) {
                             HudActionButton(
                                 label = stringResource(R.string.live_btn_guide),
@@ -560,9 +560,36 @@ fun FullscreenHud(
 
                         if (onSettingsClick != null) {
                             HudIconButton(
+                                icon = Icons.Filled.AspectRatio,
+                                contentDescription = stringResource(R.string.player_cd_aspect, pictureModeLabel),
+                                onClick = { onPictureModeClick?.invoke() },
+                            )
+
+                            HudIconButton(
                                 icon = Icons.Filled.Settings,
                                 contentDescription = stringResource(R.string.live_player_settings),
                                 onClick = onSettingsClick,
+                            )
+                        }
+
+                        if (onPipClick != null) {
+                            HudIconButton(
+                                icon = Icons.Filled.PictureInPicture,
+                                contentDescription = stringResource(R.string.player_cd_pip),
+                                onClick = onPipClick,
+                            )
+                        }
+
+                        if (isTouchDevice) {
+                            HudIconButton(
+                                icon = Icons.Filled.Lock,
+                                contentDescription = stringResource(R.string.player_lock_controls),
+                                accentColor = hudAccent,
+                                onClick = {
+                                    hudLocked = true
+                                    unlockVisible = true
+                                    unlockTrigger++
+                                },
                             )
                         }
                     }
@@ -571,13 +598,39 @@ fun FullscreenHud(
         }
     }
 
+    if (isTouchDevice && hudLocked) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable {
+                    unlockVisible = true
+                    unlockTrigger++
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            AnimatedVisibility(
+                visible = unlockVisible,
+                enter = fadeIn(tween(120)),
+                exit = fadeOut(tween(160)),
+            ) {
+                HudIconButton(
+                    icon = Icons.Filled.LockOpen,
+                    contentDescription = stringResource(R.string.player_unlock_controls),
+                    emphasis = true,
+                    accentColor = hudAccent,
+                    onClick = {
+                        hudLocked = false
+                        unlockVisible = false
+                    },
+                )
+            }
+        }
+    }
+
     if (settingsVisible && onSettingsDismiss != null) {
         FullscreenSettingsOverlay(
-            pictureModeLabel = pictureModeLabel,
             streamInfoLines = streamInfoLines,
             onDismiss = onSettingsDismiss,
-            onReloadClick = onReloadClick,
-            onPictureModeClick = onPictureModeClick,
         )
     }
 
@@ -608,26 +661,18 @@ fun FullscreenHud(
 
 @Composable
 private fun FullscreenSettingsOverlay(
-    pictureModeLabel: String,
     streamInfoLines: List<Pair<String, String>>,
     onDismiss: () -> Unit,
-    onReloadClick: (() -> Unit)?,
-    onPictureModeClick: (() -> Unit)?,
 ) {
     var selectedIndex by remember { mutableStateOf(0) }
-    var showStreamInfo by remember { mutableStateOf(false) }
     val focusRequester = remember { FocusRequester() }
     val items = listOf(
-        Triple(Icons.Filled.Refresh, stringResource(R.string.live_player_reload), ""),
-        Triple(Icons.Filled.AspectRatio, stringResource(R.string.player_picture_format), pictureModeLabel),
         Triple(Icons.Filled.Info, stringResource(R.string.live_player_stream_info), ""),
     )
 
     fun activate(index: Int) {
         when (index) {
-            0 -> onReloadClick?.invoke()
-            1 -> onPictureModeClick?.invoke()
-            2 -> showStreamInfo = !showStreamInfo
+            0 -> Unit
         }
     }
 
@@ -654,14 +699,7 @@ private fun FullscreenSettingsOverlay(
                 .onKeyEvent { event ->
                     if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
                     when (event.key) {
-                        Key.DirectionUp -> {
-                            selectedIndex = (selectedIndex - 1).mod(items.size)
-                            true
-                        }
-                        Key.DirectionDown -> {
-                            selectedIndex = (selectedIndex + 1).mod(items.size)
-                            true
-                        }
+                        Key.DirectionUp, Key.DirectionDown -> true
                         Key.DirectionCenter, Key.Enter -> {
                             activate(selectedIndex)
                             true
@@ -721,27 +759,25 @@ private fun FullscreenSettingsOverlay(
                     }
                 }
             }
-            if (showStreamInfo) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(5.dp),
-                ) {
-                    streamInfoLines.forEach { (label, value) ->
-                        Row(modifier = Modifier.fillMaxWidth()) {
-                            Text(
-                                text = label,
-                                style = LiveType.SectionTag.copy(color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp),
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                text = value,
-                                style = LiveType.TimeMono.copy(color = Color.White, fontSize = 12.sp),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                streamInfoLines.forEach { (label, value) ->
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Text(
+                            text = label,
+                            style = LiveType.SectionTag.copy(color = Color.White.copy(alpha = 0.55f), fontSize = 12.sp),
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(
+                            text = value,
+                            style = LiveType.TimeMono.copy(color = Color.White, fontSize = 12.sp),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
                 }
             }
@@ -838,6 +874,7 @@ private fun HudIconButton(
     contentDescription: String,
     modifier: Modifier = Modifier,
     emphasis: Boolean = false,
+    accentColor: Color = LiveColors.Accent,
     focusRequester: FocusRequester? = null,
     onClick: () -> Unit,
 ) {
@@ -847,8 +884,8 @@ private fun HudIconButton(
     val iconSize = if (emphasis) 28.dp else 22.dp
 
     val bgColor = when {
-        isFocused -> LiveColors.Accent
-        emphasis -> LiveColors.AccentDim
+        isFocused -> accentColor
+        emphasis -> accentColor.copy(alpha = 0.82f)
         else -> Color.Black.copy(alpha = 0.55f)
     }
 
@@ -945,11 +982,19 @@ private fun HudActionButton(
 
     Box(
         modifier = Modifier
+            .height(42.dp)
+            .width(96.dp)
             .clip(RoundedCornerShape(999.dp))
             .onFocusChanged { isFocused = it.isFocused }
             .background(if (isFocused) LiveColors.Accent else Color.Black.copy(alpha = 0.55f))
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = LiveColors.Accent.copy(alpha = if (isFocused) 1f else 0.72f),
+                shape = RoundedCornerShape(999.dp),
+            )
             .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 7.dp),
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = label,

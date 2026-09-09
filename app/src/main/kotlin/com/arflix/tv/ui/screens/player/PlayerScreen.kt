@@ -172,6 +172,7 @@ import com.arflix.tv.ui.theme.PurpleLight
 import com.arflix.tv.ui.theme.PurplePrimary
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
+import com.arflix.tv.ui.theme.contrastingContentColor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -2775,6 +2776,7 @@ fun PlayerScreen(
         showControls = false
     }
 
+
     BackHandler(enabled = showSubtitleSettings) {
         showSubtitleSettings = false
         showControls = true
@@ -2860,32 +2862,9 @@ fun PlayerScreen(
             }
             .then(
                 if (isTouchDevice) {
-                    // isCasting is a key so the handler restarts when casting changes,
-                    // picking up the updated queueControlsSeek lambda.
-                    Modifier.pointerInput(isCasting, touchLocked) {
-                        detectTapGestures(
-                            onTap = {
-                                if (touchLocked) {
-                                    showUnlockControl = true
-                                    unlockControlTrigger++
-                                } else if (uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
-                                    showControls = !showControls
-                                }
-                            },
-                            onDoubleTap = { offset ->
-                                if (!touchLocked && uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
-                                    val halfWidth = size.width / 2
-                                    if (offset.x < halfWidth) {
-                                        // Double-tap left side: rewind 10 seconds
-                                        queueControlsSeek(-10_000L)
-                                    } else {
-                                        // Double-tap right side: forward 10 seconds
-                                        queueControlsSeek(10_000L)
-                                    }
-                                }
-                            }
-                        )
-                    }.pointerInput(touchLocked, activity) {
+                    // Keep the drag detector before tap detection so detectTapGestures does not
+                    // consume the pointer-down event before brightness/volume swipes can claim it.
+                    Modifier.pointerInput(touchLocked, activity) {
                         var adjustBrightness = false
                         var accumulatedDrag = 0f
                         var startBrightness = 0.5f
@@ -2936,6 +2915,29 @@ fun PlayerScreen(
                                     showVolumeIndicator = true
                                 }
                             },
+                        )
+                    }.pointerInput(isCasting, touchLocked) {
+                        detectTapGestures(
+                            onTap = {
+                                if (touchLocked) {
+                                    showUnlockControl = true
+                                    unlockControlTrigger++
+                                } else if (uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
+                                    showControls = !showControls
+                                }
+                            },
+                            onDoubleTap = { offset ->
+                                if (!touchLocked && uiState.error == null && !showSubtitleMenu && !showSourceMenu) {
+                                    val halfWidth = size.width / 2
+                                    if (offset.x < halfWidth) {
+                                        // Double-tap left side: rewind 10 seconds
+                                        queueControlsSeek(-10_000L)
+                                    } else {
+                                        // Double-tap right side: forward 10 seconds
+                                        queueControlsSeek(10_000L)
+                                    }
+                                }
+                            }
                         )
                     }
                 } else {
@@ -4118,6 +4120,7 @@ fun PlayerScreen(
             )
         }
 
+
         // In-player subtitle settings panel (Delay, Size, Vertical Position)
         AnimatedVisibility(
             visible = showSubtitleSettings && hasPlaybackStarted,
@@ -4386,7 +4389,7 @@ fun PlayerScreen(
                 modifier = Modifier
                     .size(56.dp)
                     .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.62f))
+                    .background(playerAccent.copy(alpha = 0.88f))
                     .clickable {
                         touchLocked = false
                         showUnlockControl = false
@@ -4397,7 +4400,7 @@ fun PlayerScreen(
                 Icon(
                     imageVector = Icons.Default.LockOpen,
                     contentDescription = stringResource(R.string.player_unlock_controls),
-                    tint = Color.White,
+                    tint = contrastingContentColor(playerAccent),
                     modifier = Modifier.size(26.dp),
                 )
             }
@@ -5093,6 +5096,7 @@ private fun SubtitleMenu(
     onClose: () -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
+    val mobileAccent = LocalAccentColorOverride.current ?: Color.White
     val context = LocalContext.current
     val languageDisplayLocale = context.resources.configuration.let { configuration ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) configuration.locales[0]
@@ -5410,6 +5414,11 @@ private fun SubtitleMenu(
                         Color(0xFF1A1A1A),
                         RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp)
                     )
+                    .border(
+                        width = 1.5.dp,
+                        color = mobileAccent.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
+                    )
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -5471,11 +5480,11 @@ private fun SubtitleMenu(
                                     onTabChanged(tabIndex)
                                 }
                                 .background(
-                                    if (selected) Color.White.copy(alpha = 0.15f) else Color.Transparent,
+                                    if (selected) mobileAccent.copy(alpha = 0.2f) else Color.Transparent,
                                     RoundedCornerShape(20.dp)
                                 )
                                 .then(
-                                    if (selected) Modifier.border(1.dp, Color.White.copy(alpha = 0.6f), RoundedCornerShape(20.dp))
+                                    if (selected) Modifier.border(1.dp, mobileAccent, RoundedCornerShape(20.dp))
                                     else Modifier
                                 )
                                 .padding(horizontal = 20.dp, vertical = 8.dp)
@@ -5486,7 +5495,7 @@ private fun SubtitleMenu(
                                     fontSize = 14.sp,
                                     fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
                                 ),
-                                color = if (selected) Color.White else Color.White.copy(alpha = 0.6f)
+                                color = if (selected) mobileAccent else Color.White.copy(alpha = 0.6f)
                             )
                         }
                     }
@@ -5498,7 +5507,7 @@ private fun SubtitleMenu(
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp)
                         .height(1.dp)
-                        .background(Color.White.copy(alpha = 0.1f))
+                        .background(mobileAccent.copy(alpha = 0.3f))
                 )
 
                 // ── Track list ────────────────────────────────────────────
@@ -5859,6 +5868,7 @@ private fun MobileTrackItem(
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
+    val accentColor = LocalAccentColorOverride.current ?: Color.White
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -5893,7 +5903,7 @@ private fun MobileTrackItem(
             Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = stringResource(R.string.selected),
-                tint = Color(0xFF4CAF50), // Green checkmark
+                                tint = accentColor,
                 modifier = Modifier
                     .padding(start = 12.dp)
                     .size(20.dp)

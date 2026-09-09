@@ -4,10 +4,12 @@ package com.arflix.tv.ui.screens.tv.live
 
 import android.app.Activity
 import android.app.ActivityManager
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.ActivityInfo
 import android.view.KeyEvent as AndroidKeyEvent
+import android.util.Rational
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -142,6 +144,13 @@ private const val IptvPlaybackUserAgent = "VLC/3.0.20 LibVLC/3.0.20"
 private const val VisibleGuidePastWindowMs = 48L * 60L * 60_000L
 private const val VisibleGuideFutureWindowMs = 48L * 60L * 60_000L
 
+private enum class LiveTvAspectMode(val resizeMode: Int) {
+    AUTO(AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT),
+    STRETCH(AspectRatioFrameLayout.RESIZE_MODE_FILL),
+    CROP(AspectRatioFrameLayout.RESIZE_MODE_ZOOM),
+}
+
 internal fun formatLiveVideoBadge(format: Format?): String? {
     if (format == null || format.width <= 0 || format.height <= 0) return null
     val quality = when {
@@ -150,7 +159,7 @@ internal fun formatLiveVideoBadge(format: Format?): String? {
         format.height >= 720 -> "HD"
         else -> "SD"
     }
-    return "$quality · ${format.width}×${format.height}"
+    return quality
 }
 
 internal fun formatLiveFpsBadge(format: Format?): String? =
@@ -1673,7 +1682,8 @@ fun LiveTvScreen(
     }
     var fullscreenGuideOpen by remember { mutableStateOf(false) }
     var fullscreenSettingsOpen by remember { mutableStateOf(false) }
-    var liveTvResizeMode by rememberSaveable { mutableIntStateOf(AspectRatioFrameLayout.RESIZE_MODE_FIT) }
+    var liveTvAspectMode by rememberSaveable { mutableStateOf(LiveTvAspectMode.AUTO) }
+    val liveTvResizeMode = liveTvAspectMode.resizeMode
     var variantPickerChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
     LaunchedEffect(isFullScreen) {
         onFullscreenChanged(isFullScreen)
@@ -3494,9 +3504,12 @@ fun LiveTvScreen(
                         },
                         settingsVisible = fullscreenSettingsOpen,
                         pictureModeLabel = when (liveTvResizeMode) {
-                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> stringResource(R.string.live_player_picture_zoom)
-                            AspectRatioFrameLayout.RESIZE_MODE_FILL -> stringResource(R.string.live_player_picture_fill)
-                            else -> stringResource(R.string.live_player_picture_fit)
+                            AspectRatioFrameLayout.RESIZE_MODE_FILL -> stringResource(R.string.player_aspect_stretch)
+                            AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> stringResource(R.string.player_aspect_crop)
+                            else -> when (liveTvAspectMode) {
+                                LiveTvAspectMode.AUTO -> stringResource(R.string.player_aspect_auto)
+                                else -> stringResource(R.string.player_aspect_fit)
+                            }
                         },
                         streamBadges = listOfNotNull(
                             formatLiveVideoBadge(currentVideoFormat),
@@ -3530,12 +3543,22 @@ fun LiveTvScreen(
                             hudPokeSignal++
                         },
                         onPictureModeClick = {
-                            liveTvResizeMode = when (liveTvResizeMode) {
-                                AspectRatioFrameLayout.RESIZE_MODE_FIT -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                                AspectRatioFrameLayout.RESIZE_MODE_ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                                else -> AspectRatioFrameLayout.RESIZE_MODE_FIT
+                            liveTvAspectMode = when (liveTvAspectMode) {
+                                LiveTvAspectMode.AUTO -> LiveTvAspectMode.FIT
+                                LiveTvAspectMode.FIT -> LiveTvAspectMode.STRETCH
+                                LiveTvAspectMode.STRETCH -> LiveTvAspectMode.CROP
+                                LiveTvAspectMode.CROP -> LiveTvAspectMode.AUTO
                             }
                             hudPokeSignal++
+                        },
+                        onPipClick = {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                activity?.enterPictureInPictureMode(
+                                    PictureInPictureParams.Builder()
+                                        .setAspectRatio(Rational(16, 9))
+                                        .build()
+                                )
+                            }
                         },
                         onVisibilityChanged = { isHudVisible = it },
                         modifier = Modifier,

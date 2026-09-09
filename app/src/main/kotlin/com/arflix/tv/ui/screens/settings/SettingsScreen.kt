@@ -2876,6 +2876,8 @@ private fun ModalScrim(
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
     val contentInteraction = remember { MutableInteractionSource() }
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
 
     Box(
         modifier = Modifier
@@ -2893,6 +2895,14 @@ private fun ModalScrim(
                 interactionSource = contentInteraction,
                 indication = null,
                 onClick = {}
+            ).then(
+                if (isTouchDevice) {
+                    Modifier.border(
+                        width = 1.5.dp,
+                        color = accentColor.copy(alpha = 0.72f),
+                        shape = RoundedCornerShape(16.dp),
+                    )
+                } else Modifier
             ),
             content = content
         )

@@ -67,6 +67,8 @@ import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.util.tr
+import com.arflix.tv.util.LocalDeviceType
+import com.arflix.tv.ui.skin.resolveAccentColor
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
 
@@ -93,6 +95,8 @@ fun TextInputModal(
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
     val view = LocalView.current
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val accentColor = resolveAccentColor(fallback = Pink)
 
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
     // Show/hide keyboard using the EditText window token (toggleSoftInput can get stuck on some TV IMEs).
@@ -204,6 +208,15 @@ fun TextInputModal(
                 modifier = Modifier
                     .width(500.dp)
                     .background(Color(0xFF1A1A1A), RoundedCornerShape(20.dp))
+                    .then(
+                        if (isTouchDevice) {
+                            Modifier.border(
+                                width = 1.5.dp,
+                                color = accentColor.copy(alpha = 0.72f),
+                                shape = RoundedCornerShape(20.dp),
+                            )
+                        } else Modifier
+                    )
                     .padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

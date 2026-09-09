@@ -118,7 +118,7 @@ fun TouchCategoryRail(
                         color = when {
                             focused -> LiveColors.FocusRing
                             active -> LiveColors.Accent.copy(alpha = 0.72f)
-                            else -> LiveColors.Divider
+                            else -> LiveColors.Accent.copy(alpha = 0.42f)
                         },
                         shape = RoundedCornerShape(999.dp),
                     )

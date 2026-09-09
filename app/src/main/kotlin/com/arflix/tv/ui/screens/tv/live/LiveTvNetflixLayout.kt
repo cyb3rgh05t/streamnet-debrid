@@ -812,8 +812,8 @@ private fun NetflixChip(
             .height(36.dp)
             .clip(RoundedCornerShape(999.dp))
             .background(bg)
-            .border(width = if (focused) 1.5.dp else 0.dp,
-                color = if (focused) LiveColors.FocusRing else Color.Transparent,
+            .border(width = if (focused) 2.dp else 1.dp,
+                color = if (focused) LiveColors.Accent else LiveColors.Accent.copy(alpha = 0.42f),
                 shape = RoundedCornerShape(999.dp))
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .onFocusChanged { focused = it.hasFocus; if (it.hasFocus) onFocused() }
