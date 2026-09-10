@@ -18,7 +18,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 - VODWisharr und VOD-Requests verwenden gemeinsam `VODWISHARR_API_KEY`; das Secret wird nicht doppelt als `VOD_REQUEST_API_KEY` geführt.
 - Die VOD-Portal-URL kommt ausschließlich aus `VOD_REQUEST_BASE_URL` und ist in der App nicht mehr fest codiert.
-- Lokale `secrets.properties`, `secrets.defaults.properties` und der GitHub-Workflow verwenden denselben Secret-Vertrag.
+- Lokale `secrets.properties`, `secrets.defaults.properties` und der GitHub-Workflow verwenden denselben Secret-Vertrag; der Workflow nutzt fuer die nicht sensible VOD-Portal-URL einen Default, wenn kein Repository-Secret gesetzt ist.
 
 ### Home, Continue Watching und Recently Watched
 
