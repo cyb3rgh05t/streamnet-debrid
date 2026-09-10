@@ -108,8 +108,6 @@ internal fun LiveTvNetflixLayout(
     favoriteSet: Set<String>,
     exoPlayer: ExoPlayer,
     guideClockMillis: Long,
-    playlistLastRefreshedAtMillis: Long?,
-    isPlaylistRefreshing: Boolean,
     variantCountFor: (EnrichedChannel) -> Int,
     isFullScreen: Boolean,
     isBuffering: Boolean = false,
@@ -123,7 +121,6 @@ internal fun LiveTvNetflixLayout(
     onChannelFocused: (EnrichedChannel) -> Unit,
     onChannelSelected: (EnrichedChannel) -> Unit,
     onFavoriteToggle: (String) -> Unit,
-    onRefreshPlaylist: () -> Unit,
     onOpenVariants: (EnrichedChannel) -> Unit,
     onMoveUpFromCategory: () -> Unit,
     onMoveDownToChannels: () -> Unit,
@@ -229,18 +226,12 @@ internal fun LiveTvNetflixLayout(
                 backdropUrl = previewBackdropUrl,
                 fallbackBackdropUrl = previewFallbackArtwork?.assetPath,
                 programLogoUrl = previewProgramLogoUrl,
-                playlistLastRefreshedAtMillis = playlistLastRefreshedAtMillis,
-                isPlaylistRefreshing = isPlaylistRefreshing,
                 titleTextSize = titleTextSize,
                 descriptionTextSize = descriptionTextSize,
-                onRefreshPlaylist = onRefreshPlaylist,
-                onMoveUp = onMoveUpFromCategory,
                 emptyMessage = emptyCategoryMessage,
                 modifier = Modifier.weight(1f).fillMaxHeight(),
             )
         }
-
-        Spacer(Modifier.height(4.dp))
 
         NetflixCategoryChipRow(
             tree = tree,
@@ -417,12 +408,8 @@ private fun HeroInfoPanel(
     backdropUrl: String?,
     fallbackBackdropUrl: String?,
     programLogoUrl: String?,
-    playlistLastRefreshedAtMillis: Long?,
-    isPlaylistRefreshing: Boolean,
     titleTextSize: String,
     descriptionTextSize: String,
-    onRefreshPlaylist: () -> Unit,
-    onMoveUp: () -> Unit,
     emptyMessage: String?,
     modifier: Modifier = Modifier,
 ) {
@@ -638,80 +625,6 @@ private fun HeroInfoPanel(
             }
 
             Spacer(modifier = Modifier.weight(1f))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                PlaylistRefreshControl(
-                    lastRefreshedAtMillis = playlistLastRefreshedAtMillis,
-                    isRefreshing = isPlaylistRefreshing,
-                    onRefresh = onRefreshPlaylist,
-                    onMoveUp = onMoveUp,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun PlaylistRefreshControl(
-    lastRefreshedAtMillis: Long?,
-    isRefreshing: Boolean,
-    onRefresh: () -> Unit,
-    onMoveUp: () -> Unit,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val formattedTimestamp = remember(lastRefreshedAtMillis) {
-        lastRefreshedAtMillis?.let { timestamp ->
-            DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(timestamp))
-        }
-    }
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (focused) LiveColors.PanelRaised else LiveColors.Panel.copy(alpha = 0.72f))
-            .border(
-                width = if (focused) 1.5.dp else 1.dp,
-                color = if (focused) LiveColors.FocusRing else LiveColors.Divider,
-                shape = RoundedCornerShape(6.dp),
-            )
-            .onFocusChanged { focused = it.hasFocus }
-            .focusable(enabled = !isRefreshing)
-            .onKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (event.key) {
-                    Key.DirectionUp -> {
-                        onMoveUp()
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter -> {
-                        if (!isRefreshing) onRefresh()
-                        !isRefreshing
-                    }
-                    else -> false
-                }
-            }
-            .clickable(enabled = !isRefreshing, onClick = onRefresh)
-            .padding(horizontal = 8.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Text(
-            text = formattedTimestamp?.let { stringResource(R.string.live_playlist_updated, it) }
-                ?: stringResource(R.string.live_playlist_not_updated),
-            style = LiveType.TimeMono.copy(color = LiveColors.FgMute, fontSize = 8.sp),
-            maxLines = 1,
-        )
-        if (isRefreshing) {
-            LoadingIndicator(size = 14.dp, color = LiveColors.Accent, strokeWidth = 2.dp)
-        } else {
-            Icon(
-                imageVector = Icons.Filled.Refresh,
-                contentDescription = stringResource(R.string.live_refresh_playlist),
-                tint = if (focused) LiveColors.Accent else LiveColors.FgDim,
-                modifier = Modifier.size(14.dp),
-            )
         }
     }
 }

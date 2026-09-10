@@ -13,6 +13,8 @@
     <string name="continue_watching">Weiter ansehen</string>
     <string name="home_favorite_tv">TV-Favoriten</string>
     <string name="home_recently_watched_tv">Zuletzt gesehene TV-Sender</string>
+    <string name="home_recently_watched_movies">Zuletzt gesehene Filme</string>
+    <string name="home_recently_watched_series">Zuletzt gesehene Serien</string>
     <string name="program_info">Programminfo</string>
     <string name="add_to_favorites">Zu Favoriten hinzufügen</string>
     <string name="remove_from_favorites">Aus Favoriten entfernen</string>
@@ -1051,6 +1053,8 @@
     <string name="player_addon_setup_required">Addon-Einrichtung erforderlich</string>
     <string name="player_playback_error">Wiedergabefehler</string>
     <string name="player_error_generic">Ein unbekannter Fehler ist aufgetreten</string>
+    <string name="player_no_media_server_sources">Keine Quellen für diesen Inhalt gefunden. Die konfigurierten Mediaserver enthalten diesen Titel möglicherweise nicht.</string>
+    <string name="player_no_vod_sources">Keine Quellen für diesen Inhalt gefunden. Versuche eine andere Quelle oder überprüfe deine konfigurierten Quellen.</string>
 
     <!-- UI-Komponenten und Quellenauswahl -->
     <string name="component_qr_code">QR-Code</string>
@@ -1124,6 +1128,22 @@
     <string name="stream_try_adding_addons">Weitere Addons hinzufügen</string>
     <string name="stream_searching_addons">Addons werden durchsucht (%1$d/%2$d)...</string>
     <string name="stream_no_sources_match">Keine Quelle entspricht diesem Filter</string>
+    <string name="vod_request_action">Bei meinem Server anfragen</string>
+    <string name="vod_request_created">Anfrage gesendet</string>
+    <string name="vod_request_already_available">Bereits angefragt oder verfügbar</string>
+    <string name="vod_request_not_authenticated">Anmeldung beim Anfrage-Service erforderlich</string>
+    <string name="vod_request_forbidden">Anfrage nicht erlaubt oder Kontingent erreicht</string>
+    <string name="vod_request_already_requested">Bereits angefragt</string>
+    <string name="vod_request_failed">Anfrage fehlgeschlagen. Erneut versuchen.</string>
+    <string name="stream_refresh_sources">Quellen aktualisieren</string>
+    <string name="stream_sources_found">%1$d Quellen gefunden</string>
+    <string name="stream_sources_still_checking">%1$d Quellen gefunden – noch %2$d %3$s werden geprüft</string>
+    <string name="stream_sources_searching">%1$d Quellen gefunden – Quellen werden gesucht</string>
+    <string name="stream_sources_searching_more">%1$d Quellen gefunden – weitere Quellen werden gesucht</string>
+    <string name="stream_addon_singular">Addon</string>
+    <string name="stream_addon_plural">Addons</string>
+    <string name="stream_sources_checked">%1$d Quellen gefunden – %2$d/%3$d Addons geprüft</string>
+    <string name="stream_elapsed_prefix">%1$ds • </string>
     <string name="stream_best_match">Beste Übereinstimmung</string>
     <string name="stream_section_addons">ADDONS</string>
     <string name="stream_metric_total">Gesamt</string>

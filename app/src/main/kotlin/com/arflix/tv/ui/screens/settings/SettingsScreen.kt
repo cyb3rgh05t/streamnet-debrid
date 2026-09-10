@@ -9457,6 +9457,13 @@ private fun normalizeCatalogDiscoveryUrl(url: String): String {
 }
 
 @Composable
+private fun localizedSettingsCatalogTitle(catalog: CatalogConfig): String = when (catalog.id) {
+    "recently_watched_movies" -> stringResource(R.string.home_recently_watched_movies)
+    "recently_watched_series" -> stringResource(R.string.home_recently_watched_series)
+    else -> catalog.title
+}
+
+@Composable
 private fun sourceLabel(sourceType: CatalogSourceType): String {
     return when (sourceType) {
         CatalogSourceType.TRAKT -> "Trakt"
@@ -9550,7 +9557,8 @@ private fun CatalogsSettings(
             if (catalogs.isNotEmpty()) {
                 MobileSettingsCategory(title = stringResource(R.string.settings_section_home_catalog_settings)) {
                     catalogs.forEachIndexed { index, catalog ->
-                        val title = if (catalog.isPreinstalled) { when (catalog.kind) { CatalogKind.COLLECTION -> stringResource(R.string.settings_title_builtin_collection, catalog.title); CatalogKind.COLLECTION_RAIL -> stringResource(R.string.settings_title_builtin_rail, catalog.title); else -> stringResource(R.string.settings_title_builtin, catalog.title) } } else catalog.title
+                        val localizedTitle = localizedSettingsCatalogTitle(catalog)
+                        val title = if (catalog.isPreinstalled) { when (catalog.kind) { CatalogKind.COLLECTION -> stringResource(R.string.settings_title_builtin_collection, localizedTitle); CatalogKind.COLLECTION_RAIL -> stringResource(R.string.settings_title_builtin_rail, localizedTitle); else -> stringResource(R.string.settings_title_builtin, localizedTitle) } } else localizedTitle
                         val currentPackId = catalog.packId
                         val prevPackId = if (index > 0) catalogs[index - 1].packId else null
                         val showPackHeader = currentPackId != null && currentPackId != prevPackId && catalog.isBulkDeletablePack
@@ -9724,7 +9732,8 @@ private fun CatalogsSettings(
                     Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                val title = if (catalog.isPreinstalled) { when (catalog.kind) { CatalogKind.COLLECTION -> stringResource(R.string.settings_title_builtin_collection, catalog.title); CatalogKind.COLLECTION_RAIL -> stringResource(R.string.settings_title_builtin_rail, catalog.title); else -> stringResource(R.string.settings_title_builtin, catalog.title) } } else catalog.title
+                val localizedTitle = localizedSettingsCatalogTitle(catalog)
+                val title = if (catalog.isPreinstalled) { when (catalog.kind) { CatalogKind.COLLECTION -> stringResource(R.string.settings_title_builtin_collection, localizedTitle); CatalogKind.COLLECTION_RAIL -> stringResource(R.string.settings_title_builtin_rail, localizedTitle); else -> stringResource(R.string.settings_title_builtin, localizedTitle) } } else localizedTitle
                 val collectionFallback = stringResource(R.string.settings_collection_fallback)
                 val addonFallback = stringResource(R.string.settings_source_addon)
                 val subtitle = run {

@@ -4,6 +4,36 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.001] - 2026-09-10
+
+### VOD-Requests und Quellen
+
+- Neue VOD-Request-Funktion für Filme und Serien direkt aus dem Quellen-Empty-State: Wenn keine Quellen gefunden werden, kann das Medium mit seiner TMDB-ID beim eigenen VOD-Server angefragt werden.
+- Serien werden aktuell mit allen Staffeln angefragt; Filme und Serien senden den korrekten Medientyp und nutzen einen Schutz gegen doppelte Anfragen.
+- HTTP-Ergebnisse des Request-Portals werden als lokalisierte Erfolgs-, Bereits-angefragt-, Berechtigungs- und Fehlerzustände angezeigt.
+- Quellen-Refresh und VOD-Request bleiben getrennte Aktionen; der Quellen-Refresh verändert den Request-Status nicht.
+- Der Quellen-Empty-State nutzt den aktiven StreamNet-Akzent, responsive Buttons und funktionierende TV-D-pad-Navigation zwischen Aktualisieren und Anfragen.
+
+### Secrets und Build-Konfiguration
+
+- VODWisharr und VOD-Requests verwenden gemeinsam `VODWISHARR_API_KEY`; das Secret wird nicht doppelt als `VOD_REQUEST_API_KEY` geführt.
+- Die VOD-Portal-URL kommt ausschließlich aus `VOD_REQUEST_BASE_URL` und ist in der App nicht mehr fest codiert.
+- Lokale `secrets.properties`, `secrets.defaults.properties` und der GitHub-Workflow verwenden denselben Secret-Vertrag.
+
+### Home, Continue Watching und Recently Watched
+
+- Continue-Watching-Progress, Resume-Position und Laufzeit werden bei Start und Rückkehr aus dem lokalen Cache-/History-Fluss zuverlässig zusammengeführt.
+- Die Continue-Watching-Karte blendet ihre Watched-Checkmark aus, während andere Home-Rails den Watched-Status weiterhin anzeigen.
+- Neue profilbezogene Rails „Zuletzt gesehene Filme“ und „Zuletzt gesehene Serien“ sind als Preinstalled-Kataloge integriert, übersetzt, sortier-/versteckbar und werden bei bestehenden Installationen migriert.
+- Recently-Watched-Rails laden cache-first, hydratisieren fehlende TMDB-Details im Hintergrund und aktualisieren sich bei Watched-Events debouncebar ohne vollständigen Home-Neuaufbau.
+- Recently-Watched-Rails sind auf maximal 20 Filme beziehungsweise 20 Serien begrenzt.
+
+### UI und Toasts
+
+- Quellen- und Toast-Oberflächen verwenden responsive Größen, zentrierte Inhalte und aktive Akzentrahmen.
+- Serienkarten in Continue Watching und „Zuletzt gesehene Serien“ zeigen Staffel-/Episodeninformationen direkt auf dem Cover.
+- Der Playlist-Refresh-Button wurde aus Live-TV entfernt; Hintergrundaktualisierung und Refresh in den Einstellungen bleiben erhalten.
+
 ## [2.4.008] - 2026-09-09
 
 ### Player und Live-TV

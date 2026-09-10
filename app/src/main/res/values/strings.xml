@@ -25,6 +25,8 @@
     <string name="continue_watching">Continue Watching</string>
     <string name="home_favorite_tv">Favorite TV</string>
     <string name="home_recently_watched_tv">Recently Watched TV</string>
+    <string name="home_recently_watched_movies">Recently Watched Movies</string>
+    <string name="home_recently_watched_series">Recently Watched Series</string>
     <string name="program_info">Program info</string>
     <string name="add_to_favorites">Add to favorites</string>
     <string name="remove_from_favorites">Remove from favorites</string>
@@ -1084,6 +1086,8 @@
     <string name="player_addon_setup_required">Addon Setup Required</string>
     <string name="player_playback_error">Playback Error</string>
     <string name="player_error_generic">An unknown error occurred</string>
+    <string name="player_no_media_server_sources">No streams found for this content. The configured media servers may not have this title.</string>
+    <string name="player_no_vod_sources">No streams found for this content. Try another source or check your configured sources.</string>
 
     <!-- Extracted from code: Live TV -->
     <string name="live_badge_live">LIVE</string>
@@ -1210,6 +1214,22 @@
     <string name="stream_try_adding_addons">Try adding more addons</string>
     <string name="stream_searching_addons">Searching addons (%1$d/%2$d)...</string>
     <string name="stream_no_sources_match">No sources match this filter</string>
+    <string name="vod_request_action">Request from my server</string>
+    <string name="vod_request_created">Request submitted</string>
+    <string name="vod_request_already_available">Already requested or available</string>
+    <string name="vod_request_not_authenticated">Request service authentication required</string>
+    <string name="vod_request_forbidden">Request not permitted or quota reached</string>
+    <string name="vod_request_already_requested">Already requested</string>
+    <string name="vod_request_failed">Request failed. Try again.</string>
+    <string name="stream_refresh_sources">Refresh sources</string>
+    <string name="stream_sources_found">%1$d sources found</string>
+    <string name="stream_sources_still_checking">%1$d sources found - still checking %2$d %3$s</string>
+    <string name="stream_sources_searching">%1$d sources found - searching sources</string>
+    <string name="stream_sources_searching_more">%1$d sources found - searching for more sources</string>
+    <string name="stream_addon_singular">addon</string>
+    <string name="stream_addon_plural">addons</string>
+    <string name="stream_sources_checked">%1$d sources found - %2$d/%3$d addons checked</string>
+    <string name="stream_elapsed_prefix">%1$ds • </string>
     <string name="stream_best_match">Best Match</string>
     <string name="stream_section_addons">ADDONS</string>
     <string name="stream_metric_total">Total</string>

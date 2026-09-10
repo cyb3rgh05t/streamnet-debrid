@@ -3217,9 +3217,6 @@ fun LiveTvScreen(
                     favoriteSet = favSet,
                     exoPlayer = exoPlayer,
                     guideClockMillis = guideClockMillis,
-                    playlistLastRefreshedAtMillis = state.snapshot.loadedAt.toEpochMilli()
-                        .takeIf { state.snapshot.channels.isNotEmpty() },
-                    isPlaylistRefreshing = state.isRefreshingPlaylist,
                     isBuffering = playerIsBuffering,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
@@ -3256,7 +3253,6 @@ fun LiveTvScreen(
                     },
                     onChannelSelected = { ch -> selectChannel(ch) },
                     onFavoriteToggle = { id -> viewModel.toggleFavoriteChannel(id) },
-                    onRefreshPlaylist = viewModel::refreshPlaylist,
                     onOpenVariants = { ch -> openVariantPicker(ch) },
                     onMoveUpFromCategory = {
                         topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile)

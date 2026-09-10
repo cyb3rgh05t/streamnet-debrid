@@ -89,6 +89,8 @@ fun MediaCard(
     showLogoImage: Boolean = true,
     raiseOnFocus: Boolean = true,
     showProgress: Boolean = false,
+    showEpisodeInfo: Boolean = false,
+    showWatched: Boolean = true,
     showTitle: Boolean = true,
     showSubtitle: Boolean = true,
     titleMaxLines: Int = 1,
@@ -356,7 +358,7 @@ fun MediaCard(
                 }
 
                 // Subtle green watched badge
-                if (item.isWatched) {
+                if (showWatched && item.isWatched) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
@@ -383,7 +385,7 @@ fun MediaCard(
                 }
 
                 // Subtle playback progress bar for Continue Watching.
-                if (showProgress && item.showPlaybackProgress && !item.isWatched && item.progress in 1..94) {
+                if (showProgress && item.showPlaybackProgress && item.progress in 1..94) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -403,7 +405,7 @@ fun MediaCard(
                 }
 
                 // ── Continue Watching badges ──
-                if (showProgress) {
+                if (showProgress || showEpisodeInfo) {
                     // Top-right: time remaining or "New Episode" badge
                     val topRightLabel = item.timeRemainingLabel
                         ?: if (item.mediaType == MediaType.TV && item.progress == 0 && !item.isWatched) stringResource(R.string.component_badge_new_episode) else null
@@ -458,7 +460,7 @@ fun MediaCard(
 
                     // Season/episode marker, right-aligned with top-right badge.
                     val nextEpisode = item.nextEpisode
-                    if (!item.isWatched && item.mediaType == MediaType.TV && nextEpisode != null) {
+                    if ((showProgress || showEpisodeInfo) && item.mediaType == MediaType.TV && nextEpisode != null) {
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomEnd)

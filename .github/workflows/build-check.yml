@@ -166,6 +166,8 @@ jobs:
           : "${DISCORD_CLIENT_ID:?Missing DISCORD_CLIENT_ID repository secret}"
           [[ "$DISCORD_CLIENT_ID" =~ ^[0-9]{17,20}$ ]] || { echo "DISCORD_CLIENT_ID must be a 17-20 digit Discord application id" >&2; exit 1; }
           : "${STREAMNET_TV_XTREAM_URL:?Missing STREAMNET_TV_XTREAM_URL repository secret}"
+          : "${VOD_REQUEST_BASE_URL:?Missing VOD_REQUEST_BASE_URL repository secret}"
+          : "${VODWISHARR_API_KEY:?Missing VODWISHARR_API_KEY repository secret}"
           : "${KEYSTORE_BASE64:?Missing KEYSTORE_BASE64 repository secret}"
           : "${KEYSTORE_PASSWORD:?Missing KEYSTORE_PASSWORD repository secret}"
           : "${KEY_ALIAS:?Missing KEY_ALIAS repository secret}"
@@ -182,6 +184,7 @@ jobs:
           TVDB_API_KEY: ${{ secrets.TVDB_API_KEY }}
           FANART_API_KEY: ${{ secrets.FANART_API_KEY }}
           VODWISHARR_API_KEY: ${{ secrets.VODWISHARR_API_KEY }}
+          VOD_REQUEST_BASE_URL: ${{ secrets.VOD_REQUEST_BASE_URL }}
           DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
           STREAMNET_TV_XTREAM_URL: ${{ secrets.STREAMNET_TV_XTREAM_URL }}
         run: |
@@ -195,6 +198,7 @@ jobs:
             "TVDB_API_KEY=$TVDB_API_KEY" \
             "FANART_API_KEY=$FANART_API_KEY" \
             "VODWISHARR_API_KEY=$VODWISHARR_API_KEY" \
+            "VOD_REQUEST_BASE_URL=$VOD_REQUEST_BASE_URL" \
             "DISCORD_CLIENT_ID=$DISCORD_CLIENT_ID" \
             "STREAMNET_TV_XTREAM_URL=$STREAMNET_TV_XTREAM_URL" \
             > secrets.properties

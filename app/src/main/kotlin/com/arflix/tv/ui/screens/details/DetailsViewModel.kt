@@ -12,6 +12,8 @@ import com.arflix.tv.data.model.Episode
 import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.api.VodRequestApi
+import com.arflix.tv.data.api.VodRequestBody
 import com.arflix.tv.data.model.PersonDetails
 import com.arflix.tv.data.model.Review
 import com.arflix.tv.data.model.StreamSource
@@ -239,6 +241,7 @@ class DetailsViewModel @Inject constructor(
     private val cloudSyncRepository: CloudSyncRepository,
     private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
     private val offlineDownloadRepository: OfflineDownloadRepository
+    , private val vodRequestApi: VodRequestApi
 ) : ViewModel() {
 
     companion object {
@@ -260,6 +263,38 @@ class DetailsViewModel @Inject constructor(
     // when the play was too brief to record a resume point. Scoped to a media id.
     private var lastPlayedMediaId: Int = 0
     private var lastPlayedIdentity: EpisodeIdentity? = null
+    @Volatile private var vodRequestInFlight = false
+
+    fun requestVodMedia() {
+        if (vodRequestInFlight || currentMediaId <= 0 || com.arflix.tv.util.Constants.VOD_REQUEST_API_KEY.isBlank()) return
+        vodRequestInFlight = true
+        viewModelScope.launch {
+            try {
+                val response = vodRequestApi.requestMedia(
+                    apiKey = com.arflix.tv.util.Constants.VOD_REQUEST_API_KEY,
+                    request = VodRequestBody(
+                        mediaId = currentMediaId,
+                        mediaType = if (currentMediaType == MediaType.MOVIE) "movie" else "tv",
+                        seasons = if (currentMediaType == MediaType.TV) "all" else null,
+                    ),
+                )
+                val message = when (response.code()) {
+                    201 -> R.string.vod_request_created
+                    202 -> R.string.vod_request_already_available
+                    401 -> R.string.vod_request_not_authenticated
+                    403 -> R.string.vod_request_forbidden
+                    409 -> R.string.vod_request_already_requested
+                    else -> if (response.isSuccessful) R.string.vod_request_created else R.string.vod_request_failed
+                }
+                showToast(context.getString(message), if (response.isSuccessful) ToastType.SUCCESS else ToastType.ERROR)
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                showToast(context.getString(R.string.vod_request_failed), ToastType.ERROR)
+            } finally {
+                vodRequestInFlight = false
+            }
+        }
+    }
 
     fun recordPlayedEpisode(mediaId: Int, identity: EpisodeIdentity?) {
         lastPlayedMediaId = mediaId

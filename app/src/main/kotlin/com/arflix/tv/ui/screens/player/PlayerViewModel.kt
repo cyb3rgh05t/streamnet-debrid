@@ -4505,7 +4505,7 @@ class PlayerViewModel @Inject constructor(
         if (validSources.isEmpty()) {
             finishSupplementalSourceLookupIfReady(
                 currentJob = currentCoroutineContext()[Job],
-                errorMessage = "No streams found for this content. The configured media servers may not have this title."
+                errorMessage = context.getString(R.string.player_no_media_server_sources)
             )
             return
         }
@@ -4567,7 +4567,7 @@ class PlayerViewModel @Inject constructor(
         if (validVodSources.isEmpty()) {
             finishSupplementalSourceLookupIfReady(
                 currentJob = currentCoroutineContext()[Job],
-                errorMessage = "No streams found for this content. Try another source or check your configured sources."
+                errorMessage = context.getString(R.string.player_no_vod_sources)
             )
             return
         }

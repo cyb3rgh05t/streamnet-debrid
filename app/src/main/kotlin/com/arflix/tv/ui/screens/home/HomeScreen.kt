@@ -303,6 +303,8 @@ private class HomeFocusState(
 @Composable
 private fun localizedCategoryTitle(category: Category): String = when (category.id) {
     "continue_watching"        -> stringResource(R.string.continue_watching)
+    HomeViewModel.RECENTLY_WATCHED_MOVIES_CATEGORY_ID -> stringResource(R.string.home_recently_watched_movies)
+    HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID -> stringResource(R.string.home_recently_watched_series)
     HomeViewModel.FAVORITE_TV_CATEGORY_ID -> stringResource(R.string.home_favorite_tv)
     HomeViewModel.RECENT_TV_CATEGORY_ID   -> stringResource(R.string.home_recently_watched_tv)
     "trending_movies"          -> stringResource(R.string.trending_movies)
@@ -3680,6 +3682,7 @@ private fun MobileHomeRowsLayer(
             contentType = { _, _ -> "mobile_home_category_row" }
         ) { _, category ->
             val isContinueWatching = category.id == "continue_watching"
+            val isRecentlyWatchedSeries = category.id == HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID
             val isRanked = category.title.contains("Top 10", ignoreCase = true)
             val isCollectionRow = category.id.startsWith("collection_row_")
             val isIptvCategory = isFixedLandscapeHomeCategory(category.id)
@@ -3850,6 +3853,7 @@ private fun MobileHomeRowsLayer(
                                     isLandscape = !isPortrait,
                                     logoImageUrl = cardLogoUrl,
                                     showProgress = isContinueWatching,
+                                        showEpisodeInfo = isRecentlyWatchedSeries,
                                     showTitle = !item.collectionHideTitle,
                                     isFocusedOverride = false,
                                     enableSystemFocus = false,
@@ -4316,6 +4320,7 @@ private fun ContentRow(
     val rowState = rememberLazyListState()
     val density = LocalDensity.current
     val isContinueWatching = category.id == "continue_watching"
+    val isRecentlyWatchedSeries = category.id == HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID
     // Poster rows felt too tight vertically when focused. Instead of adding more
     // row spacing (which made the section layout feel loose), slightly reduce the
     // poster card width so the 1.05x focus zoom has more breathing room inside the
@@ -4617,6 +4622,7 @@ private fun ContentRow(
                                 showLogoImage = true,
                                 raiseOnFocus = !isFastScrolling,
                                 showProgress = false,
+                                showEpisodeInfo = isRecentlyWatchedSeries,
                                 showTitle = isCollectionRow && !item.collectionHideTitle,
                                 isFocusedOverride = itemIsFocused && !railFocusOverlayActive,
                                 focusedScale = 1f,
@@ -4675,6 +4681,8 @@ private fun ContentRow(
                             showLogoImage = true,
                             raiseOnFocus = !isFastScrolling,
                             showProgress = isContinueWatching,
+                            showEpisodeInfo = isRecentlyWatchedSeries,
+                            showWatched = !isContinueWatching,
                             showTitle = isCollectionRow && !item.collectionHideTitle,
                             isFocusedOverride = itemIsFocused && !railFocusOverlayActive,
                             focusedScale = 1f,
@@ -4747,8 +4755,10 @@ private fun IptvHomeCard(
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
         value = lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
     }
-    val categoryBackdropUrl = remember(item.subtitle) {
-        iptvHomeCategoryBackdrop(item.subtitle)
+    val categoryBackdropUrl = remember(item.subtitle, item.backdrop, item.image) {
+        item.backdrop
+            ?.takeIf { it.isNotBlank() && it != item.image }
+            ?: iptvHomeCategoryBackdrop(item.subtitle)
     }
     val hasProgramBackdrop = !backdropUrl.isNullOrBlank()
     val programBackdropAlpha = if (hasProgramBackdrop && !isMobile) 0.64f else 0.9f

@@ -1166,6 +1166,11 @@ fun DetailsScreen(
                 val ep = uiState.episodes.getOrNull(episodeIndex)
                 viewModel.startOfflineDownload(mediaType, mediaId, ep, stream)
             },
+            onRefresh = {
+                val ep = uiState.episodes.getOrNull(episodeIndex)
+                viewModel.loadStreams(uiState.imdbId, ep?.identity)
+            },
+            onRequest = viewModel::requestVodMedia,
             onClose = { showStreamSelector = false }
         )
 

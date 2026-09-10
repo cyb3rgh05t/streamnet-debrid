@@ -4711,14 +4711,26 @@ data class ContinueWatchingItem(
 ) {
     fun toMediaItem(context: Context? = null): MediaItem {
         val effectiveDurationSeconds = durationSeconds.takeIf { it > 0L } ?: parseRuntimeLabelSeconds(duration)
-        val showPlaybackProgress = !isUpNext && progress in 1..94
+        val positionProgress = if (
+            !isUpNext && effectiveDurationSeconds > 0L && resumePositionSeconds > 0L
+        ) {
+            ((resumePositionSeconds.toDouble() / effectiveDurationSeconds.toDouble()) * 100.0)
+                .toInt()
+                .coerceIn(0, 100)
+        } else {
+            0
+        }
+        // Some providers persist the exact position but leave their percentage at 0.
+        // Prefer the derived value so Home cards can render the same progress state.
+        val effectiveProgress = maxOf(progress, positionProgress).coerceIn(0, 100)
+        val showPlaybackProgress = !isUpNext && effectiveProgress in 1..94
         val resumeSeconds = when {
             resumePositionSeconds > 0L -> resumePositionSeconds
             // Only derive resume position from progress if we have a meaningful duration
             // and progress is above a trivial threshold (>5%) to avoid showing bogus
             // resume times for placeholder "next episode" entries.
-            !isUpNext && effectiveDurationSeconds > 0L && progress > 5 ->
-                ((effectiveDurationSeconds * progress) / 100L).coerceAtLeast(1L)
+            !isUpNext && effectiveDurationSeconds > 0L && effectiveProgress > 5 ->
+                ((effectiveDurationSeconds * effectiveProgress) / 100L).coerceAtLeast(1L)
             else -> 0L
         }
         val resumeLabel = resumeSeconds.takeIf { it > 0L }?.let { formatResumeClock(it) }
@@ -4765,8 +4777,8 @@ data class ContinueWatchingItem(
         val timeRemainingSeconds = when {
             effectiveDurationSeconds > 0L && resumePositionSeconds > 0L ->
                 (effectiveDurationSeconds - resumePositionSeconds).coerceAtLeast(0L)
-            !isUpNext && effectiveDurationSeconds > 0L && progress in 1..94 ->
-                (effectiveDurationSeconds * (100L - progress) / 100L).coerceAtLeast(0L)
+            !isUpNext && effectiveDurationSeconds > 0L && effectiveProgress in 1..94 ->
+                (effectiveDurationSeconds * (100L - effectiveProgress) / 100L).coerceAtLeast(0L)
             else -> 0L
         }
         val timeRemainingLabel = if (showPlaybackProgress) {
@@ -4791,7 +4803,7 @@ data class ContinueWatchingItem(
             tmdbRating = tmdbRating.orEmpty().ifBlank { imdbRating.orEmpty() },
             duration = duration,
             mediaType = mediaType,
-            progress = progress,
+            progress = effectiveProgress,
             image = posterPath ?: backdropPath ?: "",
             backdrop = backdropPath,
             badge = null,

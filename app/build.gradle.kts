@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 402
-        versionName = "2.4.008"
+        versionCode = 403
+        versionName = "2.5.001"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -67,6 +67,7 @@ android {
         buildConfigField("String", "TVDB_API_KEY", "\"${escapeBuildConfigString(localSecretValue("TVDB_API_KEY"))}\"")
         buildConfigField("String", "FANART_API_KEY", "\"${escapeBuildConfigString(localSecretValue("FANART_API_KEY"))}\"")
         buildConfigField("String", "VODWISHARR_API_KEY", "\"${escapeBuildConfigString(localSecretValue("VODWISHARR_API_KEY"))}\"")
+        buildConfigField("String", "VOD_REQUEST_BASE_URL", "\"${escapeBuildConfigString(localSecretValue("VOD_REQUEST_BASE_URL"))}\"")
 
 
         // Keep installable APKs ARM-universal by default. Emulator builds can add

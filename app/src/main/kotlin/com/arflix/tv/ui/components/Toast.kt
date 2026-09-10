@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -97,7 +98,7 @@ fun AppNotificationSurface(
     Row(
         modifier = modifier
             .widthIn(max = 560.dp)
-            .fillMaxWidth()
+            .wrapContentWidth()
             .heightIn(min = 58.dp)
             .shadow(
                 elevation = 18.dp,
@@ -114,7 +115,7 @@ fun AppNotificationSurface(
             )
             .padding(horizontal = 18.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Start,
+        horizontalArrangement = Arrangement.Center,
     ) {
         leadingContent()
         Spacer(modifier = Modifier.width(12.dp))

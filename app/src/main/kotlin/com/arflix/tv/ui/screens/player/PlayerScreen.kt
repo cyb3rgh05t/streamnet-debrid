@@ -293,6 +293,8 @@ fun PlayerScreen(
 ) {
     val playerAccent = LocalAccentColorOverride.current ?: Color.White
     val context = LocalContext.current
+    var playerForBack: ExoPlayer? = null
+    var backNavigationInProgress by remember { mutableStateOf(false) }
     val languageDisplayLocale = context.resources.configuration.let { configuration ->
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) configuration.locales[0]
         else @Suppress("DEPRECATION") configuration.locale
@@ -304,6 +306,31 @@ fun PlayerScreen(
     val clockFormat = rememberPlayerClockFormat()
     val focusManager = LocalFocusManager.current
     val coroutineScope = rememberCoroutineScope()
+    val navigateBackAfterProgressSave: () -> Unit = {
+        if (!backNavigationInProgress) {
+            backNavigationInProgress = true
+            coroutineScope.launch {
+                val player = playerForBack
+                if (player != null) {
+                    val safeDuration = player.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
+                    val safePosition = player.currentPosition.coerceAtLeast(0L)
+                    val safeProgressPercent = if (safeDuration > 0L) {
+                        ((safePosition.toDouble() / safeDuration.toDouble()) * 100.0)
+                            .toInt()
+                            .coerceIn(0, 100)
+                    } else 0
+                    viewModel.saveProgressAndWait(
+                        position = safePosition,
+                        duration = safeDuration,
+                        progressPercent = safeProgressPercent,
+                        isPlaying = false,
+                        playbackState = player.playbackState,
+                    )
+                }
+                onBack()
+            }
+        }
+    }
     val deviceType = LocalDeviceType.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val castManager = remember(context) {
@@ -411,6 +438,7 @@ fun PlayerScreen(
     var progress by remember { mutableFloatStateOf(0f) }
     var currentPlaybackState by remember { mutableIntStateOf(Player.STATE_IDLE) }
     var nextEpisodeTransitionInProgress by remember { mutableStateOf(false) }
+    var movieCompletionHandled by remember { mutableStateOf(false) }
 
     // Skip overlay state - shows +10/-10 without showing full controls
     var skipAmount by remember { mutableIntStateOf(0) }
@@ -488,6 +516,7 @@ fun PlayerScreen(
     }
     var previousEpisodeIdentity by remember { mutableStateOf<EpisodeIdentity?>(null) }
     LaunchedEffect(mediaType, mediaId, seasonNumber, episodeNumber, tmdbSeasonNumber, tmdbEpisodeNumber, kitsuId, kitsuEpisodeNumber) {
+        movieCompletionHandled = false
         nextEpisodeIdentity = null
         nextEpisodeAirDateSource = if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
             PlaybackEpisodeKey(
@@ -575,7 +604,7 @@ fun PlayerScreen(
     }
     val cancelNextEpisodePrompt: () -> Unit = {
         showNextEpisodePrompt = false
-        onBack()
+        navigateBackAfterProgressSave()
     }
     var playerAspectMode by remember { mutableStateOf(PlayerAspectMode.AUTO) }
     var subtitleMenuIndex by remember { mutableIntStateOf(0) }
@@ -2345,6 +2374,8 @@ fun PlayerScreen(
         showVolumeIndicator = true
     }
 
+    playerForBack = exoPlayer
+
     // Update progress periodically
     LaunchedEffect(exoPlayer, isCasting) {
         while (!playerReleasedAtomic.get()) {
@@ -2603,6 +2634,25 @@ fun PlayerScreen(
 
             }
 
+            if (
+                mediaType == MediaType.MOVIE &&
+                !movieCompletionHandled &&
+                hasPlaybackStarted &&
+                duration > 0L &&
+                exoPlayer.playbackState == Player.STATE_ENDED
+            ) {
+                movieCompletionHandled = true
+                viewModel.saveProgress(
+                    position = duration,
+                    duration = duration,
+                    progressPercent = 100,
+                    isPlaying = false,
+                    playbackState = Player.STATE_ENDED,
+                )
+                onBack()
+                break
+            }
+
             // Post-episode prompt: when a TV episode ends, show the "Up Next" overlay with a
             // 10-second countdown that auto-advances (or lets the user cancel / continue
             // immediately). Gated on the profile's autoPlayNext setting — when disabled we
@@ -2676,7 +2726,10 @@ fun PlayerScreen(
                         exoPlayer.currentPosition,
                         safeDuration,
                         safeProgressPercent,
-                        isPlaying = exoPlayer.isPlaying,
+                        // Leaving the player is a stop event. Force the final local/cloud
+                        // progress write instead of letting the normal playback debounce
+                        // keep the last position out of Continue Watching.
+                        isPlaying = false,
                         playbackState = exoPlayer.playbackState
                     )
                 }
@@ -2791,7 +2844,7 @@ fun PlayerScreen(
     }
 
     BackHandler(enabled = uiState.error != null) {
-        onBack()
+        navigateBackAfterProgressSave()
     }
 
     BackHandler(
@@ -2800,7 +2853,7 @@ fun PlayerScreen(
         if (showControls) {
             showControls = false
         } else {
-            onBack()
+            navigateBackAfterProgressSave()
         }
     }
 
@@ -2970,7 +3023,7 @@ fun PlayerScreen(
                         }
                         Key.MediaStop -> {
                             exoPlayer.pause()
-                            onBack()
+                            navigateBackAfterProgressSave()
                             return@onKeyEvent true
                         }
                         Key.MediaRewind -> {
@@ -3077,7 +3130,7 @@ fun PlayerScreen(
                         if (showControls) {
                             showControls = false
                         } else {
-                            onBack()
+                            navigateBackAfterProgressSave()
                         }
                         return@onKeyEvent true
                     }
@@ -3096,14 +3149,14 @@ fun PlayerScreen(
                             }
                             Key.Enter, Key.DirectionCenter -> {
                                 if (uiState.isSetupError) {
-                                    onBack()
+                                    navigateBackAfterProgressSave()
                                 } else {
-                                    if (errorModalFocusIndex == 0) viewModel.retry() else onBack()
+                                    if (errorModalFocusIndex == 0) viewModel.retry() else navigateBackAfterProgressSave()
                                 }
                                 true
                             }
                             Key.Back, Key.Escape -> {
-                                onBack()
+                                navigateBackAfterProgressSave()
                                 true
                             }
                             else -> false
@@ -3295,7 +3348,7 @@ fun PlayerScreen(
 
                     when (event.key) {
                         Key.Back, Key.Escape -> {
-                            onBack()
+                            navigateBackAfterProgressSave()
                             true
                         }
                         Key.DirectionLeft -> {
@@ -4251,6 +4304,26 @@ fun PlayerScreen(
                     delay(150)
                     runCatching { sourceButtonFocusRequester.requestFocus() }
                 }
+            },
+            onRefresh = {
+                viewModel.loadMedia(
+                    mediaType = mediaType,
+                    mediaId = mediaId,
+                    seasonNumber = tmdbSeasonNumber,
+                    episodeNumber = tmdbEpisodeNumber,
+                    displaySeasonNumber = seasonNumber,
+                    displayEpisodeNumber = episodeNumber,
+                    animeQueryOverride = kitsuId?.let { id ->
+                        kitsuEpisodeNumber?.let { episode -> "kitsu:$id:$episode" }
+                    },
+                    providedImdbId = imdbId,
+                    providedStreamUrl = null,
+                    preferredAddonId = null,
+                    preferredSourceName = null,
+                    preferredBingeGroup = null,
+                    startPositionMs = exoPlayer.currentPosition,
+                    isLiveStreamPlayback = isLiveStream,
+                )
             }
         )
 
@@ -4492,7 +4565,7 @@ fun PlayerScreen(
             exit = fadeOut(androidx.compose.animation.core.tween(200))
         ) {
             val isSetup = uiState.isSetupError
-            val accentColor = if (isSetup) Color(0xFF3B82F6) else Color(0xFFEF4444) // blue vs red
+            val accentColor = playerAccent
             Box(
                 modifier = Modifier
                     .fillMaxSize()

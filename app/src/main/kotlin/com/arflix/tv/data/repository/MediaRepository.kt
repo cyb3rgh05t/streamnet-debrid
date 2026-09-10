@@ -899,6 +899,8 @@ class MediaRepository @Inject constructor(
          */
         internal fun buildPreinstalledDefaults(): List<CatalogConfig> {
             val topLevelCatalogs = listOf(
+                CatalogConfig("recently_watched_movies", "Recently Watched Movies", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
+                CatalogConfig("recently_watched_series", "Recently Watched Series", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
                 CatalogConfig("recent_tv", "Recently Watched TV", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
                 CatalogConfig("favorite_tv", "Favorite TV", CatalogSourceType.PREINSTALLED, isPreinstalled = true),
                 CatalogConfig("trending_movies", "Trending in Movies", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/trending-movies", sourceRef = "mdblist:https://mdblist.com/lists/snoak/trending-movies"),

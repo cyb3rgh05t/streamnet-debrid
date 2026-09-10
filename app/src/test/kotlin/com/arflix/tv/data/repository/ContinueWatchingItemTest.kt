@@ -58,6 +58,24 @@ class ContinueWatchingItemTest {
     }
 
     @Test
+    fun toMediaItem_derivesMovieProgressFromResumePositionWhenPercentageIsMissing() {
+        val item = ContinueWatchingItem(
+            id = 123,
+            title = "Example Movie",
+            mediaType = MediaType.MOVIE,
+            progress = 0,
+            resumePositionSeconds = 600L,
+            durationSeconds = 1200L
+        )
+
+        val mediaItem = item.toMediaItem()
+
+        assertEquals(50, mediaItem.progress)
+        assertEquals("10min left", mediaItem.timeRemainingLabel)
+        assertEquals("Continue from 10:00", mediaItem.subtitle)
+    }
+
+    @Test
     fun toMediaItem_localizesGermanContinueWatchingBadges() {
         val baseContext = RuntimeEnvironment.getApplication()
         val configuration = Configuration(baseContext.resources.configuration).apply {

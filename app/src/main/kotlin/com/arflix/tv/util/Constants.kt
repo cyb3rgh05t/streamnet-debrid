@@ -11,6 +11,10 @@ import com.arflix.tv.BuildConfig
 object Constants {
     val CLOUD_BACKEND_URL: String
         get() = BuildConfig.CLOUD_BACKEND_URL.trim().trimEnd('/')
+    val VOD_REQUEST_BASE_URL: String
+        get() = BuildConfig.VOD_REQUEST_BASE_URL.trim().trimEnd('/')
+    val VOD_REQUEST_API_KEY: String
+        get() = VODWISHARR_API_KEY
     val CLOUD_SYNC_ENABLED: Boolean
         get() = BuildConfig.ENABLE_CLOUD_SYNC && (CLOUD_BACKEND_URL.startsWith("https://") || CLOUD_BACKEND_URL.startsWith("http://"))
 
@@ -57,7 +61,8 @@ object Constants {
     val TVDB_API_KEY: String get() = usableSecret(BuildConfig.TVDB_API_KEY)
     val FANART_API_KEY: String get() = usableSecret(BuildConfig.FANART_API_KEY)
     val VODWISHARR_API_KEY: String get() = usableSecret(BuildConfig.VODWISHARR_API_KEY)
-    const val VODWISHARR_API_URL = "https://streamnetvod.mystreamnet.club/api/v1/"
+    val VODWISHARR_API_URL: String
+        get() = "${VOD_REQUEST_BASE_URL}/api/v1/"
 
     // Image URLs - tuned for TV quality with smooth scrolling/perf.
     const val IMAGE_BASE = "https://image.tmdb.org/t/p/w780"

@@ -11,6 +11,7 @@ import com.arflix.tv.data.api.TraktApi
 import com.arflix.tv.data.api.TvdbApi
 import com.arflix.tv.data.api.FanartApi
 import com.arflix.tv.data.api.WatchHistoryApi
+import com.arflix.tv.data.api.VodRequestApi
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.util.Constants
 import dagger.Module
@@ -224,6 +225,18 @@ object AppModule {
             .addConverterFactory(GsonConverterFactory.create())
             .build()
             .create(WatchHistoryApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideVodRequestApi(okHttpClient: OkHttpClient): VodRequestApi {
+        return Retrofit.Builder()
+            .baseUrl(Constants.VOD_REQUEST_BASE_URL.trimEnd('/') + "/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(VodRequestApi::class.java)
     }
 
     @Provides
