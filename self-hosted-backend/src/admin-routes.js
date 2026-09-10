@@ -585,6 +585,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       );
       const revision = Number(revisionResult.rows[0]?.revision || 0);
       const auditId = crypto.randomUUID();
+      await deleteAccountData(client, account);
       await client.query(
         `insert into admin_audit_logs (
            id, admin_id, account_id, operation, profile_id, reason,
@@ -593,15 +594,14 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         [
           auditId,
           admin.id,
-          accountId,
+          null,
           reason,
-          JSON.stringify({ email: account.email }),
+          JSON.stringify({ accountId, email: account.email }),
           revision,
           request.ip || null,
           String(request.headers["user-agent"] || "").slice(0, 500) || null,
         ],
       );
-      await deleteAccountData(client, account);
       await client.query("commit");
       return { accepted: true, audit_id: auditId };
     } catch (error) {
