@@ -4,7 +4,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
-## [2.5.001] - 2026-09-10
+## [2.5.003] - 2026-09-10
 
 ### VOD-Requests und Quellen
 
