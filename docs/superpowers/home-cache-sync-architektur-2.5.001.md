@@ -2,7 +2,7 @@
 
 ## Geltungsbereich
 
-Diese Dokumentation beschreibt den Home-Datenfluss von StreamNet `2.5.001` fuer Android TV, Mobile und Tablet.
+Diese Dokumentation beschreibt den Home-Datenfluss von StreamNet `2.5.004` fuer Android TV, Mobile und Tablet.
 
 Abgedeckt sind:
 
@@ -67,10 +67,23 @@ Die Bild-Preloads laufen unabhaengig vom Hauptaufbau, damit die Navigation nicht
 
 ## Kataloge und Sichtbarkeit
 
+### IPTV-only First-Run-Vertrag
+
+Ein neues Profil startet bewusst mit `iptvOnlyMode = true`. Dadurch wirkt eine frische Installation zuerst IPTV-orientiert. Sobald ein installiertes und aktiviertes VOD-faehiges Streaming-Addon fuer Filme, Serien oder Anime erkannt wird, schaltet die App IPTV-only genau einmal automatisch aus. Danach gewinnt die Nutzerentscheidung: Wenn IPTV-only manuell wieder eingeschaltet wird, duerfen spaetere VOD-Addon-Aenderungen diese Wahl nicht erneut ueberschreiben.
+
+Nicht als VOD-Addon gelten deaktivierte Addons, Metadata-Addons, Subtitle-Addons wie OpenSubtitles und reine Live-TV-/Channel-Addons. Der genaue Produktvertrag ist in `docs/superpowers/iptv-only-vod-and-portal-2026-09-02.md` dokumentiert.
+
 Die beiden neuen Kataloge sind normale profilbezogene Preinstalled-Kataloge:
 
 - `recently_watched_movies`
 - `recently_watched_series`
+
+Weitere relevante Preinstalled-Kataloge fuer diesen Stand:
+
+- `coming_soon`: sichtbarer Titel „Kommende Filme“ / „Upcoming Movies“, MDBList `upcoming-movies`.
+- `upcoming_series`: sichtbarer Titel „Kommende Serien“ / „Upcoming Series“, MDBList `latest-tv-shows`.
+
+`coming_soon` behaelt seine bestehende ID, damit gespeicherte Profilreihenfolgen, Hidden-State und Cloud-Snapshots kompatibel bleiben. `upcoming_series` wird als neuer Preinstalled-Katalog automatisch in neue und bestehende Profile migriert und direkt unter `coming_soon` einsortiert.
 
 Sie werden ueber `ensurePreinstalledDefaults()` in neue und bestehende Profile eingetragen.
 

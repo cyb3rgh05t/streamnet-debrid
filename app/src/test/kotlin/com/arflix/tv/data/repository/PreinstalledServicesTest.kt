@@ -40,7 +40,10 @@ class PreinstalledServicesTest {
                 "trending_anime",
                 "new_kdramas",
                 "coming_soon",
-                "just_added"
+                "upcoming_series",
+                "just_added",
+                "recently_watched_movies",
+                "recently_watched_series"
             ),
             ids
         )

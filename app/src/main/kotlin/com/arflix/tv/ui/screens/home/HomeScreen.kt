@@ -325,7 +325,8 @@ private fun localizedCategoryTitle(category: Category): String = when (category.
     "just_added"               -> stringResource(R.string.home_just_added)
     "top_movies_week"          -> stringResource(R.string.home_top_movies_week)
     "new_kdramas"              -> stringResource(R.string.home_new_kdramas)
-    "coming_soon"              -> stringResource(R.string.home_coming_soon)
+    "coming_soon"              -> stringResource(R.string.home_upcoming_movies)
+    "upcoming_series"          -> stringResource(R.string.home_upcoming_series)
     else -> when (category.title) {
         "Continue Watching" -> stringResource(R.string.continue_watching)
         "Latest Movies" -> stringResource(R.string.collections_latest_movies)

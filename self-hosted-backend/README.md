@@ -38,6 +38,12 @@ profile playlist, remove add-ons or playlists, and delete profiles. Every
 mutation requires the current snapshot revision and a reason, then creates a new
 revision and an audit entry in the same PostgreSQL transaction.
 
+The account detail page can also revoke all active sessions and permanently
+delete an account. Both actions require an admin reason. Account deletion keeps
+an audit entry with the deleted account id and email in the audit details while
+avoiding a live foreign-key reference to the deleted account, so the audit trail
+does not block the deletion itself.
+
 For remote Stremio add-ons, paste either a `stremio://...` install link, a bare
 host/path, or a full `https://.../manifest.json` URL. The server fetches the
 manifest and builds the same account-wide add-on snapshot shape used by the

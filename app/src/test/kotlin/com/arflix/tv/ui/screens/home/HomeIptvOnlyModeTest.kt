@@ -210,6 +210,36 @@ class HomeIptvOnlyModeTest {
     }
 
     @Test
+    fun `enabled mode filters recently watched rails to IPTV available titles`() {
+        val availableMovie = MediaItem(id = 201, title = "Available Movie", mediaType = MediaType.MOVIE)
+        val missingMovie = MediaItem(id = 202, title = "Missing Movie", mediaType = MediaType.MOVIE)
+        val availableSeries = MediaItem(id = 203, title = "Available Series", mediaType = MediaType.TV)
+        val missingSeries = MediaItem(id = 204, title = "Missing Series", mediaType = MediaType.TV)
+        val projected = projectHomeForIptvOnlyMode(
+            HomeUiState(
+                categories = listOf(
+                    Category(HomeViewModel.RECENTLY_WATCHED_MOVIES_CATEGORY_ID, "Recently Watched Movies", listOf(availableMovie, missingMovie)),
+                    Category(HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID, "Recently Watched Series", listOf(availableSeries, missingSeries)),
+                ),
+            ),
+            enabled = true,
+            availability = IptvRepository.XtreamVodAvailability(
+                setOf(
+                    IptvRepository.XtreamVodAvailabilityKey(MediaType.MOVIE, "available movie"),
+                    IptvRepository.XtreamVodAvailabilityKey(MediaType.TV, "available series"),
+                )
+            ),
+        )
+
+        assertEquals(
+            listOf(HomeViewModel.RECENTLY_WATCHED_MOVIES_CATEGORY_ID, HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID),
+            projected.categories.map { it.id },
+        )
+        assertEquals(listOf(availableMovie), projected.categories[0].items)
+        assertEquals(listOf(availableSeries), projected.categories[1].items)
+    }
+
+    @Test
     fun `provider availability uses normalized title and media type`() {
         val availability = IptvRepository.XtreamVodAvailability(
             setOf(IptvRepository.XtreamVodAvailabilityKey(MediaType.MOVIE, "example"))

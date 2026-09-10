@@ -4,6 +4,19 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.004] - 2026-09-10
+
+### Home-Kataloge und IPTV-only
+
+- Neue preinstalled MDBList-Rail `upcoming_series` ergänzt: „Kommende Serien“ / „Upcoming Series“ nutzt `https://mdblist.com/lists/snoak/latest-tv-shows` und wird direkt unter der kommenden Filme-Rail einsortiert.
+- Die bestehende `coming_soon`-Rail bleibt aus Kompatibilitätsgründen als ID erhalten, wird aber sichtbar als „Kommende Filme“ / „Upcoming Movies“ benannt.
+- IPTV-only bleibt als Fresh-Install-Vertrag dokumentiert: neue Profile starten IPTV-only und schalten erst beim ersten installierten und aktivierten VOD-Streaming-Addon einmalig automatisch auf normale VOD-Discovery um.
+- Ein Regressionstest stellt sicher, dass IPTV-only auch die neuen Recently-Watched-Film- und Serienrails auf IPTV-/Xtream-Verfügbarkeit filtert.
+
+### Admin-Backend
+
+- Der Admin-Button „Konto löschen“ und „Alle Sitzungen abmelden“ sichern ihr Button-Element jetzt vor asynchronen Bestätigungsdialogen, damit `setButtonBusy()` nicht mehr mit einem verlorenen `event.currentTarget` auf `null` läuft.
+
 ## [2.5.003] - 2026-09-10
 
 ### VOD-Requests und Quellen

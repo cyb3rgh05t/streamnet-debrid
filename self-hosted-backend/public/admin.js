@@ -777,6 +777,7 @@ function updateOperationFields() {
 }
 
 function setButtonBusy(button, busy, busyLabel) {
+  if (!button) return;
   if (busy) {
     button.dataset.originalLabel = button.textContent;
     button.disabled = true;
@@ -994,11 +995,11 @@ byId("mutation-profile").addEventListener("change", () => {
 });
 byId("mutation-form").addEventListener("submit", submitMutation);
 byId("revoke-sessions-button").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
   const reason = await promptReason(
     "Warum sollen alle gültigen Logins dieses Accounts abgemeldet werden?",
   );
   if (!reason) return;
-  const button = event.currentTarget;
   setButtonBusy(button, true, "Wird abgemeldet…");
   try {
     const result = await api(
@@ -1014,6 +1015,7 @@ byId("revoke-sessions-button").addEventListener("click", async (event) => {
   }
 });
 byId("delete-account-button").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
   const account = state.selectedAccount.account;
   const typed = await openAdminDialog({
     title: "Konto löschen",
@@ -1034,7 +1036,6 @@ byId("delete-account-button").addEventListener("click", async (event) => {
     true,
   );
   if (!reason) return;
-  const button = event.currentTarget;
   setButtonBusy(button, true, "Wird gelöscht…");
   try {
     await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, {

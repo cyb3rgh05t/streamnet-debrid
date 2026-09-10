@@ -23,6 +23,23 @@ The projected Home keeps IPTV Live TV rails, Xtream VOD rails, and Continue Watc
 
 Adding a configured non-IPTV VOD addon disables IPTV-only mode, avoiding a state where newly configured content appears to be missing.
 
+### Fresh install and VOD add-on transition
+
+The intended first-run behavior is:
+
+1. A fresh profile starts with `iptvOnlyMode = true`.
+2. Home therefore initially shows IPTV Live TV, Xtream VOD, eligible IPTV-only collection content, and Continue Watching.
+3. OpenSubtitles and other subtitle-only add-ons do not count as VOD add-ons and must not affect IPTV-only mode.
+4. Pure Live TV/channel add-ons also do not count as VOD add-ons.
+5. When the first installed and enabled movie/series/anime streaming add-on is detected, `reconcileIptvOnlyModeWithVodAddons()` turns IPTV-only off once.
+6. The profile stores that this VOD-add-on transition has been seen. After that, the user choice wins: if the user manually enables IPTV-only again, later VOD add-on changes must not automatically disable it again.
+
+This is a product contract, not only a startup convenience. The app should feel IPTV-first on a clean install, but should reveal normal VOD discovery automatically when the user explicitly adds an active VOD-capable add-on.
+
+The logic is covered by `VodStreamingAddonTest`: disabled add-ons, metadata add-ons, subtitle add-ons, and live-only stream add-ons do not count as VOD; a fresh profile flips IPTV-only off when the first enabled VOD stream add-on appears; a later manual IPTV-only choice is preserved.
+
+CloudSync stores the resulting `iptvOnlyMode` value in the existing IPTV profile state. The one-time local transition flag is intentionally local behavior; the synced mode value remains authoritative for the visible Home state across devices.
+
 ## Xtream VOD catalogs and identity
 
 Xtream movies and series are exposed as separate provider-category Home rails. Provider artwork is retained as the immediate card fallback. Items with a usable TMDB identity enter the existing Details and playback flow directly.

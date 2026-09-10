@@ -1008,7 +1008,9 @@
     <string name="home_just_added">Gerade hinzugefügt</string>
     <string name="home_top_movies_week">Top-Filme dieser Woche</string>
     <string name="home_new_kdramas">Neu bei K-Dramen</string>
-    <string name="home_coming_soon">Demnächst verfügbar</string>
+    <string name="home_coming_soon">Kommende Filme</string>
+    <string name="home_upcoming_movies">Kommende Filme</string>
+    <string name="home_upcoming_series">Kommende Serien</string>
     <string name="home_please_check_connection">Bitte überprüfe deine Verbindung</string>
     <string name="home_sports_addon_required">Zuerst ein Live-TV-Sport-Addon hinzufügen</string>
     <string name="home_sports_opening">Live-Event wird geöffnet...</string>
@@ -1486,7 +1488,7 @@
     <string name="settings_tracking_episodes">Synchronisierte Episoden</string>
     <string name="settings_tracking_provider">Aktiver Anbieter</string>
     <string name="settings_tracking_last_sync">Letzte Synchronisierung</string>
-    <string name="settings_coming_soon">Demnächst verfügbar</string>
+    <string name="settings_coming_soon">Kommende Filme</string>
     <string name="settings_connecting">Verbindung wird hergestellt…</string>
     <string name="settings_trakt_tagline">Verlauf, Bewertungen und Merklisten synchronisieren</string>
     <string name="settings_mdblist_tagline">Bewertungen, Listen und Wiedergabe-Tracking</string>
