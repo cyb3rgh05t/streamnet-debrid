@@ -51,6 +51,25 @@ function formatRuntime(
     : `${m} ${minute}`;
 }
 
+function formatTimeRemaining(minutesRaw: number, language: UiLanguage): string {
+  const minutes = Math.max(1, Math.ceil(minutesRaw));
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  const duration = [
+    hours > 0 ? localize(language, `${hours} Std.`, `${hours} hr`) : "",
+    remainingMinutes > 0
+      ? localize(
+          language,
+          `${remainingMinutes} Min.`,
+          `${remainingMinutes} min`,
+        )
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return localize(language, `${duration} verbleibend`, `${duration} left`);
+}
+
 // "S1 · E9 · Whisper" for a Continue Watching / Up Next card. Only shown when
 // the item carries episode info (CW rails populate season/episode/title).
 function formatEpisodeLine(item: MediaItem): string {
@@ -77,14 +96,27 @@ function MediaCardBase({
     posterMode ?? settings.cardLayoutMode === "poster";
   const [loadedArtwork, setLoadedArtwork] = useState("");
   const [failedArtwork, setFailedArtwork] = useState("");
-  const progress = item.progress ?? 0;
+  const hasPlaybackTiming =
+    Number.isFinite(item.resumePositionSeconds) &&
+    Number.isFinite(item.durationSeconds) &&
+    (item.durationSeconds ?? 0) > 0;
+  const progress = hasPlaybackTiming
+    ? Math.max(
+        0,
+        Math.min(
+          100,
+          ((item.resumePositionSeconds ?? 0) / (item.durationSeconds ?? 1)) *
+            100,
+        ),
+      )
+    : (item.progress ?? 0);
   const watched = isWatched(item);
   // "Up next" rows carry SERIES completion (how far through the show you are),
   // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
   // reads as "you're 40% into that episode", which is wrong. Those rows get the
   // "Up next" chip instead; the bar stays for genuinely resumable items.
   const isUpNext = item.timeRemainingLabel === "Up next";
-  const showProgress = !watched && !isUpNext && progress >= 1 && progress <= 94;
+  const showProgress = !watched && !isUpNext && progress >= 1 && progress < 100;
   const isContinueWatchingCard =
     isUpNext || showProgress || Boolean(item.timeRemainingLabel);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -101,7 +133,9 @@ function MediaCardBase({
   const episodeArtwork = isContinueWatchingCard ? item.episodeStill || "" : "";
   const artwork = effectivePosterMode
     ? image || backdrop
-    : episodeArtwork || backdrop || image;
+    : item.mediaType === "tv" && isContinueWatchingCard
+      ? backdrop || episodeArtwork || image
+      : episodeArtwork || backdrop || image;
   const imgLoaded = Boolean(artwork && loadedArtwork === artwork);
   const imgFailed = Boolean(artwork && failedArtwork === artwork);
   const year =
@@ -246,15 +280,18 @@ function MediaCardBase({
     formatReleaseDate(item.releaseDate, settings.uiLanguage) ||
     mappedSubtitle ||
     year;
-  const timeRemainingLabel =
-    item.timeRemainingLabel === "Up next"
-      ? localize(settings.uiLanguage, "Als Nächstes", "Up next")
+  const timedRemainingMinutes = hasPlaybackTiming
+    ? Math.max(
+        0,
+        ((item.durationSeconds ?? 0) - (item.resumePositionSeconds ?? 0)) / 60,
+      )
+    : 0;
+  const timeRemainingLabel = isUpNext
+    ? localize(settings.uiLanguage, "Als Nächstes", "Up next")
+    : timedRemainingMinutes > 0
+      ? formatTimeRemaining(timedRemainingMinutes, settings.uiLanguage)
       : item.timeRemainingLabel?.replace(/^(\d+)m left$/, (_, minutes) =>
-          localize(
-            settings.uiLanguage,
-            `${minutes} Min. verbleibend`,
-            `${minutes}m left`,
-          ),
+          formatTimeRemaining(Number(minutes), settings.uiLanguage),
         );
   const runtimeLabel = formatRuntime(item.duration, settings.uiLanguage);
   const episodeLine = formatEpisodeLine(item);

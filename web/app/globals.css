@@ -2321,7 +2321,6 @@ a.login-submit {
   background: var(--accent, rgba(255, 255, 255, 0.92));
   display: block;
   height: 100%;
-  background: rgba(255, 255, 255, 0.92);
 }
 
 /* Lazy rail skeletons (rows load as they scroll into view) */
