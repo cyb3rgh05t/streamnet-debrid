@@ -15,7 +15,8 @@ import type {
 } from "./types";
 
 const ADDON_KEY = "arvio.web.installed.addons";
-const unauthorizedAddonBases = new Set<string>();
+const unauthorizedStreamAddonBases = new Set<string>();
+const unauthorizedSubtitleAddonBases = new Set<string>();
 
 type RawManifest = {
   id?: string;
@@ -437,7 +438,7 @@ async function queryAddonStreams(
   ids: string[],
 ) {
   const { base, query } = addonBaseUrl(manifestUrlFor(addon));
-  if (unauthorizedAddonBases.has(base)) return [] as StreamSource[];
+  if (unauthorizedStreamAddonBases.has(base)) return [] as StreamSource[];
   for (const id of ids) {
     if (!addonSupportsId(addon, id)) continue;
     for (const requestType of streamRequestTypes(addon, type)) {
@@ -450,7 +451,7 @@ async function queryAddonStreams(
         if (streams.length > 0) return streams;
       } catch (error) {
         if (isAddonAuthorizationError(error)) {
-          unauthorizedAddonBases.add(base);
+          unauthorizedStreamAddonBases.add(base);
           return [] as StreamSource[];
         }
         // Try the next compatible type/ID form. Torrentio and similar addons often
@@ -527,7 +528,7 @@ async function queryAddonSubtitles(
   ids: string[],
 ) {
   const { base, query } = addonBaseUrl(manifestUrlFor(addon));
-  if (unauthorizedAddonBases.has(base)) return [] as SubtitleTrack[];
+  if (unauthorizedSubtitleAddonBases.has(base)) return [] as SubtitleTrack[];
   for (const id of ids) {
     const url = `${base}/subtitles/${type}/${encodeURIComponent(id)}.json${query ? `?${query}` : ""}`;
     try {
@@ -540,7 +541,7 @@ async function queryAddonSubtitles(
       if (subtitles.length > 0) return subtitles;
     } catch (error) {
       if (isAddonAuthorizationError(error)) {
-        unauthorizedAddonBases.add(base);
+        unauthorizedSubtitleAddonBases.add(base);
         return [] as SubtitleTrack[];
       }
       // Try the next compatible ID form.
