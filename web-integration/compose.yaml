@@ -1,0 +1,26 @@
+services:
+  streamnet-web:
+    image: ${STREAMNET_WEB_IMAGE:-ghcr.io/cyb3rgh05t/streamnet-webplayer:latest}
+    env_file:
+      - .env
+    environment:
+      NEXT_PUBLIC_SELF_HOSTED: "true"
+      NEXT_PUBLIC_PAYWALL_ENABLED: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+      STREAMNET_BACKEND_URL: ${STREAMNET_BACKEND_URL:-https://auth.mystreamnet.club}
+      STREAMNET_CLOUDSYNC_URL: ${STREAMNET_CLOUDSYNC_URL:-https://auth.mystreamnet.club}
+    networks:
+      - proxy
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.streamnet-web.rule=Host(`${STREAMNET_WEB_HOST:-web.streamnet.live}`)
+      - traefik.http.routers.streamnet-web.entrypoints=https
+      - traefik.http.routers.streamnet-web.tls=true
+      - traefik.http.routers.streamnet-web.tls.certresolver=${TRAEFIK_CERTRESOLVER}
+      - traefik.http.services.streamnet-web.loadbalancer.server.port=3000
+    restart: unless-stopped
+
+networks:
+  proxy:
+    external: true

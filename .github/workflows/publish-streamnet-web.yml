@@ -1,0 +1,111 @@
+name: Publish StreamNet Web Player
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "web-integration/**"
+      - ".github/workflows/publish-streamnet-web.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: publish-streamnet-web-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-webplayer
+
+jobs:
+  validate:
+    name: Validate web build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-integration/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web-integration
+        run: npm ci
+
+      - name: Build Next app
+        working-directory: web-integration
+        env:
+          NEXT_PUBLIC_SELF_HOSTED: "true"
+          NEXT_PUBLIC_PAYWALL_ENABLED: "false"
+          STREAMNET_BACKEND_URL: ${{ secrets.STREAMNET_BACKEND_URL || 'https://auth.mystreamnet.club' }}
+          STREAMNET_CLOUDSYNC_URL: ${{ secrets.STREAMNET_CLOUDSYNC_URL || 'https://auth.mystreamnet.club' }}
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
+          TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
+          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
+          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
+          NEXT_PUBLIC_TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          NEXT_PUBLIC_TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          NEXT_PUBLIC_ARVIO_RESOLVER_URL: ${{ secrets.NEXT_PUBLIC_ARVIO_RESOLVER_URL }}
+        run: npm run build
+
+  publish:
+    name: Publish container image
+    needs: validate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: metadata
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,prefix=sha-
+
+      - name: Build and publish
+        uses: docker/build-push-action@v6
+        with:
+          context: ./web-integration
+          file: ./web-integration/Dockerfile
+          push: true
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_SELF_HOSTED=true
+            NEXT_PUBLIC_PAYWALL_ENABLED=false
+            NEXT_TELEMETRY_DISABLED=1
+            STREAMNET_BACKEND_URL=${{ secrets.STREAMNET_BACKEND_URL || 'https://auth.mystreamnet.club' }}
+            STREAMNET_CLOUDSYNC_URL=${{ secrets.STREAMNET_CLOUDSYNC_URL || 'https://auth.mystreamnet.club' }}
+            TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
+            TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
+            TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
+            SIMKL_CLIENT_ID=${{ secrets.SIMKL_CLIENT_ID }}
+            SIMKL_CLIENT_SECRET=${{ secrets.SIMKL_CLIENT_SECRET }}
+            NEXT_PUBLIC_TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}
+            NEXT_PUBLIC_TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
+            NEXT_PUBLIC_ARVIO_RESOLVER_URL=${{ secrets.NEXT_PUBLIC_ARVIO_RESOLVER_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

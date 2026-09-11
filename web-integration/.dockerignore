@@ -1,0 +1,8 @@
+node_modules
+.next
+.git
+.github
+npm-debug.log*
+Dockerfile
+compose.yaml
+README.md

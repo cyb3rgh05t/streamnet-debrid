@@ -168,6 +168,19 @@ gradle-8.4-bin.zip
 _tmp_tv_perf/
 .vscode/settings.json
 
+# Node / Next.js web integration
+**/node_modules/
+**/.next/
+**/out/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+web-integration/.env
+web-integration/.env.local
+web-integration/.env.*.local
+upstream-arvio-ref/
+
 # Agent skills & customizations
 .agents/
 streamnet-before-netlify-import.sql
