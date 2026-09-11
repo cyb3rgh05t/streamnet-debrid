@@ -32,6 +32,10 @@ export const config = {
     process.env.NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL,
     "https://xui.streamnet.live",
   ).replace(/\/+$/, ""),
+  mediaResolverUrl: envValue(
+    process.env.NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL,
+    "",
+  ).replace(/\/+$/, ""),
   resolverUrl: envValue(process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL, ""),
   traktClientId: process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ?? "",
   // OAuth secrets belong only on the server, never in the browser bundle.

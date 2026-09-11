@@ -1,0 +1,10 @@
+name = "streamnet-resolver"
+main = "src/index.ts"
+compatibility_date = "2026-07-01"
+routes = [
+  { pattern = "resolve.streamnet.live", custom_domain = true }
+]
+
+[vars]
+ALLOWED_ORIGINS = "https://web.streamnet.live,http://localhost:3000,http://localhost:3100"
+ALLOWED_MEDIA_HOSTS = "xui.streamnet.live,193.200.221.81"

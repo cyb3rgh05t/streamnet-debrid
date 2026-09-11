@@ -3,7 +3,13 @@ import type { InstalledAddon, MediaItem, StreamSource } from "./types";
 
 type ResolverEvent =
   | { type: "started"; addonCount?: number }
-  | { type: "batch"; addonId?: string; addonName?: string; batch?: StreamSource[]; streams?: StreamSource[] }
+  | {
+      type: "batch";
+      addonId?: string;
+      addonName?: string;
+      batch?: StreamSource[];
+      streams?: StreamSource[];
+    }
   | { type: "final"; cached?: boolean; streams?: StreamSource[] }
   | { type: "error"; error?: string };
 
@@ -12,13 +18,16 @@ export async function getResolverStreamsProgressive(
   item: MediaItem,
   season?: number,
   episode?: number,
-  onUpdate?: (streams: StreamSource[], batch: StreamSource[]) => void
+  onUpdate?: (streams: StreamSource[], batch: StreamSource[]) => void,
 ) {
   const endpoint = `${config.resolverUrl.replace(/\/+$/, "")}/sources`;
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "content-type": "application/json", accept: "application/x-ndjson, application/json" },
-    body: JSON.stringify({ addons, item, season, episode })
+    headers: {
+      "content-type": "application/json",
+      accept: "application/x-ndjson, application/json",
+    },
+    body: JSON.stringify({ addons, item, season, episode }),
   });
 
   if (!response.ok) {
@@ -28,8 +37,9 @@ export async function getResolverStreamsProgressive(
   const contentType = response.headers.get("content-type") ?? "";
   if (!response.body || contentType.includes("application/json")) {
     const payload = (await response.json()) as ResolverEvent;
-    if (payload.type === "error") throw new Error(payload.error ?? "Resolver failed");
-    const streams = payload.type === "final" ? payload.streams ?? [] : [];
+    if (payload.type === "error")
+      throw new Error(payload.error ?? "Resolver failed");
+    const streams = payload.type === "final" ? (payload.streams ?? []) : [];
     if (streams.length) onUpdate?.(streams, streams);
     return streams;
   }
@@ -48,7 +58,8 @@ export async function getResolverStreamsProgressive(
     for (const line of lines) {
       const event = parseEvent(line);
       if (!event) continue;
-      if (event.type === "error") throw new Error(event.error ?? "Resolver failed");
+      if (event.type === "error")
+        throw new Error(event.error ?? "Resolver failed");
       if (event.type === "batch") {
         latest = event.streams ?? latest;
         onUpdate?.(latest, event.batch ?? []);
@@ -67,9 +78,13 @@ export async function getResolverStreamsProgressive(
   return latest;
 }
 
-export function resolverMediaUrl(url: string, headers?: Record<string, string>) {
-  if (!config.resolverUrl) return null;
-  const endpoint = new URL(`${config.resolverUrl.replace(/\/+$/, "")}/media`);
+export function resolverMediaUrl(
+  url: string,
+  headers?: Record<string, string>,
+) {
+  const baseUrl = config.mediaResolverUrl || config.resolverUrl;
+  if (!baseUrl) return null;
+  const endpoint = new URL(`${baseUrl.replace(/\/+$/, "")}/media`);
   endpoint.searchParams.set("url", url);
   if (headers && Object.keys(headers).length > 0) {
     endpoint.searchParams.set("h", btoa(JSON.stringify(headers)));
@@ -100,8 +115,11 @@ export function resolverDownloadUrl(url: string, filename: string) {
 }
 
 export function resolverSubtitleUrl(url: string) {
-  if (!config.resolverUrl) return `/api/subtitle?url=${encodeURIComponent(url)}`;
-  const endpoint = new URL(`${config.resolverUrl.replace(/\/+$/, "")}/subtitle`);
+  if (!config.resolverUrl)
+    return `/api/subtitle?url=${encodeURIComponent(url)}`;
+  const endpoint = new URL(
+    `${config.resolverUrl.replace(/\/+$/, "")}/subtitle`,
+  );
   endpoint.searchParams.set("url", url);
   return endpoint.toString();
 }

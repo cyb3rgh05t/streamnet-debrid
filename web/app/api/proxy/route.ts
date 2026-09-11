@@ -332,7 +332,9 @@ function rewritePlaylistToWorker(
   // error 1003 on the playlist host): this Netlify function fetches the small
   // manifest, while heavy segment traffic is rewritten to the resolver worker.
   const resolverUrl = (
-    process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL ?? ""
+    process.env.NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL ??
+    process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL ??
+    ""
   ).replace(/\/+$/, "");
   if (!resolverUrl.startsWith("http"))
     return rewritePlaylistToAbsolute(text, baseUrl);
@@ -382,7 +384,9 @@ function rewritePlaylistToDirectOrWorker(
   headersParam: string | null,
 ) {
   const resolverUrl = (
-    process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL ?? ""
+    process.env.NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL ??
+    process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL ??
+    ""
   ).replace(/\/+$/, "");
   const resolveUrl = (raw: string) => {
     const trimmed = raw.trim();

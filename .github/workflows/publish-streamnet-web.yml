@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "web/**"
+      - "resolver-worker/**"
       - ".github/workflows/publish-streamnet-web.yml"
   workflow_dispatch:
 
@@ -21,10 +22,45 @@ env:
   IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-web
   STREAMNET_BACKEND_URL: ${{ vars['STREAMNET_BACKEND_URL'] || 'https://auth.mystreamnet.club' }}
   STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xui.streamnet.live' }}
+  STREAMNET_RESOLVER_URL: ${{ vars['STREAMNET_RESOLVER_URL'] || 'https://resolve.streamnet.live' }}
 
 jobs:
+  deploy-resolver:
+    name: Deploy media resolver
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: resolver-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: resolver-worker
+        run: npm ci
+
+      - name: Type-check worker
+        working-directory: resolver-worker
+        run: npm run typecheck
+
+      - name: Deploy worker
+        working-directory: resolver-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npm run deploy
+
+      - name: Verify resolver
+        run: curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 "${{ env.STREAMNET_RESOLVER_URL }}/health"
+
   validate:
     name: Validate web build
+    needs: deploy-resolver
     runs-on: ubuntu-latest
 
     steps:
@@ -48,6 +84,7 @@ jobs:
           NEXT_PUBLIC_SELF_HOSTED: "true"
           STREAMNET_BACKEND_URL: ${{ env.STREAMNET_BACKEND_URL }}
           NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL: ${{ env.STREAMNET_TV_XTREAM_URL }}
+          NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL: ${{ env.STREAMNET_RESOLVER_URL }}
         run: npm run build
 
   publish:
@@ -91,5 +128,6 @@ jobs:
             NEXT_TELEMETRY_DISABLED=1
             STREAMNET_BACKEND_URL=${{ env.STREAMNET_BACKEND_URL }}
             NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${{ env.STREAMNET_TV_XTREAM_URL }}
+            NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${{ env.STREAMNET_RESOLVER_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

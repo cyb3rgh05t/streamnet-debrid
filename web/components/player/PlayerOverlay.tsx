@@ -177,11 +177,22 @@ function directManifestUrl(url: string) {
 }
 
 function workerManifestUrl(url: string) {
+  if (!config.mediaResolverUrl && !config.resolverUrl) return null;
   // Manifest via the app backend (reaches hosts that block Cloudflare),
   // segments via the configured resolver worker with its CORS/header handling.
   const target = new URL(proxiedUrl(url, liveTvProxyHeaders()));
   target.searchParams.set("rewrite", "worker");
   return target.toString();
+}
+
+function requiresSecureStreamNetRelay(url: string) {
+  if (typeof window === "undefined" || window.location.protocol !== "https:")
+    return false;
+  try {
+    return new URL(url).origin === new URL(config.streamnetTvXtreamUrl).origin;
+  } catch {
+    return false;
+  }
 }
 
 function qualityBadges(stream: StreamSource) {
@@ -1253,13 +1264,15 @@ function VideoPlayer({
     // Playback ladder: direct first (free for CORS-friendly providers), then the
     // Cloudflare resolver media proxy for live TV (fixes CORS/ORB without Netlify
     // bandwidth), then the legacy Netlify fallbacks.
-    const attempts: string[] = [stream.url];
     // Catch-up recordings come from the same IPTV panels as live channels, so
     // they get the live relay hops — but keep VOD controls (seekable).
     const iptvRelay = liveTv || stream.addonName === "Catch-up";
+    const secureStreamNetRelay =
+      iptvRelay && requiresSecureStreamNetRelay(stream.url);
+    const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
-      if (hlsTwin) attempts.push(hlsTwin);
+      if (hlsTwin && !secureStreamNetRelay) attempts.push(hlsTwin);
       const workerUrl = resolverMediaUrl(stream.url, {
         ...liveTvProxyHeaders(),
         ...headers,
@@ -1271,11 +1284,13 @@ function VideoPlayer({
           ...headers,
         });
         if (workerTwin) attempts.push(workerTwin);
-        attempts.push(workerManifestUrl(hlsTwin));
+        const workerManifest = workerManifestUrl(hlsTwin);
+        if (workerManifest) attempts.push(workerManifest);
       }
       if (isLikelyHlsUrl(stream.url)) {
-        if (workerUrl) attempts.push(workerManifestUrl(stream.url));
-        attempts.push(directManifestUrl(stream.url));
+        const workerManifest = workerManifestUrl(stream.url);
+        if (workerUrl && workerManifest) attempts.push(workerManifest);
+        if (!secureStreamNetRelay) attempts.push(directManifestUrl(stream.url));
       }
       if (config.allowNetlifyMediaProxy) {
         attempts.push(proxiedUrl(hlsTwin ?? stream.url, liveTvProxyHeaders()));
@@ -1471,6 +1486,18 @@ function VideoPlayer({
       setError(true);
       handlingError = false;
     };
+    if (!uniqueAttempts[0]) {
+      setBuffering(false);
+      setError(true);
+      onToast(
+        localize(
+          settings.uiLanguage,
+          "Für StreamNet Live-TV ist ein HTTPS-Resolver erforderlich.",
+          "StreamNet Live TV requires an HTTPS resolver.",
+        ),
+      );
+      return;
+    }
     detach = attach(uniqueAttempts[0]);
     armStallTimer();
     const onReadyToStart = () => {

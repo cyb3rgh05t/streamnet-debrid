@@ -134,6 +134,9 @@ supabase/functions/tv-auth-web/
 # Netlify local state
 **/.netlify/
 
+# Cloudflare Wrangler local state
+**/.wrangler/
+
 # Screenshots and debug images
 !app/src/main/res/**/*.png
 !app/src/main/res/**/*.jpg
