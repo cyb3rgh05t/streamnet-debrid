@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "web-integration/**"
+      - "web/**"
       - ".github/workflows/publish-streamnet-web.yml"
   workflow_dispatch:
 
@@ -18,7 +18,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-webplayer
+  IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-web
+  STREAMNET_BACKEND_URL: ${{ vars['STREAMNET_BACKEND_URL'] || 'https://auth.mystreamnet.club' }}
+  STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xui.streamnet.live' }}
 
 jobs:
   validate:
@@ -34,27 +36,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: web-integration/package-lock.json
+          cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        working-directory: web-integration
+        working-directory: web
         run: npm ci
 
       - name: Build Next app
-        working-directory: web-integration
+        working-directory: web
         env:
           NEXT_PUBLIC_SELF_HOSTED: "true"
-          NEXT_PUBLIC_PAYWALL_ENABLED: "false"
-          STREAMNET_BACKEND_URL: ${{ secrets.STREAMNET_BACKEND_URL || 'https://auth.mystreamnet.club' }}
-          STREAMNET_CLOUDSYNC_URL: ${{ secrets.STREAMNET_CLOUDSYNC_URL || 'https://auth.mystreamnet.club' }}
-          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
-          TRAKT_CLIENT_ID: ${{ secrets.TRAKT_CLIENT_ID }}
-          TRAKT_CLIENT_SECRET: ${{ secrets.TRAKT_CLIENT_SECRET }}
-          SIMKL_CLIENT_ID: ${{ secrets.SIMKL_CLIENT_ID }}
-          SIMKL_CLIENT_SECRET: ${{ secrets.SIMKL_CLIENT_SECRET }}
-          NEXT_PUBLIC_TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
-          NEXT_PUBLIC_TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-          NEXT_PUBLIC_ARVIO_RESOLVER_URL: ${{ secrets.NEXT_PUBLIC_ARVIO_RESOLVER_URL }}
+          STREAMNET_BACKEND_URL: ${{ env.STREAMNET_BACKEND_URL }}
+          NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL: ${{ env.STREAMNET_TV_XTREAM_URL }}
         run: npm run build
 
   publish:
@@ -88,19 +81,15 @@ jobs:
       - name: Build and publish
         uses: docker/build-push-action@v6
         with:
-          context: ./web-integration
-          file: ./web-integration/Dockerfile
+          context: ./web
+          file: ./web/Dockerfile
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
           build-args: |
             NEXT_PUBLIC_SELF_HOSTED=true
-            NEXT_PUBLIC_PAYWALL_ENABLED=false
             NEXT_TELEMETRY_DISABLED=1
-            STREAMNET_BACKEND_URL=${{ secrets.STREAMNET_BACKEND_URL || 'https://auth.mystreamnet.club' }}
-            STREAMNET_CLOUDSYNC_URL=${{ secrets.STREAMNET_CLOUDSYNC_URL || 'https://auth.mystreamnet.club' }}
-            NEXT_PUBLIC_TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}
-            NEXT_PUBLIC_TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
-            NEXT_PUBLIC_ARVIO_RESOLVER_URL=${{ secrets.NEXT_PUBLIC_ARVIO_RESOLVER_URL }}
+            STREAMNET_BACKEND_URL=${{ env.STREAMNET_BACKEND_URL }}
+            NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${{ env.STREAMNET_TV_XTREAM_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

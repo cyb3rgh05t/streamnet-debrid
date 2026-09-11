@@ -176,9 +176,9 @@ _tmp_tv_perf/
 **/yarn-debug.log*
 **/yarn-error.log*
 **/pnpm-debug.log*
-web-integration/.env
-web-integration/.env.local
-web-integration/.env.*.local
+web/.env
+web/.env.local
+web/.env.*.local
 upstream-arvio-ref/
 
 # Agent skills & customizations

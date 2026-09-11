@@ -1,0 +1,16 @@
+{
+  "name": "StreamNet Web Player",
+  "short_name": "StreamNet",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#050607",
+  "theme_color": "#071214",
+  "icons": [
+    {
+      "src": "/streamnet-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
