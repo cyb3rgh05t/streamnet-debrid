@@ -6,6 +6,7 @@ import {
 } from "@/lib/server/safeProxy";
 
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
+const STREAMNET_RELAY_HOSTS = new Set(["xui.streamnet.live", "193.200.221.81"]);
 const ALLOW_MEDIA_PROXY = allowsMediaProxy();
 
 export async function GET(request: NextRequest) {
@@ -39,15 +40,26 @@ export async function GET(request: NextRequest) {
     );
   }
   const rewriteMode = input.searchParams.get("rewrite");
+  const streamNetRelayRequest =
+    rewriteMode === "streamnet" &&
+    STREAMNET_RELAY_HOSTS.has(target.hostname.toLowerCase());
+  if (rewriteMode === "streamnet" && !streamNetRelayRequest) {
+    return NextResponse.json(
+      { error: "StreamNet relay target not allowed" },
+      { status: 400 },
+    );
+  }
   const playlistOnlyRequest =
     (rewriteMode === "0" ||
       rewriteMode === "direct" ||
-      rewriteMode === "worker") &&
+      rewriteMode === "worker" ||
+      rewriteMode === "streamnet") &&
     !request.headers.has("range") &&
     isLikelyPlaylistTarget(target);
   if (
     !ALLOW_MEDIA_PROXY &&
     !playlistOnlyRequest &&
+    !streamNetRelayRequest &&
     isLikelyMediaRequest(target, request)
   ) {
     return NextResponse.json(
@@ -63,12 +75,16 @@ export async function GET(request: NextRequest) {
     decodeHeaders(input.searchParams.get("headers")) ?? {};
   const range = request.headers.get("range");
   if (range) forwardedHeaders.range = range;
-  const response = await fetchWithTimeout(target, {
-    headers: forwardedHeaders,
-    cache: "no-store",
-    redirect: "follow",
-    signal: request.signal,
-  });
+  const response = await fetchWithTimeout(
+    target,
+    {
+      headers: forwardedHeaders,
+      cache: "no-store",
+      redirect: "follow",
+      signal: request.signal,
+    },
+    streamNetRelayRequest,
+  );
 
   const contentType =
     response.headers.get("content-type") ?? "application/octet-stream";
@@ -89,23 +105,30 @@ export async function GET(request: NextRequest) {
     const rewritten =
       rewriteMode === "0"
         ? text
-        : rewriteMode === "worker"
-          ? rewritePlaylistToWorker(
+        : rewriteMode === "streamnet"
+          ? rewritePlaylistToStreamNetRelay(
               text,
               new URL(response.headers.get("x-arvio-final-url") ?? target),
               input.searchParams.get("headers"),
+              request,
             )
-          : rewriteMode === "direct" || !ALLOW_MEDIA_PROXY
-            ? rewritePlaylistToDirectOrWorker(
+          : rewriteMode === "worker"
+            ? rewritePlaylistToWorker(
                 text,
                 new URL(response.headers.get("x-arvio-final-url") ?? target),
                 input.searchParams.get("headers"),
               )
-            : rewritePlaylist(
-                text,
-                new URL(response.headers.get("x-arvio-final-url") ?? target),
-                request,
-              );
+            : rewriteMode === "direct" || !ALLOW_MEDIA_PROXY
+              ? rewritePlaylistToDirectOrWorker(
+                  text,
+                  new URL(response.headers.get("x-arvio-final-url") ?? target),
+                  input.searchParams.get("headers"),
+                )
+              : rewritePlaylist(
+                  text,
+                  new URL(response.headers.get("x-arvio-final-url") ?? target),
+                  request,
+                );
     const headers = new Headers();
     headers.set(
       "content-type",
@@ -378,6 +401,43 @@ function rewritePlaylistToWorker(
     .join("\n");
 }
 
+function rewritePlaylistToStreamNetRelay(
+  text: string,
+  baseUrl: URL,
+  headersParam: string | null,
+  request: NextRequest,
+) {
+  const relayUrl = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:"))
+      return raw;
+    try {
+      const absolute = new URL(trimmed, baseUrl);
+      if (!["http:", "https:"].includes(absolute.protocol)) return raw;
+      const proxied = new URL("/api/proxy", request.url);
+      proxied.searchParams.set("url", absolute.toString());
+      if (headersParam) proxied.searchParams.set("headers", headersParam);
+      proxied.searchParams.set("rewrite", "streamnet");
+      return proxied.toString();
+    } catch {
+      return raw;
+    }
+  };
+
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return line;
+      if (!trimmed.startsWith("#")) return relayUrl(line);
+      return line.replace(
+        /URI="([^"]+)"/g,
+        (_match, uri: string) => `URI="${relayUrl(uri)}"`,
+      );
+    })
+    .join("\n");
+}
+
 function rewritePlaylistToDirectOrWorker(
   text: string,
   baseUrl: URL,
@@ -449,8 +509,19 @@ function rewritePlaylistToAbsolute(text: string, baseUrl: URL) {
     .join("\n");
 }
 
-async function fetchWithTimeout(target: URL, init: RequestInit) {
+async function fetchWithTimeout(
+  target: URL,
+  init: RequestInit,
+  streamNetRelay = false,
+) {
   try {
+    if (streamNetRelay) {
+      return await safeProxyFetch(target, init, {
+        allowMedia: true,
+        allowInsecureRedirect: true,
+        allowedHosts: STREAMNET_RELAY_HOSTS,
+      });
+    }
     return await safeProxyFetch(
       target,
       init,

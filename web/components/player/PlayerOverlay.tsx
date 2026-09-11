@@ -185,6 +185,12 @@ function workerManifestUrl(url: string) {
   return target.toString();
 }
 
+function streamNetManifestUrl(url: string) {
+  const target = new URL(proxiedUrl(url, liveTvProxyHeaders()));
+  target.searchParams.set("rewrite", "streamnet");
+  return target.toString();
+}
+
 function requiresSecureStreamNetRelay(url: string) {
   if (typeof window === "undefined" || window.location.protocol !== "https:")
     return false;
@@ -1272,25 +1278,30 @@ function VideoPlayer({
     const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
-      if (hlsTwin && !secureStreamNetRelay) attempts.push(hlsTwin);
-      const workerUrl = resolverMediaUrl(stream.url, {
-        ...liveTvProxyHeaders(),
-        ...headers,
-      });
-      if (workerUrl) attempts.push(workerUrl);
-      if (hlsTwin) {
-        const workerTwin = resolverMediaUrl(hlsTwin, {
+      if (secureStreamNetRelay) {
+        if (hlsTwin) attempts.push(streamNetManifestUrl(hlsTwin));
+        attempts.push(streamNetManifestUrl(stream.url));
+      } else {
+        if (hlsTwin) attempts.push(hlsTwin);
+        const workerUrl = resolverMediaUrl(stream.url, {
           ...liveTvProxyHeaders(),
           ...headers,
         });
-        if (workerTwin) attempts.push(workerTwin);
-        const workerManifest = workerManifestUrl(hlsTwin);
-        if (workerManifest) attempts.push(workerManifest);
-      }
-      if (isLikelyHlsUrl(stream.url)) {
-        const workerManifest = workerManifestUrl(stream.url);
-        if (workerUrl && workerManifest) attempts.push(workerManifest);
-        if (!secureStreamNetRelay) attempts.push(directManifestUrl(stream.url));
+        if (workerUrl) attempts.push(workerUrl);
+        if (hlsTwin) {
+          const workerTwin = resolverMediaUrl(hlsTwin, {
+            ...liveTvProxyHeaders(),
+            ...headers,
+          });
+          if (workerTwin) attempts.push(workerTwin);
+          const workerManifest = workerManifestUrl(hlsTwin);
+          if (workerManifest) attempts.push(workerManifest);
+        }
+        if (isLikelyHlsUrl(stream.url)) {
+          const workerManifest = workerManifestUrl(stream.url);
+          if (workerUrl && workerManifest) attempts.push(workerManifest);
+          attempts.push(directManifestUrl(stream.url));
+        }
       }
       if (config.allowNetlifyMediaProxy) {
         attempts.push(proxiedUrl(hlsTwin ?? stream.url, liveTvProxyHeaders()));

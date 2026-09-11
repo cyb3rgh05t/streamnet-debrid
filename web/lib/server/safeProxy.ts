@@ -99,6 +99,8 @@ export async function safeProxyFetch(
     maxBytes?: number;
     textOnly?: boolean;
     allowInsecureRedirect?: boolean;
+    allowMedia?: boolean;
+    allowedHosts?: ReadonlySet<string>;
   } = {},
 ): Promise<Response> {
   let current = target;
@@ -107,7 +109,8 @@ export async function safeProxyFetch(
     AbortSignal.timeout(25_000),
     ...(init.signal ? [init.signal] : []),
   ]);
-  const allowMedia = !options.textOnly && allowsMediaProxy();
+  const allowMedia =
+    options.allowMedia === true || (!options.textOnly && allowsMediaProxy());
   const maxBytes = Math.min(MAX_BYTES, options.maxBytes ?? MAX_BYTES);
   for (let hop = 0; hop <= 4; hop++) {
     signal.throwIfAborted();
@@ -120,6 +123,11 @@ export async function safeProxyFetch(
     if (!allowMedia && (headers.has("range") || isMediaProxyTarget(current)))
       throw new Error("Media proxy disabled");
     const hostname = current.hostname.replace(/^\[|\]$/g, "");
+    if (
+      options.allowedHosts &&
+      !options.allowedHosts.has(hostname.toLowerCase())
+    )
+      throw new Error("Blocked proxy target");
     const addresses = await lookup(hostname, { all: true, verbatim: true });
     signal.throwIfAborted();
     const privateAllowed =
