@@ -19,6 +19,7 @@ const ALLOWED_HEADERS = new Set([
   "accept-language",
   "authorization",
   "content-type",
+  "icy-metadata",
   "range",
   "user-agent",
   "referer",
@@ -101,17 +102,23 @@ export async function safeProxyFetch(
     allowInsecureRedirect?: boolean;
     allowMedia?: boolean;
     allowedHosts?: ReadonlySet<string>;
+    streamMedia?: boolean;
   } = {},
 ): Promise<Response> {
   let current = target;
   let headers = safeProxyHeaders(init.headers);
-  const signal = AbortSignal.any([
-    AbortSignal.timeout(25_000),
-    ...(init.signal ? [init.signal] : []),
-  ]);
   const allowMedia =
     options.allowMedia === true || (!options.textOnly && allowsMediaProxy());
-  const maxBytes = Math.min(MAX_BYTES, options.maxBytes ?? MAX_BYTES);
+  const streamMedia = options.streamMedia === true && allowMedia;
+  const signal = streamMedia
+    ? (init.signal ?? new AbortController().signal)
+    : AbortSignal.any([
+        AbortSignal.timeout(25_000),
+        ...(init.signal ? [init.signal] : []),
+      ]);
+  const maxBytes = streamMedia
+    ? Number.POSITIVE_INFINITY
+    : Math.min(MAX_BYTES, options.maxBytes ?? MAX_BYTES);
   for (let hop = 0; hop <= 4; hop++) {
     signal.throwIfAborted();
     if (
@@ -175,7 +182,14 @@ export async function safeProxyFetch(
         throw new Error("Insecure proxy redirect");
       if (current.origin !== next.origin) {
         // A target may redirect, but it may not forward another server's credentials.
-        headers = new Headers({ accept: headers.get("accept") ?? "*/*" });
+        const redirectedHeaders = new Headers({
+          accept: headers.get("accept") ?? "*/*",
+        });
+        for (const name of ["user-agent", "icy-metadata", "range"]) {
+          const value = headers.get(name);
+          if (value) redirectedHeaders.set(name, value);
+        }
+        headers = redirectedHeaders;
       }
       if (
         response.status === 303 ||

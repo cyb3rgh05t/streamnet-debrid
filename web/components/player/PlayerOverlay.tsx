@@ -1270,17 +1270,20 @@ function VideoPlayer({
     // Playback ladder: direct first (free for CORS-friendly providers), then the
     // Cloudflare resolver media proxy for live TV (fixes CORS/ORB without Netlify
     // bandwidth), then the legacy Netlify fallbacks.
-    // Catch-up recordings come from the same IPTV panels as live channels, so
-    // they get the live relay hops — but keep VOD controls (seekable).
-    const iptvRelay = liveTv || stream.addonName === "Catch-up";
+    // Catch-up and Xtream VOD come from the same IPTV panels as live channels,
+    // so they use the restricted relay while retaining seekable VOD controls.
+    const iptvRelay =
+      liveTv ||
+      stream.addonName === "Catch-up" ||
+      stream.addonId === "iptv_xtream_vod";
     const secureStreamNetRelay =
       iptvRelay && requiresSecureStreamNetRelay(stream.url);
     const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
       if (secureStreamNetRelay) {
-        if (hlsTwin) attempts.push(streamNetManifestUrl(hlsTwin));
         attempts.push(streamNetManifestUrl(stream.url));
+        if (hlsTwin) attempts.push(streamNetManifestUrl(hlsTwin));
       } else {
         if (hlsTwin) attempts.push(hlsTwin);
         const workerUrl = resolverMediaUrl(stream.url, {

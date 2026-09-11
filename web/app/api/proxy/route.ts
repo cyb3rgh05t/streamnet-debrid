@@ -6,7 +6,11 @@ import {
 } from "@/lib/server/safeProxy";
 
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
-const STREAMNET_RELAY_HOSTS = new Set(["xui.streamnet.live", "193.200.221.81"]);
+const STREAMNET_RELAY_HOSTS = new Set([
+  "xui.streamnet.live",
+  "193.200.221.81",
+  "193.108.118.53",
+]);
 const ALLOW_MEDIA_PROXY = allowsMediaProxy();
 
 export async function GET(request: NextRequest) {
@@ -518,6 +522,7 @@ async function fetchWithTimeout(
         allowMedia: true,
         allowInsecureRedirect: true,
         allowedHosts: STREAMNET_RELAY_HOSTS,
+        streamMedia: true,
       });
     }
     return await safeProxyFetch(
