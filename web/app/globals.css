@@ -1635,7 +1635,6 @@ input:focus {
   animation: arvio-spin 900ms linear infinite;
 }
 .profile-row {
-  background: var(--accent, var(--green));
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
