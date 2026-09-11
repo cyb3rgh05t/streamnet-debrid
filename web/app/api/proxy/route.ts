@@ -8,6 +8,7 @@ import {
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 const STREAMNET_RELAY_HOSTS = new Set([
   "xui.streamnet.live",
+  "85.209.176.85",
   "193.200.221.81",
   "193.108.118.53",
 ]);
