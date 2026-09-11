@@ -4,7 +4,7 @@ import "./globals.css";
 import "./tv-guide.css";
 
 export const metadata: Metadata = {
-  title: "StreamNet",
+  title: "StreamNet Web",
   description: "StreamNet media hub for web, desktop, and TV browsers",
   robots: {
     index: false,
