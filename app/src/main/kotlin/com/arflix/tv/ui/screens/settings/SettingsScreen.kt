@@ -568,7 +568,7 @@ fun SettingsScreen(
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "offline_downloads" -> uiState.offlineDownloads.size.coerceAtLeast(1) - 1
             "plugins" -> pluginsMaxIndex
-            "accounts" -> 9 // Accounts, tracking routing, telegram and discord
+            "accounts" -> 8 // Accounts, tracking routing and Discord
             "cloud_sync" -> 3 // Cloud account, sync, pull and account deletion
             "info_updates" -> 2 // App update, privacy policy and diagnostics sharing
             else -> 0
@@ -1422,8 +1422,7 @@ fun SettingsScreen(
                                                         !uiState.trackingWriteToSimkl
                                                     )
                                                 }
-                                                8 -> onNavigateToTelegramSettings()
-                                                9 -> {
+                                                8 -> {
                                                     if (com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isSupported) {
                                                         if (com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isLoggedInFlow.value) {
                                                             com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.logout()
@@ -5007,14 +5006,6 @@ private fun MobileSettingsMainPage(
                     },
                     isFocused = false,
                     onClick = { onNavigate("Tracking Integrations") }
-                )
-                MobileSettingsRow(
-                    iconRes = R.drawable.ic_telegram,
-                    title = stringResource(R.string.telegram_title),
-                    value = "",
-                    isExternalLink = true,
-                    isFocused = false,
-                    onClick = onNavigateToTelegram
                 )
                 val isDiscordLoggedIn by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isLoggedInFlow.collectAsStateWithLifecycle(initialValue = false)
                 val discordUsername by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.usernameFlow.collectAsStateWithLifecycle(initialValue = null)
@@ -10773,19 +10764,6 @@ private fun AccountsSettings(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Telegram
-        SettingsActionRow(
-            icon = Icons.Default.Link,
-            title = stringResource(R.string.telegram_title),
-            description = stringResource(R.string.settings_telegram_desc),
-            actionLabel = stringResource(R.string.settings_badge_open),
-            isFocused = focusedIndex == 8,
-            onClick = onNavigateToTelegram,
-            modifier = Modifier.settingsFocusSlot(8)
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
         // Discord RPC
         val context = LocalContext.current
         val isDiscordLoggedIn by com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.isLoggedInFlow.collectAsStateWithLifecycle(initialValue = false)
@@ -10804,14 +10782,14 @@ private fun AccountsSettings(
             isEnabled = isDiscordSupported,
             authCode = null,
             authUrl = null,
-            isFocused = focusedIndex == 9,
+            isFocused = focusedIndex == 8,
             onConnect = {
                 com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.login(context)
             },
             onDisconnect = {
                 com.arflix.tv.ui.screens.details.discord.DiscordRpcManager.logout()
             },
-            modifier = Modifier.settingsFocusSlot(9)
+            modifier = Modifier.settingsFocusSlot(8)
         )
     }
 }

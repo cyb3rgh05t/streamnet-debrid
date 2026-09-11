@@ -357,20 +357,20 @@ fun MediaCard(
                     )
                 }
 
-                // Subtle green watched badge
+                // Neutral watched badge
                 if (showWatched && item.isWatched) {
                     Box(
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
-                        .padding(bottom = 6.dp, end = 6.dp)
+                            .align(Alignment.TopEnd)
+                        .padding(top = 6.dp, end = 6.dp)
                         .size(14.dp)
                         .background(
-                            color = ArvioSkin.colors.watchedGreen.copy(alpha = 0.2f),
+                            color = Color.White.copy(alpha = 0.2f),
                             shape = CircleShape
                         )
                         .border(
                             width = 1.dp,
-                            color = ArvioSkin.colors.watchedGreen,
+                            color = Color.White.copy(alpha = 0.9f),
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -378,7 +378,7 @@ fun MediaCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = ArvioSkin.colors.watchedGreen,
+                        tint = Color.White,
                         modifier = Modifier.size(8.dp)
                     )
                 }

@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.005] - 2026-09-11
+
+### Home und Profile
+
+- Die Home-Rails „Zuletzt gesehene Filme“ und „Zuletzt gesehene Serien“ zeigen keine Watched-Häkchen mehr.
+- Watched-Häkchen in allen übrigen Home-Rails sitzen nun oben rechts und verwenden eine neutrale weiße Darstellung statt Grün.
+- In der Profilauswahl befindet sich der StreamNet-Cloud-Button jetzt direkt unter „Profile verwalten“.
+
+### Einstellungen
+
+- Telegram wurde aus den Touch- und TV-Einstellungen entfernt; die Discord-Navigation behält eine lückenlose D-Pad-Fokusreihenfolge.
+
 ## [2.5.004] - 2026-09-10
 
 ### Home-Kataloge und IPTV-only

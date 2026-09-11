@@ -122,6 +122,14 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `watched badges are hidden on continue and recently watched rails`() {
+        assertThat(shouldShowWatchedBadge("continue_watching")).isFalse()
+        assertThat(shouldShowWatchedBadge(HomeViewModel.RECENTLY_WATCHED_MOVIES_CATEGORY_ID)).isFalse()
+        assertThat(shouldShowWatchedBadge(HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID)).isFalse()
+        assertThat(shouldShowWatchedBadge("trending_movies")).isTrue()
+    }
+
+    @Test
     fun `IPTV hero never auto plays on touch devices`() {
         assertThat(
             shouldPlayIptvHomeHero(

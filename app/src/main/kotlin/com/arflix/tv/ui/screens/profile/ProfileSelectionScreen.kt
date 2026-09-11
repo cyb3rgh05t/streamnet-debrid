@@ -206,19 +206,7 @@ fun ProfileSelectionScreen(
                     .widthIn(max = if (isTouchDevice) 260.dp else 300.dp)
             )
 
-            if (!isCloudConnected) {
-                Spacer(modifier = Modifier.height(28.dp))
-
-                CloudConnectButton(
-                    onClick = {
-                        if (!uiState.isSwitchingProfile) {
-                            onConnectCloud()
-                        }
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(if (isCloudConnected) 18.dp else 16.dp))
+            Spacer(modifier = Modifier.height(18.dp))
 
             // Profile avatars row
             val avatarSize = if (isTouchDevice) 90.dp else 120.dp
@@ -333,6 +321,18 @@ fun ProfileSelectionScreen(
                     }
                 }
             )
+
+            if (!isCloudConnected) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                CloudConnectButton(
+                    onClick = {
+                        if (!uiState.isSwitchingProfile) {
+                            onConnectCloud()
+                        }
+                    }
+                )
+            }
 
             if (uiState.isSwitchingProfile) {
                 Spacer(modifier = Modifier.height(18.dp))

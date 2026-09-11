@@ -402,6 +402,12 @@ internal fun stableHomeRowItemKeys(categoryId: String, items: List<MediaItem>): 
 internal fun stableHomeRowKey(layout: String, categoryId: String): String =
     "${layout}_home_row_$categoryId"
 
+internal fun shouldShowWatchedBadge(categoryId: String): Boolean = categoryId !in setOf(
+    "continue_watching",
+    HomeViewModel.RECENTLY_WATCHED_MOVIES_CATEGORY_ID,
+    HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID,
+)
+
 internal fun shouldDisplayHomeCategory(category: Category): Boolean =
     category.id != HomeViewModel.RECENT_TV_CATEGORY_ID ||
         category.items.any { !it.isPlaceholder }
@@ -4683,7 +4689,7 @@ private fun ContentRow(
                             raiseOnFocus = !isFastScrolling,
                             showProgress = isContinueWatching,
                             showEpisodeInfo = isRecentlyWatchedSeries,
-                            showWatched = !isContinueWatching,
+                            showWatched = shouldShowWatchedBadge(category.id),
                             showTitle = isCollectionRow && !item.collectionHideTitle,
                             isFocusedOverride = itemIsFocused && !railFocusOverlayActive,
                             focusedScale = 1f,
