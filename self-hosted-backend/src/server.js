@@ -38,6 +38,25 @@ const tvAuthTtlMs = 10 * 60_000;
 const publicDirectory = path.join(process.cwd(), "public");
 const deletionReceipts = new Map();
 
+const allowedCorsOrigins = new Set(
+  String(process.env.CORS_ALLOWED_ORIGINS || "https://web.streamnet.live,http://localhost:3000,http://localhost:3001")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+);
+
+app.addHook("onRequest", async (request, reply) => {
+  const origin = request.headers.origin;
+  if (origin && allowedCorsOrigins.has(origin)) {
+    reply.header("Access-Control-Allow-Origin", origin);
+    reply.header("Vary", "Origin");
+    reply.header("Access-Control-Allow-Credentials", "true");
+    reply.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    reply.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  }
+  if (request.method === "OPTIONS") return reply.code(204).send();
+});
+
 registerAdminRoutes(app, { pool, jwtKey, publicDirectory });
 
 function randomCode(length) {
