@@ -184,6 +184,8 @@ button:hover {
   font-weight: 800;
   letter-spacing: 0.18em;
 }
+  .brand-lockup { display: inline-flex; align-items: center; gap: .7rem; width: 148px; color: #f5f5f5; font-size: .78rem; font-weight: 800; letter-spacing: .18em; }
+  .brand-logo { display: block; width: 122px; height: 28px; object-fit: contain; object-position: left center; }
 .brand-mark {
   display: grid;
   place-items: center;
@@ -362,6 +364,7 @@ button:hover {
     transform 0.2s ease,
     box-shadow 0.2s ease;
 }
+  .poster { display: flex; align-items: flex-end; aspect-ratio: 2 / 3; padding: .8rem; border-radius: 9px; overflow: hidden; background-position: center; background-size: cover; background-color: #111827; transition: transform .2s ease, box-shadow .2s ease; }
 .poster-2 {
   background: linear-gradient(145deg, #312e81, #111827 48%, #115e59);
 }
