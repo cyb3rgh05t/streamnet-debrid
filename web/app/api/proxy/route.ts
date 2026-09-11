@@ -110,7 +110,6 @@ export async function GET(request: NextRequest) {
               text,
               new URL(response.headers.get("x-arvio-final-url") ?? target),
               input.searchParams.get("headers"),
-              request,
             )
           : rewriteMode === "worker"
             ? rewritePlaylistToWorker(
@@ -405,7 +404,6 @@ function rewritePlaylistToStreamNetRelay(
   text: string,
   baseUrl: URL,
   headersParam: string | null,
-  request: NextRequest,
 ) {
   const relayUrl = (raw: string) => {
     const trimmed = raw.trim();
@@ -414,11 +412,11 @@ function rewritePlaylistToStreamNetRelay(
     try {
       const absolute = new URL(trimmed, baseUrl);
       if (!["http:", "https:"].includes(absolute.protocol)) return raw;
-      const proxied = new URL("/api/proxy", request.url);
-      proxied.searchParams.set("url", absolute.toString());
-      if (headersParam) proxied.searchParams.set("headers", headersParam);
-      proxied.searchParams.set("rewrite", "streamnet");
-      return proxied.toString();
+      const params = new URLSearchParams();
+      params.set("url", absolute.toString());
+      if (headersParam) params.set("headers", headersParam);
+      params.set("rewrite", "streamnet");
+      return `/api/proxy?${params.toString()}`;
     } catch {
       return raw;
     }
