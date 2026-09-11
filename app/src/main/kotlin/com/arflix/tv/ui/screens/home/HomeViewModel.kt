@@ -2443,6 +2443,7 @@ class HomeViewModel @Inject constructor(
                 // then the authoritative Trakt data (with correct subtitle/resume label)
                 // replaces it when the fetch completes.
                 refreshContinueWatchingOnly(force = true)
+                refreshWatchedBadges(immediate = true)
                 // Rebuild only Recently Watched after a burst of watched events;
                 // keep the rest of Home and the current hero untouched.
                 scheduleRecentlyWatchedHydration(delayMs = 450L)
@@ -2942,7 +2943,8 @@ class HomeViewModel @Inject constructor(
                 status = "collection:${config.id}",
                 collectionGroup = config.collectionGroup,
                 collectionTileShape = config.collectionTileShape,
-                collectionHideTitle = config.collectionHideTitle
+                collectionHideTitle = config.collectionHideTitle,
+                collectionLogoUrl = config.collectionClearLogoUrl
             )
         }
         return Category(
@@ -4399,6 +4401,7 @@ class HomeViewModel @Inject constructor(
                     // immediately without waiting for the observeCatalogs flow.
                     loadHomeData()
                     refreshContinueWatchingOnly(force = true)
+                    refreshWatchedBadges(immediate = true)
                     restartContinueWatchingFetch()
                 }
             }.onFailure {
@@ -4454,7 +4457,6 @@ class HomeViewModel @Inject constructor(
                         latestCategories.add(0, continueWatchingCategory)
                     }
                     _uiState.value = _uiState.value.copy(categories = latestCategories)
-                    refreshWatchedBadges()
                 } else {
                     // No new data from any source
                     val latestCategories = _uiState.value.categories.toMutableList()

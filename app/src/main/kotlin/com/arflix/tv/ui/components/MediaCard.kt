@@ -191,7 +191,8 @@ fun MediaCard(
     }
             var channelLogoFailed by remember(imageRequest) { mutableStateOf(false) }
     // Performance: Removed context/density from keys
-            val effectiveLogoImageUrl = logoImageUrl.takeIf { showLogoImage && !isChannelLogo }
+            val effectiveLogoImageUrl = (logoImageUrl ?: item.collectionLogoUrl)
+                .takeIf { showLogoImage && !isChannelLogo }
     val logoRequest = remember(effectiveLogoImageUrl) {
         val logoWidthPx = with(density) { 220.dp.roundToPx() }.coerceAtLeast(1)
         val logoHeightPx = with(density) { 64.dp.roundToPx() }.coerceAtLeast(1)
@@ -339,7 +340,7 @@ fun MediaCard(
                 // clearlogo crowds the poster art and looks double-stamped.
                 // Collection tiles already embed their own branding, so they
                 // stay logo-free in both layouts.
-                if (logoRequest != null && isLandscape && !isCollectionTile) {
+                if (logoRequest != null && isLandscape && (!isCollectionTile || item.collectionLogoUrl != null)) {
                     AsyncImage(
                         model = logoRequest,
                         contentDescription = stringResource(R.string.component_media_logo, item.title),
@@ -362,15 +363,15 @@ fun MediaCard(
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                        .padding(top = 6.dp, end = 6.dp)
-                        .size(14.dp)
+                        .padding(top = 7.dp, end = 7.dp)
+                        .size(20.dp)
                         .background(
-                            color = Color.White.copy(alpha = 0.2f),
+                            color = Color.Black.copy(alpha = 0.72f),
                             shape = CircleShape
                         )
                         .border(
-                            width = 1.dp,
-                            color = Color.White.copy(alpha = 0.9f),
+                            width = 1.5.dp,
+                            color = progressAccentColor,
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -378,8 +379,8 @@ fun MediaCard(
                     Icon(
                         imageVector = Icons.Default.Check,
                         contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(8.dp)
+                        tint = progressAccentColor,
+                        modifier = Modifier.size(13.dp)
                     )
                 }
                 }

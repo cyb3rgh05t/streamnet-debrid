@@ -1830,20 +1830,10 @@ class MediaRepository @Inject constructor(
                     entry.group == CollectionGroupKind.MOVIE_GENRE ||
                     entry.group == CollectionGroupKind.TV_GENRE
                 ) null else resolveLegacyCollection(entry.title)
-                val legacyStaticCover = legacy?.collectionCoverImageUrl?.takeUnless {
-                    it.contains(".gif", ignoreCase = true) || it.contains("gifv", ignoreCase = true)
-                }
                 val legacyHeroCover = legacy?.collectionHeroImageUrl?.takeUnless {
                     it.contains(".gif", ignoreCase = true) || it.contains("gifv", ignoreCase = true)
                 }
-                val preferredCover = when (entry.group) {
-                    CollectionGroupKind.FRANCHISE -> if (entry.sources.isNotEmpty()) {
-                        entry.coverImageUrl
-                    } else {
-                        legacyStaticCover ?: entry.coverImageUrl
-                    }
-                    else -> entry.coverImageUrl
-                }
+                val preferredCover = entry.coverImageUrl
                 val preferredHero = when (entry.group) {
                     CollectionGroupKind.SERVICE,
                     CollectionGroupKind.GENRE,
@@ -1868,7 +1858,14 @@ class MediaRepository @Inject constructor(
                     collectionHeroImageUrl = preferredHero,
                     collectionHeroGifUrl = preferredHero,
                     collectionHeroVideoUrl = entry.heroVideoUrl ?: legacy?.collectionHeroVideoUrl,
-                    collectionClearLogoUrl = null,
+                    collectionClearLogoUrl = if (
+                        entry.group == CollectionGroupKind.FRANCHISE &&
+                        preferredCover.startsWith("https://image.tmdb.org/")
+                    ) {
+                        legacy?.collectionClearLogoUrl
+                    } else {
+                        null
+                    },
                     collectionTileShape = if (
                         entry.group == CollectionGroupKind.GENRE ||
                         entry.group == CollectionGroupKind.MOVIE_GENRE ||

@@ -514,6 +514,7 @@ class TraktRepository @Inject constructor(
                 }
             }
         }
+        if (currentProfileId() in values) invalidateWatchedCache()
     }
 
     suspend fun exportLocalWatchedEpisodesForProfiles(profileIds: List<String>): Map<String, List<String>> {
@@ -561,6 +562,7 @@ class TraktRepository @Inject constructor(
                 }
             }
         }
+        if (currentProfileId() in values) invalidateWatchedCache()
     }
 
     suspend fun importLocalWatchedChangesForProfiles(

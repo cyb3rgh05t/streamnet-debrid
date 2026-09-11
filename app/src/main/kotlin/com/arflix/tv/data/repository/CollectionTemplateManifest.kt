@@ -871,7 +871,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "X-Men",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/RC2Ny8Ds/X-Men.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/rFj9IKlL75B2pXhZA60jkNWvxeW.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -881,7 +881,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Hunger Games",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/FzfKsZ29/Hunger-Games.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/3sndNmvdF0R8AeyCmVoNv8LKtNy.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -891,7 +891,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Avatar",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/nLSV4nhT/AVATAR.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/vL5LR6WdxWPjLPFRLe133jXWsh5.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -901,7 +901,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Dune",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/HnrT6frm/Dune.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/zRKQW58MBEY078AxkHxEJzUskCl.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -911,7 +911,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Indiana Jones",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/tCbrtFwS/Indiana-Jo.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/zPACwR32amTNvzId9qyapCWXYDJ.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -921,7 +921,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "The Godfather",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/X7YwbzbT/The-Godfather.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/tSPT36ZKlP2WVHJLM4cQPLSzv3b.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -931,7 +931,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "John Wick",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/W14q7rtM/JW.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/ff2ti5DkA9UYLzyqhQfI2kZqEuh.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -941,7 +941,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Transformers",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://i.postimg.cc/CLw3Lyhx/Transformers.jpg",
+            coverImageUrl = "https://image.tmdb.org/t/p/w1280/iCDMBi6WLjUBnt24dNwHqqF81UL.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,

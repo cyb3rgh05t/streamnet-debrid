@@ -19,6 +19,36 @@ class PreinstalledServicesTest {
     private val introVideoCommit = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
 
     @Test
+    fun `later franchise tiles use stable landscape artwork`() {
+        val affectedTitles = setOf(
+            "Lord of the Rings",
+            "X-Men",
+            "Hunger Games",
+            "Avatar",
+            "Dune",
+            "Indiana Jones",
+            "The Godfather",
+            "John Wick",
+            "Transformers",
+        )
+        val franchises = MediaRepository.buildPreinstalledDefaults()
+            .filter { it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.FRANCHISE }
+            .filter { it.title in affectedTitles }
+
+        assertEquals(affectedTitles, franchises.map { it.title }.toSet())
+        franchises.forEach { franchise ->
+            val cover = franchise.collectionCoverImageUrl.orEmpty()
+            assertTrue(cover.contains("/images/lotr.jpg") || cover.startsWith("https://image.tmdb.org/t/p/w1280/"))
+            assertEquals(franchise.collectionCoverImageUrl, franchise.collectionFocusGifUrl)
+            if (cover.startsWith("https://image.tmdb.org/")) {
+                assertTrue(franchise.collectionClearLogoUrl?.startsWith("https://image.tmdb.org/t/p/original/") == true)
+            } else {
+                assertNull(franchise.collectionClearLogoUrl)
+            }
+        }
+    }
+
+    @Test
     fun `fresh profile starts with requested home row order`() {
         val ids = MediaRepository.buildPreinstalledDefaults()
             .filter { it.kind != CatalogKind.COLLECTION }

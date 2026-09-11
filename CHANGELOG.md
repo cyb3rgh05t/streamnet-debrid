@@ -4,6 +4,19 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.006] - 2026-09-11
+
+### Home-Karten und Watched-Status
+
+- Watched-Häkchen in normalen Home-Rails werden nach lokalen Watch-Events und Cloud-Restores sofort aktualisiert, ohne durch den bisherigen 90-Sekunden-Cache verzögert zu werden.
+- Cloud-importierte Film- und Episodenstände invalidieren den profilbezogenen Watched-Cache zuverlässig.
+- Die Häkchen sind oben rechts besser sichtbar und verwenden die aktive Akzentfarbe; Continue Watching sowie die beiden „Zuletzt gesehen“-Rails bleiben weiterhin ohne Häkchen.
+
+### Franchise-Rail
+
+- Franchise-Karten ab „Lord of the Rings“ verwenden erreichbare, für 16:9-Karten geeignete Hintergründe statt der nicht mehr zuverlässig erreichbaren Postimg-Dateien oder stark beschnittener Poster.
+- Franchises mit externem TMDB-Hintergrund zeigen ein transparentes Franchise-Logo; bereits gestaltete eigene Cover laden kein zusätzliches Logo.
+
 ## [2.5.005] - 2026-09-11
 
 ### Home und Profile
