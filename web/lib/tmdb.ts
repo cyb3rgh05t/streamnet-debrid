@@ -1461,7 +1461,12 @@ export async function getSeasonEpisodes(
         ).catch(() => [])
       : Promise.resolve([] as EpisodeInfo[]);
   const enrichEpisodes = async (episodes: EpisodeInfo[]) => {
-    const externalEpisodes = await externalEpisodesPromise;
+    const externalEpisodes = await Promise.race([
+      externalEpisodesPromise,
+      new Promise<EpisodeInfo[]>((resolve) =>
+        setTimeout(() => resolve([]), 2_500),
+      ),
+    ]);
     if (externalEpisodes.length === 0) return episodes;
     const externalByNumber = new Map(
       externalEpisodes.map((episode) => [
@@ -1559,7 +1564,11 @@ export async function getSeasonEpisodes(
       if (!ratingsTimedOut) writeSeasonEpisodesCache(key, episodes);
     }
     return enrichEpisodes(episodes);
-  } catch {
+  } catch (error) {
+    console.warn(
+      `Failed to load TMDB episodes for tv/${tvId}/season/${seasonNumber}`,
+      error,
+    );
     return [];
   }
 }

@@ -2,6 +2,7 @@
 
 import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { accentColor } from "@/lib/accent";
 import { serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
 import {
@@ -358,7 +359,12 @@ function MediaCardBase({
         )}
         {showProgress && (
           <span className="cw-progress">
-            <span style={{ width: `${progress}%` }} />
+            <span
+              style={{
+                width: `${progress}%`,
+                backgroundColor: accentColor(settings.accentColor),
+              }}
+            />
           </span>
         )}
       </div>

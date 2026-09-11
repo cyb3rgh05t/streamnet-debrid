@@ -4,10 +4,7 @@ import { tmdbImageUrl } from "./mediaImages";
 import type { MediaItem, WatchHistoryEntry } from "./types";
 
 export function historyToItem(entry: WatchHistoryEntry): MediaItem {
-  const title =
-    entry.media_type === "tv" && entry.episode_title
-      ? `${entry.title ?? "Series"}: ${entry.episode_title}`
-      : (entry.title ?? "Untitled");
+  const title = entry.title ?? "Untitled";
   const duration = Math.max(0, entry.duration_seconds ?? 0);
   const position = Math.max(0, entry.position_seconds ?? 0);
   const progress =
@@ -108,10 +105,7 @@ export function traktPlaybackToMedia(raw: unknown): MediaItem {
   return {
     activityAt: Date.parse(item.paused_at ?? "") || 0,
     id: trackerIdentity(media),
-    title:
-      isShow && item.episode?.title
-        ? `${media?.title ?? "Series"}: ${item.episode.title}`
-        : (media?.title ?? "Untitled"),
+    title: media?.title ?? "Untitled",
     year: media?.year ? String(media.year) : "",
     subtitle: isShow
       ? `S${item.episode?.season ?? 1} E${item.episode?.number ?? 1}`
