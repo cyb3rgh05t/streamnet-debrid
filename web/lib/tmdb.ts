@@ -298,10 +298,13 @@ export async function tmdb<T>(
       return result;
     } catch (error) {
       lastError = error;
-      if ((error as { status?: number }).status === 429) {
+      const status = (error as { status?: number }).status;
+      if (status === 429) {
         tmdbCooldownUntil = Date.now() + TMDB_COOLDOWN_MS;
         break;
       }
+      // Retrying a permanent client error only duplicates requests and logs.
+      if (status && status >= 400 && status < 500) break;
       if (attempt === 0)
         await new Promise((resolve) => setTimeout(resolve, 400));
     }
@@ -1051,11 +1054,12 @@ export function resolveTmdbId(item: {
   imdbId?: string | null;
   title?: string | null;
   year?: number | string | null;
+  isHomeServer?: boolean;
 }): Promise<number | null> {
   const directId =
     item.tmdbId && item.tmdbId > 0
       ? item.tmdbId
-      : item.id && item.id > 0
+      : !item.isHomeServer && item.id && item.id > 0
         ? item.id
         : null;
   if (directId) return Promise.resolve(directId);
@@ -1217,6 +1221,7 @@ export async function getLogoUrl(item: {
     return url;
   } catch {
     logoCache.set(key, null);
+    persistLogoCache();
     return null;
   }
 }
@@ -1372,6 +1377,7 @@ export async function getCardProviders(item: {
     return names;
   } catch {
     providerCache.set(key, []);
+    persistProviderCache();
     return [];
   }
 }

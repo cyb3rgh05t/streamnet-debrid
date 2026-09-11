@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, Pencil, Plus } from "lucide-react";
+import { Cloud, LoaderCircle, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { useApp } from "@/lib/store";
 import { accentColor } from "@/lib/accent";
@@ -22,6 +22,7 @@ export function ProfileSelectionScreen() {
     deleteProfile,
     goToLogin,
     auth,
+    cloudProfilesHydrated,
     settings,
   } = useApp();
 
@@ -65,6 +66,14 @@ export function ProfileSelectionScreen() {
               ? "Wer schaut gerade?"
               : "Who's watching?"}
         </h1>
+        {auth && !cloudProfilesHydrated && (
+          <p className="profile-cloud-status" role="status" aria-live="polite">
+            <LoaderCircle size={18} aria-hidden="true" />
+            {settings.uiLanguage === "de"
+              ? "Cloud-Profile werden geladen ..."
+              : "Loading Cloud profiles ..."}
+          </p>
+        )}
 
         <div className="profile-row">
           {profiles.map((profile) => (

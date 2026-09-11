@@ -2,8 +2,14 @@
 
 import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
+import { serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
-import { prefetchDetails, resolveTmdbId } from "@/lib/tmdb";
+import {
+  getCardProviders,
+  getLogoUrl,
+  prefetchDetails,
+  resolveTmdbId,
+} from "@/lib/tmdb";
 import type { MediaItem } from "@/lib/types";
 import { localize, type UiLanguage } from "@/lib/i18n";
 
@@ -105,8 +111,14 @@ function MediaCardBase({
       ? localize(settings.uiLanguage, "Serie", "Series")
       : localize(settings.uiLanguage, "Film", "Movie"));
   const directMetadataId =
-    item.tmdbId && item.tmdbId > 0 ? item.tmdbId : item.id > 0 ? item.id : null;
+    item.tmdbId && item.tmdbId > 0
+      ? item.tmdbId
+      : !item.isHomeServer && item.id > 0
+        ? item.id
+        : null;
   const [metadataId, setMetadataId] = useState<number | null>(directMetadataId);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [serviceBadges, setServiceBadges] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -129,6 +141,34 @@ function MediaCardBase({
     item.isHomeServer,
     item.mediaType,
   ]);
+
+  useEffect(() => {
+    let active = true;
+    setLogo(null);
+    setServiceBadges([]);
+    if (!metadataId)
+      return () => {
+        active = false;
+      };
+
+    void getLogoUrl({ mediaType: item.mediaType, id: metadataId }).then(
+      (url) => {
+        if (active) setLogo(url);
+      },
+    );
+    void getCardProviders({ mediaType: item.mediaType, id: metadataId }).then(
+      (names) => {
+        if (!active) return;
+        const logos = names
+          .map((name) => serviceClearLogo(name))
+          .filter((url): url is string => Boolean(url));
+        setServiceBadges([...new Set(logos)].slice(0, 2));
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [item.mediaType, metadataId]);
 
   useEffect(
     () => () => {
@@ -251,6 +291,22 @@ function MediaCardBase({
           />
         ) : (
           <Clapperboard size={42} />
+        )}
+        {logo && !effectivePosterMode && (
+          <img
+            className="card-logo"
+            src={logo}
+            alt=""
+            loading="lazy"
+            decoding="async"
+          />
+        )}
+        {serviceBadges.length > 0 && (
+          <span className="card-services top-left">
+            {serviceBadges.map((badge) => (
+              <img key={badge} src={badge} alt="" loading="lazy" />
+            ))}
+          </span>
         )}
         {watched && (
           <span

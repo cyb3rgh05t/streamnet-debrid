@@ -1622,7 +1622,20 @@ input:focus {
   font-weight: 400;
   color: var(--muted);
 }
+.profile-cloud-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin: calc(clamp(36px, 5vh, 56px) * -1 + 12px) 0 24px;
+  color: var(--soft);
+  font-size: 14px;
+}
+.profile-cloud-status svg {
+  color: var(--accent, #fff);
+  animation: arvio-spin 900ms linear infinite;
+}
 .profile-row {
+  background: var(--accent, var(--green));
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
@@ -2306,6 +2319,7 @@ a.login-submit {
   z-index: 2;
 }
 .cw-progress > span {
+  background: var(--accent, rgba(255, 255, 255, 0.92));
   display: block;
   height: 100%;
   background: rgba(255, 255, 255, 0.92);
@@ -2980,6 +2994,7 @@ a.login-submit {
   margin: 2px 0;
 }
 .epg-progress > span {
+  background: var(--accent, var(--green));
   display: block;
   height: 100%;
   background: var(--green);

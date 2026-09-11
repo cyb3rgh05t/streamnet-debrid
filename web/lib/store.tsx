@@ -657,6 +657,7 @@ function sameSettings(a: AppSettings, b: AppSettings) {
 export interface AppStore {
   view: AppView;
   cloudLoginRequired: boolean;
+  cloudProfilesHydrated: boolean;
   profiles: Profile[];
   activeProfile: Profile | null;
   avatarImages: Record<string, string>;
@@ -2987,6 +2988,7 @@ export function AppProvider({
         }
         setCloudProfilesHydrated(false);
         setAuth(session);
+        setView("profiles");
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Authentication failed.";
@@ -3790,6 +3792,7 @@ export function AppProvider({
     () => ({
       view,
       cloudLoginRequired,
+      cloudProfilesHydrated,
       profiles,
       activeProfile,
       avatarImages,
@@ -3886,6 +3889,7 @@ export function AppProvider({
     [
       view,
       cloudLoginRequired,
+      cloudProfilesHydrated,
       profiles,
       activeProfile,
       activeProfileId,
