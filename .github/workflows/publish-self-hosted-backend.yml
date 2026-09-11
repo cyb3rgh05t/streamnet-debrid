@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-self-hosted-backend
+  IMAGE_NAME: ghcr.io/cyb3rgh05t/streamnet-backend
 
 jobs:
   publish:
