@@ -99,11 +99,6 @@ jobs:
             NEXT_TELEMETRY_DISABLED=1
             STREAMNET_BACKEND_URL=${{ secrets.STREAMNET_BACKEND_URL || 'https://auth.mystreamnet.club' }}
             STREAMNET_CLOUDSYNC_URL=${{ secrets.STREAMNET_CLOUDSYNC_URL || 'https://auth.mystreamnet.club' }}
-            TMDB_API_KEY=${{ secrets.TMDB_API_KEY }}
-            TRAKT_CLIENT_ID=${{ secrets.TRAKT_CLIENT_ID }}
-            TRAKT_CLIENT_SECRET=${{ secrets.TRAKT_CLIENT_SECRET }}
-            SIMKL_CLIENT_ID=${{ secrets.SIMKL_CLIENT_ID }}
-            SIMKL_CLIENT_SECRET=${{ secrets.SIMKL_CLIENT_SECRET }}
             NEXT_PUBLIC_TELEGRAM_API_ID=${{ secrets.TELEGRAM_API_ID }}
             NEXT_PUBLIC_TELEGRAM_API_HASH=${{ secrets.TELEGRAM_API_HASH }}
             NEXT_PUBLIC_ARVIO_RESOLVER_URL=${{ secrets.NEXT_PUBLIC_ARVIO_RESOLVER_URL }}
