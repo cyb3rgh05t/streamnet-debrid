@@ -4,7 +4,7 @@ import {
   parseHomeServerConnectionJson,
   serializeHomeServerConnectionJson,
 } from "./homeserver";
-import { jsonRequest } from "./http";
+import { HttpError, jsonRequest } from "./http";
 import { mergeTvSessions, normalizeTvSession } from "./iptvSession";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
 import { tmdbImageUrl } from "./mediaImages";
@@ -34,6 +34,7 @@ interface AccountSyncPullResponse {
   payload?: RawPayload | string | null;
   source?: string | null;
   updatedAt?: string | null;
+  revision?: number;
 }
 
 interface AndroidContinueWatchingItem {
@@ -828,17 +829,49 @@ function androidContinueWatchingItems(
     ...readByProfile("continueWatchingByProfile"),
     ...readByProfile("watchHistoryByProfile"),
   ];
-  const global = [
-    ...arrayValue<AndroidContinueWatchingItem>(root.localContinueWatching),
-    ...arrayValue<AndroidContinueWatchingItem>(root.continueWatching),
-  ];
-  const seen = new Set<string>();
-  return [...scoped, ...global].filter((item) => {
-    const key = `${item.mediaType ?? ""}:${item.id ?? ""}:${item.season ?? ""}:${item.episode ?? ""}`;
-    if (!item.id || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const hasScopedProfileState =
+    Boolean(profileId) &&
+    [
+      "localContinueWatchingByProfile",
+      "continueWatchingByProfile",
+      "watchHistoryByProfile",
+    ].some((key) =>
+      Object.hasOwn(objectRecord<unknown>(root[key]), profileId!),
+    );
+  const global = hasScopedProfileState
+    ? []
+    : [
+        ...arrayValue<AndroidContinueWatchingItem>(root.localContinueWatching),
+        ...arrayValue<AndroidContinueWatchingItem>(root.continueWatching),
+      ];
+  const dismissedByProfile = objectRecord<unknown>(
+    root.dismissedContinueWatchingByProfile,
+  );
+  const dismissed = profileId
+    ? parseDismissedContinueWatching(dismissedByProfile[profileId])
+    : new Map<string, number>();
+  const newestByTitle = new Map<string, AndroidContinueWatchingItem>();
+  for (const item of [...scoped, ...global]) {
+    if (!item.id) continue;
+    const mediaType =
+      String(item.mediaType ?? "movie").toLowerCase() === "tv" ? "tv" : "movie";
+    const showKey = `${mediaType}:${item.id}`;
+    const exactKey =
+      mediaType === "tv" && item.season != null && item.episode != null
+        ? `${showKey}:${item.season}:${item.episode}`
+        : showKey;
+    const dismissedAt = Math.max(
+      dismissed.get(showKey) ?? 0,
+      dismissed.get(exactKey) ?? 0,
+    );
+    const updatedAt = Number(item.updatedAtMs ?? 0);
+    if (dismissedAt >= updatedAt) continue;
+    const existing = newestByTitle.get(showKey);
+    if (!existing || updatedAt > Number(existing.updatedAtMs ?? 0)) {
+      newestByTitle.set(showKey, item);
+    }
+  }
+  return [...newestByTitle.values()];
 }
 
 // A single app refresh calls pullRawPayload five times (payload, trakt token,
@@ -857,6 +890,7 @@ let rawPayloadInFlight: {
   userId: string;
   promise: Promise<RawPayload>;
 } | null = null;
+let rawPayloadRevision: { userId: string; revision: number } | null = null;
 let rawPayloadGeneration = 0;
 const RAW_PAYLOAD_TTL_MS = 5_000;
 
@@ -873,6 +907,11 @@ async function fetchRawPayload(auth: AuthClient): Promise<RawPayload> {
       "account-sync-pull",
       { method: "GET" },
     );
+    const revision = Number(response.revision ?? 0);
+    rawPayloadRevision = {
+      userId: auth.session!.userId,
+      revision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
+    };
     return parsePayload(response.payload);
   }
   const rows = await auth.supabase<Array<{ payload?: string | null }>>(
@@ -927,15 +966,24 @@ async function writeRawPayload(auth: AuthClient, payload: RawPayload) {
     const result = await backendRequest<{
       accepted?: boolean;
       reason?: string;
+      revision?: number;
     }>(auth, "account-sync-push", {
       method: "POST",
-      body: JSON.stringify({ payload }),
+      body: JSON.stringify({
+        payload,
+        ...(rawPayloadRevision?.userId === userId
+          ? { expectedRevision: rawPayloadRevision.revision }
+          : {}),
+      }),
     });
     if (result.accepted !== true) {
       invalidateRawPayloadCache();
       throw new Error(
         "Cloud did not accept your changes. They remain queued on this device; retry sync.",
       );
+    }
+    if (Number.isSafeInteger(result.revision)) {
+      rawPayloadRevision = { userId, revision: result.revision! };
     }
     // The server merges concurrent device edits. Read its acknowledged result,
     // not our submitted document (which may omit those edits).
@@ -970,16 +1018,28 @@ export async function mutateCloudPayload(
   const task = (mutationQueues.get(userId) ?? Promise.resolve())
     .catch(() => undefined)
     .then(async () => {
-      if (auth.session?.userId !== userId)
-        throw new Error("Account changed before sync completed");
-      // A recent read cache can predate another device's change. Mutations must
-      // start from a fresh snapshot, not echo that stale cached account back.
-      invalidateRawPayloadCache();
-      const root = await pullRawPayload(auth);
-      if (auth.session?.userId !== userId)
-        throw new Error("Account changed before sync completed");
-      mutator(root);
-      await writeRawPayload(auth, root);
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (auth.session?.userId !== userId)
+          throw new Error("Account changed before sync completed");
+        // A recent read cache can predate another device's change. Mutations must
+        // start from a fresh snapshot, not echo that stale cached account back.
+        invalidateRawPayloadCache();
+        const root = await pullRawPayload(auth);
+        if (auth.session?.userId !== userId)
+          throw new Error("Account changed before sync completed");
+        mutator(root);
+        try {
+          await writeRawPayload(auth, root);
+          return;
+        } catch (error) {
+          if (
+            !(error instanceof HttpError) ||
+            error.status !== 409 ||
+            attempt > 0
+          )
+            throw error;
+        }
+      }
     });
   mutationQueues.set(userId, task);
   try {

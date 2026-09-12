@@ -194,12 +194,18 @@ export function getPriorityConfig(
 // open of the day whenever the previous enriched refresh was more than a day ago.
 const LIST_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
-function cwCacheKeyFor(profileId: string | null | undefined) {
-  return `arvio.web.cw.v2:${profileId ?? "no-profile"}`;
+function cwCacheKeyFor(
+  profileId: string | null | undefined,
+  accountId: string | null | undefined,
+) {
+  return `arvio.web.cw.v3:${accountId ?? "local"}:${profileId ?? "no-profile"}`;
 }
 
-function watchlistCacheKeyFor(profileId: string | null | undefined) {
-  return `arvio.web.watchlist.v1:${profileId ?? "no-profile"}`;
+function watchlistCacheKeyFor(
+  profileId: string | null | undefined,
+  accountId: string | null | undefined,
+) {
+  return `arvio.web.watchlist.v2:${accountId ?? "local"}:${profileId ?? "no-profile"}`;
 }
 
 function readCachedList(key: string): MediaItem[] {
@@ -527,16 +533,26 @@ function mergeTraktWithLocalResume(
   localItems: MediaItem[],
 ) {
   if (!localItems.length) return traktItems;
-  const localByEpisode = new Map(
-    localItems.map((item) => [
-      `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`,
-      item,
-    ]),
-  );
-  return traktItems.map((item) => {
-    const local = localByEpisode.get(
-      `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`,
-    );
+  const exactKey = (item: MediaItem) =>
+    `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`;
+  const titleKey = (item: MediaItem) => `${item.mediaType}:${item.id}`;
+  const isNewer = (candidate: MediaItem, current: MediaItem) =>
+    (candidate.activityAt ?? 0) > (current.activityAt ?? 0) ||
+    ((candidate.activityAt ?? 0) === (current.activityAt ?? 0) &&
+      ((candidate.resumePositionSeconds ?? 0) >
+        (current.resumePositionSeconds ?? 0) ||
+        ((candidate.resumePositionSeconds ?? 0) ===
+          (current.resumePositionSeconds ?? 0) &&
+          (candidate.progress ?? 0) > (current.progress ?? 0))));
+  const localByEpisode = new Map<string, MediaItem>();
+  for (const item of localItems) {
+    const key = exactKey(item);
+    const current = localByEpisode.get(key);
+    if (!current || isNewer(item, current)) localByEpisode.set(key, item);
+  }
+  const traktEpisodeKeys = new Set(traktItems.map(exactKey));
+  const mergedTraktItems = traktItems.map((item) => {
+    const local = localByEpisode.get(exactKey(item));
     if (!local) return item;
     return {
       ...item,
@@ -556,8 +572,25 @@ function mergeTraktWithLocalResume(
       streamAddonId: item.streamAddonId ?? local.streamAddonId,
       timeRemainingLabel:
         local.timeRemainingLabel ?? item.timeRemainingLabel ?? null,
+      activityAt: Math.max(item.activityAt ?? 0, local.activityAt ?? 0),
     };
   });
+  const candidates = [
+    ...mergedTraktItems,
+    ...localItems.filter(
+      (item) =>
+        !traktEpisodeKeys.has(exactKey(item)) && isPausedPlaybackItem(item),
+    ),
+  ];
+  const newestByTitle = new Map<string, MediaItem>();
+  for (const item of candidates) {
+    const key = titleKey(item);
+    const current = newestByTitle.get(key);
+    if (!current || isNewer(item, current)) newestByTitle.set(key, item);
+  }
+  return [...newestByTitle.values()].sort(
+    (a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0),
+  );
 }
 
 async function hydrateContinueWatchingItems(items: MediaItem[]) {
@@ -829,9 +862,12 @@ export function AppProvider({
   // without this CW stays blank until the ~120-call Trakt up-next fetch returns,
   // and only appeared after a navigation round-trip remounted the screen.
   const initialProfileId = loadStored<string | null>(ACTIVE_PROFILE_KEY, null);
-  const initialCw = readCachedList(cwCacheKeyFor(initialProfileId));
+  const initialAccountId = authClient.session?.userId;
+  const initialCw = readCachedList(
+    cwCacheKeyFor(initialProfileId, initialAccountId),
+  );
   const initialWatchlist = readCachedList(
-    watchlistCacheKeyFor(initialProfileId),
+    watchlistCacheKeyFor(initialProfileId, initialAccountId),
   );
   const [categories, setCategories] = useState<Category[]>(
     initialCw.length
@@ -1120,8 +1156,8 @@ export function AppProvider({
         // Paint Continue Watching instantly from the last known list for this
         // profile — the fresh Trakt fetch replaces it seconds later. Without
         // this the rail sits empty while up to ~17 Trakt calls round-trip.
-        const cwCacheKey = cwCacheKeyFor(profileId);
-        const watchlistCacheKey = watchlistCacheKeyFor(profileId);
+        const cwCacheKey = cwCacheKeyFor(profileId, accountId);
+        const watchlistCacheKey = watchlistCacheKeyFor(profileId, accountId);
         try {
           const cachedCw = readCachedList(cwCacheKey);
           if (cachedCw.length && cwSourceRef.current === "none") {
@@ -1660,7 +1696,7 @@ export function AppProvider({
                   ...others,
                 ];
               });
-            } else if (traktReady && upNext.fetchFailures === 0) {
+            } else if (upNext.fetchFailures === 0) {
               // Only clear on a CLEAN pass: any per-show progress failure means this
               // empty result could be a partial outage, and wiping the cache would
               // recreate the blank-rail-on-startup bug the seed exists to prevent.
@@ -3471,7 +3507,8 @@ export function AppProvider({
         // so its Continue Watching paints instantly. refreshKeyRef (updated by the
         // refreshData call below) invalidates any in-flight refresh for the old
         // profile before it can write its rows over these.
-        const seededCw = readCachedList(cwCacheKeyFor(profile.id));
+        const accountId = authClient.session?.userId;
+        const seededCw = readCachedList(cwCacheKeyFor(profile.id, accountId));
         cwSourceRef.current = seededCw.length ? "seed" : "none";
         setContinueWatching(seededCw);
         setCategories(
@@ -3485,7 +3522,9 @@ export function AppProvider({
               ]
             : [],
         );
-        setWatchlist(readCachedList(watchlistCacheKeyFor(profile.id)));
+        setWatchlist(
+          readCachedList(watchlistCacheKeyFor(profile.id, accountId)),
+        );
         setWatchedKeys(new Set());
       }
       setView("app");
@@ -3570,7 +3609,10 @@ export function AppProvider({
         return;
       }
       const slim = slimCacheItem(item);
-      const cacheKey = watchlistCacheKeyFor(activeProfileId);
+      const cacheKey = watchlistCacheKeyFor(
+        activeProfileId,
+        authClient.session?.userId,
+      );
       const nextWatchlist = inWatchlist
         ? watchlist.filter(
             (entry) =>
@@ -3723,7 +3765,10 @@ export function AppProvider({
   const removeFromContinueWatching = useCallback(
     async (item: MediaItem) => {
       const key = mediaWatchKey(item);
-      const cacheKey = cwCacheKeyFor(activeProfileId);
+      const cacheKey = cwCacheKeyFor(
+        activeProfileId,
+        authClient.session?.userId,
+      );
 
       setContinueWatching((prev) => {
         const next = prev.filter(
