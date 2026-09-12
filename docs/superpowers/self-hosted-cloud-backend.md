@@ -1,5 +1,8 @@
 # Self-Hosted Cloud Backend
 
+Planned real-time delivery for Continue Watching is specified in
+[`realtime-continue-watching-sync.md`](realtime-continue-watching-sync.md).
+
 ## Goal
 
 Replace Netlify and Supabase with services operated on the StreamNet server. The Android application continues using the current cloud API contract, so the first migration only changes the backend base URL.

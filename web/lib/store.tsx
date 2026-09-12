@@ -420,13 +420,19 @@ function filterWatchedContinueWatching(
   watchedKeys: Set<string>,
   addons: InstalledAddon[],
   completions?: Map<string, number>,
+  activeResumeKeys: Set<string> = new Set(),
 ) {
   const nonLive = items.filter(
     (item) => !isLiveStreamOrSportsItem(item, addons),
   );
   if (!watchedKeys.size) return nonLive;
   return nonLive.filter((item) =>
-    isUnwatchedContinueWatching(item, watchedKeys, completions),
+    isUnwatchedContinueWatching(
+      item,
+      watchedKeys,
+      completions,
+      activeResumeKeys,
+    ),
   );
 }
 
@@ -1520,6 +1526,11 @@ export function AppProvider({
             removeStored(cwCacheKey);
           }
           const cloudCw = historyRows.map(historyToItem);
+          const activeCloudResumeKeys = new Set(
+            cloudCw
+              .map((item) => mediaWatchKey(item))
+              .filter((key): key is string => Boolean(key)),
+          );
           const traktPlaybackCw = playbackRows
             .map(traktPlaybackToMedia)
             .filter(isPausedContinueWatchingItem)
@@ -1563,6 +1574,7 @@ export function AppProvider({
               ),
             ],
             cwCompletions,
+            activeCloudResumeKeys,
           )
             .filter((item) => {
               const key = `${item.mediaType}:${item.id}`;
@@ -1650,6 +1662,7 @@ export function AppProvider({
               traktReady ? cwWatchedKeys : watchedKeys,
               addonState,
               traktReady ? cwCompletions : undefined,
+              activeCloudResumeKeys,
             ),
           );
           // Trakt outage guard: when Trakt is connected but every read came back

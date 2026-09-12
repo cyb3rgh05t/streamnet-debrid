@@ -57,3 +57,45 @@ test("one percent progress is eligible for Continue Watching", async () => {
   assert.equal(isPausedContinueWatchingItem({ progress: 89 }), true);
   assert.equal(isPausedContinueWatchingItem({ progress: 90 }), false);
 });
+
+test("active cloud movie resume survives tracker completion", async () => {
+  const { pruneCompletedResume } = await import(moduleUrl);
+  const item = {
+    id: 9481,
+    mediaType: "movie",
+    activityAt: 2_000,
+    progress: 46,
+  };
+
+  assert.deepEqual(
+    pruneCompletedResume(
+      [item],
+      new Map([["movie:9481", 3_000]]),
+      new Set(["movie:9481"]),
+    ),
+    [item],
+  );
+});
+
+test("active cloud episode resume survives tracker completion", async () => {
+  const { isUnwatchedContinueWatching } = await import(moduleUrl);
+  const item = {
+    id: 95350,
+    mediaType: "tv",
+    seasonNumber: 1,
+    episodeNumber: 1,
+    activityAt: 2_000,
+    progress: 3,
+  };
+  const key = "tv:95350:1:1";
+
+  assert.equal(
+    isUnwatchedContinueWatching(
+      item,
+      new Set([key]),
+      new Map([[key, 3_000]]),
+      new Set([key]),
+    ),
+    true,
+  );
+});

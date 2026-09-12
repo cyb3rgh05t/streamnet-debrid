@@ -45,12 +45,14 @@ export function completionTimes(
 export function pruneCompletedResume(
   items: MediaItem[],
   completions: Map<string, number>,
+  activeResumeKeys: Set<string> = new Set(),
 ): MediaItem[] {
   const next = items.filter((item) => {
     const key =
       item.mediaType === "tv"
         ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
         : `movie:${item.id}`;
+    if (activeResumeKeys.has(key)) return true;
     if (!completions.has(key)) return true;
     const completedAt = completions.get(key) ?? 0;
     if (
@@ -87,14 +89,19 @@ export function isUnwatchedContinueWatching(
   item: MediaItem,
   watchedKeys: Set<string>,
   completions?: Map<string, number>,
+  activeResumeKeys: Set<string> = new Set(),
 ): boolean {
-  if (completions) return pruneCompletedResume([item], completions).length > 0;
-  // Untimestamped badge flags alone cannot disprove a tracker progress reset.
-  if (item.mediaType === "tv" && item.badge === "Up Next") return true;
   const key =
     item.mediaType === "tv"
       ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
       : `movie:${item.id}`;
+  if (activeResumeKeys.has(key)) return true;
+  if (completions)
+    return (
+      pruneCompletedResume([item], completions, activeResumeKeys).length > 0
+    );
+  // Untimestamped badge flags alone cannot disprove a tracker progress reset.
+  if (item.mediaType === "tv" && item.badge === "Up Next") return true;
   return !watchedKeys.has(key);
 }
 
