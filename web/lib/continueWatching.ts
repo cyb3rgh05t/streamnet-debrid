@@ -111,6 +111,22 @@ export function isPausedContinueWatchingItem(item: MediaItem): boolean {
   return progress >= 1 && progress < 90;
 }
 
+export function preferActiveCloudResumeRecord<
+  T extends { progress?: number; updatedAtMs?: number },
+>(current: T | undefined, candidate: T): T {
+  if (!current) return candidate;
+  const currentProgress = Number(current.progress ?? 0);
+  const candidateProgress = Number(candidate.progress ?? 0);
+  const currentIsActive = currentProgress >= 1 && currentProgress < 90;
+  const candidateIsActive = candidateProgress >= 1 && candidateProgress < 90;
+  if (currentIsActive !== candidateIsActive) {
+    return candidateIsActive ? candidate : current;
+  }
+  return Number(candidate.updatedAtMs ?? 0) > Number(current.updatedAtMs ?? 0)
+    ? candidate
+    : current;
+}
+
 /** Active cloud episodes win same-show arbitration before completion filtering. */
 export function dedupeContinueWatchingShows(
   items: MediaItem[],

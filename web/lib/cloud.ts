@@ -5,6 +5,7 @@ import {
   serializeHomeServerConnectionJson,
 } from "./homeserver";
 import { HttpError, jsonRequest } from "./http";
+import { preferActiveCloudResumeRecord } from "./continueWatching";
 import { mergeTvSessions, normalizeTvSession } from "./iptvSession";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
 import { tmdbImageUrl } from "./mediaImages";
@@ -867,9 +868,7 @@ function androidContinueWatchingItems(
     const updatedAt = Number(item.updatedAtMs ?? 0);
     if (dismissedAt >= updatedAt) continue;
     const existing = newestByTitle.get(showKey);
-    if (!existing || updatedAt > Number(existing.updatedAtMs ?? 0)) {
-      newestByTitle.set(showKey, item);
-    }
+    newestByTitle.set(showKey, preferActiveCloudResumeRecord(existing, item));
   }
   return [...newestByTitle.values()];
 }

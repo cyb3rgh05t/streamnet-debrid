@@ -152,3 +152,27 @@ test("final reconciliation restores active cloud episodes omitted upstream", asy
     [lanterns, bull],
   );
 });
+
+test("active cloud resume wins over newer completed history for the same title", async () => {
+  const { preferActiveCloudResumeRecord } = await import(moduleUrl);
+  const activeBull = {
+    id: 66840,
+    mediaType: "TV",
+    progress: 69,
+    updatedAtMs: 2_000,
+  };
+  const completedBull = {
+    ...activeBull,
+    progress: 100,
+    updatedAtMs: 3_000,
+  };
+
+  assert.deepEqual(
+    preferActiveCloudResumeRecord(activeBull, completedBull),
+    activeBull,
+  );
+  assert.deepEqual(
+    preferActiveCloudResumeRecord(completedBull, activeBull),
+    activeBull,
+  );
+});
