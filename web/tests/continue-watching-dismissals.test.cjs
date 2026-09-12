@@ -48,3 +48,12 @@ test("episode dismissal does not hide a different episode", async () => {
     [nextEpisode],
   );
 });
+
+test("one percent progress is eligible for Continue Watching", async () => {
+  const { isPausedContinueWatchingItem } = await import(moduleUrl);
+
+  assert.equal(isPausedContinueWatchingItem({ progress: 0 }), false);
+  assert.equal(isPausedContinueWatchingItem({ progress: 1 }), true);
+  assert.equal(isPausedContinueWatchingItem({ progress: 89 }), true);
+  assert.equal(isPausedContinueWatchingItem({ progress: 90 }), false);
+});

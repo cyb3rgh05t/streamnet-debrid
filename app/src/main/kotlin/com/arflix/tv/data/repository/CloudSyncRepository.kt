@@ -2546,39 +2546,13 @@ class CloudSyncRepository @Inject constructor(
 
         // ── Local Continue Watching ──
         runCatching {
-            // Only import local CW for profiles that DON'T have Trakt connected.
-            // For Trakt profiles, CW is sourced exclusively from Trakt's progress API.
+            // Import the shared resume list for every profile. The Home resolver
+            // merges it with Trakt/MDBList so progress created by the WebUI is not lost.
             root.optJSONObject("localContinueWatchingByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, ContinueWatchingItem::class.java).type).type
                 val map: Map<String, List<ContinueWatchingItem>> = gson.fromJson(json, type) ?: emptyMap()
-                val traktProfiles = mutableSetOf<String>()
-
-                val traktTokenType = TypeToken.getParameterized(Map::class.java, String::class.java, TraktRepository.CloudTraktToken::class.java).type
-                val traktTokens = root.optJSONObject("traktTokens")
-                    ?.toString()
-                    ?.takeIf { it.isNotBlank() }
-                    ?.let { tokenJson ->
-                        runCatching {
-                            gson.fromJson<Map<String, TraktRepository.CloudTraktToken>>(tokenJson, traktTokenType)
-                        }.getOrNull()
-                    }
-                    .orEmpty()
-
-                traktTokens.forEach { (profileId, token) ->
-                    if (profileId.isNotBlank() && !token.accessToken.isNullOrBlank()) {
-                        traktProfiles.add(profileId)
-                    }
-                }
-
-                val isActiveProfileTrakt = runCatching { traktRepository.hasTrakt() }.getOrDefault(false)
-                val activeProfileIdLocal = profileManager.getProfileIdSync().ifBlank { null }
-                if (isActiveProfileTrakt && activeProfileIdLocal != null) {
-                    traktProfiles.add(activeProfileIdLocal)
-                }
-
-                val nonTraktOnly = map.filterKeys { it !in traktProfiles }
-                if (nonTraktOnly.isNotEmpty()) {
-                    traktRepository.importLocalContinueWatchingForProfiles(nonTraktOnly)
+                if (map.isNotEmpty()) {
+                    traktRepository.importLocalContinueWatchingForProfiles(map)
                 }
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_local_cw")) }

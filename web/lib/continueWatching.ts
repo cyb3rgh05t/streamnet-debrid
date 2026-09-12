@@ -98,6 +98,12 @@ export function isUnwatchedContinueWatching(
   return !watchedKeys.has(key);
 }
 
+export function isPausedContinueWatchingItem(item: MediaItem): boolean {
+  if (item.badge === "Up Next") return true;
+  const progress = item.progress ?? 0;
+  return progress >= 1 && progress < 90;
+}
+
 /** A stale pause on a watched episode must not suppress the show's next episode. */
 export function mergeTrackerContinueWatching(
   playback: MediaItem[],
@@ -164,7 +170,7 @@ export function includeIptvContinueWatching(
       !item.isWatched &&
       progress < 90 &&
       (duration <= 0 || position / duration < 0.9) &&
-      (progress >= 3 || position >= 60)
+      (progress >= 1 || position >= 60)
     );
   });
   return [...primary, ...additions].sort(

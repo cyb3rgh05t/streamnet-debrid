@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.009] - 2026-09-12
+
+### Geräteübergreifendes Weiterschauen
+
+- Cloud-Wiedergabefortschritt wird auf Android auch bei verbundenem Trakt oder MDBList importiert und mit dem Tracker-Stand zusammengeführt.
+- Die WebUI verwendet für Cloud- und IPTV-Fortschritt dieselbe 1-Prozent-Schwelle wie Android.
+
 ## [2.5.008] - 2026-09-12
 
 ### Continue Watching und Cloud-Sync

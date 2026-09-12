@@ -41,6 +41,7 @@ import {
   completionTimes,
   filterDismissedContinueWatching,
   includeIptvContinueWatching,
+  isPausedContinueWatchingItem,
   isUnwatchedContinueWatching,
   mergePartialContinueWatching,
   mergeTrackerContinueWatching,
@@ -442,13 +443,6 @@ function isMediaWatched(
   return Boolean(key && watchedKeys.has(key));
 }
 
-function isPausedPlaybackItem(item: MediaItem) {
-  if (item.badge === "Up Next") return true;
-  // Match the Android app: in-progress items are 3%–90% watched.
-  const progress = item.progress ?? 0;
-  return progress >= 3 && progress < 90;
-}
-
 function traktActivityTime(raw: unknown) {
   const item = raw as {
     last_watched_at?: string;
@@ -580,7 +574,8 @@ function mergeTraktWithLocalResume(
     ...mergedTraktItems,
     ...localItems.filter(
       (item) =>
-        !traktEpisodeKeys.has(exactKey(item)) && isPausedPlaybackItem(item),
+        !traktEpisodeKeys.has(exactKey(item)) &&
+        isPausedContinueWatchingItem(item),
     ),
   ];
   const newestByTitle = new Map<string, MediaItem>();
@@ -1527,7 +1522,7 @@ export function AppProvider({
           const cloudCw = historyRows.map(historyToItem);
           const traktPlaybackCw = playbackRows
             .map(traktPlaybackToMedia)
-            .filter(isPausedPlaybackItem)
+            .filter(isPausedContinueWatchingItem)
             .filter((item) => !isHiddenShow(item) && !isDismissed(item));
 
           // ── Fast paint ─────────────────────────────────────────────────────────
@@ -1562,7 +1557,7 @@ export function AppProvider({
               ...traktPlaybackCw,
               ...cloudCw.filter(
                 (item) =>
-                  isPausedPlaybackItem(item) &&
+                  isPausedContinueWatchingItem(item) &&
                   !isHiddenShow(item) &&
                   !isDismissed(item),
               ),
@@ -1641,7 +1636,7 @@ export function AppProvider({
           )
             setWatchedKeys(watchedKeys);
           const cwBase = includeIptvContinueWatching(
-            traktReady ? traktCw : cloudCw.filter(isPausedPlaybackItem),
+            traktReady ? traktCw : cloudCw.filter(isPausedContinueWatchingItem),
             cloudCw.filter((item) => !isHiddenShow(item) && !isDismissed(item)),
           );
           // Order newest-activity-first across playback + up-next (matches the app's

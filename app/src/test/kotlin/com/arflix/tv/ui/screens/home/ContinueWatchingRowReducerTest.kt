@@ -84,6 +84,20 @@ class ContinueWatchingRowReducerTest {
         assertEquals(2, result.single().episode)
     }
 
+    @Test
+    fun `cloud only item remains alongside tracker item`() {
+        val trackerItem = continueWatchingItem(id = 20, season = 1, episode = 2, updatedAtMs = 1_000L)
+        val cloudItem = continueWatchingItem(id = 30, season = 2, episode = 4, updatedAtMs = 2_000L)
+
+        val result = mergeTraktAndRecentLocalContinueWatching(
+            traktItems = listOf(trackerItem),
+            localItems = listOf(cloudItem),
+            historyItems = emptyList()
+        )
+
+        assertEquals(listOf(30, 20), result.map { it.id })
+    }
+
     private fun tvItem(id: Int, season: Int, episode: Int) = MediaItem(
         id = id,
         title = "Show",
