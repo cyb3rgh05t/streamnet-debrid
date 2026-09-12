@@ -126,6 +126,13 @@ export function continueWatchingProgressPercent(
   return Math.max(positionProgress, storedProgressPercent);
 }
 
+export function shouldShowContinueWatchingProgress(
+  progressPercent: number,
+  isUpNext: boolean,
+): boolean {
+  return !isUpNext && progressPercent >= 1 && progressPercent < 100;
+}
+
 export function preferActiveCloudResumeRecord<
   T extends { progress?: number; updatedAtMs?: number },
 >(current: T | undefined, candidate: T): T {

@@ -3,7 +3,10 @@
 import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { accentColor } from "@/lib/accent";
-import { continueWatchingProgressPercent } from "@/lib/continueWatching";
+import {
+  continueWatchingProgressPercent,
+  shouldShowContinueWatchingProgress,
+} from "@/lib/continueWatching";
 import { useApp } from "@/lib/store";
 import { getLogoUrl, prefetchDetails, resolveTmdbId } from "@/lib/tmdb";
 import type { MediaItem } from "@/lib/types";
@@ -81,11 +84,13 @@ function MediaCardBase({
   onOpen,
   onFocus,
   posterMode,
+  autoFocus = false,
 }: {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   posterMode?: boolean;
+  autoFocus?: boolean;
 }) {
   const { settings, isWatched, openContextMenu } = useApp();
   const effectivePosterMode =
@@ -101,15 +106,16 @@ function MediaCardBase({
     item.durationSeconds ?? 0,
     (item.progress ?? 0) / 100,
   );
-  const watched = isWatched(item);
+  const storedWatched = isWatched(item);
   // "Up next" rows carry SERIES completion (how far through the show you are),
   // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
   // reads as "you're 40% into that episode", which is wrong. Those rows get the
   // "Up next" chip instead; the bar stays for genuinely resumable items.
   const isUpNext = item.timeRemainingLabel === "Up next";
-  const showProgress = !watched && !isUpNext && progress >= 1 && progress < 100;
+  const showProgress = shouldShowContinueWatchingProgress(progress, isUpNext);
   const isContinueWatchingCard =
     isUpNext || showProgress || Boolean(item.timeRemainingLabel);
+  const watched = storedWatched && !isContinueWatchingCard;
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClickUntil = useRef(0);
   // CW/up-next items from Trakt arrive with no artwork, and a hydration that hit
@@ -279,6 +285,7 @@ function MediaCardBase({
   return (
     <button
       type="button"
+      autoFocus={autoFocus}
       className={`media-card ${effectivePosterMode ? "is-poster" : ""}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}
@@ -368,6 +375,7 @@ export const MediaCard = memo(
   (prev, next) =>
     prev.item === next.item &&
     prev.posterMode === next.posterMode &&
+    prev.autoFocus === next.autoFocus &&
     prev.onOpen === next.onOpen &&
     prev.onFocus === next.onFocus,
 );

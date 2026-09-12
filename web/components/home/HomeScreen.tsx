@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { IMDB_LOGO } from "@/lib/serviceLogos";
 import { genreNamesFromIds, getCardMeta, getLogoUrl } from "@/lib/tmdb";
 import { getImdbRating } from "@/lib/imdbRatings";
+import { loadGenreFanart } from "@/lib/genreFanart";
 import { useApp } from "@/lib/store";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
@@ -28,6 +29,116 @@ function isCollectionCatalog(catalog: CatalogConfig) {
   return String(catalog.kind ?? "").toUpperCase() === "COLLECTION";
 }
 
+function sourceSupportsMediaType(
+  source: NonNullable<CatalogConfig["collectionSources"]>[number],
+  mediaType: MediaItem["mediaType"],
+) {
+  const declared = String(source.mediaType ?? "")
+    .trim()
+    .toLowerCase();
+  if (["all", "any", "both", "mixed"].includes(declared)) return true;
+  if (declared) {
+    return mediaType === "movie"
+      ? declared === "movie" || declared === "film"
+      : ["series", "tv", "show", "anime"].includes(declared);
+  }
+  return (
+    mediaType === "movie" ||
+    String(source.kind).toUpperCase() !== "TMDB_COLLECTION"
+  );
+}
+
+function catalogForMediaType(
+  catalog: CatalogConfig,
+  mediaType: MediaItem["mediaType"],
+): CatalogConfig {
+  return {
+    ...catalog,
+    id: `${catalog.id}:${mediaType}`,
+    mediaType,
+    collectionSources: catalog.collectionSources
+      ?.filter((source) => sourceSupportsMediaType(source, mediaType))
+      .map((source) => {
+        const declared = String(source.mediaType ?? "")
+          .trim()
+          .toLowerCase();
+        return ["all", "any", "both", "mixed"].includes(declared)
+          ? { ...source, mediaType }
+          : source;
+      }),
+  };
+}
+
+function CollectionBrowser({
+  catalog,
+  onBack,
+  onOpen,
+  onHero,
+}: {
+  catalog: CatalogConfig;
+  onBack: () => void;
+  onOpen: (item: MediaItem) => void;
+  onHero: (item: MediaItem) => void;
+}) {
+  const { settings } = useApp();
+  const movieCatalog = useMemo(
+    () => catalogForMediaType(catalog, "movie"),
+    [catalog],
+  );
+  const seriesCatalog = useMemo(
+    () => catalogForMediaType(catalog, "tv"),
+    [catalog],
+  );
+  const supportsMovies = Boolean(movieCatalog.collectionSources?.length);
+  const supportsSeries =
+    String(catalog.collectionGroup ?? "").toUpperCase() === "NETWORK" ||
+    Boolean(seriesCatalog.collectionSources?.length);
+  const [mediaType, setMediaType] = useState<MediaItem["mediaType"]>(
+    supportsMovies ? "movie" : "tv",
+  );
+  const activeCatalog = mediaType === "movie" ? movieCatalog : seriesCatalog;
+
+  return (
+    <section className="collection-browser">
+      <button type="button" className="collection-back" onClick={onBack}>
+        <ArrowLeft size={20} />
+        {localize(settings.uiLanguage, "Zurück", "Back")}
+      </button>
+      {supportsMovies && supportsSeries && (
+        <div className="collection-tabs" role="tablist">
+          <button
+            type="button"
+            className={mediaType === "movie" ? "is-active" : ""}
+            onClick={() => setMediaType("movie")}
+          >
+            {localize(settings.uiLanguage, "Filme", "Movies")}
+          </button>
+          <button
+            type="button"
+            className={mediaType === "tv" ? "is-active" : ""}
+            onClick={() => setMediaType("tv")}
+          >
+            {localize(settings.uiLanguage, "Serien", "Series")}
+          </button>
+        </div>
+      )}
+      <LazyRail
+        key={activeCatalog.id}
+        catalog={activeCatalog}
+        eager
+        mediaTypeFilter={mediaType}
+        focusFirstItem
+        onOpen={onOpen}
+        onFocus={onHero}
+        onLoaded={(row) => {
+          const first = row.items[0];
+          if (first) onHero(first);
+        }}
+      />
+    </section>
+  );
+}
+
 export function HomeScreen() {
   const {
     hero,
@@ -43,6 +154,38 @@ export function HomeScreen() {
   const [openCollection, setOpenCollection] = useState<CatalogConfig | null>(
     null,
   );
+  const [genreFanart, setGenreFanart] = useState<Map<string, string>>(
+    new Map(),
+  );
+
+  useEffect(() => {
+    const needsMovieGenres = catalogConfigs.some(
+      (catalog) =>
+        String(catalog.collectionGroup).toUpperCase() === "MOVIE_GENRE",
+    );
+    const needsTvGenres = catalogConfigs.some(
+      (catalog) => String(catalog.collectionGroup).toUpperCase() === "TV_GENRE",
+    );
+    if (!needsMovieGenres && !needsTvGenres) return;
+    let active = true;
+    void Promise.all([
+      needsMovieGenres
+        ? loadGenreFanart("movie", settings.language)
+        : Promise.resolve(new Map<number, string>()),
+      needsTvGenres
+        ? loadGenreFanart("tv", settings.language)
+        : Promise.resolve(new Map<number, string>()),
+    ]).then(([movies, series]) => {
+      if (!active) return;
+      const next = new Map<string, string>();
+      movies.forEach((url, id) => next.set(`MOVIE_GENRE:${id}`, url));
+      series.forEach((url, id) => next.set(`TV_GENRE:${id}`, url));
+      setGenreFanart(next);
+    });
+    return () => {
+      active = false;
+    };
+  }, [catalogConfigs, settings.language]);
   const homeCatalogEntries = useMemo(() => {
     const groups = new Map<string, CatalogConfig[]>();
     catalogConfigs.filter(isCollectionCatalog).forEach((catalog) => {
@@ -147,44 +290,39 @@ export function HomeScreen() {
     return () => window.clearInterval(timer);
   }, [heroPool, setHeroPreview]);
 
-  // Synchronize hero changes so all content (logo, text, metadata, backdrop) updates together.
+  // Show the selected item immediately, then hydrate its logo and wide artwork
+  // together so a delayed logo response cannot overwrite the fetched backdrop.
   useEffect(() => {
     if (!hero) {
       setDisplayHero(null);
       setHeroLogo(null);
-      return;
+      return undefined;
     }
 
     let active = true;
-
-    // Fast path: if no hero is currently displayed, show it immediately so there is no blank screen on first load
-    if (!displayHero) {
-      setDisplayHero(hero);
-      void getLogoUrl({ mediaType: hero.mediaType, id: hero.id })
-        .then((url) => {
-          if (active) setHeroLogo(url);
-        })
-        .catch(() => undefined);
-      return;
-    }
-
-    // Normal path: fetch the logo in the background first, then swap all content together
-    void getLogoUrl({ mediaType: hero.mediaType, id: hero.id })
-      .then((url) => {
-        if (!active) return;
-        setHeroLogo(url);
-        setDisplayHero(hero);
-      })
-      .catch(() => {
-        if (!active) return;
-        setHeroLogo(null);
-        setDisplayHero(hero);
+    setDisplayHero(hero);
+    setHeroLogo(null);
+    void Promise.all([
+      getLogoUrl({ mediaType: hero.mediaType, id: hero.id }).catch(() => null),
+      !hero.backdrop && hero.id > 0 && !hero.isHomeServer
+        ? getCardMeta({ mediaType: hero.mediaType, id: hero.id }).catch(
+            () => null,
+          )
+        : Promise.resolve(null),
+    ]).then(([logo, meta]) => {
+      if (!active) return;
+      setHeroLogo(logo);
+      setDisplayHero({
+        ...hero,
+        backdrop: hero.backdrop || meta?.backdrop || null,
+        image: hero.image || meta?.image || "",
       });
+    });
 
     return () => {
       active = false;
     };
-  }, [hero, displayHero]);
+  }, [hero]);
 
   const onCardFocus = (item: MediaItem) => {
     userInteractedHero.current = true;
@@ -248,9 +386,10 @@ export function HomeScreen() {
         <section
           className="hero home-hero"
           style={{
-            backgroundImage: displayHero.backdrop
-              ? `url(${displayHero.backdrop})`
-              : undefined,
+            backgroundImage:
+              displayHero.backdrop || displayHero.image
+                ? `url(${displayHero.backdrop || displayHero.image})`
+                : undefined,
           }}
         >
           <div className="hero-copy">
@@ -308,22 +447,12 @@ export function HomeScreen() {
         </section>
       )}
       {openCollection ? (
-        <section className="collection-browser">
-          <button
-            type="button"
-            className="collection-back"
-            onClick={() => setOpenCollection(null)}
-          >
-            <ArrowLeft size={20} />
-            {localize(settings.uiLanguage, "Zurück", "Back")}
-          </button>
-          <LazyRail
-            catalog={openCollection}
-            eager
-            onOpen={openDetails}
-            onFocus={onCardFocus}
-          />
-        </section>
+        <CollectionBrowser
+          catalog={openCollection}
+          onBack={() => setOpenCollection(null)}
+          onOpen={openDetails}
+          onHero={setHeroPreview}
+        />
       ) : (
         <>
           {dedupedCategories.map((category) => (
@@ -370,13 +499,18 @@ export function HomeScreen() {
                       onClick={() => setOpenCollection(catalog)}
                     >
                       <span className="collection-art">
-                        {catalog.collectionCoverImageUrl && (
-                          <img
-                            src={catalog.collectionCoverImageUrl}
-                            alt=""
-                            loading="lazy"
-                          />
-                        )}
+                        {(() => {
+                          const genreId = catalog.collectionSources?.find(
+                            (source) => source.tmdbGenreId,
+                          )?.tmdbGenreId;
+                          const artwork =
+                            (genreId
+                              ? genreFanart.get(`${entry.group}:${genreId}`)
+                              : null) ?? catalog.collectionCoverImageUrl;
+                          return artwork ? (
+                            <img src={artwork} alt="" loading="lazy" />
+                          ) : null;
+                        })()}
                       </span>
                       {!catalog.collectionHideTitle && (
                         <strong>{catalog.title || catalog.name}</strong>

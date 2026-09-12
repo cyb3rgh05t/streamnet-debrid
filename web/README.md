@@ -31,6 +31,10 @@ Traefik routes `${STREAMNET_WEB_HOST}` to the web container on its internal port
 
 The backend URL in `.env` must point to the backend server, normally `https://auth.mystreamnet.club`.
 
+`VODWISHARR_API_KEY` is optional and remains server-side. When configured, the
+movie- and series-genre tiles use the same VODWisharr fanart and duotone mapping
+as Android; otherwise the synchronized/static catalog covers remain in use.
+
 `NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL` configures the host for the predefined
 STREAMNET TV Xtream login in TV settings. It defaults to
 `https://xui.streamnet.live` and is embedded when the web image is built.

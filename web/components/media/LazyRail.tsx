@@ -20,6 +20,8 @@ export function LazyRail({
   onOpen,
   onFocus,
   onLoaded,
+  mediaTypeFilter,
+  focusFirstItem = false,
 }: {
   catalog: CatalogConfig;
   eager?: boolean;
@@ -27,13 +29,15 @@ export function LazyRail({
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   onLoaded?: (category: Category) => void;
+  mediaTypeFilter?: MediaItem["mediaType"];
+  focusFirstItem?: boolean;
 }) {
   const { loadCatalogRow, settings } = useApp();
   const cacheKey = catalogCacheKey(catalog, settings.language);
   const ref = useRef<HTMLDivElement | null>(null);
   const startedRef = useRef(false);
   const [category, setCategory] = useState<Category | null>(() =>
-    readCachedCatalog(cacheKey),
+    filterCategory(readCachedCatalog(cacheKey), mediaTypeFilter),
   );
   const effectivePosterMode =
     catalog.layout === "poster" ||
@@ -43,7 +47,7 @@ export function LazyRail({
   const [done, setDone] = useState(false);
 
   useEffect(() => {
-    const cached = readCachedCatalog(cacheKey);
+    const cached = filterCategory(readCachedCatalog(cacheKey), mediaTypeFilter);
     if (cached) {
       setCategory(cached);
       onLoaded?.(cached);
@@ -64,10 +68,11 @@ export function LazyRail({
         .then((row) => {
           setLoading(false);
           setDone(true);
-          if (row?.items.length) {
-            setCategory(row);
+          const filteredRow = filterCategory(row, mediaTypeFilter);
+          if (row && filteredRow?.items.length) {
+            setCategory(filteredRow);
             writeCachedCatalog(cacheKey, row);
-            onLoaded?.(row);
+            onLoaded?.(filteredRow);
           }
         })
         .catch(() => {
@@ -112,6 +117,7 @@ export function LazyRail({
         onOpen={onOpen}
         onFocus={onFocus}
         posterMode={effectivePosterMode}
+        focusFirstItem={focusFirstItem}
       />
     );
   }
@@ -134,6 +140,17 @@ export function LazyRail({
       </div>
     </section>
   );
+}
+
+function filterCategory(
+  category: Category | null,
+  mediaType?: MediaItem["mediaType"],
+): Category | null {
+  if (!category || !mediaType) return category;
+  return {
+    ...category,
+    items: category.items.filter((item) => item.mediaType === mediaType),
+  };
 }
 
 function catalogCacheKey(catalog: CatalogConfig, language: string) {

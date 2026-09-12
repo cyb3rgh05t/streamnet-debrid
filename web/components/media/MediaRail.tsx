@@ -11,11 +11,13 @@ export function MediaRail({
   onOpen,
   onFocus,
   posterMode,
+  focusFirstItem = false,
 }: {
   category: Category;
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   posterMode?: boolean;
+  focusFirstItem?: boolean;
 }) {
   const { settings } = useApp();
   const title = translateUiText(settings.uiLanguage, category.title);
@@ -31,13 +33,14 @@ export function MediaRail({
         <h3>{title}</h3>
       </div>
       <RailScroller className="rail-strip" ariaLabel={title}>
-        {category.items.map((item) => (
+        {category.items.map((item, index) => (
           <MediaCard
             key={`${category.id}-${item.mediaType}-${item.id}-${item.title}`}
             item={item}
             onOpen={onOpen}
             onFocus={onFocus}
             posterMode={effectivePosterMode}
+            autoFocus={focusFirstItem && index === 0}
           />
         ))}
       </RailScroller>

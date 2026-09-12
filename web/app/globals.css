@@ -4097,6 +4097,30 @@ select {
   cursor: pointer;
 }
 
+.collection-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 8px clamp(20px, 4vw, 64px) 10px;
+}
+
+.collection-tabs button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 8px 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.72);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-tabs button.is-active,
+.collection-tabs button:focus-visible {
+  border-color: var(--accent, #fff);
+  background: color-mix(in srgb, var(--accent, #fff) 22%, transparent);
+  color: #fff;
+}
+
 .collection-tile {
   width: 100%;
   border: 0;
