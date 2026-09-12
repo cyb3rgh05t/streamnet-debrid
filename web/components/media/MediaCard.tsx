@@ -116,6 +116,7 @@ function MediaCardBase({
   const isContinueWatchingCard =
     isUpNext || showProgress || Boolean(item.timeRemainingLabel);
   const watched = storedWatched && !isContinueWatchingCard;
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const suppressClickUntil = useRef(0);
   // CW/up-next items from Trakt arrive with no artwork, and a hydration that hit
@@ -149,6 +150,10 @@ function MediaCardBase({
         : null;
   const [metadataId, setMetadataId] = useState<number | null>(directMetadataId);
   const [logo, setLogo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (autoFocus) buttonRef.current?.focus({ preventScroll: true });
+  }, [autoFocus, item.id, item.mediaType]);
 
   useEffect(() => {
     let active = true;
@@ -284,8 +289,8 @@ function MediaCardBase({
 
   return (
     <button
+      ref={buttonRef}
       type="button"
-      autoFocus={autoFocus}
       className={`media-card ${effectivePosterMode ? "is-poster" : ""}`}
       onClick={handleClick}
       onContextMenu={handleContextMenu}

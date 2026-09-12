@@ -271,6 +271,7 @@ button {
   position: relative;
   z-index: 1;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   padding: clamp(120px, 15vh, 160px) 0 78px;
   width: 100%;

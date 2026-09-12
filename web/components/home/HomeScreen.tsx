@@ -103,6 +103,10 @@ function CollectionBrowser({
   );
   const activeCatalog = mediaType === "movie" ? movieCatalog : seriesCatalog;
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [catalog.id]);
+
   return (
     <section className="collection-browser">
       <button type="button" className="collection-back" onClick={onBack}>
@@ -287,7 +291,7 @@ export function HomeScreen() {
   // Auto-advance the hero every 8s until the user hovers a card (which pins the
   // hero to whatever they're pointing at and stops the carousel).
   useEffect(() => {
-    if (heroPool.length < 2) return undefined;
+    if (openCollection || heroPool.length < 2) return undefined;
     let index = 0;
     if (!userInteractedHero.current) setHeroPreview(heroPool[0]);
     const timer = window.setInterval(() => {
@@ -296,7 +300,7 @@ export function HomeScreen() {
       setHeroPreview(heroPool[index]);
     }, 8000);
     return () => window.clearInterval(timer);
-  }, [heroPool, setHeroPreview]);
+  }, [heroPool, openCollection, setHeroPreview]);
 
   // Show the selected item immediately, then hydrate its logo and wide artwork
   // together so a delayed logo response cannot overwrite the fetched backdrop.
