@@ -10,3 +10,7 @@ export const ACCENTS: Record<string, string> = {
 export function accentColor(value: string): string {
   return ACCENTS[value] ?? ACCENTS.orange;
 }
+
+export function accentProfileColor(value: string): number {
+  return (0xff000000 | Number.parseInt(accentColor(value).slice(1), 16)) >>> 0;
+}

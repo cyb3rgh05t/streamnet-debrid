@@ -18,6 +18,7 @@ import {
   saveLocalAddons,
 } from "./addons";
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
+import { accentProfileColor } from "./accent";
 import { config, getAuthPortalUrl } from "./config";
 import { defaultCatalogs, mergeCatalogs } from "./catalogs";
 import {
@@ -252,6 +253,11 @@ function randomProfileColor() {
     0xff14b8a6, 0xff6366f1,
   ];
   return colors[Math.floor(Math.random() * colors.length)];
+}
+
+function automaticProfileColor() {
+  const stored = loadStored<{ accentColor?: string }>(settingsKey, {});
+  return accentProfileColor(stored.accentColor ?? "orange");
 }
 
 function makeProfile(name: string, avatarColor: number, avatarId = 0): Profile {
@@ -992,7 +998,9 @@ export function AppProvider({
     const stored = localProfilesMatchAccount()
       ? loadStored<Profile[]>(PROFILES_KEY, [])
       : [];
-    return stored.length ? stored : [makeProfile("Profile 1", 0xffe50914, 0)];
+    return stored.length
+      ? stored
+      : [makeProfile("Profile 1", automaticProfileColor(), 0)];
   });
   const [activeProfileId, setActiveProfileId] = useState<string | null>(() =>
     localProfilesMatchAccount()
@@ -2186,7 +2194,9 @@ export function AppProvider({
           // stamped for a DIFFERENT account, they leaked from a previous
           // session — replace them with one clean profile.
           if (!localProfilesMatchAccount()) {
-            const fresh = [makeProfile("Profile 1", randomProfileColor(), 0)];
+            const fresh = [
+              makeProfile("Profile 1", automaticProfileColor(), 0),
+            ];
             setProfiles(fresh);
             setActiveProfileId(fresh[0].id);
             saveStored(PROFILES_OWNER_KEY, currentAccountEmail());
@@ -3051,7 +3061,7 @@ export function AppProvider({
         // the new account's cloud profiles load. A brand-new account then starts
         // with one clean profile instead of inheriting the old ones.
         if (previousEmail && previousEmail !== trimmedEmail.toLowerCase()) {
-          const fresh = [makeProfile("Profile 1", randomProfileColor(), 0)];
+          const fresh = [makeProfile("Profile 1", automaticProfileColor(), 0)];
           setProfiles(fresh);
           setActiveProfileId(fresh[0].id);
           setContinueWatching([]);
