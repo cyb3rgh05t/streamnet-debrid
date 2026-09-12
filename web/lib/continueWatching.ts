@@ -111,6 +111,46 @@ export function isPausedContinueWatchingItem(item: MediaItem): boolean {
   return progress >= 1 && progress < 90;
 }
 
+/** Active cloud episodes win same-show arbitration before completion filtering. */
+export function dedupeContinueWatchingShows(
+  items: MediaItem[],
+  activeResumeKeys: Set<string> = new Set(),
+): MediaItem[] {
+  const exactKey = (item: MediaItem) =>
+    item.mediaType === "tv"
+      ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
+      : `movie:${item.id}`;
+  const showKey = (item: MediaItem) => `${item.mediaType}:${item.id}`;
+  const isNewer = (candidate: MediaItem, current: MediaItem) =>
+    (candidate.activityAt ?? 0) > (current.activityAt ?? 0) ||
+    ((candidate.activityAt ?? 0) === (current.activityAt ?? 0) &&
+      ((candidate.resumePositionSeconds ?? 0) >
+        (current.resumePositionSeconds ?? 0) ||
+        ((candidate.resumePositionSeconds ?? 0) ===
+          (current.resumePositionSeconds ?? 0) &&
+          (candidate.progress ?? 0) > (current.progress ?? 0))));
+  const newestByShow = new Map<string, MediaItem>();
+  for (const item of items) {
+    const key = showKey(item);
+    const current = newestByShow.get(key);
+    if (!current) {
+      newestByShow.set(key, item);
+      continue;
+    }
+    const itemIsActive = activeResumeKeys.has(exactKey(item));
+    const currentIsActive = activeResumeKeys.has(exactKey(current));
+    if (
+      (itemIsActive && !currentIsActive) ||
+      (itemIsActive === currentIsActive && isNewer(item, current))
+    ) {
+      newestByShow.set(key, item);
+    }
+  }
+  return [...newestByShow.values()].sort(
+    (a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0),
+  );
+}
+
 /** A stale pause on a watched episode must not suppress the show's next episode. */
 export function mergeTrackerContinueWatching(
   playback: MediaItem[],

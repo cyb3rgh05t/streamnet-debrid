@@ -39,6 +39,7 @@ import {
 } from "./cloud";
 import {
   completionTimes,
+  dedupeContinueWatchingShows,
   filterDismissedContinueWatching,
   includeIptvContinueWatching,
   isPausedContinueWatchingItem,
@@ -532,11 +533,11 @@ async function loadTraktUpNext(
 function mergeTraktWithLocalResume(
   traktItems: MediaItem[],
   localItems: MediaItem[],
+  activeResumeKeys: Set<string> = new Set(),
 ) {
   if (!localItems.length) return traktItems;
   const exactKey = (item: MediaItem) =>
     `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`;
-  const titleKey = (item: MediaItem) => `${item.mediaType}:${item.id}`;
   const isNewer = (candidate: MediaItem, current: MediaItem) =>
     (candidate.activityAt ?? 0) > (current.activityAt ?? 0) ||
     ((candidate.activityAt ?? 0) === (current.activityAt ?? 0) &&
@@ -584,15 +585,7 @@ function mergeTraktWithLocalResume(
         isPausedContinueWatchingItem(item),
     ),
   ];
-  const newestByTitle = new Map<string, MediaItem>();
-  for (const item of candidates) {
-    const key = titleKey(item);
-    const current = newestByTitle.get(key);
-    if (!current || isNewer(item, current)) newestByTitle.set(key, item);
-  }
-  return [...newestByTitle.values()].sort(
-    (a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0),
-  );
+  return dedupeContinueWatchingShows(candidates, activeResumeKeys);
 }
 
 async function hydrateContinueWatchingItems(items: MediaItem[]) {
@@ -1562,9 +1555,9 @@ export function AppProvider({
           // resume (you watched on another device), and dedupeMedia keys on the
           // episode subtitle — which rendered that series twice until the enriched
           // pass tidied up. Trakt playback is the newer truth, so it wins.
-          const fastSeen = new Set<string>();
-          const fastCw = pruneCompletedResume(
-            [
+          const fastCw = dedupeContinueWatchingShows(
+            pruneCompletedResume(
+              [
               ...traktPlaybackCw,
               ...cloudCw.filter(
                 (item) =>
@@ -1572,16 +1565,12 @@ export function AppProvider({
                   !isHiddenShow(item) &&
                   !isDismissed(item),
               ),
-            ],
-            cwCompletions,
+              ],
+              cwCompletions,
+              activeCloudResumeKeys,
+            ),
             activeCloudResumeKeys,
           )
-            .filter((item) => {
-              const key = `${item.mediaType}:${item.id}`;
-              if (fastSeen.has(key)) return false;
-              fastSeen.add(key);
-              return true;
-            })
             .sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
           if (fastCw.length) {
             void hydrateContinueWatchingItems(fastCw)
@@ -1640,6 +1629,7 @@ export function AppProvider({
               cwCompletions,
             ),
             cloudCw,
+            activeCloudResumeKeys,
           );
           if (
             !readFailures.has("watched-movies") &&

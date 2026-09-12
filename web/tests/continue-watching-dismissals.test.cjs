@@ -99,3 +99,30 @@ test("active cloud episode resume survives tracker completion", async () => {
     true,
   );
 });
+
+test("active cloud episode wins over a different Trakt episode for the same show", async () => {
+  const { dedupeContinueWatchingShows } = await import(moduleUrl);
+  const cloudResume = {
+    id: 95350,
+    mediaType: "tv",
+    seasonNumber: 1,
+    episodeNumber: 1,
+    activityAt: 2_000,
+    progress: 3,
+  };
+  const newerTraktUpNext = {
+    ...cloudResume,
+    episodeNumber: 2,
+    activityAt: 3_000,
+    progress: 0,
+    badge: "Up Next",
+  };
+
+  assert.deepEqual(
+    dedupeContinueWatchingShows(
+      [newerTraktUpNext, cloudResume],
+      new Set(["tv:95350:1:1"]),
+    ),
+    [cloudResume],
+  );
+});
