@@ -1,16 +1,18 @@
 import { config } from "./config";
 import { getDetails, resolveTmdbId } from "./tmdb";
 import { tmdbImageUrl } from "./mediaImages";
+import { continueWatchingProgressPercent } from "./continueWatching";
 import type { MediaItem, WatchHistoryEntry } from "./types";
 
 export function historyToItem(entry: WatchHistoryEntry): MediaItem {
   const title = entry.title ?? "Untitled";
   const duration = Math.max(0, entry.duration_seconds ?? 0);
   const position = Math.max(0, entry.position_seconds ?? 0);
-  const progress =
-    duration > 0
-      ? Math.round(Math.min(1, position / duration) * 100)
-      : Math.round((entry.progress ?? 0) * 100);
+  const progress = continueWatchingProgressPercent(
+    position,
+    duration,
+    entry.progress ?? 0,
+  );
   const remaining = Math.max(0, duration - position);
   return {
     id: entry.show_tmdb_id,

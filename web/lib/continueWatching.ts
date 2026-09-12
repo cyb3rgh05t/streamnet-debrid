@@ -111,6 +111,21 @@ export function isPausedContinueWatchingItem(item: MediaItem): boolean {
   return progress >= 1 && progress < 90;
 }
 
+export function continueWatchingProgressPercent(
+  positionSeconds: number,
+  durationSeconds: number,
+  storedProgress: number,
+): number {
+  const positionProgress =
+    durationSeconds > 0
+      ? Math.round(Math.min(1, positionSeconds / durationSeconds) * 100)
+      : 0;
+  const storedProgressPercent = Math.round(
+    Math.min(1, Math.max(0, storedProgress)) * 100,
+  );
+  return Math.max(positionProgress, storedProgressPercent);
+}
+
 export function preferActiveCloudResumeRecord<
   T extends { progress?: number; updatedAtMs?: number },
 >(current: T | undefined, candidate: T): T {

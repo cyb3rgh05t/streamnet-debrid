@@ -58,6 +58,13 @@ test("one percent progress is eligible for Continue Watching", async () => {
   assert.equal(isPausedContinueWatchingItem({ progress: 90 }), false);
 });
 
+test("stored cloud progress survives placeholder playback timing", async () => {
+  const { continueWatchingProgressPercent } = await import(moduleUrl);
+
+  assert.equal(continueWatchingProgressPercent(0, 1, 0.03), 3);
+  assert.equal(continueWatchingProgressPercent(4357, 7670, 0.57), 57);
+});
+
 test("active cloud movie resume survives tracker completion", async () => {
   const { pruneCompletedResume } = await import(moduleUrl);
   const item = {
