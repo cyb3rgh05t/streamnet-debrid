@@ -17,34 +17,19 @@ import org.junit.Test
  */
 class PreinstalledServicesTest {
     private val introVideoCommit = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
+    private val franchiseImageCommit = "20bee004466c109d992a78601a78f0609dd2f78a"
 
     @Test
-    fun `later franchise tiles use stable landscape artwork`() {
-        val affectedTitles = setOf(
-            "Lord of the Rings",
-            "X-Men",
-            "Hunger Games",
-            "Avatar",
-            "Dune",
-            "Indiana Jones",
-            "The Godfather",
-            "John Wick",
-            "Transformers",
-        )
+    fun `all franchise tiles use pinned branded artwork without logo overlays`() {
         val franchises = MediaRepository.buildPreinstalledDefaults()
             .filter { it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.FRANCHISE }
-            .filter { it.title in affectedTitles }
 
-        assertEquals(affectedTitles, franchises.map { it.title }.toSet())
+        assertEquals(20, franchises.size)
         franchises.forEach { franchise ->
             val cover = franchise.collectionCoverImageUrl.orEmpty()
-            assertTrue(cover.contains("/images/lotr.jpg") || cover.startsWith("https://image.tmdb.org/t/p/w1280/"))
+            assertTrue(cover.contains("/$franchiseImageCommit/images/Franchises/"))
             assertEquals(franchise.collectionCoverImageUrl, franchise.collectionFocusGifUrl)
-            if (cover.startsWith("https://image.tmdb.org/")) {
-                assertTrue(franchise.collectionClearLogoUrl?.startsWith("https://image.tmdb.org/t/p/original/") == true)
-            } else {
-                assertNull(franchise.collectionClearLogoUrl)
-            }
+            assertNull(franchise.collectionClearLogoUrl)
         }
     }
 

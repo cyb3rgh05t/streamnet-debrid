@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.007] - 2026-09-12
+
+### Franchise-Rail
+
+- Alle 20 Franchise-Karten laden ihr gebrandetes 16:9-Fanart aus dem eigenen, unveränderlich gepinnten Asset-Repository statt aus gemischten Legacy- und TMDB-Quellen.
+- Separate Franchise-Logo-Overlays wurden entfernt, damit die bereits beschrifteten Fanarts nicht doppelt gebrandet werden.
+
 ## [2.5.006] - 2026-09-11
 
 ### Home-Karten und Watched-Status

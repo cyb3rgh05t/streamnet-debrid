@@ -42,7 +42,6 @@ data class MediaItem(
     val collectionGroup: CollectionGroupKind? = null,
     val collectionTileShape: CollectionTileShape? = null,
     val collectionHideTitle: Boolean = false,
-    val collectionLogoUrl: String? = null,
     // Character name (for person filmography / known for)
     val character: String = "",
     // Popularity score from TMDB (higher = more mainstream content)

@@ -191,8 +191,7 @@ fun MediaCard(
     }
             var channelLogoFailed by remember(imageRequest) { mutableStateOf(false) }
     // Performance: Removed context/density from keys
-            val effectiveLogoImageUrl = (logoImageUrl ?: item.collectionLogoUrl)
-                .takeIf { showLogoImage && !isChannelLogo }
+            val effectiveLogoImageUrl = logoImageUrl.takeIf { showLogoImage && !isChannelLogo }
     val logoRequest = remember(effectiveLogoImageUrl) {
         val logoWidthPx = with(density) { 220.dp.roundToPx() }.coerceAtLeast(1)
         val logoHeightPx = with(density) { 64.dp.roundToPx() }.coerceAtLeast(1)
@@ -340,7 +339,7 @@ fun MediaCard(
                 // clearlogo crowds the poster art and looks double-stamped.
                 // Collection tiles already embed their own branding, so they
                 // stay logo-free in both layouts.
-                if (logoRequest != null && isLandscape && (!isCollectionTile || item.collectionLogoUrl != null)) {
+                if (logoRequest != null && isLandscape && !isCollectionTile) {
                     AsyncImage(
                         model = logoRequest,
                         contentDescription = stringResource(R.string.component_media_logo, item.title),

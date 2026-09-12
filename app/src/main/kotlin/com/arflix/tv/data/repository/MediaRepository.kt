@@ -1858,14 +1858,7 @@ class MediaRepository @Inject constructor(
                     collectionHeroImageUrl = preferredHero,
                     collectionHeroGifUrl = preferredHero,
                     collectionHeroVideoUrl = entry.heroVideoUrl ?: legacy?.collectionHeroVideoUrl,
-                    collectionClearLogoUrl = if (
-                        entry.group == CollectionGroupKind.FRANCHISE &&
-                        preferredCover.startsWith("https://image.tmdb.org/")
-                    ) {
-                        legacy?.collectionClearLogoUrl
-                    } else {
-                        null
-                    },
+                    collectionClearLogoUrl = null,
                     collectionTileShape = if (
                         entry.group == CollectionGroupKind.GENRE ||
                         entry.group == CollectionGroupKind.MOVIE_GENRE ||

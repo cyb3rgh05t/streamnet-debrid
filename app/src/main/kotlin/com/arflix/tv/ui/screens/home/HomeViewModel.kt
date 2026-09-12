@@ -2943,8 +2943,7 @@ class HomeViewModel @Inject constructor(
                 status = "collection:${config.id}",
                 collectionGroup = config.collectionGroup,
                 collectionTileShape = config.collectionTileShape,
-                collectionHideTitle = config.collectionHideTitle,
-                collectionLogoUrl = config.collectionClearLogoUrl
+                collectionHideTitle = config.collectionHideTitle
             )
         }
         return Category(

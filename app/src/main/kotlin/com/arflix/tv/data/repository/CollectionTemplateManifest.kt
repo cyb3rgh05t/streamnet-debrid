@@ -33,12 +33,14 @@ internal data class CollectionTemplateEntry(
 
 internal object CollectionTemplateManifest {
     private const val ASSET_COMMIT = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
+    private const val FRANCHISE_ASSET_COMMIT = "20bee004466c109d992a78601a78f0609dd2f78a"
     private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
     private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
     private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
     private const val IMAGE_BASE = "${ASSET_BASE}images/"
     private const val STREAMING_SERVICE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Streaming%20Services/"
     private const val GENRE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Genres/"
+    private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/images/Franchises/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
     private const val MARVEL_ADDON_URL = "https://addon-marvel.onrender.com/catalog/marvel-mcu/manifest.json"
     private const val DC_ADDON_URL = "https://addon-dc-cq85.onrender.com/catalog/dc-chronological/manifest.json"
@@ -697,7 +699,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Marvel",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Marvel.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Marvel.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -711,7 +713,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "DC Universe",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}DC.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}DC.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -725,7 +727,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Star Wars",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Star-Wars.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Star-Wars.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -739,7 +741,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "James Bond",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}007.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}007.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -753,7 +755,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Harry Potter",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Harry-Potter.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Harry-Potter.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -767,7 +769,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Alien vs Predator",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}avp.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}avp.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -784,7 +786,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Pirates of the Caribbean",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}pirates.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}pirates.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -799,7 +801,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Terminator",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Terminator.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Terminator.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -814,7 +816,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Mission Impossible",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}mission-impossible.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}mission-impossible.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -828,7 +830,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Jurassic Park",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}jurrasic-park.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}jurrasic-park.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -842,7 +844,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "The Matrix",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}matrix.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}matrix.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -857,7 +859,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Lord of the Rings",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}lotr.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}lotr.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -871,7 +873,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "X-Men",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/rFj9IKlL75B2pXhZA60jkNWvxeW.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}X-Men.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -881,7 +883,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Hunger Games",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/3sndNmvdF0R8AeyCmVoNv8LKtNy.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Hunger-Games.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -891,7 +893,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Avatar",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/vL5LR6WdxWPjLPFRLe133jXWsh5.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}AVATAR.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -901,7 +903,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Dune",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/zRKQW58MBEY078AxkHxEJzUskCl.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Dune.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -911,7 +913,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Indiana Jones",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/zPACwR32amTNvzId9qyapCWXYDJ.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Indiana-Jo.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -921,7 +923,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "The Godfather",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/tSPT36ZKlP2WVHJLM4cQPLSzv3b.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}The-Godfather.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -931,7 +933,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "John Wick",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/ff2ti5DkA9UYLzyqhQfI2kZqEuh.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}JW.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
@@ -941,7 +943,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Transformers",
             group = CollectionGroupKind.FRANCHISE,
-            coverImageUrl = "https://image.tmdb.org/t/p/w1280/iCDMBi6WLjUBnt24dNwHqqF81UL.jpg",
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Transformers.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
