@@ -13,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Languages,
+  KeyRound,
   LayoutGrid,
   ListVideo,
   LogOut,
@@ -118,7 +119,7 @@ const SECTIONS = [
   { id: "homeserver", label: "Home Server", icon: Server },
   { id: "catalogs", label: "Catalogs", icon: ListVideo },
   { id: "addons", label: "Addons", icon: Sparkles },
-  { id: "metadata", label: "Metadata & Keys", icon: Sparkles },
+  { id: "metadata", label: "Metadata & Keys", icon: KeyRound },
 ] as const;
 
 type SectionId = (typeof SECTIONS)[number]["id"];
@@ -162,13 +163,12 @@ const SUBTITLE_COLOR_HEX: Record<AppSettings["subtitleColorName"], string> = {
 };
 
 const QUALITY_PRESET_LABELS: Array<
-  [AppSettings["qualityFilterPreset"], string]
+  [Exclude<AppSettings["qualityFilterPreset"], "custom">, string]
 > = [
   ["off", "Off"],
   ["1080p-plus", "1080p and above"],
   ["1080p-only", "1080p only"],
   ["720p-plus", "720p and above"],
-  ["custom", "Custom"],
 ];
 
 const CONTENT_LANGUAGE_OPTIONS: Array<[string, string]> = [
@@ -222,7 +222,7 @@ function optionsWithCurrent(
 }
 
 function qualityPresetFilters(
-  preset: AppSettings["qualityFilterPreset"],
+  preset: Exclude<AppSettings["qualityFilterPreset"], "custom">,
 ): QualityFilterConfig[] {
   const poorSources =
     "cam|hdcam|camrip|ts|hdts|telesync|tc|hdtc|telecine|screener|scr|dvdscr|r5";
@@ -408,7 +408,9 @@ export function SettingsScreen() {
         </div>
       </div>
 
-      <div className="settings-content">
+      <div
+        className={`settings-content ${section === "metadata" ? "settings-content-metadata" : ""}`}
+      >
         <SettingsSectionBoundary
           section={section}
           language={settings.uiLanguage}
@@ -641,52 +643,15 @@ function SectionBody({ section }: { section: SectionId }) {
   const app = useApp();
   const { settings } = app;
   const set = (patch: Partial<AppSettings>) => app.updateSettings(patch);
-  const [qualityFilterName, setQualityFilterName] = useState("");
-  const [qualityFilterPattern, setQualityFilterPattern] = useState("");
   const setSubtitleColor = (name: AppSettings["subtitleColorName"]) =>
     set({ subtitleColorName: name, subtitleColor: SUBTITLE_COLOR_HEX[name] });
-  const setQualityPreset = (preset: AppSettings["qualityFilterPreset"]) =>
+  const setQualityPreset = (
+    preset: Exclude<AppSettings["qualityFilterPreset"], "custom">,
+  ) =>
     set({
       qualityFilterPreset: preset,
-      qualityFilters:
-        preset === "custom"
-          ? settings.qualityFilters
-          : qualityPresetFilters(preset),
+      qualityFilters: qualityPresetFilters(preset),
     });
-  const addQualityFilter = () => {
-    const pattern = qualityFilterPattern.trim();
-    if (!pattern) {
-      app.setToast(
-        localize(
-          settings.uiLanguage,
-          "Gib zuerst einen regulären Ausdruck für den Qualitätsfilter ein.",
-          "Enter a quality filter regex first.",
-        ),
-      );
-      return;
-    }
-    set({
-      qualityFilterPreset: "custom",
-      qualityFilters: [
-        {
-          id: crypto.randomUUID(),
-          deviceName:
-            qualityFilterName.trim() ||
-            localize(
-              settings.uiLanguage,
-              "Benutzerdefinierter Qualitätsfilter",
-              "Custom quality filter",
-            ),
-          regexPattern: pattern,
-          enabled: true,
-          createdAt: Date.now(),
-        },
-        ...safeArray(settings.qualityFilters),
-      ],
-    });
-    setQualityFilterName("");
-    setQualityFilterPattern("");
-  };
 
   switch (section) {
     case "accounts":
@@ -957,104 +922,15 @@ function SectionBody({ section }: { section: SectionId }) {
             )}
           >
             <Select
-              value={settings.qualityFilterPreset}
+              value={
+                settings.qualityFilterPreset === "custom"
+                  ? "off"
+                  : settings.qualityFilterPreset
+              }
               onChange={setQualityPreset}
               options={QUALITY_PRESET_LABELS}
             />
           </Row>
-          <div className="inline-form wide">
-            <input
-              value={qualityFilterName}
-              onChange={(e) => setQualityFilterName(e.target.value)}
-              placeholder={localize(
-                settings.uiLanguage,
-                "Filtername",
-                "Filter name",
-              )}
-            />
-            <input
-              value={qualityFilterPattern}
-              onChange={(e) => setQualityFilterPattern(e.target.value)}
-              placeholder={localize(
-                settings.uiLanguage,
-                "Regex zum Ausblenden passender Quellen",
-                "Regex to hide matching sources",
-              )}
-            />
-            <button
-              type="button"
-              className="secondary text-button"
-              onClick={addQualityFilter}
-            >
-              <Plus size={18} />{" "}
-              {localize(settings.uiLanguage, "Filter hinzufügen", "Add filter")}
-            </button>
-          </div>
-          <div className="settings-list">
-            {safeArray(settings.qualityFilters).map((filter) => (
-              <div
-                className="settings-list-row quality-filter-row"
-                key={filter.id}
-              >
-                <button
-                  type="button"
-                  className="icon-button"
-                  onClick={() =>
-                    set({
-                      qualityFilterPreset: "custom",
-                      qualityFilters: settings.qualityFilters.map((item) =>
-                        item.id === filter.id
-                          ? { ...item, enabled: !item.enabled }
-                          : item,
-                      ),
-                    })
-                  }
-                >
-                  {filter.enabled ? <Eye size={18} /> : <EyeOff size={18} />}
-                </button>
-                <input
-                  value={filter.deviceName}
-                  onChange={(e) =>
-                    set({
-                      qualityFilterPreset: "custom",
-                      qualityFilters: settings.qualityFilters.map((item) =>
-                        item.id === filter.id
-                          ? { ...item, deviceName: e.target.value }
-                          : item,
-                      ),
-                    })
-                  }
-                />
-                <input
-                  value={filter.regexPattern}
-                  onChange={(e) =>
-                    set({
-                      qualityFilterPreset: "custom",
-                      qualityFilters: settings.qualityFilters.map((item) =>
-                        item.id === filter.id
-                          ? { ...item, regexPattern: e.target.value }
-                          : item,
-                      ),
-                    })
-                  }
-                />
-                <button
-                  type="button"
-                  className="icon-button danger"
-                  onClick={() =>
-                    set({
-                      qualityFilterPreset: "custom",
-                      qualityFilters: settings.qualityFilters.filter(
-                        (item) => item.id !== filter.id,
-                      ),
-                    })
-                  }
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
-            ))}
-          </div>
         </Panel>
       );
     case "language":
@@ -1418,7 +1294,7 @@ function MetadataSection({
   const tvdbActive = Boolean(settings.customTvdbApiKey?.trim());
 
   return (
-    <div className="settings-section">
+    <div className="settings-section metadata-settings-section">
       <Panel title="Custom API Keys (Bring Your Own Key)">
         <Row label="TMDB API Key" hint="Custom v3 API key for TMDB requests">
           <input

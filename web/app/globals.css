@@ -7115,6 +7115,55 @@ button,
   overflow: hidden;
 }
 
+.settings-content-metadata {
+  grid-template-columns: minmax(0, 820px);
+}
+
+.metadata-settings-section {
+  display: grid;
+  gap: 18px;
+  width: 100%;
+}
+
+.metadata-settings-section .settings-panel-card {
+  min-width: 0;
+}
+
+.metadata-settings-section .set-row {
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 280px);
+  gap: 28px;
+  min-height: 68px;
+}
+
+.metadata-settings-section .set-control {
+  width: 100%;
+}
+
+.metadata-settings-section .set-control input[type="password"] {
+  width: 100%;
+}
+
+.metadata-settings-section .accent-badge {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .settings-content-metadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .metadata-settings-section .set-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  .metadata-settings-section .set-control,
+  .metadata-settings-section .accent-badge {
+    justify-self: stretch;
+  }
+}
+
 .settings-panel-card h2 {
   letter-spacing: 0;
 }

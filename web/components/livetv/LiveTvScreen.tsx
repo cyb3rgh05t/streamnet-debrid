@@ -51,7 +51,7 @@ import type { IptvChannel, IptvProgram, IptvSnapshot } from "@/lib/types";
 
 const LAST_CHANNEL_KEY = "arvio.web.livetv.lastChannel";
 const GUIDE_BATCH_DELAY_MS = 500;
-const GUIDE_WINDOW_HOURS = 4;
+const GUIDE_WINDOW_HOURS = 12;
 const GUIDE_PX_PER_MIN = 6;
 const rowKey = (item: { id: string }) => item.id;
 
@@ -1792,16 +1792,16 @@ function GuideGrid({
           type="button"
           title={localize(
             settings.uiLanguage,
-            "Vorherige vier Stunden",
-            "Previous four hours",
+            "Vorherige zwölf Stunden",
+            "Previous twelve hours",
           )}
           aria-label={localize(
             settings.uiLanguage,
-            "Vorherige vier Stunden",
-            "Previous four hours",
+            "Vorherige zwölf Stunden",
+            "Previous twelve hours",
           )}
           disabled={windowStart <= currentStart - 48 * 3_600_000}
-          onClick={() => setManualStart(windowStart - 4 * 3_600_000)}
+          onClick={() => setManualStart(windowStart - 12 * 3_600_000)}
         >
           <ChevronLeft size={18} />
         </button>
@@ -1819,16 +1819,16 @@ function GuideGrid({
           type="button"
           title={localize(
             settings.uiLanguage,
-            "Nächste vier Stunden",
-            "Next four hours",
+            "Nächste zwölf Stunden",
+            "Next twelve hours",
           )}
           aria-label={localize(
             settings.uiLanguage,
-            "Nächste vier Stunden",
-            "Next four hours",
+            "Nächste zwölf Stunden",
+            "Next twelve hours",
           )}
           disabled={windowStart >= currentStart + 44 * 3_600_000}
-          onClick={() => setManualStart(windowStart + 4 * 3_600_000)}
+          onClick={() => setManualStart(windowStart + 12 * 3_600_000)}
         >
           <ChevronRight size={18} />
         </button>
