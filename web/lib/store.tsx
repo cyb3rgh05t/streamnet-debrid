@@ -35,6 +35,8 @@ import {
   saveCloudSettings,
   saveCloudTrackingSelection,
   saveCloudWatchlist,
+  flushCloudPayloadOutbox,
+  hasPendingCloudPayload,
   saveWatchedState,
 } from "./cloud";
 import {
@@ -1185,6 +1187,9 @@ export function AppProvider({
         }
         try {
           const localAddons = loadLocalAddons();
+          await flushCloudPayloadOutbox(authClient).catch(() =>
+            setSettingsSyncState("error"),
+          );
           await flushSettingsOutbox(authClient).catch(() =>
             setSettingsSyncState("error"),
           );
@@ -2125,9 +2130,14 @@ export function AppProvider({
 
   useEffect(() => {
     const retry = () => {
-      if (!hasPendingSettings(authClient)) return;
+      const pendingSettings = hasPendingSettings(authClient);
+      const pendingPayload = hasPendingCloudPayload(authClient);
+      if (!pendingSettings && !pendingPayload) return;
       setSettingsSyncState("pending");
-      void flushSettingsOutbox(authClient)
+      void (async () => {
+        if (pendingPayload) await flushCloudPayloadOutbox(authClient);
+        if (pendingSettings) await flushSettingsOutbox(authClient);
+      })()
         .then(() => setSettingsSyncState("saved"))
         .catch(() => setSettingsSyncState("error"));
     };

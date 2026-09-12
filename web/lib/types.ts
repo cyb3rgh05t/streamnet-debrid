@@ -166,6 +166,12 @@ export interface CatalogConfig {
   addonName?: string | null;
   collectionGroup?: string | null;
   collectionDescription?: string | null;
+  collectionCoverImageUrl?: string | null;
+  collectionFocusGifUrl?: string | null;
+  collectionHeroImageUrl?: string | null;
+  collectionHeroGifUrl?: string | null;
+  collectionHeroVideoUrl?: string | null;
+  collectionClearLogoUrl?: string | null;
   collectionTileShape?: "LANDSCAPE" | "POSTER" | "landscape" | "poster";
   collectionHideTitle?: boolean;
   collectionSources?: CollectionSourceConfig[];

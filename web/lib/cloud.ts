@@ -9,6 +9,7 @@ import { preferActiveCloudResumeRecord } from "./continueWatching";
 import { mergeTvSessions, normalizeTvSession } from "./iptvSession";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
 import { tmdbImageUrl } from "./mediaImages";
+import { loadStored, saveStored } from "./storage";
 import type { TraktToken } from "./trakt";
 import type { SimklToken } from "./simkl";
 import type { TrackingPreferences, TrackingReadMode } from "./sync";
@@ -30,6 +31,31 @@ export interface CloudPayload {
 }
 
 type RawPayload = Record<string, unknown>;
+
+const payloadSnapshotKey = (userId: string) =>
+  `arvio.web.cloudPayloadSnapshot.v1:${userId}`;
+const payloadOutboxKey = (userId: string) =>
+  `arvio.web.cloudPayloadOutbox.v1:${userId}`;
+
+function savePayloadSnapshot(userId: string, payload: RawPayload) {
+  saveStored(payloadSnapshotKey(userId), payload);
+}
+
+function queuePayload(userId: string, payload: RawPayload) {
+  saveStored(payloadOutboxKey(userId), payload);
+  savePayloadSnapshot(userId, payload);
+}
+
+function clearQueuedPayload(userId: string) {
+  saveStored<RawPayload | null>(payloadOutboxKey(userId), null);
+}
+
+export function hasPendingCloudPayload(auth: AuthClient): boolean {
+  return Boolean(
+    auth.session &&
+    loadStored<RawPayload | null>(payloadOutboxKey(auth.session.userId), null),
+  );
+}
 
 interface AccountSyncPullResponse {
   payload?: RawPayload | string | null;
@@ -947,6 +973,7 @@ export async function pullRawPayload(auth: AuthClient): Promise<RawPayload> {
         auth.session?.userId === userId
       )
         rawPayloadCache = { userId, at: Date.now(), payload };
+      savePayloadSnapshot(userId, payload);
       return payload;
     })
     .finally(() => {
@@ -987,6 +1014,8 @@ async function writeRawPayload(auth: AuthClient, payload: RawPayload) {
     // The server merges concurrent device edits. Read its acknowledged result,
     // not our submitted document (which may omit those edits).
     if (auth.session?.userId === userId) invalidateRawPayloadCache();
+    savePayloadSnapshot(userId, payload);
+    clearQueuedPayload(userId);
     return;
   }
   await auth.supabase("/rest/v1/account_sync_state", {
@@ -999,6 +1028,20 @@ async function writeRawPayload(auth: AuthClient, payload: RawPayload) {
     }),
   });
   invalidateRawPayloadCache();
+  savePayloadSnapshot(userId, payload);
+  clearQueuedPayload(userId);
+}
+
+export async function flushCloudPayloadOutbox(auth: AuthClient): Promise<void> {
+  const userId = auth.session?.userId;
+  if (!userId) return;
+  const pending = loadStored<RawPayload | null>(payloadOutboxKey(userId), null);
+  if (!pending) return;
+  // The backend merges timestamped fields and item-level playback records. A
+  // queued offline snapshot intentionally omits CAS so a newer server revision
+  // can merge it instead of rejecting it as stale.
+  rawPayloadRevision = null;
+  await writeRawPayload(auth, structuredClone(pending));
 }
 
 /**
@@ -1023,7 +1066,18 @@ export async function mutateCloudPayload(
         // A recent read cache can predate another device's change. Mutations must
         // start from a fresh snapshot, not echo that stale cached account back.
         invalidateRawPayloadCache();
-        const root = await pullRawPayload(auth);
+        let root: RawPayload;
+        try {
+          await flushCloudPayloadOutbox(auth);
+          root = await pullRawPayload(auth);
+        } catch {
+          root = structuredClone(
+            loadStored<RawPayload | null>(payloadOutboxKey(userId), null) ??
+              loadStored<RawPayload>(payloadSnapshotKey(userId), {}),
+          );
+          if (!Object.keys(root).length)
+            throw new Error("Cloud snapshot unavailable while offline");
+        }
         if (auth.session?.userId !== userId)
           throw new Error("Account changed before sync completed");
         mutator(root);
@@ -1036,7 +1090,8 @@ export async function mutateCloudPayload(
             error.status !== 409 ||
             attempt > 0
           )
-            throw error;
+            queuePayload(userId, root);
+          throw error;
         }
       }
     });

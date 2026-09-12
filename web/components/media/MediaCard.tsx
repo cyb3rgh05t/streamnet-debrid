@@ -4,14 +4,8 @@ import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { accentColor } from "@/lib/accent";
 import { continueWatchingProgressPercent } from "@/lib/continueWatching";
-import { serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
-import {
-  getCardProviders,
-  getLogoUrl,
-  prefetchDetails,
-  resolveTmdbId,
-} from "@/lib/tmdb";
+import { getLogoUrl, prefetchDetails, resolveTmdbId } from "@/lib/tmdb";
 import type { MediaItem } from "@/lib/types";
 import { localize, type UiLanguage } from "@/lib/i18n";
 
@@ -149,7 +143,6 @@ function MediaCardBase({
         : null;
   const [metadataId, setMetadataId] = useState<number | null>(directMetadataId);
   const [logo, setLogo] = useState<string | null>(null);
-  const [serviceBadges, setServiceBadges] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -176,7 +169,6 @@ function MediaCardBase({
   useEffect(() => {
     let active = true;
     setLogo(null);
-    setServiceBadges([]);
     if (!metadataId)
       return () => {
         active = false;
@@ -185,15 +177,6 @@ function MediaCardBase({
     void getLogoUrl({ mediaType: item.mediaType, id: metadataId }).then(
       (url) => {
         if (active) setLogo(url);
-      },
-    );
-    void getCardProviders({ mediaType: item.mediaType, id: metadataId }).then(
-      (names) => {
-        if (!active) return;
-        const logos = names
-          .map((name) => serviceClearLogo(name))
-          .filter((url): url is string => Boolean(url));
-        setServiceBadges([...new Set(logos)].slice(0, 2));
       },
     );
     return () => {
@@ -334,13 +317,6 @@ function MediaCardBase({
             loading="lazy"
             decoding="async"
           />
-        )}
-        {serviceBadges.length > 0 && (
-          <span className="card-services top-left">
-            {serviceBadges.map((badge) => (
-              <img key={badge} src={badge} alt="" loading="lazy" />
-            ))}
-          </span>
         )}
         {watched && (
           <span

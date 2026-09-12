@@ -1,6 +1,6 @@
 "use client";
 
-import { Info, Play } from "lucide-react";
+import { ArrowLeft, Info, Play } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { IMDB_LOGO } from "@/lib/serviceLogos";
 import { genreNamesFromIds, getCardMeta, getLogoUrl } from "@/lib/tmdb";
@@ -8,8 +8,25 @@ import { getImdbRating } from "@/lib/imdbRatings";
 import { useApp } from "@/lib/store";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
-import type { Category, MediaItem } from "@/lib/types";
-import { localize, t } from "@/lib/i18n";
+import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
+import { localize, t, translateUiText } from "@/lib/i18n";
+import { RailScroller } from "@/components/media/RailScroller";
+
+const collectionGroupTitles: Record<string, string> = {
+  SERVICE: "Services",
+  FRANCHISE: "Franchises",
+  STUDIO: "Studios",
+  NETWORK: "Networks",
+  MOVIE_GENRE: "Movie Genres",
+  TV_GENRE: "TV Genres",
+  GENRE: "Genres",
+  DECADE: "Decades",
+  FEATURED: "Featured",
+};
+
+function isCollectionCatalog(catalog: CatalogConfig) {
+  return String(catalog.kind ?? "").toUpperCase() === "COLLECTION";
+}
 
 export function HomeScreen() {
   const {
@@ -23,6 +40,42 @@ export function HomeScreen() {
     settings,
   } = useApp();
   const posterMode = settings.cardLayoutMode === "poster";
+  const [openCollection, setOpenCollection] = useState<CatalogConfig | null>(
+    null,
+  );
+  const homeCatalogEntries = useMemo(() => {
+    const groups = new Map<string, CatalogConfig[]>();
+    catalogConfigs.filter(isCollectionCatalog).forEach((catalog) => {
+      const group = String(catalog.collectionGroup ?? "FEATURED").toUpperCase();
+      groups.set(group, [...(groups.get(group) ?? []), catalog]);
+    });
+    const renderedGroups = new Set<string>();
+    const entries: Array<
+      | { type: "catalog"; catalog: CatalogConfig }
+      | { type: "group"; group: string; catalogs: CatalogConfig[] }
+    > = [];
+    catalogConfigs.forEach((catalog) => {
+      const kind = String(catalog.kind ?? "").toUpperCase();
+      if (kind === "COLLECTION") return;
+      if (kind === "COLLECTION_RAIL") {
+        const group = String(
+          catalog.collectionGroup ?? "FEATURED",
+        ).toUpperCase();
+        const catalogs = groups.get(group) ?? [];
+        if (catalogs.length) {
+          entries.push({ type: "group", group, catalogs });
+          renderedGroups.add(group);
+        }
+        return;
+      }
+      entries.push({ type: "catalog", catalog });
+    });
+    groups.forEach((catalogs, group) => {
+      if (!renderedGroups.has(group))
+        entries.push({ type: "group", group, catalogs });
+    });
+    return entries;
+  }, [catalogConfigs]);
 
   // The eager rails (trending/popular/provider lists) overlap heavily; keep each
   // title in the first rail it appears in and trim repeats from later rails,
@@ -254,34 +307,97 @@ export function HomeScreen() {
           </div>
         </section>
       )}
-      {dedupedCategories.map((category) => (
-        <MediaRail
-          key={category.id}
-          category={category}
-          onOpen={openDetails}
-          onFocus={onCardFocus}
-          posterMode={posterMode}
-        />
-      ))}
-      {homeServerRows.map((category) => (
-        <MediaRail
-          key={category.id}
-          category={category}
-          onOpen={openDetails}
-          onFocus={onCardFocus}
-          posterMode={posterMode}
-        />
-      ))}
-      {catalogConfigs.map((catalog, index) => (
-        <LazyRail
-          key={catalog.id}
-          catalog={catalog}
-          eager={index < 2}
-          onOpen={openDetails}
-          onFocus={onCardFocus}
-          onLoaded={seedHeroFromRow}
-        />
-      ))}
+      {openCollection ? (
+        <section className="collection-browser">
+          <button
+            type="button"
+            className="collection-back"
+            onClick={() => setOpenCollection(null)}
+          >
+            <ArrowLeft size={20} />
+            {localize(settings.uiLanguage, "Zurück", "Back")}
+          </button>
+          <LazyRail
+            catalog={openCollection}
+            eager
+            onOpen={openDetails}
+            onFocus={onCardFocus}
+          />
+        </section>
+      ) : (
+        <>
+          {dedupedCategories.map((category) => (
+            <MediaRail
+              key={category.id}
+              category={category}
+              onOpen={openDetails}
+              onFocus={onCardFocus}
+              posterMode={posterMode}
+            />
+          ))}
+          {homeServerRows.map((category) => (
+            <MediaRail
+              key={category.id}
+              category={category}
+              onOpen={openDetails}
+              onFocus={onCardFocus}
+              posterMode={posterMode}
+            />
+          ))}
+          {homeCatalogEntries.map((entry, index) =>
+            entry.type === "group" ? (
+              <section
+                className="rail collection-picker"
+                key={`group-${entry.group}`}
+              >
+                <div className="rail-head">
+                  <h3>
+                    {translateUiText(
+                      settings.uiLanguage,
+                      collectionGroupTitles[entry.group] ?? entry.group,
+                    )}
+                  </h3>
+                </div>
+                <RailScroller
+                  className="rail-strip collection-strip"
+                  ariaLabel={entry.group}
+                >
+                  {entry.catalogs.map((catalog) => (
+                    <button
+                      type="button"
+                      className="collection-tile"
+                      key={catalog.id}
+                      onClick={() => setOpenCollection(catalog)}
+                    >
+                      <span className="collection-art">
+                        {catalog.collectionCoverImageUrl && (
+                          <img
+                            src={catalog.collectionCoverImageUrl}
+                            alt=""
+                            loading="lazy"
+                          />
+                        )}
+                      </span>
+                      {!catalog.collectionHideTitle && (
+                        <strong>{catalog.title || catalog.name}</strong>
+                      )}
+                    </button>
+                  ))}
+                </RailScroller>
+              </section>
+            ) : (
+              <LazyRail
+                key={entry.catalog.id}
+                catalog={entry.catalog}
+                eager={index < 2}
+                onOpen={openDetails}
+                onFocus={onCardFocus}
+                onLoaded={seedHeroFromRow}
+              />
+            ),
+          )}
+        </>
+      )}
     </div>
   );
 }

@@ -4076,8 +4076,60 @@ select {
 
 .card-meta-row span {
   min-width: 0;
-  color: rgba(255, 255, 255, 0.62);
+  color: var(--accent, rgba(255, 255, 255, 0.82));
   font-size: clamp(13px, 0.95vw, 16px);
+}
+
+.collection-browser {
+  padding-top: 18px;
+}
+
+.collection-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 clamp(20px, 4vw, 64px) 8px;
+  border: 0;
+  background: transparent;
+  color: var(--accent, #fff);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collection-tile {
+  width: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.collection-art {
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.collection-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collection-tile strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(14px, 1vw, 18px);
+}
+
+.collection-tile:focus-visible .collection-art,
+.collection-tile:hover .collection-art {
+  box-shadow: 0 0 0 3px var(--accent, #fff);
 }
 
 /* Continue Watching / Up Next episode line under the card title. */
