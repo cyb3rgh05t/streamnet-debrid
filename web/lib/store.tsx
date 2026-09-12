@@ -614,22 +614,21 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
         const index = cursor;
         cursor += 1;
         const item = source[index];
-        const episodeStillPromise =
+        const episodeMetadataPromise =
           item.mediaType === "tv" &&
           item.seasonNumber != null &&
           item.episodeNumber != null
             ? getSeasonEpisodes(item.id, item.seasonNumber)
-                .then(
-                  (episodes) =>
-                    episodes.find(
-                      (episode) => episode.episodeNumber === item.episodeNumber,
-                    )?.still ?? null,
+                .then((episodes) =>
+                  episodes.find(
+                    (episode) => episode.episodeNumber === item.episodeNumber,
+                  ),
                 )
                 .catch(() => null)
             : Promise.resolve(null);
-        const [details, episodeStill] = await Promise.all([
+        const [details, episodeMetadata] = await Promise.all([
           getDetails(item).catch(() => item),
-          episodeStillPromise,
+          episodeMetadataPromise,
         ]);
         const enriched = {
           ...details,
@@ -643,7 +642,9 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
         };
         hydrated[index] = {
           ...enriched,
-          episodeStill: episodeStill || item.episodeStill || null,
+          episodeStill: episodeMetadata?.still || item.episodeStill || null,
+          episodeTitle:
+            item.episodeTitle?.trim() || episodeMetadata?.name?.trim() || null,
         };
       }
     },

@@ -360,7 +360,12 @@ function MediaCardBase({
               {localize(settings.uiLanguage, "Als Nächstes", "Up next")}
             </span>
           )}
-          <span className="card-episode">{episodeLine}</span>
+          <span
+            className="card-episode"
+            style={{ color: accentColor(settings.accentColor) }}
+          >
+            {episodeLine}
+          </span>
         </div>
       ) : (
         <div className="card-meta-row">

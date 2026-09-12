@@ -266,14 +266,20 @@
 }
 .tv-guide-workspace .livetv-cats button.is-active {
   color: #fff;
-  background: #292929;
+  border-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 68%,
+    transparent
+  );
+  background: color-mix(in srgb, var(--accent, var(--orange)) 20%, #181818);
+  box-shadow: inset 3px 0 0 var(--accent, var(--orange));
 }
 .tv-guide-workspace .livetv-cats button.is-active em {
-  color: #ccc;
+  color: color-mix(in srgb, var(--accent, var(--orange)) 72%, #fff);
 }
 .tv-guide-workspace button:focus-visible,
 .tv-event-picker button:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent, var(--orange));
   outline-offset: -2px;
   box-shadow: none;
 }
@@ -467,6 +473,11 @@
   border-radius: 5px;
   margin-inline-end: 4px;
   flex-basis: calc(var(--guide-channel-width) - 4px);
+}
+.tv-guide-workspace .livetv-guide-row.is-selected .livetv-guide-channel,
+.tv-guide-workspace .livetv-row.is-selected .livetv-row-main {
+  background: color-mix(in srgb, var(--accent, var(--orange)) 18%, #141719);
+  box-shadow: inset 3px 0 0 var(--accent, var(--orange));
 }
 .tv-guide-workspace .livetv-guide-row {
   height: 58px;
