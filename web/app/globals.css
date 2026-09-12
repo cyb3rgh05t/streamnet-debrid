@@ -4085,6 +4085,24 @@ select {
   padding-top: 18px;
 }
 
+.hero + .collection-browser {
+  position: relative;
+  z-index: 4;
+  margin-top: -360px;
+}
+
+@media (max-width: 1180px) {
+  .hero + .collection-browser {
+    margin-top: -320px;
+  }
+}
+
+@media (max-width: 680px) {
+  .hero + .collection-browser {
+    margin-top: -180px;
+  }
+}
+
 .collection-back {
   display: inline-flex;
   align-items: center;
@@ -4133,6 +4151,7 @@ select {
 }
 
 .collection-art {
+  position: relative;
   display: block;
   aspect-ratio: 16 / 9;
   overflow: hidden;
@@ -4150,6 +4169,21 @@ select {
   display: block;
   margin-top: 8px;
   font-size: clamp(14px, 1vw, 18px);
+}
+
+.collection-tile.is-genre .collection-genre-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 12px 18px;
+  color: rgba(255, 255, 255, 0.98);
+  font-size: 15px;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.95);
 }
 
 .collection-tile:focus-visible .collection-art,

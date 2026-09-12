@@ -14,7 +14,7 @@ const nav = [
   { id: "tv", icon: Tv },
 ] satisfies Array<{ id: NavSection; icon: typeof Home }>;
 
-export function TopNav() {
+export function TopNav({ onNavigateHome }: { onNavigateHome: () => void }) {
   const {
     view,
     section,
@@ -83,6 +83,7 @@ export function TopNav() {
                 className={`nav-item ${!selected && section === item.id ? "is-active" : ""}`}
                 onClick={() => {
                   closeDetails();
+                  if (item.id === "home") onNavigateHome();
                   setSection(item.id);
                 }}
               >
@@ -159,6 +160,7 @@ export function TopNav() {
               className={`mobile-nav-item ${!selected && section === item.id ? "is-active" : ""}`}
               onClick={() => {
                 closeDetails();
+                if (item.id === "home") onNavigateHome();
                 setSection(item.id);
               }}
             >

@@ -24,6 +24,7 @@ export function AppShell() {
   const { view, section, settings, selected, activeStream, activeChannel } =
     useApp();
   const [mounted, setMounted] = useState(false);
+  const [homeResetKey, setHomeResetKey] = useState(0);
 
   useEffect(() => {
     setMounted(true);
@@ -85,14 +86,18 @@ export function AppShell() {
       className={`app-shell accent-${settings.accentColor} ${settings.oledBlack ? "oled" : ""} ${settings.spoilerBlur ? "spoiler-blur" : ""}`}
       style={{ ["--accent" as string]: accent }}
     >
-      {(!activeStream || (section === "tv" && activeChannel)) && <TopNav />}
+      {(!activeStream || (section === "tv" && activeChannel)) && (
+        <TopNav
+          onNavigateHome={() => setHomeResetKey((current) => current + 1)}
+        />
+      )}
 
       <section className="content">
         {selected ? (
           <DetailsDrawer />
         ) : (
           <>
-            {section === "home" && <HomeScreen />}
+            {section === "home" && <HomeScreen resetKey={homeResetKey} />}
             {section === "search" && <SearchScreen />}
             {section === "watchlist" && <WatchlistScreen />}
             {section === "tv" && <LiveTvScreen />}

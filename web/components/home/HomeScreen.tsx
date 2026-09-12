@@ -148,7 +148,7 @@ function CollectionBrowser({
   );
 }
 
-export function HomeScreen() {
+export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
   const {
     hero,
     categories,
@@ -163,6 +163,11 @@ export function HomeScreen() {
   const [openCollection, setOpenCollection] = useState<CatalogConfig | null>(
     null,
   );
+
+  useEffect(() => {
+    setOpenCollection(null);
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [resetKey]);
   const [genreFanart, setGenreFanart] = useState<Map<string, string>>(
     new Map(),
   );
@@ -503,32 +508,43 @@ export function HomeScreen() {
                   className="rail-strip collection-strip"
                   ariaLabel={entry.group}
                 >
-                  {entry.catalogs.map((catalog) => (
-                    <button
-                      type="button"
-                      className="collection-tile"
-                      key={catalog.id}
-                      onClick={() => setOpenCollection(catalog)}
-                    >
-                      <span className="collection-art">
-                        {(() => {
-                          const genreId = catalog.collectionSources?.find(
-                            (source) => source.tmdbGenreId,
-                          )?.tmdbGenreId;
-                          const artwork =
-                            (genreId
-                              ? genreFanart.get(`${entry.group}:${genreId}`)
-                              : null) ?? catalog.collectionCoverImageUrl;
-                          return artwork ? (
-                            <img src={artwork} alt="" loading="lazy" />
-                          ) : null;
-                        })()}
-                      </span>
-                      {!catalog.collectionHideTitle && (
-                        <strong>{catalog.title || catalog.name}</strong>
-                      )}
-                    </button>
-                  ))}
+                  {entry.catalogs.map((catalog) => {
+                    const isGenreTile = ["MOVIE_GENRE", "TV_GENRE"].includes(
+                      entry.group,
+                    );
+                    const title = catalog.title || catalog.name;
+                    return (
+                      <button
+                        type="button"
+                        className={`collection-tile ${isGenreTile ? "is-genre" : ""}`}
+                        key={catalog.id}
+                        onClick={() => setOpenCollection(catalog)}
+                      >
+                        <span className="collection-art">
+                          {(() => {
+                            const genreId = catalog.collectionSources?.find(
+                              (source) => source.tmdbGenreId,
+                            )?.tmdbGenreId;
+                            const artwork =
+                              (genreId
+                                ? genreFanart.get(`${entry.group}:${genreId}`)
+                                : null) ?? catalog.collectionCoverImageUrl;
+                            return artwork ? (
+                              <img src={artwork} alt="" loading="lazy" />
+                            ) : null;
+                          })()}
+                          {isGenreTile && !catalog.collectionHideTitle && (
+                            <strong className="collection-genre-title">
+                              {translateUiText(settings.uiLanguage, title)}
+                            </strong>
+                          )}
+                        </span>
+                        {!isGenreTile && !catalog.collectionHideTitle && (
+                          <strong>{title}</strong>
+                        )}
+                      </button>
+                    );
+                  })}
                 </RailScroller>
               </section>
             ) : (

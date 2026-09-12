@@ -4,6 +4,22 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.010] - 2026-09-12
+
+### WebUI-Kataloge und Collections
+
+- Die Web-Kataloge entsprechen dem aktuellen Android-Stand; veraltete Web-Kataloge sowie „Jahrzehnte“ und „Empfohlen“ werden aus bestehenden Einstellungen entfernt.
+- „Kommende Filme“ und „Kommende Serien“ sind korrekt benannt und in der Android-Reihenfolge einsortiert.
+- Services, Franchises sowie Film- und Seriengenres öffnen getrennte Film-/Serienansichten mit Fokus auf dem ersten Eintrag und sichtbarer Hero-Fanart.
+- Collection-Rails liegen kompakter unter dem Hero, ohne dessen Breite oder Fanart zu verzerren; „Startseite“ schließt eine geöffnete Collection zuverlässig.
+- Film- und Seriengenre-Karten zeigen ihre Bezeichnung wie Android zentriert direkt auf der Fanart.
+- Laufzeit, Episodencode und Episodentitel auf Medienkarten verwenden die aktive Akzentfarbe; Continue-Watching-Fortschrittsbalken bleiben auch bei einem veralteten Watched-Status sichtbar.
+
+### WebUI-Synchronisierung
+
+- Allgemeine Cloud-Payload-Änderungen werden dauerhaft zwischengespeichert und nach Offline- oder Serverfehlern automatisch erneut synchronisiert.
+- VODWisharr-Genre-Fanart wird über eine serverseitige Web-Route geladen, damit der API-Schlüssel nicht an den Browser ausgeliefert wird.
+
 ## [2.5.009] - 2026-09-12
 
 ### Geräteübergreifendes Weiterschauen
