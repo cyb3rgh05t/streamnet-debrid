@@ -255,7 +255,9 @@ const germanUiPhrases: Record<string, string> = {
   "Just Added": "Neu hinzugefügt",
   "Latest Airing": "Aktuell ausgestrahlt",
   "New in K-Dramas": "Neue K-Dramen",
-  "Coming Soon": "Demnächst",
+  "Coming Soon": "Kommende Filme",
+  "Upcoming Movies": "Kommende Filme",
+  "Upcoming Series": "Kommende Serien",
   "Recently Watched Movies": "Zuletzt gesehene Filme",
   "Recently Watched Series": "Zuletzt gesehene Serien",
   "Recently Watched TV": "Zuletzt gesehene Sender",
@@ -267,8 +269,6 @@ const germanUiPhrases: Record<string, string> = {
   "Movie Genres": "Filmgenres",
   "TV Genres": "Seriengenres",
   Genres: "Genres",
-  Decades: "Jahrzehnte",
-  Featured: "Empfohlen",
 };
 
 export function translateUiText(language: UiLanguage, text: string): string {

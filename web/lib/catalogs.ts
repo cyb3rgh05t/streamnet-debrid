@@ -11,24 +11,12 @@ const germanCatalogNames: Record<string, string> = {
   latest_tv: "Aktuell ausgestrahlt",
   top_movies_week: "Top-Filme dieser Woche",
   new_kdramas: "Neue K-Dramen",
-  coming_soon: "Demnächst",
-  action: "Beliebte Action",
-  comedy: "Beliebte Komödien",
-  scifi: "Beliebte Science-Fiction",
-  thriller: "Beliebte Thriller",
-  drama: "Beliebte Dramen",
-  horror: "Beliebter Horror",
-  documentary: "Beliebte Dokumentationen",
-  romance: "Beliebte Liebesfilme",
-  animated: "Beliebte Animation",
-  family: "Beliebte Familienfilme",
-  bond: "James-Bond-Sammlung",
-  harry_potter: "Harry-Potter-Sammlung",
-  matrix: "Matrix-Sammlung",
-  lotr: "Der-Herr-der-Ringe- und Hobbit-Sammlung",
-  jurassic: "Jurassic-Park-Sammlung",
-  tmdb_popular_movies: "Beliebte Filme",
-  tmdb_popular_tv: "Beliebte Serien",
+  coming_soon: "Kommende Filme",
+  upcoming_series: "Kommende Serien",
+  recently_watched_movies: "Zuletzt gesehene Filme",
+  recently_watched_series: "Zuletzt gesehene Serien",
+  recent_tv: "Zuletzt gesehene Sender",
+  favorite_tv: "TV-Favoriten",
 };
 
 export function localizedCatalogName(
@@ -41,6 +29,20 @@ export function localizedCatalogName(
 }
 
 export const defaultCatalogs: CatalogConfig[] = [
+  {
+    id: "recent_tv",
+    name: "Recently Watched TV",
+    sourceType: "preinstalled",
+    enabled: true,
+    isPreinstalled: true,
+  },
+  {
+    id: "favorite_tv",
+    name: "Favorite TV",
+    sourceType: "preinstalled",
+    enabled: true,
+    isPreinstalled: true,
+  },
   {
     id: "trending_movies",
     name: "Trending in Movies",
@@ -96,15 +98,6 @@ export const defaultCatalogs: CatalogConfig[] = [
     isPreinstalled: true,
   },
   {
-    id: "latest_tv",
-    name: "Latest Airing",
-    sourceType: "mdblist",
-    mediaType: "tv",
-    sourceUrl: "https://mdblist.com/lists/snoak/latest-tv-shows",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
     id: "top_movies_week",
     name: "Top Movies This Week",
     sourceType: "mdblist",
@@ -125,7 +118,7 @@ export const defaultCatalogs: CatalogConfig[] = [
   },
   {
     id: "coming_soon",
-    name: "Coming Soon",
+    name: "Upcoming Movies",
     sourceType: "mdblist",
     mediaType: "movie",
     sourceUrl: "https://mdblist.com/lists/snoak/upcoming-movies",
@@ -133,163 +126,75 @@ export const defaultCatalogs: CatalogConfig[] = [
     isPreinstalled: true,
   },
   {
-    id: "action",
-    name: "Popular Action",
+    id: "upcoming_series",
+    name: "Upcoming Series",
     sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/action-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "comedy",
-    name: "Popular Comedy",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/comedy-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "scifi",
-    name: "Popular Sci-Fi",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/science-fiction-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "thriller",
-    name: "Popular Thriller",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/thriller-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "drama",
-    name: "Popular Drama",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/drama-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "horror",
-    name: "Popular Horror",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/horror-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "documentary",
-    name: "Popular Documentary",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/popular-documentary-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "romance",
-    name: "Popular Romance",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/popular-romance-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "animated",
-    name: "Popular Animated",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl: "https://mdblist.com/lists/snoak/animationanime-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "family",
-    name: "Popular Family",
-    sourceType: "mdblist",
-    mediaType: "all",
-    sourceUrl:
-      "https://mdblist.com/lists/familytv133/family-kids-english-movies-rated-g-pg",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "bond",
-    name: "James Bond Collection",
-    sourceType: "mdblist",
-    mediaType: "movie",
-    sourceUrl: "https://mdblist.com/lists/hdlists/james-bond-movies",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "harry_potter",
-    name: "Harry Potter Collection",
-    sourceType: "mdblist",
-    mediaType: "movie",
-    sourceUrl: "https://mdblist.com/lists/thebirdod/harry-potter-collection",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "matrix",
-    name: "The Matrix Collection",
-    sourceType: "mdblist",
-    mediaType: "movie",
-    sourceUrl: "https://mdblist.com/lists/andyhawks/universe-the-matrix",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "lotr",
-    name: "Lord of the Rings and Hobbit Collection",
-    sourceType: "mdblist",
-    mediaType: "movie",
-    sourceUrl:
-      "https://mdblist.com/lists/spudhead15/lord-of-the-rings-and-hobbit-collection",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "jurassic",
-    name: "Jurassic Park Collection",
-    sourceType: "mdblist",
-    mediaType: "movie",
-    sourceUrl: "https://mdblist.com/lists/purple_smurf/jurassic-park",
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "tmdb_popular_movies",
-    name: "Popular Movies",
-    sourceType: "tmdb",
-    mediaType: "movie",
-    endpoint: "discover/movie",
-    params: { sort_by: "popularity.desc" },
-    enabled: true,
-    isPreinstalled: true,
-  },
-  {
-    id: "tmdb_popular_tv",
-    name: "Popular Series",
-    sourceType: "tmdb",
     mediaType: "tv",
-    endpoint: "discover/tv",
-    params: { sort_by: "popularity.desc" },
+    sourceUrl: "https://mdblist.com/lists/snoak/latest-tv-shows",
+    enabled: true,
+    isPreinstalled: true,
+  },
+  {
+    id: "recently_watched_movies",
+    name: "Recently Watched Movies",
+    sourceType: "preinstalled",
+    enabled: true,
+    isPreinstalled: true,
+  },
+  {
+    id: "recently_watched_series",
+    name: "Recently Watched Series",
+    sourceType: "preinstalled",
     enabled: true,
     isPreinstalled: true,
   },
 ];
+
+const defaultCatalogOrder = [
+  "recent_tv",
+  "favorite_tv",
+  "trending_movies",
+  "top10_movies_today",
+  "top_movies_week",
+  "trending_tv",
+  "top10_shows_today",
+  "trending_anime",
+  "new_kdramas",
+  "coming_soon",
+  "upcoming_series",
+  "just_added",
+  "recently_watched_movies",
+  "recently_watched_series",
+];
+const defaultCatalogRank = new Map(
+  defaultCatalogOrder.map((catalogId, index) => [catalogId, index]),
+);
+defaultCatalogs.sort(
+  (left, right) =>
+    (defaultCatalogRank.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+    (defaultCatalogRank.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+);
+
+const retiredWebCatalogIds = new Set([
+  "latest_tv",
+  "action",
+  "comedy",
+  "scifi",
+  "thriller",
+  "drama",
+  "horror",
+  "documentary",
+  "romance",
+  "animated",
+  "family",
+  "bond",
+  "harry_potter",
+  "matrix",
+  "lotr",
+  "jurassic",
+  "tmdb_popular_movies",
+  "tmdb_popular_tv",
+]);
 
 function isValidCatalog(
   catalog: CatalogConfig | null | undefined,
@@ -356,6 +261,16 @@ function isLegacyServiceCatalog(catalog: CatalogConfig) {
   );
 }
 
+function isRetiredCatalog(catalog: CatalogConfig) {
+  const group = String(catalog.collectionGroup ?? "").toUpperCase();
+  return (
+    group === "DECADE" ||
+    group === "FEATURED" ||
+    /^collection_(?:rail_)?(?:decade|featured)(?:_|$)/i.test(catalog.id) ||
+    retiredWebCatalogIds.has(catalog.id)
+  );
+}
+
 export function mergeCatalogs(
   saved: CatalogConfig[] | undefined,
   hiddenIds: string[] = [],
@@ -363,23 +278,30 @@ export function mergeCatalogs(
   const cleaned = (saved ?? [])
     .filter(isValidCatalog)
     .map(normalizedCatalog)
-    .filter((catalog) => catalog.id !== "favorite_tv")
+    .filter((catalog) => !isRetiredCatalog(catalog))
     .filter((catalog) => !isLegacyServiceCatalog(catalog));
-  if (cleaned.length) {
-    return cleaned.map((catalog) => ({
-      ...catalog,
-      enabled: !hiddenIds.includes(catalog.id) && catalog.enabled !== false,
-    }));
-  }
   const savedById = new Map(cleaned.map((catalog) => [catalog.id, catalog]));
-  const merged = defaultCatalogs.map((catalog) => ({
-    ...catalog,
-    ...savedById.get(catalog.id),
-    enabled:
-      !hiddenIds.includes(catalog.id) &&
-      (savedById.get(catalog.id)?.enabled ?? catalog.enabled),
-  }));
-  const defaultIds = new Set(defaultCatalogs.map((catalog) => catalog.id));
-  const custom = cleaned.filter((catalog) => !defaultIds.has(catalog.id));
-  return [...merged, ...custom];
+  const result = cleaned.map((catalog) => {
+    const currentDefault = defaultCatalogs.find(
+      (candidate) => candidate.id === catalog.id,
+    );
+    return {
+      ...catalog,
+      ...(currentDefault && catalog.isPreinstalled ? currentDefault : {}),
+      enabled: !hiddenIds.includes(catalog.id) && catalog.enabled !== false,
+    };
+  });
+  for (const catalog of defaultCatalogs) {
+    if (savedById.has(catalog.id)) continue;
+    const rank = defaultCatalogRank.get(catalog.id) ?? Number.MAX_SAFE_INTEGER;
+    const successor = result.findIndex(
+      (candidate) => (defaultCatalogRank.get(candidate.id) ?? -1) > rank,
+    );
+    const enabled = !hiddenIds.includes(catalog.id) && catalog.enabled;
+    result.splice(successor < 0 ? result.length : successor, 0, {
+      ...catalog,
+      enabled,
+    });
+  }
+  return result;
 }

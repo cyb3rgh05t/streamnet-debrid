@@ -21,9 +21,14 @@ const collectionGroupTitles: Record<string, string> = {
   MOVIE_GENRE: "Movie Genres",
   TV_GENRE: "TV Genres",
   GENRE: "Genres",
-  DECADE: "Decades",
-  FEATURED: "Featured",
 };
+
+const settingsOnlyCatalogIds = new Set([
+  "recent_tv",
+  "favorite_tv",
+  "recently_watched_movies",
+  "recently_watched_series",
+]);
 
 function isCollectionCatalog(catalog: CatalogConfig) {
   return String(catalog.kind ?? "").toUpperCase() === "COLLECTION";
@@ -187,8 +192,11 @@ export function HomeScreen() {
     };
   }, [catalogConfigs, settings.language]);
   const homeCatalogEntries = useMemo(() => {
+    const visibleCatalogs = catalogConfigs.filter(
+      (catalog) => !settingsOnlyCatalogIds.has(catalog.id),
+    );
     const groups = new Map<string, CatalogConfig[]>();
-    catalogConfigs.filter(isCollectionCatalog).forEach((catalog) => {
+    visibleCatalogs.filter(isCollectionCatalog).forEach((catalog) => {
       const group = String(catalog.collectionGroup ?? "FEATURED").toUpperCase();
       groups.set(group, [...(groups.get(group) ?? []), catalog]);
     });
@@ -197,7 +205,7 @@ export function HomeScreen() {
       | { type: "catalog"; catalog: CatalogConfig }
       | { type: "group"; group: string; catalogs: CatalogConfig[] }
     > = [];
-    catalogConfigs.forEach((catalog) => {
+    visibleCatalogs.forEach((catalog) => {
       const kind = String(catalog.kind ?? "").toUpperCase();
       if (kind === "COLLECTION") return;
       if (kind === "COLLECTION_RAIL") {

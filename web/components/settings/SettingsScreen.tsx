@@ -2843,9 +2843,18 @@ function CatalogsSection() {
         <button
           type="button"
           className="secondary text-button"
-          onClick={() =>
-            updateCatalogs([...homeServerCatalogs, ...defaultCatalogs])
-          }
+          onClick={() => {
+            const collections = standardCatalogs.filter((catalog) =>
+              ["COLLECTION", "COLLECTION_RAIL"].includes(
+                String(catalog.kind ?? "").toUpperCase(),
+              ),
+            );
+            updateCatalogs([
+              ...homeServerCatalogs,
+              ...defaultCatalogs,
+              ...collections,
+            ]);
+          }}
         >
           <RotateCcw size={18} />{" "}
           {localize(settings.uiLanguage, "Zurücksetzen", "Reset")}

@@ -14,9 +14,10 @@ export const preferredCatalogOrder = [
   "trending_anime",
   "new_kdramas",
   "coming_soon",
+  "upcoming_series",
   "just_added",
-  "collection_rail_studio",
-  "collection_rail_network",
+  "recently_watched_movies",
+  "recently_watched_series",
 ];
 
 const preferredRank = new Map(

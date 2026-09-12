@@ -4170,7 +4170,7 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--accent, rgba(255, 255, 255, 0.82));
   font-size: clamp(13px, 0.95vw, 16px);
 }
 
@@ -13776,13 +13776,13 @@ html {
 
 .card-meta-row .card-runtime {
   flex: 0 0 auto;
-  color: rgba(255, 255, 255, 0.55);
+  color: var(--accent, rgba(255, 255, 255, 0.82));
 }
 
 .card-meta-row .card-runtime::before {
   content: "·";
   margin: 0 6px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--accent, rgba(255, 255, 255, 0.62));
 }
 
 /* Watchlist grid: comfortable, even spacing (rows were too tight because a
