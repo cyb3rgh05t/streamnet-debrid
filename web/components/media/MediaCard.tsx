@@ -71,12 +71,14 @@ function formatTimeRemaining(minutesRaw: number, language: UiLanguage): string {
 
 // "S1 · E9 · Whisper" for a Continue Watching / Up Next card. Only shown when
 // the item carries episode info (CW rails populate season/episode/title).
-function formatEpisodeLine(item: MediaItem): string {
+function episodeMetadata(item: MediaItem): {
+  code: string;
+  title: string;
+} | null {
   if (item.mediaType !== "tv" || !item.seasonNumber || !item.episodeNumber)
-    return "";
+    return null;
   const code = `S${item.seasonNumber} · E${item.episodeNumber}`;
-  const title = item.episodeTitle?.trim();
-  return title ? `${code} · ${title}` : code;
+  return { code, title: item.episodeTitle?.trim() ?? "" };
 }
 
 function MediaCardBase({
@@ -193,7 +195,7 @@ function MediaCardBase({
     return () => {
       active = false;
     };
-  }, [item.mediaType, metadataId]);
+  }, [item.mediaType, metadataId, settings.uiLanguage]);
 
   useEffect(
     () => () => {
@@ -284,8 +286,11 @@ function MediaCardBase({
       : item.timeRemainingLabel?.replace(/^(\d+)m left$/, (_, minutes) =>
           formatTimeRemaining(Number(minutes), settings.uiLanguage),
         );
-  const runtimeLabel = formatRuntime(item.duration, settings.uiLanguage);
-  const episodeLine = formatEpisodeLine(item);
+  const runtimeLabel =
+    item.mediaType === "movie"
+      ? ""
+      : formatRuntime(item.duration, settings.uiLanguage);
+  const episode = episodeMetadata(item);
 
   return (
     <button
@@ -353,7 +358,7 @@ function MediaCardBase({
         )}
       </div>
       <strong>{item.title}</strong>
-      {episodeLine ? (
+      {episode ? (
         <div className="card-episode-line">
           {isUpNext && (
             <span className="card-upnext">
@@ -361,11 +366,14 @@ function MediaCardBase({
             </span>
           )}
           <span
-            className="card-episode"
+            className="card-episode-code"
             style={{ color: accentColor(settings.accentColor) }}
           >
-            {episodeLine}
+            {episode.code}
           </span>
+          {episode.title && (
+            <span className="card-episode">· {episode.title}</span>
+          )}
         </div>
       ) : (
         <div className="card-meta-row">

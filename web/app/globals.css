@@ -4200,12 +4200,17 @@ select {
   min-width: 0;
 }
 
+.card-episode-code {
+  flex: 0 0 auto;
+  font-size: clamp(13px, 0.95vw, 16px);
+}
+
 .card-episode {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--accent, rgba(255, 255, 255, 0.82));
+  color: rgba(255, 255, 255, 0.82);
   font-size: clamp(13px, 0.95vw, 16px);
 }
 

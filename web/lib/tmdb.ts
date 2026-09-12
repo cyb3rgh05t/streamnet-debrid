@@ -1198,20 +1198,29 @@ export async function getLogoUrl(item: {
   mediaType: MediaType;
   id: number;
 }): Promise<string | null> {
-  const key = `${item.mediaType}:${item.id}`;
+  const activeLanguage = activeTmdbLanguage.split("-")[0];
+  const fallbackLanguage = activeLanguage === "de" ? "en" : "de";
+  const key = `${activeLanguage}:${item.mediaType}:${item.id}`;
   restoreLogoCache();
   if (logoCache.has(key)) return logoCache.get(key) ?? null;
   try {
     const images = await tmdb<TmdbImages>(
       `${item.mediaType}/${item.id}/images`,
-      { include_image_language: `${activeTmdbLanguage.split("-")[0]},en,null` },
+      {
+        include_image_language: `${activeLanguage},${fallbackLanguage},null`,
+      },
     );
     const logos = images.logos ?? [];
-    const pick =
+    const bestInLanguage = (language: string | null) =>
       logos
-        .filter((l) => l.iso_639_1 === "en")
-        .sort((a, b) => (b.vote_average ?? 0) - (a.vote_average ?? 0))[0] ??
-      logos.find((l) => l.iso_639_1 === null) ??
+        .filter((logo) => logo.iso_639_1 === language)
+        .sort(
+          (left, right) => (right.vote_average ?? 0) - (left.vote_average ?? 0),
+        )[0];
+    const pick =
+      bestInLanguage(activeLanguage) ??
+      bestInLanguage(fallbackLanguage) ??
+      bestInLanguage(null) ??
       logos[0];
     const url = pick?.file_path
       ? `https://image.tmdb.org/t/p/w500${pick.file_path}`

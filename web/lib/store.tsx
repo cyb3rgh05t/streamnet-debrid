@@ -597,7 +597,10 @@ function mergeTraktWithLocalResume(
   return dedupeContinueWatchingShows(candidates, activeResumeKeys);
 }
 
-async function hydrateContinueWatchingItems(items: MediaItem[]) {
+async function hydrateContinueWatchingItems(
+  items: MediaItem[],
+  language: string,
+) {
   // Throttled pool (not one big Promise.all): 50 parallel TMDB calls at startup
   // starved user-initiated fetches (opening a details page mid-boot timed out
   // and rendered without seasons/cast). Only the head of the rail pays for
@@ -618,7 +621,7 @@ async function hydrateContinueWatchingItems(items: MediaItem[]) {
           item.mediaType === "tv" &&
           item.seasonNumber != null &&
           item.episodeNumber != null
-            ? getSeasonEpisodes(item.id, item.seasonNumber)
+            ? getSeasonEpisodes(item.id, item.seasonNumber, language)
                 .then((episodes) =>
                   episodes.find(
                     (episode) => episode.episodeNumber === item.episodeNumber,
@@ -1587,7 +1590,7 @@ export function AppProvider({
             activeCloudResumeKeys,
           ).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
           if (fastCw.length) {
-            void hydrateContinueWatchingItems(fastCw)
+            void hydrateContinueWatchingItems(fastCw, settings.language)
               .then((hydrated) => {
                 // Only fill an empty rail: replacing a seeded cache list with this
                 // playback-only list would visibly shrink the rail for a few seconds
@@ -1677,6 +1680,7 @@ export function AppProvider({
               ),
               activeCloudResumeKeys,
             ),
+            settings.language,
           );
           // Trakt outage guard: when Trakt is connected but every read came back
           // empty, the calls were blocked (Cloudflare challenges the CORS

@@ -339,7 +339,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     return () => {
       active = false;
     };
-  }, [hero]);
+  }, [hero, settings.uiLanguage]);
 
   const onCardFocus = (item: MediaItem) => {
     userInteractedHero.current = true;
