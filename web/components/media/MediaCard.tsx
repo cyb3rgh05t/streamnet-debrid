@@ -3,6 +3,7 @@
 import { BadgeCheck, Clapperboard } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { accentColor } from "@/lib/accent";
+import { continueWatchingProgressPercent } from "@/lib/continueWatching";
 import { serviceClearLogo } from "@/lib/serviceLogos";
 import { useApp } from "@/lib/store";
 import {
@@ -101,16 +102,11 @@ function MediaCardBase({
     Number.isFinite(item.resumePositionSeconds) &&
     Number.isFinite(item.durationSeconds) &&
     (item.durationSeconds ?? 0) > 0;
-  const progress = hasPlaybackTiming
-    ? Math.max(
-        0,
-        Math.min(
-          100,
-          ((item.resumePositionSeconds ?? 0) / (item.durationSeconds ?? 1)) *
-            100,
-        ),
-      )
-    : (item.progress ?? 0);
+  const progress = continueWatchingProgressPercent(
+    item.resumePositionSeconds ?? 0,
+    item.durationSeconds ?? 0,
+    (item.progress ?? 0) / 100,
+  );
   const watched = isWatched(item);
   // "Up next" rows carry SERIES completion (how far through the show you are),
   // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
