@@ -32,6 +32,9 @@ import {
   loadXtreamCatchup,
   type CatchupProgram,
 } from "@/lib/iptv";
+import { config } from "@/lib/config";
+import { buildStreamNetTvPlaylist } from "@/lib/streamnetTv";
+import { formatTime24Hour } from "@/lib/dateTime";
 import { VirtualList } from "@/components/ui/VirtualList";
 import { SportsGuidePane } from "@/components/livetv/SportsGuidePane";
 import { ChannelLogo } from "@/components/livetv/ChannelLogo";
@@ -54,10 +57,7 @@ const rowKey = (item: { id: string }) => item.id;
 
 function fmtTime(ms: number): string {
   try {
-    return new Intl.DateTimeFormat([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    }).format(new Date(ms));
+    return formatTime24Hour(ms);
   } catch {
     return "";
   }
@@ -140,6 +140,8 @@ export function LiveTvScreen() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [epgUrl, setEpgUrl] = useState("");
+  const [streamNetUser, setStreamNetUser] = useState("");
+  const [streamNetPassword, setStreamNetPassword] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [query, setQuery] = useState("");
   // Re-open Live TV where the user left off (requested: "start at the last
@@ -555,6 +557,41 @@ export function LiveTvScreen() {
     setManaging(false);
   };
 
+  const saveStreamNetTv = () => {
+    const username = streamNetUser.trim();
+    const password = streamNetPassword.trim();
+    if (!username || !password) {
+      setToast(
+        localize(
+          settings.uiLanguage,
+          "Gib deinen Xtream-Codes-Benutzernamen und dein Passwort ein.",
+          "Enter your Xtream Codes username and password.",
+        ),
+      );
+      return;
+    }
+    const preset = buildStreamNetTvPlaylist(
+      config.streamnetTvXtreamUrl,
+      username,
+      password,
+    );
+    setSettings({
+      ...settings,
+      iptvPlaylists: [
+        preset,
+        ...playlists.filter((playlist) => playlist.id !== preset.id),
+      ],
+    });
+    setToast(
+      localize(
+        settings.uiLanguage,
+        "STREAMNET TV wurde gespeichert.",
+        "STREAMNET TV was saved.",
+      ),
+    );
+    setManaging(false);
+  };
+
   const activeCategoryLabel =
     categories.find((category) => category.id === activeCategory)?.label ??
     localize(settings.uiLanguage, "Alle Sender", "All Channels");
@@ -738,6 +775,55 @@ export function LiveTvScreen() {
 
       {managing && (
         <section className="livetv-manage">
+          <section className="streamnet-tv-preset">
+            <div className="streamnet-tv-preset-head">
+              <strong>STREAMNET TV</strong>
+              <span>
+                {localize(settings.uiLanguage, "Vordefiniert", "Preset")}
+              </span>
+            </div>
+            <p>
+              {localize(
+                settings.uiLanguage,
+                "Gib nur deine Xtream-Codes-Zugangsdaten ein. Die Serveradresse ist bereits hinterlegt.",
+                "Enter only your Xtream Codes credentials. The server address is already configured.",
+              )}
+            </p>
+            <div className="streamnet-tv-credentials">
+              <input
+                value={streamNetUser}
+                onChange={(event) => setStreamNetUser(event.target.value)}
+                placeholder={localize(
+                  settings.uiLanguage,
+                  "Benutzername",
+                  "Username",
+                )}
+                autoComplete="username"
+              />
+              <input
+                value={streamNetPassword}
+                onChange={(event) => setStreamNetPassword(event.target.value)}
+                placeholder={localize(
+                  settings.uiLanguage,
+                  "Passwort",
+                  "Password",
+                )}
+                type="password"
+                autoComplete="current-password"
+              />
+              <button
+                type="button"
+                className="primary"
+                onClick={saveStreamNetTv}
+              >
+                {localize(
+                  settings.uiLanguage,
+                  "Zugang speichern",
+                  "Save access",
+                )}
+              </button>
+            </div>
+          </section>
           {hiddenGroups.length > 0 && (
             <div className="hidden-groups">
               <strong>
@@ -1112,7 +1198,6 @@ export function LiveTvScreen() {
             {activeCategory === "sports" ? (
               <SportsGuidePane
                 key={activeProfile?.id ?? "local"}
-                clockFormat={settings.clockFormat}
                 channels={channels}
                 guide={iptvSnapshot.nowNext}
                 addons={addons}
@@ -1396,7 +1481,7 @@ export function LiveTvScreen() {
                     {favoriteIds.has(selectedChannel.id) && (
                       <>
                         <button
-                          className="secondary"
+                          className="secondary livetv-action-icon"
                           type="button"
                           title={localize(
                             settings.uiLanguage,
@@ -1417,7 +1502,7 @@ export function LiveTvScreen() {
                           <ArrowUp size={17} />
                         </button>
                         <button
-                          className="secondary"
+                          className="secondary livetv-action-icon"
                           type="button"
                           title={localize(
                             settings.uiLanguage,
@@ -1449,7 +1534,7 @@ export function LiveTvScreen() {
                     </button>
                     <button
                       type="button"
-                      className="secondary"
+                      className="secondary livetv-action-secondary"
                       onClick={() =>
                         openChannelExternally(selectedChannel, "vlc")
                       }
@@ -1460,8 +1545,8 @@ export function LiveTvScreen() {
                       type="button"
                       className={
                         favoriteIds.has(selectedChannel.id)
-                          ? "secondary is-active"
-                          : "secondary"
+                          ? "secondary livetv-action-icon is-active"
+                          : "secondary livetv-action-icon"
                       }
                       aria-label={
                         favoriteIds.has(selectedChannel.id)
@@ -1553,11 +1638,9 @@ export function LiveTvScreen() {
                           <span>
                             <strong>{program.title}</strong>
                             <em>
-                              {new Intl.DateTimeFormat([], {
+                              {formatTime24Hour(program.startUtcMillis, [], {
                                 weekday: "short",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              }).format(new Date(program.startUtcMillis))}
+                              })}
                             </em>
                           </span>
                           <Play size={13} fill="currentColor" />

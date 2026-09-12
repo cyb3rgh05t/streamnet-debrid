@@ -55,22 +55,26 @@ export async function loadGenreFanart(
   mediaType: "movie" | "tv",
   language: string,
 ): Promise<Map<number, string>> {
-  const response = await fetch(
-    `/api/genre-fanart/${mediaType}?language=${encodeURIComponent(language)}`,
-  );
-  if (!response.ok) return new Map();
-  const entries = (await response.json()) as GenreFanartEntry[];
-  const result = new Map<number, string>();
-  for (const entry of Array.isArray(entries) ? entries : []) {
-    const id = Number(entry.id ?? 0);
-    const backdrops = Array.isArray(entry.backdrops) ? entry.backdrops : [];
-    const path = backdrops[4] ?? backdrops.at(-1);
-    if (!id || !path?.startsWith("/")) continue;
-    const tone = tones[toneByGenreId[id] ?? "black"];
-    result.set(
-      id,
-      `https://image.tmdb.org/t/p/w1280_filter(duotone,${tone[0]},${tone[1]})${path}`,
+  try {
+    const response = await fetch(
+      `/api/genre-fanart/${mediaType}?language=${encodeURIComponent(language)}`,
     );
+    if (!response.ok) return new Map();
+    const entries = (await response.json()) as GenreFanartEntry[];
+    const result = new Map<number, string>();
+    for (const entry of Array.isArray(entries) ? entries : []) {
+      const id = Number(entry.id ?? 0);
+      const backdrops = Array.isArray(entry.backdrops) ? entry.backdrops : [];
+      const path = backdrops[4] ?? backdrops.at(-1);
+      if (!id || !path?.startsWith("/")) continue;
+      const tone = tones[toneByGenreId[id] ?? "black"];
+      result.set(
+        id,
+        `https://image.tmdb.org/t/p/w1280_filter(duotone,${tone[0]},${tone[1]})${path}`,
+      );
+    }
+    return result;
+  } catch {
+    return new Map();
   }
-  return result;
 }

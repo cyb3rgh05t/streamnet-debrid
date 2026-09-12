@@ -367,10 +367,15 @@
   padding: 0 10px;
 }
 .tv-guide-workspace .livetv-detail-actions button {
-  background: transparent;
   color: #f5f5f5;
-  border-color: transparent;
-  box-shadow: none;
+}
+.tv-guide-workspace .livetv-detail-actions .secondary {
+  border-color: color-mix(in srgb, var(--accent, var(--orange)) 72%, #fff 8%);
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 12%,
+    rgba(255, 255, 255, 0.07)
+  );
 }
 .tv-guide-workspace .livetv-detail .is-next,
 .tv-guide-workspace .livetv-detail-group {
@@ -435,6 +440,10 @@
   flex: 1;
   height: auto;
   min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
   scroll-padding-top: 36px;
 }
 .tv-guide-workspace .livetv-rows {
@@ -473,8 +482,12 @@
   align-items: flex-start;
 }
 .tv-guide-workspace .livetv-guide-block.is-live {
-  background: #232628;
-  border-color: transparent;
+  background: color-mix(in srgb, var(--accent, var(--orange)) 24%, #232628);
+  border-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 68%,
+    transparent
+  );
 }
 .tv-guide-workspace .livetv-guide-block:focus-visible {
   background: #343739;

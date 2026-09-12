@@ -13079,8 +13079,49 @@ button,
   cursor: pointer;
 }
 
+.livetv-detail-actions .secondary {
+  border: 1px solid
+    color-mix(in srgb, var(--accent, var(--orange)) 62%, transparent);
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 8%,
+    rgba(255, 255, 255, 0.07)
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.livetv-detail-actions .livetv-action-secondary {
+  flex: 0 1 150px;
+  min-width: 112px;
+  padding-inline: 18px;
+}
+
+.livetv-detail-actions .livetv-action-icon {
+  flex: 0 0 46px;
+  width: 46px;
+  min-width: 46px;
+  padding: 0;
+  border-radius: 11px;
+}
+
+.livetv-detail-actions .secondary:hover,
+.livetv-detail-actions .secondary:focus-visible {
+  border-color: var(--accent, var(--orange));
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 18%,
+    rgba(255, 255, 255, 0.1)
+  );
+}
+
 .livetv-detail-actions .secondary.is-active {
   color: var(--accent, var(--orange));
+  border-color: var(--accent, var(--orange));
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 20%,
+    rgba(255, 255, 255, 0.08)
+  );
 }
 
 .livetv-detail-empty-state {
@@ -13219,7 +13260,8 @@ html {
   gap: 2px;
   padding: 3px;
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
   margin-left: 6px;
 }
 
@@ -13227,7 +13269,7 @@ html {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 30px;
+  min-height: 34px;
   padding: 0 12px;
   border: 0;
   border-radius: 8px;
@@ -13239,8 +13281,9 @@ html {
 }
 
 .livetv-view-toggle button.is-active {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--accent, var(--orange));
+  color: #141414;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.34);
 }
 
 /* Guide grid */
@@ -13371,8 +13414,16 @@ html {
 }
 
 .livetv-guide-block.is-live {
-  background: rgba(46, 196, 182, 0.16);
-  border-color: rgba(46, 196, 182, 0.4);
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 18%,
+    rgba(255, 255, 255, 0.05)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 58%,
+    transparent
+  );
   color: #fff;
   font-weight: 600;
 }

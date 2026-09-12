@@ -59,6 +59,8 @@ import {
   VLC_SETUP_URL,
 } from "@/lib/externalPlayers";
 import { buildHomeServerCatalogConfigs } from "@/lib/homeserver";
+import { buildStreamNetTvPlaylist } from "@/lib/streamnetTv";
+import { formatTime24Hour } from "@/lib/dateTime";
 import { defaultSettings, useApp } from "@/lib/store";
 import { localize, t, translateUiText } from "@/lib/i18n";
 import type {
@@ -2070,15 +2072,12 @@ function AccountsSection() {
         <p className="empty">
           {localize(settings.uiLanguage, "Web-Build", "Web build")}:{" "}
           {process.env.NEXT_PUBLIC_BUILD_STAMP
-            ? new Date(
+            ? formatTime24Hour(
                 Number(process.env.NEXT_PUBLIC_BUILD_STAMP),
-              ).toLocaleString(
                 settings.uiLanguage === "de" ? "de-DE" : "en-GB",
                 {
                   day: "2-digit",
                   month: "short",
-                  hour: "2-digit",
-                  minute: "2-digit",
                 },
               )
             : localize(settings.uiLanguage, "unbekannt", "unknown")}
@@ -2397,21 +2396,11 @@ function TvSettingsSection() {
       );
       return;
     }
-    const m3u = new URL(`${config.streamnetTvXtreamUrl}/get.php`);
-    m3u.searchParams.set("username", username);
-    m3u.searchParams.set("password", password);
-    m3u.searchParams.set("type", "m3u_plus");
-    m3u.searchParams.set("output", "m3u8");
-    const epg = new URL(`${config.streamnetTvXtreamUrl}/xmltv.php`);
-    epg.searchParams.set("username", username);
-    epg.searchParams.set("password", password);
-    const preset: IptvPlaylistEntry = {
-      id: "streamnet_tv",
-      name: "STREAMNET TV",
-      m3uUrl: m3u.toString(),
-      epgUrl: epg.toString(),
-      enabled: true,
-    };
+    const preset = buildStreamNetTvPlaylist(
+      config.streamnetTvXtreamUrl,
+      username,
+      password,
+    );
     updatePlaylists([
       preset,
       ...playlists.filter((playlist) => playlist.id !== preset.id),

@@ -29,6 +29,7 @@ import {
 import { VirtualList } from "@/components/ui/VirtualList";
 import { ChannelLogo } from "@/components/livetv/ChannelLogo";
 import { localize } from "@/lib/i18n";
+import { formatTime24Hour } from "@/lib/dateTime";
 import { useApp } from "@/lib/store";
 
 const NO_ADDONS: InstalledAddon[] = [];
@@ -40,7 +41,6 @@ export function SportsGuidePane({
   onOpenCategories,
   providerNames = {},
   addons = NO_ADDONS,
-  clockFormat,
 }: {
   channels: IptvChannel[];
   guide: Record<string, IptvNowNext>;
@@ -49,7 +49,6 @@ export function SportsGuidePane({
   onOpenCategories: () => void;
   providerNames?: Record<string, string>;
   addons?: InstalledAddon[];
-  clockFormat?: "12h" | "24h";
 }) {
   const { settings } = useApp();
   const [artwork, setArtwork] = useState<SportsEventArtwork[]>([]);
@@ -254,7 +253,7 @@ export function SportsGuidePane({
               settings.uiLanguage === "de" ? "de-DE" : "en-US",
               { weekday: "short", day: "numeric", month: "short" },
             ).format(date);
-    return `${day} ${new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit", ...(clockFormat ? { hour12: clockFormat === "12h" } : {}) }).format(date)}`;
+    return `${day} ${formatTime24Hour(date)}`;
   };
   return (
     <section
