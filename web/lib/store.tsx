@@ -936,9 +936,7 @@ export function AppProvider({
       ...defaultSettings,
       ...stored,
       accentColor:
-        stored.accentColor === "arctic" || stored.accentColor === "gold"
-          ? "orange"
-          : stored.accentColor,
+        stored.accentColor === "gold" ? "orange" : stored.accentColor,
       uiLanguage:
         storedLanguage.userSelectedLanguage === true &&
         stored.uiLanguage === "en"

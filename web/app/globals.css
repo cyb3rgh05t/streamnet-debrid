@@ -10504,7 +10504,7 @@ button,
     linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0)),
     radial-gradient(
       ellipse at 72% 0%,
-      rgba(0, 213, 136, 0.14),
+      color-mix(in srgb, var(--accent, var(--orange)) 14%, transparent),
       transparent 38%
     ),
     linear-gradient(
@@ -10521,9 +10521,10 @@ button,
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.11);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.86);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--accent, var(--orange)) 42%, transparent);
+  color: var(--accent, var(--orange));
   box-shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
 }
 
@@ -10554,10 +10555,14 @@ button,
 }
 
 .search-hero input:focus {
-  border-color: rgba(255, 255, 255, 0.72);
+  border-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 72%,
+    transparent
+  );
   box-shadow:
-    0 0 0 3px rgba(255, 255, 255, 0.16),
-    0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 0 0 3px color-mix(in srgb, var(--accent, var(--orange)) 16%, transparent),
+    0 0 0 1px var(--accent, var(--orange)),
     0 24px 70px rgba(0, 0, 0, 0.44);
 }
 
