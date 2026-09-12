@@ -383,6 +383,29 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `locally reordered catalogs win push despite newer remote device clock`() {
+        val local = JSONObject()
+            .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("id", "favorite_tv"))
+                .put(JSONObject().put("id", "collection_rail_service"))))
+            .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 100L))
+            .toString()
+        val remote = JSONObject()
+            .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray()
+                .put(JSONObject().put("id", "collection_rail_service"))
+                .put(JSONObject().put("id", "favorite_tv"))))
+            .put("catalogsUpdatedAtByProfile", JSONObject().put("main", 200L))
+            .toString()
+
+        val merged = JSONObject(mergeCatalogsByTimestamp(local, remote, setOf("main")))
+        val catalogs = merged.getJSONObject("catalogsByProfile").getJSONArray("main")
+
+        assertEquals("favorite_tv", catalogs.getJSONObject(0).getString("id"))
+        assertEquals("collection_rail_service", catalogs.getJSONObject(1).getString("id"))
+        assertEquals(200L, merged.getJSONObject("catalogsUpdatedAtByProfile").getLong("main"))
+    }
+
+    @Test
     fun `explicit restore applies cloud catalogs despite newer local startup timestamp`() {
         assertFalse(
             shouldApplyCloudCatalogState(

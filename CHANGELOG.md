@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.011] - 2026-09-12
+
+### Geräteübergreifende Katalogreihenfolge
+
+- Auf Android gewinnt eine ausdrücklich lokal geänderte Home-Katalogreihenfolge beim nächsten Cloud-Push auch dann, wenn ein anderes Gerät aufgrund einer abweichenden Systemuhr einen höheren Katalog-Zeitstempel gespeichert hat.
+- Nach einem erfolgreichen Upload wird die lokale Änderungsmarkierung zurückgesetzt; fehlgeschlagene Uploads behalten sie für den nächsten Synchronisierungsversuch.
+- Die WebUI versieht echte Katalogänderungen mit dem von Android verwendeten profilbezogenen Zeitstempel und bewahrt bei fachfremden Einstellungsänderungen einen neueren Cloud-Katalogstand.
+- Web-spezifisch ausgeblendete Home-Rails wie TV-Favoriten bleiben Bestandteil der gemeinsamen Katalogreihenfolge und werden nicht allein durch die abweichende Web-Darstellung entfernt.
+- Regressionstests decken Web-Katalogänderungen, unveränderte Web-Saves und Android-Pushes bei abweichenden Geräteuhren ab.
+
 ## [2.5.010] - 2026-09-12
 
 ### WebUI-Kataloge und Collections

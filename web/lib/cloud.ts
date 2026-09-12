@@ -1,4 +1,5 @@
 import type { AuthClient } from "./auth";
+import { writeCatalogProfileState } from "./catalogSync";
 import { config, hasNetlifyBackendUrl } from "./config";
 import {
   parseHomeServerConnectionJson,
@@ -1457,19 +1458,7 @@ export async function saveCloudSettings(
       // NOTE: settings saves must NOT touch add-ons. Android now reconciles add-ons to the cloud
       // authoritatively, so writing this session's (possibly stale) add-on list here could delete an
       // add-on installed on another device. Add-ons are written exclusively by saveCloudAddons().
-      setScopedValue(root, "catalogsByProfile", profileId, settings.catalogs);
-      setScopedValue(
-        root,
-        "hiddenPreinstalledByProfile",
-        profileId,
-        settings.hiddenCatalogIds,
-      );
-      setScopedValue(
-        root,
-        "hiddenHomeServerByProfile",
-        profileId,
-        settings.hiddenHomeServerCatalogIds,
-      );
+      writeCatalogProfileState(root, profileId, settings, baseline, changedAt);
       const newIptv = androidIptvSettings(settings);
       const baseIptv = baseline ? androidIptvSettings(baseline) : null;
       for (const [field, value] of Object.entries(newIptv)) {

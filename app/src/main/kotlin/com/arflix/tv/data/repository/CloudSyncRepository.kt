@@ -282,7 +282,11 @@ internal fun mergeWatchlistPayloads(localPayload: String, remotePayload: String)
     }.getOrDefault(localPayload)
 }
 
-internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: String): String {
+internal fun mergeCatalogsByTimestamp(
+    localPayload: String,
+    remotePayload: String,
+    locallyDirtyProfiles: Set<String> = emptySet(),
+): String {
     return runCatching {
         val local = JSONObject(localPayload)
         val remote = JSONObject(remotePayload)
@@ -298,7 +302,7 @@ internal fun mergeCatalogsByTimestamp(localPayload: String, remotePayload: Strin
         profileIds.forEach { profileId ->
             val localUpdatedAt = localTs.optLong(profileId, 0L)
             val remoteUpdatedAt = remoteTs.optLong(profileId, 0L)
-            if (remoteUpdatedAt >= localUpdatedAt) {
+            if (profileId !in locallyDirtyProfiles && remoteUpdatedAt >= localUpdatedAt) {
                 copyProfileArray(remote, local, "catalogsByProfile", profileId)
                 copyProfileArray(remote, local, "hiddenPreinstalledByProfile", profileId)
                 copyProfileArray(remote, local, "hiddenAddonByProfile", profileId)
@@ -760,6 +764,7 @@ class CloudSyncRepository @Inject constructor(
         latestLocalDirtyAt = 0L
         isPushDirty = false
         iptvRepository.clearGroupPreferencesLocallyDirty()
+        catalogRepository.clearCatalogOrderLocallyDirty()
         context.settingsDataStore.edit { prefs ->
             prefs.remove(cloudSyncLocalDirtyAtKey)
             prefs[cloudSyncLastPushAtKey] = System.currentTimeMillis()
@@ -1729,6 +1734,7 @@ class CloudSyncRepository @Inject constructor(
         val catalogsMergedPayload = mergeCatalogsByTimestamp(
             localPayload = watchlistMergedPayload,
             remotePayload = remotePayload,
+            locallyDirtyProfiles = catalogRepository.catalogOrderLocallyDirtyProfiles(),
         )
         val historyMergedPayload = mergeLocalHistoryByTimestamp(
             localPayload = catalogsMergedPayload,

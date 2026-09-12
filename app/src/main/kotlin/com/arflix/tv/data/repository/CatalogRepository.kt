@@ -45,6 +45,7 @@ import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -69,6 +70,14 @@ class CatalogRepository @Inject constructor(
     // diffs against persisted state — all of which is wasted work when the
     // installed addon list is identical between calls.
     @Volatile private var lastSyncedAddonFingerprint: String? = null
+
+    private val catalogOrderLocallyDirtyProfiles = ConcurrentHashMap.newKeySet<String>()
+
+    fun catalogOrderLocallyDirtyProfiles(): Set<String> = catalogOrderLocallyDirtyProfiles.toSet()
+
+    fun clearCatalogOrderLocallyDirty() {
+        catalogOrderLocallyDirtyProfiles.clear()
+    }
 
     private val bundledPreinstalledCatalogIds by lazy(LazyThreadSafetyMode.NONE) {
         bundledPreinstalledCatalogsById.keys
@@ -1058,6 +1067,7 @@ class CatalogRepository @Inject constructor(
         val moved = current.removeAt(currentIndex)
         val insertAt = if (currentIndex > previousIndex) previousIndex else previousIndex - 1
         current.add(insertAt.coerceAtLeast(0), moved)
+        catalogOrderLocallyDirtyProfiles += activeProfileId()
         saveCatalogs(current)
         return true
     }
@@ -1074,6 +1084,7 @@ class CatalogRepository @Inject constructor(
         val moved = current.removeAt(currentIndex)
         val insertAt = if (currentIndex < nextIndex) nextIndex else nextIndex + 1
         current.add(insertAt.coerceAtMost(current.size), moved)
+        catalogOrderLocallyDirtyProfiles += activeProfileId()
         saveCatalogs(current)
         return true
     }
