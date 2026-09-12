@@ -46,6 +46,7 @@ import {
   isUnwatchedContinueWatching,
   mergePartialContinueWatching,
   mergeTrackerContinueWatching,
+  preserveActiveCloudResumes,
   pruneCompletedResume,
   traktProgressActivityKey,
 } from "./continueWatching";
@@ -1558,20 +1559,19 @@ export function AppProvider({
           const fastCw = dedupeContinueWatchingShows(
             pruneCompletedResume(
               [
-              ...traktPlaybackCw,
-              ...cloudCw.filter(
-                (item) =>
-                  isPausedContinueWatchingItem(item) &&
-                  !isHiddenShow(item) &&
-                  !isDismissed(item),
-              ),
+                ...traktPlaybackCw,
+                ...cloudCw.filter(
+                  (item) =>
+                    isPausedContinueWatchingItem(item) &&
+                    !isHiddenShow(item) &&
+                    !isDismissed(item),
+                ),
               ],
               cwCompletions,
               activeCloudResumeKeys,
             ),
             activeCloudResumeKeys,
-          )
-            .sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
+          ).sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
           if (fastCw.length) {
             void hydrateContinueWatchingItems(fastCw)
               .then((hydrated) => {
@@ -1647,11 +1647,20 @@ export function AppProvider({
             .filter((item) => !isDismissed(item))
             .sort((a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0));
           const cw = await hydrateContinueWatchingItems(
-            filterWatchedContinueWatching(
-              cwSorted,
-              traktReady ? cwWatchedKeys : watchedKeys,
-              addonState,
-              traktReady ? cwCompletions : undefined,
+            preserveActiveCloudResumes(
+              filterWatchedContinueWatching(
+                cwSorted,
+                traktReady ? cwWatchedKeys : watchedKeys,
+                addonState,
+                traktReady ? cwCompletions : undefined,
+                activeCloudResumeKeys,
+              ),
+              cloudCw.filter(
+                (item) =>
+                  !isHiddenShow(item) &&
+                  !isDismissed(item) &&
+                  !isLiveStreamOrSportsItem(item, addonState),
+              ),
               activeCloudResumeKeys,
             ),
           );

@@ -3005,6 +3005,13 @@ class HomeViewModel @Inject constructor(
             }
             if (instant.isNotEmpty() && continueWatchingUpdates.revision == localUpdateRevision) {
                 publishContinueWatching(instant)
+                val hydratedInstant = repairContinueWatchingMetadataIfNeeded(instant)
+                if (
+                    hydratedInstant != instant &&
+                    continueWatchingUpdates.revision == localUpdateRevision
+                ) {
+                    publishContinueWatching(hydratedInstant)
+                }
             }
 
             // SLOW PATH — do a freshness refresh in the background. If it
@@ -4551,7 +4558,7 @@ class HomeViewModel @Inject constructor(
                     posterPath = entry.poster_path
                 )
             }
-            traktRepository.enrichContinueWatchingItems(mapped)
+            mapped
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -4648,40 +4655,37 @@ class HomeViewModel @Inject constructor(
                 }
             }
             val localItems = try {
-                traktRepository.getLocalContinueWatching()
+                traktRepository.getLocalContinueWatchingSnapshot()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 emptyList()
             }
             val historyItems = loadContinueWatchingFromHistoryStable()
-            if (remoteItems.isEmpty() && historyItems.isNotEmpty()) {
-                historyItems
-            } else {
-                mergeTraktAndRecentLocalContinueWatching(
-                    traktItems = remoteItems,
-                    localItems = localItems,
-                    historyItems = historyItems
-                )
-            }
+            mergeTraktAndRecentLocalContinueWatching(
+                traktItems = remoteItems,
+                localItems = localItems,
+                historyItems = historyItems
+            )
         } else {
             val historyItems = loadContinueWatchingFromHistoryStable()
-            if (historyItems.isNotEmpty()) {
-                historyItems
-            } else {
-                try {
-                    traktRepository.getLocalContinueWatching()
-                } catch (e: kotlinx.coroutines.CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    emptyList()
-                }
+            val localItems = try {
+                traktRepository.getLocalContinueWatchingSnapshot()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                emptyList()
             }
+            mergeTraktAndRecentLocalContinueWatching(
+                traktItems = emptyList(),
+                localItems = localItems,
+                historyItems = historyItems
+            )
         }
 
-        val repairedItems = repairContinueWatchingMetadataIfNeeded(items, prioritizeFirstItem = true)
-        return applyContinueWatchingDismissals(sanitizeContinueWatchingItems(repairedItems))
-            .filter { item ->
+        val sanitizedItems = sanitizeContinueWatchingItems(items)
+        val visibleItems = applyContinueWatchingDismissals(sanitizedItems)
+        return visibleItems.filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
             }
             .take(Constants.MAX_CONTINUE_WATCHING)

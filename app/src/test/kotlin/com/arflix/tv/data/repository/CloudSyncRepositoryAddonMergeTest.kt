@@ -7,6 +7,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.json.JSONArray
 import org.json.JSONObject
 
 class CloudSyncRepositoryAddonMergeTest {
@@ -38,6 +39,21 @@ class CloudSyncRepositoryAddonMergeTest {
         assertEquals("remote-catalog", merged.getJSONObject("catalogsByProfile").getJSONArray("tv").getJSONObject(0).getString("id"))
         assertEquals(7, merged.getJSONObject("watchlistByProfile").getJSONArray("tv").getJSONObject(0).getInt("tmdbId"))
         assertEquals(50, merged.getJSONObject("localContinueWatchingByProfile").getJSONArray("tv").getJSONObject(0).getInt("progress"))
+    }
+
+    @Test
+    fun `local continue watching list infers missing media types`() {
+        val normalized = JSONArray(
+            normalizeCloudContinueWatchingMediaTypes(
+                """[{"id":1,"title":"Movie","overview":null},{"id":2,"title":"Show","season":1,"episode":2}]"""
+            )
+        )
+
+        assertEquals("MOVIE", normalized.getJSONObject(0).getString("mediaType"))
+        assertEquals("", normalized.getJSONObject(0).getString("overview"))
+        assertEquals("", normalized.getJSONObject(0).getString("year"))
+        assertEquals("", normalized.getJSONObject(0).getString("duration"))
+        assertEquals("TV", normalized.getJSONObject(1).getString("mediaType"))
     }
 
     @Test
@@ -147,6 +163,19 @@ class CloudSyncRepositoryAddonMergeTest {
 
         assertEquals(80, merged.getInt("progress"))
         assertEquals(200L, merged.getLong("updatedAtMs"))
+    }
+
+    @Test
+    fun `cloud continue watching import infers missing media types without changing valid types`() {
+        val normalized = JSONObject(
+            normalizeCloudContinueWatchingMediaTypes(
+                """{"main":[{"id":1,"title":"Movie","progress":20},{"id":2,"title":"Episode","season":1,"episode":3,"progress":30},{"id":3,"title":"Typed","mediaType":"TV","season":2,"episode":4,"progress":40}]}"""
+            )
+        ).getJSONArray("main")
+
+        assertEquals("MOVIE", normalized.getJSONObject(0).getString("mediaType"))
+        assertEquals("TV", normalized.getJSONObject(1).getString("mediaType"))
+        assertEquals("TV", normalized.getJSONObject(2).getString("mediaType"))
     }
 
     @Test

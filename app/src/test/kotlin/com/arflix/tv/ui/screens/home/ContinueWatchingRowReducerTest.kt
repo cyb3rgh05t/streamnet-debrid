@@ -98,6 +98,20 @@ class ContinueWatchingRowReducerTest {
         assertEquals(listOf(30, 20), result.map { it.id })
     }
 
+    @Test
+    fun `cloud item remains when tracker is empty and history exists`() {
+        val cloudItem = continueWatchingItem(id = 30, season = 2, episode = 4, updatedAtMs = 2_000L)
+        val historyItem = continueWatchingItem(id = 40, season = 1, episode = 3, updatedAtMs = 1_000L)
+
+        val result = mergeTraktAndRecentLocalContinueWatching(
+            traktItems = emptyList(),
+            localItems = listOf(cloudItem),
+            historyItems = listOf(historyItem)
+        )
+
+        assertEquals(listOf(30, 40), result.map { it.id })
+    }
+
     private fun tvItem(id: Int, season: Int, episode: Int) = MediaItem(
         id = id,
         title = "Show",

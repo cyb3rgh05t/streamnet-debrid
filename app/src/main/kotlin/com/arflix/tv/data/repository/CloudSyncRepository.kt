@@ -41,6 +41,34 @@ import kotlin.math.max
 import javax.inject.Inject
 import javax.inject.Singleton
 
+internal fun normalizeCloudContinueWatchingMediaTypes(json: String): String {
+    fun normalize(items: JSONArray) {
+        for (index in 0 until items.length()) {
+            val item = items.optJSONObject(index) ?: continue
+            val mediaType = item.optString("mediaType").uppercase()
+            if (mediaType == "MOVIE" || mediaType == "TV") {
+                item.put("mediaType", mediaType)
+            } else {
+                item.put("mediaType", if (item.has("season") || item.has("episode")) "TV" else "MOVIE")
+            }
+            listOf("title", "year", "releaseDate", "overview", "imdbRating", "tmdbRating", "duration")
+                .forEach { field ->
+                    if (!item.has(field) || item.isNull(field)) item.put(field, "")
+                }
+        }
+    }
+
+    return if (json.trimStart().startsWith("[")) {
+        JSONArray(json).also(::normalize).toString()
+    } else {
+        JSONObject(json).also { profiles ->
+            profiles.keys().forEach { profileId ->
+                profiles.optJSONArray(profileId)?.let(::normalize)
+            }
+        }.toString()
+    }
+}
+
 /**
  * Reconcile local addons to the cloud list — the cloud is authoritative. A local addon that is
  * ABSENT from the cloud was removed on another device, so it is dropped here; this is what makes
@@ -2550,7 +2578,8 @@ class CloudSyncRepository @Inject constructor(
             // merges it with Trakt/MDBList so progress created by the WebUI is not lost.
             root.optJSONObject("localContinueWatchingByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, ContinueWatchingItem::class.java).type).type
-                val map: Map<String, List<ContinueWatchingItem>> = gson.fromJson(json, type) ?: emptyMap()
+                val map: Map<String, List<ContinueWatchingItem>> =
+                    gson.fromJson(normalizeCloudContinueWatchingMediaTypes(json), type) ?: emptyMap()
                 if (map.isNotEmpty()) {
                     traktRepository.importLocalContinueWatchingForProfiles(map)
                 }

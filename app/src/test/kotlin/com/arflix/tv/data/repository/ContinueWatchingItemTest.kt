@@ -76,6 +76,31 @@ class ContinueWatchingItemTest {
     }
 
     @Test
+    fun toMediaItem_resolvesRelativeTmdbArtworkPaths() {
+        val relativeArtwork = ContinueWatchingItem(
+            id = 123,
+            title = "Example Movie",
+            mediaType = MediaType.MOVIE,
+            progress = 50,
+            posterPath = "/poster.jpg",
+            backdropPath = "/backdrop.jpg"
+        ).toMediaItem()
+        val absoluteArtwork = ContinueWatchingItem(
+            id = 456,
+            title = "Existing Movie",
+            mediaType = MediaType.MOVIE,
+            progress = 50,
+            posterPath = "https://cdn.example/poster.jpg",
+            backdropPath = "https://cdn.example/backdrop.jpg"
+        ).toMediaItem()
+
+        assertEquals("https://image.tmdb.org/t/p/w780/poster.jpg", relativeArtwork.image)
+        assertEquals("https://image.tmdb.org/t/p/original/backdrop.jpg", relativeArtwork.backdrop)
+        assertEquals("https://cdn.example/poster.jpg", absoluteArtwork.image)
+        assertEquals("https://cdn.example/backdrop.jpg", absoluteArtwork.backdrop)
+    }
+
+    @Test
     fun toMediaItem_localizesGermanContinueWatchingBadges() {
         val baseContext = RuntimeEnvironment.getApplication()
         val configuration = Configuration(baseContext.resources.configuration).apply {

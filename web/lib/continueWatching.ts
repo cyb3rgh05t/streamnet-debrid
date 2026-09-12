@@ -151,6 +151,24 @@ export function dedupeContinueWatchingShows(
   );
 }
 
+export function preserveActiveCloudResumes(
+  items: MediaItem[],
+  cloudItems: MediaItem[],
+  activeResumeKeys: Set<string>,
+): MediaItem[] {
+  const activeCloudItems = cloudItems.filter((item) => {
+    const key =
+      item.mediaType === "tv"
+        ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
+        : `movie:${item.id}`;
+    return activeResumeKeys.has(key) && isPausedContinueWatchingItem(item);
+  });
+  return dedupeContinueWatchingShows(
+    [...items, ...activeCloudItems],
+    activeResumeKeys,
+  );
+}
+
 /** A stale pause on a watched episode must not suppress the show's next episode. */
 export function mergeTrackerContinueWatching(
   playback: MediaItem[],

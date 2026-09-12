@@ -2527,7 +2527,10 @@ class TraktRepository @Inject constructor(
         if (json.isBlank()) return emptyList()
         return try {
             val type = TypeToken.getParameterized(MutableList::class.java, ContinueWatchingItem::class.java).type
-            val items: List<ContinueWatchingItem> = gson.fromJson(json, type)
+            val items: List<ContinueWatchingItem> = gson.fromJson(
+                normalizeCloudContinueWatchingMediaTypes(json),
+                type
+            )
             items.distinctBy { "${it.mediaType}:${it.id}" }
         } catch (_: Exception) {
             emptyList()
@@ -2772,6 +2775,10 @@ class TraktRepository @Inject constructor(
      */
     suspend fun getLocalContinueWatching(): List<ContinueWatchingItem> {
         return loadLocalContinueWatching()
+    }
+
+    suspend fun getLocalContinueWatchingSnapshot(): List<ContinueWatchingItem> {
+        return loadLocalContinueWatchingRaw()
     }
 
     /**
@@ -4793,6 +4800,12 @@ data class ContinueWatchingItem(
         val watchedEpisodeCount = watchedEpisodes
             .takeIf { totalEpisodeCount != null && it > 0 }
             ?.coerceAtMost(totalEpisodeCount ?: 0)
+        val resolvedPosterPath = posterPath?.let { path ->
+            if (path.startsWith('/')) "${Constants.IMAGE_BASE}$path" else path
+        }
+        val resolvedBackdropPath = backdropPath?.let { path ->
+            if (path.startsWith('/')) "${Constants.BACKDROP_BASE_LARGE}$path" else path
+        }
 
         return MediaItem(
             id = id,
@@ -4806,8 +4819,8 @@ data class ContinueWatchingItem(
             duration = duration,
             mediaType = mediaType,
             progress = effectiveProgress,
-            image = posterPath ?: backdropPath ?: "",
-            backdrop = backdropPath,
+            image = resolvedPosterPath ?: resolvedBackdropPath ?: "",
+            backdrop = resolvedBackdropPath,
             badge = null,
             budget = budget,
             nextEpisode = nextEp,

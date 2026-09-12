@@ -126,3 +126,29 @@ test("active cloud episode wins over a different Trakt episode for the same show
     [cloudResume],
   );
 });
+
+test("final reconciliation restores active cloud episodes omitted upstream", async () => {
+  const { preserveActiveCloudResumes } = await import(moduleUrl);
+  const lanterns = {
+    id: 95350,
+    mediaType: "tv",
+    seasonNumber: 1,
+    episodeNumber: 1,
+    activityAt: 2_000,
+    progress: 3,
+  };
+  const bull = {
+    id: 66840,
+    mediaType: "tv",
+    seasonNumber: 5,
+    episodeNumber: 3,
+    activityAt: 1_000,
+    progress: 3,
+  };
+  const activeKeys = new Set(["tv:95350:1:1", "tv:66840:5:3"]);
+
+  assert.deepEqual(
+    preserveActiveCloudResumes([], [lanterns, bull], activeKeys),
+    [lanterns, bull],
+  );
+});
