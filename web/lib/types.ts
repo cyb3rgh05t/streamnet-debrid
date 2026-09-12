@@ -32,6 +32,7 @@ export interface MediaItem {
   genreIds?: number[];
   genres?: string[];
   status?: string | null;
+  certification?: string | null;
   budget?: number | null;
   revenue?: number | null;
   originalLanguage?: string | null;
@@ -531,6 +532,7 @@ export interface AppSettings {
   oledBlack: boolean;
   clockFormat: "12h" | "24h";
   showBudget: boolean;
+  showCertification: boolean;
   smoothScrolling: boolean;
   spoilerBlur: boolean;
   accentColor: string;

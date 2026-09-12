@@ -572,6 +572,7 @@ function androidProfileSettings(settings: AppSettings) {
     trailerInCards: settings.trailerInCards,
     clockFormat: settings.clockFormat,
     showBudget: settings.showBudget,
+    showCertification: settings.showCertification,
     showLoadingStats: settings.showLoadingStats,
     spoilerBlurEnabled: settings.spoilerBlur,
     volumeBoostDb: Math.max(
@@ -623,6 +624,8 @@ function settingsFromAndroidProfile(value: unknown): Partial<AppSettings> {
   if ("clockFormat" in state)
     partial.clockFormat = String(state.clockFormat) === "12h" ? "12h" : "24h";
   if ("showBudget" in state) partial.showBudget = Boolean(state.showBudget);
+  if ("showCertification" in state)
+    partial.showCertification = Boolean(state.showCertification);
   if ("showLoadingStats" in state)
     partial.showLoadingStats = Boolean(state.showLoadingStats);
   if ("spoilerBlurEnabled" in state)

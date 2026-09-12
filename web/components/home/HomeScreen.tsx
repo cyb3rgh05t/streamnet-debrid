@@ -321,7 +321,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     setHeroLogo(null);
     void Promise.all([
       getLogoUrl({ mediaType: hero.mediaType, id: hero.id }).catch(() => null),
-      !hero.backdrop && hero.id > 0 && !hero.isHomeServer
+      hero.id > 0 && !hero.isHomeServer
         ? getCardMeta({ mediaType: hero.mediaType, id: hero.id }).catch(
             () => null,
           )
@@ -333,6 +333,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
         ...hero,
         backdrop: hero.backdrop || meta?.backdrop || null,
         image: hero.image || meta?.image || "",
+        certification: hero.certification || meta?.certification || null,
       });
     });
 
@@ -392,6 +393,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
       : localize(settings.uiLanguage, "Film", "Movie"),
     displayHero?.releaseDate?.slice(0, 4) || displayHero?.year || null,
     displayHero?.duration || null,
+    settings.showCertification ? displayHero?.certification : null,
     ...heroGenres,
   ].filter(Boolean);
 
@@ -440,7 +442,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                   (settings.uiLanguage === "de"
                     ? "Setze deine StreamNet-Mediathek fort."
                     : "Continue from your StreamNet library.");
-                return desc.length > 150 ? desc.slice(0, 150) + "..." : desc;
+                return desc;
               })()}
             </p>
             <div className="hero-actions">

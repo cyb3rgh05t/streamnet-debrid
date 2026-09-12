@@ -1278,8 +1278,9 @@ type CardMeta = {
   image?: string;
   backdrop?: string | null;
   imdbId?: string | null;
+  certification?: string | null;
 };
-const CARD_META_KEY = "arvio.web.cardMeta.v2";
+const CARD_META_KEY = "arvio.web.cardMeta.v3";
 const cardMetaCache = new Map<string, CardMeta>();
 
 function restoreCardMetaCache() {
@@ -1320,6 +1321,7 @@ export async function getCardMeta(item: {
   image: string;
   backdrop: string | null;
   imdbId: string | null;
+  certification: string | null;
 }> {
   const key = `${item.mediaType}:${item.id}`;
   restoreCardMetaCache();
@@ -1332,6 +1334,7 @@ export async function getCardMeta(item: {
       image: cached.image ?? "",
       backdrop: cached.backdrop ?? null,
       imdbId: cached.imdbId ?? null,
+      certification: cached.certification ?? null,
     };
   }
   try {
@@ -1343,20 +1346,69 @@ export async function getCardMeta(item: {
       poster_path?: string | null;
       backdrop_path?: string | null;
       external_ids?: { imdb_id?: string | null };
-    }>(`${item.mediaType}/${item.id}`, { append_to_response: "external_ids" });
+      release_dates?: {
+        results?: Array<{
+          iso_3166_1?: string;
+          release_dates?: Array<{ certification?: string; type?: number }>;
+        }>;
+      };
+      content_ratings?: {
+        results?: Array<{ iso_3166_1?: string; rating?: string }>;
+      };
+    }>(`${item.mediaType}/${item.id}`, {
+      append_to_response:
+        item.mediaType === "movie"
+          ? "external_ids,release_dates"
+          : "external_ids,content_ratings",
+    });
     const runtime = payload.runtime ?? payload.episode_run_time?.[0] ?? 0;
+    const normalizeFsk = (value?: string) => {
+      const rating = (value ?? "")
+        .trim()
+        .toUpperCase()
+        .replace(/^FSK\s*/, "");
+      return ["0", "6", "12", "16", "18"].includes(rating)
+        ? `FSK ${rating}`
+        : null;
+    };
+    const germanReleaseDates =
+      payload.release_dates?.results?.find(
+        (result) => result.iso_3166_1?.toUpperCase() === "DE",
+      )?.release_dates ?? [];
+    const preferredReleaseTypes = [3, 2, 1, 4, 5, 6];
+    const movieCertification = preferredReleaseTypes
+      .flatMap((type) =>
+        germanReleaseDates.filter((release) => release.type === type),
+      )
+      .map((release) => normalizeFsk(release.certification))
+      .find(Boolean);
+    const tvCertification = normalizeFsk(
+      payload.content_ratings?.results?.find(
+        (result) => result.iso_3166_1?.toUpperCase() === "DE",
+      )?.rating,
+    );
     const meta = {
       runtime,
       image: tmdbImageUrl(config.imageBase, payload.poster_path),
       backdrop:
         tmdbImageUrl(config.backdropBase, payload.backdrop_path) || null,
       imdbId: payload.external_ids?.imdb_id ?? null,
+      certification:
+        item.mediaType === "movie"
+          ? (movieCertification ?? null)
+          : tvCertification,
     };
     cardMetaCache.set(key, meta);
     persistCardMetaCache();
     return meta;
   } catch {
-    const meta = { runtime: 0, image: "", backdrop: null, imdbId: null };
+    const meta = {
+      runtime: 0,
+      image: "",
+      backdrop: null,
+      imdbId: null,
+      certification: null,
+    };
     cardMetaCache.set(key, meta);
     return meta;
   }

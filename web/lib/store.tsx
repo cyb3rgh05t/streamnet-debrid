@@ -315,6 +315,7 @@ export const defaultSettings: AppSettings = {
   oledBlack: false,
   clockFormat: "24h",
   showBudget: true,
+  showCertification: true,
   smoothScrolling: true,
   spoilerBlur: false,
   accentColor: "orange",

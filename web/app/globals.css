@@ -378,7 +378,7 @@ p {
   line-height: 1.48;
   text-shadow: 0 3px 14px rgba(0, 0, 0, 0.65);
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }

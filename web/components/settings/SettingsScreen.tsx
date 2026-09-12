@@ -1295,6 +1295,18 @@ function SectionBody({ section }: { section: SectionId }) {
               onChange={(v) => set({ showBudget: v })}
             />
           </Row>
+          <Row
+            label={localize(
+              settings.uiLanguage,
+              "FSK im großen Hero anzeigen",
+              "Show FSK rating in large hero",
+            )}
+          >
+            <Toggle
+              value={settings.showCertification}
+              onChange={(v) => set({ showCertification: v })}
+            />
+          </Row>
           <Row label="Smooth scrolling">
             <Toggle
               value={settings.smoothScrolling}
