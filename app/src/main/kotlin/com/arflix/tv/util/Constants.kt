@@ -77,7 +77,7 @@ object Constants {
 
     // Progress thresholds.
     const val WATCHED_THRESHOLD = 90
-    const val MIN_PROGRESS_THRESHOLD = 3
+    const val MIN_PROGRESS_THRESHOLD = 1
     const val MAX_PROGRESS_ENTRIES = 50
     const val MAX_CONTINUE_WATCHING = 50
 

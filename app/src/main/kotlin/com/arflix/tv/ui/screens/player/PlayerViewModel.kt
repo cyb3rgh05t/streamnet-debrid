@@ -4377,7 +4377,7 @@ class PlayerViewModel @Inject constructor(
                             displaySeason = nextIdentity?.displaySeason ?: nextSeason,
                             displayEpisode = nextIdentity?.displayEpisode ?: nextEpisode,
                             episodeTitle = null,
-                            progress = 3, // meets MIN_PROGRESS_THRESHOLD to avoid filter
+                            progress = 3, // Keep next episodes above the minimum progress filter.
                             positionSeconds = 0L, // next episode: no resume position yet
                             durationSeconds = 0L  // next episode: unknown duration
                         )

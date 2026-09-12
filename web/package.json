@@ -12,7 +12,7 @@
     "dev": "next dev",
     "setup:selfhost": "node scripts/selfhost.mjs setup",
     "check:selfhost": "node scripts/selfhost.mjs check",
-    "test": "node --test tests/*.test.cjs",
+    "test": "node --experimental-strip-types --test tests/*.test.cjs",
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "next lint"

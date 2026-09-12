@@ -793,7 +793,7 @@ function historyToAndroidCw(
   return {
     id: entry.show_tmdb_id,
     title: entry.title ?? "",
-    mediaType: entry.media_type,
+    mediaType: entry.media_type === "tv" ? "TV" : "MOVIE",
     progress: Math.round(Math.max(0, Math.min(1, entry.progress)) * 100),
     resumePositionSeconds: entry.position_seconds ?? 0,
     durationSeconds: entry.duration_seconds ?? 0,
@@ -2071,7 +2071,7 @@ export async function saveProgress(
         const sameTitle =
           candidate.id === nextItem.id &&
           String(candidate.mediaType ?? "").toLowerCase() ===
-            nextItem.mediaType;
+            String(nextItem.mediaType ?? "").toLowerCase();
         if (!sameTitle) return true;
         if (nextItem.mediaType !== "tv") return false;
         return (

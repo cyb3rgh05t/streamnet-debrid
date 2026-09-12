@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unveröffentlicht]
 
+## [2.5.008] - 2026-09-12
+
+### Continue Watching und Cloud-Sync
+
+- Android zeigt angefangene Filme und Episoden bereits ab 1 Prozent Fortschritt in „Weiterschauen“ an.
+- Die WebUI bereinigt ihren bereits sichtbaren Browser-Cache sofort anhand profilbezogener Cloud-Tombstones, damit entfernte Titel auch bei vorübergehenden Tracking-Provider-Fehlern nicht wieder erscheinen.
+- Von der WebUI gespeicherte Continue-Watching-Einträge verwenden den Android-kompatiblen Medientyp `MOVIE` beziehungsweise `TV`; bestehende ältere Einträge bleiben weiterhin lesbar.
+- Regressionstests sichern die 1-Prozent-Schwelle sowie Show- und Episoden-Tombstones ab.
+
 ## [2.5.007] - 2026-09-12
 
 ### Franchise-Rail

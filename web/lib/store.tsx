@@ -39,6 +39,7 @@ import {
 } from "./cloud";
 import {
   completionTimes,
+  filterDismissedContinueWatching,
   includeIptvContinueWatching,
   isUnwatchedContinueWatching,
   mergePartialContinueWatching,
@@ -1503,6 +1504,26 @@ export function AppProvider({
             );
             return dismissedAt > 0 && (item.activityAt ?? 0) <= dismissedAt;
           };
+          const pruneCloudDismissals = (items: MediaItem[]) =>
+            filterDismissedContinueWatching(items, cloudDismissals);
+          setContinueWatching((current) => pruneCloudDismissals(current));
+          setCategories((current) =>
+            current.flatMap((category) => {
+              if (category.id !== "continue_watching") return [category];
+              const items = pruneCloudDismissals(category.items);
+              return items.length
+                ? [items === category.items ? category : { ...category, items }]
+                : [];
+            }),
+          );
+          const cachedAfterDismissals = pruneCloudDismissals(
+            readCachedList(cwCacheKey),
+          );
+          if (cachedAfterDismissals.length) {
+            saveCachedList(cwCacheKey, cachedAfterDismissals, 20);
+          } else {
+            removeStored(cwCacheKey);
+          }
           const cloudCw = historyRows.map(historyToItem);
           const traktPlaybackCw = playbackRows
             .map(traktPlaybackToMedia)
