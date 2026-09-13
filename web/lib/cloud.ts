@@ -2105,6 +2105,9 @@ export async function saveProgress(
       });
     }
   });
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("streamnet-cloud-push-succeeded"));
+  }
 }
 
 export async function removeContinueWatchingProgress(

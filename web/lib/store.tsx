@@ -2218,6 +2218,19 @@ export function AppProvider({
   }, [markSyncTimestamp]);
 
   useEffect(() => {
+    const onCloudPushSucceeded = () => markSyncTimestamp("pushAt");
+    window.addEventListener(
+      "streamnet-cloud-push-succeeded",
+      onCloudPushSucceeded,
+    );
+    return () =>
+      window.removeEventListener(
+        "streamnet-cloud-push-succeeded",
+        onCloudPushSucceeded,
+      );
+  }, [markSyncTimestamp]);
+
+  useEffect(() => {
     saveStored(PROFILES_KEY, profiles);
     saveStored(ACTIVE_PROFILE_KEY, activeProfileId);
     // Stamp which account these cached profiles belong to (empty when signed
