@@ -33,6 +33,7 @@ object Constants {
     val CLOUD_AUTH_EMAIL_URL: String get() = "$CLOUD_BACKEND_URL/cloud-auth-email"
     val ACCOUNT_SYNC_PULL_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-pull"
     val ACCOUNT_SYNC_PUSH_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-push"
+    val ACCOUNT_SYNC_EVENTS_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-events"
     val ACCOUNT_SYNC_CURSOR_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-cursor"
     val ACCOUNT_SYNC_DELTA_URL: String get() = "$CLOUD_BACKEND_URL/account-sync-delta"
     val APP_USAGE_EVENT_URL: String get() = "$CLOUD_BACKEND_URL/app-usage-event"

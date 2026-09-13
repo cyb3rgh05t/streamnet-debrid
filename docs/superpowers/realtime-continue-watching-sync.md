@@ -1,7 +1,8 @@
 # Echtzeit-Synchronisierung für Continue Watching
 
-Status: Geplantes Feature  
+Status: Umgesetzt
 Dokumentiert: 12. September 2026
+Aktualisiert: 13. September 2026
 
 ## Ziel
 

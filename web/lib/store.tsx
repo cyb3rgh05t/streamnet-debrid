@@ -39,7 +39,9 @@ import {
   flushCloudPayloadOutbox,
   hasPendingCloudPayload,
   saveWatchedState,
+  getRawPayloadRevision,
 } from "./cloud";
+import { subscribeCloudSyncEvents } from "./cloudSyncEvents";
 import {
   completionTimes,
   dedupeContinueWatchingShows,
@@ -1035,6 +1037,7 @@ export function AppProvider({
   const [manageMode, setManageMode] = useState(false);
   const [view, setView] = useState<AppView>(() => {
     if (initialView) return initialView;
+    if (!authClient.session) return "login";
     const stored = loadStored<Profile[]>(PROFILES_KEY, []);
     const activeId = loadStored<string | null>(ACTIVE_PROFILE_KEY, null);
     const skip = loadStored<AppSettings>(
@@ -1958,18 +1961,12 @@ export function AppProvider({
         if (access_token && refresh_token) {
           const payload = decodeJwtPayload(access_token);
           const userId = (payload.sub as string | undefined) ?? "";
-          const provider = (
-            (payload.iss as string | undefined) === "arvio-netlify"
-              ? "netlify"
-              : "supabase"
-          ) as "netlify" | "supabase";
           const session = {
             accessToken: access_token,
             refreshToken: refresh_token,
             userId,
             email,
             expiresAt: Date.now() + expires_in * 1000,
-            provider,
           };
 
           saveStored(SESSION_KEY, session);
@@ -2067,6 +2064,24 @@ export function AppProvider({
       document.removeEventListener("visibilitychange", refreshOnReturn);
     };
   }, [cloudProfilesHydrated, refreshData, view]);
+
+  useEffect(() => {
+    if (!auth || view === "login") return undefined;
+    let debounceTimer: NodeJS.Timeout | null = null;
+    const unsubscribe = subscribeCloudSyncEvents(authClient, (event) => {
+      const currentRev = getRawPayloadRevision(auth.userId);
+      if (event.revision > currentRev) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => {
+          void refreshData(undefined, true);
+        }, 300);
+      }
+    });
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribe();
+    };
+  }, [auth, refreshData, view]);
 
   useEffect(() => {
     saveStored(settingsKey, settings);
@@ -3093,6 +3108,7 @@ export function AppProvider({
     authClient.signOut();
     setAuth(null);
     setCloudProfilesHydrated(true);
+    setView("login");
     setToast("Von StreamNet Cloud abgemeldet.");
   }, []);
 

@@ -43,11 +43,9 @@ import { createPortal } from "react-dom";
 import { defaultCatalogs, mergeCatalogs } from "@/lib/catalogs";
 import {
   config,
-  hasNetlifyBackendConfig,
-  hasSupabaseConfig,
+  hasCloudBackendConfig,
   hasTraktConfig,
   hasSimklConfig,
-  getAuthPortalUrl,
 } from "@/lib/config";
 import {
   isLinux,
@@ -1401,6 +1399,7 @@ function AccountsSection() {
   const {
     settings,
     auth,
+    goToLogin,
     traktConnected,
     mdblistConnected,
     simklConnected,
@@ -1428,7 +1427,7 @@ function AccountsSection() {
   const [mdblistError, setMdblistError] = useState<string | null>(null);
   const [mdblistBusy, setMdblistBusy] = useState(false);
   const [syncBusy, setSyncBusy] = useState(false);
-  const cloudConfigured = hasNetlifyBackendConfig() || hasSupabaseConfig();
+  const cloudConfigured = hasCloudBackendConfig();
   const routingOptions: Array<
     [typeof trackingPreferences.watchlistReadMode, string]
   > = [];
@@ -1437,11 +1436,6 @@ function AccountsSection() {
   if (traktConnected) routingOptions.push(["trakt", "Trakt"]);
   if (simklConnected) routingOptions.push(["simkl", "Simkl"]);
   if (mdblistConnected) routingOptions.push(["mdblist", "MDBList"]);
-
-  const redirectToAuthPortal = () => {
-    const redirectUri = window.location.origin + "/";
-    window.location.href = `${getAuthPortalUrl()}?redirect_uri=${encodeURIComponent(redirectUri)}`;
-  };
 
   const startTraktLink = async () => {
     setTraktBusy("start");
@@ -1533,20 +1527,14 @@ function AccountsSection() {
 
   return (
     <>
-      <Panel title={config.selfHosted ? "Local Account" : "StreamNet Account"}>
+      <Panel title="StreamNet Cloud Account">
         {!cloudConfigured && (
           <p className="empty">
-            {config.selfHosted
-              ? localize(
-                  settings.uiLanguage,
-                  "Profile und Einstellungen werden in diesem Browser gespeichert. StreamNet Cloud ist nicht verbunden.",
-                  "Profiles and settings are saved in this browser. StreamNet Cloud is not connected.",
-                )
-              : localize(
-                  settings.uiLanguage,
-                  "Die Umgebungsvariablen für StreamNet Cloud fehlen. Ergänze die Backend-Werte in web/.env.local.",
-                  "StreamNet Cloud backend env is missing. Add backend values in web/.env.local.",
-                )}
+            {localize(
+              settings.uiLanguage,
+              "Profile und Einstellungen werden in diesem Browser gespeichert. StreamNet Cloud ist nicht verbunden.",
+              "Profiles and settings are saved in this browser. StreamNet Cloud is not connected.",
+            )}
           </p>
         )}
         <div className="settings-status-grid">
@@ -1557,13 +1545,7 @@ function AccountsSection() {
                 ? localize(settings.uiLanguage, "Verbunden", "Connected")
                 : cloudConfigured
                   ? localize(settings.uiLanguage, "Bereit", "Ready")
-                  : config.selfHosted
-                    ? localize(settings.uiLanguage, "Deaktiviert", "Disabled")
-                    : localize(
-                        settings.uiLanguage,
-                        "Konfiguration fehlt",
-                        "Missing config",
-                      )}
+                  : localize(settings.uiLanguage, "Deaktiviert", "Disabled")}
             </strong>
           </div>
           <div>
@@ -1657,13 +1639,13 @@ function AccountsSection() {
               {localize(settings.uiLanguage, "Abmelden", "Sign out")}
             </button>
           </div>
-        ) : !config.selfHosted ? (
+        ) : (
           <div className="login-form">
             <button
               type="button"
               className="primary"
               disabled={!cloudConfigured}
-              onClick={redirectToAuthPortal}
+              onClick={goToLogin}
             >
               {localize(
                 settings.uiLanguage,
@@ -1672,7 +1654,7 @@ function AccountsSection() {
               )}
             </button>
           </div>
-        ) : null}
+        )}
       </Panel>
 
       <Panel title="Trakt">

@@ -4,30 +4,15 @@ function envValue(value: string | undefined, fallback = "") {
     : fallback;
 }
 
-const selfHosted = process.env.NEXT_PUBLIC_SELF_HOSTED === "true";
 const streamnetBackendUrl = envValue(
   process.env.STREAMNET_BACKEND_URL,
   "https://auth.mystreamnet.club",
 ).replace(/\/+$/, "");
 
 export const config = {
-  selfHosted,
+  selfHosted: true,
   sportsMetadataUrl: process.env.NEXT_PUBLIC_SPORTS_METADATA_URL ?? "",
-  supabaseUrl: selfHosted ? "" : (process.env.NEXT_PUBLIC_SUPABASE_URL ?? ""),
-  supabaseAnonKey: selfHosted
-    ? ""
-    : (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? ""),
-  appAnonKey: selfHosted
-    ? ""
-    : envValue(
-        process.env.NEXT_PUBLIC_ARVIO_APP_ANON_KEY,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
-      ),
-  netlifyBackendUrl: selfHosted
-    ? streamnetBackendUrl
-    : (process.env.NEXT_PUBLIC_NETLIFY_BACKEND_URL ??
-      process.env.NETLIFY_BACKEND_URL ??
-      "https://auth.arvio.tv/.netlify/functions"),
+  backendUrl: streamnetBackendUrl,
   streamnetTvXtreamUrl: envValue(
     process.env.NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL,
     "https://xui.streamnet.live",
@@ -44,30 +29,13 @@ export const config = {
     process.env.NEXT_PUBLIC_SIMKL_CLIENT_ID ||
     process.env.SIMKL_CLIENT_ID ||
     "",
-  allowNetlifyMediaProxy:
-    envValue(process.env.NEXT_PUBLIC_ALLOW_NETLIFY_MEDIA_PROXY, "false") ===
-    "true",
   imageBase: "https://image.tmdb.org/t/p/w780",
   backdropBase: "https://image.tmdb.org/t/p/w1280",
   backdropOriginal: "https://image.tmdb.org/t/p/original",
 };
 
-export function hasSupabaseConfig() {
-  return (
-    config.supabaseUrl.startsWith("https://") &&
-    config.supabaseAnonKey.length > 40
-  );
-}
-
-export function hasNetlifyBackendUrl() {
-  return config.netlifyBackendUrl.startsWith("https://");
-}
-
-export function hasNetlifyBackendConfig() {
-  return (
-    config.selfHosted ||
-    (hasNetlifyBackendUrl() && config.appAnonKey.length > 40)
-  );
+export function hasCloudBackendConfig() {
+  return Boolean(config.backendUrl && config.backendUrl.startsWith("http"));
 }
 
 export function hasResolverConfig() {
@@ -79,26 +47,18 @@ export function hasResolverConfig() {
 
 export function hasTraktConfig() {
   return (
-    hasNetlifyBackendUrl() ||
+    hasCloudBackendConfig() ||
     (config.traktClientId.length > 10 && !config.traktClientId.startsWith("__"))
   );
 }
 
 export function hasSimklConfig() {
   return (
-    hasNetlifyBackendUrl() ||
+    hasCloudBackendConfig() ||
     (config.simklClientId.length > 10 && !config.simklClientId.startsWith("__"))
   );
 }
 
 export function getAuthPortalUrl(): string {
-  if (config.selfHosted) return config.netlifyBackendUrl;
-  const backend = config.netlifyBackendUrl;
-  try {
-    const url = new URL(backend);
-    const cleanPath = url.pathname.replace(/\/\.netlify\/functions\/?$/, "/");
-    return `${url.protocol}//${url.host}${cleanPath}`;
-  } catch {
-    return "https://auth.arvio.tv/";
-  }
+  return config.backendUrl;
 }

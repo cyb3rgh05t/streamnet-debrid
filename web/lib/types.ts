@@ -307,7 +307,6 @@ export interface AuthSession {
   userId: string;
   email: string;
   expiresAt: number;
-  provider?: "netlify" | "supabase";
 }
 
 /**

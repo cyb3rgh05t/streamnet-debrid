@@ -1,16 +1,10 @@
-import {
-  config,
-  hasNetlifyBackendConfig,
-  hasNetlifyBackendUrl,
-  hasSupabaseConfig,
-} from "./config";
 import { jsonRequest } from "./http";
 import { loadStored, removeStored, saveStored } from "./storage";
-import type { AuthSession, UserProfile } from "./types";
+import type { AuthSession } from "./types";
 
 export const SESSION_KEY = "streamnet.web.session";
 
-interface SupabaseAuthResponse {
+interface AuthResponse {
   access_token: string;
   refresh_token: string;
   expires_in?: number;
@@ -32,9 +26,8 @@ export function decodeJwtPayload(token: string): Record<string, unknown> {
 }
 
 function sessionFromResponse(
-  response: SupabaseAuthResponse,
+  response: AuthResponse,
   fallbackEmail: string,
-  provider?: AuthSession["provider"],
 ): AuthSession {
   const payload = decodeJwtPayload(response.access_token);
   const userId = response.user?.id ?? (payload.sub as string | undefined) ?? "";
@@ -42,18 +35,12 @@ function sessionFromResponse(
     response.user?.email ??
     (payload.email as string | undefined) ??
     fallbackEmail;
-  const tokenProvider =
-    provider ??
-    ((payload.iss as string | undefined) === "arvio-netlify"
-      ? "netlify"
-      : "supabase");
   return {
     accessToken: response.access_token,
     refreshToken: response.refresh_token,
     userId,
     email,
     expiresAt: Date.now() + (response.expires_in ?? 3600) * 1000,
-    provider: tokenProvider,
   };
 }
 
@@ -65,93 +52,29 @@ export class AuthClient {
     return Boolean(this.session?.accessToken);
   }
 
-  get isNetlifySession() {
-    if (config.selfHosted && this.session?.provider === "netlify") return true;
-    if (this.session?.provider === "netlify") return true;
-    const payload = this.session?.accessToken
-      ? decodeJwtPayload(this.session.accessToken)
-      : {};
-    return payload.iss === "arvio-netlify";
-  }
-
-  private async netlifyAuth<T>(path: string, body: Record<string, unknown>) {
-    if (config.selfHosted) {
-      return jsonRequest<T>(`/api/cloud-auth/${path.replace(/^\/+/, "")}`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-    }
-    if (!hasNetlifyBackendConfig()) {
-      return jsonRequest<T>(`/api/cloud-auth/${path}`, {
-        method: "POST",
-        body: JSON.stringify(body),
-      });
-    }
-    return jsonRequest<T>(
-      `${config.netlifyBackendUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`,
-      {
-        method: "POST",
-        headers: {
-          apikey: config.appAnonKey,
-          Authorization: `Bearer ${config.appAnonKey}`,
-        },
-        body: JSON.stringify(body),
-      },
-    );
+  private async cloudAuth<T>(path: string, body: Record<string, unknown>) {
+    return jsonRequest<T>(`/api/cloud-auth/${path.replace(/^\/+/, "")}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
   }
 
   async signIn(email: string, password: string) {
-    if (hasNetlifyBackendUrl()) {
-      try {
-        const response = await this.netlifyAuth<SupabaseAuthResponse>(
-          "auth-login",
-          { email, password },
-        );
-        this.session = sessionFromResponse(response, email, "netlify");
-        saveStored(SESSION_KEY, this.session);
-        return this.session;
-      } catch (error) {
-        throw error;
-      }
-    }
-    if (!hasSupabaseConfig()) throw new Error("Supabase is not configured");
-    const response = await jsonRequest<SupabaseAuthResponse>(
-      `${config.supabaseUrl}/auth/v1/token?grant_type=password`,
-      {
-        method: "POST",
-        headers: { apikey: config.supabaseAnonKey },
-        body: JSON.stringify({ email, password }),
-      },
-    );
-    this.session = sessionFromResponse(response, email, "supabase");
+    const response = await this.cloudAuth<AuthResponse>("auth-login", {
+      email,
+      password,
+    });
+    this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
     return this.session;
   }
 
   async signUp(email: string, password: string) {
-    if (hasNetlifyBackendUrl()) {
-      try {
-        const response = await this.netlifyAuth<SupabaseAuthResponse>(
-          "cloud-auth-email",
-          { email, password },
-        );
-        this.session = sessionFromResponse(response, email, "netlify");
-        saveStored(SESSION_KEY, this.session);
-        return this.session;
-      } catch (error) {
-        throw error;
-      }
-    }
-    if (!hasSupabaseConfig()) throw new Error("Supabase is not configured");
-    const response = await jsonRequest<SupabaseAuthResponse>(
-      `${config.supabaseUrl}/auth/v1/signup`,
-      {
-        method: "POST",
-        headers: { apikey: config.supabaseAnonKey },
-        body: JSON.stringify({ email, password }),
-      },
-    );
-    this.session = sessionFromResponse(response, email, "supabase");
+    const response = await this.cloudAuth<AuthResponse>("cloud-auth-email", {
+      email,
+      password,
+    });
+    this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
     return this.session;
   }
@@ -171,27 +94,11 @@ export class AuthClient {
     if (!sourceSession) throw new Error("Sign in required");
 
     const refresh = (async () => {
-      const payload = sourceSession.accessToken
-        ? decodeJwtPayload(sourceSession.accessToken)
-        : {};
-      const isNetlify =
-        sourceSession.provider === "netlify" || payload.iss === "arvio-netlify";
-      let response: SupabaseAuthResponse;
+      let response: AuthResponse;
       try {
-        response = isNetlify
-          ? await this.netlifyAuth<SupabaseAuthResponse>("auth-refresh", {
-              refresh_token: sourceSession.refreshToken,
-            })
-          : await jsonRequest<SupabaseAuthResponse>(
-              `${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`,
-              {
-                method: "POST",
-                headers: { apikey: config.supabaseAnonKey },
-                body: JSON.stringify({
-                  refresh_token: sourceSession.refreshToken,
-                }),
-              },
-            );
+        response = await this.cloudAuth<AuthResponse>("auth-refresh", {
+          refresh_token: sourceSession.refreshToken,
+        });
       } catch (error) {
         const status = (error as { status?: number }).status;
         if (status === 401 || status === 400) {
@@ -206,11 +113,7 @@ export class AuthClient {
         this.session.refreshToken !== sourceSession.refreshToken
       )
         return;
-      this.session = sessionFromResponse(
-        response,
-        sourceSession.email,
-        isNetlify ? "netlify" : "supabase",
-      );
+      this.session = sessionFromResponse(response, sourceSession.email);
       saveStored(SESSION_KEY, this.session);
     })();
 
@@ -220,31 +123,6 @@ export class AuthClient {
     } finally {
       if (this.refreshInFlight === refresh) this.refreshInFlight = null;
     }
-  }
-
-  async supabase<T>(path: string, init: RequestInit = {}) {
-    if (this.isNetlifySession) {
-      throw new Error(
-        "Diese StreamNet Cloud-Sitzung muss die StreamNet-Sync-API verwenden.",
-      );
-    }
-    const token = await this.accessToken();
-    return jsonRequest<T>(`${config.supabaseUrl}${path}`, {
-      ...init,
-      headers: {
-        apikey: config.supabaseAnonKey,
-        Authorization: `Bearer ${token}`,
-        ...(init.headers ?? {}),
-      },
-    });
-  }
-
-  async loadProfile() {
-    if (!this.session) return null;
-    const rows = await this.supabase<UserProfile[]>(
-      `/rest/v1/profiles?id=eq.${this.session.userId}&select=id,email,addons,default_subtitle,auto_play_next`,
-    );
-    return rows[0] ?? { id: this.session.userId, email: this.session.email };
   }
 
   signOut() {

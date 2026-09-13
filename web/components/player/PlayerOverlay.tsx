@@ -1306,16 +1306,6 @@ function VideoPlayer({
           attempts.push(directManifestUrl(stream.url));
         }
       }
-      if (config.allowNetlifyMediaProxy) {
-        attempts.push(proxiedUrl(hlsTwin ?? stream.url, liveTvProxyHeaders()));
-      }
-    }
-    if (
-      config.allowNetlifyMediaProxy &&
-      !headers &&
-      /^https?:\/\//i.test(stream.url)
-    ) {
-      attempts.push(proxiedUrl(stream.url));
     }
     const uniqueAttempts = [...new Set(attempts)];
     let attemptIndex = 0;

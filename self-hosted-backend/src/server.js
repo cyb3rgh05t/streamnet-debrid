@@ -144,12 +144,43 @@ async function sendPasswordResetEmail(account, token) {
   }
 }
 
+const sseClientsByAccount = new Map();
+
+function broadcastAccountSyncRevision(
+  accountId,
+  revision,
+  sourceDeviceId = null,
+) {
+  const clients = sseClientsByAccount.get(accountId);
+  if (!clients || clients.size === 0) return;
+  const eventPayload = JSON.stringify({
+    type: "account_sync_revision",
+    revision,
+    sourceDeviceId: sourceDeviceId || null,
+    changedAreas: ["continue_watching"],
+    occurredAt: new Date().toISOString(),
+  });
+  const data = `data: ${eventPayload}\n\n`;
+  for (const clientReply of clients) {
+    try {
+      clientReply.raw.write(data);
+    } catch {
+      // Socket write failure cleaned up by close handler
+    }
+  }
+}
+
 async function authenticatedAccount(request) {
-  const value = request.headers.authorization;
+  let value = request.headers.authorization;
   if (!value?.startsWith("Bearer ")) {
-    const error = new Error("Missing bearer token");
-    error.statusCode = 401;
-    throw error;
+    const tokenQuery = request.query?.token;
+    if (tokenQuery && typeof tokenQuery === "string") {
+      value = `Bearer ${tokenQuery}`;
+    } else {
+      const error = new Error("Missing bearer token");
+      error.statusCode = 401;
+      throw error;
+    }
   }
   try {
     const { payload } = await jwtVerify(value.slice(7), jwtKey);
@@ -1043,6 +1074,50 @@ async function completeTvAuth(request, reply) {
 app.post("/tv-auth-complete", completeTvAuth);
 app.post("/tv-auth-web", completeTvAuth);
 
+app.get("/account-sync-events", async (request, reply) => {
+  const account = await authenticatedAccount(request);
+
+  reply.raw.setHeader("Content-Type", "text/event-stream");
+  reply.raw.setHeader("Cache-Control", "no-cache, no-transform");
+  reply.raw.setHeader("Connection", "keep-alive");
+  reply.raw.setHeader("X-Accel-Buffering", "no");
+
+  const origin = request.headers.origin;
+  if (origin && allowedCorsOrigins.has(origin)) {
+    reply.raw.setHeader("Access-Control-Allow-Origin", origin);
+    reply.raw.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  reply.raw.write(": heartbeat\n\n");
+
+  if (!sseClientsByAccount.has(account.id)) {
+    sseClientsByAccount.set(account.id, new Set());
+  }
+  const clientSet = sseClientsByAccount.get(account.id);
+  clientSet.add(reply);
+
+  const heartbeatInterval = setInterval(() => {
+    try {
+      reply.raw.write(": heartbeat\n\n");
+    } catch {
+      clearInterval(heartbeatInterval);
+    }
+  }, 25_000);
+
+  const cleanup = () => {
+    clearInterval(heartbeatInterval);
+    const set = sseClientsByAccount.get(account.id);
+    if (set) {
+      set.delete(reply);
+      if (set.size === 0) sseClientsByAccount.delete(account.id);
+    }
+  };
+
+  request.raw.on("close", cleanup);
+  request.raw.on("end", cleanup);
+  return reply;
+});
+
 app.route({
   method: ["GET", "POST"],
   url: "/account-sync-pull",
@@ -1115,6 +1190,11 @@ app.post("/account-sync-push", async (request, reply) => {
       ],
     );
     await client.query("commit");
+    broadcastAccountSyncRevision(
+      account.id,
+      nextRevision,
+      request.body?.sourceDeviceId,
+    );
     return {
       accepted: true,
       revision: nextRevision,

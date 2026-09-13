@@ -2,7 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [Unveröffentlicht]
+## [2.5.012] - 2026-09-13
+
+### StreamNet-Cloud-Portal und Echtzeit-Synchronisierung (SSE)
+
+- **Cloud-Portal vor der WebUI**: Unangemeldete Nutzer werden beim Laden der WebUI direkt auf das StreamNet-Cloud-Portal geleitet (Login, Signup, Passwort-Reset & TV-Code-Kopplung).
+- **Echtzeit-Sync via Server-Sent Events (SSE)**: Backend (`/account-sync-events`), WebUI (`subscribeCloudSyncEvents`) und Android-App (`RealtimeSyncManager`) halten authentifizierte SSE-Verbindungen. Revisionsänderungen durch Pushes lösen geräteübergreifend sofortige Hintergrund-Pulls aus.
+- **Entfernung von Altlasten**: Veraltete Netlify- und Supabase-Referenzen in der WebUI wurden vollständig entfernt; alle Cloud-Funktionen laufen über das eigene Self-Hosted Backend (`https://auth.mystreamnet.club`).
+- **Styling & Typografie**: Portal und Backend nutzen ein abgestimmtes warmes Farbverlaufs-Design ohne Gitterlinien und durchgehend die Inter-Schriftfamilie.
 
 ## [2.5.011] - 2026-09-12
 

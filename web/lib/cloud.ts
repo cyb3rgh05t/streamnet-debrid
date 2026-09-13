@@ -1,6 +1,6 @@
 import type { AuthClient } from "./auth";
 import { writeCatalogProfileState } from "./catalogSync";
-import { config, hasNetlifyBackendUrl } from "./config";
+import { config } from "./config";
 import {
   parseHomeServerConnectionJson,
   serializeHomeServerConnectionJson,
@@ -109,14 +109,7 @@ interface AndroidIptvProfileState {
 }
 
 function canUseBackendSync(auth: AuthClient) {
-  // Account sync authenticates with the signed-in user's bearer token. The
-  // public app key is only needed to create/refresh a password session, so it
-  // must not disable cloud pulls for sessions returned by auth.arvio.tv.
-  return Boolean(
-    auth.session?.accessToken &&
-    auth.isNetlifySession &&
-    hasNetlifyBackendUrl(),
-  );
+  return Boolean(auth.session?.accessToken);
 }
 
 async function backendRequest<T>(
@@ -125,10 +118,7 @@ async function backendRequest<T>(
   init: RequestInit = {},
 ) {
   const token = await auth.accessToken();
-  const base = config.selfHosted
-    ? `/api/cloud-auth/${path.replace(/^\/+/, "")}`
-    : `${config.netlifyBackendUrl.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`;
-  return jsonRequest<T>(base, {
+  return jsonRequest<T>(`/api/cloud-auth/${path.replace(/^\/+/, "")}`, {
     ...init,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -929,30 +919,24 @@ export function invalidateRawPayloadCache() {
   rawPayloadGeneration++;
 }
 
+export function getRawPayloadRevision(userId?: string): number {
+  if (!userId || rawPayloadRevision?.userId !== userId) return 0;
+  return rawPayloadRevision.revision;
+}
+
 async function fetchRawPayload(auth: AuthClient): Promise<RawPayload> {
-  if (canUseBackendSync(auth)) {
-    const response = await backendRequest<AccountSyncPullResponse>(
-      auth,
-      "account-sync-pull",
-      { method: "GET" },
-    );
-    const revision = Number(response.revision ?? 0);
-    rawPayloadRevision = {
-      userId: auth.session!.userId,
-      revision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
-    };
-    return parsePayload(response.payload);
-  }
-  const rows = await auth.supabase<Array<{ payload?: string | null }>>(
-    `/rest/v1/account_sync_state?user_id=eq.${auth.session!.userId}&select=user_id,payload,updated_at`,
+  if (!auth.session) return {};
+  const response = await backendRequest<AccountSyncPullResponse>(
+    auth,
+    "account-sync-pull",
+    { method: "GET" },
   );
-  const raw = rows[0]?.payload;
-  if (!raw) return {};
-  try {
-    return (JSON.parse(raw) as RawPayload) ?? {};
-  } catch {
-    return {};
-  }
+  const revision = Number(response.revision ?? 0);
+  rawPayloadRevision = {
+    userId: auth.session.userId,
+    revision: Number.isSafeInteger(revision) && revision >= 0 ? revision : 0,
+  };
+  return parsePayload(response.payload);
 }
 
 /** Read the full account_sync_state payload object (shared with Android). */
@@ -1020,20 +1004,7 @@ async function writeRawPayload(auth: AuthClient, payload: RawPayload) {
     if (auth.session?.userId === userId) invalidateRawPayloadCache();
     savePayloadSnapshot(userId, payload);
     clearQueuedPayload(userId);
-    return;
   }
-  await auth.supabase("/rest/v1/account_sync_state", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({
-      user_id: auth.session.userId,
-      payload: JSON.stringify(payload),
-      updated_at: new Date().toISOString(),
-    }),
-  });
-  invalidateRawPayloadCache();
-  savePayloadSnapshot(userId, payload);
-  clearQueuedPayload(userId);
 }
 
 export async function flushCloudPayloadOutbox(auth: AuthClient): Promise<void> {
@@ -2069,28 +2040,18 @@ export async function getContinueWatching(
   addons: InstalledAddon[] = [],
 ) {
   if (!auth.session) return [];
-  if (canUseBackendSync(auth)) {
-    const root = await pullRawPayload(auth);
-    return androidContinueWatchingItems(root, profileId)
-      .map((item) => androidCwToHistory(item, profileId))
-      .filter((item): item is WatchHistoryEntry => Boolean(item))
-      .filter(
-        (item) =>
-          (item.progress ?? 0) < 0.9 && !isLiveStreamOrSportsItem(item, addons),
-      )
-      .sort(
-        (a, b) =>
-          Date.parse(b.updated_at ?? "") - Date.parse(a.updated_at ?? ""),
-      )
-      .slice(0, 50);
-  }
-  const profileFilter = profileId
-    ? `&profile_id=eq.${encodeURIComponent(profileId)}`
-    : "";
-  const records = await auth.supabase<WatchHistoryEntry[]>(
-    `/rest/v1/watch_history?user_id=eq.${auth.session.userId}${profileFilter}&progress=lt.0.9&select=*&order=updated_at.desc&limit=50`,
-  );
-  return records.filter((item) => !isLiveStreamOrSportsItem(item, addons));
+  const root = await pullRawPayload(auth);
+  return androidContinueWatchingItems(root, profileId)
+    .map((item) => androidCwToHistory(item, profileId))
+    .filter((item): item is WatchHistoryEntry => Boolean(item))
+    .filter(
+      (item) =>
+        (item.progress ?? 0) < 0.9 && !isLiveStreamOrSportsItem(item, addons),
+    )
+    .sort(
+      (a, b) => Date.parse(b.updated_at ?? "") - Date.parse(a.updated_at ?? ""),
+    )
+    .slice(0, 50);
 }
 
 export async function saveProgress(
@@ -2100,63 +2061,49 @@ export async function saveProgress(
   addons: InstalledAddon[] = [],
 ) {
   if (!auth.session || isLiveStreamOrSportsItem(entry, addons)) return;
-  if (canUseBackendSync(auth)) {
-    await mutateCloudPayload(auth, (root) => {
-      const targetProfileId = entry.profile_id ?? profileId ?? "default";
-      const byProfile = objectRecord<unknown>(
-        root.localContinueWatchingByProfile,
-      );
-      const current = arrayValue<AndroidContinueWatchingItem>(
-        byProfile[targetProfileId],
-      );
-      const nextItem = historyToAndroidCw({
-        ...entry,
-        profile_id: targetProfileId,
-      });
-      const filtered = current.filter((candidate) => {
-        const sameTitle =
-          candidate.id === nextItem.id &&
-          String(candidate.mediaType ?? "").toLowerCase() ===
-            String(nextItem.mediaType ?? "").toLowerCase();
-        if (!sameTitle) return true;
-        if (nextItem.mediaType !== "tv") return false;
-        return (
-          candidate.season !== nextItem.season ||
-          candidate.episode !== nextItem.episode
-        );
-      });
-      byProfile[targetProfileId] =
-        (nextItem.progress ?? 0) >= 90
-          ? filtered
-          : [nextItem, ...filtered].slice(0, 50);
-      root.localContinueWatchingByProfile = byProfile;
-      if ((nextItem.progress ?? 0) > 0 && (nextItem.progress ?? 0) < 90) {
-        const dismissalItem = {
-          id: entry.show_tmdb_id,
-          mediaType: entry.media_type,
-          seasonNumber: entry.season,
-          episodeNumber: entry.episode,
-        };
-        const { showKey, exactKey } =
-          continueWatchingDismissalKeys(dismissalItem);
-        updateProfileDismissals(root, targetProfileId, (values) => {
-          values.delete(showKey);
-          values.delete(exactKey);
-        });
-      }
-    });
-    return;
-  }
-  await auth.supabase("/rest/v1/watch_history", {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates" },
-    body: JSON.stringify({
+  await mutateCloudPayload(auth, (root) => {
+    const targetProfileId = entry.profile_id ?? profileId ?? "default";
+    const byProfile = objectRecord<unknown>(
+      root.localContinueWatchingByProfile,
+    );
+    const current = arrayValue<AndroidContinueWatchingItem>(
+      byProfile[targetProfileId],
+    );
+    const nextItem = historyToAndroidCw({
       ...entry,
-      user_id: auth.session.userId,
-      profile_id: entry.profile_id ?? profileId ?? null,
-      paused_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }),
+      profile_id: targetProfileId,
+    });
+    const filtered = current.filter((candidate) => {
+      const sameTitle =
+        candidate.id === nextItem.id &&
+        String(candidate.mediaType ?? "").toLowerCase() ===
+          String(nextItem.mediaType ?? "").toLowerCase();
+      if (!sameTitle) return true;
+      if (nextItem.mediaType !== "tv") return false;
+      return (
+        candidate.season !== nextItem.season ||
+        candidate.episode !== nextItem.episode
+      );
+    });
+    byProfile[targetProfileId] =
+      (nextItem.progress ?? 0) >= 90
+        ? filtered
+        : [nextItem, ...filtered].slice(0, 50);
+    root.localContinueWatchingByProfile = byProfile;
+    if ((nextItem.progress ?? 0) > 0 && (nextItem.progress ?? 0) < 90) {
+      const dismissalItem = {
+        id: entry.show_tmdb_id,
+        mediaType: entry.media_type,
+        seasonNumber: entry.season,
+        episodeNumber: entry.episode,
+      };
+      const { showKey, exactKey } =
+        continueWatchingDismissalKeys(dismissalItem);
+      updateProfileDismissals(root, targetProfileId, (values) => {
+        values.delete(showKey);
+        values.delete(exactKey);
+      });
+    }
   });
 }
 
@@ -2180,48 +2127,23 @@ export async function removeContinueWatchingProgress(
     return true;
   };
 
-  if (canUseBackendSync(auth)) {
-    await mutateCloudPayload(auth, (root) => {
-      const targetProfileId = profileId ?? "default";
-      for (const key of [
-        "localContinueWatchingByProfile",
-        "continueWatchingByProfile",
-      ]) {
-        const byProfile = objectRecord<unknown>(root[key]);
-        byProfile[targetProfileId] = arrayValue<AndroidContinueWatchingItem>(
-          byProfile[targetProfileId],
-        ).filter((candidate) => !matches(candidate));
-        root[key] = byProfile;
-      }
-      for (const key of ["localContinueWatching", "continueWatching"]) {
-        root[key] = arrayValue<AndroidContinueWatchingItem>(root[key]).filter(
-          (candidate) => !matches(candidate),
-        );
-      }
-      const { showKey, exactKey } = continueWatchingDismissalKeys(item);
-      updateProfileDismissals(root, targetProfileId, (values) => {
-        const now = Date.now();
-        values.set(showKey, now);
-        values.set(exactKey, now);
-      });
-    });
-    return;
-  }
-
-  const query = new URLSearchParams({
-    user_id: `eq.${auth.session.userId}`,
-    media_type: `eq.${item.mediaType}`,
-    show_tmdb_id: `eq.${item.id}`,
-  });
-  query.set("profile_id", profileId ? `eq.${profileId}` : "is.null");
-  if (item.seasonNumber != null) query.set("season", `eq.${item.seasonNumber}`);
-  if (item.episodeNumber != null)
-    query.set("episode", `eq.${item.episodeNumber}`);
-  await auth.supabase(`/rest/v1/watch_history?${query.toString()}`, {
-    method: "DELETE",
-  });
   await mutateCloudPayload(auth, (root) => {
     const targetProfileId = profileId ?? "default";
+    for (const key of [
+      "localContinueWatchingByProfile",
+      "continueWatchingByProfile",
+    ]) {
+      const byProfile = objectRecord<unknown>(root[key]);
+      byProfile[targetProfileId] = arrayValue<AndroidContinueWatchingItem>(
+        byProfile[targetProfileId],
+      ).filter((candidate) => !matches(candidate));
+      root[key] = byProfile;
+    }
+    for (const key of ["localContinueWatching", "continueWatching"]) {
+      root[key] = arrayValue<AndroidContinueWatchingItem>(root[key]).filter(
+        (candidate) => !matches(candidate),
+      );
+    }
     const { showKey, exactKey } = continueWatchingDismissalKeys(item);
     updateProfileDismissals(root, targetProfileId, (values) => {
       const now = Date.now();
