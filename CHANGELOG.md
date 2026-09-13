@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.014] - 2026-09-13
+
+### Zuletzt gesehene Inhalte
+
+- Die Reihenfolge der Rails „Zuletzt gesehene Filme“ und „Zuletzt gesehene Serien“ ist korrigiert. Neu als gesehen markierte Inhalte erscheinen jetzt vorne; ältere Inhalte folgen dahinter.
+- Die Anzeige liest die letzten Einträge aus den profilbezogenen Watched-Caches, statt die ältesten Einträge mit `.take(20)` auszuwählen.
+- Der normale VOD-Player, Continue Watching und die Wiedergabelogik bleiben unverändert.
+
 ## [2.5.013] - 2026-09-13
 
 ### Live-TV-Audio

@@ -1286,10 +1286,16 @@ class HomeViewModel @Inject constructor(
                 if (error is CancellationException) throw error
             }
 
+        // Both caches are insertion-ordered (oldest watched first, newest last), so the
+        // most recently watched titles must be read from the tail, not the head.
         val watchedMovieIds = traktRepository.getWatchedMoviesFromCache()
             .filter { it > 0 }
+            .toList()
+            .asReversed()
             .take(20)
         val watchedSeriesIds = traktRepository.getWatchedEpisodesFromCache()
+            .toList()
+            .asReversed()
             .mapNotNull { key ->
                 key.removePrefix("show_tmdb:")
                     .substringBefore(':')
