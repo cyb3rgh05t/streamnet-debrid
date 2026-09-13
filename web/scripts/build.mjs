@@ -8,8 +8,14 @@ if (!env.NEXT_PUBLIC_BUILD_STAMP) {
   const version = JSON.parse(
     readFileSync(new URL("../public/version.json", import.meta.url), "utf8"),
   );
-  const buildStamp = String(version.v ?? "");
-  if (!/^\d+$/.test(buildStamp)) {
+  const rawBuildStamp = String(version.v ?? "");
+  const parsedDate = Date.parse(rawBuildStamp);
+  const buildStamp = /^\d+$/.test(rawBuildStamp)
+    ? rawBuildStamp
+    : Number.isFinite(parsedDate)
+      ? String(parsedDate)
+      : "";
+  if (!buildStamp) {
     throw new Error(
       "public/version.json must contain a numeric build stamp in the v field.",
     );

@@ -24,7 +24,7 @@ env:
   STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xui.streamnet.live' }}
   STREAMNET_RESOLVER_URL: ${{ vars['STREAMNET_RESOLVER_URL'] || 'https://resolve.streamnet.live' }}
   TRAKT_CLIENT_ID: ${{ vars['TRAKT_CLIENT_ID'] || secrets['TRAKT_CLIENT_ID'] || '' }}
-  WEB_BUILD_STAMP: ${{ github.run_id }}
+  WEB_BUILD_STAMP: ${{ github.run_started_at }}
 
 jobs:
   deploy-resolver:

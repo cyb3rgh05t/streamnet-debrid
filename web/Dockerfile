@@ -22,7 +22,13 @@ ENV NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL}
 ENV NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL}
 ENV NEXT_PUBLIC_TRAKT_CLIENT_ID=${NEXT_PUBLIC_TRAKT_CLIENT_ID}
 ENV NEXT_PUBLIC_BUILD_STAMP=${NEXT_PUBLIC_BUILD_STAMP}
-RUN if [ -n "$NEXT_PUBLIC_BUILD_STAMP" ]; then printf '{ "v": "%s" }\n' "$NEXT_PUBLIC_BUILD_STAMP" > public/version.json; fi
+RUN if [ -n "$NEXT_PUBLIC_BUILD_STAMP" ]; then \
+			stamp="$NEXT_PUBLIC_BUILD_STAMP"; \
+			case "$stamp" in \
+				''|*[!0-9]*) stamp="$(date -d "$stamp" +%s)000" ;; \
+			esac; \
+			printf '{ "v": "%s" }\n' "$stamp" > public/version.json; \
+		fi
 RUN npm run build
 
 FROM node:22-alpine AS runner
