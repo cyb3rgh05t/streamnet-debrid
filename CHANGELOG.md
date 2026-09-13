@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.013] - 2026-09-13
+
+### Live-TV-Audio
+
+- **Live-TV-Ton auf Android TV und Emulatoren**: Live TV verwendet jetzt den mitgelieferten FFmpeg-Audio-Renderer vor den Plattform-Decodern. Dadurch werden fehlerhafte Android-AAC-Zuordnungen bei IPTV-TS-Streams umgangen, die zuvor trotz gestarteten AudioTracks stumm blieben.
+- **VOD unverändert**: Der normale Film-/Serien-Player behält Plattformdecoder zuerst, Audio-Passthrough und FFmpeg nur als Fallback. Der Live-TV-Fix verändert den VOD-Audiopfad nicht.
+- Die Diagnose zeigte bei den betroffenen IPTV-Sendern `audio/mp4a-latm` und `c2.android.aac.decoder`; `out_standby` trat beim anschließenden Senderwechsel auf und war nicht selbst die Ursache.
+
 ## [2.5.012] - 2026-09-13
 
 ### StreamNet-Cloud-Portal und Echtzeit-Synchronisierung (SSE)
@@ -10,6 +18,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - **Echtzeit-Sync via Server-Sent Events (SSE)**: Backend (`/account-sync-events`), WebUI (`subscribeCloudSyncEvents`) und Android-App (`RealtimeSyncManager`) halten authentifizierte SSE-Verbindungen. Revisionsänderungen durch Pushes lösen geräteübergreifend sofortige Hintergrund-Pulls aus.
 - **Entfernung von Altlasten**: Veraltete Netlify- und Supabase-Referenzen in der WebUI wurden vollständig entfernt; alle Cloud-Funktionen laufen über das eigene Self-Hosted Backend (`https://auth.mystreamnet.club`).
 - **Styling & Typografie**: Portal und Backend nutzen ein abgestimmtes warmes Farbverlaufs-Design ohne Gitterlinien und durchgehend die Inter-Schriftfamilie.
+- **E-AC-3 / Audio-Fix**: `AudioCaptureProcessor` signalisiert bei komprimierten Audioformaten (E-AC-3, AC-3, DTS, TrueHD) korrekt `AudioFormat.NOT_SET`, sodass ExoPlayer `DefaultAudioSink` Passthrough- und FFmpeg-Fallback-Pfade nicht blockiert und Tonstille bei E-AC3-Streams behoben ist.
 
 ## [2.5.011] - 2026-09-12
 

@@ -178,6 +178,31 @@ const germanUiPhrases: Record<string, string> = {
   "Local Account": "Lokales Konto",
   "StreamNet Account": "StreamNet-Konto",
   "Tracking behavior": "Tracking-Verhalten",
+  Connected: "Verbunden",
+  "Not linked": "Nicht verknüpft",
+  "Missing config": "Konfiguration fehlt",
+  "Local only": "Nur lokal",
+  "Settings saved": "Einstellungen gespeichert",
+  "Save pending - retrying": "Speichern ausstehend – erneuter Versuch",
+  "Settings pending": "Einstellungen ausstehend",
+  "StreamNet Cloud account": "StreamNet-Cloud-Konto",
+  "Sign In with StreamNet Cloud": "Bei StreamNet Cloud anmelden",
+  "Trakt client id is missing.": "Die Trakt-Client-ID fehlt.",
+  "Simkl client configuration is missing.":
+    "Die Simkl-Client-Konfiguration fehlt.",
+  "Starting...": "Wird gestartet ...",
+  "Checking...": "Wird geprüft ...",
+  "Start device link": "Geräteverknüpfung starten",
+  "I approved it": "Ich habe bestätigt",
+  "Could not start Trakt device link.":
+    "Die Trakt-Geräteverknüpfung konnte nicht gestartet werden.",
+  "Trakt has not approved this device yet.":
+    "Trakt hat dieses Gerät noch nicht bestätigt.",
+  "Could not start Simkl device link.":
+    "Die Simkl-Geräteverknüpfung konnte nicht gestartet werden.",
+  "Simkl has not approved this device yet.":
+    "Simkl hat dieses Gerät noch nicht bestätigt.",
+  "and enter the code above": "und gib den obigen Code ein",
   "Watchlist source": "Quelle der Merkliste",
   "Choose which connected service fills your watchlist.":
     "Wähle, welcher verbundene Dienst deine Merkliste füllt.",

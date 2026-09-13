@@ -152,6 +152,7 @@ const settingsKey = "arvio.web.settings";
 const PROFILES_KEY = "arvio.web.profiles";
 const ACTIVE_PROFILE_KEY = "arvio.web.activeProfileId";
 const AVATAR_IMAGES_KEY = "arvio.web.avatarImages";
+const SYNC_TIMESTAMPS_KEY = "arvio.web.syncTimestamps";
 // Which account the locally-cached profiles belong to. Profiles live in a single
 // browser-global localStorage key, so without this a second account signing in
 // on the same browser would see the FIRST account's profiles (they persist until
@@ -162,6 +163,12 @@ const PROFILES_OWNER_KEY = "arvio.web.profilesOwner";
 
 function currentAccountEmail(): string {
   return (authClient.session?.email ?? "").trim().toLowerCase();
+}
+
+type SyncTimestamps = { refreshAt: number; pullAt: number; pushAt: number };
+
+function syncTimestampsKey() {
+  return `${SYNC_TIMESTAMPS_KEY}:${authClient.session?.userId ?? "local"}`;
 }
 
 // Cached profiles are only trusted when they belong to the signed-in account
@@ -820,6 +827,11 @@ export interface AppStore {
     source: string,
   ) => Promise<MediaItem[]>;
   settingsSyncState: "local" | "saved" | "pending" | "error";
+  syncTimestamps: {
+    refreshAt: number;
+    pullAt: number;
+    pushAt: number;
+  };
   searchState: "idle" | "loading" | "error";
 
   toggleWatchlist: (item: MediaItem) => Promise<void>;
@@ -929,6 +941,23 @@ export function AppProvider({
   const [settingsSyncState, setSettingsSyncState] = useState<
     "local" | "saved" | "pending" | "error"
   >("local");
+  const [syncTimestamps, setSyncTimestamps] = useState<SyncTimestamps>(() =>
+    loadStored<SyncTimestamps>(syncTimestampsKey(), {
+      refreshAt: 0,
+      pullAt: 0,
+      pushAt: 0,
+    }),
+  );
+  const markSyncTimestamp = useCallback((field: keyof SyncTimestamps) => {
+    const next = {
+      ...syncTimestampsRef.current,
+      [field]: Date.now(),
+    };
+    syncTimestampsRef.current = next;
+    setSyncTimestamps(next);
+    saveStored(syncTimestampsKey(), next);
+  }, []);
+  const syncTimestampsRef = useRef(syncTimestamps);
   const [settings, setSettings] = useState<AppSettings>(() => {
     const stored = loadStored<AppSettings>(settingsKey, defaultSettings);
     const storedLanguage = stored as AppSettings & {
@@ -1211,6 +1240,7 @@ export function AppProvider({
             authClient.session && !hasPendingSettings(authClient, profileId)
               ? await pullCloudPayload(authClient, profileId).catch(() => null)
               : null;
+          if (cloud) markSyncTimestamp("pullAt");
           let effectiveSettings = currentSettings;
           if (authClient.session && profileId) {
             const cloudTracking = await pullCloudTrackingSelection(
@@ -1782,12 +1812,13 @@ export function AppProvider({
       })();
       refreshInFlightRef.current = { key, promise: run };
       return run.finally(() => {
+        markSyncTimestamp("refreshAt");
         if (refreshInFlightRef.current?.promise === run)
           refreshInFlightRef.current = null;
       });
       // eslint-disable-next-line react-hooks/exhaustive-deps
     },
-    [activeProfileId],
+    [activeProfileId, markSyncTimestamp],
   );
 
   const refreshIptv = useCallback(async () => {
@@ -2144,6 +2175,7 @@ export function AppProvider({
             activeProfileIdRef.current !== activeProfileId
           )
             return;
+          markSyncTimestamp("pushAt");
           lastSyncedSettingsRef.current = JSON.stringify(submitted);
           setSettingsSyncState(
             hasPendingSettings(authClient) ? "pending" : "saved",
@@ -2153,7 +2185,13 @@ export function AppProvider({
     }, 1200);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settings, activeProfileId, profiles, cloudProfilesHydrated]);
+  }, [
+    settings,
+    activeProfileId,
+    profiles,
+    cloudProfilesHydrated,
+    markSyncTimestamp,
+  ]);
 
   useEffect(() => {
     const retry = () => {
@@ -2165,7 +2203,10 @@ export function AppProvider({
         if (pendingPayload) await flushCloudPayloadOutbox(authClient);
         if (pendingSettings) await flushSettingsOutbox(authClient);
       })()
-        .then(() => setSettingsSyncState("saved"))
+        .then(() => {
+          markSyncTimestamp("pushAt");
+          setSettingsSyncState("saved");
+        })
         .catch(() => setSettingsSyncState("error"));
     };
     window.addEventListener("online", retry);
@@ -2174,7 +2215,7 @@ export function AppProvider({
       window.removeEventListener("online", retry);
       window.clearInterval(timer);
     };
-  }, []);
+  }, [markSyncTimestamp]);
 
   useEffect(() => {
     saveStored(PROFILES_KEY, profiles);
@@ -3951,6 +3992,7 @@ export function AppProvider({
       results,
       searchState,
       settingsSyncState,
+      syncTimestamps,
       settings,
       setSettings,
       updateSettings,

@@ -1418,6 +1418,7 @@ function AccountsSection() {
     disconnectSimkl,
     refreshData,
     settingsSyncState,
+    syncTimestamps,
   } = useApp();
   const [traktError, setTraktError] = useState<string | null>(null);
   const [traktBusy, setTraktBusy] = useState<"start" | "poll" | null>(null);
@@ -1446,7 +1447,11 @@ function AccountsSection() {
       setTraktError(
         error instanceof Error
           ? error.message
-          : "Could not start Trakt device link.",
+          : localize(
+              settings.uiLanguage,
+              "Die Trakt-Geräteverknüpfung konnte nicht gestartet werden.",
+              "Could not start Trakt device link.",
+            ),
       );
     } finally {
       setTraktBusy(null);
@@ -1462,7 +1467,11 @@ function AccountsSection() {
       setTraktError(
         error instanceof Error
           ? error.message
-          : "Trakt has not approved this device yet.",
+          : localize(
+              settings.uiLanguage,
+              "Trakt hat dieses Gerät noch nicht bestätigt.",
+              "Trakt has not approved this device yet.",
+            ),
       );
     } finally {
       setTraktBusy(null);
@@ -1478,7 +1487,11 @@ function AccountsSection() {
       setSimklError(
         error instanceof Error
           ? error.message
-          : "Could not start Simkl device link.",
+          : localize(
+              settings.uiLanguage,
+              "Die Simkl-Geräteverknüpfung konnte nicht gestartet werden.",
+              "Could not start Simkl device link.",
+            ),
       );
     } finally {
       setSimklBusy(null);
@@ -1494,7 +1507,11 @@ function AccountsSection() {
       setSimklError(
         error instanceof Error
           ? error.message
-          : "Simkl has not approved this device yet.",
+          : localize(
+              settings.uiLanguage,
+              "Simkl hat dieses Gerät noch nicht bestätigt.",
+              "Simkl has not approved this device yet.",
+            ),
       );
     } finally {
       setSimklBusy(null);
@@ -1762,7 +1779,7 @@ function AccountsSection() {
               <div className="device-code">
                 <span>{simklDeviceCode.user_code}</span>
                 <p>
-                  Open{" "}
+                  {localize(settings.uiLanguage, "Öffne", "Open")}{" "}
                   <a
                     href={
                       simklDeviceCode.verification_url ||
@@ -1778,7 +1795,11 @@ function AccountsSection() {
                     {simklDeviceCode.verification_url ||
                       "https://simkl.com/pin"}
                   </a>{" "}
-                  and enter the code above
+                  {localize(
+                    settings.uiLanguage,
+                    "und gib den obigen Code ein",
+                    "and enter the code above",
+                  )}
                 </p>
                 <button
                   type="button"
@@ -1952,6 +1973,33 @@ function AccountsSection() {
               )
             : localize(settings.uiLanguage, "unbekannt", "unknown")}
         </p>
+        <div className="settings-status-grid">
+          {(
+            [
+              ["Letzter Refresh", "Last refresh", syncTimestamps.refreshAt],
+              ["Letzter Pull", "Last pull", syncTimestamps.pullAt],
+              ["Letzter Push", "Last push", syncTimestamps.pushAt],
+            ] as const
+          ).map(([de, en, value]) => (
+            <div key={en}>
+              <span>{localize(settings.uiLanguage, de, en)}</span>
+              <strong>
+                {value
+                  ? formatTime24Hour(
+                      value,
+                      settings.uiLanguage === "de" ? "de-DE" : "en-GB",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )
+                  : localize(settings.uiLanguage, "noch nicht", "not yet")}
+              </strong>
+            </div>
+          ))}
+        </div>
       </Panel>
     </>
   );

@@ -2200,6 +2200,7 @@ fun LiveTvScreen(
             .setBackBuffer(livePlaybackBufferProfile.backBufferMs, true)
             .build()
         ExoPlayer.Builder(context)
+            .setRenderersFactory(com.arflix.tv.ui.screens.player.FfmpegFirstRenderersFactory(context))
             .setMediaSourceFactory(mediaSourceFactory)
             .setLoadControl(loadControl)
             .build().apply {

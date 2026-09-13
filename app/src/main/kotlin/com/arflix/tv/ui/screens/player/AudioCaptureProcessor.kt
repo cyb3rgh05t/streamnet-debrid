@@ -32,7 +32,14 @@ class AudioCaptureProcessor : BaseAudioProcessor() {
             "onChunk=${onChunk != null}")
         if (inputAudioFormat.encoding != C.ENCODING_PCM_16BIT &&
             inputAudioFormat.encoding != C.ENCODING_PCM_FLOAT) {
-            // Still passthrough — return same format, just won't capture.
+            srcStep = 1.0
+            srcFrac = 0.0
+            accum.clear()
+            prevMono = 0
+            // Non-PCM formats (e.g. E-AC3, AC3, DTS, TrueHD) cannot be captured or processed
+            // as PCM. Returning AudioFormat.NOT_SET ensures isActive() returns false so
+            // DefaultAudioSink bypasses this processor for direct/passthrough playback.
+            return AudioFormat.NOT_SET
         }
         srcStep = if (inputAudioFormat.sampleRate > 0)
             inputAudioFormat.sampleRate.toDouble() / TARGET_RATE else 1.0

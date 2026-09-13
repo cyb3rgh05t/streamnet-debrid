@@ -73,13 +73,7 @@ class AiSubtitleRenderersFactory(
         eventListener: AudioRendererEventListener,
         out: ArrayList<Renderer>
     ) {
-        // EXTENSION_RENDERER_MODE_PREFER exists only for the Amlogic/SEI *video* C2 decoder hang
-        // (PlayerScreen preferExtensionDecoder). For AUDIO, FFmpeg-first software-decodes every
-        // E-AC3/TrueHD/DTS stream to PCM — killing AVR bitstream passthrough — and jellyfin-ffmpeg's
-        // TrueHD path fails outright. Always build audio with mode ON: the platform
-        // MediaCodecAudioRenderer (whose DefaultAudioSink auto-detects AVR capabilities and
-        // bitstreams via bypass) goes first; FFmpeg stays strictly a fallback for codecs the
-        // device can neither passthrough nor decode.
+        // Keep platform audio first for VOD so AVR bitstream passthrough remains available.
         super.buildAudioRenderers(
             context, EXTENSION_RENDERER_MODE_ON, mediaCodecSelector,
             enableDecoderFallback, audioSink, eventHandler, eventListener, out

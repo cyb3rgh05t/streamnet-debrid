@@ -1380,14 +1380,18 @@ fun PlayerScreen(
                             }
 
                             // Audio recovery ladder — try to save the SAME source
-                            // before skipping. An audio-track init/write failure (e.g. TrueHD/DTS
+                            // before skipping. An audio-track init/write failure (e.g. TrueHD/DTS/E-AC3
                             // the device can't render, or a channel layout it rejects) shouldn't
                             // lose an otherwise-good video source. Rung 1: constrain channels + no
-                            // tunneling. Rung 2: drop audio entirely so video still plays.
+                            // tunneling + respect device audio capabilities. Rung 2: drop audio entirely so video still plays.
                             val isAudioFailure =
                                 error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_INIT_FAILED ||
                                     error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_WRITE_FAILED ||
-                                    "audiotrack" in timeoutMessage || "audio track" in timeoutMessage
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_AUDIO_TRACK_OFFLOAD_WRITE_FAILED ||
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODER_INIT_FAILED ||
+                                    error.errorCode == androidx.media3.common.PlaybackException.ERROR_CODE_DECODING_FAILED ||
+                                    "audiotrack" in timeoutMessage || "audio track" in timeoutMessage ||
+                                    "audio" in timeoutMessage || "eac3" in timeoutMessage || "ac-3" in timeoutMessage || "dts" in timeoutMessage
                             if (isAudioFailure) {
                                 val currentUrl = latestUiState.selectedStreamUrl.orEmpty()
                                 val selector = this@apply.trackSelector as? androidx.media3.exoplayer.trackselection.DefaultTrackSelector
@@ -1399,6 +1403,7 @@ fun PlayerScreen(
                                     playbackStartupDiag("audio recovery: safe-audio for source")
                                     selector.parameters = selector.buildUponParameters()
                                         .setConstrainAudioChannelCountToDeviceCapabilities(true)
+                                        .setExceedAudioConstraintsIfNecessary(false)
                                         .setTunnelingEnabled(false)
                                         .build()
                                     this@apply.stop(); this@apply.prepare()
@@ -1463,6 +1468,13 @@ fun PlayerScreen(
                     }
 
                     override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                        val audioFormats = tracks.groups
+                            .filter { it.type == C.TRACK_TYPE_AUDIO }
+                            .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it) } }
+                            .joinToString { format ->
+                                "mime=${format.sampleMimeType}, codec=${format.codecs}, ch=${format.channelCount}, rate=${format.sampleRate}"
+                            }
+                        android.util.Log.i("AudioDebug", "tracks changed: audio=[$audioFormats]")
                         // Extract audio tracks from ExoPlayer
                         val extractedAudioTracks = mutableListOf<AudioTrackInfo>()
                         var trackIndex = 0
