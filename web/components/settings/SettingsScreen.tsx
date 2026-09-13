@@ -1714,7 +1714,21 @@ function AccountsSection() {
                 <span>{deviceCode.user_code}</span>
                 <p>
                   {localize(settings.uiLanguage, "Öffne", "Open")}{" "}
-                  {deviceCode.verification_url}
+                  <a
+                    href={
+                      deviceCode.verification_url ||
+                      "https://auth.trakt.tv/activate"
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{
+                      color: "var(--accent)",
+                      textDecoration: "underline",
+                    }}
+                  >
+                    {deviceCode.verification_url ||
+                      "https://auth.trakt.tv/activate"}
+                  </a>
                 </p>
                 <button
                   type="button"
