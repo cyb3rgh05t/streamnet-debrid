@@ -24,6 +24,7 @@ env:
   STREAMNET_TV_XTREAM_URL: ${{ vars['STREAMNET_TV_XTREAM_URL'] || 'https://xui.streamnet.live' }}
   STREAMNET_RESOLVER_URL: ${{ vars['STREAMNET_RESOLVER_URL'] || 'https://resolve.streamnet.live' }}
   TRAKT_CLIENT_ID: ${{ vars['TRAKT_CLIENT_ID'] || secrets['TRAKT_CLIENT_ID'] || '' }}
+  WEB_BUILD_STAMP: ${{ github.run_id }}
 
 jobs:
   deploy-resolver:
@@ -87,6 +88,7 @@ jobs:
           NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL: ${{ env.STREAMNET_TV_XTREAM_URL }}
           NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL: ${{ env.STREAMNET_RESOLVER_URL }}
           NEXT_PUBLIC_TRAKT_CLIENT_ID: ${{ env.TRAKT_CLIENT_ID }}
+          NEXT_PUBLIC_BUILD_STAMP: ${{ env.WEB_BUILD_STAMP }}
         run: npm run build
 
   publish:
@@ -131,6 +133,7 @@ jobs:
             STREAMNET_BACKEND_URL=${{ env.STREAMNET_BACKEND_URL }}
             NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${{ env.STREAMNET_TV_XTREAM_URL }}
             NEXT_PUBLIC_TRAKT_CLIENT_ID=${{ env.TRAKT_CLIENT_ID }}
+            NEXT_PUBLIC_BUILD_STAMP=${{ env.WEB_BUILD_STAMP }}
             NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${{ env.STREAMNET_RESOLVER_URL }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
