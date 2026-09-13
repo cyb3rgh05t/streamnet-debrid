@@ -2107,6 +2107,11 @@ export async function saveProgress(
   });
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("streamnet-cloud-push-succeeded"));
+    window.dispatchEvent(
+      new CustomEvent("streamnet-vod-progress-saved", {
+        detail: { profileId: entry.profile_id ?? profileId ?? "default" },
+      }),
+    );
   }
 }
 

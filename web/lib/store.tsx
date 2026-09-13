@@ -2231,6 +2231,21 @@ export function AppProvider({
   }, [markSyncTimestamp]);
 
   useEffect(() => {
+    const onVodProgressSaved = (event: Event) => {
+      const profileId = (event as CustomEvent<{ profileId?: string }>).detail
+        ?.profileId;
+      if (!profileId || profileId !== activeProfileIdRef.current) return;
+      void refreshData(profileId, true);
+    };
+    window.addEventListener("streamnet-vod-progress-saved", onVodProgressSaved);
+    return () =>
+      window.removeEventListener(
+        "streamnet-vod-progress-saved",
+        onVodProgressSaved,
+      );
+  }, [refreshData]);
+
+  useEffect(() => {
     saveStored(PROFILES_KEY, profiles);
     saveStored(ACTIVE_PROFILE_KEY, activeProfileId);
     // Stamp which account these cached profiles belong to (empty when signed
