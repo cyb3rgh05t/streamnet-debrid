@@ -1,7 +1,8 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SECRET =
-  process.env.STREAMNET_INTERNAL_MEDIA_SECRET ?? randomBytes(32).toString("hex");
+  process.env.STREAMNET_INTERNAL_MEDIA_SECRET ??
+  randomBytes(32).toString("hex");
 const MAX_AGE_SECONDS = 10 * 60;
 
 type MediaTarget = {

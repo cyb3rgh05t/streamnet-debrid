@@ -33,10 +33,12 @@ function resolveInternalUrl(
 ): URL | null {
   try {
     const parsed = new URL(rawUrl);
-    if (!['http:', 'https:'].includes(parsed.protocol))
-      return null;
+    if (!["http:", "https:"].includes(parsed.protocol)) return null;
     const token = createInternalMediaToken(parsed.toString(), headers);
-    return new URL(`/api/proxy?internal=${encodeURIComponent(token)}`, INTERNAL_ORIGIN);
+    return new URL(
+      `/api/proxy?internal=${encodeURIComponent(token)}`,
+      INTERNAL_ORIGIN,
+    );
   } catch {
     return null;
   }
@@ -225,8 +227,7 @@ function decodeHeaders(raw: string | null): Record<string, string> {
     if (!value || typeof value !== "object") return {};
     const headers: Record<string, string> = {};
     for (const [key, item] of Object.entries(value)) {
-      if (typeof item === "string" && item.length <= 8192)
-        headers[key] = item;
+      if (typeof item === "string" && item.length <= 8192) headers[key] = item;
     }
     return headers;
   } catch {
