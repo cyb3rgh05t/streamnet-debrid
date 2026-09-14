@@ -1,8 +1,12 @@
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
+// This value must be identical in every Next.js route worker. Production
+// should set STREAMNET_INTERNAL_MEDIA_SECRET explicitly; the stable fallback
+// keeps self-hosted multi-worker deployments functional when that variable has
+// not yet been configured.
 const SECRET =
   process.env.STREAMNET_INTERNAL_MEDIA_SECRET ??
-  randomBytes(32).toString("hex");
+  "streamnet-web-internal-media-relay-v1";
 const MAX_AGE_SECONDS = 10 * 60;
 
 type MediaTarget = {
