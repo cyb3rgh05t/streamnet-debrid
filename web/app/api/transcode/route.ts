@@ -85,6 +85,21 @@ function json(value: unknown, status: number) {
   });
 }
 
+async function waitForPlaylist(directory: string, timeoutMs = 15_000) {
+  const deadline = Date.now() + timeoutMs;
+  const playlistPath = path.join(directory, "index.m3u8");
+  while (Date.now() < deadline) {
+    try {
+      const info = await stat(playlistPath);
+      if (info.size > 0) return true;
+    } catch {
+      // FFmpeg is still probing or creating its first segment.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  return false;
+}
+
 function resolveInternalUrl(
   rawUrl: string,
   headers: Record<string, string>,
@@ -303,6 +318,8 @@ export async function POST(request: NextRequest) {
   );
   if (existing) {
     existing[1].lastAccess = Date.now();
+    if (!(await waitForPlaylist(existing[1].directory)))
+      return json({ error: "Transcoder did not produce a playlist" }, 504);
     return json(
       {
         sessionId: existing[0],
@@ -399,6 +416,10 @@ export async function POST(request: NextRequest) {
   ff.on("error", () => {
     removeSession(id, false);
   });
+  if (!(await waitForPlaylist(directory))) {
+    removeSession(id, true);
+    return json({ error: "Transcoder did not produce a playlist" }, 504);
+  }
   // The POST only creates the session. Its request signal ends when the short
   // JSON response is delivered, which must not terminate the FFmpeg process
   // before the browser requests the playlist and its segments.
