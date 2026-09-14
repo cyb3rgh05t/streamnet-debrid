@@ -113,7 +113,7 @@ const REMUX_PROXY_HOSTNAMES = [config.streamnetTvXtreamUrl]
 // User-Agent ("EMPTY_USER_AGENT — Empty user-agents are disallowed."),
 // serving an HTML error page with a 200 status instead of the file. VOD
 // streams normally carry no proxyHeaders at all (unlike LiveTV, which sets
-// its own), so the resolver forwarded nothing and got this HTML back where
+// its own), so nothing was forwarded and we got this HTML back where
 // mediabunny expected a media container.
 const DEFAULT_REMUX_HEADERS: Record<string, string> = {
   accept: "*/*",
@@ -125,16 +125,13 @@ const DEFAULT_REMUX_HEADERS: Record<string, string> = {
  *
  * The remux worker downloads bytes with a real cross-origin `fetch()` inside
  * a Worker — unlike a `<video src>`, that requires the source to send CORS
- * headers. Our own IPTV/Xtream panel doesn't, so its VOD sources silently
- * failed remux with "Failed to fetch". Route only known-allowlisted hosts
- * through the resolver worker (which fetches server-side and re-serves with
- * CORS); everything else keeps using the direct URL and headers it already
- * relies on.
- *
- * The original headers are embedded in the resolver URL's `h` param, which
- * the worker forwards to the real upstream itself — they must NOT also be
- * sent as fetch() headers on the resolver request, or the browser's CORS
- * preflight fails (the worker only allows `content-type,range`).
+ * headers our own IPTV/Xtream panel doesn't send. Worse, a valid User-Agent
+ * makes the panel issue a redirect to a rotating backend streaming IP that
+ * a firewall in front of it blocks for Cloudflare Workers specifically (but
+ * not for our own server) — so the Cloudflare resolver worker can't reach it
+ * at all. `/api/proxy` runs on our own server, needs no CORS (same-origin),
+ * and isn't behind that block. Everything else (debrid CDNs, usenet
+ * gateways) keeps using its direct URL/headers, which already work.
  */
 export function remuxFetchTarget(
   url: string,
@@ -146,10 +143,14 @@ export function remuxFetchTarget(
   } catch {
     return { url, headers };
   }
+  if (typeof window === "undefined") return { url, headers };
   const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
-  return { url: resolverMediaUrl(url, forwarded) ?? url, headers: undefined };
+  const target = new URL("/api/proxy", window.location.origin);
+  target.searchParams.set("url", url);
+  target.searchParams.set("rewrite", "streamnet");
+  target.searchParams.set("headers", btoa(JSON.stringify(forwarded)));
+  return { url: target.toString(), headers: undefined };
 }
-
 
 // External-player launch interstitial: iOS home-screen webapps silently drop
 // custom-scheme navigations, but the Safari sheet they open for https links can
