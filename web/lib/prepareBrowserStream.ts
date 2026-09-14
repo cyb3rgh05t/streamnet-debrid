@@ -13,7 +13,7 @@ import {
 } from "./streamCompatibility";
 import { prepareHomeServerPlayback } from "./homeServerPlayback";
 import {
-  canSelfTranscode,
+  canProactivelyProbe,
   createServerTranscodeSession,
   probeServerMedia,
   probeSelfTranscodeDuration,
@@ -134,7 +134,7 @@ export async function prepareBrowserStream(
     !options.forceServerTranscode &&
     stream.transport !== "hls" &&
     stream.transport !== "dash" &&
-    canSelfTranscode(stream.url)
+    canProactivelyProbe(stream.url)
   ) {
     const probe = await probeServerMedia(
       stream.url,

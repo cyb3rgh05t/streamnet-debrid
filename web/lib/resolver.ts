@@ -167,6 +167,23 @@ export function canSelfTranscode(url: string | null | undefined): boolean {
   }
 }
 
+// Debrid CDNs and usenet gateways commonly reject requests from datacenter
+// IPs (ours), and probing them from our own server before the browser even
+// attempts native playback adds up to 15s of latency per source — for a
+// codec check that mainly matters for our own IPTV panel, whose AC-3/EAC-3
+// audio is already known to be common. Only proactively probe hosts we
+// already relay through `/api/proxy` (see REMUX_PROXY_HOSTNAMES above);
+// everything else still gets `canSelfTranscode`'s broader reactive fallback
+// if native/remux playback actually fails.
+export function canProactivelyProbe(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Server-side re-encode as the final fallback tier, for sources whose audio
  * codec neither the browser nor the in-browser WebCodecs remux can play
