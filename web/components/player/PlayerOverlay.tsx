@@ -632,10 +632,13 @@ function VideoPlayer({
   }, [stream.url]);
   const probeAudioTracks = useCallback(() => {
     const current = currentStreamRef.current;
-    if (liveTv || current.remux || !current.url) return;
-    const text =
-      `${current.url} ${current.originalUrl ?? ""} ${current.source ?? ""} ${current.description ?? ""}`.toLowerCase();
-    if (!/\.mkv|matroska|remux/.test(text)) return;
+    if (
+      liveTv ||
+      current.remux ||
+      !current.url ||
+      (current.transport && current.transport !== "file")
+    )
+      return;
     setAudioProbeState("probing");
     audioProbeAbort.current?.abort();
     const controller = new AbortController();
@@ -653,7 +656,7 @@ function VideoPlayer({
         if (
           !controller.signal.aborted &&
           prepared &&
-          prepared.probe.audioTracks.length > 1
+          prepared.probe.audioTracks.length > 0
         ) {
           setRemuxTracks(prepared.probe.audioTracks);
         }
