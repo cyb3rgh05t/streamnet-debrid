@@ -12,7 +12,7 @@ import {
   recordBrowserPlaybackFailure,
 } from "./streamCompatibility";
 import { prepareHomeServerPlayback } from "./homeServerPlayback";
-import { selfTranscodeUrl } from "./resolver";
+import { selfTranscodeUrl, probeSelfTranscodeDuration } from "./resolver";
 import type { AppSettings, StreamSource } from "./types";
 
 export type PreparePlaybackOptions = {
@@ -41,21 +41,35 @@ export async function prepareBrowserStream(
       throw new Error(
         "Server conversion was already attempted. Use an external player.",
       );
+    const startSeconds = stream.resumePositionSeconds ?? 0;
+    const originalUrl = stream.originalUrl ?? stream.url;
     const url = selfTranscodeUrl(
-      stream.originalUrl ?? stream.url,
+      originalUrl,
       stream.behaviorHints?.proxyHeaders?.request,
-      stream.resumePositionSeconds ?? 0,
+      startSeconds,
     );
     if (!url)
       throw new Error("This source cannot be converted by our own server.");
+    check();
+    // The known total duration is the ONLY way Continue Watching progress
+    // can be computed for this stream — `video.duration` never becomes
+    // finite while it's being streamed live from ffmpeg (see PlayerOverlay's
+    // capturePosition). Best-effort: playback still works if this fails.
+    const knownDurationSeconds = await probeSelfTranscodeDuration(
+      originalUrl,
+      stream.behaviorHints?.proxyHeaders?.request,
+    ).catch(() => null);
+    check();
     return {
       ...stream,
       url,
-      originalUrl: stream.originalUrl ?? stream.url,
+      originalUrl,
       remux: false,
       transcoded: true,
       transport: "file",
       media: undefined,
+      selfTranscodeStartOffset: startSeconds,
+      knownDurationSeconds: knownDurationSeconds ?? undefined,
       behaviorHints: {
         ...stream.behaviorHints,
         notWebReady: false,

@@ -443,13 +443,17 @@ function VideoPlayer({
       // resume position. Keep the pending seek until replacement media is ready.
       const time =
         video && video.readyState >= 1 && Number.isFinite(video.currentTime)
-          ? video.currentTime + (stream.playbackSession?.startOffset ?? 0)
+          ? video.currentTime +
+            (stream.playbackSession?.startOffset ??
+              stream.selfTranscodeStartOffset ??
+              0)
           : resumeAtRef.current || stream.resumePositionSeconds || 0;
       selectStream({ ...next, resumePositionSeconds: time }, options);
     },
     [
       selectStream,
       stream.playbackSession?.startOffset,
+      stream.selfTranscodeStartOffset,
       stream.resumePositionSeconds,
     ],
   );
@@ -1670,7 +1674,14 @@ function VideoPlayer({
       setBuffered(bufferedEndAt(video.buffered, video.currentTime));
       setBufferAheadSec(bufferedAhead(video.buffered, video.currentTime));
     };
-    const onDur = () => setDuration(video.duration || 0);
+    const onDur = () => {
+      // A self-transcoded stream (web/app/api/transcode) never gets a finite
+      // `video.duration` while ffmpeg keeps writing it — fall back to the
+      // server-probed original length so the scrubber/remaining-time UI
+      // isn't stuck showing Infinity.
+      const finite = Number.isFinite(video.duration) && video.duration > 0;
+      setDuration(finite ? video.duration : (stream.knownDurationSeconds ?? 0));
+    };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
@@ -1787,6 +1798,23 @@ function VideoPlayer({
         lastPosition = {
           position: video.currentTime + offset,
           duration: video.duration + offset,
+        };
+      } else if (
+        stream.knownDurationSeconds &&
+        stream.knownDurationSeconds > 0 &&
+        Number.isFinite(video.currentTime)
+      ) {
+        // Self-transcoded stream (web/app/api/transcode): `video.duration`
+        // never becomes finite while ffmpeg is still writing it, so the
+        // real, server-probed length of the ORIGINAL file is the only
+        // duration Continue Watching progress has to divide by.
+        const offset = stream.selfTranscodeStartOffset ?? 0;
+        lastPosition = {
+          position: Math.min(
+            video.currentTime + offset,
+            stream.knownDurationSeconds,
+          ),
+          duration: stream.knownDurationSeconds,
         };
       }
       return lastPosition;

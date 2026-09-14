@@ -188,6 +188,33 @@ export function selfTranscodeUrl(
   return target.toString();
 }
 
+/**
+ * The transcode output is a plain streamed response with no duration of its
+ * own — `<video>.duration` never becomes finite while it plays. Ask the
+ * server for the ORIGINAL file's real length up front so Continue Watching
+ * progress has something to divide by (see PlayerOverlay's capturePosition).
+ */
+export async function probeSelfTranscodeDuration(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<number | null> {
+  const relayed = relayProxyUrl(url, headers);
+  if (!relayed || typeof window === "undefined") return null;
+  const target = new URL("/api/transcode", window.location.origin);
+  target.searchParams.set("url", relayed);
+  target.searchParams.set("probe", "1");
+  try {
+    const response = await fetch(target.toString(), { cache: "no-store" });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { durationSeconds?: number | null };
+    return typeof payload.durationSeconds === "number" && payload.durationSeconds > 0
+      ? payload.durationSeconds
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 // External-player launch interstitial: iOS home-screen webapps silently drop
 // custom-scheme navigations, but the Safari sheet they open for https links can
 // launch app schemes (native "Open in …?" prompt). See worker /launch.

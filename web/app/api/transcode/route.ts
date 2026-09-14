@@ -9,8 +9,8 @@ import { spawn } from "node:child_process";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-// ffmpeg reads from our own already-validated /api/proxy response, never
-// straight from a user-supplied URL — ffmpeg's HTTP client has none of
+// ffmpeg/ffprobe read from our own already-validated /api/proxy response,
+// never straight from a user-supplied URL — their HTTP clients have none of
 // safeProxy.ts's SSRF protections (private-IP blocking, DNS-rebind pinning).
 const INTERNAL_ORIGIN = "http://127.0.0.1:3000";
 const MAX_CONCURRENT = 4;
@@ -26,32 +26,67 @@ function json(value: unknown, status: number) {
   });
 }
 
+function resolveInternalUrl(rawUrl: string, requestOrigin: string): URL | null {
+  try {
+    const parsed = new URL(rawUrl, requestOrigin);
+    if (parsed.origin !== requestOrigin || parsed.pathname !== "/api/proxy") return null;
+    return new URL(`${parsed.pathname}${parsed.search}`, INTERNAL_ORIGIN);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * `<video>` never learns a real duration for the streamed-transcode output
+ * (no Content-Length, no moov duration while ffmpeg is still writing it), so
+ * Continue Watching progress has nothing to divide by. The player probes
+ * this once up front and carries the real length as `knownDurationSeconds`.
+ */
+async function probeDuration(internalUrl: URL): Promise<Response> {
+  const args = ["-v", "error", "-show_entries", "format=duration", "-of", "json", internalUrl.toString()];
+  const durationSeconds = await new Promise<number | null>((resolve) => {
+    let out = "";
+    let proc;
+    try {
+      proc = spawn("ffprobe", args, { stdio: ["ignore", "pipe", "ignore"] });
+    } catch {
+      resolve(null);
+      return;
+    }
+    proc.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8"); });
+    proc.on("error", () => resolve(null));
+    proc.on("close", () => {
+      try {
+        const parsed = JSON.parse(out) as { format?: { duration?: string } };
+        const value = Number(parsed.format?.duration);
+        resolve(Number.isFinite(value) && value > 0 ? value : null);
+      } catch {
+        resolve(null);
+      }
+    });
+    const timer = setTimeout(() => proc.kill("SIGKILL"), 15_000);
+    proc.on("close", () => clearTimeout(timer));
+  });
+  return json({ durationSeconds }, 200);
+}
+
 export async function GET(request: NextRequest) {
   const input = new URL(request.url);
   const raw = input.searchParams.get("url");
   if (!raw) return json({ error: "Missing url" }, 400);
+
+  const internalUrl = resolveInternalUrl(raw, input.origin);
+  if (!internalUrl) {
+    return json({ error: "Only an already-proxied /api/proxy URL may be transcoded" }, 400);
+  }
+
+  if (input.searchParams.get("probe") === "1") return probeDuration(internalUrl);
+
   if (active >= MAX_CONCURRENT) {
     return json(
       { error: "Too many active transcodes. Try again shortly." },
       429,
     );
-  }
-
-  let internalUrl: URL;
-  try {
-    const parsed = new URL(raw, input.origin);
-    if (parsed.origin !== input.origin || parsed.pathname !== "/api/proxy") {
-      return json(
-        { error: "Only an already-proxied /api/proxy URL may be transcoded" },
-        400,
-      );
-    }
-    internalUrl = new URL(
-      `${parsed.pathname}${parsed.search}`,
-      INTERNAL_ORIGIN,
-    );
-  } catch {
-    return json({ error: "Invalid url" }, 400);
   }
 
   const startSeconds = Math.max(
