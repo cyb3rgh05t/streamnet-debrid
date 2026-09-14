@@ -92,6 +92,51 @@ export function resolverMediaUrl(
   return endpoint.toString();
 }
 
+// Hosts the media resolver worker already allowlists (see
+// resolver-worker/wrangler.toml ALLOWED_MEDIA_HOSTS) — safe to always proxy.
+// Everything else (debrid CDNs, usenet gateways) has an unpredictable,
+// per-request hostname the worker was never configured to allow, and most
+// already send their own CORS headers; routing those through the worker
+// would just get a 400 "Media host not allowed" instead of playing.
+const REMUX_PROXY_HOSTNAMES = [config.streamnetTvXtreamUrl]
+  .filter((value): value is string => !!value)
+  .map((value) => {
+    try {
+      return new URL(value).hostname;
+    } catch {
+      return null;
+    }
+  })
+  .filter((value): value is string => !!value);
+
+/**
+ * Fetch target for the in-browser remux worker.
+ *
+ * The remux worker downloads bytes with a real cross-origin `fetch()` inside
+ * a Worker — unlike a `<video src>`, that requires the source to send CORS
+ * headers. Our own IPTV/Xtream panel doesn't, so its VOD sources silently
+ * failed remux with "Failed to fetch". Route only known-allowlisted hosts
+ * through the resolver worker (which fetches server-side and re-serves with
+ * CORS); everything else keeps using the direct URL and headers it already
+ * relies on.
+ *
+ * The original headers are embedded in the resolver URL's `h` param, which
+ * the worker forwards to the real upstream itself — they must NOT also be
+ * sent as fetch() headers on the resolver request, or the browser's CORS
+ * preflight fails (the worker only allows `content-type,range`).
+ */
+export function remuxFetchTarget(
+  url: string,
+  headers?: Record<string, string>,
+): { url: string; headers?: Record<string, string> } {
+  try {
+    if (!REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname)) return { url, headers };
+  } catch {
+    return { url, headers };
+  }
+  return { url: resolverMediaUrl(url, headers) ?? url, headers: undefined };
+}
+
 // External-player launch interstitial: iOS home-screen webapps silently drop
 // custom-scheme navigations, but the Safari sheet they open for https links can
 // launch app schemes (native "Open in …?" prompt). See worker /launch.
