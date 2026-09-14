@@ -1,25 +1,25 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const env = { ...process.env };
 if (!env.NEXT_PUBLIC_BUILD_STAMP) {
-  const version = JSON.parse(
-    readFileSync(new URL("../public/version.json", import.meta.url), "utf8"),
-  );
-  const rawBuildStamp = String(version.v ?? "");
+  const versionUrl = new URL("../public/version.json", import.meta.url);
+  let rawBuildStamp = "";
+  try {
+    const version = JSON.parse(readFileSync(versionUrl, "utf8"));
+    rawBuildStamp = String(version.v ?? "");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
   const parsedDate = Date.parse(rawBuildStamp);
   const buildStamp = /^\d+$/.test(rawBuildStamp)
     ? rawBuildStamp
     : Number.isFinite(parsedDate)
       ? String(parsedDate)
-      : "";
-  if (!buildStamp) {
-    throw new Error(
-      "public/version.json must contain a numeric build stamp in the v field.",
-    );
-  }
+      : String(Date.now());
+  writeFileSync(versionUrl, `{ "v": "${buildStamp}" }\n`);
   env.NEXT_PUBLIC_BUILD_STAMP = buildStamp;
 }
 // Netlify CLI can replace browser variables with masked secret values. Carry

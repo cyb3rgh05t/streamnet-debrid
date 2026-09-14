@@ -744,7 +744,7 @@ function VideoPlayer({
   // as "direct playable" — the browser then plays the video and silently
   // drops the track it cannot decode, with no error event to react to.
   useEffect(() => {
-    if (!booted || stream.remux) return undefined;
+    if (!booted) return undefined;
     const video = videoRef.current;
     if (!video) return undefined;
     return monitorSilentAudio(video, () => {
@@ -773,12 +773,6 @@ function VideoPlayer({
           onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
           return;
         }
-        if (canTryRemux(stream)) {
-          const playhead = video.currentTime;
-          if (playhead > 5) resumeAtRef.current = playhead;
-          onSelectStream(stream, { forceRemux: true });
-          return;
-        }
         if (
           !stream.transcoded &&
           canSelfTranscode(stream.originalUrl ?? stream.url)
@@ -791,6 +785,12 @@ function VideoPlayer({
             ),
           );
           onSelectStream(stream, { forceSelfTranscode: true });
+          return;
+        }
+        if (canTryRemux(stream)) {
+          const playhead = video.currentTime;
+          if (playhead > 5) resumeAtRef.current = playhead;
+          onSelectStream(stream, { forceRemux: true });
           return;
         }
         if (tryNextSource()) return;
