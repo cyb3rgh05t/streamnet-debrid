@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
@@ -20,6 +20,7 @@ if (!env.NEXT_PUBLIC_BUILD_STAMP) {
       "public/version.json must contain a numeric build stamp in the v field.",
     );
   }
+  writeFileSync(versionFile, `${JSON.stringify({ v: buildStamp })}\n`);
   env.NEXT_PUBLIC_BUILD_STAMP = buildStamp;
 }
 // Netlify CLI can replace browser variables with masked secret values. Carry
