@@ -51,7 +51,11 @@ import {
   type PlaybackTracks,
   type PlaybackError,
 } from "@/lib/player";
-import { remuxFetchTarget, resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
+import {
+  remuxFetchTarget,
+  resolverMediaUrl,
+  resolverSubtitleUrl,
+} from "@/lib/resolver";
 import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
 import {
   playbackPlan,
@@ -645,7 +649,10 @@ function VideoPlayer({
       try {
         const { probeAndPrepareRemux } = await import("@/lib/remux");
         const probeUrl = cachedDebridDirectUrl(current.url) ?? current.url!;
-        const probeTarget = remuxFetchTarget(probeUrl, current.behaviorHints?.proxyHeaders?.request);
+        const probeTarget = remuxFetchTarget(
+          probeUrl,
+          current.behaviorHints?.proxyHeaders?.request,
+        );
         const prepared = await probeAndPrepareRemux(
           probeTarget.url,
           probeTarget.headers,
@@ -1175,7 +1182,10 @@ function VideoPlayer({
       void (async () => {
         try {
           const { probeAndPrepareRemux } = await import("@/lib/remux");
-          const remuxTarget = remuxFetchTarget(stream.url!, stream.behaviorHints?.proxyHeaders?.request);
+          const remuxTarget = remuxFetchTarget(
+            stream.url!,
+            stream.behaviorHints?.proxyHeaders?.request,
+          );
           const prepared = await probeAndPrepareRemux(
             remuxTarget.url,
             remuxTarget.headers,

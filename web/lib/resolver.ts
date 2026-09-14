@@ -130,7 +130,8 @@ export function remuxFetchTarget(
   headers?: Record<string, string>,
 ): { url: string; headers?: Record<string, string> } {
   try {
-    if (!REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname)) return { url, headers };
+    if (!REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname))
+      return { url, headers };
   } catch {
     return { url, headers };
   }
