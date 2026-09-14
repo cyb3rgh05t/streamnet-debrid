@@ -17,6 +17,7 @@ import {
   createServerTranscodeSession,
   probeServerMedia,
   probeSelfTranscodeDuration,
+  selfTranscodeUrl,
 } from "./resolver";
 import type { AppSettings, StreamSource } from "./types";
 
@@ -50,6 +51,30 @@ export async function prepareBrowserStream(
     const startSeconds = stream.resumePositionSeconds ?? 0;
     const sourceUrl = stream.url;
     const originalUrl = stream.originalUrl ?? sourceUrl;
+    if (stream.addonName === "Live TV") {
+      const directUrl = selfTranscodeUrl(
+        sourceUrl,
+        stream.behaviorHints?.proxyHeaders?.request,
+        startSeconds,
+      );
+      if (!directUrl)
+        throw new Error("This live source cannot be converted by our server.");
+      return {
+        ...stream,
+        url: directUrl,
+        originalUrl,
+        remux: false,
+        transcoded: true,
+        transport: "file",
+        media: undefined,
+        selfTranscodeStartOffset: startSeconds,
+        behaviorHints: {
+          ...stream.behaviorHints,
+          notWebReady: false,
+          proxyHeaders: undefined,
+        },
+      };
+    }
     const session = await createServerTranscodeSession(
       sourceUrl,
       stream.behaviorHints?.proxyHeaders?.request,
@@ -63,7 +88,7 @@ export async function prepareBrowserStream(
     // finite while it's being streamed live from ffmpeg (see PlayerOverlay's
     // capturePosition). Best-effort: playback still works if this fails.
     const knownDurationSeconds =
-      stream.transport === "mpegts"
+      stream.addonName === "Live TV"
         ? null
         : await probeSelfTranscodeDuration(
             sourceUrl,
