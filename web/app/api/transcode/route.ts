@@ -399,13 +399,9 @@ export async function POST(request: NextRequest) {
   ff.on("error", () => {
     removeSession(id, false);
   });
-  request.signal.addEventListener(
-    "abort",
-    () => {
-      removeSession(id, true);
-    },
-    { once: true },
-  );
+  // The POST only creates the session. Its request signal ends when the short
+  // JSON response is delivered, which must not terminate the FFmpeg process
+  // before the browser requests the playlist and its segments.
   return json(
     {
       sessionId: id,
