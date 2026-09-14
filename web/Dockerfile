@@ -22,7 +22,7 @@ ENV NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL}
 ENV NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL}
 ENV NEXT_PUBLIC_TRAKT_CLIENT_ID=${NEXT_PUBLIC_TRAKT_CLIENT_ID}
 ENV NEXT_PUBLIC_BUILD_STAMP=${NEXT_PUBLIC_BUILD_STAMP}
-RUN resolved="$(node -e 'const raw=process.argv[1];const n=Number(raw);const ms=Number.isFinite(n)?n:Date.parse(raw);console.log(Number.isFinite(ms)?ms:Date.now())' "$NEXT_PUBLIC_BUILD_STAMP")"; \
+RUN resolved="$(node -e 'const raw=process.argv[1]||"";const n=/^\\d+$/.test(raw)?Number(raw):Date.parse(raw);console.log(Number.isFinite(n)&&n>0?n:Date.now())' "$NEXT_PUBLIC_BUILD_STAMP")"; \
 		printf '{ "v": "%s" }\n' "$resolved" > public/version.json; \
 		export NEXT_PUBLIC_BUILD_STAMP="$resolved"; \
 		npm run build

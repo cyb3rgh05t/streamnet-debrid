@@ -4,7 +4,11 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const env = { ...process.env };
-if (!env.NEXT_PUBLIC_BUILD_STAMP) {
+const suppliedBuildStamp = String(env.NEXT_PUBLIC_BUILD_STAMP ?? "");
+const suppliedBuildMillis = /^\d+$/.test(suppliedBuildStamp)
+  ? Number(suppliedBuildStamp)
+  : Date.parse(suppliedBuildStamp);
+if (!Number.isFinite(suppliedBuildMillis) || suppliedBuildMillis <= 0) {
   const versionUrl = new URL("../public/version.json", import.meta.url);
   let rawBuildStamp = "";
   try {
@@ -13,10 +17,11 @@ if (!env.NEXT_PUBLIC_BUILD_STAMP) {
   } catch (error) {
     if (error?.code !== "ENOENT") throw error;
   }
-  const parsedDate = Date.parse(rawBuildStamp);
-  const buildStamp = /^\d+$/.test(rawBuildStamp)
-    ? rawBuildStamp
-    : Number.isFinite(parsedDate)
+  const parsedDate = /^\d+$/.test(rawBuildStamp)
+    ? Number(rawBuildStamp)
+    : Date.parse(rawBuildStamp);
+  const buildStamp =
+    Number.isFinite(parsedDate) && parsedDate > 0
       ? String(parsedDate)
       : String(Date.now());
   writeFileSync(versionUrl, `{ "v": "${buildStamp}" }\n`);
