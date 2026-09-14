@@ -128,37 +128,73 @@ async function probeDuration(internalUrl: URL): Promise<Response> {
     "-v",
     "error",
     "-show_entries",
-    "format=duration",
+    "format=duration,format_name:stream=codec_type,codec_name",
     "-of",
     "json",
     internalUrl.toString(),
   ];
-  const durationSeconds = await new Promise<number | null>((resolve) => {
+  const probe = await new Promise<{
+    durationSeconds: number | null;
+    container: string | null;
+    audioCodecs: string[];
+    videoCodecs: string[];
+  }>((resolve) => {
     let out = "";
     let proc;
     try {
       proc = spawn("ffprobe", args, { stdio: ["ignore", "pipe", "ignore"] });
     } catch {
-      resolve(null);
+      resolve({
+        durationSeconds: null,
+        container: null,
+        audioCodecs: [],
+        videoCodecs: [],
+      });
       return;
     }
     proc.stdout.on("data", (chunk: Buffer) => {
       out += chunk.toString("utf8");
     });
-    proc.on("error", () => resolve(null));
+    proc.on("error", () =>
+      resolve({
+        durationSeconds: null,
+        container: null,
+        audioCodecs: [],
+        videoCodecs: [],
+      }),
+    );
     proc.on("close", () => {
       try {
-        const parsed = JSON.parse(out) as { format?: { duration?: string } };
+        const parsed = JSON.parse(out) as {
+          format?: { duration?: string; format_name?: string };
+          streams?: Array<{ codec_type?: string; codec_name?: string }>;
+        };
         const value = Number(parsed.format?.duration);
-        resolve(Number.isFinite(value) && value > 0 ? value : null);
+        resolve({
+          durationSeconds: Number.isFinite(value) && value > 0 ? value : null,
+          container: parsed.format?.format_name ?? null,
+          audioCodecs: (parsed.streams ?? [])
+            .filter((stream) => stream.codec_type === "audio")
+            .map((stream) => stream.codec_name)
+            .filter((codec): codec is string => Boolean(codec)),
+          videoCodecs: (parsed.streams ?? [])
+            .filter((stream) => stream.codec_type === "video")
+            .map((stream) => stream.codec_name)
+            .filter((codec): codec is string => Boolean(codec)),
+        });
       } catch {
-        resolve(null);
+        resolve({
+          durationSeconds: null,
+          container: null,
+          audioCodecs: [],
+          videoCodecs: [],
+        });
       }
     });
     const timer = setTimeout(() => proc.kill("SIGKILL"), 15_000);
     proc.on("close", () => clearTimeout(timer));
   });
-  return json({ durationSeconds }, 200);
+  return json(probe, 200);
 }
 
 export async function GET(request: NextRequest) {

@@ -2794,9 +2794,7 @@ export function AppProvider({
       }, 20000);
       void prepareBrowserStream(stream, settingsRef.current, {
         ...options,
-        forceServerTranscode:
-          options.forceServerTranscode ??
-          (!stream.homeServer && !stream.transcoded),
+        forceServerTranscode: options.forceServerTranscode ?? false,
         signal: controller.signal,
       })
         .then((prepared) => {

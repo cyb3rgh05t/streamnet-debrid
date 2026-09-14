@@ -216,6 +216,34 @@ export async function createServerTranscodeSession(
   }
 }
 
+export type ServerMediaProbe = {
+  durationSeconds?: number | null;
+  container?: string | null;
+  audioCodecs?: string[];
+  videoCodecs?: string[];
+};
+
+export async function probeServerMedia(
+  url: string,
+  headers?: Record<string, string>,
+): Promise<ServerMediaProbe | null> {
+  if (!canSelfTranscode(url) || typeof window === "undefined") return null;
+  const target = new URL("/api/transcode", window.location.origin);
+  target.searchParams.set("url", url);
+  target.searchParams.set(
+    "headers",
+    btoa(JSON.stringify({ ...DEFAULT_REMUX_HEADERS, ...headers })),
+  );
+  target.searchParams.set("probe", "1");
+  try {
+    const response = await fetch(target.toString(), { cache: "no-store" });
+    if (!response.ok) return null;
+    return (await response.json()) as ServerMediaProbe;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The transcode output is a plain streamed response with no duration of its
  * own — `<video>.duration` never becomes finite while it plays. Ask the

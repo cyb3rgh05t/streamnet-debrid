@@ -13,7 +13,9 @@ import {
 } from "./streamCompatibility";
 import { prepareHomeServerPlayback } from "./homeServerPlayback";
 import {
+  canSelfTranscode,
   createServerTranscodeSession,
+  probeServerMedia,
   probeSelfTranscodeDuration,
 } from "./resolver";
 import type { AppSettings, StreamSource } from "./types";
@@ -100,6 +102,34 @@ export async function prepareBrowserStream(
         "Provider conversion was already attempted. Choose another source or use an external player.",
       );
     return { ...stream, remux: false };
+  }
+  if (
+    !options.forceRemux &&
+    !options.forceTranscode &&
+    !options.forceServerTranscode &&
+    stream.transport !== "hls" &&
+    stream.transport !== "dash" &&
+    canSelfTranscode(stream.url)
+  ) {
+    const probe = await probeServerMedia(
+      stream.url,
+      stream.behaviorHints?.proxyHeaders?.request,
+    );
+    check();
+    const audio = (probe?.audioCodecs ?? []).map((codec) =>
+      codec.toLowerCase(),
+    );
+    const container = (probe?.container ?? "").toLowerCase();
+    const needsServerAudio = audio.some((codec) =>
+      /^(ac3|eac3|dts|truehd|mlp)$/.test(codec),
+    );
+    const needsServerContainer =
+      stream.transport === "mpegts" || /(^|,)mpegts(,|$)/.test(container);
+    if (needsServerAudio || needsServerContainer)
+      return prepareBrowserStream(stream, settings, {
+        ...options,
+        forceServerTranscode: true,
+      });
   }
   const plan = playbackPlan(stream);
   const debrid = parseDebridStream(stream.originalUrl ?? stream.url);
