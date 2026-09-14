@@ -418,13 +418,15 @@ export async function POST(request: NextRequest) {
 
 async function serveSessionFile(sessionId: string, requested: string | null) {
   const session = sessions.get(sessionId);
-  if (!session) return json({ error: "Transcode session not found" }, 404);
-  session.lastAccess = Date.now();
+  if (!/^[a-f0-9]{32}$/i.test(sessionId))
+    return json({ error: "Transcode session not found" }, 404);
+  const directory = session?.directory ?? path.join(sessionRoot, sessionId);
+  if (session) session.lastAccess = Date.now();
   const file = requested === "index.m3u8" ? requested : (requested ?? "");
   if (!/^(index\.m3u8|segment-\d{6}\.ts)$/.test(file))
     return json({ error: "Invalid transcode file" }, 400);
   try {
-    const filePath = path.join(session.directory, file);
+    const filePath = path.join(directory, file);
     const info = await stat(filePath);
     let data: Uint8Array = await readFile(filePath);
     if (file === "index.m3u8") {
