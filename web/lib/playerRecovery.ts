@@ -153,14 +153,6 @@ export function monitorVideoFrames(
   return stop;
 }
 
-// One tap per <video> element, reused across source reloads on the same
-// element — a second createMediaElementSource() call on the same element
-// throws, and the element persists across attachPlayback() reattachments.
-const audioTaps = new WeakMap<
-  HTMLVideoElement,
-  { ctx: AudioContext; analyser: AnalyserNode }
->();
-
 /**
  * Detect a video that is decoding and rendering frames while its audio track
  * never produces sound.
@@ -170,9 +162,16 @@ const audioTaps = new WeakMap<
  * text-based heuristics in streamCompatibility.ts wave these through as
  * "direct playable", so the browser plays the video track and silently drops
  * the audio track it cannot decode. No `error` event fires because the
- * element is, technically, playing successfully. An `AnalyserNode` tapped
- * onto the element's real output is the only way to tell "no audio track" and
- * "audio track nobody can hear" apart.
+ * element is, technically, playing successfully.
+ *
+ * This deliberately avoids tapping the element with an AudioContext /
+ * MediaElementAudioSourceNode: per the Web Audio spec, connecting one to a
+ * cross-origin element without CORS headers — true for essentially every
+ * stream URL here (debrid CDNs, IPTV panels, usenet gateways) — forces the
+ * ENTIRE output of that element to silence as an anti-fingerprinting
+ * measure, not just the tap's own readback. That would silence audio the
+ * browser could otherwise play just fine. `webkitAudioDecodedByteCount` is
+ * read-only telemetry with no such side effect.
  */
 export function monitorSilentAudio(
   video: HTMLVideoElement,
@@ -182,45 +181,25 @@ export function monitorSilentAudio(
   let timer: ReturnType<typeof setInterval> | undefined;
   let silentMs = 0;
   let lastCheck = Date.now();
+  let lastDecodedBytes = -1;
   const stop = () => {
     stopped = true;
     if (timer !== undefined) clearInterval(timer);
   };
-  let analyser: AnalyserNode;
-  try {
-    const AudioCtx =
-      window.AudioContext ??
-      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!AudioCtx) return stop;
-    let tap = audioTaps.get(video);
-    if (!tap) {
-      const ctx = new AudioCtx();
-      const node = ctx.createAnalyser();
-      node.fftSize = 512;
-      // Route through the analyser so the tap never mutes the element:
-      // .volume/.muted on the source element still apply upstream of it.
-      ctx
-        .createMediaElementSource(video)
-        .connect(node)
-        .connect(ctx.destination);
-      tap = { ctx, analyser: node };
-      audioTaps.set(video, tap);
-    }
-    analyser = tap.analyser;
-    if (tap.ctx.state === "suspended")
-      void tap.ctx.resume().catch(() => undefined);
-  } catch {
-    // Autoplay-gated AudioContext, an already-tapped element from another
-    // caller, or a browser without Web Audio — never block playback for this.
+  const withByteCount = video as HTMLVideoElement & {
+    webkitAudioDecodedByteCount?: number;
+  };
+  // Only Chromium exposes this counter. Without it there is no safe way to
+  // tell "no audio track" apart from "audio track nobody can hear" — skip
+  // rather than risk a false positive on browsers we cannot verify.
+  if (typeof withByteCount.webkitAudioDecodedByteCount !== "number")
     return stop;
-  }
-  const data = new Uint8Array(analyser.fftSize);
   timer = setInterval(() => {
     if (stopped) return;
     const now = Date.now();
     const elapsed = Math.min(2000, Math.max(0, now - lastCheck));
     lastCheck = now;
+    const bytes = withByteCount.webkitAudioDecodedByteCount ?? 0;
     if (
       document.visibilityState === "hidden" ||
       video.paused ||
@@ -230,16 +209,19 @@ export function monitorSilentAudio(
       video.volume === 0
     ) {
       silentMs = 0;
+      lastDecodedBytes = bytes;
       return;
     }
-    analyser.getByteTimeDomainData(data);
-    let peak = 0;
-    for (let i = 0; i < data.length; i += 1)
-      peak = Math.max(peak, Math.abs(data[i] - 128));
-    if (peak > 2) {
-      silentMs = 0;
+    if (lastDecodedBytes < 0) {
+      // First sample after (re)starting: establish a baseline, don't judge it.
+      lastDecodedBytes = bytes;
       return;
-    } // Real signal, above quantization noise floor.
+    }
+    if (bytes > lastDecodedBytes) {
+      silentMs = 0;
+      lastDecodedBytes = bytes;
+      return;
+    }
     silentMs += elapsed;
     if (silentMs >= 8000) {
       stop();
