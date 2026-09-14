@@ -161,6 +161,20 @@ function isLikelyHlsUrl(url?: string | null) {
   );
 }
 
+function isInternalTranscodeUrl(url?: string | null) {
+  if (!url || typeof window === "undefined") return false;
+  try {
+    const parsed = new URL(url, window.location.origin);
+    return (
+      parsed.origin === window.location.origin &&
+      parsed.pathname === "/api/transcode" &&
+      parsed.searchParams.has("session")
+    );
+  } catch {
+    return false;
+  }
+}
+
 // Xtream panels serve the same live stream as HLS at …/id.m3u8. Playlists with
 // output=ts hand out raw-TS URLs the browser often can't use directly, so the
 // ladder also tries the HLS twin of an Xtream-style live URL.
@@ -1393,10 +1407,12 @@ function VideoPlayer({
     // bandwidth), then the legacy Netlify fallbacks.
     // Catch-up and Xtream VOD come from the same IPTV panels as live channels,
     // so they use the restricted relay while retaining seekable VOD controls.
+    const internalTranscode = isInternalTranscodeUrl(stream.url);
     const iptvRelay =
-      liveTv ||
-      stream.addonName === "Catch-up" ||
-      stream.addonId === "iptv_xtream_vod";
+      !internalTranscode &&
+      (liveTv ||
+        stream.addonName === "Catch-up" ||
+        stream.addonId === "iptv_xtream_vod");
     const secureStreamNetRelay =
       iptvRelay && requiresSecureStreamNetRelay(stream.url);
     const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
