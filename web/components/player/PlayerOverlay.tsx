@@ -52,6 +52,7 @@ import {
   type PlaybackError,
 } from "@/lib/player";
 import {
+  canSelfTranscode,
   remuxFetchTarget,
   resolverMediaUrl,
   resolverSubtitleUrl,
@@ -405,6 +406,7 @@ function VideoPlayer({
       forceTranscode?: boolean;
       forceRemux?: boolean;
       forceBrowser?: boolean;
+      forceSelfTranscode?: boolean;
     },
   ) => void;
   onAdvance: () => Promise<boolean>;
@@ -433,6 +435,7 @@ function VideoPlayer({
         forceTranscode?: boolean;
         forceRemux?: boolean;
         forceBrowser?: boolean;
+        forceSelfTranscode?: boolean;
       },
     ) => {
       const video = videoRef.current;
@@ -770,6 +773,20 @@ function VideoPlayer({
           const playhead = video.currentTime;
           if (playhead > 5) resumeAtRef.current = playhead;
           onSelectStream(stream, { forceRemux: true });
+          return;
+        }
+        if (
+          !stream.transcoded &&
+          canSelfTranscode(stream.originalUrl ?? stream.url)
+        ) {
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "Es wurde kein Ton decodiert. Server-Konvertierung wird angefordert.",
+              "No audio decoded. Requesting server-side conversion.",
+            ),
+          );
+          onSelectStream(stream, { forceSelfTranscode: true });
           return;
         }
         if (tryNextSource()) return;
@@ -1177,6 +1194,18 @@ function VideoPlayer({
             ),
           );
           onSelectStream(stream, { forceBrowser: true, forceTranscode: true });
+        } else if (
+          !stream.transcoded &&
+          canSelfTranscode(stream.originalUrl ?? stream.url)
+        ) {
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "Der Browser kann die Tonspur nicht decodieren. Server-Konvertierung wird angefordert ...",
+              "The browser cannot decode this audio track. Requesting server-side conversion...",
+            ),
+          );
+          onSelectStream(stream, { forceSelfTranscode: true });
         } else if (!tryNextSource()) {
           setErrorDetail(message);
           setBuffering(false);

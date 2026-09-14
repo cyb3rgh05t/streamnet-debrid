@@ -795,6 +795,7 @@ export interface AppStore {
       forceTranscode?: boolean;
       forceRemux?: boolean;
       forceBrowser?: boolean;
+      forceSelfTranscode?: boolean;
     },
   ) => void;
   playTrailer: (item: MediaItem) => Promise<void>;
@@ -2667,6 +2668,7 @@ export function AppProvider({
         forceTranscode?: boolean;
         forceRemux?: boolean;
         forceBrowser?: boolean;
+        forceSelfTranscode?: boolean;
       } = {},
     ) => {
       playbackPreparation.current?.abort();
@@ -2716,6 +2718,7 @@ export function AppProvider({
         !options.forceBrowser &&
         !options.forceRemux &&
         !options.forceTranscode &&
+        !options.forceSelfTranscode &&
         (preferredPlayer === "vlc" || preferredPlayer === "infuse")
       ) {
         const externalItem = selected;

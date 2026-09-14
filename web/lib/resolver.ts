@@ -133,6 +133,16 @@ const DEFAULT_REMUX_HEADERS: Record<string, string> = {
  * and isn't behind that block. Everything else (debrid CDNs, usenet
  * gateways) keeps using its direct URL/headers, which already work.
  */
+function relayProxyUrl(url: string, headers?: Record<string, string>) {
+  if (typeof window === "undefined") return null;
+  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
+  const target = new URL("/api/proxy", window.location.origin);
+  target.searchParams.set("url", url);
+  target.searchParams.set("rewrite", "streamnet");
+  target.searchParams.set("headers", btoa(JSON.stringify(forwarded)));
+  return target.toString();
+}
+
 export function remuxFetchTarget(
   url: string,
   headers?: Record<string, string>,
@@ -143,13 +153,39 @@ export function remuxFetchTarget(
   } catch {
     return { url, headers };
   }
-  if (typeof window === "undefined") return { url, headers };
-  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
-  const target = new URL("/api/proxy", window.location.origin);
-  target.searchParams.set("url", url);
-  target.searchParams.set("rewrite", "streamnet");
-  target.searchParams.set("headers", btoa(JSON.stringify(forwarded)));
-  return { url: target.toString(), headers: undefined };
+  const relayed = relayProxyUrl(url, headers);
+  return relayed ? { url: relayed, headers: undefined } : { url, headers };
+}
+
+/** Whether `/api/transcode` can act as a last-resort fallback for this source. */
+export function canSelfTranscode(url: string | null | undefined): boolean {
+  if (!url) return false;
+  try {
+    return REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Server-side re-encode as the final fallback tier, for sources whose audio
+ * codec neither the browser nor the in-browser WebCodecs remux can play
+ * (see web/app/api/transcode/route.ts). Only for hosts already routed
+ * through our own `/api/proxy` relay — never an arbitrary URL.
+ */
+export function selfTranscodeUrl(
+  url: string,
+  headers?: Record<string, string>,
+  startSeconds = 0,
+): string | null {
+  if (!canSelfTranscode(url)) return null;
+  const relayed = relayProxyUrl(url, headers);
+  if (!relayed || typeof window === "undefined") return null;
+  const target = new URL("/api/transcode", window.location.origin);
+  target.searchParams.set("url", relayed);
+  if (startSeconds > 0)
+    target.searchParams.set("t", String(Math.floor(startSeconds)));
+  return target.toString();
 }
 
 // External-player launch interstitial: iOS home-screen webapps silently drop
