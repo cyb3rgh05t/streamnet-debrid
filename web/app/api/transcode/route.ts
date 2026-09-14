@@ -29,6 +29,7 @@ const sessions = new Map<
     lastAccess: number;
     key: string;
     running: boolean;
+    error?: string;
   }
 >();
 const SESSION_TTL_MS = 30 * 60 * 1000;
@@ -242,6 +243,16 @@ export async function GET(request: NextRequest) {
     "+genpts+discardcorrupt",
     "-err_detect",
     "ignore_err",
+    "-reconnect",
+    "1",
+    "-reconnect_streamed",
+    "1",
+    "-reconnect_on_http_error",
+    "4xx,5xx",
+    "-reconnect_delay_max",
+    "10",
+    "-seekable",
+    "0",
     ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
     "-i",
     internalUrl.toString(),
@@ -394,6 +405,16 @@ export async function POST(request: NextRequest) {
     "+genpts+discardcorrupt",
     "-err_detect",
     "ignore_err",
+    "-reconnect",
+    "1",
+    "-reconnect_streamed",
+    "1",
+    "-reconnect_on_http_error",
+    "4xx,5xx",
+    "-reconnect_delay_max",
+    "10",
+    "-seekable",
+    "0",
     ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
     "-i",
     internalUrl.toString(),
@@ -447,6 +468,12 @@ export async function POST(request: NextRequest) {
     session.running = false;
     active--;
   });
+  let stderr = "";
+  ff.stderr.on("data", (chunk: Buffer) => {
+    stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4000);
+    const session = sessions.get(id);
+    if (session) session.error = stderr;
+  });
   ff.on("error", () => {
     removeSession(id, false);
   });
@@ -474,8 +501,17 @@ async function serveSessionFile(sessionId: string, requested: string | null) {
     return json({ error: "Invalid transcode file" }, 400);
   try {
     const filePath = path.join(directory, file);
-    if (file === "index.m3u8" && !(await waitForPlaylist(directory, 20_000)))
-      return json({ error: "Transcoder did not produce a playlist" }, 504);
+    if (file === "index.m3u8" && !(await waitForPlaylist(directory, 20_000))) {
+      const detail = session?.error
+        ?.split("\n")
+        .filter(Boolean)
+        .slice(-3)
+        .join(" ");
+      return json(
+        { error: "Transcoder did not produce a playlist", detail },
+        session?.error ? 502 : 504,
+      );
+    }
     const info = await stat(filePath);
     let data: Uint8Array = await readFile(filePath);
     if (file === "index.m3u8") {
