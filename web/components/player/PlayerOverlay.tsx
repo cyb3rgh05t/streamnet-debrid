@@ -168,7 +168,7 @@ function isInternalTranscodeUrl(url?: string | null) {
     return (
       parsed.origin === window.location.origin &&
       parsed.pathname === "/api/transcode" &&
-      parsed.searchParams.has("session")
+      (parsed.searchParams.has("session") || parsed.searchParams.has("url"))
     );
   } catch {
     return false;
