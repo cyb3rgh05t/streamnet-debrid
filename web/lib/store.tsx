@@ -797,6 +797,7 @@ export interface AppStore {
       forceBrowser?: boolean;
       forceSelfTranscode?: boolean;
       forceServerTranscode?: boolean;
+      keepActiveChannel?: boolean;
     },
   ) => void;
   playTrailer: (item: MediaItem) => Promise<void>;
@@ -2671,6 +2672,7 @@ export function AppProvider({
         forceBrowser?: boolean;
         forceSelfTranscode?: boolean;
         forceServerTranscode?: boolean;
+        keepActiveChannel?: boolean;
       } = {},
     ) => {
       playbackPreparation.current?.abort();
@@ -2794,7 +2796,8 @@ export function AppProvider({
       }, 20000);
       void prepareBrowserStream(stream, settingsRef.current, {
         ...options,
-        forceServerTranscode: options.forceServerTranscode ?? false,
+        forceServerTranscode:
+          options.forceServerTranscode ?? options.keepActiveChannel ?? false,
         signal: controller.signal,
       })
         .then((prepared) => {
@@ -2806,7 +2809,7 @@ export function AppProvider({
             ).catch(() => undefined);
             return;
           }
-          setActiveChannel(null);
+          if (!options.keepActiveChannel) setActiveChannel(null);
           ownedPlayback.current = {
             stream: prepared,
             settings: settingsRef.current,
@@ -3041,15 +3044,20 @@ export function AppProvider({
         quality: "Live",
         size: "",
         url: channel.streamUrl,
+        transport: "mpegts",
         description: channel.group,
         behaviorHints: { proxyHeaders: { request: channel.requestHeaders } },
       };
       recordChannelPlayback(channel);
       if (openLiveExternally(stream, channel.name)) return;
       setActiveChannel(channel);
-      setActiveStream(stream);
+      playStream(stream, {
+        forceBrowser: true,
+        forceServerTranscode: true,
+        keepActiveChannel: true,
+      });
     },
-    [openLiveExternally, recordChannelPlayback],
+    [openLiveExternally, playStream, recordChannelPlayback],
   );
 
   // Catch-up plays a finished programme from the panel's archive. It is a
