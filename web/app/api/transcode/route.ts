@@ -426,13 +426,26 @@ async function serveSessionFile(sessionId: string, requested: string | null) {
   try {
     const filePath = path.join(session.directory, file);
     const info = await stat(filePath);
-    const data = await readFile(filePath);
-    return new Response(data, {
+    let data: Uint8Array = await readFile(filePath);
+    if (file === "index.m3u8") {
+      const playlist = Buffer.from(data)
+        .toString("utf8")
+        .replace(
+          /(^|\r?\n)(segment-\d{6}\.ts)(?=\r?$)/gm,
+          (_match, prefix: string, segment: string) =>
+            `${prefix}/api/transcode?session=${encodeURIComponent(sessionId)}&file=${segment}`,
+        );
+      data = new Uint8Array(Buffer.from(playlist, "utf8"));
+    }
+    const body = file.endsWith(".m3u8")
+      ? Buffer.from(data).toString("utf8")
+      : new Blob([new Uint8Array(data).buffer as ArrayBuffer]);
+    return new Response(body, {
       headers: {
         "content-type": file.endsWith(".m3u8")
           ? "application/vnd.apple.mpegurl"
           : "video/mp2t",
-        "content-length": String(info.size),
+        "content-length": String(data.byteLength),
         "cache-control": file.endsWith(".m3u8")
           ? "no-store"
           : "private, max-age=31536000",
