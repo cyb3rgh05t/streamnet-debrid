@@ -19,6 +19,7 @@ export type PreparePlaybackOptions = {
   forceRemux?: boolean;
   forceTranscode?: boolean;
   forceSelfTranscode?: boolean;
+  forceServerTranscode?: boolean;
   signal?: AbortSignal;
 };
 
@@ -36,15 +37,16 @@ export async function prepareBrowserStream(
   // Last-resort fallback: neither the browser nor the in-browser WebCodecs
   // remux could produce audio for this source. Re-encode audio to AAC on our
   // own server (web/app/api/transcode/route.ts) and play the plain result.
-  if (options.forceSelfTranscode) {
+  if (options.forceSelfTranscode || options.forceServerTranscode) {
     if (stream.transcoded)
       throw new Error(
         "Server conversion was already attempted. Use an external player.",
       );
     const startSeconds = stream.resumePositionSeconds ?? 0;
-    const originalUrl = stream.originalUrl ?? stream.url;
+    const sourceUrl = stream.url;
+    const originalUrl = stream.originalUrl ?? sourceUrl;
     const url = selfTranscodeUrl(
-      originalUrl,
+      sourceUrl,
       stream.behaviorHints?.proxyHeaders?.request,
       startSeconds,
     );
@@ -55,10 +57,13 @@ export async function prepareBrowserStream(
     // can be computed for this stream — `video.duration` never becomes
     // finite while it's being streamed live from ffmpeg (see PlayerOverlay's
     // capturePosition). Best-effort: playback still works if this fails.
-    const knownDurationSeconds = await probeSelfTranscodeDuration(
-      originalUrl,
-      stream.behaviorHints?.proxyHeaders?.request,
-    ).catch(() => null);
+    const knownDurationSeconds =
+      stream.transport === "mpegts"
+        ? null
+        : await probeSelfTranscodeDuration(
+            sourceUrl,
+            stream.behaviorHints?.proxyHeaders?.request,
+          ).catch(() => null);
     check();
     return {
       ...stream,

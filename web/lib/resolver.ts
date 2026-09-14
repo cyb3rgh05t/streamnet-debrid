@@ -161,7 +161,7 @@ export function remuxFetchTarget(
 export function canSelfTranscode(url: string | null | undefined): boolean {
   if (!url) return false;
   try {
-    return REMUX_PROXY_HOSTNAMES.includes(new URL(url).hostname);
+    return ["http:", "https:"].includes(new URL(url).protocol);
   } catch {
     return false;
   }
@@ -179,10 +179,11 @@ export function selfTranscodeUrl(
   startSeconds = 0,
 ): string | null {
   if (!canSelfTranscode(url)) return null;
-  const relayed = relayProxyUrl(url, headers);
-  if (!relayed || typeof window === "undefined") return null;
+  if (typeof window === "undefined") return null;
   const target = new URL("/api/transcode", window.location.origin);
-  target.searchParams.set("url", relayed);
+  target.searchParams.set("url", url);
+  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
+  target.searchParams.set("headers", btoa(JSON.stringify(forwarded)));
   if (startSeconds > 0)
     target.searchParams.set("t", String(Math.floor(startSeconds)));
   return target.toString();
@@ -198,10 +199,11 @@ export async function probeSelfTranscodeDuration(
   url: string,
   headers?: Record<string, string>,
 ): Promise<number | null> {
-  const relayed = relayProxyUrl(url, headers);
-  if (!relayed || typeof window === "undefined") return null;
+  if (!canSelfTranscode(url) || typeof window === "undefined") return null;
   const target = new URL("/api/transcode", window.location.origin);
-  target.searchParams.set("url", relayed);
+  target.searchParams.set("url", url);
+  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
+  target.searchParams.set("headers", btoa(JSON.stringify(forwarded)));
   target.searchParams.set("probe", "1");
   try {
     const response = await fetch(target.toString(), { cache: "no-store" });

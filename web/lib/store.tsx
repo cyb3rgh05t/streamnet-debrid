@@ -2669,6 +2669,7 @@ export function AppProvider({
         forceRemux?: boolean;
         forceBrowser?: boolean;
         forceSelfTranscode?: boolean;
+        forceServerTranscode?: boolean;
       } = {},
     ) => {
       playbackPreparation.current?.abort();
@@ -2719,6 +2720,7 @@ export function AppProvider({
         !options.forceRemux &&
         !options.forceTranscode &&
         !options.forceSelfTranscode &&
+        !options.forceServerTranscode &&
         (preferredPlayer === "vlc" || preferredPlayer === "infuse")
       ) {
         const externalItem = selected;
@@ -2784,6 +2786,9 @@ export function AppProvider({
       }, 20000);
       void prepareBrowserStream(stream, settingsRef.current, {
         ...options,
+        forceServerTranscode:
+          options.forceServerTranscode ??
+          (!stream.homeServer && !stream.transcoded),
         signal: controller.signal,
       })
         .then((prepared) => {

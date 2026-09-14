@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { spawn } from "node:child_process";
+import { createInternalMediaToken } from "@/lib/server/internalMedia";
 
 // Last-resort server-side fallback: when a source's audio codec can be
 // played by neither the browser directly nor the in-browser WebCodecs remux
@@ -26,12 +27,16 @@ function json(value: unknown, status: number) {
   });
 }
 
-function resolveInternalUrl(rawUrl: string, requestOrigin: string): URL | null {
+function resolveInternalUrl(
+  rawUrl: string,
+  headers: Record<string, string>,
+): URL | null {
   try {
-    const parsed = new URL(rawUrl, requestOrigin);
-    if (parsed.origin !== requestOrigin || parsed.pathname !== "/api/proxy")
+    const parsed = new URL(rawUrl);
+    if (!['http:', 'https:'].includes(parsed.protocol))
       return null;
-    return new URL(`${parsed.pathname}${parsed.search}`, INTERNAL_ORIGIN);
+    const token = createInternalMediaToken(parsed.toString(), headers);
+    return new URL(`/api/proxy?internal=${encodeURIComponent(token)}`, INTERNAL_ORIGIN);
   } catch {
     return null;
   }
@@ -86,10 +91,11 @@ export async function GET(request: NextRequest) {
   const raw = input.searchParams.get("url");
   if (!raw) return json({ error: "Missing url" }, 400);
 
-  const internalUrl = resolveInternalUrl(raw, input.origin);
+  const headers = decodeHeaders(input.searchParams.get("headers"));
+  const internalUrl = resolveInternalUrl(raw, headers);
   if (!internalUrl) {
     return json(
-      { error: "Only an already-proxied /api/proxy URL may be transcoded" },
+      { error: "Only public HTTP media URLs may be transcoded" },
       400,
     );
   }
@@ -114,6 +120,14 @@ export async function GET(request: NextRequest) {
     "-hide_banner",
     "-loglevel",
     "error",
+    "-probesize",
+    "5000000",
+    "-analyzeduration",
+    "5000000",
+    "-fflags",
+    "+genpts+discardcorrupt",
+    "-err_detect",
+    "ignore_err",
     ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
     "-i",
     internalUrl.toString(),
@@ -129,6 +143,10 @@ export async function GET(request: NextRequest) {
     "48000",
     "-ac",
     "2",
+    "-b:a",
+    "192k",
+    "-af",
+    "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
     "-movflags",
     "frag_keyframe+empty_moov+default_base_moof",
     "-f",
@@ -198,4 +216,20 @@ export async function GET(request: NextRequest) {
       "access-control-allow-origin": "*",
     },
   });
+}
+
+function decodeHeaders(raw: string | null): Record<string, string> {
+  if (!raw) return {};
+  try {
+    const value = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    if (!value || typeof value !== "object") return {};
+    const headers: Record<string, string> = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (typeof item === "string" && item.length <= 8192)
+        headers[key] = item;
+    }
+    return headers;
+  } catch {
+    return {};
+  }
 }

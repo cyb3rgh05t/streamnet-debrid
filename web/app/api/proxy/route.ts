@@ -4,6 +4,7 @@ import {
   safeProxyFetch,
   withinProxyBudget,
 } from "@/lib/server/safeProxy";
+import { readInternalMediaToken } from "@/lib/server/internalMedia";
 
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
 const STREAMNET_RELAY_HOSTS = new Set([
@@ -15,6 +16,8 @@ const STREAMNET_RELAY_HOSTS = new Set([
 const ALLOW_MEDIA_PROXY = allowsMediaProxy();
 
 export async function GET(request: NextRequest) {
+  const internalToken = new URL(request.url).searchParams.get("internal");
+  if (internalToken) return handleInternalMedia(request, internalToken);
   if (
     !withinProxyBudget(
       request.headers.get("x-nf-client-connection-ip") ?? "local",
@@ -177,6 +180,28 @@ export async function GET(request: NextRequest) {
   if (response.ok) cacheIptvCatalog(headers, target);
 
   return new NextResponse(response.body, { status: response.status, headers });
+}
+
+async function handleInternalMedia(request: NextRequest, token: string) {
+  const target = readInternalMediaToken(token);
+  if (!target)
+    return NextResponse.json({ error: "Invalid media relay token" }, { status: 403 });
+  const range = request.headers.get("range");
+  const headers = new Headers(target.headers);
+  if (range) headers.set("range", range);
+  try {
+    const response = await safeProxyFetch(
+      new URL(target.url),
+      { headers, cache: "no-store", redirect: "manual", signal: request.signal },
+      { allowMedia: true, allowInsecureRedirect: true, streamMedia: true },
+    );
+    const output = new Headers(response.headers);
+    output.set("access-control-allow-origin", "*");
+    output.set("cache-control", "no-store");
+    return new NextResponse(response.body, { status: response.status, headers: output });
+  } catch {
+    return NextResponse.json({ error: "Media upstream unavailable" }, { status: 502 });
+  }
 }
 
 const CACHEABLE_XTREAM_ACTIONS = new Set([
