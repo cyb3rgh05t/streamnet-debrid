@@ -36,15 +36,15 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 416
-        versionName = "2.5.014"
+        versionCode = 417
+        versionName = "2.5.015"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
         // Cloud sync uses the self-hosted account backend.
         buildConfigField("Boolean", "ENABLE_TMDB_EDGE_PROXY", "false")
         buildConfigField("Boolean", "ENABLE_TRAKT_EDGE_PROXY", "false")
-        buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "false")
+        buildConfigField("Boolean", "ENABLE_REALTIME_CLOUD_SYNC", "true")
         buildConfigField("Boolean", "ENABLE_REALTIME_WATCH_SYNC", "false")
         buildConfigField("Boolean", "ENABLE_PERIODIC_CLOUD_PULL", "true")
         buildConfigField("Boolean", "ENABLE_CLOUD_SYNC", "true")

@@ -222,7 +222,9 @@ class RealtimeSyncManager @Inject constructor(
             delay(DEBOUNCE_MS)
             Log.i(TAG, "Pulling cloud state after realtime notification")
             try {
-                val result = cloudSyncRepository.pullFromCloud()
+                // An SSE revision is an authoritative invalidation signal; bypass the
+                // normal pull burst guard so a recent startup pull cannot hide it.
+                val result = cloudSyncRepository.pullFromCloud(forceApplyRemote = true)
                 if (result == CloudSyncRepository.RestoreResult.RESTORED) {
                     _accountSyncEvents.tryEmit(Unit)
                     _watchHistoryEvents.tryEmit(Unit)

@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.015] - 2026-09-14
+
+### Cloud-Synchronisierung via SSE
+
+- Android aktiviert jetzt die bestehende SSE-Verbindung zum Self-Hosted Cloud-Backend. Änderungen an Cloud-Daten lösen dadurch auch ohne manuellen Reload einen Home-Refresh aus.
+- SSE-Events aktualisieren Continue Watching, Recently Watched, Watchlist, Kataloge, Addons und Einstellungen über den bestehenden Cloud-Pull.
+- Ein durch SSE ausgelöster Pull umgeht den normalen 30-Sekunden-Burst-Guard, damit ein vorheriger Startup-Pull keine echte neue Revision verschluckt.
+- Die WebUI verwendet weiterhin ihren eigenen SSE-Listener. Beide Clients lesen den autoritativen Cloud-Stand; Revision/CAS sowie die bestehenden Feld-Zeitstempel- und Merge-Regeln verhindern gegenseitiges blindes Überschreiben.
+
 ## [2.5.014] - 2026-09-13
 
 ### Zuletzt gesehene Inhalte
