@@ -1975,12 +1975,16 @@ function AccountsSection() {
           </button>
         )}
         <p className="empty">
+          {localize(settings.uiLanguage, "Version", "Version")}{" "}
+          {process.env.NEXT_PUBLIC_APP_VERSION ?? "0.0.0"}
+          {" · "}
           {localize(settings.uiLanguage, "Web-Build", "Web build")}:{" "}
           {process.env.NEXT_PUBLIC_BUILD_STAMP
             ? formatTime24Hour(
                 Number(process.env.NEXT_PUBLIC_BUILD_STAMP),
                 settings.uiLanguage === "de" ? "de-DE" : "en-GB",
                 {
+                  year: "numeric",
                   day: "2-digit",
                   month: "short",
                 },
