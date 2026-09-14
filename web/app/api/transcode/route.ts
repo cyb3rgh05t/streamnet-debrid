@@ -318,8 +318,6 @@ export async function POST(request: NextRequest) {
   );
   if (existing) {
     existing[1].lastAccess = Date.now();
-    if (!(await waitForPlaylist(existing[1].directory)))
-      return json({ error: "Transcoder did not produce a playlist" }, 504);
     return json(
       {
         sessionId: existing[0],
@@ -416,10 +414,6 @@ export async function POST(request: NextRequest) {
   ff.on("error", () => {
     removeSession(id, false);
   });
-  if (!(await waitForPlaylist(directory))) {
-    removeSession(id, true);
-    return json({ error: "Transcoder did not produce a playlist" }, 504);
-  }
   // The POST only creates the session. Its request signal ends when the short
   // JSON response is delivered, which must not terminate the FFmpeg process
   // before the browser requests the playlist and its segments.
@@ -444,6 +438,8 @@ async function serveSessionFile(sessionId: string, requested: string | null) {
     return json({ error: "Invalid transcode file" }, 400);
   try {
     const filePath = path.join(directory, file);
+    if (file === "index.m3u8" && !(await waitForPlaylist(directory, 20_000)))
+      return json({ error: "Transcoder did not produce a playlist" }, 504);
     const info = await stat(filePath);
     let data: Uint8Array = await readFile(filePath);
     if (file === "index.m3u8") {
