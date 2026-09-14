@@ -8372,7 +8372,7 @@ button,
 }
 
 .source-side b {
-  color: var(--orange);
+  color: var(--accent, var(--orange));
   font-size: 18px;
 }
 
@@ -8426,7 +8426,8 @@ button,
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--accent, #fff) 60%, transparent);
   background: var(--accent-soft);
-  box-shadow: 0 0 18px rgba(0, 213, 136, 0.14);
+  box-shadow: 0 0 18px
+    color-mix(in srgb, var(--accent, var(--orange)) 28%, transparent);
 }
 
 .source-action:disabled {
