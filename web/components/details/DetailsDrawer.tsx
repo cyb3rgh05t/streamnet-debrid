@@ -26,7 +26,6 @@ import { createPortal } from "react-dom";
 import { MediaCard } from "@/components/media/MediaCard";
 import { RailScroller } from "@/components/media/RailScroller";
 import { config } from "@/lib/config";
-import { accentColor } from "@/lib/accent";
 import { localize, type UiLanguage } from "@/lib/i18n";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
 import { saveWatchedState } from "@/lib/cloud";
@@ -1176,11 +1175,6 @@ function SourcePickerModal({
   return createPortal(
     <section
       className="source-modal"
-      style={{
-        ["--accent" as string]: accentColor(settings.accentColor),
-        ["--accent-soft" as string]: `color-mix(in srgb, ${accentColor(settings.accentColor)} 16%, transparent)`,
-        ["--accent-glow" as string]: `color-mix(in srgb, ${accentColor(settings.accentColor)} 28%, transparent)`,
-      }}
       role="dialog"
       aria-modal="true"
       aria-label={localize(
@@ -1419,10 +1413,7 @@ function SourcePickerModal({
                           )
                         }
                         onClick={() => {
-                          playStream(stream, {
-                            forceBrowser: true,
-                            forceServerTranscode: true,
-                          });
+                          playStream(stream, { forceBrowser: true });
                           onClose();
                         }}
                       >

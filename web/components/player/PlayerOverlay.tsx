@@ -51,12 +51,7 @@ import {
   type PlaybackTracks,
   type PlaybackError,
 } from "@/lib/player";
-import {
-  canSelfTranscode,
-  remuxFetchTarget,
-  resolverMediaUrl,
-  resolverSubtitleUrl,
-} from "@/lib/resolver";
+import { resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
 import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
 import {
   playbackPlan,
@@ -75,7 +70,6 @@ import {
   bufferedEndAt,
   classifyMediaError,
   isStalled,
-  monitorSilentAudio,
   monitorVideoFrames,
   nextStallAction,
 } from "@/lib/playerRecovery";
@@ -154,25 +148,7 @@ function streamMeta(stream: StreamSource) {
 
 function isLikelyHlsUrl(url?: string | null) {
   if (!url) return false;
-  return (
-    /\.m3u8(?:[?#]|$)/i.test(url) ||
-    url.toLowerCase().includes("mpegurl") ||
-    url.includes("/api/transcode?session=")
-  );
-}
-
-function isInternalTranscodeUrl(url?: string | null) {
-  if (!url || typeof window === "undefined") return false;
-  try {
-    const parsed = new URL(url, window.location.origin);
-    return (
-      parsed.origin === window.location.origin &&
-      parsed.pathname === "/api/transcode" &&
-      (parsed.searchParams.has("session") || parsed.searchParams.has("url"))
-    );
-  } catch {
-    return false;
-  }
+  return /\.m3u8(?:[?#]|$)/i.test(url) || url.toLowerCase().includes("mpegurl");
 }
 
 // Xtream panels serve the same live stream as HLS at …/id.m3u8. Playlists with
@@ -424,8 +400,6 @@ function VideoPlayer({
       forceTranscode?: boolean;
       forceRemux?: boolean;
       forceBrowser?: boolean;
-      forceSelfTranscode?: boolean;
-      forceServerTranscode?: boolean;
     },
   ) => void;
   onAdvance: () => Promise<boolean>;
@@ -454,8 +428,6 @@ function VideoPlayer({
         forceTranscode?: boolean;
         forceRemux?: boolean;
         forceBrowser?: boolean;
-        forceSelfTranscode?: boolean;
-        forceServerTranscode?: boolean;
       },
     ) => {
       const video = videoRef.current;
@@ -463,17 +435,13 @@ function VideoPlayer({
       // resume position. Keep the pending seek until replacement media is ready.
       const time =
         video && video.readyState >= 1 && Number.isFinite(video.currentTime)
-          ? video.currentTime +
-            (stream.playbackSession?.startOffset ??
-              stream.selfTranscodeStartOffset ??
-              0)
+          ? video.currentTime + (stream.playbackSession?.startOffset ?? 0)
           : resumeAtRef.current || stream.resumePositionSeconds || 0;
       selectStream({ ...next, resumePositionSeconds: time }, options);
     },
     [
       selectStream,
       stream.playbackSession?.startOffset,
-      stream.selfTranscodeStartOffset,
       stream.resumePositionSeconds,
     ],
   );
@@ -676,13 +644,9 @@ function VideoPlayer({
       try {
         const { probeAndPrepareRemux } = await import("@/lib/remux");
         const probeUrl = cachedDebridDirectUrl(current.url) ?? current.url!;
-        const probeTarget = remuxFetchTarget(
+        const prepared = await probeAndPrepareRemux(
           probeUrl,
           current.behaviorHints?.proxyHeaders?.request,
-        );
-        const prepared = await probeAndPrepareRemux(
-          probeTarget.url,
-          probeTarget.headers,
           settings.audioLanguage,
           { signal: controller.signal },
         );
@@ -758,90 +722,7 @@ function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, stream.url, remuxRestartKey, liveTv]);
 
-  // Recover when the video decodes fine but its audio track never produces
-  // sound. Undocumented AC-3/E-AC-3/DTS audio (no codec hint in the channel
-  // name, filename or description) passes the text-based compatibility check
-  // as "direct playable" — the browser then plays the video and silently
-  // drops the track it cannot decode, with no error event to react to.
-  useEffect(() => {
-    if (!booted) return undefined;
-    const video = videoRef.current;
-    if (!video) return undefined;
-    return monitorSilentAudio(video, () => {
-      // eslint-disable-next-line no-console -- temporary diagnostic, remove once confirmed live
-      console.debug("[silent-audio] fired", {
-        url: stream.url,
-        liveTv,
-        transcoded: stream.transcoded,
-        canProviderTranscode: canProviderTranscode(stream),
-        canTryRemux: canTryRemux(stream),
-      });
-      recordBrowserPlaybackFailure(
-        stream,
-        "This browser could not decode this source's audio track.",
-        !!stream.transcoded,
-      );
-      if (liveTv) {
-        if (!stream.transcoded && canSelfTranscode(stream.url)) {
-          onToast(
-            localize(
-              settings.uiLanguage,
-              "Dieser Sender liefert keine decodierbare Tonspur. Server-Konvertierung wird angefordert.",
-              "This channel has no decodable audio track. Requesting server-side conversion.",
-            ),
-          );
-          onSelectStream(stream, {
-            forceServerTranscode: true,
-            forceBrowser: true,
-          });
-          return;
-        }
-      } else {
-        if (!stream.transcoded && canProviderTranscode(stream)) {
-          onToast(
-            localize(
-              settings.uiLanguage,
-              "Es wurde kein Ton decodiert. Eine Konvertierung beim Anbieter wird angefordert.",
-              "No audio decoded. Requesting provider conversion for this source.",
-            ),
-          );
-          onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
-          return;
-        }
-        if (
-          !stream.transcoded &&
-          canSelfTranscode(stream.originalUrl ?? stream.url)
-        ) {
-          onToast(
-            localize(
-              settings.uiLanguage,
-              "Es wurde kein Ton decodiert. Server-Konvertierung wird angefordert.",
-              "No audio decoded. Requesting server-side conversion.",
-            ),
-          );
-          onSelectStream(stream, { forceSelfTranscode: true });
-          return;
-        }
-        if (canTryRemux(stream)) {
-          const playhead = video.currentTime;
-          if (playhead > 5) resumeAtRef.current = playhead;
-          onSelectStream(stream, { forceRemux: true });
-          return;
-        }
-        if (tryNextSource()) return;
-      }
-      setShowControls(true);
-      onToast(
-        localize(
-          settings.uiLanguage,
-          "Das Bild wird angezeigt, aber der Browser kann die Tonspur dieser Quelle nicht decodieren. Nutze einen externen Player für Ton.",
-          "Video plays but this browser cannot decode this source's audio track. Use an external player for sound.",
-        ),
-      );
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [booted, stream.url, remuxRestartKey, liveTv]);
-
+  // Live cue translation: when AI subs are active, the selected (English
   // source) track's cues are translated in small batches and swapped in place;
   // upcoming cues are pre-warmed so swaps land before display. Mirrors the
   // app's SubtitleTranslationManager.
@@ -1233,18 +1114,6 @@ function VideoPlayer({
             ),
           );
           onSelectStream(stream, { forceBrowser: true, forceTranscode: true });
-        } else if (
-          !stream.transcoded &&
-          canSelfTranscode(stream.originalUrl ?? stream.url)
-        ) {
-          onToast(
-            localize(
-              settings.uiLanguage,
-              "Der Browser kann die Tonspur nicht decodieren. Server-Konvertierung wird angefordert ...",
-              "The browser cannot decode this audio track. Requesting server-side conversion...",
-            ),
-          );
-          onSelectStream(stream, { forceSelfTranscode: true });
         } else if (!tryNextSource()) {
           setErrorDetail(message);
           setBuffering(false);
@@ -1258,13 +1127,9 @@ function VideoPlayer({
       void (async () => {
         try {
           const { probeAndPrepareRemux } = await import("@/lib/remux");
-          const remuxTarget = remuxFetchTarget(
+          const prepared = await probeAndPrepareRemux(
             stream.url!,
             stream.behaviorHints?.proxyHeaders?.request,
-          );
-          const prepared = await probeAndPrepareRemux(
-            remuxTarget.url,
-            remuxTarget.headers,
             settings.audioLanguage,
             {
               signal: controller.signal,
@@ -1407,12 +1272,10 @@ function VideoPlayer({
     // bandwidth), then the legacy Netlify fallbacks.
     // Catch-up and Xtream VOD come from the same IPTV panels as live channels,
     // so they use the restricted relay while retaining seekable VOD controls.
-    const internalTranscode = isInternalTranscodeUrl(stream.url);
     const iptvRelay =
-      !internalTranscode &&
-      (liveTv ||
-        stream.addonName === "Catch-up" ||
-        stream.addonId === "iptv_xtream_vod");
+      liveTv ||
+      stream.addonName === "Catch-up" ||
+      stream.addonId === "iptv_xtream_vod";
     const secureStreamNetRelay =
       iptvRelay && requiresSecureStreamNetRelay(stream.url);
     const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
@@ -1711,14 +1574,7 @@ function VideoPlayer({
       setBuffered(bufferedEndAt(video.buffered, video.currentTime));
       setBufferAheadSec(bufferedAhead(video.buffered, video.currentTime));
     };
-    const onDur = () => {
-      // A self-transcoded stream (web/app/api/transcode) never gets a finite
-      // `video.duration` while ffmpeg keeps writing it — fall back to the
-      // server-probed original length so the scrubber/remaining-time UI
-      // isn't stuck showing Infinity.
-      const finite = Number.isFinite(video.duration) && video.duration > 0;
-      setDuration(stream.knownDurationSeconds ?? (finite ? video.duration : 0));
-    };
+    const onDur = () => setDuration(video.duration || 0);
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
@@ -1827,19 +1683,6 @@ function VideoPlayer({
     };
     const capturePosition = () => {
       if (
-        stream.knownDurationSeconds &&
-        stream.knownDurationSeconds > 0 &&
-        Number.isFinite(video.currentTime)
-      ) {
-        const offset = stream.selfTranscodeStartOffset ?? 0;
-        lastPosition = {
-          position: Math.min(
-            video.currentTime + offset,
-            stream.knownDurationSeconds,
-          ),
-          duration: stream.knownDurationSeconds,
-        };
-      } else if (
         Number.isFinite(video.duration) &&
         video.duration > 0 &&
         Number.isFinite(video.currentTime)

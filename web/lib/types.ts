@@ -271,15 +271,6 @@ export interface StreamSource {
   originalUrl?: string | null;
   // Set when this source should play through the in-browser MKV remux path.
   remux?: boolean;
-  // Our own server-side ffmpeg re-encode (web/app/api/transcode). The result
-  // is a plain progressive stream with no duration of its own — startOffset
-  // is where in the ORIGINAL file this clip begins, and knownDurationSeconds
-  // is the original file's real length, needed to compute Continue Watching
-  // progress since `video.duration` never becomes finite while streaming it.
-  // Deliberately separate from `playbackSession`, which also drives Home
-  // Server progress reporting that must not fire for this source.
-  selfTranscodeStartOffset?: number;
-  knownDurationSeconds?: number;
 }
 
 export interface InstalledAddon {

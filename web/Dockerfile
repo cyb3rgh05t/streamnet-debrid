@@ -22,18 +22,19 @@ ENV NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL}
 ENV NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL}
 ENV NEXT_PUBLIC_TRAKT_CLIENT_ID=${NEXT_PUBLIC_TRAKT_CLIENT_ID}
 ENV NEXT_PUBLIC_BUILD_STAMP=${NEXT_PUBLIC_BUILD_STAMP}
-RUN resolved="$(node -e 'const raw=process.argv[1]||"";const n=/^\\d+$/.test(raw)?Number(raw):Date.parse(raw);console.log(Number.isFinite(n)&&n>0?n:Date.now())' "$NEXT_PUBLIC_BUILD_STAMP")"; \
-		printf '{ "v": "%s" }\n' "$resolved" > public/version.json; \
-		export NEXT_PUBLIC_BUILD_STAMP="$resolved"; \
-		npm run build
+RUN if [ -n "$NEXT_PUBLIC_BUILD_STAMP" ]; then \
+			stamp="$NEXT_PUBLIC_BUILD_STAMP"; \
+			case "$stamp" in \
+				''|*[!0-9]*) stamp="$(date -d "$stamp" +%s)000" ;; \
+			esac; \
+			printf '{ "v": "%s" }\n' "$stamp" > public/version.json; \
+		fi
+RUN npm run build
 
 FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
-# Server-side fallback transcode (/api/transcode) for sources whose audio
-# codec no browser, and no in-browser WebCodecs decoder, can play.
-RUN apk add --no-cache ffmpeg
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json

@@ -1,30 +1,25 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const env = { ...process.env };
-const suppliedBuildStamp = String(env.NEXT_PUBLIC_BUILD_STAMP ?? "");
-const suppliedBuildMillis = /^\d+$/.test(suppliedBuildStamp)
-  ? Number(suppliedBuildStamp)
-  : Date.parse(suppliedBuildStamp);
-if (!Number.isFinite(suppliedBuildMillis) || suppliedBuildMillis <= 0) {
-  const versionUrl = new URL("../public/version.json", import.meta.url);
-  let rawBuildStamp = "";
-  try {
-    const version = JSON.parse(readFileSync(versionUrl, "utf8"));
-    rawBuildStamp = String(version.v ?? "");
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-  }
-  const parsedDate = /^\d+$/.test(rawBuildStamp)
-    ? Number(rawBuildStamp)
-    : Date.parse(rawBuildStamp);
-  const buildStamp =
-    Number.isFinite(parsedDate) && parsedDate > 0
+if (!env.NEXT_PUBLIC_BUILD_STAMP) {
+  const version = JSON.parse(
+    readFileSync(new URL("../public/version.json", import.meta.url), "utf8"),
+  );
+  const rawBuildStamp = String(version.v ?? "");
+  const parsedDate = Date.parse(rawBuildStamp);
+  const buildStamp = /^\d+$/.test(rawBuildStamp)
+    ? rawBuildStamp
+    : Number.isFinite(parsedDate)
       ? String(parsedDate)
-      : String(Date.now());
-  writeFileSync(versionUrl, `{ "v": "${buildStamp}" }\n`);
+      : "";
+  if (!buildStamp) {
+    throw new Error(
+      "public/version.json must contain a numeric build stamp in the v field.",
+    );
+  }
   env.NEXT_PUBLIC_BUILD_STAMP = buildStamp;
 }
 // Netlify CLI can replace browser variables with masked secret values. Carry

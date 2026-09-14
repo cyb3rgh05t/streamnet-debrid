@@ -795,9 +795,6 @@ export interface AppStore {
       forceTranscode?: boolean;
       forceRemux?: boolean;
       forceBrowser?: boolean;
-      forceSelfTranscode?: boolean;
-      forceServerTranscode?: boolean;
-      keepActiveChannel?: boolean;
     },
   ) => void;
   playTrailer: (item: MediaItem) => Promise<void>;
@@ -2670,9 +2667,6 @@ export function AppProvider({
         forceTranscode?: boolean;
         forceRemux?: boolean;
         forceBrowser?: boolean;
-        forceSelfTranscode?: boolean;
-        forceServerTranscode?: boolean;
-        keepActiveChannel?: boolean;
       } = {},
     ) => {
       playbackPreparation.current?.abort();
@@ -2722,8 +2716,6 @@ export function AppProvider({
         !options.forceBrowser &&
         !options.forceRemux &&
         !options.forceTranscode &&
-        !options.forceSelfTranscode &&
-        !options.forceServerTranscode &&
         (preferredPlayer === "vlc" || preferredPlayer === "infuse")
       ) {
         const externalItem = selected;
@@ -2768,18 +2760,11 @@ export function AppProvider({
         return;
       }
       setToast(
-        stream.homeServer ||
-          options.forceTranscode ||
-          options.forceSelfTranscode ||
-          options.forceServerTranscode
+        stream.homeServer || options.forceTranscode
           ? localize(
               settingsRef.current.uiLanguage,
-              options.forceServerTranscode || options.forceSelfTranscode
-                ? "Server-Konvertierung wird vorbereitet ..."
-                : "Browser-Wiedergabe wird vorbereitet ...",
-              options.forceServerTranscode || options.forceSelfTranscode
-                ? "Preparing server conversion..."
-                : "Preparing browser playback...",
+              "Browser-Wiedergabe wird vorbereitet ...",
+              "Preparing browser playback...",
             )
           : null,
       );
@@ -2796,8 +2781,6 @@ export function AppProvider({
       }, 20000);
       void prepareBrowserStream(stream, settingsRef.current, {
         ...options,
-        forceServerTranscode:
-          options.forceServerTranscode ?? options.keepActiveChannel ?? false,
         signal: controller.signal,
       })
         .then((prepared) => {
@@ -2809,12 +2792,11 @@ export function AppProvider({
             ).catch(() => undefined);
             return;
           }
-          if (!options.keepActiveChannel) setActiveChannel(null);
+          setActiveChannel(null);
           ownedPlayback.current = {
             stream: prepared,
             settings: settingsRef.current,
           };
-          setToast(null);
           setActiveStream(prepared);
         })
         .catch((error: unknown) => {
@@ -3044,20 +3026,15 @@ export function AppProvider({
         quality: "Live",
         size: "",
         url: channel.streamUrl,
-        transport: "mpegts",
         description: channel.group,
         behaviorHints: { proxyHeaders: { request: channel.requestHeaders } },
       };
       recordChannelPlayback(channel);
       if (openLiveExternally(stream, channel.name)) return;
       setActiveChannel(channel);
-      playStream(stream, {
-        forceBrowser: true,
-        forceServerTranscode: true,
-        keepActiveChannel: true,
-      });
+      setActiveStream(stream);
     },
-    [openLiveExternally, playStream, recordChannelPlayback],
+    [openLiveExternally, recordChannelPlayback],
   );
 
   // Catch-up plays a finished programme from the panel's archive. It is a
