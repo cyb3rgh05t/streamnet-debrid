@@ -206,8 +206,11 @@ export async function probeSelfTranscodeDuration(
   try {
     const response = await fetch(target.toString(), { cache: "no-store" });
     if (!response.ok) return null;
-    const payload = (await response.json()) as { durationSeconds?: number | null };
-    return typeof payload.durationSeconds === "number" && payload.durationSeconds > 0
+    const payload = (await response.json()) as {
+      durationSeconds?: number | null;
+    };
+    return typeof payload.durationSeconds === "number" &&
+      payload.durationSeconds > 0
       ? payload.durationSeconds
       : null;
   } catch {

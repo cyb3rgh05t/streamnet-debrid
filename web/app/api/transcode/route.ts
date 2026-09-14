@@ -29,7 +29,8 @@ function json(value: unknown, status: number) {
 function resolveInternalUrl(rawUrl: string, requestOrigin: string): URL | null {
   try {
     const parsed = new URL(rawUrl, requestOrigin);
-    if (parsed.origin !== requestOrigin || parsed.pathname !== "/api/proxy") return null;
+    if (parsed.origin !== requestOrigin || parsed.pathname !== "/api/proxy")
+      return null;
     return new URL(`${parsed.pathname}${parsed.search}`, INTERNAL_ORIGIN);
   } catch {
     return null;
@@ -43,7 +44,15 @@ function resolveInternalUrl(rawUrl: string, requestOrigin: string): URL | null {
  * this once up front and carries the real length as `knownDurationSeconds`.
  */
 async function probeDuration(internalUrl: URL): Promise<Response> {
-  const args = ["-v", "error", "-show_entries", "format=duration", "-of", "json", internalUrl.toString()];
+  const args = [
+    "-v",
+    "error",
+    "-show_entries",
+    "format=duration",
+    "-of",
+    "json",
+    internalUrl.toString(),
+  ];
   const durationSeconds = await new Promise<number | null>((resolve) => {
     let out = "";
     let proc;
@@ -53,7 +62,9 @@ async function probeDuration(internalUrl: URL): Promise<Response> {
       resolve(null);
       return;
     }
-    proc.stdout.on("data", (chunk: Buffer) => { out += chunk.toString("utf8"); });
+    proc.stdout.on("data", (chunk: Buffer) => {
+      out += chunk.toString("utf8");
+    });
     proc.on("error", () => resolve(null));
     proc.on("close", () => {
       try {
@@ -77,10 +88,14 @@ export async function GET(request: NextRequest) {
 
   const internalUrl = resolveInternalUrl(raw, input.origin);
   if (!internalUrl) {
-    return json({ error: "Only an already-proxied /api/proxy URL may be transcoded" }, 400);
+    return json(
+      { error: "Only an already-proxied /api/proxy URL may be transcoded" },
+      400,
+    );
   }
 
-  if (input.searchParams.get("probe") === "1") return probeDuration(internalUrl);
+  if (input.searchParams.get("probe") === "1")
+    return probeDuration(internalUrl);
 
   if (active >= MAX_CONCURRENT) {
     return json(
