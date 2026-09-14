@@ -95,10 +95,24 @@ export function videoDecodableForDevice(stream: CompatStream) { return !videoRea
 export function audioDecodableForDevice(stream: CompatStream) {
   return !audioReason(stream) || (getMediaCapabilities().mse && !/true[ -]?hd|\bmlp\b/i.test(stream.media?.audioCodec || text(stream)));
 }
+// `audioReason()` only flags codecs it recognises by name in the filename/
+// description; an MKV with no audio tag at all (extremely common — AC-3/
+// E-AC-3/DTS almost never get mentioned) passes it "clean" by default. That
+// false "clean" used to be enough for native direct-play, so the browser's
+// own demuxer discovered the real, unplayable codec only after the video was
+// already rendering — silent audio with no error for 8+ seconds until the
+// silent-audio watchdog recovered it. Native MKV playback now needs a
+// codec the filename/description positively names as browser-safe, not just
+// the absence of a bad one; everything ambiguous goes straight to remux.
+function audioConfirmedSafe(stream: CompatStream): boolean {
+  if (audioReason(stream)) return false;
+  const audio = stream.media?.audioCodec?.toLowerCase() || text(stream);
+  return /\b(aac|mp3|opus|vorbis|flac|pcm)\b/.test(audio);
+}
 export function canDirectPlayMkvStream(stream: CompatStream): boolean {
   if (typeof navigator === "undefined" || /iPhone|iPad|iPod|CriOS|FxiOS/.test(navigator.userAgent)) return false;
   const version = navigator.userAgent.match(/(?:Chrome|Chromium|Edg)\/(\d+)/);
-  return !!version && Number(version[1]) >= 145 && /^(mkv|matroska)$/.test(streamContainer(stream)) && !hasDolbyVision(stream) && !videoReason(stream) && !audioReason(stream);
+  return !!version && Number(version[1]) >= 145 && /^(mkv|matroska)$/.test(streamContainer(stream)) && !hasDolbyVision(stream) && !videoReason(stream) && audioConfirmedSafe(stream);
 }
 export function canTryRemux(stream: CompatStream): boolean {
   return /^https?:/i.test(stream.url ?? "") && getMediaCapabilities().mse
