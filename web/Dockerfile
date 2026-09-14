@@ -22,13 +22,9 @@ ENV NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL=${NEXT_PUBLIC_STREAMNET_TV_XTREAM_URL}
 ENV NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL=${NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL}
 ENV NEXT_PUBLIC_TRAKT_CLIENT_ID=${NEXT_PUBLIC_TRAKT_CLIENT_ID}
 ENV NEXT_PUBLIC_BUILD_STAMP=${NEXT_PUBLIC_BUILD_STAMP}
-RUN if [ -n "$NEXT_PUBLIC_BUILD_STAMP" ]; then \
-			resolved="$(node -e 'const raw=process.argv[1];const n=Number(raw);const ms=Number.isFinite(n)?n:Date.parse(raw);if(!Number.isFinite(ms)){process.exit(1)}console.log(ms)' "$NEXT_PUBLIC_BUILD_STAMP")"; \
-			if [ -n "$resolved" ]; then \
-				printf '{ "v": "%s" }\n' "$resolved" > public/version.json; \
-				export NEXT_PUBLIC_BUILD_STAMP="$resolved"; \
-			fi; \
-		fi; \
+RUN resolved="$(node -e 'const raw=process.argv[1];const n=Number(raw);const ms=Number.isFinite(n)?n:Date.parse(raw);console.log(Number.isFinite(ms)?ms:Date.now())' "$NEXT_PUBLIC_BUILD_STAMP")"; \
+		printf '{ "v": "%s" }\n' "$resolved" > public/version.json; \
+		export NEXT_PUBLIC_BUILD_STAMP="$resolved"; \
 		npm run build
 
 FROM node:22-alpine AS runner
