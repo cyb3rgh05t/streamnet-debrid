@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { spawn } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rm, stat } from "node:fs/promises";
 import path from "node:path";
 import { createInternalMediaToken } from "@/lib/server/internalMedia";
@@ -22,8 +22,58 @@ let active = 0;
 const sessionRoot = path.join("/tmp", "streamnet-transcode");
 const sessions = new Map<
   string,
-  { directory: string; process: ReturnType<typeof spawn>; created: number }
+  {
+    directory: string;
+    process: ReturnType<typeof spawn>;
+    created: number;
+    lastAccess: number;
+    key: string;
+    running: boolean;
+  }
 >();
+const SESSION_TTL_MS = 30 * 60 * 1000;
+const MAX_RUNNING_SESSION_MS = 3 * 60 * 60 * 1000;
+
+function sessionKey(
+  url: string,
+  headers: Record<string, string>,
+  start: number,
+) {
+  return createHash("sha256")
+    .update(url)
+    .update(JSON.stringify(headers))
+    .update(String(start))
+    .digest("hex");
+}
+
+function removeSession(id: string, kill: boolean) {
+  const session = sessions.get(id);
+  if (!session) return;
+  sessions.delete(id);
+  if (kill && session.running) session.process.kill("SIGKILL");
+  if (session.running) {
+    session.running = false;
+    active--;
+  }
+  void rm(session.directory, { recursive: true, force: true });
+}
+
+const sessionJanitor = setInterval(
+  () => {
+    const now = Date.now();
+    for (const [id, session] of sessions) {
+      const age = now - session.created;
+      const idle = now - session.lastAccess;
+      if (
+        (session.running && age > MAX_RUNNING_SESSION_MS) ||
+        (!session.running && idle > SESSION_TTL_MS)
+      )
+        removeSession(id, true);
+    }
+  },
+  5 * 60 * 1000,
+);
+sessionJanitor.unref?.();
 
 function json(value: unknown, status: number) {
   return new Response(JSON.stringify(value), {
@@ -99,7 +149,8 @@ async function probeDuration(internalUrl: URL): Promise<Response> {
 export async function GET(request: NextRequest) {
   const input = new URL(request.url);
   const sessionId = input.searchParams.get("session");
-  if (sessionId) return serveSessionFile(sessionId, input.searchParams.get("file"));
+  if (sessionId)
+    return serveSessionFile(sessionId, input.searchParams.get("file"));
   const raw = input.searchParams.get("url");
   if (!raw) return json({ error: "Missing url" }, 400);
 
@@ -243,24 +294,84 @@ export async function POST(request: NextRequest) {
   }
   if (!body.url || !/^https?:/i.test(body.url))
     return json({ error: "A public HTTP media URL is required" }, 400);
-  if (active >= MAX_CONCURRENT) return json({ error: "Too many active transcodes" }, 429);
   const id = randomBytes(16).toString("hex");
   const directory = path.join(sessionRoot, id);
+  const startSeconds = Math.max(0, Math.floor(Number(body.startSeconds) || 0));
+  const key = sessionKey(body.url, body.headers ?? {}, startSeconds);
+  const existing = [...sessions.entries()].find(
+    ([, session]) => session.key === key,
+  );
+  if (existing) {
+    existing[1].lastAccess = Date.now();
+    return json(
+      {
+        sessionId: existing[0],
+        url: `/api/transcode?session=${existing[0]}&file=index.m3u8`,
+        startSeconds,
+      },
+      200,
+    );
+  }
+  if (active >= MAX_CONCURRENT)
+    return new Response(
+      JSON.stringify({ error: "Too many active transcodes" }),
+      {
+        status: 429,
+        headers: {
+          "content-type": "application/json",
+          "retry-after": "5",
+          "cache-control": "no-store",
+        },
+      },
+    );
   await mkdir(directory, { recursive: true });
   const internalUrl = resolveInternalUrl(body.url, body.headers ?? {});
-  if (!internalUrl) return json({ error: "Invalid media URL" }, 400);
-  const startSeconds = Math.max(0, Math.floor(Number(body.startSeconds) || 0));
+  if (!internalUrl) {
+    await rm(directory, { recursive: true, force: true });
+    return json({ error: "Invalid media URL" }, 400);
+  }
   const args = [
-    "-nostdin", "-hide_banner", "-loglevel", "error",
-    "-probesize", "5000000", "-analyzeduration", "5000000",
-    "-fflags", "+genpts+discardcorrupt", "-err_detect", "ignore_err",
+    "-nostdin",
+    "-hide_banner",
+    "-loglevel",
+    "error",
+    "-probesize",
+    "5000000",
+    "-analyzeduration",
+    "5000000",
+    "-fflags",
+    "+genpts+discardcorrupt",
+    "-err_detect",
+    "ignore_err",
     ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
-    "-i", internalUrl.toString(), "-map", "0:v:0", "-map", "0:a:0?",
-    "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2",
-    "-b:a", "192k", "-af", "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
-    "-f", "hls", "-hls_time", "4", "-hls_list_size", "0",
-    "-hls_flags", "independent_segments+append_list",
-    "-hls_segment_filename", path.join(directory, "segment-%06d.ts"),
+    "-i",
+    internalUrl.toString(),
+    "-map",
+    "0:v:0",
+    "-map",
+    "0:a:0?",
+    "-c:v",
+    "copy",
+    "-c:a",
+    "aac",
+    "-ar",
+    "48000",
+    "-ac",
+    "2",
+    "-b:a",
+    "192k",
+    "-af",
+    "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
+    "-f",
+    "hls",
+    "-hls_time",
+    "4",
+    "-hls_list_size",
+    "0",
+    "-hls_flags",
+    "independent_segments+append_list",
+    "-hls_segment_filename",
+    path.join(directory, "segment-%06d.ts"),
     path.join(directory, "index.m3u8"),
   ];
   let ff;
@@ -271,35 +382,45 @@ export async function POST(request: NextRequest) {
     return json({ error: "Server transcoder is unavailable" }, 502);
   }
   active++;
-  sessions.set(id, { directory, process: ff, created: Date.now() });
-  const cleanup = () => {
-    if (!sessions.has(id)) return;
-    sessions.delete(id);
-    void rm(directory, { recursive: true, force: true });
-  };
+  sessions.set(id, {
+    directory,
+    process: ff,
+    created: Date.now(),
+    lastAccess: Date.now(),
+    key,
+    running: true,
+  });
   ff.on("close", () => {
+    const session = sessions.get(id);
+    if (!session) return;
+    session.running = false;
     active--;
-    setTimeout(cleanup, 30 * 60 * 1000);
   });
   ff.on("error", () => {
-    active--;
-    cleanup();
+    removeSession(id, false);
   });
-  request.signal.addEventListener("abort", () => {
-    ff.kill("SIGKILL");
-    cleanup();
-  }, { once: true });
-  return json({
-    sessionId: id,
-    url: `/api/transcode?session=${id}&file=index.m3u8`,
-    startSeconds,
-  }, 201);
+  request.signal.addEventListener(
+    "abort",
+    () => {
+      removeSession(id, true);
+    },
+    { once: true },
+  );
+  return json(
+    {
+      sessionId: id,
+      url: `/api/transcode?session=${id}&file=index.m3u8`,
+      startSeconds,
+    },
+    201,
+  );
 }
 
 async function serveSessionFile(sessionId: string, requested: string | null) {
   const session = sessions.get(sessionId);
   if (!session) return json({ error: "Transcode session not found" }, 404);
-  const file = requested === "index.m3u8" ? requested : requested ?? "";
+  session.lastAccess = Date.now();
+  const file = requested === "index.m3u8" ? requested : (requested ?? "");
   if (!/^(index\.m3u8|segment-\d{6}\.ts)$/.test(file))
     return json({ error: "Invalid transcode file" }, 400);
   try {
@@ -312,7 +433,9 @@ async function serveSessionFile(sessionId: string, requested: string | null) {
           ? "application/vnd.apple.mpegurl"
           : "video/mp2t",
         "content-length": String(info.size),
-        "cache-control": file.endsWith(".m3u8") ? "no-store" : "private, max-age=31536000",
+        "cache-control": file.endsWith(".m3u8")
+          ? "no-store"
+          : "private, max-age=31536000",
         "access-control-allow-origin": "*",
       },
     });
