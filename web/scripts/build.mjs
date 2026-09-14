@@ -1,14 +1,14 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const env = { ...process.env };
 if (!env.NEXT_PUBLIC_BUILD_STAMP) {
-  const version = JSON.parse(
-    readFileSync(new URL("../public/version.json", import.meta.url), "utf8"),
-  );
-  const rawBuildStamp = String(version.v ?? "");
+  const versionFile = new URL("../public/version.json", import.meta.url);
+  const rawBuildStamp = existsSync(versionFile)
+    ? String(JSON.parse(readFileSync(versionFile, "utf8")).v ?? "")
+    : String(env.GITHUB_RUN_ID ?? Date.now());
   const parsedDate = Date.parse(rawBuildStamp);
   const buildStamp = /^\d+$/.test(rawBuildStamp)
     ? rawBuildStamp
