@@ -8152,6 +8152,30 @@ button,
   overflow: hidden;
 }
 
+.toast-preparing {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.toast-preparing::before {
+  content: "";
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  border: 2px solid
+    color-mix(in srgb, var(--accent, var(--orange)) 30%, transparent);
+  border-top-color: var(--accent, var(--orange));
+  border-radius: 50%;
+  animation: toast-preparing-spin 800ms linear infinite;
+}
+
+@keyframes toast-preparing-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .source-panel::before {
   content: "";
   position: absolute;

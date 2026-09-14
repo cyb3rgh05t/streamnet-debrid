@@ -2766,11 +2766,18 @@ export function AppProvider({
         return;
       }
       setToast(
-        stream.homeServer || options.forceTranscode
+        stream.homeServer ||
+          options.forceTranscode ||
+          options.forceSelfTranscode ||
+          options.forceServerTranscode
           ? localize(
               settingsRef.current.uiLanguage,
-              "Browser-Wiedergabe wird vorbereitet ...",
-              "Preparing browser playback...",
+              options.forceServerTranscode || options.forceSelfTranscode
+                ? "Server-Konvertierung wird vorbereitet ..."
+                : "Browser-Wiedergabe wird vorbereitet ...",
+              options.forceServerTranscode || options.forceSelfTranscode
+                ? "Preparing server conversion..."
+                : "Preparing browser playback...",
             )
           : null,
       );
@@ -2806,6 +2813,7 @@ export function AppProvider({
             stream: prepared,
             settings: settingsRef.current,
           };
+          setToast(null);
           setActiveStream(prepared);
         })
         .catch((error: unknown) => {
