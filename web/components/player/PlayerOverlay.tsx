@@ -411,6 +411,7 @@ function VideoPlayer({
       forceRemux?: boolean;
       forceBrowser?: boolean;
       forceSelfTranscode?: boolean;
+      forceServerTranscode?: boolean;
     },
   ) => void;
   onAdvance: () => Promise<boolean>;
@@ -440,6 +441,7 @@ function VideoPlayer({
         forceRemux?: boolean;
         forceBrowser?: boolean;
         forceSelfTranscode?: boolean;
+        forceServerTranscode?: boolean;
       },
     ) => {
       const video = videoRef.current;
@@ -765,7 +767,22 @@ function VideoPlayer({
         "This browser could not decode this source's audio track.",
         !!stream.transcoded,
       );
-      if (!liveTv) {
+      if (liveTv) {
+        if (!stream.transcoded && canSelfTranscode(stream.url)) {
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "Dieser Sender liefert keine decodierbare Tonspur. Server-Konvertierung wird angefordert.",
+              "This channel has no decodable audio track. Requesting server-side conversion.",
+            ),
+          );
+          onSelectStream(stream, {
+            forceServerTranscode: true,
+            forceBrowser: true,
+          });
+          return;
+        }
+      } else {
         if (!stream.transcoded && canProviderTranscode(stream)) {
           onToast(
             localize(
@@ -1684,9 +1701,7 @@ function VideoPlayer({
       // server-probed original length so the scrubber/remaining-time UI
       // isn't stuck showing Infinity.
       const finite = Number.isFinite(video.duration) && video.duration > 0;
-      setDuration(
-        stream.knownDurationSeconds ?? (finite ? video.duration : 0),
-      );
+      setDuration(stream.knownDurationSeconds ?? (finite ? video.duration : 0));
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);

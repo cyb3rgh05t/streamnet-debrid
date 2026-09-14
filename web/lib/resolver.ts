@@ -204,7 +204,10 @@ export async function createServerTranscodeSession(
       cache: "no-store",
     });
     if (!response.ok) return null;
-    const payload = (await response.json()) as { url?: string; startSeconds?: number };
+    const payload = (await response.json()) as {
+      url?: string;
+      startSeconds?: number;
+    };
     return payload.url
       ? { url: payload.url, startSeconds: payload.startSeconds ?? startSeconds }
       : null;

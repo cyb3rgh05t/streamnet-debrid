@@ -16,6 +16,9 @@
   --red: #e74c3c;
   --warning-orange: #f39c12;
   --imdb-yellow: #ffcd3c;
+  --accent: var(--orange);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-glow: color-mix(in srgb, var(--accent) 28%, transparent);
   --shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
 }
 
@@ -1019,8 +1022,9 @@ input:focus {
   margin: 0 0 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(0, 213, 136, 0.1);
-  border: 1px solid rgba(0, 213, 136, 0.24);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 10%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--accent, var(--orange)) 24%, transparent);
   font-size: 13px;
   color: rgba(255, 255, 255, 0.82);
 }
@@ -1029,8 +1033,8 @@ input:focus {
   padding: 8px 14px;
   border-radius: 9px;
   border: 0;
-  background: linear-gradient(90deg, #00d588, #09b3f0);
-  color: #04120c;
+  background: var(--accent, var(--orange));
+  color: #111;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -8138,6 +8142,7 @@ button,
   flex-direction: column;
   gap: 16px;
   border: 1px solid rgba(255, 255, 255, 0.16);
+  border-top-color: color-mix(in srgb, var(--accent) 68%, transparent);
   border-radius: 22px;
   background:
     linear-gradient(180deg, rgba(27, 31, 38, 0.96), rgba(5, 7, 10, 0.98)),
@@ -8145,6 +8150,16 @@ button,
   box-shadow: 0 34px 120px rgba(0, 0, 0, 0.68);
   padding: clamp(18px, 2.4vw, 30px);
   overflow: hidden;
+}
+
+.source-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 18% auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  opacity: 0.72;
+  pointer-events: none;
 }
 
 .source-panel-head {
@@ -8238,9 +8253,10 @@ button,
 .source-addon-tabs button.is-active,
 .source-filter-group button:hover,
 .source-addon-tabs button:hover {
-  color: #000;
-  background: #fff;
-  border-color: #fff;
+  color: #04120d;
+  background: var(--accent);
+  border-color: var(--accent);
+  box-shadow: 0 0 22px var(--accent-glow);
 }
 
 .source-addon-tabs {
@@ -8394,11 +8410,8 @@ button,
 }
 
 .source-action.primary-action {
-  background: color-mix(
-    in srgb,
-    var(--accent, #fff) 22%,
-    rgba(255, 255, 255, 0.08)
-  );
+  background: color-mix(in srgb, var(--accent) 22%, rgba(255, 255, 255, 0.08));
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 .source-action.icon-only {
@@ -8412,7 +8425,8 @@ button,
   outline: none;
   transform: translateY(-1px);
   border-color: color-mix(in srgb, var(--accent, #fff) 60%, transparent);
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--accent-soft);
+  box-shadow: 0 0 18px rgba(0, 213, 136, 0.14);
 }
 
 .source-action:disabled {
