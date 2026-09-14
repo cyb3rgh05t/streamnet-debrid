@@ -8324,6 +8324,44 @@ button,
   display: grid;
   place-items: center;
   background: rgba(255, 255, 255, 0.12);
+  .source-panel {
+    border-color: color-mix(
+      in srgb,
+      var(--accent, #fff) 38%,
+      transparent
+    ) !important;
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--accent, #fff) 12%, transparent),
+      0 34px 120px rgba(0, 0, 0, 0.68),
+      0 18px 70px color-mix(in srgb, var(--accent, #fff) 10%, transparent) !important;
+  }
+
+  .source-search:focus-within {
+    border-color: color-mix(in srgb, var(--accent, #fff) 68%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--accent, #fff) 18%, transparent);
+  }
+
+  .source-filter-group button.is-active,
+  .source-addon-tabs button.is-active {
+    color: #000;
+    background: var(--accent, #fff);
+    border-color: var(--accent, #fff);
+  }
+
+  .source-filter-group button:hover,
+  .source-addon-tabs button:hover {
+    color: #000;
+    background: color-mix(in srgb, var(--accent, #fff) 78%, #fff);
+    border-color: var(--accent, #fff);
+  }
+
+  .source-rank {
+    color: #000;
+    background: var(--accent, #fff) !important;
+    box-shadow: 0 0 0 4px
+      color-mix(in srgb, var(--accent, #fff) 14%, transparent);
+  }
   font-weight: 850;
 }
 
