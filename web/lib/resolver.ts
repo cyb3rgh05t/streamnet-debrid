@@ -109,6 +109,17 @@ const REMUX_PROXY_HOSTNAMES = [config.streamnetTvXtreamUrl]
   })
   .filter((value): value is string => !!value);
 
+// XUI.one (our IPTV panel software) rejects any request with no/empty
+// User-Agent ("EMPTY_USER_AGENT — Empty user-agents are disallowed."),
+// serving an HTML error page with a 200 status instead of the file. VOD
+// streams normally carry no proxyHeaders at all (unlike LiveTV, which sets
+// its own), so the resolver forwarded nothing and got this HTML back where
+// mediabunny expected a media container.
+const DEFAULT_REMUX_HEADERS: Record<string, string> = {
+  accept: "*/*",
+  "user-agent": "VLC/3.0.20 LibVLC/3.0.20",
+};
+
 /**
  * Fetch target for the in-browser remux worker.
  *
@@ -135,8 +146,10 @@ export function remuxFetchTarget(
   } catch {
     return { url, headers };
   }
-  return { url: resolverMediaUrl(url, headers) ?? url, headers: undefined };
+  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
+  return { url: resolverMediaUrl(url, forwarded) ?? url, headers: undefined };
 }
+
 
 // External-player launch interstitial: iOS home-screen webapps silently drop
 // custom-scheme navigations, but the Safari sheet they open for https links can
