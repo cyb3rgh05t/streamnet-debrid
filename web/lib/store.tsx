@@ -796,6 +796,7 @@ export interface AppStore {
       forceRemux?: boolean;
       forceBrowser?: boolean;
       forceSelfTranscode?: boolean;
+      forceServerTranscode?: boolean;
     },
   ) => void;
   playTrailer: (item: MediaItem) => Promise<void>;
