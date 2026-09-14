@@ -58,7 +58,7 @@ export async function prepareBrowserStream(
     // finite while it's being streamed live from ffmpeg (see PlayerOverlay's
     // capturePosition). Best-effort: playback still works if this fails.
     const knownDurationSeconds =
-      stream.transport === "mpegts"
+      !options.forceSelfTranscode || stream.transport === "mpegts"
         ? null
         : await probeSelfTranscodeDuration(
             sourceUrl,

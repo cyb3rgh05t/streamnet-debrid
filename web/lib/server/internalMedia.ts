@@ -1,7 +1,7 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SECRET =
-  process.env.STREAMNET_INTERNAL_MEDIA_SECRET ?? "streamnet-local-media";
+  process.env.STREAMNET_INTERNAL_MEDIA_SECRET ?? randomBytes(32).toString("hex");
 const MAX_AGE_SECONDS = 10 * 60;
 
 type MediaTarget = {
