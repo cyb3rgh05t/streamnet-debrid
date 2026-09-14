@@ -70,6 +70,7 @@ import {
   bufferedEndAt,
   classifyMediaError,
   isStalled,
+  monitorSilentAudio,
   monitorVideoFrames,
   nextStallAction,
 } from "@/lib/playerRecovery";
@@ -722,7 +723,53 @@ function VideoPlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, stream.url, remuxRestartKey, liveTv]);
 
-  // Live cue translation: when AI subs are active, the selected (English
+  // Recover when the video decodes fine but its audio track never produces
+  // sound. Undocumented AC-3/E-AC-3/DTS audio (no codec hint in the channel
+  // name, filename or description) passes the text-based compatibility check
+  // as "direct playable" — the browser then plays the video and silently
+  // drops the track it cannot decode, with no error event to react to.
+  useEffect(() => {
+    if (!booted || stream.remux) return undefined;
+    const video = videoRef.current;
+    if (!video) return undefined;
+    return monitorSilentAudio(video, () => {
+      recordBrowserPlaybackFailure(
+        stream,
+        "This browser could not decode this source's audio track.",
+        !!stream.transcoded,
+      );
+      if (!liveTv) {
+        if (!stream.transcoded && canProviderTranscode(stream)) {
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "Es wurde kein Ton decodiert. Eine Konvertierung beim Anbieter wird angefordert.",
+              "No audio decoded. Requesting provider conversion for this source.",
+            ),
+          );
+          onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
+          return;
+        }
+        if (canTryRemux(stream)) {
+          const playhead = video.currentTime;
+          if (playhead > 5) resumeAtRef.current = playhead;
+          onSelectStream(stream, { forceRemux: true });
+          return;
+        }
+        if (tryNextSource()) return;
+      }
+      setShowControls(true);
+      onToast(
+        localize(
+          settings.uiLanguage,
+          "Das Bild wird angezeigt, aber der Browser kann die Tonspur dieser Quelle nicht decodieren. Nutze einen externen Player für Ton.",
+          "Video plays but this browser cannot decode this source's audio track. Use an external player for sound.",
+        ),
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booted, stream.url, remuxRestartKey, liveTv]);
+
   // source) track's cues are translated in small batches and swapped in place;
   // upcoming cues are pre-warmed so swaps land before display. Mirrors the
   // app's SubtitleTranslationManager.

@@ -83,7 +83,10 @@ export function isStalled(opts: {
 }
 
 /** Detect audio advancing without video, including streams with known dimensions. */
-export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => void): () => void {
+export function monitorVideoFrames(
+  video: HTMLVideoElement,
+  onMissing: () => void,
+): () => void {
   let stopped = false;
   let frame: number | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -99,15 +102,25 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
   const decodedFrame = () => {
     try {
       const quality = video.getVideoPlaybackQuality?.();
-      return quality && quality.totalVideoFrames - quality.droppedVideoFrames > 0;
-    } catch { return false; }
+      return (
+        quality && quality.totalVideoFrames - quality.droppedVideoFrames > 0
+      );
+    } catch {
+      return false;
+    }
   };
   if (video.requestVideoFrameCallback) {
-    frame = video.requestVideoFrameCallback(() => { presented = true; stop(); });
+    frame = video.requestVideoFrameCallback(() => {
+      presented = true;
+      stop();
+    });
   }
   timer = setInterval(() => {
     if (stopped) return;
-    if (presented || decodedFrame()) { stop(); return; }
+    if (presented || decodedFrame()) {
+      stop();
+      return;
+    }
     const now = Date.now();
     const advancing = video.currentTime > lastTime;
     const elapsed = Math.min(2000, Math.max(0, now - lastCheck));
@@ -115,15 +128,124 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
     lastTime = video.currentTime;
     // Background tabs may intentionally stop presenting frames. Pauses, seeks
     // and ordinary buffering must not consume the missing-video grace period.
-    if (document.visibilityState === "hidden" || video.paused || video.seeking || video.ended || !advancing) {
+    if (
+      document.visibilityState === "hidden" ||
+      video.paused ||
+      video.seeking ||
+      video.ended ||
+      !advancing
+    ) {
       framelessPlayingMs = 0;
       return;
     }
-    const hasFrameTelemetry = !!video.requestVideoFrameCallback || !!video.getVideoPlaybackQuality;
-    if (!hasFrameTelemetry && video.videoWidth > 0) { stop(); return; }
+    const hasFrameTelemetry =
+      !!video.requestVideoFrameCallback || !!video.getVideoPlaybackQuality;
+    if (!hasFrameTelemetry && video.videoWidth > 0) {
+      stop();
+      return;
+    }
     framelessPlayingMs += elapsed;
-    if (framelessPlayingMs >= 12000) { stop(); onMissing(); }
+    if (framelessPlayingMs >= 12000) {
+      stop();
+      onMissing();
+    }
   }, 1500);
+  return stop;
+}
+
+// One tap per <video> element, reused across source reloads on the same
+// element — a second createMediaElementSource() call on the same element
+// throws, and the element persists across attachPlayback() reattachments.
+const audioTaps = new WeakMap<
+  HTMLVideoElement,
+  { ctx: AudioContext; analyser: AnalyserNode }
+>();
+
+/**
+ * Detect a video that is decoding and rendering frames while its audio track
+ * never produces sound.
+ *
+ * Many IPTV panels and scene releases carry AC-3/E-AC-3/DTS audio with no
+ * codec hint anywhere in the channel name, filename or description — the
+ * text-based heuristics in streamCompatibility.ts wave these through as
+ * "direct playable", so the browser plays the video track and silently drops
+ * the audio track it cannot decode. No `error` event fires because the
+ * element is, technically, playing successfully. An `AnalyserNode` tapped
+ * onto the element's real output is the only way to tell "no audio track" and
+ * "audio track nobody can hear" apart.
+ */
+export function monitorSilentAudio(
+  video: HTMLVideoElement,
+  onSilent: () => void,
+): () => void {
+  let stopped = false;
+  let timer: ReturnType<typeof setInterval> | undefined;
+  let silentMs = 0;
+  let lastCheck = Date.now();
+  const stop = () => {
+    stopped = true;
+    if (timer !== undefined) clearInterval(timer);
+  };
+  let analyser: AnalyserNode;
+  try {
+    const AudioCtx =
+      window.AudioContext ??
+      (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return stop;
+    let tap = audioTaps.get(video);
+    if (!tap) {
+      const ctx = new AudioCtx();
+      const node = ctx.createAnalyser();
+      node.fftSize = 512;
+      // Route through the analyser so the tap never mutes the element:
+      // .volume/.muted on the source element still apply upstream of it.
+      ctx
+        .createMediaElementSource(video)
+        .connect(node)
+        .connect(ctx.destination);
+      tap = { ctx, analyser: node };
+      audioTaps.set(video, tap);
+    }
+    analyser = tap.analyser;
+    if (tap.ctx.state === "suspended")
+      void tap.ctx.resume().catch(() => undefined);
+  } catch {
+    // Autoplay-gated AudioContext, an already-tapped element from another
+    // caller, or a browser without Web Audio — never block playback for this.
+    return stop;
+  }
+  const data = new Uint8Array(analyser.fftSize);
+  timer = setInterval(() => {
+    if (stopped) return;
+    const now = Date.now();
+    const elapsed = Math.min(2000, Math.max(0, now - lastCheck));
+    lastCheck = now;
+    if (
+      document.visibilityState === "hidden" ||
+      video.paused ||
+      video.seeking ||
+      video.ended ||
+      video.muted ||
+      video.volume === 0
+    ) {
+      silentMs = 0;
+      return;
+    }
+    analyser.getByteTimeDomainData(data);
+    let peak = 0;
+    for (let i = 0; i < data.length; i += 1)
+      peak = Math.max(peak, Math.abs(data[i] - 128));
+    if (peak > 2) {
+      silentMs = 0;
+      return;
+    } // Real signal, above quantization noise floor.
+    silentMs += elapsed;
+    if (silentMs >= 8000) {
+      stop();
+      onSilent();
+    }
+  }, 1000);
   return stop;
 }
 
@@ -134,7 +256,10 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
  * LAST range — which misreports badly after seeking backwards, when the range
  * containing the playhead is no longer the last one.
  */
-export function bufferedAhead(ranges: TimeRanges | null, currentTime: number): number {
+export function bufferedAhead(
+  ranges: TimeRanges | null,
+  currentTime: number,
+): number {
   if (!ranges) return 0;
   for (let i = 0; i < ranges.length; i += 1) {
     if (currentTime >= ranges.start(i) && currentTime <= ranges.end(i)) {
@@ -157,7 +282,9 @@ export function bufferedAhead(ranges: TimeRanges | null, currentTime: number): n
  */
 export type MediaFaultKind = "retryable" | "fatal";
 
-export function classifyMediaError(code: number | null | undefined): MediaFaultKind {
+export function classifyMediaError(
+  code: number | null | undefined,
+): MediaFaultKind {
   // DECODE (3) and SRC_NOT_SUPPORTED (4) mean this browser genuinely cannot
   // play these bytes; retrying the same URL will fail the same way.
   if (code === 3 || code === 4) return "fatal";
@@ -167,7 +294,10 @@ export function classifyMediaError(code: number | null | undefined): MediaFaultK
 }
 
 /** End of the buffered range holding the playhead, for the scrubber's buffer bar. */
-export function bufferedEndAt(ranges: TimeRanges | null, currentTime: number): number {
+export function bufferedEndAt(
+  ranges: TimeRanges | null,
+  currentTime: number,
+): number {
   if (!ranges) return 0;
   for (let i = 0; i < ranges.length; i += 1) {
     if (currentTime >= ranges.start(i) && currentTime <= ranges.end(i)) {
