@@ -154,7 +154,11 @@ function streamMeta(stream: StreamSource) {
 
 function isLikelyHlsUrl(url?: string | null) {
   if (!url) return false;
-  return /\.m3u8(?:[?#]|$)/i.test(url) || url.toLowerCase().includes("mpegurl");
+  return (
+    /\.m3u8(?:[?#]|$)/i.test(url) ||
+    url.toLowerCase().includes("mpegurl") ||
+    url.includes("/api/transcode?session=")
+  );
 }
 
 // Xtream panels serve the same live stream as HLS at …/id.m3u8. Playlists with
@@ -1680,7 +1684,9 @@ function VideoPlayer({
       // server-probed original length so the scrubber/remaining-time UI
       // isn't stuck showing Infinity.
       const finite = Number.isFinite(video.duration) && video.duration > 0;
-      setDuration(finite ? video.duration : (stream.knownDurationSeconds ?? 0));
+      setDuration(
+        stream.knownDurationSeconds ?? (finite ? video.duration : 0),
+      );
     };
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
@@ -1790,6 +1796,19 @@ function VideoPlayer({
     };
     const capturePosition = () => {
       if (
+        stream.knownDurationSeconds &&
+        stream.knownDurationSeconds > 0 &&
+        Number.isFinite(video.currentTime)
+      ) {
+        const offset = stream.selfTranscodeStartOffset ?? 0;
+        lastPosition = {
+          position: Math.min(
+            video.currentTime + offset,
+            stream.knownDurationSeconds,
+          ),
+          duration: stream.knownDurationSeconds,
+        };
+      } else if (
         Number.isFinite(video.duration) &&
         video.duration > 0 &&
         Number.isFinite(video.currentTime)
@@ -1798,23 +1817,6 @@ function VideoPlayer({
         lastPosition = {
           position: video.currentTime + offset,
           duration: video.duration + offset,
-        };
-      } else if (
-        stream.knownDurationSeconds &&
-        stream.knownDurationSeconds > 0 &&
-        Number.isFinite(video.currentTime)
-      ) {
-        // Self-transcoded stream (web/app/api/transcode): `video.duration`
-        // never becomes finite while ffmpeg is still writing it, so the
-        // real, server-probed length of the ORIGINAL file is the only
-        // duration Continue Watching progress has to divide by.
-        const offset = stream.selfTranscodeStartOffset ?? 0;
-        lastPosition = {
-          position: Math.min(
-            video.currentTime + offset,
-            stream.knownDurationSeconds,
-          ),
-          duration: stream.knownDurationSeconds,
         };
       }
       return lastPosition;

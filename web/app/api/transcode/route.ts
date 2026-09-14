@@ -1,5 +1,8 @@
 import { NextRequest } from "next/server";
 import { spawn } from "node:child_process";
+import { randomBytes } from "node:crypto";
+import { mkdir, readFile, rm, stat } from "node:fs/promises";
+import path from "node:path";
 import { createInternalMediaToken } from "@/lib/server/internalMedia";
 
 // Last-resort server-side fallback: when a source's audio codec can be
@@ -16,6 +19,11 @@ export const runtime = "nodejs";
 const INTERNAL_ORIGIN = "http://127.0.0.1:3000";
 const MAX_CONCURRENT = 4;
 let active = 0;
+const sessionRoot = path.join("/tmp", "streamnet-transcode");
+const sessions = new Map<
+  string,
+  { directory: string; process: ReturnType<typeof spawn>; created: number }
+>();
 
 function json(value: unknown, status: number) {
   return new Response(JSON.stringify(value), {
@@ -90,6 +98,8 @@ async function probeDuration(internalUrl: URL): Promise<Response> {
 
 export async function GET(request: NextRequest) {
   const input = new URL(request.url);
+  const sessionId = input.searchParams.get("session");
+  if (sessionId) return serveSessionFile(sessionId, input.searchParams.get("file"));
   const raw = input.searchParams.get("url");
   if (!raw) return json({ error: "Missing url" }, 400);
 
@@ -218,6 +228,97 @@ export async function GET(request: NextRequest) {
       "access-control-allow-origin": "*",
     },
   });
+}
+
+export async function POST(request: NextRequest) {
+  let body: {
+    url?: string;
+    headers?: Record<string, string>;
+    startSeconds?: number;
+  };
+  try {
+    body = (await request.json()) as typeof body;
+  } catch {
+    return json({ error: "Invalid request" }, 400);
+  }
+  if (!body.url || !/^https?:/i.test(body.url))
+    return json({ error: "A public HTTP media URL is required" }, 400);
+  if (active >= MAX_CONCURRENT) return json({ error: "Too many active transcodes" }, 429);
+  const id = randomBytes(16).toString("hex");
+  const directory = path.join(sessionRoot, id);
+  await mkdir(directory, { recursive: true });
+  const internalUrl = resolveInternalUrl(body.url, body.headers ?? {});
+  if (!internalUrl) return json({ error: "Invalid media URL" }, 400);
+  const startSeconds = Math.max(0, Math.floor(Number(body.startSeconds) || 0));
+  const args = [
+    "-nostdin", "-hide_banner", "-loglevel", "error",
+    "-probesize", "5000000", "-analyzeduration", "5000000",
+    "-fflags", "+genpts+discardcorrupt", "-err_detect", "ignore_err",
+    ...(startSeconds > 0 ? ["-ss", String(startSeconds)] : []),
+    "-i", internalUrl.toString(), "-map", "0:v:0", "-map", "0:a:0?",
+    "-c:v", "copy", "-c:a", "aac", "-ar", "48000", "-ac", "2",
+    "-b:a", "192k", "-af", "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
+    "-f", "hls", "-hls_time", "4", "-hls_list_size", "0",
+    "-hls_flags", "independent_segments+append_list",
+    "-hls_segment_filename", path.join(directory, "segment-%06d.ts"),
+    path.join(directory, "index.m3u8"),
+  ];
+  let ff;
+  try {
+    ff = spawn("ffmpeg", args, { stdio: ["ignore", "ignore", "pipe"] });
+  } catch {
+    await rm(directory, { recursive: true, force: true });
+    return json({ error: "Server transcoder is unavailable" }, 502);
+  }
+  active++;
+  sessions.set(id, { directory, process: ff, created: Date.now() });
+  const cleanup = () => {
+    if (!sessions.has(id)) return;
+    sessions.delete(id);
+    void rm(directory, { recursive: true, force: true });
+  };
+  ff.on("close", () => {
+    active--;
+    setTimeout(cleanup, 30 * 60 * 1000);
+  });
+  ff.on("error", () => {
+    active--;
+    cleanup();
+  });
+  request.signal.addEventListener("abort", () => {
+    ff.kill("SIGKILL");
+    cleanup();
+  }, { once: true });
+  return json({
+    sessionId: id,
+    url: `/api/transcode?session=${id}&file=index.m3u8`,
+    startSeconds,
+  }, 201);
+}
+
+async function serveSessionFile(sessionId: string, requested: string | null) {
+  const session = sessions.get(sessionId);
+  if (!session) return json({ error: "Transcode session not found" }, 404);
+  const file = requested === "index.m3u8" ? requested : requested ?? "";
+  if (!/^(index\.m3u8|segment-\d{6}\.ts)$/.test(file))
+    return json({ error: "Invalid transcode file" }, 400);
+  try {
+    const filePath = path.join(session.directory, file);
+    const info = await stat(filePath);
+    const data = await readFile(filePath);
+    return new Response(data, {
+      headers: {
+        "content-type": file.endsWith(".m3u8")
+          ? "application/vnd.apple.mpegurl"
+          : "video/mp2t",
+        "content-length": String(info.size),
+        "cache-control": file.endsWith(".m3u8") ? "no-store" : "private, max-age=31536000",
+        "access-control-allow-origin": "*",
+      },
+    });
+  } catch {
+    return json({ error: "Transcode file is not ready" }, 404);
+  }
 }
 
 function decodeHeaders(raw: string | null): Record<string, string> {

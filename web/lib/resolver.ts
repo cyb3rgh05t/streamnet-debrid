@@ -189,6 +189,30 @@ export function selfTranscodeUrl(
   return target.toString();
 }
 
+export async function createServerTranscodeSession(
+  url: string,
+  headers?: Record<string, string>,
+  startSeconds = 0,
+): Promise<{ url: string; startSeconds: number } | null> {
+  if (!canSelfTranscode(url) || typeof window === "undefined") return null;
+  const forwarded = { ...DEFAULT_REMUX_HEADERS, ...headers };
+  try {
+    const response = await fetch("/api/transcode", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url, headers: forwarded, startSeconds }),
+      cache: "no-store",
+    });
+    if (!response.ok) return null;
+    const payload = (await response.json()) as { url?: string; startSeconds?: number };
+    return payload.url
+      ? { url: payload.url, startSeconds: payload.startSeconds ?? startSeconds }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The transcode output is a plain streamed response with no duration of its
  * own — `<video>.duration` never becomes finite while it plays. Ask the
