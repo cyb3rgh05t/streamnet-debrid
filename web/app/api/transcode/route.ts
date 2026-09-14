@@ -294,8 +294,60 @@ export async function GET(request: NextRequest) {
     active--;
   };
 
+  let stderr = "";
+  ff.stderr.on("data", (chunk: Buffer) => {
+    stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4000);
+  });
+
+  // Committing to a 200 response before ffmpeg produces any bytes hides real
+  // startup failures: if the upstream fetch fails, ffmpeg exits with nothing
+  // written, the stream ends with no data, and a reverse proxy in front of
+  // this server reports that as an opaque 502 with no error detail at all.
+  // Wait for the first chunk (or a fast failure) before deciding the status.
+  const first = await new Promise<{ chunk?: Buffer; failed?: true }>(
+    (resolve) => {
+      let settled = false;
+      const onData = (chunk: Buffer) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve({ chunk });
+      };
+      const onExit = () => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve({ failed: true });
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        ff.stdout.off("data", onData);
+        ff.off("close", onExit);
+        ff.off("error", onExit);
+      };
+      const timer = setTimeout(onExit, 20_000);
+      ff.stdout.once("data", onData);
+      ff.once("close", onExit);
+      ff.once("error", onExit);
+    },
+  );
+
+  if (first.failed) {
+    ff.kill("SIGKILL");
+    release();
+    const detail = stderr.split("\n").filter(Boolean).slice(-6).join(" ");
+    return json({ error: "Server transcoder failed to start", detail }, 502);
+  }
+
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
+      if (first.chunk) {
+        try {
+          controller.enqueue(new Uint8Array(first.chunk));
+        } catch {
+          // Controller already closed (client disconnected mid-stream).
+        }
+      }
       ff.stdout.on("data", (chunk: Buffer) => {
         try {
           controller.enqueue(new Uint8Array(chunk));
@@ -307,7 +359,11 @@ export async function GET(request: NextRequest) {
         release();
         try {
           if (code && code !== 0)
-            controller.error(new Error(`ffmpeg exited with code ${code}`));
+            controller.error(
+              new Error(
+                `ffmpeg exited with code ${code}: ${stderr.split("\n").filter(Boolean).slice(-3).join(" ")}`,
+              ),
+            );
           else controller.close();
         } catch {
           // Already closed/errored.
