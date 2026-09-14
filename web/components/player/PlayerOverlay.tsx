@@ -741,6 +741,14 @@ function VideoPlayer({
     const video = videoRef.current;
     if (!video) return undefined;
     return monitorSilentAudio(video, () => {
+      // eslint-disable-next-line no-console -- temporary diagnostic, remove once confirmed live
+      console.debug("[silent-audio] fired", {
+        url: stream.url,
+        liveTv,
+        transcoded: stream.transcoded,
+        canProviderTranscode: canProviderTranscode(stream),
+        canTryRemux: canTryRemux(stream),
+      });
       recordBrowserPlaybackFailure(
         stream,
         "This browser could not decode this source's audio track.",

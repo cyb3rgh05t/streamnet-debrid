@@ -192,8 +192,13 @@ export function monitorSilentAudio(
   // Only Chromium exposes this counter. Without it there is no safe way to
   // tell "no audio track" apart from "audio track nobody can hear" — skip
   // rather than risk a false positive on browsers we cannot verify.
-  if (typeof withByteCount.webkitAudioDecodedByteCount !== "number")
+  if (typeof withByteCount.webkitAudioDecodedByteCount !== "number") {
+    // eslint-disable-next-line no-console -- temporary diagnostic, remove once confirmed live
+    console.debug(
+      "[silent-audio] webkitAudioDecodedByteCount unavailable, watchdog disabled",
+    );
     return stop;
+  }
   timer = setInterval(() => {
     if (stopped) return;
     const now = Date.now();
@@ -223,6 +228,8 @@ export function monitorSilentAudio(
       return;
     }
     silentMs += elapsed;
+    // eslint-disable-next-line no-console -- temporary diagnostic, remove once confirmed live
+    console.debug("[silent-audio]", { bytes, silentMs, paused: video.paused });
     if (silentMs >= 8000) {
       stop();
       onSilent();
