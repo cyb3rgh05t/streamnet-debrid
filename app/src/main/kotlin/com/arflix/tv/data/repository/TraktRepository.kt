@@ -2379,7 +2379,7 @@ class TraktRepository @Inject constructor(
             )) {
             return
         }
-        val hasMeaningfulPosition = positionSeconds >= 60L
+        val hasMeaningfulPosition = positionSeconds >= Constants.MEANINGFUL_POSITION_SECONDS
 
         // Keep accidental taps out, but still keep real partial sessions on long content
         // where percent can be low while position is already meaningful.
@@ -4731,7 +4731,16 @@ data class ContinueWatchingItem(
         }
         // Some providers persist the exact position but leave their percentage at 0.
         // Prefer the derived value so Home cards can render the same progress state.
-        val effectiveProgress = maxOf(progress, positionProgress).coerceIn(0, 100)
+        val roundedProgress = maxOf(progress, positionProgress).coerceIn(0, 100)
+        // A real, meaningful resume position still rounds to 0% on long content;
+        // bump it to a thin visible sliver instead of hiding the progress bar.
+        val effectiveProgress = if (roundedProgress == 0 && !isUpNext &&
+            resumePositionSeconds >= Constants.MEANINGFUL_POSITION_SECONDS
+        ) {
+            Constants.MIN_VISIBLE_PROGRESS_PERCENT
+        } else {
+            roundedProgress
+        }
         val showPlaybackProgress = !isUpNext && effectiveProgress in 1..94
         val resumeSeconds = when {
             resumePositionSeconds > 0L -> resumePositionSeconds

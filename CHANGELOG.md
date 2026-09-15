@@ -2,6 +2,17 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.018] - 2026-09-15
+
+### Continue Watching bei sehr kurzen Sitzungen
+
+- Kurz angespielte Filme/Episoden (ab ca. 10 Sekunden Position) erscheinen jetzt zuverlässig in „Weiter ansehen“ auf Android UND im Web, auch wenn die gerundete Prozentzahl bei langem Content noch 0 % anzeigt. Zuvor filterte das Web solche Einträge komplett aus der Kachelliste heraus, obwohl Android sie bereits lokal speicherte und synchronisierte.
+- Ist die reale Fortschrittsprozentzahl unter 1 %, aber eine echte Wiedergabeposition vorhanden, zeigen beide Plattformen jetzt einen sichtbaren, minimalen Fortschrittsbalken (Sliver) statt eines leeren Balkens.
+- Die Web-Detailansicht bietet in diesem Fall „Fortsetzen“ statt „Abspielen“ als Button-Beschriftung an.
+- Sitzungen unter 10 Sekunden bleiben weiterhin als vermutlich unbeabsichtigter Tastendruck ausgeblendet.
+- Doku: `docs/superpowers/continue-watching-sub-one-percent-2026-09-15.md`.
+- Android-Version: `2.5.018` (`versionCode` 420); Web-Version: `1.0.018`.
+
 ## [2.5.017] - 2026-09-15
 
 ### Xtream-VOD-Quellenpriorität

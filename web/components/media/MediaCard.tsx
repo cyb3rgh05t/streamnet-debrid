@@ -5,6 +5,8 @@ import { memo, useEffect, useRef, useState } from "react";
 import { accentColor } from "@/lib/accent";
 import {
   continueWatchingProgressPercent,
+  MEANINGFUL_RESUME_POSITION_SECONDS,
+  MIN_VISIBLE_PROGRESS_PERCENT,
   shouldShowContinueWatchingProgress,
 } from "@/lib/continueWatching";
 import { useApp } from "@/lib/store";
@@ -114,7 +116,18 @@ function MediaCardBase({
   // reads as "you're 40% into that episode", which is wrong. Those rows get the
   // "Up next" chip instead; the bar stays for genuinely resumable items.
   const isUpNext = item.timeRemainingLabel === "Up next";
-  const showProgress = shouldShowContinueWatchingProgress(progress, isUpNext);
+  const hasMeaningfulPosition =
+    (item.resumePositionSeconds ?? 0) >= MEANINGFUL_RESUME_POSITION_SECONDS;
+  const showProgress = shouldShowContinueWatchingProgress(
+    progress,
+    isUpNext,
+    hasMeaningfulPosition,
+  );
+  // A real but sub-1% resume still needs a visible sliver, not an empty bar.
+  const progressBarWidth =
+    showProgress && progress < MIN_VISIBLE_PROGRESS_PERCENT
+      ? MIN_VISIBLE_PROGRESS_PERCENT
+      : progress;
   const isContinueWatchingCard =
     isUpNext || showProgress || Boolean(item.timeRemainingLabel);
   const watched = storedWatched && !isContinueWatchingCard;
@@ -350,7 +363,7 @@ function MediaCardBase({
           <span className="cw-progress">
             <span
               style={{
-                width: `${progress}%`,
+                width: `${progressBarWidth}%`,
                 backgroundColor: accentColor(settings.accentColor),
               }}
             />

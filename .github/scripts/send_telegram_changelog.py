@@ -12,6 +12,7 @@ from pathlib import Path
 
 MAX_BODY_LENGTH = 3_200
 SECTION_HEADING = re.compile(r"^## \[([^]]+)](?:\s+-.*)?$")
+INLINE_CODE = re.compile(r"`([^`]+)`")
 
 
 def required_environment(name: str) -> str:
@@ -80,6 +81,18 @@ def read_changelog_section(path: Path, version: str) -> str:
     return text
 
 
+def render_inline_markdown(text: str) -> str:
+    """Escape HTML and turn markdown `code` spans into Telegram <code> tags."""
+    parts: list[str] = []
+    last_end = 0
+    for match in INLINE_CODE.finditer(text):
+        parts.append(html.escape(text[last_end : match.start()]))
+        parts.append(f"<code>{html.escape(match.group(1))}</code>")
+        last_end = match.end()
+    parts.append(html.escape(text[last_end:]))
+    return "".join(parts)
+
+
 def format_changelog_line(line: str) -> str:
     stripped = line.strip()
     if not stripped:
@@ -87,13 +100,13 @@ def format_changelog_line(line: str) -> str:
 
     heading = re.match(r"^#{1,6}\s+(.+)$", stripped)
     if heading:
-        return f"<b>{html.escape(heading.group(1))}</b>"
+        return f"<b>{render_inline_markdown(heading.group(1))}</b>"
 
     bullet = re.match(r"^[-*]\s+(.+)$", stripped)
     if bullet:
-        return f"• {html.escape(bullet.group(1))}"
+        return f"• {render_inline_markdown(bullet.group(1))}"
 
-    return html.escape(stripped)
+    return render_inline_markdown(stripped)
 
 
 def split_changelog(changelog: str) -> list[str]:

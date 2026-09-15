@@ -77,6 +77,23 @@ class ContinueWatchingItemTest {
     }
 
     @Test
+    fun toMediaItem_bumpsSubOnePercentResumeToVisibleSliver() {
+        val item = ContinueWatchingItem(
+            id = 123,
+            title = "Long Movie",
+            mediaType = MediaType.MOVIE,
+            progress = 0,
+            resumePositionSeconds = 15L,
+            durationSeconds = 10800L
+        )
+
+        val mediaItem = item.toMediaItem()
+
+        assertEquals(2, mediaItem.progress)
+        assertEquals(true, mediaItem.showPlaybackProgress)
+    }
+
+    @Test
     fun toMediaItem_resolvesRelativeTmdbArtworkPaths() {
         val relativeArtwork = ContinueWatchingItem(
             id = 123,

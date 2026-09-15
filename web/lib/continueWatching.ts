@@ -105,10 +105,24 @@ export function isUnwatchedContinueWatching(
   return !watchedKeys.has(key);
 }
 
+// Matches the Android app's own "hasMeaningfulPosition" bypass: a rounded
+// percentage can read as 0% early into long content even though the device
+// already saved (and pushed) a real resume position — that must not make the
+// card vanish entirely.
+export const MEANINGFUL_RESUME_POSITION_SECONDS = 10;
+
+// Once a session is meaningful, the bar renders at least this wide so a sub-1%
+// resume shows a visible sliver instead of an empty bar.
+export const MIN_VISIBLE_PROGRESS_PERCENT = 2;
+
 export function isPausedContinueWatchingItem(item: MediaItem): boolean {
   if (item.badge === "Up Next") return true;
   const progress = item.progress ?? 0;
-  return progress >= 1 && progress < 90;
+  if (progress >= 90) return false;
+  if (progress >= 1) return true;
+  return (
+    (item.resumePositionSeconds ?? 0) >= MEANINGFUL_RESUME_POSITION_SECONDS
+  );
 }
 
 export function continueWatchingProgressPercent(
@@ -129,18 +143,31 @@ export function continueWatchingProgressPercent(
 export function shouldShowContinueWatchingProgress(
   progressPercent: number,
   isUpNext: boolean,
+  hasMeaningfulPosition = false,
 ): boolean {
-  return !isUpNext && progressPercent >= 1 && progressPercent < 100;
+  if (isUpNext || progressPercent >= 100) return false;
+  return progressPercent >= 1 || hasMeaningfulPosition;
 }
 
 export function preferActiveCloudResumeRecord<
-  T extends { progress?: number; updatedAtMs?: number },
+  T extends {
+    progress?: number;
+    updatedAtMs?: number;
+    resumePositionSeconds?: number;
+  },
 >(current: T | undefined, candidate: T): T {
   if (!current) return candidate;
-  const currentProgress = Number(current.progress ?? 0);
-  const candidateProgress = Number(candidate.progress ?? 0);
-  const currentIsActive = currentProgress >= 1 && currentProgress < 90;
-  const candidateIsActive = candidateProgress >= 1 && candidateProgress < 90;
+  const isActive = (record: T) => {
+    const progress = Number(record.progress ?? 0);
+    if (progress >= 90) return false;
+    if (progress >= 1) return true;
+    return (
+      Number(record.resumePositionSeconds ?? 0) >=
+      MEANINGFUL_RESUME_POSITION_SECONDS
+    );
+  };
+  const currentIsActive = isActive(current);
+  const candidateIsActive = isActive(candidate);
   if (currentIsActive !== candidateIsActive) {
     return candidateIsActive ? candidate : current;
   }
@@ -273,7 +300,7 @@ export function includeIptvContinueWatching(
       !item.isWatched &&
       progress < 90 &&
       (duration <= 0 || position / duration < 0.9) &&
-      (progress >= 1 || position >= 60)
+      (progress >= 1 || position >= MEANINGFUL_RESUME_POSITION_SECONDS)
     );
   });
   return [...primary, ...additions].sort(

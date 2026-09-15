@@ -48,6 +48,7 @@ import {
   VLC_SETUP_URL,
 } from "@/lib/externalPlayers";
 import { fetchSubtitlesForItem } from "@/lib/addons";
+import { MEANINGFUL_RESUME_POSITION_SECONDS } from "@/lib/continueWatching";
 import {
   cachedDebridDirectUrl,
   isUncachedDebridStream,
@@ -1736,9 +1737,18 @@ function buildContinueLabel(
       : localize(language, "Folge auswählen", "Choose episode");
   }
   const progress = item.progress ?? 0;
-  return progress >= 1 && progress <= 94
-    ? `${localize(language, "Fortsetzen", "Continue")} ${Math.round(progress)}%`
-    : localize(language, "Abspielen", "Play");
+  if (progress >= 1 && progress <= 94) {
+    return `${localize(language, "Fortsetzen", "Continue")} ${Math.round(progress)}%`;
+  }
+  // Long content can round a real saved position down to 0% — still offer
+  // "Continue" (no percent) instead of "Play" so the resume isn't lost.
+  if (
+    progress < 90 &&
+    (item.resumePositionSeconds ?? 0) >= MEANINGFUL_RESUME_POSITION_SECONDS
+  ) {
+    return localize(language, "Fortsetzen", "Continue");
+  }
+  return localize(language, "Abspielen", "Play");
 }
 
 function formatMoney(value: number | null | undefined, label: string) {

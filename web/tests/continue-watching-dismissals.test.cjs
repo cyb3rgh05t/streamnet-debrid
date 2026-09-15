@@ -58,6 +58,22 @@ test("one percent progress is eligible for Continue Watching", async () => {
   assert.equal(isPausedContinueWatchingItem({ progress: 90 }), false);
 });
 
+test("a real resume position still counts as active even when rounded progress is 0%", async () => {
+  const { isPausedContinueWatchingItem } = await import(moduleUrl);
+
+  // Very short taps (a few seconds) stay excluded as accidental starts, but a
+  // real ~10s+ resume position must not vanish just because long content
+  // rounds the percentage down to 0%.
+  assert.equal(
+    isPausedContinueWatchingItem({ progress: 0, resumePositionSeconds: 5 }),
+    false,
+  );
+  assert.equal(
+    isPausedContinueWatchingItem({ progress: 0, resumePositionSeconds: 10 }),
+    true,
+  );
+});
+
 test("active resume progress renders even when watched state is stale", async () => {
   const { shouldShowContinueWatchingProgress } = await import(moduleUrl);
 
@@ -65,6 +81,8 @@ test("active resume progress renders even when watched state is stale", async ()
   assert.equal(shouldShowContinueWatchingProgress(0, false), false);
   assert.equal(shouldShowContinueWatchingProgress(100, false), false);
   assert.equal(shouldShowContinueWatchingProgress(40, true), false);
+  // A meaningful resume position renders the bar (as a sliver) even at 0%.
+  assert.equal(shouldShowContinueWatchingProgress(0, false, true), true);
 });
 
 test("stored cloud progress survives placeholder playback timing", async () => {
