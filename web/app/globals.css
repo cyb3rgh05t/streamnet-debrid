@@ -14004,19 +14004,12 @@ html {
 .trailer-link:hover {
   box-shadow:
     0 0 0 2px rgba(0, 0, 0, 0.55),
-    0 0 0 4px rgba(255, 255, 255, 0.9);
+    0 0 0 4px var(--accent, #fff);
   transform: translateY(-1px);
 }
 
-.detail-actions .primary:hover,
-.hero-actions .primary:hover,
-.trailer-link:hover {
-  box-shadow:
-    0 0 0 2px rgba(0, 0, 0, 0.55),
-    0 0 0 4px var(--accent, #fff);
-}
-
 .detail-actions .secondary:hover,
+.detail-actions .text-button:hover,
 .hero-actions .secondary:hover {
   background: rgba(255, 255, 255, 0.22);
 }
@@ -14031,16 +14024,8 @@ html {
   outline: none;
   box-shadow:
     0 0 0 3px rgba(0, 0, 0, 0.6),
-    0 0 0 5px #fff;
-  transform: translateY(-1px);
-}
-
-.detail-actions .primary:focus-visible,
-.hero-actions .primary:focus-visible,
-.trailer-link:focus-visible {
-  box-shadow:
-    0 0 0 3px rgba(0, 0, 0, 0.6),
     0 0 0 5px var(--accent, #fff);
+  transform: translateY(-1px);
 }
 
 /* ============================================================
