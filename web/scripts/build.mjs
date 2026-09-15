@@ -4,6 +4,16 @@ import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
 const env = { ...process.env };
+const webPackage = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
+const appGradle = readFileSync(
+  new URL("../../app/build.gradle.kts", import.meta.url),
+  "utf8",
+);
+const apkVersion = appGradle.match(/versionName\s*=\s*"([^"]+)"/)?.[1];
+env.NEXT_PUBLIC_WEB_VERSION = env.NEXT_PUBLIC_WEB_VERSION || webPackage.version;
+env.NEXT_PUBLIC_APK_VERSION = env.NEXT_PUBLIC_APK_VERSION || apkVersion || "";
 if (!env.NEXT_PUBLIC_BUILD_STAMP) {
   const versionFile = new URL("../public/version.json", import.meta.url);
   const rawBuildStamp = existsSync(versionFile)

@@ -59,9 +59,11 @@ import {
 } from "@/lib/externalPlayers";
 import { buildHomeServerCatalogConfigs } from "@/lib/homeserver";
 import { buildStreamNetTvPlaylist } from "@/lib/streamnetTv";
+import { accentColor } from "@/lib/accent";
 import { formatTime24Hour } from "@/lib/dateTime";
 import { defaultSettings, useApp } from "@/lib/store";
 import { localize, t, translateUiText } from "@/lib/i18n";
+import webPackage from "../../package.json";
 import type {
   AppSettings,
   CatalogConfig,
@@ -91,13 +93,9 @@ function VlcIcon({
       className={className}
       style={{ display: "inline-block", verticalAlign: "middle", ...style }}
     >
-      {/* Cone tip */}
       <path d="M10.8 4.2C11.1 3.4 11.5 3 12 3C12.5 3 12.9 3.4 13.2 4.2L14.2 6.5H9.8L10.8 4.2Z" />
-      {/* Upper cone band */}
       <path d="M9.1 8H14.9L16.2 11H7.8L9.1 8Z" />
-      {/* Lower cone band */}
       <path d="M7.1 12.5H16.9L18.4 16H5.6L7.1 12.5Z" />
-      {/* Base stand */}
       <path d="M2.5 17.5L4.5 17H19.5L21.5 17.5L20.5 21C20.4 21.6 19.8 22 19.2 22H4.8C4.2 22 3.6 21.6 3.5 21L2.5 17.5Z" />
     </svg>
   );
@@ -590,6 +588,9 @@ function Select<T extends string>({
         createPortal(
           <div
             className="option-sheet-backdrop"
+            style={{
+              ["--accent" as string]: accentColor(settings.accentColor),
+            }}
             role="presentation"
             onClick={() => setOpen(false)}
           >
@@ -735,81 +736,9 @@ function SectionBody({ section }: { section: SectionId }) {
                 {localize(
                   settings.uiLanguage,
                   "Nativ unterstützt",
-                  "Natively supported",
+                  "Native support",
                 )}
               </span>
-            </Row>
-          ) : isLinux() ? (
-            <Row
-              label={localize(
-                settings.uiLanguage,
-                "VLC-Einrichtung mit einem Klick",
-                "VLC One-Click Setup",
-              )}
-              hint={localize(
-                settings.uiLanguage,
-                "Lade vlc-setup.sh herunter, um VLC unter Linux direkt über vlc:// zu starten, ohne .m3u-Wiedergabelisten zu speichern.",
-                "Download vlc-setup.sh to enable direct vlc:// launching on Linux without saving .m3u playlist files",
-              )}
-            >
-              <button
-                type="button"
-                className="secondary text-button"
-                onClick={() => {
-                  triggerDownload(VLC_SETUP_SH_URL, "vlc-setup.sh");
-                  setVlcProtocolReady(true);
-                  app.setToast(
-                    localize(
-                      settings.uiLanguage,
-                      "vlc-setup.sh wurde heruntergeladen. Führe `bash vlc-setup.sh` aus, um VLC direkt zu starten.",
-                      "Downloaded vlc-setup.sh; run `bash vlc-setup.sh` to enable direct VLC launching.",
-                    ),
-                  );
-                }}
-              >
-                <Download size={16} />{" "}
-                {localize(
-                  settings.uiLanguage,
-                  ".sh herunterladen",
-                  "Download .sh",
-                )}
-              </button>
-            </Row>
-          ) : isWindows() ? (
-            <Row
-              label={localize(
-                settings.uiLanguage,
-                "VLC-Einrichtung mit einem Klick",
-                "VLC One-Click Setup",
-              )}
-              hint={localize(
-                settings.uiLanguage,
-                "Lade vlc-setup.bat herunter, um VLC unter Windows direkt über vlc:// zu starten, ohne .m3u-Wiedergabelisten zu speichern.",
-                "Download vlc-setup.bat to enable direct vlc:// launching on Windows without saving .m3u playlist files",
-              )}
-            >
-              <button
-                type="button"
-                className="secondary text-button"
-                onClick={() => {
-                  triggerDownload(VLC_SETUP_URL, "vlc-setup.bat");
-                  setVlcProtocolReady(true);
-                  app.setToast(
-                    localize(
-                      settings.uiLanguage,
-                      "vlc-setup.bat wurde heruntergeladen. Führe die Datei unter Windows einmal aus, um VLC direkt zu starten.",
-                      "Downloaded vlc-setup.bat; run it once on Windows to enable direct VLC launching.",
-                    ),
-                  );
-                }}
-              >
-                <Download size={16} />{" "}
-                {localize(
-                  settings.uiLanguage,
-                  ".bat herunterladen",
-                  "Download .bat",
-                )}
-              </button>
             </Row>
           ) : null}
           <Row
@@ -1674,6 +1603,86 @@ function AccountsSection() {
         )}
       </Panel>
 
+      <Panel title="Sync & Updates">
+        {!config.selfHosted && (
+          <button
+            type="button"
+            className="secondary text-button"
+            disabled={syncBusy}
+            onClick={() => void syncNow()}
+          >
+            <RefreshCw size={18} />{" "}
+            {syncBusy
+              ? localize(
+                  settings.uiLanguage,
+                  "Synchronisierung läuft ...",
+                  "Syncing...",
+                )
+              : localize(
+                  settings.uiLanguage,
+                  "Cloud-Synchronisierung jetzt erzwingen",
+                  "Force cloud sync now",
+                )}
+          </button>
+        )}
+        <div className="settings-status-grid">
+          {(
+            [
+              [
+                "APK-App-Version",
+                "APK app version",
+                process.env.NEXT_PUBLIC_APK_VERSION ||
+                  localize(settings.uiLanguage, "unbekannt", "unknown"),
+              ],
+              ["Web-Version", "Web version", webPackage.version],
+              [
+                "Web-Build",
+                "Web build",
+                process.env.NEXT_PUBLIC_BUILD_STAMP
+                  ? formatTime24Hour(
+                      Number(process.env.NEXT_PUBLIC_BUILD_STAMP),
+                      settings.uiLanguage === "de" ? "de-DE" : "en-GB",
+                      { day: "2-digit", month: "short" },
+                    )
+                  : localize(settings.uiLanguage, "unbekannt", "unknown"),
+              ],
+            ] as const
+          ).map(([de, en, value]) => (
+            <div key={en}>
+              <span>{localize(settings.uiLanguage, de, en)}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
+        <div className="settings-status-grid">
+          {(
+            [
+              ["Letzter Refresh", "Last refresh", syncTimestamps.refreshAt],
+              ["Letzter Pull", "Last pull", syncTimestamps.pullAt],
+              ["Letzter Push", "Last push", syncTimestamps.pushAt],
+            ] as const
+          ).map(([de, en, value]) => (
+            <div key={en}>
+              <span>{localize(settings.uiLanguage, de, en)}</span>
+              <strong>
+                {value
+                  ? formatTime24Hour(
+                      value,
+                      settings.uiLanguage === "de" ? "de-DE" : "en-GB",
+                      {
+                        day: "2-digit",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      },
+                    )
+                  : localize(settings.uiLanguage, "noch nicht", "not yet")}
+              </strong>
+            </div>
+          ))}
+        </div>
+      </Panel>
+
       <Panel title="Trakt">
         {!hasTraktConfig() && (
           <p className="empty">
@@ -1950,70 +1959,6 @@ function AccountsSection() {
             </p>
           </div>
         )}
-      </Panel>
-
-      <Panel title="Sync & Updates">
-        {!config.selfHosted && (
-          <button
-            type="button"
-            className="secondary text-button"
-            disabled={syncBusy}
-            onClick={() => void syncNow()}
-          >
-            <RefreshCw size={18} />{" "}
-            {syncBusy
-              ? localize(
-                  settings.uiLanguage,
-                  "Synchronisierung läuft ...",
-                  "Syncing...",
-                )
-              : localize(
-                  settings.uiLanguage,
-                  "Cloud-Synchronisierung jetzt erzwingen",
-                  "Force cloud sync now",
-                )}
-          </button>
-        )}
-        <p className="empty">
-          {localize(settings.uiLanguage, "Web-Build", "Web build")}:{" "}
-          {process.env.NEXT_PUBLIC_BUILD_STAMP
-            ? formatTime24Hour(
-                Number(process.env.NEXT_PUBLIC_BUILD_STAMP),
-                settings.uiLanguage === "de" ? "de-DE" : "en-GB",
-                {
-                  day: "2-digit",
-                  month: "short",
-                },
-              )
-            : localize(settings.uiLanguage, "unbekannt", "unknown")}
-        </p>
-        <div className="settings-status-grid">
-          {(
-            [
-              ["Letzter Refresh", "Last refresh", syncTimestamps.refreshAt],
-              ["Letzter Pull", "Last pull", syncTimestamps.pullAt],
-              ["Letzter Push", "Last push", syncTimestamps.pushAt],
-            ] as const
-          ).map(([de, en, value]) => (
-            <div key={en}>
-              <span>{localize(settings.uiLanguage, de, en)}</span>
-              <strong>
-                {value
-                  ? formatTime24Hour(
-                      value,
-                      settings.uiLanguage === "de" ? "de-DE" : "en-GB",
-                      {
-                        day: "2-digit",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      },
-                    )
-                  : localize(settings.uiLanguage, "noch nicht", "not yet")}
-              </strong>
-            </div>
-          ))}
-        </div>
       </Panel>
     </>
   );

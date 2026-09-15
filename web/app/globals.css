@@ -12,6 +12,7 @@
   --line: rgba(242, 242, 242, 0.16);
   --orange: #e5a209;
   --orange-strong: #ce8017;
+  --accent: var(--orange);
   --green: #32c76f;
   --red: #e74c3c;
   --warning-orange: #f39c12;
@@ -9679,12 +9680,18 @@ button,
   white-space: nowrap;
 }
 
-.option-button:hover,
+.option-button:hover {
+  outline: none;
+  border-color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
+  box-shadow: none;
+}
+
 .option-button:focus-visible {
   outline: none;
   border-color: var(--accent, var(--orange));
   background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
-  box-shadow: var(--focus-glow);
+  box-shadow: inset 0 0 0 1px var(--accent, var(--orange));
 }
 
 .option-sheet-backdrop {
@@ -11097,7 +11104,7 @@ button,
 }
 .library-provider-tabs button:focus-visible {
   color: #fff;
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent, var(--orange));
   outline-offset: 1px;
 }
 
@@ -11116,7 +11123,7 @@ button,
 }
 
 .library-provider-sort:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent, var(--orange));
   outline-offset: 1px;
 }
 
@@ -11225,7 +11232,7 @@ button,
 
 .library-sidebar button:focus-visible {
   color: #fff;
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent, var(--orange));
   outline-offset: 0;
 }
 
@@ -11389,7 +11396,7 @@ button,
 .library-screen .watchlist-pill:focus-visible,
 .library-screen .watchlist-sort:focus-visible,
 .library-screen .library-refresh:focus-visible {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--accent, var(--orange));
   outline-offset: 1px;
 }
 .library-load-more {
@@ -14126,8 +14133,23 @@ html {
    `:focus` (not :focus-visible) on purpose: TV engines predate :focus-visible,
    and on a couch every focus IS keyboard focus — the ring must always show. */
 .is-tv *:focus {
-  outline: 3px solid #fff !important;
+  outline: none !important;
   outline-offset: 3px;
+}
+
+/* Component focus styles provide the visible accent state; avoid a second
+   browser/TV outline around the same control. */
+:where(button, a[href], [role="button"], [tabindex]):focus,
+:where(button, a[href], [role="button"], [tabindex]):focus-visible {
+  outline: none !important;
+}
+
+.primary:focus-visible,
+.secondary:focus-visible,
+.icon-button:focus-visible,
+.pill:focus-visible,
+.text-button:focus-visible {
+  box-shadow: none !important;
 }
 
 /* TV SoCs render backdrop blur at single-digit framerates. These surfaces all
