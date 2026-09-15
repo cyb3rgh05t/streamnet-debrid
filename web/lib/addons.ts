@@ -6,6 +6,7 @@ import {
   isBrowserPlayableStream,
   isIosPlayableStream,
 } from "./streamCompatibility";
+import { isXtreamVodSource } from "./sourceRank";
 import type {
   AddonCatalog,
   InstalledAddon,
@@ -756,6 +757,7 @@ function streamScore(stream: StreamSource) {
   const text =
     `${stream.quality ?? ""} ${stream.source} ${stream.description ?? ""}`.toLowerCase();
   let score = 0;
+  if (isXtreamVodSource(stream)) score += 100_000;
   if (isBrowserPlayableStream(stream)) score += 180;
   else if (isIosPlayableStream(stream)) score += 110;
   else if (stream.url) score += 25;

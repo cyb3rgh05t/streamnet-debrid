@@ -228,6 +228,7 @@ data class StreamSource(
     // that are intentionally separate from behaviorHints.filename.
     val addonTitle: String? = null
 ) : Serializable
+internal fun StreamSource.isXtreamVodSource(): Boolean = addonId == "iptv_xtream_vod"
 
 /**
  * Stream behavior hints - all primitive / immutable fields, safe for

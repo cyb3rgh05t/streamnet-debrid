@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.details
 
 import com.arflix.tv.data.model.StreamSource
+import com.arflix.tv.data.model.isXtreamVodSource
 import java.util.Locale
 
 // Autoplay starts the best quality/size source it can find within ~2s. It keeps
@@ -54,7 +55,8 @@ internal fun bestAutoPlayStream(
             // `notWebReady` HTTP sources (e.g. direct MKV rips) are fully playable on the
             // native ExoPlayer, so they are eligible; webReady only breaks ties at equal
             // quality+size so a known-simple URL wins a coin-flip.
-            compareByDescending<StreamSource> { qualityScoreForAutoPlay(it) }
+            compareByDescending<StreamSource> { if (it.isXtreamVodSource()) 1 else 0 }
+                .thenByDescending { qualityScoreForAutoPlay(it) }
                 .thenByDescending { autoPlaySizeBytes(it) }
                 .thenByDescending { if (it.behaviorHints?.notWebReady == true) 0 else 1 }
                 .thenByDescending { if (it.behaviorHints?.cached == true) 1 else 0 }

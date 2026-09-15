@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.components
 
 import com.arflix.tv.ui.motion.*
+import com.arflix.tv.data.model.isXtreamVodSource
 
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.ui.graphics.graphicsLayer
@@ -324,7 +325,9 @@ fun StreamSelector(
             .thenBy { it.value.title.lowercase() }
         presentations.withIndex()
             .sortedWith(
-                compareBy<IndexedValue<SourcePresentation>> {
+                compareByDescending<IndexedValue<SourcePresentation>> {
+                    if (it.value.stream.isXtreamVodSource()) 1 else 0
+                }.thenBy {
                     addonOrder[sourceTabId(it.value.stream)] ?: Int.MAX_VALUE
                 }.then { a, b ->
                     if (keepsOwnStreamOrder(a.value.stream) && keepsOwnStreamOrder(b.value.stream)) {

@@ -125,17 +125,37 @@ class AutoPlaySourcePlannerTest {
         assertEquals(notWebReady4k, selected)
     }
 
+    @Test
+    fun `best autoplay prefers xtream vod when another source has better quality`() {
+        val betterQuality = stream(
+            source = "Movie 2160p REMUX",
+            quality = "4K",
+            size = "52 GB"
+        )
+        val xtreamVod = stream(
+            source = "Movie 1080p VOD",
+            quality = "1080p",
+            size = "4 GB",
+            addonId = "iptv_xtream_vod"
+        )
+
+        val selected = bestAutoPlayStream(listOf(betterQuality, xtreamVod), minQualityScore = 0)
+
+        assertEquals(xtreamVod, selected)
+    }
+
     private fun stream(
         source: String,
         quality: String,
         size: String,
+        addonId: String = "torrentio",
         sizeBytes: Long? = null,
         cached: Boolean = true,
         notWebReady: Boolean = false
     ) = StreamSource(
         source = source,
         addonName = "Torrentio",
-        addonId = "torrentio",
+            addonId = addonId,
         quality = quality,
         size = size,
         sizeBytes = sizeBytes,

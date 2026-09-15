@@ -17,6 +17,7 @@ import com.arflix.tv.data.model.EpisodeIdentity
 import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.model.StreamSource
 import com.arflix.tv.data.model.Subtitle
+import com.arflix.tv.data.model.isXtreamVodSource
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.PlaybackTelemetryRepository
@@ -2141,7 +2142,8 @@ class PlayerViewModel @Inject constructor(
         preferredLanguage: String
     ): List<StreamSource> {
         return streams.sortedWith(
-            compareBy<StreamSource> { streamRepository.getPlaybackHostHealthPenalty(it) }
+            compareByDescending<StreamSource> { if (it.isXtreamVodSource()) 1 else 0 }
+                .thenBy { streamRepository.getPlaybackHostHealthPenalty(it) }
                 .thenBy { if (it.behaviorHints?.notWebReady == true) 1 else 0 }
                 .thenByDescending { qualityScore(it.quality) }
                 .thenByDescending { parseSize(it.size) }
@@ -2173,7 +2175,9 @@ class PlayerViewModel @Inject constructor(
             .sortedWith(
                 // Streams stay grouped by addon order; within a group, self-ordered addons keep
                 // their original (arrival) order while everything else gets the quality sort.
-                compareBy<IndexedValue<StreamSource>> { addonOrderIndex(it.value) }
+                compareByDescending<IndexedValue<StreamSource>> {
+                    if (it.value.isXtreamVodSource()) 1 else 0
+                }.thenBy { addonOrderIndex(it.value) }
                     .then { a, b ->
                         if (keepsOwnStreamOrder(a.value) && keepsOwnStreamOrder(b.value)) {
                             a.index.compareTo(b.index)

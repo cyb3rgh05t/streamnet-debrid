@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.017] - 2026-09-15
+
+### Xtream-VOD-Quellenpriorität
+
+- Xtream-VOD-Quellen werden in der manuellen Quellenliste auf Android und im Web vor anderen Quellen angezeigt, sobald mindestens eine solche Quelle vorhanden ist.
+- Die automatische Wiedergabe priorisiert Xtream-VOD ebenfalls vor Qualität, Größe und Addon-Gesundheit der übrigen Quellen.
+- Wenn kein Xtream-VOD verfügbar ist, bleibt die bisherige Sortierung unverändert. Die Reihenfolge innerhalb der Xtream-VOD-Quellen folgt weiterhin der bestehenden Qualitäts- und Größenlogik.
+- Android-Version: `2.5.017` (`versionCode` 419); Web-Version: `1.0.2`.
+
 ## [2.5.016] - 2026-09-15
 
 ### Mobile Home und Weiterschauen
