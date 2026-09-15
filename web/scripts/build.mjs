@@ -7,11 +7,10 @@ const env = { ...process.env };
 const webPackage = JSON.parse(
   readFileSync(new URL("../package.json", import.meta.url), "utf8"),
 );
-const appGradle = readFileSync(
-  new URL("../../app/build.gradle.kts", import.meta.url),
-  "utf8",
-);
-const apkVersion = appGradle.match(/versionName\s*=\s*"([^"]+)"/)?.[1];
+const appGradleUrl = new URL("../../app/build.gradle.kts", import.meta.url);
+const apkVersion = existsSync(appGradleUrl)
+  ? readFileSync(appGradleUrl, "utf8").match(/versionName\s*=\s*"([^"]+)"/)?.[1]
+  : undefined;
 env.NEXT_PUBLIC_WEB_VERSION = env.NEXT_PUBLIC_WEB_VERSION || webPackage.version;
 env.NEXT_PUBLIC_APK_VERSION = env.NEXT_PUBLIC_APK_VERSION || apkVersion || "";
 if (!env.NEXT_PUBLIC_BUILD_STAMP) {
