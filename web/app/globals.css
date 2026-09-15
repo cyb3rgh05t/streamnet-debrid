@@ -1019,8 +1019,9 @@ input:focus {
   margin: 0 0 12px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(0, 213, 136, 0.1);
-  border: 1px solid rgba(0, 213, 136, 0.24);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 10%, transparent);
+  border: 1px solid
+    color-mix(in srgb, var(--accent, var(--orange)) 24%, transparent);
   font-size: 13px;
   color: rgba(255, 255, 255, 0.82);
 }
@@ -1028,9 +1029,9 @@ input:focus {
   flex: 0 0 auto;
   padding: 8px 14px;
   border-radius: 9px;
-  border: 0;
-  background: linear-gradient(90deg, #00d588, #09b3f0);
-  color: #04120c;
+  border: 1px solid var(--accent, var(--orange));
+  background: var(--accent, var(--orange));
+  color: #000;
   font-weight: 700;
   font-size: 13px;
   cursor: pointer;
@@ -2399,7 +2400,7 @@ a.login-submit {
 }
 .season-tab.is-active,
 .season-tab:hover {
-  background: #fff;
+  background: var(--accent, var(--orange));
   color: #050505;
 }
 
@@ -2424,8 +2425,9 @@ a.login-submit {
 .episode-row:focus-visible,
 .episode-row.is-active {
   outline: none;
-  background: rgba(255, 255, 255, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.3);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
+  box-shadow: inset 0 0 0 1px
+    color-mix(in srgb, var(--accent, var(--orange)) 58%, transparent);
 }
 .episode-still {
   position: relative;
@@ -3828,8 +3830,12 @@ select {
 .settings-gear:hover,
 .settings-gear:focus-visible,
 .settings-gear.is-active {
-  background: rgba(255, 255, 255, 0.13);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 13%, transparent);
+  border-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 42%,
+    transparent
+  );
   box-shadow: 0 14px 36px rgba(0, 0, 0, 0.34);
 }
 
@@ -8239,8 +8245,13 @@ button,
 .source-filter-group button:hover,
 .source-addon-tabs button:hover {
   color: #000;
-  background: #fff;
-  border-color: #fff;
+  background: color-mix(in srgb, var(--accent, var(--orange)) 78%, #fff);
+  border-color: var(--accent, var(--orange));
+}
+
+.source-filter-group button.is-active,
+.source-addon-tabs button.is-active {
+  background: var(--accent, var(--orange));
 }
 
 .source-addon-tabs {
@@ -8449,8 +8460,8 @@ button,
 .source-action:focus-visible {
   outline: none;
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent, #fff) 60%, transparent);
-  background: rgba(255, 255, 255, 0.16);
+  border-color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 18%, transparent);
 }
 
 .source-action:disabled {
@@ -9518,21 +9529,11 @@ button,
 .settings-panel-card .text-button:hover:not(:disabled),
 .settings-panel-card .icon-button:hover:not(:disabled) {
   transform: translateY(-2px);
-  border-color: color-mix(
-    in srgb,
-    var(--accent, #fff) 34%,
-    rgba(255, 255, 255, 0.16)
-  );
-  background:
-    linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.16),
-      rgba(255, 255, 255, 0.08)
-    ),
-    rgba(255, 255, 255, 0.08);
+  border-color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 20%, transparent);
   box-shadow:
     0 16px 38px rgba(0, 0, 0, 0.42),
-    0 0 0 1px color-mix(in srgb, var(--accent, #fff) 18%, transparent);
+    0 0 0 1px color-mix(in srgb, var(--accent, var(--orange)) 30%, transparent);
 }
 
 .settings-panel-card .primary:focus-visible,
@@ -9621,8 +9622,12 @@ button,
 .settings-panel-card select:hover,
 .set-control input:hover,
 .settings-panel-card input:hover {
-  border-color: rgba(255, 255, 255, 0.2);
-  background-color: rgba(255, 255, 255, 0.105);
+  border-color: var(--accent, var(--orange));
+  background-color: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 11%,
+    transparent
+  );
 }
 
 @media (max-width: 720px) {
@@ -9677,11 +9682,8 @@ button,
 .option-button:hover,
 .option-button:focus-visible {
   outline: none;
-  border-color: color-mix(
-    in srgb,
-    var(--accent, #fff) 52%,
-    rgba(255, 255, 255, 0.18)
-  );
+  border-color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 12%, transparent);
   box-shadow: var(--focus-glow);
 }
 
@@ -9742,7 +9744,7 @@ button,
 .option-sheet-close:hover,
 .option-sheet-close:focus-visible {
   border-color: var(--accent, var(--orange));
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in srgb, var(--accent, var(--orange)) 16%, transparent);
 }
 
 .option-sheet-list {
@@ -9772,8 +9774,8 @@ button,
 .option-row:focus-visible,
 .option-row.is-selected {
   outline: none;
-  border-color: color-mix(in srgb, var(--accent, #fff) 52%, transparent);
-  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 16%, transparent);
   box-shadow: 0 12px 34px rgba(0, 0, 0, 0.36);
 }
 
@@ -10980,7 +10982,7 @@ button,
 }
 
 .watchlist-pill:hover {
-  color: #fff;
+  color: var(--accent, var(--orange));
 }
 
 .watchlist-pill.is-active {
@@ -11086,7 +11088,7 @@ button,
 }
 
 .library-provider-tabs button:hover {
-  color: #fff;
+  color: var(--accent, var(--orange));
 }
 .library-provider-tabs button.is-active {
   color: #fff;
@@ -11211,8 +11213,8 @@ button,
 }
 
 .library-sidebar button:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.055);
+  color: var(--accent, var(--orange));
+  background: color-mix(in srgb, var(--accent, var(--orange)) 10%, transparent);
 }
 
 .library-sidebar button.is-active {
