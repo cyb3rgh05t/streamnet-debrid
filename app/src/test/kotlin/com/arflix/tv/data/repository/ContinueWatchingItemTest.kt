@@ -36,6 +36,7 @@ class ContinueWatchingItemTest {
         assertEquals("Continue S4E29", mediaItem.subtitle)
         assertFalse(mediaItem.showPlaybackProgress)
         assertNull(mediaItem.timeRemainingLabel)
+        assertEquals(true, mediaItem.isUpNext)
     }
 
     @Test

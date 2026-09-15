@@ -408,7 +408,7 @@ fun MediaCard(
                 if (showProgress || showEpisodeInfo) {
                     // Top-right: time remaining or "New Episode" badge
                     val topRightLabel = item.timeRemainingLabel
-                        ?: if (item.mediaType == MediaType.TV && item.progress == 0 && !item.isWatched) stringResource(R.string.component_badge_new_episode) else null
+                        ?: if (item.mediaType == MediaType.TV && item.isUpNext && !item.isWatched) stringResource(R.string.component_badge_new_episode) else null
                     if (topRightLabel != null) {
                         Box(
                             modifier = Modifier
@@ -518,22 +518,23 @@ fun MediaCard(
             )
 
             if (showSubtitle) {
-                // Prefer release date (or year) under the title. Fall back to the
-                // explicit subtitle or media-type label only when neither is set.
                 val tvSeriesLabel = stringResource(R.string.component_label_tv_series)
                 val movieLabel = stringResource(R.string.movie)
                 val mediaLabel = stringResource(R.string.component_label_media)
-                val subtitle = remember(item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
-                    val release = item.releaseDate?.takeIf { it.isNotBlank() }
-                        ?: item.year.takeIf { it.isNotBlank() }
-                    release
-                        ?: item.subtitle.ifBlank {
+                val subtitle = remember(showProgress, item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
+                    if (showProgress && item.subtitle.isNotBlank()) {
+                        item.subtitle
+                    } else {
+                        val release = item.releaseDate?.takeIf { it.isNotBlank() }
+                            ?: item.year.takeIf { it.isNotBlank() }
+                        release ?: item.subtitle.ifBlank {
                             when (item.mediaType) {
                                 MediaType.TV -> tvSeriesLabel
                                 MediaType.MOVIE -> movieLabel
                                 else -> mediaLabel
                             }
                         }
+                    }
                 }
                 Text(
                     text = subtitle,

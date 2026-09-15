@@ -24,7 +24,8 @@ internal object ContinueWatchingRowReducer {
             progress = fresh.progress,
             nextEpisode = fresh.nextEpisode,
             timeRemainingLabel = fresh.timeRemainingLabel,
-            showPlaybackProgress = fresh.showPlaybackProgress
+            showPlaybackProgress = fresh.showPlaybackProgress,
+            isUpNext = fresh.isUpNext
         ) ?: fresh
 
         val items = listOf(merged) + existingCategory.orEmptyItems().filterNot {

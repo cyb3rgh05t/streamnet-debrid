@@ -2986,13 +2986,24 @@ private fun MobileHeroCarousel(
         ) { page ->
             val item = heroItems[page % heroItems.size]
             val genres = context.genreNames(item.mediaType, item.genreIds).take(3)
-            // releaseDate is stored as "d MMM yyyy" by MediaRepository.formatDate()
-            val year = remember(item.id, item.releaseDate, item.year) {
+            val releaseLabel = remember(item.id, item.releaseDate, item.year) {
                 val rd = item.releaseDate
                 if (!rd.isNullOrBlank()) {
                     runCatching {
                         val parsed = java.text.SimpleDateFormat("d MMM yyyy", java.util.Locale.ENGLISH).parse(rd)
-                        parsed?.let { java.text.SimpleDateFormat("d MMM", java.util.Locale.ENGLISH).format(it) }
+                        parsed?.let { releaseDate ->
+                            val today = java.util.Calendar.getInstance().apply {
+                                set(java.util.Calendar.HOUR_OF_DAY, 0)
+                                set(java.util.Calendar.MINUTE, 0)
+                                set(java.util.Calendar.SECOND, 0)
+                                set(java.util.Calendar.MILLISECOND, 0)
+                            }.time
+                            if (releaseDate.after(today)) {
+                                java.text.SimpleDateFormat("d. MMM yyyy", java.util.Locale.getDefault()).format(releaseDate)
+                            } else {
+                                java.text.SimpleDateFormat("yyyy", java.util.Locale.getDefault()).format(releaseDate)
+                            }
+                        }
                     }.getOrNull() ?: item.year
                 } else {
                     item.year
@@ -3015,7 +3026,7 @@ private fun MobileHeroCarousel(
                 imageUrl = item.backdrop ?: item.image ?: "",
                 title = item.title,
                 genres = genres,
-                year = year,
+                year = releaseLabel,
                 rating = rating,
                 cardAspectRatio = heroAspectRatio,
                 maxCardHeight = tabletHeroMaxHeight,

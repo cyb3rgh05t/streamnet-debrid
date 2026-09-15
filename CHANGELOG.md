@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.016] - 2026-09-15
+
+### Mobile Home und Weiterschauen
+
+- Karten in „Weiter ansehen“ priorisieren jetzt ihre konkrete Fortsetzungsinformation unter dem Titel, etwa „S1E1 bei 00:21 fortsetzen“ oder „Ab 55:15 fortsetzen“, statt dort Veröffentlichungsdatum oder Jahr anzuzeigen.
+- Das Badge „Neue Episode“ erscheint nur noch für ausdrücklich vom Anbieter als Up Next markierte Episoden. Der Status bleibt auch bei unmittelbaren In-App-Updates der Rail erhalten.
+- Der Mobile-Hero zeigt für bereits veröffentlichte Titel nur das Jahr; kommende Titel zeigen stattdessen ein vollständiges Veröffentlichungsdatum.
+
 ## [2.5.015] - 2026-09-14
 
 ### Cloud-Synchronisierung via SSE

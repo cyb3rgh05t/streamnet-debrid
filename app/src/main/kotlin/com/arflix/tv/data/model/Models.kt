@@ -56,6 +56,8 @@ data class MediaItem(
     val timeRemainingLabel: String? = null,
     // Continue Watching: true only when progress represents current movie/episode playback.
     val showPlaybackProgress: Boolean = true,
+    // Continue Watching: provider explicitly selected this as the next unwatched episode.
+    val isUpNext: Boolean = false,
     val liveChannelNumber: String? = null,
     val liveProgramTitle: String? = null,
     val liveProgramStartMs: Long? = null,
