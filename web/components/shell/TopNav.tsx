@@ -112,9 +112,9 @@ export function TopNav({ onNavigateHome }: { onNavigateHome: () => void }) {
       <header className={`mobile-header ${scrolled ? "is-scrolled" : ""}`}>
         <div className="mobile-brand">
           <img
-            src="/streamnet-wordmark.svg"
+            src="/streamnet-icon.svg"
             alt="StreamNet"
-            className="mobile-wordmark"
+            className="mobile-brand-logo"
           />
         </div>
         <div className="mobile-header-actions">
