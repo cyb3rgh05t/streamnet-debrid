@@ -4777,8 +4777,12 @@ select:focus {
 }
 
 .detail-actions .secondary {
-  background: rgba(255, 255, 255, 0.13);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  background: color-mix(
+    in srgb,
+    var(--accent, var(--orange)) 12%,
+    rgba(255, 255, 255, 0.06)
+  );
+  box-shadow: none;
 }
 
 .trailer-link {
