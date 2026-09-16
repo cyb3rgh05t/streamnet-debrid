@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.022] - 2026-09-16
+
+### Xtream-VOD Mixed-Content-Hotfix
+
+- Der Browser-Remux und die manuelle Audiospur-Probe laden StreamNet-Xtream-VOD jetzt über den eingeschränkten HTTPS-Relay, statt einem Anbieter-Redirect von `https://xui.streamnet.live` auf eine unverschlüsselte HTTP-IP direkt im Browser zu folgen.
+- Normale Addon- und Debrid-Dateien bleiben auf ihrem bisherigen direkten Pfad; der Relay wird ausschließlich für `iptv_xtream_vod` vom konfigurierten StreamNet-Xtream-Ursprung verwendet.
+- Der produktive Relay wurde mit einem MKV-Byte-Range geprüft: HTTP 206, `video/x-matroska`, `Accept-Ranges: bytes` und korrekter 1-KiB-Teilinhalt.
+- Reine Web-Releases senden ihren deutschen Changelog nach erfolgreichem Container-Publish automatisch an das bestehende Telegram-Topic. Normale Web-/Resolver-Commits ohne neue Version lösen keine Nachricht aus.
+
 ## [Web 1.0.021] - 2026-09-16
 
 ### Webplayer-Audio für Live-TV und VOD

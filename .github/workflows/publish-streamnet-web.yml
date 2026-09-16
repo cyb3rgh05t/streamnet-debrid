@@ -151,3 +151,50 @@ jobs:
             NEXT_PUBLIC_APK_VERSION=${{ steps.apk_version.outputs.value }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  notify-telegram:
+    name: Send web changelog to Telegram
+    needs: publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 2
+
+      - name: Detect new web version
+        id: web_version
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          current=$(node -p "require('./web/package.json').version")
+          previous=""
+          if [[ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            previous=$(git show "$BEFORE_SHA:web/package.json" 2>/dev/null | node -e "let input=''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(input).version));" || true)
+          fi
+
+          if [[ -n "$previous" && "$current" != "$previous" ]]; then
+            heading="## [Web $current]"
+            grep -Fqx "$heading" CHANGELOG.md
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "value=$current" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Send German web changelog to Telegram
+        if: steps.web_version.outputs.changed == 'true'
+        env:
+          CHANGELOG_VERSION: Web ${{ steps.web_version.outputs.value }}
+          CHANGELOG_TITLE: StreamNet Web Update
+          CHANGELOG_FILE: CHANGELOG.md
+          RELEASE_URL: https://github.com/${{ github.repository }}/tree/web-${{ steps.web_version.outputs.value }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+          TELEGRAM_DRY_RUN: "false"
+        run: python3 .github/scripts/send_telegram_changelog.py

@@ -186,10 +186,17 @@ function workerManifestUrl(url: string) {
   return target.toString();
 }
 
-function streamNetManifestUrl(url: string) {
+function streamNetRelayUrl(url: string) {
   const target = new URL(proxiedUrl(url, liveTvProxyHeaders()));
   target.searchParams.set("rewrite", "streamnet");
   return target.toString();
+}
+
+function browserReadableStreamUrl(stream: StreamSource, url: string) {
+  return stream.addonId === "iptv_xtream_vod" &&
+    requiresSecureStreamNetRelay(url)
+    ? streamNetRelayUrl(url)
+    : url;
 }
 
 function audioTranscodeUrl(url: string) {
@@ -653,7 +660,9 @@ function VideoPlayer({
     void (async () => {
       try {
         const { probeAndPrepareRemux } = await import("@/lib/remux");
-        const probeUrl = cachedDebridDirectUrl(current.url) ?? current.url!;
+        const directProbeUrl =
+          cachedDebridDirectUrl(current.url) ?? current.url!;
+        const probeUrl = browserReadableStreamUrl(current, directProbeUrl);
         const prepared = await probeAndPrepareRemux(
           probeUrl,
           current.behaviorHints?.proxyHeaders?.request,
@@ -1201,7 +1210,7 @@ function VideoPlayer({
         try {
           const { probeAndPrepareRemux } = await import("@/lib/remux");
           const prepared = await probeAndPrepareRemux(
-            stream.url!,
+            browserReadableStreamUrl(stream, stream.url!),
             stream.behaviorHints?.proxyHeaders?.request,
             settings.audioLanguage,
             {
@@ -1355,8 +1364,8 @@ function VideoPlayer({
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
       if (secureStreamNetRelay) {
-        attempts.push(streamNetManifestUrl(stream.url));
-        if (hlsTwin) attempts.push(streamNetManifestUrl(hlsTwin));
+        attempts.push(streamNetRelayUrl(stream.url));
+        if (hlsTwin) attempts.push(streamNetRelayUrl(hlsTwin));
       } else {
         if (hlsTwin) attempts.push(hlsTwin);
         const workerUrl = resolverMediaUrl(stream.url, {
