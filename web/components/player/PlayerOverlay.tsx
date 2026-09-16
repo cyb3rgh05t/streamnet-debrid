@@ -192,20 +192,10 @@ function streamNetManifestUrl(url: string) {
 }
 
 function requiresSecureStreamNetRelay(url: string) {
-  const streamNetRelayHosts = new Set([
-    "xui.streamnet.live",
-    "85.209.176.85",
-    "193.200.221.81",
-    "193.108.118.53",
-  ]);
+  if (typeof window === "undefined" || window.location.protocol !== "https:")
+    return false;
   try {
-    const target = new URL(url);
-    if (streamNetRelayHosts.has(target.hostname.toLowerCase())) return true;
-    return (
-      typeof window !== "undefined" &&
-      window.location.protocol === "https:" &&
-      target.origin === new URL(config.streamnetTvXtreamUrl).origin
-    );
+    return new URL(url).origin === new URL(config.streamnetTvXtreamUrl).origin;
   } catch {
     return false;
   }
@@ -1253,7 +1243,6 @@ function VideoPlayer({
     let handlingError = false;
     let cancelled = false;
     let detach: PlaybackHandle | undefined;
-    let playbackHeaders = headers;
     setTransportTracks({
       audioTracks: [],
       qualities: [],
@@ -1261,20 +1250,11 @@ function VideoPlayer({
       selectedQualityId: null,
     });
     const attach = (url: string) => {
-      debugPlayback("attach", {
-        attempt: attemptIndex + 1,
-        totalAttempts: uniqueAttempts.length,
-        url: redactPlaybackUrl(url),
-        transport: stream.transport ?? "auto",
-        live: liveTv,
-        hasHeaders: Boolean(headers && Object.keys(headers).length),
-      });
       const handle = attachPlayback(video, url, {
         onError: handlePlaybackError,
         live: liveTv,
-        // Fallback URLs keep the provider headers; attachPlayback infers the
-        // transport from each concrete URL so HLS twins use HLS.js correctly.
-        requestHeaders: playbackHeaders,
+        transport: url === stream.url ? stream.transport : undefined,
+        requestHeaders: url === stream.url ? headers : undefined,
         onTracks: (tracks) => {
           if (!cancelled) setTransportTracks(tracks);
         },
@@ -1305,20 +1285,6 @@ function VideoPlayer({
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
       if (secureStreamNetRelay) {
-        // Prefer the configured ARVIO-compatible media resolver in production.
-        // It rewrites manifests and segments consistently; the local relay
-        // remains the fallback for localhost and resolver outages.
-        const resolverUrl = resolverMediaUrl(stream.url, {
-          ...liveTvProxyHeaders(),
-          ...headers,
-        });
-        const useExternalResolver =
-          Boolean(resolverUrl) &&
-          typeof window !== "undefined" &&
-          window.location.protocol === "https:" &&
-          window.location.hostname !== "localhost" &&
-          window.location.hostname !== "127.0.0.1";
-        if (useExternalResolver && resolverUrl) attempts.push(resolverUrl);
         attempts.push(streamNetManifestUrl(stream.url));
         if (hlsTwin) attempts.push(streamNetManifestUrl(hlsTwin));
       } else {
@@ -1346,20 +1312,6 @@ function VideoPlayer({
     }
     const uniqueAttempts = [...new Set(attempts)];
     let attemptIndex = 0;
-    const redactPlaybackUrl = (url: string) => {
-      try {
-        const parsed = new URL(url, window.location.href);
-        return `${parsed.origin}${parsed.pathname}`;
-      } catch {
-        return url.split("?")[0];
-      }
-    };
-    const debugPlayback = (event: string, details: Record<string, unknown>) => {
-      const localHost =
-        window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1";
-      if (localHost) console.info(`[StreamNet playback] ${event}`, details);
-    };
     // Some sources hang forever without ever firing an "error" event (the CDN
     // accepts the connection but never delivers a playable moov/metadata). A
     // plain error-based ladder can't recover from that. Arm a per-attempt stall
@@ -1415,50 +1367,8 @@ function VideoPlayer({
       }
     };
     let refreshedLink = false;
-    let liveTranscodeStarted = false;
-    const startLiveTranscode = async () => {
-      if (!liveTv || liveTranscodeStarted || !config.backendUrl) return false;
-      liveTranscodeStarted = true;
-      try {
-        const token = await authClient.accessToken();
-        const response = await fetch(`${config.backendUrl}/live-tv/transcode`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({ url: stream.url, headers }),
-        });
-        if (!response.ok)
-          throw new Error(`Live transcode failed (${response.status})`);
-        const payload = (await response.json()) as { manifestUrl?: string };
-        if (!payload.manifestUrl)
-          throw new Error("Live transcode returned no manifest");
-        playbackHeaders = { ...headers, Authorization: `Bearer ${token}` };
-        detach?.();
-        setError(false);
-        setBuffering(true);
-        detach = attach(payload.manifestUrl);
-        armStallTimer();
-        requestPlayback();
-        return true;
-      } catch (error) {
-        debugPlayback("transcode-error", {
-          message: error instanceof Error ? error.message : "Unknown error",
-        });
-        return false;
-      }
-    };
     const handlePlaybackError = (fault?: PlaybackError) => {
       if (cancelled || handlingError) return;
-      debugPlayback("error", {
-        attempt: attemptIndex + 1,
-        totalAttempts: uniqueAttempts.length,
-        fault,
-        readyState: video.readyState,
-        networkState: video.networkState,
-        mediaError: video.error?.code ?? null,
-      });
       if (fault) setErrorDetail(fault.message);
       // A source that already played is not a startup failure. Walking the
       // ladder here would re-attach a different URL (or hop to another source)
@@ -1571,13 +1481,6 @@ function VideoPlayer({
         cancelled = true;
         onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
         detach?.();
-        return;
-      }
-      if (liveTv && !liveTranscodeStarted) {
-        handlingError = false;
-        void startLiveTranscode().then((started) => {
-          if (!started && !cancelled) handlePlaybackError();
-        });
         return;
       }
       // This source is dead — hop to the next playable one before giving up.
