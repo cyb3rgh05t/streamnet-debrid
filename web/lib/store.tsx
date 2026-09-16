@@ -18,7 +18,7 @@ import {
   saveLocalAddons,
 } from "./addons";
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
-import { accentProfileColor } from "./accent";
+import { accentProfileColor, normalizeAccentName } from "./accent";
 import { config, getAuthPortalUrl } from "./config";
 import { defaultCatalogs, mergeCatalogs } from "./catalogs";
 import {
@@ -266,7 +266,9 @@ function randomProfileColor() {
 
 function automaticProfileColor() {
   const stored = loadStored<{ accentColor?: string }>(settingsKey, {});
-  return accentProfileColor(stored.accentColor ?? "orange");
+  return accentProfileColor(
+    normalizeAccentName(stored.accentColor ?? "Orange"),
+  );
 }
 
 function makeProfile(name: string, avatarColor: number, avatarId = 0): Profile {
@@ -327,7 +329,7 @@ export const defaultSettings: AppSettings = {
   showCertification: true,
   smoothScrolling: true,
   spoilerBlur: false,
-  accentColor: "orange",
+  accentColor: "Orange",
   dnsProvider: "system",
   showLoadingStats: false,
   customUserAgent: "",
@@ -966,8 +968,7 @@ export function AppProvider({
     return {
       ...defaultSettings,
       ...stored,
-      accentColor:
-        stored.accentColor === "gold" ? "orange" : stored.accentColor,
+      accentColor: normalizeAccentName(stored.accentColor),
       uiLanguage:
         storedLanguage.userSelectedLanguage === true &&
         stored.uiLanguage === "en"

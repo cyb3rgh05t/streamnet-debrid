@@ -6,6 +6,7 @@ import {
   serializeHomeServerConnectionJson,
 } from "./homeserver";
 import { HttpError, jsonRequest } from "./http";
+import { normalizeAccentName } from "./accent";
 import { preferActiveCloudResumeRecord } from "./continueWatching";
 import { mergeTvSessions, normalizeTvSession } from "./iptvSession";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
@@ -1125,7 +1126,7 @@ export async function pullCloudPayload(
   // Android change (accent color, AI subtitles, etc.) is actually visible on web.
   const globalSettings: Partial<AppSettings> = {};
   if ("accentColor" in root)
-    globalSettings.accentColor = String(root.accentColor ?? "");
+    globalSettings.accentColor = normalizeAccentName(root.accentColor);
   if ("oledBlackBackground" in root)
     globalSettings.oledBlack = Boolean(root.oledBlackBackground);
   if ("customUserAgent" in root)
@@ -1324,7 +1325,11 @@ export async function saveCloudSettings(
     //    timestamp when the web actually changed the field vs its baseline; otherwise leave the
     //    (freshly read-modify-written) cloud value so a phone's newer change survives.
     const globalFields: Array<[string, unknown, unknown]> = [
-      ["accentColor", settings.accentColor, baseline?.accentColor],
+      [
+        "accentColor",
+        normalizeAccentName(settings.accentColor),
+        baseline?.accentColor,
+      ],
       ["oledBlackBackground", settings.oledBlack, baseline?.oledBlack],
       [
         "skipProfileSelection",
@@ -1353,7 +1358,7 @@ export async function saveCloudSettings(
         bumpFieldTs(root, `g:${rootKey}`, changedAt);
       }
     }
-    root.focusBorderColor = settings.accentColor; // mirror of accentColor (not a merge key)
+    root.focusBorderColor = normalizeAccentName(settings.accentColor); // mirror of accentColor (not a merge key)
 
     // ── Root legacy flat mirrors: only OLD Android clients read these (current clients read
     //    profileSettingsById below). Kept for backward compat; not timestamp-managed.

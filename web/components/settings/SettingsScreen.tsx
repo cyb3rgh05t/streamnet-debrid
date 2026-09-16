@@ -1131,12 +1131,14 @@ function SectionBody({ section }: { section: SectionId }) {
               value={settings.accentColor}
               onChange={(v) => set({ accentColor: v })}
               options={[
-                ["orange", "Orange"],
-                ["arctic", "Arctic"],
-                ["green", "Green"],
-                ["blue", "Blue"],
-                ["purple", "Purple"],
-                ["red", "Red"],
+                ["White", "White"],
+                ["Red", "Red"],
+                ["Orange", "Orange"],
+                ["Yellow", "Yellow"],
+                ["Green", "Green"],
+                ["Blue", "Blue"],
+                ["Indigo", "Indigo"],
+                ["Violet", "Violet"],
               ]}
             />
           </Row>
