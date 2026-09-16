@@ -993,6 +993,18 @@ export function AppProvider({
   const [simklDeviceCode, setSimklDeviceCode] = useState<SimklPinCode | null>(
     null,
   );
+
+  useEffect(() => {
+    return authClient.onSessionChange((session) => {
+      setAuth(session);
+      if (!session) {
+        setCloudProfilesHydrated(true);
+        setContinueWatching([]);
+        setWatchlist([]);
+        setView("login");
+      }
+    });
+  }, []);
   const [busy, setBusy] = useState("Loading StreamNet");
   const [toast, setToast] = useState<string | null>(null);
   const [cloudProfilesHydrated, setCloudProfilesHydrated] = useState(

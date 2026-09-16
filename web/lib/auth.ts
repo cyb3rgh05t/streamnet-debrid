@@ -47,6 +47,18 @@ function sessionFromResponse(
 export class AuthClient {
   session = loadStored<AuthSession | null>(SESSION_KEY, null);
   private refreshInFlight: Promise<void> | null = null;
+  private readonly sessionListeners = new Set<
+    (session: AuthSession | null) => void
+  >();
+
+  onSessionChange(listener: (session: AuthSession | null) => void) {
+    this.sessionListeners.add(listener);
+    return () => this.sessionListeners.delete(listener);
+  }
+
+  private notifySessionChange() {
+    for (const listener of this.sessionListeners) listener(this.session);
+  }
 
   get isAuthenticated() {
     return Boolean(this.session?.accessToken);
@@ -66,6 +78,7 @@ export class AuthClient {
     });
     this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
+    this.notifySessionChange();
     return this.session;
   }
 
@@ -76,6 +89,7 @@ export class AuthClient {
     });
     this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
+    this.notifySessionChange();
     return this.session;
   }
 
@@ -115,6 +129,7 @@ export class AuthClient {
         return;
       this.session = sessionFromResponse(response, sourceSession.email);
       saveStored(SESSION_KEY, this.session);
+      this.notifySessionChange();
     })();
 
     this.refreshInFlight = refresh;
@@ -128,5 +143,6 @@ export class AuthClient {
   signOut() {
     this.session = null;
     removeStored(SESSION_KEY);
+    this.notifySessionChange();
   }
 }

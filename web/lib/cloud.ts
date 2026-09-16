@@ -554,6 +554,7 @@ function webQuality(value: unknown): AppSettings["autoPlayMinQuality"] {
 
 function androidProfileSettings(settings: AppSettings) {
   return {
+    accentColor: normalizeAccentName(settings.accentColor),
     defaultSubtitle: settings.defaultSubtitle || "Off",
     defaultAudioLanguage: settings.audioLanguage || "Auto (Original)",
     contentLanguage: settings.language || "en-US",
@@ -598,6 +599,8 @@ function androidProfileSettings(settings: AppSettings) {
 function settingsFromAndroidProfile(value: unknown): Partial<AppSettings> {
   const state = objectRecord(value);
   const partial: Partial<AppSettings> = {};
+  if ("accentColor" in state)
+    partial.accentColor = normalizeAccentName(state.accentColor);
   if ("defaultSubtitle" in state)
     partial.defaultSubtitle = String(state.defaultSubtitle || "");
   if ("defaultAudioLanguage" in state)
@@ -1125,7 +1128,7 @@ export async function pullCloudPayload(
   // Android with per-field timestamps), NOT in the legacy `root.settings` blob. Map them so an
   // Android change (accent color, AI subtitles, etc.) is actually visible on web.
   const globalSettings: Partial<AppSettings> = {};
-  if ("accentColor" in root)
+  if ("accentColor" in root && !("accentColor" in profileSettings))
     globalSettings.accentColor = normalizeAccentName(root.accentColor);
   if ("oledBlackBackground" in root)
     globalSettings.oledBlack = Boolean(root.oledBlackBackground);

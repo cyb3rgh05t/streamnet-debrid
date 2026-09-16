@@ -2268,7 +2268,9 @@ class CloudSyncRepository @Inject constructor(
                 if (root.has("oledBlackBackground")) {
                     prefs[OLED_BLACK_BACKGROUND_KEY] = root.optBoolean("oledBlackBackground", false)
                 }
-                if (root.has("accentColor") || root.has("focusBorderColor")) {
+                if ((root.has("accentColor") || root.has("focusBorderColor")) &&
+                    root.optJSONObject("profileSettingsById")?.has(activeProfileId) != true
+                ) {
                     prefs[ACCENT_COLOR_KEY] = root.optString(
                         "accentColor",
                         root.optString("focusBorderColor", "White")
