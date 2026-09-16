@@ -35,10 +35,11 @@ jobs:
           cache: npm
           cache-dependency-path: self-hosted-backend/package-lock.json
 
-      - name: Install and test
+      - name: Install, validate and test
         working-directory: self-hosted-backend
         run: |
           npm ci
+          node --check src/server.js
           npm test
 
       - name: Set up Docker Buildx
