@@ -83,7 +83,10 @@ export function isStalled(opts: {
 }
 
 /** Detect audio advancing without video, including streams with known dimensions. */
-export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => void): () => void {
+export function monitorVideoFrames(
+  video: HTMLVideoElement,
+  onMissing: () => void,
+): () => void {
   let stopped = false;
   let frame: number | undefined;
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -99,15 +102,25 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
   const decodedFrame = () => {
     try {
       const quality = video.getVideoPlaybackQuality?.();
-      return quality && quality.totalVideoFrames - quality.droppedVideoFrames > 0;
-    } catch { return false; }
+      return (
+        quality && quality.totalVideoFrames - quality.droppedVideoFrames > 0
+      );
+    } catch {
+      return false;
+    }
   };
   if (video.requestVideoFrameCallback) {
-    frame = video.requestVideoFrameCallback(() => { presented = true; stop(); });
+    frame = video.requestVideoFrameCallback(() => {
+      presented = true;
+      stop();
+    });
   }
   timer = setInterval(() => {
     if (stopped) return;
-    if (presented || decodedFrame()) { stop(); return; }
+    if (presented || decodedFrame()) {
+      stop();
+      return;
+    }
     const now = Date.now();
     const advancing = video.currentTime > lastTime;
     const elapsed = Math.min(2000, Math.max(0, now - lastCheck));
@@ -115,16 +128,73 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
     lastTime = video.currentTime;
     // Background tabs may intentionally stop presenting frames. Pauses, seeks
     // and ordinary buffering must not consume the missing-video grace period.
-    if (document.visibilityState === "hidden" || video.paused || video.seeking || video.ended || !advancing) {
+    if (
+      document.visibilityState === "hidden" ||
+      video.paused ||
+      video.seeking ||
+      video.ended ||
+      !advancing
+    ) {
       framelessPlayingMs = 0;
       return;
     }
-    const hasFrameTelemetry = !!video.requestVideoFrameCallback || !!video.getVideoPlaybackQuality;
-    if (!hasFrameTelemetry && video.videoWidth > 0) { stop(); return; }
+    const hasFrameTelemetry =
+      !!video.requestVideoFrameCallback || !!video.getVideoPlaybackQuality;
+    if (!hasFrameTelemetry && video.videoWidth > 0) {
+      stop();
+      return;
+    }
     framelessPlayingMs += elapsed;
-    if (framelessPlayingMs >= 12000) { stop(); onMissing(); }
+    if (framelessPlayingMs >= 12000) {
+      stop();
+      onMissing();
+    }
   }, 1500);
   return stop;
+}
+
+/** Detect video advancing while Chromium decodes no audio bytes. */
+export function monitorSilentAudio(
+  video: HTMLVideoElement,
+  onSilent: () => void,
+): () => void {
+  const chromiumVideo = video as HTMLVideoElement & {
+    webkitAudioDecodedByteCount?: number;
+  };
+  if (typeof chromiumVideo.webkitAudioDecodedByteCount !== "number")
+    return () => undefined;
+  let lastTime = video.currentTime;
+  let lastBytes = chromiumVideo.webkitAudioDecodedByteCount;
+  let lastCheck = Date.now();
+  let silentPlayingMs = 0;
+  const timer = setInterval(() => {
+    const now = Date.now();
+    const bytes = chromiumVideo.webkitAudioDecodedByteCount ?? lastBytes;
+    const advancing = video.currentTime > lastTime;
+    const elapsed = Math.min(2_000, Math.max(0, now - lastCheck));
+    lastCheck = now;
+    lastTime = video.currentTime;
+    if (
+      document.visibilityState === "hidden" ||
+      video.paused ||
+      video.muted ||
+      video.volume === 0 ||
+      video.seeking ||
+      video.ended ||
+      !advancing ||
+      bytes > lastBytes
+    ) {
+      silentPlayingMs = 0;
+      lastBytes = bytes;
+      return;
+    }
+    silentPlayingMs += elapsed;
+    if (silentPlayingMs >= 8_000) {
+      clearInterval(timer);
+      onSilent();
+    }
+  }, 1_000);
+  return () => clearInterval(timer);
 }
 
 /**
@@ -134,7 +204,10 @@ export function monitorVideoFrames(video: HTMLVideoElement, onMissing: () => voi
  * LAST range — which misreports badly after seeking backwards, when the range
  * containing the playhead is no longer the last one.
  */
-export function bufferedAhead(ranges: TimeRanges | null, currentTime: number): number {
+export function bufferedAhead(
+  ranges: TimeRanges | null,
+  currentTime: number,
+): number {
   if (!ranges) return 0;
   for (let i = 0; i < ranges.length; i += 1) {
     if (currentTime >= ranges.start(i) && currentTime <= ranges.end(i)) {
@@ -157,7 +230,9 @@ export function bufferedAhead(ranges: TimeRanges | null, currentTime: number): n
  */
 export type MediaFaultKind = "retryable" | "fatal";
 
-export function classifyMediaError(code: number | null | undefined): MediaFaultKind {
+export function classifyMediaError(
+  code: number | null | undefined,
+): MediaFaultKind {
   // DECODE (3) and SRC_NOT_SUPPORTED (4) mean this browser genuinely cannot
   // play these bytes; retrying the same URL will fail the same way.
   if (code === 3 || code === 4) return "fatal";
@@ -167,7 +242,10 @@ export function classifyMediaError(code: number | null | undefined): MediaFaultK
 }
 
 /** End of the buffered range holding the playhead, for the scrubber's buffer bar. */
-export function bufferedEndAt(ranges: TimeRanges | null, currentTime: number): number {
+export function bufferedEndAt(
+  ranges: TimeRanges | null,
+  currentTime: number,
+): number {
   if (!ranges) return 0;
   for (let i = 0; i < ranges.length; i += 1) {
     if (currentTime >= ranges.start(i) && currentTime <= ranges.end(i)) {

@@ -70,6 +70,7 @@ import {
   bufferedEndAt,
   classifyMediaError,
   isStalled,
+  monitorSilentAudio,
   monitorVideoFrames,
   nextStallAction,
 } from "@/lib/playerRecovery";
@@ -188,6 +189,12 @@ function workerManifestUrl(url: string) {
 function streamNetManifestUrl(url: string) {
   const target = new URL(proxiedUrl(url, liveTvProxyHeaders()));
   target.searchParams.set("rewrite", "streamnet");
+  return target.toString();
+}
+
+function audioTranscodeUrl(url: string) {
+  const target = new URL("/api/transcode/audio", window.location.origin);
+  target.searchParams.set("url", url);
   return target.toString();
 }
 
@@ -719,6 +726,69 @@ function VideoPlayer({
           settings.uiLanguage,
           "Der Ton wird wiedergegeben, aber der Browser kann dieses Videoformat nicht darstellen. Wähle eine Version ohne Dolby Vision oder einen kompatiblen externen Player.",
           "Audio is playing but the browser cannot render this video's format. Choose a non-DV version or use a compatible external player.",
+        ),
+      );
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [booted, stream.url, remuxRestartKey, liveTv]);
+
+  useEffect(() => {
+    if (!booted) return undefined;
+    const video = videoRef.current;
+    if (!video) return undefined;
+    return monitorSilentAudio(video, () => {
+      video.pause();
+      if (!stream.transcoded && canProviderTranscode(stream)) {
+        onToast(
+          localize(
+            settings.uiLanguage,
+            "Kein Ton decodiert. Die Audio-Spur wird beim Anbieter konvertiert.",
+            "No audio decoded. Requesting provider audio conversion.",
+          ),
+        );
+        onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
+        return;
+      }
+      if (liveTv && !stream.transcoded && stream.url) {
+        onToast(
+          localize(
+            settings.uiLanguage,
+            "Kein Ton decodiert. Live-Audio wird in AAC umgewandelt.",
+            "No audio decoded. Converting live audio to AAC.",
+          ),
+        );
+        onSelectStream(
+          {
+            ...stream,
+            url: audioTranscodeUrl(stream.url),
+            originalUrl: stream.originalUrl ?? stream.url,
+            transport: "mpegts",
+            transcoded: true,
+          },
+          { forceBrowser: true },
+        );
+        return;
+      }
+      if (!liveTv && !stream.remux && canTryRemux(stream)) {
+        onToast(
+          localize(
+            settings.uiLanguage,
+            "Kein Ton decodiert. Die Audio-Spur wird in AAC umgewandelt.",
+            "No audio decoded. Converting the audio track to AAC.",
+          ),
+        );
+        onSelectStream(stream, { forceRemux: true, forceBrowser: true });
+        return;
+      }
+      if (tryNextSource()) return;
+      setBuffering(false);
+      setShowControls(true);
+      setError(true);
+      onToast(
+        localize(
+          settings.uiLanguage,
+          "Dieses Audioformat kann der Browser nicht wiedergeben. Öffne den Stream in VLC.",
+          "This browser cannot decode the audio format. Open the stream in VLC.",
         ),
       );
     });

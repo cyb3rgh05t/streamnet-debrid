@@ -7,6 +7,8 @@ services:
       NEXT_PUBLIC_SELF_HOSTED: "true"
       NEXT_TELEMETRY_DISABLED: "1"
       STREAMNET_BACKEND_URL: ${STREAMNET_BACKEND_URL:-https://auth.mystreamnet.club}
+      STREAMNET_AUDIO_TRANSCODE_HOSTS: ${STREAMNET_AUDIO_TRANSCODE_HOSTS:-xui.streamnet.live,usenetstreamer.mystreamnet.club,85.209.176.85,193.200.221.81,193.108.118.53}
+      STREAMNET_MAX_AUDIO_TRANSCODES: ${STREAMNET_MAX_AUDIO_TRANSCODES:-4}
     networks:
       - proxy
     labels:

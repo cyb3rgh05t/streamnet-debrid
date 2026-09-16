@@ -2,6 +2,18 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.021] - 2026-09-16
+
+### Webplayer-Audio für Live-TV und VOD
+
+- Chromium erkennt jetzt laufendes Video ohne decodierte Audiobytes und wechselt nach acht Sekunden kontrolliert auf Anbieter-Transcoding, Browser-AAC-Remux oder die nächste Quelle.
+- AC-3 und E-AC-3 werden im Browser-Remux nicht mehr aufgrund einer unzuverlässigen MSE-Passthrough-Meldung direkt durchgereicht, sondern zu AAC konvertiert.
+- Live-TV kann stumme Audioformate über den neuen Self-hosted-FFmpeg-Endpunkt zu AAC Stereo konvertieren; Video wird ohne Re-Encoding übernommen.
+- Der AAC-Endpunkt ist auf explizit erlaubte Hosts begrenzt; `usenetstreamer.mystreamnet.club` ist als zulässiger Ursprung eingetragen. Addon-VOD verwendet weiterhin den Browser-Remux und benötigt dafür CORS- sowie Range-Support der Quelle.
+- Gleichzeitige Audio-Transcodes sind über `STREAMNET_MAX_AUDIO_TRANSCODES` von 1 bis 16 konfigurierbar; Standard ist 4. Die Slot-Reservierung erfolgt vor dem Upstream-Aufruf und verhindert paralleles Überschreiten des Limits.
+- Das Produktionsimage enthält FFmpeg. Lokale End-to-End-Prüfung: AC-3 5.1 wurde zu AAC Stereo; bei fünf parallelen Anfragen ergaben sich viermal HTTP 200 und einmal HTTP 503, anschließend wurde der Slot wieder freigegeben.
+- Produktivtest, Diagnose und Rollback: `docs/superpowers/web-audio-recovery-1.0.021-2026-09-16.md`.
+
 ## [2.5.021] - 2026-09-16
 
 ### Home-Rails, Hero und Live-TV-PiP
