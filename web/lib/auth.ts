@@ -53,7 +53,9 @@ export class AuthClient {
 
   onSessionChange(listener: (session: AuthSession | null) => void) {
     this.sessionListeners.add(listener);
-    return () => this.sessionListeners.delete(listener);
+    return () => {
+      this.sessionListeners.delete(listener);
+    };
   }
 
   private notifySessionChange() {
