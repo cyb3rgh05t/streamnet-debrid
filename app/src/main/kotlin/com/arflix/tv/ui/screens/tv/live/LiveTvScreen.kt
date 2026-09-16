@@ -2261,7 +2261,13 @@ fun LiveTvScreen(
     DisposableEffect(lifecycleOwner) {
         val obs = LifecycleEventObserver { _, ev ->
             when (ev) {
-                Lifecycle.Event.ON_PAUSE -> exoPlayer.pause()
+                Lifecycle.Event.ON_PAUSE -> {
+                    // Entering PiP also fires ON_PAUSE; the stream must keep playing
+                    // in the PiP window instead of freezing (matches VOD PlayerScreen).
+                    val inPip = android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O &&
+                        activity?.isInPictureInPictureMode == true
+                    if (!inPip) exoPlayer.pause()
+                }
                 Lifecycle.Event.ON_RESUME -> {
                     if (playingChannelId != null) exoPlayer.play()
                     if (currentUiState.isConfigured &&

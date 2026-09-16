@@ -610,7 +610,8 @@ class HomeViewModel @Inject constructor(
         return item.posterPath.isNullOrBlank() ||
             item.backdropPath.isNullOrBlank() ||
             item.overview.isBlank() ||
-            item.durationSeconds <= 0L
+            item.durationSeconds <= 0L ||
+            item.year.isBlank()
     }
 
     private suspend fun repairContinueWatchingMetadataIfNeeded(
@@ -2856,7 +2857,10 @@ class HomeViewModel @Inject constructor(
             error = null
         )
         replaceCardLogoState(snapshotLogoCache())
-        refreshWatchedBadges()
+        // Freshly rebuilt categories always start with isWatched=false; the 90s
+        // debounce must not skip re-applying badges here or checkmarks stay
+        // missing until the cooldown lapses on its own.
+        refreshWatchedBadges(immediate = true)
     }
 
     private var cwFetchJob: Job? = null
@@ -3042,7 +3046,14 @@ class HomeViewModel @Inject constructor(
                 fresh != instant &&
                 continueWatchingUpdates.revision == localUpdateRevision
             ) {
-                publishContinueWatching(fresh)
+                // Without repairing metadata here, items missing year/releaseDate/backdrop
+                // (common straight from the tracking provider) overwrite the already
+                // hydrated instant list, causing hero fields like the release year to
+                // flash away until the next repair pass runs.
+                val hydratedFresh = repairContinueWatchingMetadataIfNeeded(fresh)
+                if (continueWatchingUpdates.revision == localUpdateRevision) {
+                    publishContinueWatching(hydratedFresh)
+                }
             }
             val traktConnected = try {
             traktRepository.hasTrakt()
@@ -3717,7 +3728,10 @@ class HomeViewModel @Inject constructor(
                     }
                 }
                 replaceCardLogoState(snapshotLogoCache())
-                refreshWatchedBadges()
+                // categories was just replaced wholesale (isWatched resets to false);
+                // skipping this due to the 90s debounce is what leaves checkmarks
+                // missing after frequent loadHomeData reloads (catalog/IPTV/cloud sync).
+                refreshWatchedBadges(immediate = true)
                 scheduleStartupCatalogImageWarmup(categories)
                 scheduleRecentlyWatchedHydration()
 

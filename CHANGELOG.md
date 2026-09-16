@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.021] - 2026-09-16
+
+### Home-Rails, Hero und Live-TV-PiP
+
+- Gesehen-Häkchen in normalen Home-Rails werden jetzt zuverlässig nach jedem vollständigen Neuaufbau der Kategorien (Katalog-/IPTV-/Cloud-Refresh) sofort wieder angezeigt, statt durch das bisherige 90-Sekunden-Cooldown des Badge-Refreshs übersprungen zu werden.
+- Das Veröffentlichungsjahr im Mobile/Tablet-Hero blinkt nicht mehr unter dem Logo ein und aus: Der Hintergrund-Refresh von „Weiter ansehen“ durchläuft jetzt dieselbe Metadaten-Reparatur wie der Sofort-Pfad, bevor er veröffentlicht wird.
+- Bild-in-Bild bei Live-TV pausiert den Stream nicht mehr sofort: Der Lifecycle-Handler unterscheidet jetzt zwischen echtem Pausieren und dem Wechsel in den PiP-Modus, analog zum bestehenden VOD-Player.
+- Android-Version: `2.5.021` (`versionCode` 422).
+
 ## [2.5.020] - 2026-09-16
 
 ### Continue Watching bei sehr kurzen Sitzungen
