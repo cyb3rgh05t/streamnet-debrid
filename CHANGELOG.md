@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.020] - 2026-09-16
+
+### Continue Watching bei sehr kurzen Sitzungen
+
+- UI-Akzent-Sync wurde behoben und wird jetzt pro Profil zwischen WebUi und Android App gesynced. Der globale Wert dient nur noch
+  als Fallback.
+- Android-Version: `2.5.020` (`versionCode` 421); Web-Version: `1.0.020`.
+
 ## [2.5.018] - 2026-09-15
 
 ### Continue Watching bei sehr kurzen Sitzungen
