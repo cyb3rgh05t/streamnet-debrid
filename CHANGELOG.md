@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.002] - 2026-09-17
+
+### Erstes Backend-Cloud-Image
+
+- Der erste veröffentlichte `backend-cloud`-Build verwendet die umbenannte Ordnerstruktur und die korrigierte Versionsvergleichslogik.
+- Nach erfolgreichem Container-Publish sendet der eigene Actions-Job diesen deutschen Changelog an das StreamNet-Telegram-Topic.
+
 ## [2.5.022] - 2026-09-17
 
 ### Gemeinsamer Cloud-Release
