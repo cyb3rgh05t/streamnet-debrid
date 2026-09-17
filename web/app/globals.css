@@ -139,6 +139,7 @@ button {
   align-items: center;
   gap: 14px;
   min-width: 0;
+  transform: translateY(-6px);
 }
 
 .brand {
@@ -173,6 +174,7 @@ button {
   justify-content: center;
   align-items: center;
   gap: clamp(8px, 0.94vw, 18px);
+  transform: translateY(-6px);
 }
 
 .nav-item {
@@ -220,6 +222,7 @@ button {
   display: flex;
   align-items: center;
   gap: clamp(12px, 1.1vw, 22px);
+  transform: translateY(-6px);
 }
 
 .settings-gear {
@@ -4193,11 +4196,14 @@ select {
   gap: 7px;
   margin-top: 5px;
   min-width: 0;
+  font-size: clamp(16px, 1.22vw, 23px);
+  font-weight: 720;
+  line-height: 1.18;
 }
 
 .card-episode-code {
   flex: 0 0 auto;
-  font-size: clamp(13px, 0.95vw, 16px);
+  font-size: inherit;
 }
 
 .card-episode {
@@ -4206,7 +4212,7 @@ select {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(13px, 0.95vw, 16px);
+  font-size: inherit;
 }
 
 .media-card .card-upnext {
@@ -13121,20 +13127,24 @@ button,
 .livetv-detail-info {
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 15px;
+  gap: 8px;
+  min-height: 126px;
+  box-sizing: border-box;
+  padding: 12px;
   border: 1px solid rgba(255, 255, 255, 0.09);
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.035);
 }
 
 .livetv-detail-group {
+  margin: 0;
   font-size: 11.5px;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.45);
 }
 .livetv-detail h2 {
+  margin: 0;
   font-size: 20px;
   font-weight: 800;
   line-height: 1.2;
@@ -13143,8 +13153,8 @@ button,
 .livetv-program {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
+  gap: 4px;
+  padding: 9px 11px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.05);
 }
@@ -13177,10 +13187,11 @@ button,
   line-height: 1.3;
 }
 .livetv-program p {
+  margin: 0;
   font-size: 12.5px;
   color: rgba(255, 255, 255, 0.55);
   line-height: 1.5;
-  max-height: 96px;
+  max-height: 76px;
   overflow: hidden;
 }
 

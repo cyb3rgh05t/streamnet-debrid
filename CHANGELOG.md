@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.024] - 2026-09-17
+
+### Continue Watching und Live-TV-Feinschliff
+
+- Staffel, Episode und Episodentitel in „Weiterschauen“ verwenden nun dieselbe Titeltypografie wie Filmkarten; die Staffel-/Episodenkennung behält den aktiven Akzent.
+- Das Live-TV-Infofeld nutzt eine feste Grundhöhe passend zur Player-Vorschau und verdichtet Zeitangabe sowie Plot für eine ruhigere, einheitliche Kopfzeile.
+- Profil, Navigation und Einstellungen wurden im festen Desktop-Header gemeinsam leicht nach oben versetzt, damit sie nicht mehr mit dem darunterliegenden Live-TV-Inhalt kollidieren.
+
 ## [Web 1.0.023] - 2026-09-17
 
 ### Home- und Live-TV-Oberfläche
