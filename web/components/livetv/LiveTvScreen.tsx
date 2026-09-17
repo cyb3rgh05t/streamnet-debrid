@@ -1426,228 +1426,237 @@ export function LiveTvScreen() {
                       </button>
                     )}
                   </div>
-                  <p className="livetv-detail-group">
-                    {selectedChannel.group || "Live TV"}
-                  </p>
-                  <div className="livetv-channel-identity">
-                    <div className="tv-identity-logo">
-                      <ChannelLogo channel={selectedChannel} size={28} />
-                    </div>
-                    <span>
-                      {selectedChannel.name}
-                      {selectedChannel.qualityLabel
-                        ? ` · ${selectedChannel.qualityLabel}`
-                        : ""}
-                    </span>
-                  </div>
-                  <h2>{selectedGuide?.now?.title || selectedChannel.name}</h2>
-                  {selectedGuide?.now?.title ? (
-                    <div className="livetv-program">
-                      <div className="livetv-program-head">
-                        <em>
-                          {fmtTime(selectedGuide.now.startUtcMillis)} –{" "}
-                          {fmtTime(selectedGuide.now.endUtcMillis)}
-                        </em>
-                      </div>
-                      {selectedGuide.now.description && (
-                        <p>{selectedGuide.now.description}</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="livetv-detail-empty">
-                      {localize(
-                        settings.uiLanguage,
-                        "Keine Programmdaten für diesen Sender.",
-                        "No guide data for this channel.",
-                      )}
+                  <div className="livetv-detail-info">
+                    <p className="livetv-detail-group">
+                      {selectedChannel.group || "Live TV"}
                     </p>
-                  )}
-                  {selectedGuide?.next?.title && (
-                    <div className="livetv-program is-next">
-                      <div className="livetv-program-head">
-                        <span>
-                          {localize(
-                            settings.uiLanguage,
-                            "ALS NÄCHSTES",
-                            "NEXT",
-                          )}
-                        </span>
-                        <em>{fmtTime(selectedGuide.next.startUtcMillis)}</em>
+                    <div className="livetv-channel-identity">
+                      <div className="tv-identity-logo">
+                        <ChannelLogo channel={selectedChannel} size={28} />
                       </div>
-                      <strong>{selectedGuide.next.title}</strong>
+                      <span>
+                        {selectedChannel.name}
+                        {selectedChannel.qualityLabel
+                          ? ` · ${selectedChannel.qualityLabel}`
+                          : ""}
+                      </span>
                     </div>
-                  )}
-                  <div className="livetv-detail-actions">
-                    {favoriteIds.has(selectedChannel.id) && (
-                      <>
-                        <button
-                          className="secondary livetv-action-icon"
-                          type="button"
-                          title={localize(
-                            settings.uiLanguage,
-                            "Favoriten nach oben verschieben",
-                            "Move favorite up",
-                          )}
-                          aria-label={localize(
-                            settings.uiLanguage,
-                            "Favoriten nach oben verschieben",
-                            "Move favorite up",
-                          )}
-                          disabled={
-                            channelById.get(favorites[0])?.id ===
-                            selectedChannel.id
-                          }
-                          onClick={() => moveFavorite(selectedChannel.id, -1)}
-                        >
-                          <ArrowUp size={17} />
-                        </button>
-                        <button
-                          className="secondary livetv-action-icon"
-                          type="button"
-                          title={localize(
-                            settings.uiLanguage,
-                            "Favoriten nach unten verschieben",
-                            "Move favorite down",
-                          )}
-                          aria-label={localize(
-                            settings.uiLanguage,
-                            "Favoriten nach unten verschieben",
-                            "Move favorite down",
-                          )}
-                          disabled={
-                            channelById.get(favorites[favorites.length - 1])
-                              ?.id === selectedChannel.id
-                          }
-                          onClick={() => moveFavorite(selectedChannel.id, 1)}
-                        >
-                          <ArrowDown size={17} />
-                        </button>
-                      </>
+                    <h2>{selectedGuide?.now?.title || selectedChannel.name}</h2>
+                    {selectedGuide?.now?.title ? (
+                      <div className="livetv-program">
+                        <div className="livetv-program-head">
+                          <em>
+                            {fmtTime(selectedGuide.now.startUtcMillis)} –{" "}
+                            {fmtTime(selectedGuide.now.endUtcMillis)}
+                          </em>
+                        </div>
+                        {selectedGuide.now.description && (
+                          <p>{selectedGuide.now.description}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="livetv-detail-empty">
+                        {localize(
+                          settings.uiLanguage,
+                          "Keine Programmdaten für diesen Sender.",
+                          "No guide data for this channel.",
+                        )}
+                      </p>
                     )}
-                    <button
-                      type="button"
-                      className="primary"
-                      onClick={() => watchChannel(selectedChannel)}
-                    >
-                      <Play size={17} fill="currentColor" />{" "}
-                      {localize(settings.uiLanguage, "Ansehen", "Watch")}
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary livetv-action-secondary"
-                      onClick={() =>
-                        openChannelExternally(selectedChannel, "vlc")
-                      }
-                    >
-                      <ExternalLink size={17} /> VLC
-                    </button>
-                    <button
-                      type="button"
-                      className={
-                        favoriteIds.has(selectedChannel.id)
-                          ? "secondary livetv-action-icon is-active"
-                          : "secondary livetv-action-icon"
-                      }
-                      aria-label={
-                        favoriteIds.has(selectedChannel.id)
-                          ? localize(
+                    {selectedGuide?.next?.title && (
+                      <div className="livetv-program is-next">
+                        <div className="livetv-program-head">
+                          <span>
+                            {localize(
                               settings.uiLanguage,
-                              "Ausgewählten Favoriten entfernen",
-                              "Remove selected favorite",
-                            )
-                          : localize(
+                              "ALS NÄCHSTES",
+                              "NEXT",
+                            )}
+                          </span>
+                          <em>{fmtTime(selectedGuide.next.startUtcMillis)}</em>
+                        </div>
+                        <strong>{selectedGuide.next.title}</strong>
+                      </div>
+                    )}
+                    <div className="livetv-detail-actions">
+                      {favoriteIds.has(selectedChannel.id) && (
+                        <>
+                          <button
+                            className="secondary livetv-action-icon"
+                            type="button"
+                            title={localize(
                               settings.uiLanguage,
-                              "Ausgewählten Favoriten hinzufügen",
-                              "Add selected favorite",
-                            )
-                      }
-                      title={
-                        favoriteIds.has(selectedChannel.id)
-                          ? localize(
+                              "Favoriten nach oben verschieben",
+                              "Move favorite up",
+                            )}
+                            aria-label={localize(
                               settings.uiLanguage,
-                              "Favorit entfernen",
-                              "Remove favorite",
-                            )
-                          : localize(
+                              "Favoriten nach oben verschieben",
+                              "Move favorite up",
+                            )}
+                            disabled={
+                              channelById.get(favorites[0])?.id ===
+                              selectedChannel.id
+                            }
+                            onClick={() => moveFavorite(selectedChannel.id, -1)}
+                          >
+                            <ArrowUp size={17} />
+                          </button>
+                          <button
+                            className="secondary livetv-action-icon"
+                            type="button"
+                            title={localize(
                               settings.uiLanguage,
-                              "Favorit hinzufügen",
-                              "Add favorite",
-                            )
-                      }
-                      onClick={() => toggleFavorite(selectedChannel.id)}
-                    >
-                      <Star
-                        size={17}
-                        fill={
-                          favoriteIds.has(selectedChannel.id)
-                            ? "currentColor"
-                            : "none"
-                        }
-                      />
-                    </button>
-                    {Boolean(selectedChannel.catchupDays) && (
+                              "Favoriten nach unten verschieben",
+                              "Move favorite down",
+                            )}
+                            aria-label={localize(
+                              settings.uiLanguage,
+                              "Favoriten nach unten verschieben",
+                              "Move favorite down",
+                            )}
+                            disabled={
+                              channelById.get(favorites[favorites.length - 1])
+                                ?.id === selectedChannel.id
+                            }
+                            onClick={() => moveFavorite(selectedChannel.id, 1)}
+                          >
+                            <ArrowDown size={17} />
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
-                        className="secondary"
-                        aria-label={localize(
-                          settings.uiLanguage,
-                          "Catch-up-Archiv anzeigen",
-                          "Show catch-up archive",
-                        )}
-                        aria-expanded={archiveOpen}
-                        onClick={() => setArchiveOpen((value) => !value)}
+                        className="primary"
+                        onClick={() => watchChannel(selectedChannel)}
                       >
-                        <History size={17} /> Catch-up
+                        <Play size={17} fill="currentColor" />{" "}
+                        {localize(settings.uiLanguage, "Ansehen", "Watch")}
                       </button>
-                    )}
-                  </div>
-                  {archiveOpen && catchup?.channelId === selectedChannel.id && (
-                    <div className="livetv-catchup">
-                      <p className="livetv-catchup-head">
-                        <History size={14} /> Catch-up
-                        {selectedChannel.catchupDays
-                          ? ` · ${selectedChannel.catchupDays} ${localize(settings.uiLanguage, "Tage Archiv", "days archive")}`
-                          : ""}
-                      </p>
-                      {catchup.loading && (
-                        <p className="livetv-detail-empty">
-                          {localize(
-                            settings.uiLanguage,
-                            "Archiv wird geladen ...",
-                            "Loading archive...",
-                          )}
-                        </p>
-                      )}
-                      {!catchup.loading && !catchup.programs.length && (
-                        <p className="livetv-detail-empty">
-                          {localize(
-                            settings.uiLanguage,
-                            "Kein Archiv verfügbar.",
-                            "No archive available.",
-                          )}
-                        </p>
-                      )}
-                      {catchup.programs.map((program) => (
+                      <button
+                        type="button"
+                        className="secondary livetv-action-secondary"
+                        onClick={() =>
+                          openChannelExternally(selectedChannel, "vlc")
+                        }
+                      >
+                        <ExternalLink size={17} /> VLC
+                      </button>
+                      <button
+                        type="button"
+                        className={
+                          favoriteIds.has(selectedChannel.id)
+                            ? "secondary livetv-action-icon is-active"
+                            : "secondary livetv-action-icon"
+                        }
+                        aria-label={
+                          favoriteIds.has(selectedChannel.id)
+                            ? localize(
+                                settings.uiLanguage,
+                                "Ausgewählten Favoriten entfernen",
+                                "Remove selected favorite",
+                              )
+                            : localize(
+                                settings.uiLanguage,
+                                "Ausgewählten Favoriten hinzufügen",
+                                "Add selected favorite",
+                              )
+                        }
+                        title={
+                          favoriteIds.has(selectedChannel.id)
+                            ? localize(
+                                settings.uiLanguage,
+                                "Favorit entfernen",
+                                "Remove favorite",
+                              )
+                            : localize(
+                                settings.uiLanguage,
+                                "Favorit hinzufügen",
+                                "Add favorite",
+                              )
+                        }
+                        onClick={() => toggleFavorite(selectedChannel.id)}
+                      >
+                        <Star
+                          size={17}
+                          fill={
+                            favoriteIds.has(selectedChannel.id)
+                              ? "currentColor"
+                              : "none"
+                          }
+                        />
+                      </button>
+                      {Boolean(selectedChannel.catchupDays) && (
                         <button
                           type="button"
-                          key={`${program.startUtcMillis}`}
-                          className="livetv-catchup-row"
-                          onClick={() => playCatchup(selectedChannel, program)}
+                          className="secondary"
+                          aria-label={localize(
+                            settings.uiLanguage,
+                            "Catch-up-Archiv anzeigen",
+                            "Show catch-up archive",
+                          )}
+                          aria-expanded={archiveOpen}
+                          onClick={() => setArchiveOpen((value) => !value)}
                         >
-                          <CalendarClock size={14} />
-                          <span>
-                            <strong>{program.title}</strong>
-                            <em>
-                              {formatTime24Hour(program.startUtcMillis, [], {
-                                weekday: "short",
-                              })}
-                            </em>
-                          </span>
-                          <Play size={13} fill="currentColor" />
+                          <History size={17} /> Catch-up
                         </button>
-                      ))}
+                      )}
                     </div>
-                  )}
+                    {archiveOpen &&
+                      catchup?.channelId === selectedChannel.id && (
+                        <div className="livetv-catchup">
+                          <p className="livetv-catchup-head">
+                            <History size={14} /> Catch-up
+                            {selectedChannel.catchupDays
+                              ? ` · ${selectedChannel.catchupDays} ${localize(settings.uiLanguage, "Tage Archiv", "days archive")}`
+                              : ""}
+                          </p>
+                          {catchup.loading && (
+                            <p className="livetv-detail-empty">
+                              {localize(
+                                settings.uiLanguage,
+                                "Archiv wird geladen ...",
+                                "Loading archive...",
+                              )}
+                            </p>
+                          )}
+                          {!catchup.loading && !catchup.programs.length && (
+                            <p className="livetv-detail-empty">
+                              {localize(
+                                settings.uiLanguage,
+                                "Kein Archiv verfügbar.",
+                                "No archive available.",
+                              )}
+                            </p>
+                          )}
+                          {catchup.programs.map((program) => (
+                            <button
+                              type="button"
+                              key={`${program.startUtcMillis}`}
+                              className="livetv-catchup-row"
+                              onClick={() =>
+                                playCatchup(selectedChannel, program)
+                              }
+                            >
+                              <CalendarClock size={14} />
+                              <span>
+                                <strong>{program.title}</strong>
+                                <em>
+                                  {formatTime24Hour(
+                                    program.startUtcMillis,
+                                    [],
+                                    {
+                                      weekday: "short",
+                                    },
+                                  )}
+                                </em>
+                              </span>
+                              <Play size={13} fill="currentColor" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                  </div>
                 </>
               ) : (
                 <div className="livetv-detail-empty-state">

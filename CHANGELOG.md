@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.023] - 2026-09-17
+
+### Home- und Live-TV-Oberfläche
+
+- Continue-Watching-Episoden zeigen jetzt zuerst Staffel, Episode und Episodentitel; der Serienname steht darunter in derselben dezenten Meta-Schrift wie ein Film-Release-Datum.
+- Das Live-TV-Info-Panel trennt Preview-Player sowie Sender- und Programminformationen klarer durch eigene Flächen.
+- Live-TV-Aktionsbuttons behalten jetzt ihre natürliche Breite und umbrechen bei Bedarf sauber, statt das Info-Panel unnötig weit aufzuziehen.
+
 ## [Web 1.0.022] - 2026-09-16
 
 ### Xtream-VOD Mixed-Content-Hotfix

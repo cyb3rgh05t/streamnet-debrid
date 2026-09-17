@@ -304,6 +304,22 @@ function MediaCardBase({
       ? ""
       : formatRuntime(item.duration, settings.uiLanguage);
   const episode = episodeMetadata(item);
+  const episodeLine = episode ? (
+    <div className="card-episode-line">
+      {isUpNext && (
+        <span className="card-upnext">
+          {localize(settings.uiLanguage, "Als Nächstes", "Up next")}
+        </span>
+      )}
+      <span
+        className="card-episode-code"
+        style={{ color: accentColor(settings.accentColor) }}
+      >
+        {episode.code}
+      </span>
+      {episode.title && <span className="card-episode">· {episode.title}</span>}
+    </div>
+  ) : null;
 
   return (
     <button
@@ -370,30 +386,24 @@ function MediaCardBase({
           </span>
         )}
       </div>
-      <strong>{item.title}</strong>
-      {episode ? (
-        <div className="card-episode-line">
-          {isUpNext && (
-            <span className="card-upnext">
-              {localize(settings.uiLanguage, "Als Nächstes", "Up next")}
-            </span>
-          )}
-          <span
-            className="card-episode-code"
-            style={{ color: accentColor(settings.accentColor) }}
-          >
-            {episode.code}
-          </span>
-          {episode.title && (
-            <span className="card-episode">· {episode.title}</span>
-          )}
+      {isContinueWatchingCard && episodeLine}
+      {isContinueWatchingCard ? (
+        <div className="card-meta-row card-series-title">
+          <span className="card-date">{item.title}</span>
         </div>
       ) : (
-        <div className="card-meta-row">
-          <span className="card-date">{dateLabel}</span>
-          {runtimeLabel && <span className="card-runtime">{runtimeLabel}</span>}
-        </div>
+        <strong>{item.title}</strong>
       )}
+      {!isContinueWatchingCard && episode
+        ? episodeLine
+        : !episode && (
+            <div className="card-meta-row">
+              <span className="card-date">{dateLabel}</span>
+              {runtimeLabel && (
+                <span className="card-runtime">{runtimeLabel}</span>
+              )}
+            </div>
+          )}
     </button>
   );
 }

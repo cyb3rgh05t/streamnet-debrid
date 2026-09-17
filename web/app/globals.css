@@ -13070,11 +13070,20 @@ button,
 .livetv-detail {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 20px;
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  background: rgba(255, 255, 255, 0.03);
+  gap: 14px;
+  padding: 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(229, 162, 9, 0.22);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.065),
+      rgba(255, 255, 255, 0.02)
+    ),
+    rgba(10, 10, 10, 0.84);
+  box-shadow:
+    0 18px 42px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   position: sticky;
   /* Same clearance as .livetv-cats — 96px sat under the bar's controls on
      large screens. max-height follows so the stuck panel still fits. */
@@ -13088,17 +13097,35 @@ button,
 .livetv-detail-art {
   display: grid;
   place-items: center;
-  height: 110px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.05);
+  height: 126px;
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background:
+    radial-gradient(
+      circle at 50% 18%,
+      rgba(229, 162, 9, 0.14),
+      transparent 62%
+    ),
+    rgba(0, 0, 0, 0.42);
   color: rgba(255, 255, 255, 0.3);
   overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.24);
 }
 
 .livetv-detail-art img {
   max-width: 70%;
   max-height: 84%;
   object-fit: contain;
+}
+
+.livetv-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.035);
 }
 
 .livetv-detail-group {
@@ -13164,17 +13191,19 @@ button,
 
 .livetv-detail-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 .livetv-detail-actions .primary,
 .livetv-detail-actions .secondary {
-  flex: 1;
+  flex: 0 1 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 44px;
+  padding-inline: 15px;
   border-radius: 12px;
   font-weight: 700;
   font-size: 14px;
@@ -13960,6 +13989,10 @@ html {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.card-series-title .card-date {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .card-meta-row .card-runtime {
