@@ -49,7 +49,10 @@ jobs:
           current=$(node -p "require('./backend-cloud/package.json').version")
           previous=""
           if [[ "$BEFORE_SHA" != "0000000000000000000000000000000000000000" ]]; then
-            previous=$(git show "$BEFORE_SHA:backend-cloud/package.json" 2>/dev/null | node -e "let input=''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(input).version));" || true)
+            previous_package=$(git show "$BEFORE_SHA:backend-cloud/package.json" 2>/dev/null || git show "$BEFORE_SHA:self-hosted-backend/package.json" 2>/dev/null || true)
+            if [[ -n "$previous_package" ]]; then
+              previous=$(printf '%s' "$previous_package" | node -e "let input=''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(input).version));")
+            fi
           fi
 
           if [[ -n "$previous" && "$current" != "$previous" ]]; then
