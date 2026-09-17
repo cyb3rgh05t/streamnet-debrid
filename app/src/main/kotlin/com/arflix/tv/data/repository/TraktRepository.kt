@@ -139,6 +139,7 @@ class TraktRepository @Inject constructor(
         watchedMoviesCache.clear()
         watchedEpisodesCache.clear()
         cacheInitialized = false
+        cacheInitializedAtMs = 0L
         cacheInitializing = false
         showWatchedEpisodesCache.clear()
         showWatchedCacheTime = 0L
@@ -4476,7 +4477,17 @@ class TraktRepository @Inject constructor(
     private val watchedMoviesCache = mutableSetOf<Int>()
     private val watchedEpisodesCache = mutableSetOf<String>()
     private var cacheInitialized = false
+    private var cacheInitializedAtMs = 0L
     @Volatile private var cacheInitializing = false
+    private val EMPTY_WATCHED_CACHE_RETRY_MS = 30_000L
+
+    private fun watchedCacheHasData(): Boolean =
+        watchedMoviesCache.isNotEmpty() || watchedEpisodesCache.isNotEmpty()
+
+    private fun markWatchedCacheInitialized() {
+        cacheInitialized = true
+        cacheInitializedAtMs = System.currentTimeMillis()
+    }
 
     /**
      * Invalidate watched cache - forces reload on next access
@@ -4485,6 +4496,7 @@ class TraktRepository @Inject constructor(
     fun invalidateWatchedCache() {
         ensureProfileCacheScope()
         cacheInitialized = false
+        cacheInitializedAtMs = 0L
         watchedMoviesCache.clear()
         watchedEpisodesCache.clear()
     }
@@ -4498,7 +4510,12 @@ class TraktRepository @Inject constructor(
      */
     suspend fun initializeWatchedCache() {
         ensureProfileCacheScope()
-        if (cacheInitialized) return
+        if (cacheInitialized) {
+            val emptyCacheExpired = !watchedCacheHasData() &&
+                System.currentTimeMillis() - cacheInitializedAtMs >= EMPTY_WATCHED_CACHE_RETRY_MS
+            if (!emptyCacheExpired) return
+            cacheInitialized = false
+        }
         // Prevent multiple simultaneous initializations
         if (cacheInitializing) {
             // Wait for ongoing initialization to complete
@@ -4537,7 +4554,7 @@ class TraktRepository @Inject constructor(
                 watchedMoviesCache.addAll(localSnapshotMovies)
                 watchedEpisodesCache.clear()
                 watchedEpisodesCache.addAll(localSnapshotEpisodes)
-                cacheInitialized = true
+                markWatchedCacheInitialized()
                 return
             }
 
@@ -4557,7 +4574,7 @@ class TraktRepository @Inject constructor(
             watchedEpisodesCache.addAll(mdbEpisodes)
             watchedEpisodesCache.addAll(simklEpisodes)
 
-            cacheInitialized = true
+            markWatchedCacheInitialized()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
@@ -4578,10 +4595,10 @@ class TraktRepository @Inject constructor(
                     watchedEpisodesCache.clear()
                     watchedEpisodesCache.addAll(localSnapshotEpisodes)
                 }
-                cacheInitialized = true
+                markWatchedCacheInitialized()
             } catch (_: Exception) {
                 // No data available - mark as initialized with empty caches
-                cacheInitialized = true
+                markWatchedCacheInitialized()
             }
         } finally {
             cacheInitializing = false

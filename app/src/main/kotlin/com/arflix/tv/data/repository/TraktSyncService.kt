@@ -977,6 +977,7 @@ class TraktSyncService @Inject constructor(
             val allRecords = mutableListOf<WatchedMovieRecord>()
             val pageSize = 1000
             var offset = 0
+            var previousPage: List<WatchedMovieRecord>? = null
             while (true) {
                 val page = executeSupabaseCall("get watched movies page $offset") { auth ->
                     supabaseApi.getWatchedMovies(
@@ -987,8 +988,10 @@ class TraktSyncService @Inject constructor(
                         limit = pageSize
                     )
                 }
+                if (page.isNotEmpty() && page == previousPage) break
                 allRecords.addAll(page)
                 if (page.size < pageSize) break // Last page
+                previousPage = page
                 offset += pageSize
             }
             if (allRecords.isEmpty() && cachedWatchedMovies != null) {
@@ -1033,6 +1036,7 @@ class TraktSyncService @Inject constructor(
             val allRecords = mutableListOf<WatchedEpisodeRecord>()
             val pageSize = 1000
             var offset = 0
+            var previousPage: List<WatchedEpisodeRecord>? = null
             while (true) {
                 val page = executeSupabaseCall("get watched episodes page $offset") { auth ->
                     supabaseApi.getWatchedEpisodes(
@@ -1043,8 +1047,10 @@ class TraktSyncService @Inject constructor(
                         limit = pageSize
                     )
                 }
+                if (page.isNotEmpty() && page == previousPage) break
                 allRecords.addAll(page)
                 if (page.size < pageSize) break // Last page
+                previousPage = page
                 offset += pageSize
             }
 

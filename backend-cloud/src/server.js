@@ -358,6 +358,19 @@ function watchStateProfile(query) {
   return stateQueryValue(query.profile_id);
 }
 
+function watchStatePage(query) {
+  const parsedLimit = Number.parseInt(String(query.limit ?? "1000"), 10);
+  const parsedOffset = Number.parseInt(String(query.offset ?? "0"), 10);
+  return {
+    limit:
+      Number.isFinite(parsedLimit) && parsedLimit > 0
+        ? Math.min(parsedLimit, 1000)
+        : 1000,
+    offset:
+      Number.isFinite(parsedOffset) && parsedOffset > 0 ? parsedOffset : 0,
+  };
+}
+
 async function readWatchState(type, request) {
   const account = await authenticatedAccount(request);
   const query = request.query || {};
@@ -386,8 +399,10 @@ async function readWatchState(type, request) {
     );
     filters.push(`${column} = $${values.length}`);
   }
+  const page = watchStatePage(query);
+  values.push(page.limit, page.offset);
   const result = await pool.query(
-    `select payload from watch_state where ${filters.join(" and ")} order by updated_at desc limit 5000`,
+    `select payload from watch_state where ${filters.join(" and ")} order by updated_at desc, id desc limit $${values.length - 1} offset $${values.length}`,
     values,
   );
   return result.rows.map((row) => row.payload);

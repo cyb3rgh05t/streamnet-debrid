@@ -2,6 +2,22 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.023] - 2026-09-17
+
+### Watched-Checkmarks in Home-Rails
+
+- Watched-Häkchen in normalen Home-Rails laden auf Mobile, Tablet und TV wieder vollständig nach, auch wenn der erste Watched-Cache-Aufbau leer oder zu früh abgeschlossen wurde.
+- Die Android-App retryt leere Watched-State-Caches nach kurzer Zeit erneut, statt einen transienten leeren Zustand für die ganze Sitzung als final zu behandeln.
+- Android-Version: `2.5.023` ; Backend-Cloud-Version: `1.0.003`.
+
+## [Backend 1.0.003] - 2026-09-17
+
+### Watched-State-Pagination
+
+- Backend Cloud berücksichtigt bei Watched-State-Reads jetzt `offset` und `limit`, sodass Android alle Filme und Episoden über mehrere Seiten laden kann statt wiederholt denselben neuesten Block zu erhalten.
+- Die Watched-State-Endpunkte liefern Seiten stabil sortiert nach letzter Änderung und ID aus.
+- Backend-Cloud-Version: `1.0.003`.
+
 ## [Backend 1.0.002] - 2026-09-17
 
 ### Erstes Backend-Cloud-Image
