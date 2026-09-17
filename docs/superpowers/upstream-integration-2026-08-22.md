@@ -27,7 +27,7 @@ The full upstream branch was not merged directly because this fork has intention
   - Mobile callbacks use `mobile_` state and return to the app deeplink.
   - TV callbacks use `tv_` state and notify `/.netlify/functions/discord-auth-callback` with the unprefixed device code.
   - Unmarked states are rejected instead of guessing the flow.
-- Shared callback logic was later migrated to `self-hosted-backend/public/discord/callback.js`; the former Netlify copy has been removed.
+- Shared callback logic was later migrated to `backend-cloud/public/discord/callback.js`; the former Netlify copy has been removed.
 - Duplicate Android Discord string resources were removed from `app/src/main/res/values/strings.xml` to fix resource merging.
 
 ## Deployment Notes

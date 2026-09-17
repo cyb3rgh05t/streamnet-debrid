@@ -1,4 +1,4 @@
-name: Android Build
+name: Publish StreamNet Android App
 
 on:
   push:
@@ -294,12 +294,45 @@ jobs:
               --notes-file release-notes.md
           fi
 
+  notify-telegram:
+    name: Send app changelog to Telegram
+    needs: [version-check, signed-apk]
+    if: github.event_name == 'push' && needs.version-check.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Read Android version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(grep -oP 'versionName\s*=\s*"\K[^"]+' app/build.gradle.kts)
+          grep -Eq "^## \[$version\](\s+-.*)?$" CHANGELOG.md
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate Telegram secrets
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+        run: |
+          set -euo pipefail
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_TOPIC_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing GitHub secret: ${name}"
+              exit 1
+            fi
+          done
+
       - name: Send German changelog to Telegram
         env:
-          CHANGELOG_VERSION: ${{ steps.package.outputs.version_name }}
-          CHANGELOG_TITLE: StreamNet Update
+          CHANGELOG_VERSION: ${{ steps.version.outputs.value }}
+          CHANGELOG_TITLE: StreamNet App Update
           CHANGELOG_FILE: CHANGELOG.md
-          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.package.outputs.version_name }}
+          RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ steps.version.outputs.value }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}

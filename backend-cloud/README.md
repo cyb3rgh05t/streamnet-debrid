@@ -1,4 +1,4 @@
-# StreamNet Self-Hosted Backend
+# StreamNet Backend Cloud
 
 This is the self-hosted StreamNet backend. The production Android build uses it at `https://auth.mystreamnet.club`.
 
@@ -154,7 +154,7 @@ The API router deliberately has no Authelia middleware. Android TV and mobile ca
 
 `PUBLIC_BASE_URL` now serves the existing StreamNet gold account page and StreamNet logo assets directly from this container. It supports self-hosted sign-in, account creation, and QR TV-pairing approval without Netlify. Use `https://auth.mystreamnet.club/` to inspect it; QR codes open the same page with a one-time `?code=...` pairing parameter.
 
-The active static web assets live in `self-hosted-backend/public/` and are copied into the Docker image from that directory.
+The active static web assets live in `backend-cloud/public/` and are copied into the Docker image from that directory.
 
 Account deletion is available at `https://auth.mystreamnet.club/delete-account`; it requires a fresh sign-in and an exact `DELETE` confirmation, revokes the account sessions, removes the cloud snapshot, and removes pending TV pairing sessions. It does not fall back to Netlify.
 
@@ -217,10 +217,10 @@ Install `app/build/outputs/apk/sideload/selfHosted/app-sideload-selfHosted.apk` 
 
 ## Container Publishing
 
-The `Publish Self-Hosted Backend` GitHub Actions workflow runs for changes under `self-hosted-backend/` on `main`. It tests the service and publishes these GHCR tags:
+The `Publish StreamNet Cloud Backend` GitHub Actions workflow runs for changes under `backend-cloud/` on `main`. It tests the service and publishes these GHCR tags:
 
-- `ghcr.io/cyb3rgh05t/streamnet-self-hosted-backend:latest`
-- `ghcr.io/cyb3rgh05t/streamnet-self-hosted-backend:sha-<commit>`
+- `ghcr.io/cyb3rgh05t/streamnet-backend:latest`
+- `ghcr.io/cyb3rgh05t/streamnet-backend:sha-<commit>`
 
 Use the `sha-<commit>` tag in `STREAMNET_BACKEND_IMAGE` when testing or rolling back a server deployment. The container package must be public, or the server must use a GitHub personal access token with `read:packages` before `docker compose pull`.
 
@@ -262,7 +262,7 @@ The write runs in one transaction, increments each changed snapshot revision, up
 
 The commands below use the Compose service name `postgres` from `compose.yaml`.
 They do not depend on Docker's generated container name (for example,
-`self-hosted-backend-postgres-1`). Run them from the directory containing
+`backend-cloud-postgres-1`). Run them from the directory containing
 `compose.yaml`.
 
 Create a database backup before either reset:

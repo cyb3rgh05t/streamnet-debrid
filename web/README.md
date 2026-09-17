@@ -1,6 +1,6 @@
 # StreamNet Webplayer
 
-This folder contains the self-hosted StreamNet webplayer. It is deployed separately from `self-hosted-backend` and reaches the backend over HTTPS.
+This folder contains the self-hosted StreamNet webplayer. It is deployed separately from `backend-cloud` and reaches the backend over HTTPS.
 
 ## Purpose
 

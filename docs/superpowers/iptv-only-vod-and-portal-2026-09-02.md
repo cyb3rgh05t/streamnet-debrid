@@ -93,7 +93,7 @@ Standard validation commands:
 
 ```powershell
 .\gradlew.bat :app:testSideloadDebugUnitTest -PenableUnitTests :app:assembleSideloadDebug --no-daemon
-npm --prefix self-hosted-backend test
+npm --prefix backend-cloud test
 git diff --check
 ```
 

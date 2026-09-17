@@ -5,7 +5,7 @@ StreamNet Debrid is a StreamNet-focused Android TV APK with its own cloud/auth b
 This repository intentionally keeps only the surfaces that are needed for the app runtime and account sync:
 
 - `app/` - Android TV/mobile APK source
-- `self-hosted-backend/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
+- `backend-cloud/` - StreamNet account, sync, pairing, deletion, analytics, and hosted auth/privacy pages
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, and release artifact folders.
 

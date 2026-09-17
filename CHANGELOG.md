@@ -2,6 +2,27 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.022] - 2026-09-17
+
+### Gemeinsamer Cloud-Release
+
+- Android-Version: `2.5.022` (`versionCode` 423). Der Release baut die aktuelle APK, Weboberfläche, den Mediaresolver und Backend Cloud erneut.
+- Der Android-Publish-Workflow zeigt den Telegram-Versand künftig als eigenen, nachgelagerten Actions-Job an.
+
+## [Web 1.0.025] - 2026-09-17
+
+### Veröffentlichung und Navigation
+
+- Web-Version für den gemeinsamen Cloud-Release erhöht; der versionsgesteuerte Publish-Workflow baut das Web-Image und den Mediaresolver erneut.
+- Die aktuelle Desktop-Navigation und Live-TV-Infofeld-Ausrichtung sind Teil dieses Builds.
+
+## [Backend 1.0.001] - 2026-09-17
+
+### Backend Cloud und Veröffentlichung
+
+- Der bisherige Ordner `self-hosted-backend/` heißt jetzt `backend-cloud/`; Docker-Build, GitHub Actions, lokale Befehle und Dokumentation verwenden den neuen Namen.
+- Backend-Releases prüfen künftig die Paketversion, bauen und veröffentlichen das Container-Image nur bei einer neuen Version und senden den deutschen Changelog anschließend an das bestehende Telegram-Topic.
+
 ## [Web 1.0.024] - 2026-09-17
 
 ### Continue Watching und Live-TV-Feinschliff

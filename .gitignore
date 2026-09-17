@@ -81,7 +81,7 @@ secrets.properties
 *.secrets.properties
 keystore.properties
 migration-export/
-self-hosted-backend/data/
+backend-cloud/data/
 
 # Signing keys
 release.keystore
@@ -189,3 +189,4 @@ upstream-arvio-ref/
 streamnet-before-netlify-import.sql
 streamnet-payload.json
 streamnet-payload.txt
+web/tsconfig.tsbuildinfo

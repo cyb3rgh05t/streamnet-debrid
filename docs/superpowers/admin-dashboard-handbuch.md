@@ -298,7 +298,7 @@ Die Login-Seite (`index.html`) zeigt einen „Passwort vergessen?“-Link und ru
 dafür `/cloud-auth-reset` sowie `/auth-password-complete` auf. Diese beiden
 Endpunkte existieren im aktuellen Self-hosted-Backend noch nicht — ein Klick
 darauf schlägt derzeit fehl. Das ist kein Bug, sondern ein dokumentierter,
-offener Punkt: Laut `self-hosted-backend/README.md` wird Passwort-Reset erst
+offener Punkt: Laut `backend-cloud/README.md` wird Passwort-Reset erst
 nach Einrichtung eines E-Mail-Versands (z. B. via SMTP oder einem Anbieter wie
 Resend) ergänzt. Bis dahin kann ein vergessenes Passwort nur durch einen
 Admin-Eingriff auf Datenbankebene behoben werden (kein Dashboard-Feature).
