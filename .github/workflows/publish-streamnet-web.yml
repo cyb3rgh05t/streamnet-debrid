@@ -177,14 +177,39 @@ jobs:
             previous=$(git show "$BEFORE_SHA:web/package.json" 2>/dev/null | node -e "let input=''; process.stdin.on('data', chunk => input += chunk); process.stdin.on('end', () => process.stdout.write(JSON.parse(input).version));" || true)
           fi
 
+          echo "before_sha=${BEFORE_SHA}"
+          echo "current_version=${current}"
+          echo "previous_version=${previous:-<not found>}"
+
           if [[ -n "$previous" && "$current" != "$previous" ]]; then
-            heading="## [Web $current]"
-            grep -Fqx "$heading" CHANGELOG.md
+            if ! grep -Eq "^## \[Web ${current}\](\s+-.*)?$" CHANGELOG.md; then
+              echo "No changelog heading found for version ${current} in CHANGELOG.md"
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             echo "changed=true" >> "$GITHUB_OUTPUT"
             echo "value=$current" >> "$GITHUB_OUTPUT"
+            echo "Telegram notification enabled for new web version ${current}"
           else
+            echo "Telegram notification skipped: previous version missing or unchanged."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Validate Telegram secrets
+        if: steps.web_version.outputs.changed == 'true'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          TELEGRAM_TOPIC_ID: ${{ secrets.TELEGRAM_TOPIC_ID }}
+        run: |
+          set -euo pipefail
+          for name in TELEGRAM_BOT_TOKEN TELEGRAM_CHAT_ID TELEGRAM_TOPIC_ID; do
+            if [[ -z "${!name}" ]]; then
+              echo "Missing GitHub secret: ${name}"
+              exit 1
+            fi
+          done
+          echo "Telegram secrets configured successfully."
 
       - name: Send German web changelog to Telegram
         if: steps.web_version.outputs.changed == 'true'
