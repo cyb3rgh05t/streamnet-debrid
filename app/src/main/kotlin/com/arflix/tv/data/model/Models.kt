@@ -24,6 +24,7 @@ data class MediaItem(
     val backdrop: String? = null,
     val progress: Int = 0,
     val isWatched: Boolean = false,
+    val isPartiallyWatched: Boolean = false,
     val traktId: Int? = null,
     val badge: String? = null,
     val genreIds: List<Int> = emptyList(),
@@ -32,6 +33,7 @@ data class MediaItem(
     val isOngoing: Boolean = false,
     val totalEpisodes: Int? = null,
     val watchedEpisodes: Int? = null,
+    val seriesEpisodeCount: Int? = null,
     val nextEpisode: NextEpisode? = null,
     // Additional movie-specific fields
     val certification: String? = null,

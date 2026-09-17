@@ -741,6 +741,7 @@ export interface AppStore {
     seasonNumber?: number | null,
     episodeNumber?: number | null,
   ) => boolean;
+  isPartiallyWatched: (item: MediaItem) => boolean;
   markWatchedLocally: (
     item: {
       mediaType: MediaItem["mediaType"];
@@ -1693,12 +1694,24 @@ export function AppProvider({
             cloudCw,
             activeCloudResumeKeys,
           );
-          if (
-            !readFailures.has("watched-movies") &&
-            !readFailures.has("watched-shows") &&
-            isCurrent()
-          )
-            setWatchedKeys(watchedKeys);
+          if (isCurrent()) {
+            const movieReadFailed = readFailures.has("watched-movies");
+            const showReadFailed = readFailures.has("watched-shows");
+            setWatchedKeys((current) => {
+              const next = new Set(watchedKeys);
+              if (movieReadFailed) {
+                current.forEach((key) => {
+                  if (key.startsWith("movie:")) next.add(key);
+                });
+              }
+              if (showReadFailed) {
+                current.forEach((key) => {
+                  if (key.startsWith("tv:")) next.add(key);
+                });
+              }
+              return next;
+            });
+          }
           const cwBase = includeIptvContinueWatching(
             traktReady ? traktCw : cloudCw.filter(isPausedContinueWatchingItem),
             cloudCw.filter((item) => !isHiddenShow(item) && !isDismissed(item)),
@@ -2363,6 +2376,16 @@ export function AppProvider({
       seasonNumber?: number | null,
       episodeNumber?: number | null,
     ) => isMediaWatched(item, watchedKeys, seasonNumber, episodeNumber),
+    [watchedKeys],
+  );
+
+  const isPartiallyWatched = useCallback(
+    (item: MediaItem) => {
+      if (item.mediaType !== "tv" || watchedKeys.has(`tv:${item.id}`))
+        return false;
+      const prefix = `tv:${item.id}:`;
+      return [...watchedKeys].some((key) => key.startsWith(prefix));
+    },
     [watchedKeys],
   );
 
@@ -4009,6 +4032,7 @@ export function AppProvider({
       continueWatching,
       watchlist,
       isWatched,
+      isPartiallyWatched,
       markWatchedLocally,
       hero,
       setHeroPreview,
@@ -4106,6 +4130,7 @@ export function AppProvider({
       continueWatching,
       watchlist,
       isWatched,
+      isPartiallyWatched,
       hero,
       heroPreview,
       selected,

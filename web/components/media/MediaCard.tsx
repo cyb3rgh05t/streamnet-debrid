@@ -1,6 +1,6 @@
 "use client";
 
-import { BadgeCheck, Clapperboard } from "lucide-react";
+import { BadgeCheck, Clapperboard, Minus } from "lucide-react";
 import { memo, useEffect, useRef, useState } from "react";
 import { accentColor } from "@/lib/accent";
 import {
@@ -96,7 +96,7 @@ function MediaCardBase({
   posterMode?: boolean;
   autoFocus?: boolean;
 }) {
-  const { settings, isWatched, openContextMenu } = useApp();
+  const { settings, isWatched, isPartiallyWatched, openContextMenu } = useApp();
   const effectivePosterMode =
     posterMode ?? settings.cardLayoutMode === "poster";
   const [loadedArtwork, setLoadedArtwork] = useState("");
@@ -111,6 +111,7 @@ function MediaCardBase({
     (item.progress ?? 0) / 100,
   );
   const storedWatched = isWatched(item);
+  const partiallyWatched = isPartiallyWatched(item);
   // "Up next" rows carry SERIES completion (how far through the show you are),
   // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
   // reads as "you're 40% into that episode", which is wrong. Those rows get the
@@ -370,6 +371,18 @@ function MediaCardBase({
             aria-label={localize(settings.uiLanguage, "Gesehen", "Watched")}
           >
             <BadgeCheck size={13} />
+          </span>
+        )}
+        {!watched && partiallyWatched && !isContinueWatchingCard && (
+          <span
+            className="watched-badge partial-watched-badge"
+            aria-label={localize(
+              settings.uiLanguage,
+              "Teilweise gesehen",
+              "Partially watched",
+            )}
+          >
+            <Minus size={13} />
           </span>
         )}
         {timeRemainingLabel && (

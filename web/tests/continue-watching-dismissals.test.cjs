@@ -92,6 +92,30 @@ test("stored cloud progress survives placeholder playback timing", async () => {
   assert.equal(continueWatchingProgressPercent(4357, 7670, 0.57), 57);
 });
 
+test("completed episode advances within the current season", async () => {
+  const { nextEpisodeAfter } = await import(moduleUrl);
+  const show = {
+    mediaType: "tv",
+    seasons: [{ seasonNumber: 1, episodeCount: 10 }],
+  };
+
+  assert.deepEqual(nextEpisodeAfter(show, 1, 4), { season: 1, episode: 5 });
+});
+
+test("completed season advances to the first episode of the next season", async () => {
+  const { nextEpisodeAfter } = await import(moduleUrl);
+  const show = {
+    mediaType: "tv",
+    seasons: [
+      { seasonNumber: 1, episodeCount: 10 },
+      { seasonNumber: 2, episodeCount: 8 },
+    ],
+  };
+
+  assert.deepEqual(nextEpisodeAfter(show, 1, 10), { season: 2, episode: 1 });
+  assert.equal(nextEpisodeAfter(show, 2, 8), null);
+});
+
 test("active cloud movie resume survives tracker completion", async () => {
   const { pruneCompletedResume } = await import(moduleUrl);
   const item = {

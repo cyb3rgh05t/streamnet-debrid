@@ -1,5 +1,29 @@
 import type { MediaItem } from "./types";
 
+export function nextEpisodeAfter(
+  item: MediaItem,
+  seasonNumber: number,
+  episodeNumber: number,
+): { season: number; episode: number } | null {
+  const seasons = (item.seasons ?? [])
+    .filter((season) => season.seasonNumber > 0)
+    .sort((a, b) => a.seasonNumber - b.seasonNumber);
+  const currentSeason = seasons.find(
+    (season) => season.seasonNumber === seasonNumber,
+  );
+  if (
+    !currentSeason?.episodeCount ||
+    episodeNumber < currentSeason.episodeCount
+  ) {
+    return { season: seasonNumber, episode: episodeNumber + 1 };
+  }
+  const nextSeason = seasons.find(
+    (season) =>
+      season.seasonNumber > seasonNumber && (season.episodeCount ?? 0) > 0,
+  );
+  return nextSeason ? { season: nextSeason.seasonNumber, episode: 1 } : null;
+}
+
 type WatchedRow = {
   status?: string;
   last_watched_at?: string;

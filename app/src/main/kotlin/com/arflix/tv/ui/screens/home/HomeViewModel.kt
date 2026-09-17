@@ -100,6 +100,32 @@ internal fun isLogoCacheLanguageCurrent(cachedLanguage: String?, contentLanguage
     cachedLanguage != null &&
         normalizeLogoCacheLanguage(cachedLanguage) == normalizeLogoCacheLanguage(contentLanguage)
 
+internal data class HomeWatchedBadgeState(
+    val isWatched: Boolean,
+    val isPartiallyWatched: Boolean,
+)
+
+internal fun resolveHomeWatchedBadgeState(
+    item: MediaItem,
+    watchedMovies: Set<Int>,
+    watchedEpisodeCount: Int,
+    seriesEpisodeCount: Int? = item.seriesEpisodeCount,
+): HomeWatchedBadgeState = when (item.mediaType) {
+    MediaType.MOVIE -> HomeWatchedBadgeState(
+        isWatched = item.id in watchedMovies,
+        isPartiallyWatched = false,
+    )
+    MediaType.TV -> {
+        val isComplete = seriesEpisodeCount != null &&
+            seriesEpisodeCount > 0 &&
+            watchedEpisodeCount >= seriesEpisodeCount
+        HomeWatchedBadgeState(
+            isWatched = isComplete,
+            isPartiallyWatched = watchedEpisodeCount > 0 && !isComplete,
+        )
+    }
+}
+
 private const val RECENT_TV_HOME_ITEM_LIMIT = 10
 private const val HOME_TV_GUIDE_WINDOW_MS = 48L * 60L * 60_000L
 internal fun isIptvLiveHomeCategory(categoryId: String): Boolean =
@@ -283,6 +309,16 @@ internal fun compactHomeCategoriesForCache(
         .take(maxItemsPerCategory)
         .toList()
     category.copy(items = items).takeIf { items.isNotEmpty() }
+}
+
+internal fun appendUniqueHomePageItems(
+    latestItems: List<MediaItem>,
+    incomingItems: List<MediaItem>,
+): List<MediaItem> {
+    val seen = latestItems.mapTo(HashSet(latestItems.size)) { "${it.mediaType.name}_${it.id}" }
+    return latestItems + incomingItems.filter { item ->
+        seen.add("${item.mediaType.name}_${item.id}")
+    }
 }
 
 enum class ToastType {
@@ -4041,20 +4077,45 @@ class HomeViewModel @Inject constructor(
                     return@launch
                 }
 
-                val seen = currentCategory.items
-                    .map { "${it.mediaType.name}_${it.id}" }
-                    .toHashSet()
-                val uniqueNewItems = result.items.filter { item ->
-                    seen.add("${item.mediaType.name}_${item.id}")
+                // The watched-badge refresh may have updated categories while this page
+                // was loading. Merge into the latest state so the network result cannot
+                // restore the older undecorated item copies.
+                val latestCategories = _uiState.value.categories
+                val latestCategory = latestCategories.firstOrNull { it.id == categoryId } ?: return@launch
+                val watchedMovies = traktRepository.getWatchedMoviesFromCache()
+                val watchedEpisodeCounts = traktRepository.getWatchedEpisodesFromCache().asSequence()
+                    .mapNotNull { key ->
+                        key.removePrefix("show_tmdb:")
+                            .substringBefore(':')
+                            .toIntOrNull()
+                    }
+                    .groupingBy { it }
+                    .eachCount()
+                val decoratedNewItems = result.items.map { item ->
+                    val episodeCount = item.seriesEpisodeCount
+                        ?: mediaRepository.getCachedFullItem(item.mediaType, item.id)?.seriesEpisodeCount
+                    val watchedState = resolveHomeWatchedBadgeState(
+                        item = item,
+                        watchedMovies = watchedMovies,
+                        watchedEpisodeCount = watchedEpisodeCounts[item.id] ?: 0,
+                        seriesEpisodeCount = episodeCount,
+                    )
+                    item.copy(
+                        isWatched = watchedState.isWatched,
+                        isPartiallyWatched = watchedState.isPartiallyWatched,
+                    )
                 }
-                if (uniqueNewItems.isEmpty()) {
+
+                val mergedItems = appendUniqueHomePageItems(latestCategory.items, decoratedNewItems)
+                if (mergedItems.size == latestCategory.items.size) {
                     pagination.hasMore = false
                     return@launch
                 }
+                val uniqueNewItems = mergedItems.drop(latestCategory.items.size)
 
-                val updatedCategories = currentCategories.map { category ->
+                val updatedCategories = latestCategories.map { category ->
                     if (category.id == categoryId) {
-                        category.copy(items = category.items + uniqueNewItems)
+                        category.copy(items = mergedItems)
                     } else {
                         category
                     }
@@ -4411,7 +4472,7 @@ class HomeViewModel @Inject constructor(
             // device's state on top of it — preventing stale overwrites.
             if (cloudSyncRepository.isPushDirty) {
                 android.util.Log.i("HomeViewModel", "Retrying dirty push before pull")
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             }
             val result = runCatching {
                 cloudSyncRepository.pullFromCloud()
@@ -4818,58 +4879,103 @@ class HomeViewModel @Inject constructor(
                 if (categories.isEmpty()) return@launch
 
                 val watchedMovies = traktRepository.getWatchedMoviesFromCache()
+                val watchedEpisodes = traktRepository.getWatchedEpisodesFromCache()
 
-                // Performance: Build show watched map only for unique TV shows
-                val showWatched = mutableMapOf<Int, Boolean>()
-                val seenShows = mutableSetOf<Int>()
-                for (category in categories) {
-                    for (item in category.items) {
-                        if (item.mediaType == MediaType.TV && seenShows.add(item.id)) {
-                            showWatched[item.id] = traktRepository.hasWatchedEpisodes(item.id)
-                        }
+                val watchedEpisodeCounts = watchedEpisodes.asSequence()
+                    .mapNotNull { key ->
+                        key.removePrefix("show_tmdb:")
+                            .substringBefore(':')
+                            .toIntOrNull()
                     }
-                }
+                    .groupingBy { it }
+                    .eachCount()
 
-                var anyChange = false
-                val updatedCategories = categories.map { category ->
-                    var categoryChanged = false
+                val seriesEpisodeCounts = categories.asSequence()
+                    .flatMap { it.items.asSequence() }
+                    .filter { it.mediaType == MediaType.TV && (watchedEpisodeCounts[it.id] ?: 0) > 0 }
+                    .distinctBy { it.id }
+                    .mapNotNull { item ->
+                        val count = item.seriesEpisodeCount
+                            ?: mediaRepository.getCachedFullItem(MediaType.TV, item.id)?.seriesEpisodeCount
+                        count?.let { item.id to it }
+                    }
+                    .toMap()
+
+                fun decorateBadges(
+                    source: List<Category>,
+                    episodeTotals: Map<Int, Int>,
+                ): List<Category> = source.map { category ->
                     val updatedItems = category.items.map { item ->
-                        val newWatched = when (item.mediaType) {
-                            MediaType.MOVIE -> watchedMovies.contains(item.id)
-                            MediaType.TV -> showWatched[item.id] == true
-                        }
-                        if (item.isWatched != newWatched) {
-                            categoryChanged = true
-                            item.copy(isWatched = newWatched)
-                        } else {
+                        val watchedState = resolveHomeWatchedBadgeState(
+                            item = item,
+                            watchedMovies = watchedMovies,
+                            watchedEpisodeCount = watchedEpisodeCounts[item.id] ?: 0,
+                            seriesEpisodeCount = episodeTotals[item.id],
+                        )
+                        if (item.isWatched == watchedState.isWatched &&
+                            item.isPartiallyWatched == watchedState.isPartiallyWatched
+                        ) {
                             item
+                        } else {
+                            item.copy(
+                                isWatched = watchedState.isWatched,
+                                isPartiallyWatched = watchedState.isPartiallyWatched,
+                            )
                         }
                     }
-                    if (categoryChanged) {
-                        anyChange = true
-                        category.copy(items = updatedItems)
-                    } else {
-                        category
+                    if (updatedItems == category.items) category else category.copy(items = updatedItems)
+                }
+
+                fun publishBadges(updatedCategories: List<Category>) {
+                    val currentState = _uiState.value
+                    if (updatedCategories == currentState.categories) return
+                    val updatedHero = currentState.heroItem?.let { hero ->
+                        updatedCategories.asSequence()
+                            .flatMap { it.items.asSequence() }
+                            .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
+                            ?: hero
+                    }
+                    _uiState.value = currentState.copy(
+                        categories = updatedCategories,
+                        heroItem = updatedHero,
+                    )
+                }
+
+                publishBadges(decorateBadges(categories, seriesEpisodeCounts))
+
+                val unresolvedSeriesIds = categories.asSequence()
+                    .flatMap { it.items.asSequence() }
+                    .filter { item ->
+                        item.mediaType == MediaType.TV &&
+                            (watchedEpisodeCounts[item.id] ?: 0) > 0 &&
+                            item.id !in seriesEpisodeCounts
+                    }
+                    .map { it.id }
+                    .distinct()
+                    .toList()
+                if (unresolvedSeriesIds.isNotEmpty()) {
+                    val detailSemaphore = Semaphore(5)
+                    val loadedEpisodeCounts = coroutineScope {
+                        unresolvedSeriesIds.map { showId ->
+                            async {
+                                detailSemaphore.withPermit {
+                                    showId to runCatching {
+                                        mediaRepository.getTvDetails(showId).seriesEpisodeCount
+                                    }.getOrNull()
+                                }
+                            }
+                        }.awaitAll()
+                    }.mapNotNull { (showId, count) -> count?.let { showId to it } }
+                        .toMap()
+                    if (loadedEpisodeCounts.isNotEmpty()) {
+                        publishBadges(
+                            decorateBadges(
+                                _uiState.value.categories,
+                                seriesEpisodeCounts + loadedEpisodeCounts,
+                            )
+                        )
                     }
                 }
-
-                if (!anyChange) {
-                    lastWatchedBadgesRefreshMs = SystemClock.elapsedRealtime()
-                    return@launch
-                }
-
-                val heroItem = _uiState.value.heroItem
-                val updatedHero = heroItem?.let { hero ->
-                    updatedCategories.asSequence()
-                        .flatMap { it.items.asSequence() }
-                        .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
-                        ?: hero
-                }
-
-                _uiState.value = _uiState.value.copy(
-                    categories = updatedCategories,
-                    heroItem = updatedHero
-                )
                 lastWatchedBadgesRefreshMs = SystemClock.elapsedRealtime()
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
@@ -5511,7 +5617,7 @@ class HomeViewModel @Inject constructor(
                 // and the updated Continue Watching entry. Without this, the snapshot
                 // (localCW, localWatchedMovies, localWatchedEpisodes, dismissedCW)
                 // was never updated — only the Supabase watch_history table was.
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(
@@ -5623,7 +5729,7 @@ class HomeViewModel @Inject constructor(
                 }
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 // Push cloud snapshot so other devices see watched status + CW update
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _uiState.value = _uiState.value.copy(

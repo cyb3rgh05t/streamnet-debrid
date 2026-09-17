@@ -130,6 +130,30 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `movie badge reflects watched movie cache`() {
+        val item = MediaItem(id = 42, title = "Movie", mediaType = MediaType.MOVIE)
+
+        assertThat(resolveHomeWatchedBadgeState(item, setOf(42), 0).isWatched).isTrue()
+        assertThat(resolveHomeWatchedBadgeState(item, emptySet(), 0).isWatched).isFalse()
+    }
+
+    @Test
+    fun `started series uses partial badge until every episode is watched`() {
+        val item = MediaItem(id = 7, title = "Series", mediaType = MediaType.TV)
+
+        val partial = resolveHomeWatchedBadgeState(item, emptySet(), 4, seriesEpisodeCount = 10)
+        val complete = resolveHomeWatchedBadgeState(item, emptySet(), 10, seriesEpisodeCount = 10)
+        val unknownTotal = resolveHomeWatchedBadgeState(item, emptySet(), 10, seriesEpisodeCount = null)
+
+        assertThat(partial.isPartiallyWatched).isTrue()
+        assertThat(partial.isWatched).isFalse()
+        assertThat(complete.isWatched).isTrue()
+        assertThat(complete.isPartiallyWatched).isFalse()
+        assertThat(unknownTotal.isPartiallyWatched).isTrue()
+        assertThat(unknownTotal.isWatched).isFalse()
+    }
+
+    @Test
     fun `IPTV hero never auto plays on touch devices`() {
         assertThat(
             shouldPlayIptvHomeHero(
@@ -272,6 +296,17 @@ class HomeRowStateTest {
         )
 
         assertThat(resolvedIndex).isEqualTo(9)
+    }
+
+    @Test
+    fun `page append preserves latest watched item copies`() {
+        val latest = listOf(mediaItem(1).copy(isWatched = true))
+        val stalePage = listOf(mediaItem(1), mediaItem(2))
+
+        val merged = appendUniqueHomePageItems(latest, stalePage)
+
+        assertThat(merged.map { it.id }).containsExactly(1, 2).inOrder()
+        assertThat(merged.first().isWatched).isTrue()
     }
 
     @Test

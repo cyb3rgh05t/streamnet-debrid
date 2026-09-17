@@ -4494,6 +4494,7 @@ private fun TmdbTvDetails.toMediaItem(): MediaItem {
         certification = certification.takeIf { it.isNotEmpty() },
         isOngoing = status == "Returning Series",
         totalEpisodes = actualSeasonCount,
+        seriesEpisodeCount = numberOfEpisodes.takeIf { it > 0 },
         status = status,
         genreIds = genres.map { it.id }
     )

@@ -1335,7 +1335,7 @@ class DetailsViewModel @Inject constructor(
                     persistSeriesContinueWatchingTarget(currentItem)
                     runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 }
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (e: Exception) {
                 Log.e(TAG, "[PlayTarget] Primary watched toggle failed tmdb=$currentMediaId", e)
                 _uiState.value = _uiState.value.copy(
@@ -1368,7 +1368,7 @@ class DetailsViewModel @Inject constructor(
                 )
                 _uiState.value = _uiState.value.copy(playPositionMs = 0L)
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (error: Exception) {
                 Log.e(TAG, "[PlayTarget] Failed to reset playback progress", error)
             } finally {
@@ -2169,7 +2169,7 @@ class DetailsViewModel @Inject constructor(
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 // Push cloud snapshot so other devices see the episode watched-status
                 // change and the updated Continue Watching entry.
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (e: Exception) {
                 Log.e(TAG, "[PlayTarget] Episode toggle failed tmdb=$currentMediaId s=$season e=$episode", e)
             }
@@ -2337,7 +2337,7 @@ class DetailsViewModel @Inject constructor(
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
                 // Push cloud snapshot so other devices see the entire season marked watched
                 // and the updated Continue Watching entry pointing to the next unwatched episode.
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(
                     toastMessage = context.getString(R.string.details_failed_mark_season_watched),
@@ -2430,7 +2430,7 @@ class DetailsViewModel @Inject constructor(
                 refreshSeriesPlayTarget(refreshedProgress?.progress ?: optimisticProgress, refreshedProgress)
                 persistSeriesContinueWatchingTarget(currentItem)
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
-                runCatching { cloudSyncRepository.pushToCloud() }
+                runCatching { cloudSyncRepository.pushLocalSnapshotToCloud() }
             } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(
                     toastMessage = context.getString(R.string.details_failed_mark_season_unwatched),

@@ -30,6 +30,7 @@ import {
   saveProgress,
   saveWatchedState,
 } from "@/lib/cloud";
+import { nextEpisodeAfter } from "@/lib/continueWatching";
 import {
   cachedDebridDirectUrl,
   invalidateDebridDirectUrl,
@@ -52,6 +53,7 @@ import {
   type PlaybackError,
 } from "@/lib/player";
 import { resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
+import { getSeasonEpisodes } from "@/lib/tmdb";
 import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
 import {
   playbackPlan,
@@ -420,6 +422,7 @@ function VideoPlayer({
   onToast: (message: string) => void;
   onClose: () => void;
 }) {
+  const { markWatchedLocally } = useApp();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dock = useLivePlayerDock(liveTv, stream.url ?? "", close);
@@ -1852,23 +1855,73 @@ function VideoPlayer({
       scrobbleActive = false;
       // Match ARVIO's 90% completion threshold; lower-progress stops remain resumable.
       scrobble(progress >= 90 ? "stop" : "pause", progress);
-      if (
-        progress >= 90 &&
-        authClient.session?.userId === userId &&
-        authClient.session &&
-        !isLiveStream
-      ) {
-        void saveWatchedState(
-          authClient,
+      if (progress >= 90 && !isLiveStream) {
+        markWatchedLocally(
           {
             id: item.id,
             mediaType: item.mediaType,
-            seasonNumber: season,
-            episodeNumber: episode,
+            season,
+            episode,
           },
           true,
-          activeProfileId,
-        ).catch(() => undefined);
+        );
+        if (authClient.session?.userId === userId && authClient.session) {
+          void (async () => {
+            await saveWatchedState(
+              authClient,
+              {
+                id: item.id,
+                mediaType: item.mediaType,
+                seasonNumber: season,
+                episodeNumber: episode,
+              },
+              true,
+              activeProfileId,
+            );
+            if (item.mediaType !== "tv" || season == null || episode == null)
+              return;
+            const next = nextEpisodeAfter(item, season, episode);
+            if (!next) return;
+            const nextEpisodes = await getSeasonEpisodes(
+              item.tmdbId ?? item.id,
+              next.season,
+              settings.uiLanguage === "de" ? "de-DE" : "en-US",
+            );
+            const nextEpisode = nextEpisodes.find(
+              (candidate) => candidate.episodeNumber === next.episode,
+            );
+            if (
+              !nextEpisode ||
+              (nextEpisode.airDate &&
+                Date.parse(nextEpisode.airDate) > Date.now())
+            )
+              return;
+            await saveProgress(
+              authClient,
+              {
+                media_type: "tv",
+                show_tmdb_id: item.id,
+                profile_id: activeProfileId,
+                season: next.season,
+                episode: next.episode,
+                episode_title: nextEpisode.name || null,
+                title: item.title,
+                progress: 0.03,
+                duration_seconds: 1,
+                position_seconds: 0,
+                backdrop_path:
+                  item.backdrop?.replace(config.backdropBase, "") ?? null,
+                episode_still_path: nextEpisode.still ?? null,
+                poster_path: item.image?.replace(config.imageBase, "") ?? null,
+                source: stream.addonName,
+                stream_addon_id: stream.addonId ?? null,
+                stream_title: stream.source,
+              },
+              activeProfileId,
+              addons,
+            );
+          })().catch(() => undefined);
+        }
       }
     };
     const onStopped = () => {
@@ -1921,6 +1974,7 @@ function VideoPlayer({
     addons,
     canAdvance,
     liveTv,
+    markWatchedLocally,
     onToast,
   ]);
 

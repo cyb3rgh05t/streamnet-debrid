@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -358,7 +359,7 @@ fun MediaCard(
                 }
 
                 // Neutral watched badge
-                if (showWatched && item.isWatched) {
+                if (showWatched && (item.isWatched || item.isPartiallyWatched)) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -375,12 +376,21 @@ fun MediaCard(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        tint = progressAccentColor,
-                        modifier = Modifier.size(13.dp)
-                    )
+                    if (item.isPartiallyWatched && !item.isWatched) {
+                        Icon(
+                            imageVector = Icons.Default.Remove,
+                            contentDescription = null,
+                            tint = progressAccentColor,
+                            modifier = Modifier.size(13.dp),
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = progressAccentColor,
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
                 }
 

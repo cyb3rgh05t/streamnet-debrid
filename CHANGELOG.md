@@ -2,6 +2,26 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.024] - 2026-09-17
+
+### Watched-Status in Home-Rails
+
+- Filme behalten ihr Gesehen-Häkchen auch nach Cloud-Push/Pull und beim Nachladen weiterer Elemente in langen Home-Rails.
+- Pagination merged neue Seiten in den neuesten Home-State, sodass alte Item-Kopien bereits gesetzte Watched-Icons nicht mehr überschreiben.
+- Serien zeigen auf Mobile, Tablet und TV ein Minus bei teilweise gesehenen Episoden und ein Häkchen erst bei vollständig gesehenen Serien.
+- Fehlende Episodenzahlen werden im Hintergrund aufgelöst, ohne das sofortige Rendern der Home-Rails zu blockieren.
+- Android-Version: `2.5.024`.
+
+## [Web 1.0.026] - 2026-09-17
+
+### Episodenstatus und nächste Folge
+
+- Serienkarten zeigen ein Minus bei teilweise gesehenen Serien und ein Häkchen bei vollständigem Abschluss.
+- Der Serien-Detailscreen zeigt Gesehen-Icons für die tatsächlich abgeschlossenen Episoden; Cloud-Episodenstände bleiben auch bei partiellen Tracker-Fehlern erhalten.
+- Ab 90 Prozent Wiedergabefortschritt wird die laufende Episode sofort lokal und in StreamNet Cloud als gesehen markiert.
+- Die nächste verfügbare und bereits ausgestrahlte Episode wird direkt als „Weiterschauen“-Eintrag gespeichert, einschließlich korrektem Wechsel in die nächste Staffel.
+- Web-Version: `1.0.026`.
+
 ## [2.5.023] - 2026-09-17
 
 ### Watched-Checkmarks in Home-Rails

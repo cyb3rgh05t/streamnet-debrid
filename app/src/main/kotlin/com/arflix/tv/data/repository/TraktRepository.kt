@@ -78,7 +78,8 @@ class TraktRepository @Inject constructor(
     private val mdbListRepository: MdbListRepository,
     private val syncProviderStore: com.arflix.tv.data.repository.sync.SyncProviderStore,
     private val simklSyncService: com.arflix.tv.data.repository.simkl.SimklSyncService,
-    private val continueWatchingUpdates: ContinueWatchingUpdates
+    private val continueWatchingUpdates: ContinueWatchingUpdates,
+    private val cloudSyncInvalidationBus: CloudSyncInvalidationBus,
 ) {
     private val gson = Gson()
     private val watchlistHttpClient by lazy { okHttpClient }
@@ -2515,6 +2516,11 @@ class TraktRepository @Inject constructor(
             changes[itemKey] = System.currentTimeMillis()
             prefs[storageKey] = encodeDismissedMap(changes)
         }
+        cloudSyncInvalidationBus.markDirty(
+            CloudSyncScope.LOCAL_HISTORY,
+            currentProfileId(),
+            "watched state changed",
+        )
     }
 
     private suspend fun loadLocalWatchedSnapshotForCurrentProfile(): Pair<Set<Int>, Set<String>> {
