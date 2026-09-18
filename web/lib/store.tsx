@@ -25,6 +25,7 @@ import {
   getContinueWatching,
   isLiveStreamOrSportsItem,
   pullCloudContinueWatchingDismissals,
+  pullCloudWatchHistory,
   pullCloudPayload,
   pullCloudProfiles,
   pullCloudTrackingSelection,
@@ -1507,9 +1508,15 @@ export function AppProvider({
             cwShows,
           ] = await Promise.all([
             authClient.session
-              ? getContinueWatching(authClient, profileId, addonState).catch(
-                  () => [],
-                )
+              ? pullCloudWatchHistory(authClient, profileId)
+                  .then((rows) => rows)
+                  .catch(() =>
+                    getContinueWatching(
+                      authClient,
+                      profileId,
+                      addonState,
+                    ).catch(() => []),
+                  )
               : Promise.resolve([]),
             traktReady
               ? client.watchlist().catch(() => failedRead("watchlist"))
@@ -1707,8 +1714,12 @@ export function AppProvider({
               cwWatchedKeys,
               cwCompletions,
             ),
-            cloudCw,
-            activeCloudResumeKeys,
+            // Match Android: for tracker-backed profiles, Trakt playback and
+            // Up Next are authoritative. Cloud CW remains the no-tracker and
+            // outage fallback, but must not resurrect an older episode over
+            // the current tracker entry for the same show.
+            traktReady ? [] : cloudCw,
+            traktReady ? new Set<string>() : activeCloudResumeKeys,
           );
           if (isCurrent()) {
             const movieReadFailed = readFailures.has("watched-movies");
@@ -1748,11 +1759,12 @@ export function AppProvider({
               ),
               cloudCw.filter(
                 (item) =>
+                  !traktReady &&
                   !isHiddenShow(item) &&
                   !isDismissed(item) &&
                   !isLiveStreamOrSportsItem(item, addonState),
               ),
-              activeCloudResumeKeys,
+              traktReady ? new Set<string>() : activeCloudResumeKeys,
             ),
             settings.language,
           );
@@ -2143,7 +2155,10 @@ export function AppProvider({
     let debounceTimer: NodeJS.Timeout | null = null;
     const unsubscribe = subscribeCloudSyncEvents(authClient, (event) => {
       const currentRev = getRawPayloadRevision(auth.userId);
-      if (event.revision > currentRev) {
+      if (
+        event.changedAreas?.includes("continue_watching") ||
+        event.revision > currentRev
+      ) {
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(() => {
           void refreshData(undefined, true);

@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.028] / [Backend 1.0.004] - 2026-09-18
+
+### Gemeinsames Continue Watching
+
+- Web und Android verwenden für Continue Watching nun dieselbe profilbezogene `watch_history` im StreamNet-Backend.
+- Der Web-Snapshot bleibt nur noch Fallback bei einem echten Backend-Fehler; eine leere, erfolgreiche History-Antwort löscht veraltete Einträge korrekt.
+- Web-Fortschritt wird zusätzlich in `watch_history` gespeichert und beim Entfernen dort gelöscht.
+- Watch-History-Änderungen lösen über den bestehenden SSE-Kanal sofortige Aktualisierungen auf verbundenen Geräten aus.
+- Web-Version: `1.0.028`; Backend-Cloud-Version: `1.0.004`.
+
 ## [Web 1.0.027] - 2026-09-18
 
 ### Watched-Status und Merkliste

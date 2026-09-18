@@ -150,6 +150,7 @@ function broadcastAccountSyncRevision(
   accountId,
   revision,
   sourceDeviceId = null,
+  changedAreas = ["continue_watching"],
 ) {
   const clients = sseClientsByAccount.get(accountId);
   if (!clients || clients.size === 0) return;
@@ -157,7 +158,7 @@ function broadcastAccountSyncRevision(
     type: "account_sync_revision",
     revision,
     sourceDeviceId: sourceDeviceId || null,
-    changedAreas: ["continue_watching"],
+    changedAreas,
     occurredAt: new Date().toISOString(),
   });
   const data = `data: ${eventPayload}\n\n`;
@@ -309,7 +310,11 @@ app.post("/watch-history", async (request, reply) => {
       JSON.stringify(body),
     ],
   );
-  return watchHistoryPayload(result.rows[0]);
+  const response = watchHistoryPayload(result.rows[0]);
+  broadcastAccountSyncRevision(account.id, Date.now(), null, [
+    "continue_watching",
+  ]);
+  return response;
 });
 
 app.delete("/watch-history", async (request, reply) => {
@@ -336,6 +341,9 @@ app.delete("/watch-history", async (request, reply) => {
     `delete from watch_history where ${filters.join(" and ")}`,
     values,
   );
+  broadcastAccountSyncRevision(account.id, Date.now(), null, [
+    "continue_watching",
+  ]);
   return reply.code(204).send();
 });
 

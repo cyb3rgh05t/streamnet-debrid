@@ -2062,6 +2062,39 @@ export async function getContinueWatching(
     .slice(0, 50);
 }
 
+export async function pullCloudWatchHistory(
+  auth: AuthClient,
+  profileId?: string | null,
+): Promise<WatchHistoryEntry[]> {
+  if (!auth.session) return [];
+  const query = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : "";
+  const rows = await backendRequest<WatchHistoryEntry[] & { error?: string }>(
+    auth,
+    `watch-history${query}`,
+    { method: "GET" },
+  );
+  return Array.isArray(rows) ? rows : [];
+}
+
+async function saveBackendWatchHistory(
+  auth: AuthClient,
+  entry: Omit<WatchHistoryEntry, "user_id">,
+  profileId?: string | null,
+) {
+  if (!auth.session) return;
+  await backendRequest(auth, "watch-history", {
+    method: "POST",
+    body: JSON.stringify({
+      ...entry,
+      profile_id: entry.profile_id ?? profileId ?? "default",
+      media_type: entry.media_type,
+      show_tmdb_id: entry.show_tmdb_id,
+      season: entry.season ?? null,
+      episode: entry.episode ?? null,
+    }),
+  });
+}
+
 export async function saveProgress(
   auth: AuthClient,
   entry: Omit<WatchHistoryEntry, "user_id">,
@@ -2069,6 +2102,7 @@ export async function saveProgress(
   addons: InstalledAddon[] = [],
 ) {
   if (!auth.session || isLiveStreamOrSportsItem(entry, addons)) return;
+  await saveBackendWatchHistory(auth, entry, profileId).catch(() => undefined);
   await mutateCloudPayload(auth, (root) => {
     const targetProfileId = entry.profile_id ?? profileId ?? "default";
     const byProfile = objectRecord<unknown>(
@@ -2129,6 +2163,17 @@ export async function removeContinueWatchingProgress(
   profileId?: string | null,
 ) {
   if (!auth.session) return;
+  const query = new URLSearchParams({
+    profile_id: profileId ?? "default",
+    media_type: item.mediaType,
+    show_tmdb_id: String(item.id),
+  });
+  if (item.seasonNumber != null) query.set("season", String(item.seasonNumber));
+  if (item.episodeNumber != null)
+    query.set("episode", String(item.episodeNumber));
+  await backendRequest(auth, `watch-history?${query.toString()}`, {
+    method: "DELETE",
+  }).catch(() => undefined);
   const matches = (candidate: AndroidContinueWatchingItem) => {
     if (
       candidate.id !== item.id ||

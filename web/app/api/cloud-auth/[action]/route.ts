@@ -11,6 +11,7 @@ const allowed = new Set([
   "account-sync-pull",
   "account-sync-push",
   "account-sync-events",
+  "watch-history",
 ]);
 
 async function proxy(
