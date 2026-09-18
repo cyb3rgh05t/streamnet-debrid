@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.033] - 2026-09-18
+
+### Continue-Watching-Titel
+
+- Der Seriencode `S… · E…` verwendet die aktive StreamNet-Akzentfarbe.
+- Schriftgröße und Schriftschnitt bleiben identisch zum Filmtitel; der Episodentitel bleibt neutral.
+- Web-Version: `1.0.033`.
+
 ## [Web 1.0.032] - 2026-09-18
 
 ### Continue-Watching-Titel
