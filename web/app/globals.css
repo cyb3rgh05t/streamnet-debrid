@@ -4220,7 +4220,7 @@ select {
   gap: 7px;
   margin-top: 5px;
   min-width: 0;
-  font-size: clamp(16px, 1.22vw, 23px);
+  font-size: clamp(13px, 0.95vw, 16px);
   font-weight: 720;
   line-height: 1.18;
 }

@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.031] - 2026-09-18
+
+### Continue-Watching-Titel
+
+- Serienzeilen mit `S… · E…` verwenden jetzt dieselbe Schriftgröße wie Filmtitel in Continue Watching.
+- Web-Version: `1.0.031`.
+
 ## [Web 1.0.030] - 2026-09-18
 
 ### IPTV-Wiedergabe und Genre-Fanart
