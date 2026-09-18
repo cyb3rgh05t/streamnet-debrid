@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.035] - 2026-09-18
+
+### CSS- und Continue-Watching-Fix
+
+- Einen beschädigten CSS-Block mit losgelösten Deklarationen repariert.
+- Die Serienzeile `S… · E… · Titel` ist typografisch explizit an die Film-Titelzeile angeglichen; der Seriencode bleibt akzentfarben.
+- Web-Version: `1.0.035`.
+
 ## [Web 1.0.034] - 2026-09-18
 
 ### Continue-Watching-Titel
