@@ -94,42 +94,115 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  const isHls =
+    target.pathname.toLowerCase().endsWith(".m3u8") ||
+    (upstream.headers.get("content-type") ?? "")
+      .toLowerCase()
+      .includes("mpegurl");
+  if (isHls) {
+    // Validate the target through the SSRF-safe proxy first, but let FFmpeg
+    // own the HLS session. Piping a live manifest through stdin freezes the
+    // playlist at one snapshot and prevents FFmpeg from reloading segments.
+    await upstream.body.cancel().catch(() => undefined);
+  }
+
   const ffmpeg = spawn(
     "ffmpeg",
-    [
-      "-hide_banner",
-      "-loglevel",
-      "error",
-      "-probesize",
-      "5000000",
-      "-analyzeduration",
-      "5000000",
-      "-fflags",
-      "+genpts+discardcorrupt",
-      "-i",
-      "pipe:0",
-      "-map",
-      "0:v:0?",
-      "-map",
-      "0:a:0?",
-      "-c:v",
-      "copy",
-      "-c:a",
-      "aac",
-      "-ac",
-      "2",
-      "-ar",
-      "48000",
-      "-b:a",
-      "192k",
-      "-af",
-      "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
-      "-f",
-      "mpegts",
-      "pipe:1",
-    ],
+    isHls
+      ? [
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          // Xtream HLS segment URLs are opaque tokens without .ts suffixes.
+          "-allowed_extensions",
+          "ALL",
+          "-allowed_segment_extensions",
+          "ALL",
+          "-extension_picky",
+          "0",
+          "-protocol_whitelist",
+          "file,http,https,tcp,tls,crypto",
+          "-reconnect",
+          "1",
+          "-reconnect_streamed",
+          "1",
+          "-reconnect_delay_max",
+          "2",
+          "-live_start_index",
+          "-3",
+          "-probesize",
+          "10000000",
+          "-analyzeduration",
+          "10000000",
+          "-fflags",
+          "+genpts+discardcorrupt",
+          "-f",
+          "hls",
+          "-headers",
+          "Accept: */*\r\nUser-Agent: VLC/3.0.20 LibVLC/3.0.20\r\nIcy-MetaData: 1\r\n",
+          "-i",
+          target.toString(),
+          "-map",
+          "0:v:0?",
+          "-map",
+          "0:a:0?",
+          "-c:v",
+          "copy",
+          "-c:a",
+          "aac",
+          "-ac",
+          "2",
+          "-ar",
+          "48000",
+          "-b:a",
+          "192k",
+          "-af",
+          "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
+          "-f",
+          "mpegts",
+          "pipe:1",
+        ]
+      : [
+          "-hide_banner",
+          "-loglevel",
+          "error",
+          "-probesize",
+          "5000000",
+          "-analyzeduration",
+          "5000000",
+          "-fflags",
+          "+genpts+discardcorrupt",
+          "-i",
+          "pipe:0",
+          "-map",
+          "0:v:0?",
+          "-map",
+          "0:a:0?",
+          "-c:v",
+          "copy",
+          "-c:a",
+          "aac",
+          "-ac",
+          "2",
+          "-ar",
+          "48000",
+          "-b:a",
+          "192k",
+          "-af",
+          "aresample=async=1:first_pts=0:min_hard_comp=0.100000",
+          "-f",
+          "mpegts",
+          "pipe:1",
+        ],
     { stdio: ["pipe", "pipe", "pipe"] },
   );
+  ffmpeg.stderr.on("data", (chunk: Buffer) => {
+    const message = chunk
+      .toString("utf8")
+      .replace(/https?:\/\/[^\s]+/gi, "<upstream-url>")
+      .trim();
+    if (message) console.warn(`[audio-transcode] ${message}`);
+  });
   let released = false;
   const release = () => {
     if (released) return;
@@ -141,10 +214,14 @@ export async function GET(request: NextRequest) {
   ffmpeg.once("close", release);
   ffmpeg.once("error", release);
   request.signal.addEventListener("abort", release, { once: true });
-  Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream)
-    .on("error", release)
-    .pipe(ffmpeg.stdin)
-    .on("error", release);
+  if (isHls) {
+    ffmpeg.stdin.end();
+  } else {
+    Readable.fromWeb(upstream.body as import("node:stream/web").ReadableStream)
+      .on("error", release)
+      .pipe(ffmpeg.stdin)
+      .on("error", release);
+  }
 
   return new Response(Readable.toWeb(ffmpeg.stdout) as ReadableStream, {
     headers: {

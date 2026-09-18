@@ -14,10 +14,9 @@ export async function GET(
 
   const apiKey = (process.env.VODWISHARR_API_KEY ?? "").trim();
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "Genre fanart is not configured" },
-      { status: 503 },
-    );
+    return NextResponse.json([], {
+      headers: { "cache-control": "public, max-age=600" },
+    });
   }
 
   const baseUrl = (
@@ -37,10 +36,9 @@ export async function GET(
       signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
-      return NextResponse.json(
-        { error: "Genre fanart service unavailable" },
-        { status: response.status },
-      );
+      return NextResponse.json([], {
+        headers: { "cache-control": "public, max-age=600" },
+      });
     }
     return NextResponse.json(await response.json(), {
       headers: {
@@ -48,9 +46,8 @@ export async function GET(
       },
     });
   } catch {
-    return NextResponse.json(
-      { error: "Genre fanart service unavailable" },
-      { status: 502 },
-    );
+    return NextResponse.json([], {
+      headers: { "cache-control": "public, max-age=600" },
+    });
   }
 }

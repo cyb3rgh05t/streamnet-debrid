@@ -4765,6 +4765,7 @@ data class ContinueWatchingItem(
             roundedProgress
         }
         val showPlaybackProgress = !isUpNext && effectiveProgress in 1..94
+        val isPartiallyWatched = !isUpNext && effectiveProgress in 1 until Constants.WATCHED_THRESHOLD
         val resumeSeconds = when {
             resumePositionSeconds > 0L -> resumePositionSeconds
             // Only derive resume position from progress if we have a meaningful duration
@@ -4860,6 +4861,7 @@ data class ContinueWatchingItem(
             watchedEpisodes = watchedEpisodeCount,
             timeRemainingLabel = timeRemainingLabel,
             showPlaybackProgress = showPlaybackProgress,
+            isPartiallyWatched = isPartiallyWatched,
             isUpNext = isUpNext
         )
     }

@@ -19,7 +19,7 @@ export const config = {
   ).replace(/\/+$/, ""),
   mediaResolverUrl: envValue(
     process.env.NEXT_PUBLIC_STREAMNET_MEDIA_RESOLVER_URL,
-    "",
+    "https://resolve.streamnet.live",
   ).replace(/\/+$/, ""),
   resolverUrl: envValue(process.env.NEXT_PUBLIC_ARVIO_RESOLVER_URL, ""),
   traktClientId: process.env.NEXT_PUBLIC_TRAKT_CLIENT_ID ?? "",

@@ -208,10 +208,11 @@ function audioTranscodeUrl(url: string) {
 }
 
 function requiresSecureStreamNetRelay(url: string) {
-  if (typeof window === "undefined" || window.location.protocol !== "https:")
-    return false;
   try {
-    return new URL(url).origin === new URL(config.streamnetTvXtreamUrl).origin;
+    return (
+      Boolean(config.mediaResolverUrl) &&
+      new URL(url).origin === new URL(config.streamnetTvXtreamUrl).origin
+    );
   } catch {
     return false;
   }
@@ -745,11 +746,15 @@ function VideoPlayer({
   }, [booted, stream.url, remuxRestartKey, liveTv]);
 
   useEffect(() => {
-    if (!booted) return undefined;
+    // mpegts.js reports its AAC track through its own demuxer, while Chromium's
+    // file-oriented audio counter can stay at zero for that MSE path. Keep the
+    // watchdog for HLS live and VOD, where AAC fallback is still needed.
+    if (!booted || (liveTv && stream.transport === "mpegts")) return undefined;
     const video = videoRef.current;
     if (!video) return undefined;
     return monitorSilentAudio(video, () => {
       video.pause();
+      const isIptvVod = stream.addonId === "iptv_xtream_vod";
       if (!stream.transcoded && canProviderTranscode(stream)) {
         onToast(
           localize(
@@ -761,12 +766,12 @@ function VideoPlayer({
         onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
         return;
       }
-      if (liveTv && !stream.transcoded && stream.url) {
+      if ((liveTv || isIptvVod) && !stream.transcoded && stream.url) {
         onToast(
           localize(
             settings.uiLanguage,
             "Kein Ton decodiert. Live-Audio wird in AAC umgewandelt.",
-            "No audio decoded. Converting live audio to AAC.",
+            "No audio decoded. Converting IPTV audio to AAC.",
           ),
         );
         onSelectStream(
@@ -1361,14 +1366,22 @@ function VideoPlayer({
       liveTv ||
       stream.addonName === "Catch-up" ||
       stream.addonId === "iptv_xtream_vod";
-    const secureStreamNetRelay =
-      iptvRelay && requiresSecureStreamNetRelay(stream.url);
+    const secureStreamNetRelay = requiresSecureStreamNetRelay(stream.url);
     const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
       if (secureStreamNetRelay) {
-        attempts.push(streamNetRelayUrl(stream.url));
-        if (hlsTwin) attempts.push(streamNetRelayUrl(hlsTwin));
+        // The IPTV panel rejects direct manifest fetches from the resolver's
+        // Cloudflare egress. Let the app proxy fetch the manifest, then rewrite
+        // its segments to the resolver worker.
+        const manifestAttempt = isLikelyHlsUrl(stream.url)
+          ? workerManifestUrl(stream.url)
+          : null;
+        attempts.push(manifestAttempt ?? streamNetRelayUrl(stream.url));
+        if (hlsTwin)
+          attempts.push(
+            workerManifestUrl(hlsTwin) ?? streamNetRelayUrl(hlsTwin),
+          );
       } else {
         if (hlsTwin) attempts.push(hlsTwin);
         const workerUrl = resolverMediaUrl(stream.url, {
@@ -1623,6 +1636,12 @@ function VideoPlayer({
     const onFirstPlaying = () => {
       if (video.readyState < 3) return;
       hasPlayed = true;
+      // A fallback may have reached playback after an earlier manifest/segment
+      // failure. Once frames are playing, the stale external-player overlay is
+      // no longer actionable and must be dismissed.
+      setError(false);
+      setErrorDetail("");
+      setBuffering(false);
       window.clearTimeout(stallTimer);
       window.clearTimeout(playableWatchdog);
       video.removeEventListener("playing", onFirstPlaying);

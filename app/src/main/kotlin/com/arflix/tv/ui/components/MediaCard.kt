@@ -358,8 +358,8 @@ fun MediaCard(
                     )
                 }
 
-                // Neutral watched badge
-                if (showWatched && (item.isWatched || item.isPartiallyWatched)) {
+                // Continue-Watching cards also show a partial-progress marker.
+                if ((showWatched || showProgress) && (item.isWatched || item.isPartiallyWatched)) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)

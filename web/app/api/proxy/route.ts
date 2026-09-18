@@ -376,6 +376,15 @@ function rewritePlaylistToWorker(
       return raw;
     }
     if (!["http:", "https:"].includes(absolute.protocol)) return raw;
+    // The IPTV panel's rotating segment IP rejects Cloudflare resolver
+    // requests, while the self-hosted app relay can reach it.
+    if (absolute.hostname === "193.200.221.81") {
+      const params = new URLSearchParams();
+      params.set("url", absolute.toString());
+      if (headersParam) params.set("headers", headersParam);
+      params.set("rewrite", "streamnet");
+      return `/api/proxy?${params.toString()}`;
+    }
     if (/\.m3u8?(?:$|[?#])/i.test(absolute.pathname)) {
       // Child playlists may live on the same CF-blocked host as the master;
       // keep them on this route (root-relative resolves against the app origin).

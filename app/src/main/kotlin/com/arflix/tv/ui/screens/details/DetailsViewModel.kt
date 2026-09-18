@@ -451,7 +451,11 @@ class DetailsViewModel @Inject constructor(
                     playTmdbSeason = initialSeason,
                     playTmdbEpisode = initialEpisode,
                     playLabel = if (mediaType == MediaType.TV && initialSeason != null && initialEpisode != null) {
-                        context.getString(R.string.continue_season_episode, initialSeason, initialEpisode)
+                        if (initialSeason == 1 && initialEpisode == 1) {
+                            context.getString(R.string.play_start_s1e1)
+                        } else {
+                            context.getString(R.string.continue_season_episode, initialSeason, initialEpisode)
+                        }
                     } else {
                         null
                     },
@@ -968,8 +972,16 @@ class DetailsViewModel @Inject constructor(
                                 playTmdbSeason = initialSeason,
                                 playTmdbEpisode = initialEpisode,
                                 playLabel = displayTarget?.let {
-                                    context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
-                                } ?: matchedResume?.label ?: context.getString(R.string.continue_season_episode, initialSeason, initialEpisode),
+                                    if (matchedResume == null && it.displaySeason == 1 && it.displayEpisode == 1) {
+                                        context.getString(R.string.play_start_s1e1)
+                                    } else {
+                                        context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
+                                    }
+                                } ?: matchedResume?.label ?: if (initialSeason == 1 && initialEpisode == 1) {
+                                    context.getString(R.string.play_start_s1e1)
+                                } else {
+                                    context.getString(R.string.continue_season_episode, initialSeason, initialEpisode)
+                                },
                                 playPositionMs = matchedResume?.positionMs
                             )
                         }

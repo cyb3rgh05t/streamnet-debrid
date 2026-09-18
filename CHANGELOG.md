@@ -2,6 +2,26 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.030] - 2026-09-18
+
+### IPTV-Wiedergabe und Genre-Fanart
+
+- Xtream-VOD-HLS/MPEG-TS wird im Browser zuverlässiger direkt erkannt und abgespielt.
+- IPTV-HLS nutzt Proxy- und Audio-Transcoding-Unterstützung für Manifest-, Segment- und AAC-Wiedergabe.
+- Der Audio-Watchdog bleibt bei Live-MPEG-TS aus und greift gezielt bei Xtream-VOD ein; Playback blendet veraltete Fehlerzustände aus.
+- Genre-Fanart liefert bei fehlender Konfiguration oder Upstream-Fehlern einen gecachten leeren Fallback statt eines 5xx-Fehlers.
+- Der Standard-Resolver verwendet `https://resolve.streamnet.live`; bekannte IPTV-Playlisten werden über den eigenen Proxy umgeschrieben.
+- Web-Version: `1.0.030`.
+
+## [2.5.025] - 2026-09-18
+
+### Continue Watching und Watched-Status
+
+- Android erkennt bereits ab fünf Sekunden Wiedergabe eine bedeutungsvolle Continue-Watching-Position.
+- Continue-Watching-Karten zeigen den partiellen Fortschrittsstatus zuverlässig; bei der ersten Episode erscheint weiterhin „Starten“ statt „Fortsetzen“.
+- Die Trakt-/Cloud- und Episodenstatus-Zusammenführung wurde für diese Zustände angepasst und durch einen Regressionstest abgesichert.
+- Android-Version: `2.5.025` (`versionCode` 426).
+
 ## [Web 1.0.029] - 2026-09-18
 
 ### Build-Release

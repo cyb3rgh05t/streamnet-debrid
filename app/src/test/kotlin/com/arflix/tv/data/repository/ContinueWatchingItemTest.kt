@@ -94,6 +94,26 @@ class ContinueWatchingItemTest {
     }
 
     @Test
+    fun toMediaItem_showsFiveSecondEpisodeSessionAsPartialProgress() {
+        val item = ContinueWatchingItem(
+            id = 123,
+            title = "Example Show",
+            mediaType = MediaType.TV,
+            progress = 0,
+            resumePositionSeconds = 5L,
+            durationSeconds = 3600L,
+            season = 1,
+            episode = 1
+        )
+
+        val mediaItem = item.toMediaItem()
+
+        assertEquals(2, mediaItem.progress)
+        assertEquals(true, mediaItem.showPlaybackProgress)
+        assertEquals(true, mediaItem.isPartiallyWatched)
+    }
+
+    @Test
     fun toMediaItem_resolvesRelativeTmdbArtworkPaths() {
         val relativeArtwork = ContinueWatchingItem(
             id = 123,

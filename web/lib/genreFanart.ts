@@ -4,6 +4,8 @@ type GenreFanartEntry = {
   backdrops?: string[];
 };
 
+const failedGenreFanartUntil = new Map<string, number>();
+
 const tones: Record<string, [string, string]> = {
   red: ["991B1B", "FCA5A5"],
   darkred: ["1F2937", "F87171"],
@@ -55,11 +57,17 @@ export async function loadGenreFanart(
   mediaType: "movie" | "tv",
   language: string,
 ): Promise<Map<number, string>> {
+  const failureKey = `${mediaType}:${language}`;
+  if ((failedGenreFanartUntil.get(failureKey) ?? 0) > Date.now())
+    return new Map();
   try {
     const response = await fetch(
       `/api/genre-fanart/${mediaType}?language=${encodeURIComponent(language)}`,
     );
-    if (!response.ok) return new Map();
+    if (!response.ok) {
+      failedGenreFanartUntil.set(failureKey, Date.now() + 10 * 60_000);
+      return new Map();
+    }
     const entries = (await response.json()) as GenreFanartEntry[];
     const result = new Map<number, string>();
     for (const entry of Array.isArray(entries) ? entries : []) {
@@ -73,8 +81,10 @@ export async function loadGenreFanart(
         `https://image.tmdb.org/t/p/w1280_filter(duotone,${tone[0]},${tone[1]})${path}`,
       );
     }
+    failedGenreFanartUntil.delete(failureKey);
     return result;
   } catch {
+    failedGenreFanartUntil.set(failureKey, Date.now() + 10 * 60_000);
     return new Map();
   }
 }
