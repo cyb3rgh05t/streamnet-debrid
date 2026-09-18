@@ -2,6 +2,20 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.029] - 2026-09-18
+
+### Build-Release
+
+- Neuer Web-Build für den aktuellen gemeinsamen Continue-Watching-Sync.
+- Web-Version: `1.0.029`.
+
+## [Backend 1.0.005] - 2026-09-18
+
+### Build-Release
+
+- Neuer Backend-Cloud-Build für den aktuellen gemeinsamen Continue-Watching-Sync.
+- Backend-Cloud-Version: `1.0.005`.
+
 ## [Web 1.0.028] - 2026-09-18
 
 ### Gemeinsames Continue Watching
