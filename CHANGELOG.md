@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.034] - 2026-09-18
+
+### Continue-Watching-Titel
+
+- Die Serienzeile `S… · E… · Titel` verwendet jetzt exakt die responsive Schriftgröße und den normalen Schriftschnitt der Film-Titelzeile.
+- Der Seriencode bleibt in der aktiven Akzentfarbe, der Episodentitel bleibt neutral.
+- Web-Version: `1.0.034`.
+
 ## [Web 1.0.033] - 2026-09-18
 
 ### Continue-Watching-Titel
