@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.027] - 2026-09-18
+
+### Watched-Status und Merkliste
+
+- Gesehene Episoden werden im Detailscreen wieder zuverlässig mit einem sichtbaren Checkmark über dem Episodenbild dargestellt.
+- Trakt-Progress, StreamNet-Cloud-Watch-Keys und Tracker-History werden für den Episodenstatus zusammengeführt; vollständig gesehene Staffeln erhalten ein Checkmark in der Season-Pill.
+- Das Staffel-Checkmark übernimmt die Textfarbe des jeweiligen Pills und bleibt dadurch in aktiven und inaktiven Zuständen lesbar.
+- Merkliste hinzufügen und entfernen funktioniert lokal sowie über StreamNet Cloud auch ohne verbundene Trakt-, Simkl- oder MDBList-Integration; Tracker-Sync bleibt optional.
+- Web-Version: `1.0.027`.
+
 ## [2.5.024] - 2026-09-17
 
 ### Watched-Status in Home-Rails

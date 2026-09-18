@@ -1,5 +1,50 @@
 import type { MediaItem } from "./types";
 
+export function watchedKeysFromShowProgress(
+  tmdbId: number,
+  progress: unknown,
+): Set<string> {
+  const value = progress as {
+    aired?: number;
+    completed?: number;
+    seasons?: Array<{
+      number?: number;
+      completed?: number;
+      episodes?: Array<{
+        number?: number;
+        completed?: boolean;
+        watched_at?: string;
+      }>;
+    }>;
+  };
+  const keys = new Set<string>();
+  for (const season of value.seasons ?? []) {
+    const seasonNumber = Number(season.number);
+    if (!Number.isInteger(seasonNumber) || seasonNumber < 0) continue;
+    const completed = Math.max(0, Number(season.completed ?? 0));
+    for (let episode = 1; episode <= completed; episode += 1) {
+      keys.add(`tv:${tmdbId}:${seasonNumber}:${episode}`);
+    }
+    for (const episode of season.episodes ?? []) {
+      const episodeNumber = Number(episode.number);
+      if (
+        Number.isInteger(episodeNumber) &&
+        episodeNumber > 0 &&
+        (episode.completed === true || Boolean(episode.watched_at))
+      ) {
+        keys.add(`tv:${tmdbId}:${seasonNumber}:${episodeNumber}`);
+      }
+    }
+  }
+  if (
+    Number(value.aired) > 0 &&
+    Number(value.completed) >= Number(value.aired)
+  ) {
+    keys.add(`tv:${tmdbId}`);
+  }
+  return keys;
+}
+
 export function nextEpisodeAfter(
   item: MediaItem,
   seasonNumber: number,
@@ -34,6 +79,39 @@ type WatchedRow = {
     episodes?: { number: number; last_watched_at?: string }[];
   }[];
 };
+
+export function isWatchedShowEpisode(
+  item: MediaItem,
+  watchedKeys: Set<string>,
+  seasonNumber?: number | null,
+  episodeNumber?: number | null,
+): boolean {
+  if (item.mediaType !== "tv") {
+    return watchedKeys.has(`movie:${item.id}`);
+  }
+
+  const season = seasonNumber ?? item.seasonNumber ?? null;
+  const episode = episodeNumber ?? item.episodeNumber ?? null;
+  const showKey = `tv:${item.id}`;
+  if (watchedKeys.has(showKey)) return true;
+
+  if (season == null || episode == null) return false;
+
+  const exactKey = `tv:${item.id}:${season}:${episode}`;
+  if (watchedKeys.has(exactKey)) return true;
+
+  const seasonPrefix = `tv:${item.id}:${season}:`;
+  let latestWatchedEpisode = -Infinity;
+  for (const key of watchedKeys) {
+    if (!key.startsWith(seasonPrefix)) continue;
+    const watchedEpisode = Number.parseInt(key.slice(seasonPrefix.length), 10);
+    if (Number.isFinite(watchedEpisode)) {
+      latestWatchedEpisode = Math.max(latestWatchedEpisode, watchedEpisode);
+    }
+  }
+
+  return latestWatchedEpisode >= episode;
+}
 
 /** Only positive completion evidence can prune a saved rail during a partial outage. */
 export function completionTimes(

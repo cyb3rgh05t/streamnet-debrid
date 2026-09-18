@@ -49,6 +49,8 @@ import {
   includeIptvContinueWatching,
   isPausedContinueWatchingItem,
   isUnwatchedContinueWatching,
+  isWatchedShowEpisode,
+  watchedKeysFromShowProgress,
   mergePartialContinueWatching,
   mergeTrackerContinueWatching,
   preserveActiveCloudResumes,
@@ -465,10 +467,7 @@ function isMediaWatched(
   episodeNumber?: number | null,
 ) {
   if (item.isWatched) return true;
-  const key = mediaWatchKey(item, seasonNumber, episodeNumber);
-  // An episode counts as watched only via its own tv:id:season:episode key —
-  // never via the show-level key, which now means "entire show completed".
-  return Boolean(key && watchedKeys.has(key));
+  return isWatchedShowEpisode(item, watchedKeys, seasonNumber, episodeNumber);
 }
 
 function traktActivityTime(raw: unknown) {
@@ -515,6 +514,7 @@ async function loadTraktUpNext(
   const results: Array<MediaItem | null> = new Array(watchedShows.length).fill(
     null,
   );
+  const progressWatchedKeys = new Set<string>();
   let cursor = 0;
   // Distinguishes "progress fetch failed" (rate-limited/blocked) from "show has
   // no next episode" — an empty result with failures present is a partial
@@ -527,7 +527,9 @@ async function loadTraktUpNext(
         const index = cursor;
         cursor += 1;
         const watched = watchedShows[index];
-        const row = watched as { show?: { ids?: { trakt?: number } } };
+        const row = watched as {
+          show?: { ids?: { trakt?: number; tmdb?: number } };
+        };
         const traktId = row.show?.ids?.trakt;
         if (!traktId) continue;
         // The client owns the account-scoped, expiring cache. A second, timeless
@@ -540,6 +542,11 @@ async function loadTraktUpNext(
           )
           .catch(() => null);
         if (!progress) fetchFailures += 1;
+        if (progress && row.show?.ids?.tmdb) {
+          watchedKeysFromShowProgress(row.show.ids.tmdb, progress).forEach(
+            (key) => progressWatchedKeys.add(key),
+          );
+        }
         results[index] = traktUpNextToMedia(watched, progress);
       }
     },
@@ -548,7 +555,7 @@ async function loadTraktUpNext(
   const items = results
     .filter((item): item is MediaItem => Boolean(item))
     .filter((item) => includeSpecials || item.seasonNumber !== 0);
-  return { items, fetchFailures };
+  return { items, fetchFailures, watchedKeys: progressWatchedKeys };
 }
 
 function mergeTraktWithLocalResume(
@@ -1675,12 +1682,21 @@ export function AppProvider({
                 effectiveSettings.includeSpecials,
                 hiddenShowIds,
                 isCurrent,
-              ).catch(() => ({ items: [] as MediaItem[], fetchFailures: 1 }))
-            : { items: [] as MediaItem[], fetchFailures: 0 };
+              ).catch(() => ({
+                items: [] as MediaItem[],
+                fetchFailures: 1,
+                watchedKeys: new Set<string>(),
+              }))
+            : {
+                items: [] as MediaItem[],
+                fetchFailures: 0,
+                watchedKeys: new Set<string>(),
+              };
           const upNextRows = upNext.items;
           const watchedKeys = new Set([
             ...traktWatchedKeys(watchedMoviesRows, watchedShowsRows),
             ...cloudWatchedKeys,
+            ...(upNext.watchedKeys ?? []),
           ]);
           // Cloud watched flags may be older than a provider's reset/progress response.
           // Keep those flags for badges, but do not let them veto tracker Continue Watching.
@@ -3771,16 +3787,6 @@ export function AppProvider({
       const inWatchlist = watchlist.some(
         (entry) => entry.mediaType === item.mediaType && entry.id === item.id,
       );
-      if (activeSyncProvider() === "none") {
-        setToast(
-          localize(
-            settingsRef.current.uiLanguage,
-            "Verbinde Trakt, Simkl oder MDBList in den Einstellungen, um die Merkliste zu verwenden.",
-            "Connect Trakt, Simkl, or MDBList in Settings to use Watchlist.",
-          ),
-        );
-        return;
-      }
       const slim = slimCacheItem(item);
       const cacheKey = watchlistCacheKeyFor(
         activeProfileId,
@@ -3795,7 +3801,10 @@ export function AppProvider({
       setWatchlist(nextWatchlist);
       saveCachedList(cacheKey, nextWatchlist, 60);
 
-      try {
+      let trackerError: unknown = null;
+      let cloudError: unknown = null;
+      const provider = activeSyncProvider();
+      if (provider !== "none") {
         const ref = {
           mediaType: item.mediaType,
           tmdbId: item.id,
@@ -3804,51 +3813,50 @@ export function AppProvider({
             item.originalLanguage === "ja" &&
             Boolean(item.genreIds?.includes(16)),
         };
-        if (inWatchlist) {
-          await syncClient().removeFromWatchlist(ref);
-          setToast(
-            localize(
-              settingsRef.current.uiLanguage,
-              "Von der Merkliste entfernt.",
-              "Removed from watchlist.",
-            ),
-          );
-        } else {
-          await syncClient().addToWatchlist(ref);
-          setToast(
-            localize(
-              settingsRef.current.uiLanguage,
-              "Zur Merkliste hinzugefügt.",
-              "Added to watchlist.",
-            ),
-          );
+        try {
+          if (inWatchlist) await syncClient().removeFromWatchlist(ref);
+          else await syncClient().addToWatchlist(ref);
+        } catch (err) {
+          trackerError = err;
         }
+      }
+      try {
         if (authClient.session) {
-          await saveCloudWatchlist(
-            authClient,
-            nextWatchlist,
-            activeProfileId,
-          ).catch(() => undefined);
+          await saveCloudWatchlist(authClient, nextWatchlist, activeProfileId);
         }
       } catch (err) {
-        setWatchlist((prev) => {
-          const next = inWatchlist
-            ? [slim, ...prev]
-            : prev.filter(
-                (entry) =>
-                  !(entry.mediaType === item.mediaType && entry.id === item.id),
-              );
-          saveCachedList(cacheKey, next, 60);
-          return next;
-        });
+        cloudError = err;
+      }
+
+      if (trackerError && !cloudError) {
         setToast(
-          err instanceof Error
-            ? err.message
-            : localize(
-                settingsRef.current.uiLanguage,
-                "Die Merkliste konnte nicht aktualisiert werden.",
-                "Failed to update watchlist.",
-              ),
+          localize(
+            settingsRef.current.uiLanguage,
+            inWatchlist
+              ? "Lokal und in StreamNet Cloud entfernt. Tracker-Sync fehlgeschlagen."
+              : "Lokal und in StreamNet Cloud gespeichert. Tracker-Sync fehlgeschlagen.",
+            inWatchlist
+              ? "Removed locally and from StreamNet Cloud. Tracker sync failed."
+              : "Saved locally and to StreamNet Cloud. Tracker sync failed.",
+          ),
+        );
+      } else if (cloudError) {
+        setToast(
+          localize(
+            settingsRef.current.uiLanguage,
+            "Lokal aktualisiert, aber StreamNet Cloud konnte nicht gespeichert werden.",
+            "Updated locally, but StreamNet Cloud could not be saved.",
+          ),
+        );
+      } else {
+        setToast(
+          localize(
+            settingsRef.current.uiLanguage,
+            inWatchlist
+              ? "Von der Merkliste entfernt."
+              : "Zur Merkliste hinzugefügt.",
+            inWatchlist ? "Removed from watchlist." : "Added to watchlist.",
+          ),
         );
       }
     },

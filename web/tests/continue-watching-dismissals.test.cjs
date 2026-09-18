@@ -116,6 +116,52 @@ test("completed season advances to the first episode of the next season", async 
   assert.equal(nextEpisodeAfter(show, 2, 8), null);
 });
 
+test("earlier episodes in the same season count as watched for details badges", async () => {
+  const { isWatchedShowEpisode } = await import(moduleUrl);
+
+  const watchedKeys = new Set(["tv:123:2:7", "tv:123:2:9"]);
+  assert.equal(
+    isWatchedShowEpisode(
+      { id: 123, mediaType: "tv", seasonNumber: 2, episodeNumber: 8 },
+      watchedKeys,
+    ),
+    true,
+  );
+  assert.equal(
+    isWatchedShowEpisode(
+      { id: 123, mediaType: "tv", seasonNumber: 2, episodeNumber: 9 },
+      watchedKeys,
+    ),
+    true,
+  );
+  assert.equal(
+    isWatchedShowEpisode(
+      { id: 123, mediaType: "tv", seasonNumber: 2, episodeNumber: 10 },
+      watchedKeys,
+    ),
+    false,
+  );
+});
+
+test("Trakt progress contributes completed season episodes to detail badges", async () => {
+  const { watchedKeysFromShowProgress } = await import(moduleUrl);
+  const watchedKeys = watchedKeysFromShowProgress(123, {
+    aired: 24,
+    completed: 17,
+    seasons: [
+      { number: 1, completed: 8 },
+      { number: 2, completed: 8 },
+      { number: 3, completed: 1 },
+    ],
+  });
+
+  assert.equal(watchedKeys.has("tv:123:1:8"), true);
+  assert.equal(watchedKeys.has("tv:123:2:8"), true);
+  assert.equal(watchedKeys.has("tv:123:3:1"), true);
+  assert.equal(watchedKeys.has("tv:123:3:2"), false);
+  assert.equal(watchedKeys.has("tv:123"), false);
+});
+
 test("active cloud movie resume survives tracker completion", async () => {
   const { pruneCompletedResume } = await import(moduleUrl);
   const item = {

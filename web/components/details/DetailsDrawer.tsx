@@ -1913,6 +1913,18 @@ function SeasonEpisodes({
     });
   };
 
+  const isSeasonWatched = (seasonNumber: number, episodeCount?: number) => {
+    if (!episodeCount || episodeCount < 1) return false;
+    for (
+      let episodeNumber = 1;
+      episodeNumber <= episodeCount;
+      episodeNumber += 1
+    ) {
+      if (!isWatched(item, seasonNumber, episodeNumber)) return false;
+    }
+    return true;
+  };
+
   const handleEpisodeContextMenu = (e: React.MouseEvent, ep: EpisodeInfo) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1979,6 +1991,17 @@ function SeasonEpisodes({
           >
             {s.name ||
               `${localize(settings.uiLanguage, "Staffel", "Season")} ${s.seasonNumber}`}
+            {isSeasonWatched(s.seasonNumber, s.episodeCount) && (
+              <BadgeCheck
+                className="season-tab-watched"
+                size={15}
+                aria-label={localize(
+                  settings.uiLanguage,
+                  "Staffel vollständig gesehen",
+                  "Season fully watched",
+                )}
+              />
+            )}
           </button>
         ))}
         {!seasons.length && loadingDetails ? (

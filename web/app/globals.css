@@ -2227,11 +2227,17 @@ a.login-submit {
   border-radius: 999px;
   display: grid;
   place-items: center;
-  /* Full-strength white — a lower-specificity .media-card span rule was dimming
-     it to 76% opacity. */
-  color: #ffffff !important;
-  background: rgba(0, 0, 0, 0.5);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  color: var(--accent, #ffffff) !important;
+  background: color-mix(
+    in srgb,
+    var(--accent, #ffffff) 18%,
+    rgba(0, 0, 0, 0.72)
+  );
+  border: 1px solid
+    color-mix(in srgb, var(--accent, #ffffff) 42%, rgba(255, 255, 255, 0.04));
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--accent, #ffffff) 16%, transparent),
+    0 1px 4px rgba(0, 0, 0, 0.45);
   z-index: 3;
 }
 
@@ -2260,8 +2266,15 @@ a.login-submit {
   height: 28px;
   flex: 0 0 auto;
   margin-bottom: 18px;
-  background: rgba(0, 213, 136, 0.22);
-  box-shadow: 0 0 26px rgba(0, 213, 136, 0.24);
+  color: var(--accent, #ffffff);
+  background: color-mix(
+    in srgb,
+    var(--accent, #ffffff) 18%,
+    rgba(0, 0, 0, 0.68)
+  );
+  border: 1px solid color-mix(in srgb, var(--accent, #ffffff) 28%, transparent);
+  box-shadow: 0 0 26px
+    color-mix(in srgb, var(--accent, #ffffff) 26%, transparent);
 }
 
 .detail-watched-badge svg {
@@ -2270,12 +2283,23 @@ a.login-submit {
 }
 
 .episode-watched-badge {
+  position: absolute;
   right: 12px;
   bottom: 12px;
   width: 22px;
   height: 22px;
-  background: rgba(0, 213, 136, 0.22);
-  box-shadow: 0 0 22px rgba(0, 213, 136, 0.22);
+  display: grid;
+  place-items: center;
+  color: var(--accent, #ffffff);
+  background: color-mix(
+    in srgb,
+    var(--accent, #ffffff) 18%,
+    rgba(0, 0, 0, 0.68)
+  );
+  border: 1px solid color-mix(in srgb, var(--accent, #ffffff) 22%, transparent);
+  box-shadow: 0 0 22px
+    color-mix(in srgb, var(--accent, #ffffff) 22%, transparent);
+  z-index: 4;
 }
 
 .episode-watched-badge svg {
@@ -4848,6 +4872,13 @@ select:focus {
   padding: 0 18px;
   border-radius: 999px;
   font-size: clamp(14px, 1vw, 17px);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.season-tab-watched {
+  color: inherit;
 }
 
 .episode-list {
