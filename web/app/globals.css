@@ -4085,7 +4085,7 @@ select {
   margin-top: 12px;
   font-size: clamp(16px, 1.22vw, 23px);
   line-height: 1.18;
-  font-weight: 720;
+  font-weight: 400;
   color: rgba(255, 255, 255, 0.94);
 }
 

@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.032] - 2026-09-18
+
+### Continue-Watching-Titel
+
+- Die Serienzeile `S… · E…` verwendet jetzt denselben normalen Schriftschnitt wie Filmtitel.
+- Web-Version: `1.0.032`.
+
 ## [Web 1.0.031] - 2026-09-18
 
 ### Continue-Watching-Titel
