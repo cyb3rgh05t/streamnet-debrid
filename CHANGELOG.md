@@ -2,6 +2,23 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.026] - 2026-09-19
+
+### Profile und Wiedergabehinweise
+
+- Die Profilauswahl zeigt wieder „Wer schaut gerade?“; die englische Oberfläche verwendet „Who’s watching?“.
+- Continue-Watching-Karten zeigen ausschließlich Fortschritt oder „Up next“, nie ein Watched-Häkchen oder Teilstatus-Minus.
+- Intro-, Recap- und Credits-Segmente werden nach einer temporär leeren Anbieterantwort erneut abgefragt, statt für die gesamte App-Sitzung auszufallen.
+- Android-Version: `2.5.026`.
+
+## [Web 1.0.036] - 2026-09-19
+
+### Audio-Transcoder und Continue Watching
+
+- Beim Audio-Transcoder-Neustart bleiben Staffel, Episode, Resume-Position, Fortschritt und gespeicherte Dauer erhalten.
+- MPEG-TS-Transcoder-Ausgaben ohne eigene Endzeit verwenden die gespeicherte Continue-Watching-Dauer für Restzeit, Scrubber und Fortschritts-Speicherung.
+- Web-Version: `1.0.036`.
+
 ## [Web 1.0.035] - 2026-09-18
 
 ### CSS- und Continue-Watching-Fix

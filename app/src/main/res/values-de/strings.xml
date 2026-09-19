@@ -59,7 +59,7 @@
     <string name="selected">ausgewählt</string>
     <string name="sign_in">Anmelden</string>
     <string name="log_out">Abmelden</string>
-    <string name="whos_watching">Wer schaut?</string>
+    <string name="whos_watching">Wer schaut gerade?</string>
     <string name="manage_profiles">Profile verwalten</string>
     <string name="add_profile">Profil hinzufügen</string>
     <string name="loading_profile">Profil wird geladen…</string>

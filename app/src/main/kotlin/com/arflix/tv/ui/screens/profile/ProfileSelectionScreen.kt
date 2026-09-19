@@ -208,6 +208,16 @@ fun ProfileSelectionScreen(
 
             Spacer(modifier = Modifier.height(18.dp))
 
+            Text(
+                text = stringResource(R.string.whos_watching),
+                fontSize = if (isTouchDevice) 24.sp else 30.sp,
+                fontWeight = FontWeight.Normal,
+                color = Color.White.copy(alpha = 0.86f),
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
             // Profile avatars row
             val avatarSize = if (isTouchDevice) 90.dp else 120.dp
             val avatarSpacing = if (isTouchDevice) 16.dp else 24.dp

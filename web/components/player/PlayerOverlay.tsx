@@ -120,6 +120,18 @@ function fmt(seconds: number): string {
     : `${m}:${String(s).padStart(2, "0")}`;
 }
 
+function playbackDurationSeconds(
+  videoDuration: number,
+  savedDurationSeconds?: number,
+  startOffset = 0,
+): number {
+  if (Number.isFinite(videoDuration) && videoDuration > 0)
+    return videoDuration + startOffset;
+  return savedDurationSeconds && savedDurationSeconds > 0
+    ? savedDurationSeconds
+    : 0;
+}
+
 function isSameStream(a: StreamSource, b: StreamSource) {
   return (
     a.url === b.url &&
@@ -1678,7 +1690,14 @@ function VideoPlayer({
       setBuffered(bufferedEndAt(video.buffered, video.currentTime));
       setBufferAheadSec(bufferedAhead(video.buffered, video.currentTime));
     };
-    const onDur = () => setDuration(video.duration || 0);
+    const onDur = () =>
+      setDuration(
+        playbackDurationSeconds(
+          video.duration,
+          item?.durationSeconds,
+          stream.playbackSession?.startOffset ?? 0,
+        ),
+      );
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
@@ -1786,15 +1805,16 @@ function VideoPlayer({
         });
     };
     const capturePosition = () => {
-      if (
-        Number.isFinite(video.duration) &&
-        video.duration > 0 &&
-        Number.isFinite(video.currentTime)
-      ) {
-        const offset = stream.playbackSession?.startOffset ?? 0;
+      const offset = stream.playbackSession?.startOffset ?? 0;
+      const duration = playbackDurationSeconds(
+        video.duration,
+        item.durationSeconds,
+        offset,
+      );
+      if (duration > 0 && Number.isFinite(video.currentTime)) {
         lastPosition = {
           position: video.currentTime + offset,
-          duration: video.duration + offset,
+          duration,
         };
       }
       return lastPosition;

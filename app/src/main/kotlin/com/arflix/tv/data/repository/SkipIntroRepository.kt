@@ -48,7 +48,6 @@ class SkipIntroRepository @Inject constructor(
             }
         }
 
-        cache[cacheKey] = emptyList()
         return emptyList()
     }
 

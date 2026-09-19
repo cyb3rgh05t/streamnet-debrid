@@ -2644,6 +2644,12 @@ export function AppProvider({
       seasonNumber: item.seasonNumber ?? detailed.seasonNumber ?? null,
       episodeNumber: item.episodeNumber ?? detailed.episodeNumber ?? null,
       episodeTitle: item.episodeTitle ?? detailed.episodeTitle ?? null,
+      progress: item.progress ?? detailed.progress,
+      resumePositionSeconds:
+        item.resumePositionSeconds ?? detailed.resumePositionSeconds,
+      durationSeconds: item.durationSeconds ?? detailed.durationSeconds,
+      timeRemainingLabel:
+        item.timeRemainingLabel ?? detailed.timeRemainingLabel,
     };
     setSelected(withResumeEpisode);
     // Movies fetch sources immediately. Continue-watching TV entries already
