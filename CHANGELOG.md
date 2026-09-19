@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.027] - 2026-09-19
+
+### TheIntroDB für Filme und Serien
+
+- TheIntroDB ist die primäre, keyfreie Quelle für Überspring-Zeitstempel mit StreamNets nativen TMDB-IDs.
+- Filme sowie Serienepisoden unterstützen Intro, Recap, Credits und Vorschau; IMDb-ID bleibt als alternative ID verfügbar.
+- Offene Credits- und Vorschau-Segmente ohne Endzeit überspringen bis zum tatsächlichen Medienende.
+- Das bisherige IntroDB und AniSkip bleiben für Serienepisoden als Fallback erhalten.
+- Android-Version: `2.5.027`.
+
 ## [2.5.026] - 2026-09-19
 
 ### Profile und Wiedergabehinweise

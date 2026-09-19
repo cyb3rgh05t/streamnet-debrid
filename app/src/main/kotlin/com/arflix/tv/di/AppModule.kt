@@ -4,6 +4,7 @@ import android.content.Context
 import com.arflix.tv.data.api.AniSkipApi
 import com.arflix.tv.data.api.ArmApi
 import com.arflix.tv.data.api.IntroDbApi
+import com.arflix.tv.data.api.TheIntroDbApi
 import com.arflix.tv.data.api.StreamApi
 import com.arflix.tv.data.api.WatchStateApi
 import com.arflix.tv.data.api.TmdbApi
@@ -253,6 +254,25 @@ object AppModule {
     }
 
     // Skip intro providers (IntroDB + AniSkip + ARM).
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    @Named("theIntroDb")
+    fun provideTheIntroDbRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        return Retrofit.Builder()
+            .baseUrl("https://api.theintrodb.org/v3/")
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    @JvmStatic
+    fun provideTheIntroDbApi(@Named("theIntroDb") retrofit: Retrofit): TheIntroDbApi {
+        return retrofit.create(TheIntroDbApi::class.java)
+    }
 
     @Provides
     @Singleton

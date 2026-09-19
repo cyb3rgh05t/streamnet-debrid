@@ -6,9 +6,32 @@ import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/**
- * IntroDB segments API.
- */
+/** TheIntroDB v3 timestamps API, using TMDB IDs as the primary identity. */
+interface TheIntroDbApi {
+    @GET("media")
+    suspend fun getMedia(
+        @Query("tmdb_id") tmdbId: Int? = null,
+        @Query("imdb_id") imdbId: String? = null,
+        @Query("season") season: Int? = null,
+        @Query("episode") episode: Int? = null
+    ): TheIntroDbMediaResponse
+}
+
+@Keep
+data class TheIntroDbMediaResponse(
+    @SerializedName("intro") val intro: List<TheIntroDbSegment>? = null,
+    @SerializedName("recap") val recap: List<TheIntroDbSegment>? = null,
+    @SerializedName("credits") val credits: List<TheIntroDbSegment>? = null,
+    @SerializedName("preview") val preview: List<TheIntroDbSegment>? = null
+)
+
+@Keep
+data class TheIntroDbSegment(
+    @SerializedName("start_ms") val startMs: Long? = null,
+    @SerializedName("end_ms") val endMs: Long? = null
+)
+
+/** IntroDB segment timestamps API. */
 interface IntroDbApi {
     @GET("segments")
     suspend fun getSegments(
@@ -33,10 +56,7 @@ data class IntroDbSegment(
     @SerializedName("start_ms") val startMs: Long = 0L,
     @SerializedName("end_ms") val endMs: Long = 0L,
     @SerializedName("start_sec") val startSec: Double? = null,
-    @SerializedName("end_sec") val endSec: Double? = null,
-    @SerializedName("confidence") val confidence: Double? = null,
-    @SerializedName("submission_count") val submissionCount: Int? = null,
-    @SerializedName("updated_at") val updatedAt: String? = null
+    @SerializedName("end_sec") val endSec: Double? = null
 )
 
 /**

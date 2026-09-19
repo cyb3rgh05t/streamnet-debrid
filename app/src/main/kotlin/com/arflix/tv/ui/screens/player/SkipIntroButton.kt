@@ -158,6 +158,7 @@ fun SkipIntroButton(
 private fun skipLabel(type: String?): String = when (type) {
     "op", "mixed-op", "intro" -> "Skip Intro"
     "recap" -> "Skip Recap"
-    "ed", "mixed-ed", "outro" -> "Skip Ending"
+    "ed", "mixed-ed", "outro", "credits" -> "Skip Credits"
+    "preview" -> "Skip Preview"
     else -> "Skip"
 }

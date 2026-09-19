@@ -3598,8 +3598,13 @@ fun PlayerScreen(
                 dismissed = uiState.skipIntervalDismissed,
                 controlsVisible = showControls,
                 onSkip = {
-                    val end = activeSkip?.endMs ?: return@SkipIntroButton
-                    exoPlayer.seekTo((end + 500L).coerceAtLeast(0L))
+                    val interval = activeSkip ?: return@SkipIntroButton
+                    val target = if (interval.endsAtMediaEnd && duration > 0L) {
+                        duration
+                    } else {
+                        (interval.endMs + 500L).coerceAtLeast(0L)
+                    }
+                    exoPlayer.seekTo(target)
                     viewModel.dismissSkipInterval()
                 },
                 focusRequester = skipIntroFocusRequester,

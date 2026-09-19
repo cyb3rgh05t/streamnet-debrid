@@ -839,18 +839,17 @@ class PlayerViewModel @Inject constructor(
                     runCatching { fetchMediaMetadata(mediaType, mediaId) }
                         .onFailure(childFailed("metadata"))
                 }
-                // Fetch skip intervals in background (needs IMDB id)
+                // TheIntroDB uses the native TMDB ID, so skip timestamps can load
+                // immediately for films and episodes without waiting for IMDb resolution.
                 launch {
                     runCatching {
-                        if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null) {
-                            val cachedImdbId = currentImdbId ?: mediaRepository.getCachedImdbId(mediaType, mediaId)
-                            val imdbId = cachedImdbId ?: resolveExternalIds(mediaType, mediaId).imdbId
-                            if (!imdbId.isNullOrBlank()) {
-                                currentImdbId = imdbId
-                                if (cachedImdbId == null) mediaRepository.cacheImdbId(mediaType, mediaId, imdbId)
-                                fetchSkipIntervals(imdbId, seasonNumber, episodeNumber)
-                            }
-                        }
+                        fetchSkipIntervals(
+                            mediaType,
+                            mediaId,
+                            currentImdbId ?: mediaRepository.getCachedImdbId(mediaType, mediaId),
+                            seasonNumber,
+                            episodeNumber
+                        )
                     }.onFailure(childFailed("skipIntervals"))
                 }
                 // Direct-URL playback must still fetch subtitle addons (e.g. OpenSubtitles).
@@ -976,9 +975,7 @@ class PlayerViewModel @Inject constructor(
                 // Never block source loading on title hydration from TMDB.
                 // Fetch skip intervals in background. This should never block playback.
                 launch {
-                    if (mediaType == MediaType.TV && seasonNumber != null && episodeNumber != null && !imdbId.isNullOrBlank()) {
-                        fetchSkipIntervals(imdbId, seasonNumber, episodeNumber)
-                    }
+                    fetchSkipIntervals(mediaType, mediaId, imdbId, seasonNumber, episodeNumber)
                 }
                 // Start VOD append in background - single fast attempt, no retries blocking UI
                 homeServerAppendJob?.cancel()
@@ -1364,12 +1361,18 @@ class PlayerViewModel @Inject constructor(
         }
     }
 
-    private fun fetchSkipIntervals(imdbId: String, season: Int, episode: Int) {
-        val requestKey = "$imdbId:$season:$episode"
+    private fun fetchSkipIntervals(
+        mediaType: MediaType,
+        tmdbId: Int,
+        imdbId: String?,
+        season: Int? = null,
+        episode: Int? = null
+    ) {
+        val requestKey = "$mediaType:$tmdbId:${imdbId.orEmpty()}:${season ?: 0}:${episode ?: 0}"
         activeSkipRequestKey = requestKey
         skipIntervalsJob?.cancel()
         skipIntervalsJob = viewModelScope.launch {
-            val intervals = skipIntroRepository.getSkipIntervals(imdbId, season, episode)
+            val intervals = skipIntroRepository.getSkipIntervals(mediaType, tmdbId, imdbId, season, episode)
             if (activeSkipRequestKey != requestKey) return@launch
             skipIntervals = intervals
             // Force a recompute on the next position tick.
