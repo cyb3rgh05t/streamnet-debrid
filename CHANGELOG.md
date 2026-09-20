@@ -2,6 +2,23 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.007] - 2026-09-20
+
+### Admin-Dashboard und Sitzungsmetadaten
+
+- Admin-Accounts können per klickbarer Statuskarte auf aktuell online gesehene Geräte gefiltert werden.
+- Das Admin-Dashboard listet aktive Login-Sessions als Web-/Login-Instanzen und unterstützt das Entfernen alter Gerätehistorien.
+- Audit-Protokolle können im Dashboard nach Bestätigung geleert werden; Kommentare sind nur noch beim endgültigen Löschen eines Accounts verpflichtend.
+- Neue Account-Sessions speichern optionale Client-, Gerätetyp-, IP- und User-Agent-Metadaten für künftige Admin-Anzeigen.
+- Backend-Version: `1.0.007`.
+
+## [Web 1.0.038] - 2026-09-20
+
+### Admin-Sitzungsanzeige
+
+- Web-Login, Registrierung und Token-Refresh melden künftig `client_type: web` und einen groben Gerätetyp an das Backend.
+- Web-Version: `1.0.038`.
+
 ## [Backend 1.0.006] - 2026-09-20
 
 ### Continue-Watching-Synchronisation
