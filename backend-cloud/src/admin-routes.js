@@ -258,7 +258,8 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
             from (
               select distinct on (install_id) install_id, created_at
                 from app_usage_events
-               where coalesce(install_id, '') <> ''
+               where account_id is not null
+                 and coalesce(install_id, '') <> ''
                order by install_id, created_at desc
             ) latest_events
            where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes') as online_devices,

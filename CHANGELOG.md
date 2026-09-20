@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.008] - 2026-09-20
+
+### Admin-Dashboard Online-Filter
+
+- Die Statuskarte „Geräte online“ zählt nur noch account-verknüpfte Online-Geräte, damit Kartenwert und Account-Tabellenfilter übereinstimmen.
+- Backend-Version: `1.0.008`.
+
 ## [Backend 1.0.007] - 2026-09-20
 
 ### Admin-Dashboard und Sitzungsmetadaten
