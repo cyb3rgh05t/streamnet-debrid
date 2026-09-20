@@ -107,7 +107,9 @@ test("server-side push merge preserves Android Continue Watching omitted by web"
       ],
     },
   };
-  const incoming = { profileSettingsById: { ivory: { accentColor: "Orange" } } };
+  const incoming = {
+    profileSettingsById: { ivory: { accentColor: "Orange" } },
+  };
 
   const merged = mergePushPayloadByFieldTimestamps(incoming, current);
 

@@ -108,9 +108,8 @@ function setMergeFieldValue(root, key, value) {
 
 function continueWatchingItemKey(item) {
   if (!isPlainObject(item)) return null;
-  const mediaType = String(item.mediaType || "movie").toLowerCase() === "tv"
-    ? "tv"
-    : "movie";
+  const mediaType =
+    String(item.mediaType || "movie").toLowerCase() === "tv" ? "tv" : "movie";
   const id = Number(item.id || 0);
   if (!Number.isInteger(id) || id === 0) return null;
   if (mediaType === "tv" && item.season != null && item.episode != null) {
@@ -120,9 +119,7 @@ function continueWatchingItemKey(item) {
 }
 
 function mergeContinueWatchingProfiles(incoming, current) {
-  const incomingProfiles = isPlainObject(incoming)
-    ? incoming
-    : {};
+  const incomingProfiles = isPlainObject(incoming) ? incoming : {};
   const currentProfiles = isPlainObject(current) ? current : {};
   const profileIds = new Set([
     ...Object.keys(currentProfiles),
@@ -145,8 +142,9 @@ function mergeContinueWatchingProfiles(incoming, current) {
     }
     if (itemsByKey.size > 0 || Object.hasOwn(currentProfiles, profileId)) {
       mergedProfiles[profileId] = [...itemsByKey.values()]
-        .sort((left, right) =>
-          Number(right.updatedAtMs || 0) - Number(left.updatedAtMs || 0),
+        .sort(
+          (left, right) =>
+            Number(right.updatedAtMs || 0) - Number(left.updatedAtMs || 0),
         )
         .slice(0, 50);
     }
