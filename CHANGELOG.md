@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.010] - 2026-09-20
+
+### Admin-Dashboard Account-Details
+
+- Account-Details zeigen die Bereiche jetzt in der Reihenfolge Statuskarten, Profile, Remote-Konfiguration/Snapshot, Online-Geräte und Änderungen.
+- Backend-Version: `1.0.010`.
+
 ## [Backend 1.0.009] - 2026-09-20
 
 ### Admin-Dashboard Web-Logins

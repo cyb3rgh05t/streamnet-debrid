@@ -176,44 +176,6 @@
           </button>
           <div id="account-heading" class="account-heading"></div>
           <div id="account-stats" class="metrics compact"></div>
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="eyebrow">GERÄTE</p>
-              <h2>Online & zuletzt gesehen</h2>
-            </div>
-          </div>
-          <div id="account-devices" class="table-wrap hidden">
-            <table>
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Gerät</th>
-                  <th>Profil</th>
-                  <th>App</th>
-                  <th>Letztes Event</th>
-                  <th>Zuletzt gesehen</th>
-                  <th>Aktion</th>
-                </tr>
-              </thead>
-              <tbody id="account-devices-body"></tbody>
-            </table>
-          </div>
-          <div class="account-actions">
-            <button
-              id="revoke-sessions-button"
-              class="button secondary"
-              type="button"
-            >
-              Alle Sitzungen abmelden
-            </button>
-            <button
-              id="delete-account-button"
-              class="button danger"
-              type="button"
-            >
-              Konto löschen
-            </button>
-          </div>
 
           <div class="section-heading">
             <div>
@@ -223,33 +185,6 @@
             <span id="snapshot-revision" class="revision-pill"></span>
           </div>
           <div id="profiles-grid" class="profiles-grid"></div>
-
-          <section class="detail-panel" aria-labelledby="account-audits-title">
-            <div class="section-heading compact-heading">
-              <div>
-                <p class="eyebrow">PROTOKOLL</p>
-                <h2 id="account-audits-title">Account-Änderungen</h2>
-              </div>
-            </div>
-            <div id="account-audits" class="table-wrap hidden">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Zeit</th>
-                    <th>Operation</th>
-                    <th>Profil</th>
-                    <th>Revision</th>
-                    <th>Grund</th>
-                  </tr>
-                </thead>
-                <tbody id="account-audits-body"></tbody>
-              </table>
-            </div>
-            <p id="account-audits-empty" class="empty hidden">
-              Keine protokollierten Änderungen für diesen Account.
-            </p>
-            <div id="account-audits-pagination" class="pagination-bar"></div>
-          </section>
 
           <div class="split-layout">
             <section class="editor-panel" aria-labelledby="editor-title">
@@ -420,6 +355,72 @@
               </form>
             </section>
           </div>
+
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">GERÄTE</p>
+              <h2>Online & zuletzt gesehen</h2>
+            </div>
+          </div>
+          <div id="account-devices" class="table-wrap hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Gerät</th>
+                  <th>Profil</th>
+                  <th>App</th>
+                  <th>Letztes Event</th>
+                  <th>Zuletzt gesehen</th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="account-devices-body"></tbody>
+            </table>
+          </div>
+          <div class="account-actions">
+            <button
+              id="revoke-sessions-button"
+              class="button secondary"
+              type="button"
+            >
+              Alle Sitzungen abmelden
+            </button>
+            <button
+              id="delete-account-button"
+              class="button danger"
+              type="button"
+            >
+              Konto löschen
+            </button>
+          </div>
+
+          <section class="detail-panel" aria-labelledby="account-audits-title">
+            <div class="section-heading compact-heading">
+              <div>
+                <p class="eyebrow">PROTOKOLL</p>
+                <h2 id="account-audits-title">Account-Änderungen</h2>
+              </div>
+            </div>
+            <div id="account-audits" class="table-wrap hidden">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Zeit</th>
+                    <th>Operation</th>
+                    <th>Profil</th>
+                    <th>Revision</th>
+                    <th>Grund</th>
+                  </tr>
+                </thead>
+                <tbody id="account-audits-body"></tbody>
+              </table>
+            </div>
+            <p id="account-audits-empty" class="empty hidden">
+              Keine protokollierten Änderungen für diesen Account.
+            </p>
+            <div id="account-audits-pagination" class="pagination-bar"></div>
+          </section>
         </section>
 
         <section id="audits-view" class="hidden">
