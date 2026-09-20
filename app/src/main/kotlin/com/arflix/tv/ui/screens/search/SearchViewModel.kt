@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Category
+import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.MediaRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -16,6 +17,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -69,6 +71,20 @@ internal fun buildAnimeGenreFilter(genre: String?): String? = when (genre) {
     else -> "16,$genre"
 }
 
+internal data class IptvOnlySearchFilter(
+    val enabled: Boolean,
+    val availability: IptvRepository.XtreamVodAvailability? = null,
+)
+
+internal fun filterSearchResultsForIptvOnlyMode(
+    items: List<MediaItem>,
+    filter: IptvOnlySearchFilter,
+): List<MediaItem> = when {
+    !filter.enabled -> items
+    filter.availability == null -> emptyList()
+    else -> items.filter(filter.availability::contains)
+}
+
 // Memoized empty collections to reduce GC pressure
 private val EMPTY_MEDIA_ITEMS: List<MediaItem> = emptyList()
 private val EMPTY_CATEGORIES: List<Category> = emptyList()
@@ -99,7 +115,8 @@ data class SearchUiState(
 
 @HiltViewModel
 class SearchViewModel @Inject constructor(
-    private val mediaRepository: MediaRepository
+    private val mediaRepository: MediaRepository,
+    private val iptvRepository: IptvRepository,
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(SearchUiState())
@@ -138,16 +155,17 @@ class SearchViewModel @Inject constructor(
 
                 val categories = withContext(Dispatchers.IO) {
                     coroutineScope {
+                        val iptvOnlyFilter = loadIptvOnlySearchFilter()
                         // Row 1: Trending - popular with minimum votes to filter garbage
-                        val row1 = async { buildRow("Trending", type, genre, "popularity.desc", 50, lang, isAnime, 1, releaseDateLte = today) }
+                        val row1 = async { buildRow("Trending", type, genre, "popularity.desc", 50, lang, isAnime, 1, iptvOnlyFilter, releaseDateLte = today) }
                         // Row 2: Popular This Year - recent + popular, no obscure stuff
-                        val row2 = async { buildRow("Popular This Year", type, genre, "popularity.desc", 20, lang, isAnime, 1, releaseDateGte = oneYearAgo, releaseDateLte = today) }
+                        val row2 = async { buildRow("Popular This Year", type, genre, "popularity.desc", 20, lang, isAnime, 1, iptvOnlyFilter, releaseDateGte = oneYearAgo, releaseDateLte = today) }
                         // Row 3: Top Rated - high quality, well-known titles
-                        val row3 = async { buildRow("Top Rated", type, genre, "vote_average.desc", 1000, lang, isAnime, 1, releaseDateLte = today) }
+                        val row3 = async { buildRow("Top Rated", type, genre, "vote_average.desc", 1000, lang, isAnime, 1, iptvOnlyFilter, releaseDateLte = today) }
                         // Row 4: New Releases - last 90 days ONLY, must be actually released (date <= today)
-                        val row4 = async { buildRow("New Releases", type, genre, "popularity.desc", 10, lang, isAnime, 1, releaseDateGte = threeMonthsAgo, releaseDateLte = today) }
+                        val row4 = async { buildRow("New Releases", type, genre, "popularity.desc", 10, lang, isAnime, 1, iptvOnlyFilter, releaseDateGte = threeMonthsAgo, releaseDateLte = today) }
                         // Row 5: Hidden Gems - good ratings but less mainstream
-                        val row5 = async { buildRow("Hidden Gems", type, genre, "vote_average.desc", 200, lang, isAnime, 2, releaseDateLte = today) }
+                        val row5 = async { buildRow("Hidden Gems", type, genre, "vote_average.desc", 200, lang, isAnime, 2, iptvOnlyFilter, releaseDateLte = today) }
                         listOfNotNull(row1.await(), row2.await(), row3.await(), row4.await(), row5.await())
                     }
                 }
@@ -176,7 +194,7 @@ class SearchViewModel @Inject constructor(
 
     private suspend fun buildRow(
         title: String, type: DiscoverType, genre: String?, sort: String,
-        minVotes: Int?, lang: String?, isAnime: Boolean, page: Int,
+        minVotes: Int?, lang: String?, isAnime: Boolean, page: Int, iptvOnlyFilter: IptvOnlySearchFilter,
         releaseDateGte: String? = null, releaseDateLte: String? = null
     ): Category? {
         return try {
@@ -197,8 +215,19 @@ class SearchViewModel @Inject constructor(
                     }
                 }
             }
-            if (items.isEmpty()) null else Category(id = "${type}_${title}_${genre}_${lang}_$page", title = title, items = items.take(20))
+            val filteredItems = filterSearchResultsForIptvOnlyMode(items, iptvOnlyFilter)
+            if (filteredItems.isEmpty()) null else Category(id = "${type}_${title}_${genre}_${lang}_$page", title = title, items = filteredItems.take(20))
         } catch (_: Exception) { null }
+    }
+
+    private suspend fun loadIptvOnlySearchFilter(): IptvOnlySearchFilter {
+        if (!iptvRepository.observeConfig().first().iptvOnlyMode) {
+            return IptvOnlySearchFilter(enabled = false)
+        }
+        val availability = runCatching {
+            iptvRepository.getXtreamVodAvailability(allowNetwork = true)
+        }.getOrNull()
+        return IptvOnlySearchFilter(enabled = true, availability = availability)
     }
 
     private fun mapMovieGenreToTvGenre(genre: String?): String? = when (genre) {
@@ -274,8 +303,9 @@ class SearchViewModel @Inject constructor(
             try {
                 val (sorted, peopleRows) = withContext(Dispatchers.IO) {
                     coroutineScope {
+                        val iptvOnlyFilter = loadIptvOnlySearchFilter()
                         val mediaDeferred = async {
-                            if (cachedSuggestionQuery.equals(query, true) && cachedSuggestionResults.isNotEmpty()) {
+                            val results = if (cachedSuggestionQuery.equals(query, true) && cachedSuggestionResults.isNotEmpty()) {
                                 cachedSuggestionResults
                             } else {
                                 val found = mediaRepository.search(query)
@@ -284,9 +314,10 @@ class SearchViewModel @Inject constructor(
                                 cachedSuggestionResults = sortedResults
                                 sortedResults
                             }
+                            filterSearchResultsForIptvOnlyMode(results, iptvOnlyFilter)
                         }
                         val peopleDeferred = async {
-                            if (cachedPeopleQuery.equals(query, true) && cachedPeopleResults.isNotEmpty()) {
+                            val rows = if (cachedPeopleQuery.equals(query, true) && cachedPeopleResults.isNotEmpty()) {
                                 cachedPeopleResults
                             } else {
                                 val rows = mediaRepository.searchPeopleKnownFor(query)
@@ -300,6 +331,10 @@ class SearchViewModel @Inject constructor(
                                 cachedPeopleQuery = query
                                 cachedPeopleResults = rows
                                 rows
+                            }
+                            rows.mapNotNull { row ->
+                                row.copy(items = filterSearchResultsForIptvOnlyMode(row.items, iptvOnlyFilter))
+                                    .takeIf { it.items.isNotEmpty() }
                             }
                         }
                         mediaDeferred.await() to peopleDeferred.await()
@@ -352,7 +387,8 @@ class SearchViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, isAiSearch = true, aiInterpretation = sq.interpretation, error = null, movieResults = EMPTY_MEDIA_ITEMS, tvResults = EMPTY_MEDIA_ITEMS, personResults = EMPTY_CATEGORIES)
             try {
                 val items = withContext(Dispatchers.IO) {
-                    if (sq.similarTo != null) { val r = mediaRepository.search(sq.similarTo); val m = r.firstOrNull(); if (m != null) mediaRepository.getSimilar(m.mediaType, m.id) else EMPTY_MEDIA_ITEMS }
+                    val iptvOnlyFilter = loadIptvOnlySearchFilter()
+                    val results = if (sq.similarTo != null) { val r = mediaRepository.search(sq.similarTo); val m = r.firstOrNull(); if (m != null) mediaRepository.getSimilar(m.mediaType, m.id) else EMPTY_MEDIA_ITEMS }
                     else {
                         val tvGenre = mapMovieGenreToTvGenre(sq.genreId)
                         when (sq.type) {
@@ -368,6 +404,7 @@ class SearchViewModel @Inject constructor(
                             }
                         }
                     }
+                    filterSearchResultsForIptvOnlyMode(results, iptvOnlyFilter)
                 }
                 _uiState.value = _uiState.value.copy(isLoading = false, aiResults = if (sq.limit != null) items.take(sq.limit) else items)
                 items.forEach { mediaRepository.cacheItem(it) }

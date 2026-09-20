@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.028] - 2026-09-20
+
+### IPTV-only-Suche
+
+- Discover-Rails, Textsuche, Smart-Suche und "Bekannt aus"-Treffer berücksichtigen im IPTV-only-Modus jetzt dieselbe Xtream-VOD-Verfügbarkeit wie der Home-Screen.
+- Nicht im eigenen IPTV-VOD vorhandene Filme und Serien erscheinen dadurch auch im Suche-Screen nicht mehr.
+- Android-Version: `2.5.028`.
+
 ## [Backend 1.0.014] - 2026-09-20
 
 ### Admin-Dashboard Geräte- und Session-Cleanup
