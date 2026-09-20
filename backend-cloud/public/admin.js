@@ -623,7 +623,9 @@ async function removeDevice(device) {
       : `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`;
     const result = await api(
       path,
-      isSession ? { method: "POST", body: JSON.stringify({}) } : { method: "DELETE" },
+      isSession
+        ? { method: "POST", body: JSON.stringify({}) }
+        : { method: "DELETE" },
     );
     showToast(
       isSession
@@ -1129,6 +1131,35 @@ byId("reset-offline-devices-button").addEventListener(
         { method: "DELETE" },
       );
       showToast(`${result.removed_events || 0} Offline-Event(s) entfernt.`);
+      await openAccount(state.selectedAccount.account.id);
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      setButtonBusy(button, false);
+    }
+  },
+);
+byId("cleanup-devices-sessions-button").addEventListener(
+  "click",
+  async (event) => {
+    const button = event.currentTarget;
+    const confirmed = await confirmAction({
+      title: "Geräte & Sessions bereinigen",
+      message:
+        "Pro Gerät bleibt nur der neueste Geräte-Event erhalten. Bei gültigen Logins bleibt pro erkennbarem Client die neueste Session aktiv.",
+      confirmLabel: "Bereinigen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    setButtonBusy(button, true, "Wird bereinigt…");
+    try {
+      const result = await api(
+        `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/cleanup`,
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      showToast(
+        `${result.removed_events || 0} alte Geräte-Event(s) entfernt, ${result.revoked_sessions || 0} alte Session(s) widerrufen.`,
+      );
       await openAccount(state.selectedAccount.account.id);
     } catch (error) {
       showToast(error.message, true);

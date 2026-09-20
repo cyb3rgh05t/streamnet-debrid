@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.014] - 2026-09-20
+
+### Admin-Dashboard Geräte- und Session-Cleanup
+
+- Account-Details haben einen Cleanup-Button, der Geräteevents auf den neuesten Eintrag je Gerät reduziert und ältere gültige Sessions je erkennbarem Client widerruft.
+- Backend-Version: `1.0.014`.
+
 ## [Backend 1.0.013] - 2026-09-20
 
 ### Admin-Dashboard Web-Login-Widerruf

@@ -672,6 +672,56 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     },
   );
 
+  app.post(
+    "/admin-api/accounts/:accountId/devices/cleanup",
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      await authenticatedAdmin(request, pool, jwtKey);
+      const accountId = validAccountId(request, reply);
+      if (!accountId) return;
+      const [eventsResult, sessionsResult] = await Promise.all([
+        pool.query(
+          `with ranked_events as (
+             select id,
+                    row_number() over (
+                      partition by install_id
+                      order by created_at desc, id desc
+                    ) as rank
+               from app_usage_events
+              where account_id = $1 and coalesce(install_id, '') <> ''
+           )
+           delete from app_usage_events events
+            using ranked_events
+            where events.id = ranked_events.id
+              and ranked_events.rank > 1`,
+          [accountId],
+        ),
+        pool.query(
+          `with ranked_sessions as (
+             select id,
+                    row_number() over (
+                      partition by coalesce(client_type, ''), coalesce(device_type, ''), coalesce(user_agent, ''), coalesce(request_ip, '')
+                      order by created_at desc, id desc
+                    ) as rank
+               from account_sessions
+              where account_id = $1 and revoked_at is null and expires_at > now()
+           )
+           update account_sessions sessions
+              set revoked_at = now()
+             from ranked_sessions
+            where sessions.id = ranked_sessions.id
+              and ranked_sessions.rank > 1`,
+          [accountId],
+        ),
+      ]);
+      return {
+        accepted: true,
+        removed_events: eventsResult.rowCount,
+        revoked_sessions: sessionsResult.rowCount,
+      };
+    },
+  );
+
   app.delete(
     "/admin-api/accounts/:accountId/devices/:installId",
     async (request, reply) => {
