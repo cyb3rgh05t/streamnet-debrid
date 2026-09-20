@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.013] - 2026-09-20
+
+### Admin-Dashboard Web-Login-Widerruf
+
+- Einzelne Web-Logins werden im Admin-Dashboard über einen expliziten Widerruf-Endpunkt abgemeldet und melden nicht gefundene Sessions klar zurück.
+- Backend-Version: `1.0.013`.
+
 ## [Backend 1.0.012] - 2026-09-20
 
 ### Admin-Dashboard Geräte und Danger Zone

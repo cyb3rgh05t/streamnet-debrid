@@ -619,9 +619,12 @@ async function removeDevice(device) {
   if (!confirmed) return;
   try {
     const path = isSession
-      ? `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/${encodeURIComponent(device.install_id)}`
+      ? `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/${encodeURIComponent(device.install_id)}/revoke`
       : `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`;
-    const result = await api(path, { method: "DELETE" });
+    const result = await api(
+      path,
+      isSession ? { method: "POST", body: JSON.stringify({}) } : { method: "DELETE" },
+    );
     showToast(
       isSession
         ? `${result.revoked_count || 0} Login(s) widerrufen.`

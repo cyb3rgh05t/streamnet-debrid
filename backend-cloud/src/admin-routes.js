@@ -612,26 +612,36 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     },
   );
 
+  async function revokeSingleAccountSession(request, reply) {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const accountId = validAccountId(request, reply);
+    if (!accountId) return;
+    const sessionId = String(request.params.sessionId || "").trim();
+    if (!uuidPattern.test(sessionId)) {
+      return reply.code(400).send({ error: "Invalid session id" });
+    }
+    const result = await pool.query(
+      `update account_sessions
+          set revoked_at = now()
+        where account_id = $1 and id = $2 and revoked_at is null
+        returning id`,
+      [accountId, sessionId],
+    );
+    if (result.rowCount === 0) {
+      return reply.code(404).send({ error: "Login session not found" });
+    }
+    return { accepted: true, revoked_count: result.rowCount };
+  }
+
+  app.post(
+    "/admin-api/accounts/:accountId/sessions/:sessionId/revoke",
+    revokeSingleAccountSession,
+  );
+
   app.delete(
     "/admin-api/accounts/:accountId/sessions/:sessionId",
-    async (request, reply) => {
-      reply.header("Cache-Control", "no-store");
-      await authenticatedAdmin(request, pool, jwtKey);
-      const accountId = validAccountId(request, reply);
-      if (!accountId) return;
-      const sessionId = String(request.params.sessionId || "").trim();
-      if (!uuidPattern.test(sessionId)) {
-        return reply.code(400).send({ error: "Invalid session id" });
-      }
-      const result = await pool.query(
-        `update account_sessions
-            set revoked_at = now()
-          where account_id = $1 and id = $2 and revoked_at is null
-          returning id`,
-        [accountId, sessionId],
-      );
-      return { accepted: true, revoked_count: result.rowCount };
-    },
+    revokeSingleAccountSession,
   );
 
   app.delete(
