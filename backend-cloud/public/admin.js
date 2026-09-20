@@ -541,7 +541,7 @@ function renderDeviceBadges(devices) {
     const row = document.createElement("tr");
     const status = document.createElement("span");
     status.className = `device-status${device.online ? " online" : ""}`;
-    status.textContent = device.online ? "Online" : "Offline";
+    status.textContent = device.status_label || (device.online ? "Online" : "Offline");
     const deviceLabel = [
       deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt",
       device.platform,

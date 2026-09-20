@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.009] - 2026-09-20
+
+### Admin-Dashboard Web-Logins
+
+- Aktive Web-Login-Sessions werden in Account-Details nicht mehr als grüne Online-Geräte angezeigt, sondern neutral als gültige Logins.
+- Backend-Version: `1.0.009`.
+
 ## [Backend 1.0.008] - 2026-09-20
 
 ### Admin-Dashboard Online-Filter
