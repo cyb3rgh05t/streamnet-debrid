@@ -378,22 +378,39 @@
               <tbody id="account-devices-body"></tbody>
             </table>
           </div>
-          <div class="account-actions">
-            <button
-              id="revoke-sessions-button"
-              class="button secondary"
-              type="button"
-            >
-              Alle Sitzungen abmelden
-            </button>
-            <button
-              id="delete-account-button"
-              class="button danger"
-              type="button"
-            >
-              Konto löschen
-            </button>
-          </div>
+          <section class="danger-zone" aria-labelledby="account-danger-title">
+            <div>
+              <p class="eyebrow">DANGER ZONE</p>
+              <h2 id="account-danger-title">Account-Aktionen</h2>
+            </div>
+            <p class="muted">
+              Diese Aktionen wirken direkt auf Sitzungen, Gerätehistorie oder
+              den gesamten Account.
+            </p>
+            <div class="account-actions">
+              <button
+                id="reset-offline-devices-button"
+                class="button secondary"
+                type="button"
+              >
+                Offline-Verlauf zurücksetzen
+              </button>
+              <button
+                id="revoke-sessions-button"
+                class="button secondary"
+                type="button"
+              >
+                Alle Sitzungen abmelden
+              </button>
+              <button
+                id="delete-account-button"
+                class="button danger"
+                type="button"
+              >
+                Konto löschen
+              </button>
+            </div>
+          </section>
 
           <section class="detail-panel" aria-labelledby="account-audits-title">
             <div class="section-heading compact-heading">

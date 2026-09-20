@@ -412,7 +412,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
           })),
           ...sessionsResult.rows.map((row) => ({
             kind: "session",
-            removable: false,
+            removable: true,
             install_id: row.id,
             profile_id: null,
             platform: row.client_type || "login",
@@ -609,6 +609,56 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       } finally {
         client.release();
       }
+    },
+  );
+
+  app.delete(
+    "/admin-api/accounts/:accountId/sessions/:sessionId",
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      await authenticatedAdmin(request, pool, jwtKey);
+      const accountId = validAccountId(request, reply);
+      if (!accountId) return;
+      const sessionId = String(request.params.sessionId || "").trim();
+      if (!uuidPattern.test(sessionId)) {
+        return reply.code(400).send({ error: "Invalid session id" });
+      }
+      const result = await pool.query(
+        `update account_sessions
+            set revoked_at = now()
+          where account_id = $1 and id = $2 and revoked_at is null
+          returning id`,
+        [accountId, sessionId],
+      );
+      return { accepted: true, revoked_count: result.rowCount };
+    },
+  );
+
+  app.delete(
+    "/admin-api/accounts/:accountId/devices/offline",
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      await authenticatedAdmin(request, pool, jwtKey);
+      const accountId = validAccountId(request, reply);
+      if (!accountId) return;
+      const result = await pool.query(
+        `with latest_events as (
+           select distinct on (install_id) install_id, created_at
+             from app_usage_events
+            where account_id = $1 and coalesce(install_id, '') <> ''
+            order by install_id, created_at desc
+         ), offline_installs as (
+           select install_id
+             from latest_events
+            where created_at < now() - interval '${onlineDeviceWindowMinutes} minutes'
+         )
+         delete from app_usage_events events
+          using offline_installs
+          where events.account_id = $1
+            and events.install_id = offline_installs.install_id`,
+        [accountId],
+      );
+      return { accepted: true, removed_events: result.rowCount };
     },
   );
 

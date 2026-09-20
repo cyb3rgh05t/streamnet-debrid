@@ -703,6 +703,31 @@ tbody tr[data-account-id]:focus {
   background: var(--ok);
   box-shadow: 0 0 0 3px rgba(104, 216, 155, 0.16);
 }
+.device-status.session {
+  color: var(--muted);
+}
+.device-title {
+  font-weight: 700;
+  color: var(--text);
+}
+.device-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.device-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  background: var(--surface-raised);
+  font-size: 11px;
+  line-height: 1;
+}
 .pagination-bar {
   display: flex;
   align-items: center;
@@ -720,8 +745,17 @@ tbody tr[data-account-id]:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 18px;
-  margin-bottom: 24px;
+  margin-top: 14px;
+}
+.danger-zone {
+  margin: 24px 0 28px;
+  padding: 18px 20px;
+  border: 1px solid rgba(255, 135, 120, 0.24);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 135, 120, 0.055);
+}
+.danger-zone h2 {
+  margin-bottom: 6px;
 }
 .button.danger {
   color: var(--danger);

@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.012] - 2026-09-20
+
+### Admin-Dashboard Geräte und Danger Zone
+
+- Web-Login-Sessions können in Account-Details einzeln widerrufen werden.
+- Die Geräteübersicht nutzt Badges für Plattform, Version, Build und Distribution und zeigt Profilnamen statt roher Profil-IDs, wenn der Snapshot sie enthält.
+- Account-Details enthalten eine Danger Zone mit Sitzungen abmelden, Konto löschen und Offline-Geräteverlauf zurücksetzen; aktuell online gesehene Geräte bleiben beim Zurücksetzen erhalten.
+- Backend-Version: `1.0.012`.
+
 ## [Backend 1.0.011] - 2026-09-20
 
 ### Admin-Dashboard Audit-Protokoll

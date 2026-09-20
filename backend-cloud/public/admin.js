@@ -538,25 +538,39 @@ function renderDeviceBadges(devices) {
   const body = byId("account-devices-body");
   body.replaceChildren();
   container.classList.toggle("hidden", devices.length === 0);
+  const profileNames = new Map(
+    (state.selectedAccount?.snapshot?.profiles || []).map((profile) => [
+      profile.id,
+      profile.name || profile.id,
+    ]),
+  );
   for (const device of devices) {
     const row = document.createElement("tr");
     const status = document.createElement("span");
-    status.className = `device-status${device.online ? " online" : ""}`;
-    status.textContent = device.status_label || (device.online ? "Online" : "Offline");
-    const deviceLabel = [
-      deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt",
-      device.platform,
-      shortInstallId(device.install_id),
-    ]
-      .filter(Boolean)
-      .join(" · ");
-    const appLabel = [
-      device.app_version,
-      device.app_version_code ? `(${device.app_version_code})` : "",
-      device.distribution,
-    ]
-      .filter(Boolean)
-      .join(" ");
+    status.className = `device-status${device.online ? " online" : ""}${device.kind === "session" ? " session" : ""}`;
+    status.textContent =
+      device.status_label || (device.online ? "Online" : "Offline");
+    const deviceCell = document.createElement("td");
+    const deviceTitle = document.createElement("div");
+    deviceTitle.className = "device-title";
+    deviceTitle.textContent = `${deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt"} · ${shortInstallId(device.install_id)}`;
+    const deviceMeta = document.createElement("div");
+    deviceMeta.className = "device-meta";
+    if (device.platform) deviceMeta.append(badgeNode(device.platform));
+    if (device.kind === "session") deviceMeta.append(badgeNode("Session"));
+    deviceCell.append(deviceTitle, deviceMeta);
+    const profileName = device.profile_id
+      ? profileNames.get(device.profile_id) || device.profile_id
+      : "—";
+    const appCell = document.createElement("td");
+    const appBadges = document.createElement("div");
+    appBadges.className = "device-meta";
+    if (device.app_version) appBadges.append(badgeNode(device.app_version));
+    if (device.app_version_code)
+      appBadges.append(badgeNode(`Build ${device.app_version_code}`));
+    if (device.distribution) appBadges.append(badgeNode(device.distribution));
+    if (!appBadges.childNodes.length) appBadges.textContent = "—";
+    appCell.append(appBadges);
     const statusCell = document.createElement("td");
     statusCell.append(status);
     const actionCell = document.createElement("td");
@@ -564,7 +578,8 @@ function renderDeviceBadges(devices) {
       const removeButton = document.createElement("button");
       removeButton.type = "button";
       removeButton.className = "text-button danger-link";
-      removeButton.textContent = "Entfernen";
+      removeButton.textContent =
+        device.kind === "session" ? "Login widerrufen" : "Entfernen";
       removeButton.addEventListener("click", () => removeDevice(device));
       actionCell.append(removeButton);
     } else {
@@ -573,9 +588,9 @@ function renderDeviceBadges(devices) {
     }
     row.append(
       statusCell,
-      textCell(deviceLabel),
-      textCell(device.profile_id || "—"),
-      textCell(appLabel || "—"),
+      deviceCell,
+      textCell(profileName),
+      appCell,
       textCell(device.event_name || "—"),
       textCell(formatDate(device.last_seen)),
       actionCell,
@@ -584,21 +599,34 @@ function renderDeviceBadges(devices) {
   }
 }
 
+function badgeNode(label) {
+  const badge = document.createElement("span");
+  badge.className = "device-badge";
+  badge.textContent = label;
+  return badge;
+}
+
 async function removeDevice(device) {
+  const isSession = device.kind === "session";
   const confirmed = await confirmAction({
-    title: "Gerät entfernen",
-    message:
-      "Dieses Gerät wird aus der Admin-Gerätehistorie entfernt. Der Account selbst und gültige Logins bleiben unverändert.",
-    confirmLabel: "Gerät entfernen",
+    title: isSession ? "Login widerrufen" : "Gerät entfernen",
+    message: isSession
+      ? "Diese Web-Login-Session wird abgemeldet. Andere Sitzungen bleiben aktiv."
+      : "Dieses Gerät wird aus der Admin-Gerätehistorie entfernt. Der Account selbst und gültige Logins bleiben unverändert.",
+    confirmLabel: isSession ? "Login widerrufen" : "Gerät entfernen",
     danger: true,
   });
   if (!confirmed) return;
   try {
-    const result = await api(
-      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`,
-      { method: "DELETE" },
+    const path = isSession
+      ? `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/${encodeURIComponent(device.install_id)}`
+      : `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`;
+    const result = await api(path, { method: "DELETE" });
+    showToast(
+      isSession
+        ? `${result.revoked_count || 0} Login(s) widerrufen.`
+        : `${result.removed_events || 0} Geräte-Event(s) entfernt.`,
     );
-    showToast(`${result.removed_events || 0} Geräte-Event(s) entfernt.`);
     await openAccount(state.selectedAccount.account.id);
   } catch (error) {
     showToast(error.message, true);
@@ -1079,6 +1107,33 @@ byId("revoke-sessions-button").addEventListener("click", async (event) => {
     setButtonBusy(button, false);
   }
 });
+byId("reset-offline-devices-button").addEventListener(
+  "click",
+  async (event) => {
+    const button = event.currentTarget;
+    const confirmed = await confirmAction({
+      title: "Offline-Verlauf zurücksetzen",
+      message:
+        "Alle nicht aktuell online gesehenen Geräte werden aus der Gerätehistorie entfernt. Gerade aktive Geräte bleiben erhalten.",
+      confirmLabel: "Offline-Verlauf löschen",
+      danger: true,
+    });
+    if (!confirmed) return;
+    setButtonBusy(button, true, "Wird zurückgesetzt…");
+    try {
+      const result = await api(
+        `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/offline`,
+        { method: "DELETE" },
+      );
+      showToast(`${result.removed_events || 0} Offline-Event(s) entfernt.`);
+      await openAccount(state.selectedAccount.account.id);
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      setButtonBusy(button, false);
+    }
+  },
+);
 byId("delete-account-button").addEventListener("click", async (event) => {
   const button = event.currentTarget;
   const account = state.selectedAccount.account;
