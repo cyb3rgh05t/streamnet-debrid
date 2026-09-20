@@ -25,8 +25,8 @@ import {
   getContinueWatching,
   isLiveStreamOrSportsItem,
   pullCloudContinueWatchingDismissals,
-  pullCloudWatchHistory,
   pullCloudPayload,
+  pullRawPayload,
   pullCloudProfiles,
   pullCloudTrackingSelection,
   pullCloudWatchedKeys,
@@ -1508,15 +1508,9 @@ export function AppProvider({
             cwShows,
           ] = await Promise.all([
             authClient.session
-              ? pullCloudWatchHistory(authClient, profileId)
-                  .then((rows) => rows)
-                  .catch(() =>
-                    getContinueWatching(
-                      authClient,
-                      profileId,
-                      addonState,
-                    ).catch(() => []),
-                  )
+              ? getContinueWatching(authClient, profileId, addonState).catch(
+                  () => [],
+                )
               : Promise.resolve([]),
             traktReady
               ? client.watchlist().catch(() => failedRead("watchlist"))
@@ -1714,12 +1708,11 @@ export function AppProvider({
               cwWatchedKeys,
               cwCompletions,
             ),
-            // Match Android: for tracker-backed profiles, Trakt playback and
-            // Up Next are authoritative. Cloud CW remains the no-tracker and
-            // outage fallback, but must not resurrect an older episode over
-            // the current tracker entry for the same show.
-            traktReady ? [] : cloudCw,
-            traktReady ? new Set<string>() : activeCloudResumeKeys,
+            // Cloud resumes are device-originated playback state, so retain
+            // active entries even when Trakt is also connected. Dismissals
+            // and completion filters below still remove stale records.
+            cloudCw,
+            activeCloudResumeKeys,
           );
           if (isCurrent()) {
             const movieReadFailed = readFailures.has("watched-movies");
@@ -1757,16 +1750,40 @@ export function AppProvider({
                 traktReady ? cwCompletions : undefined,
                 activeCloudResumeKeys,
               ),
-              cloudCw.filter(
-                (item) =>
-                  !traktReady &&
+              cloudCw.filter((item) => {
+                const hasSavedResume =
+                  (item.progress ?? 0) > 0 ||
+                  (item.resumePositionSeconds ?? 0) > 0;
+                return (
+                  hasSavedResume &&
+                  (item.progress ?? 0) < 90 &&
                   !isHiddenShow(item) &&
                   !isDismissed(item) &&
-                  !isLiveStreamOrSportsItem(item, addonState),
-              ),
-              traktReady ? new Set<string>() : activeCloudResumeKeys,
+                  !isLiveStreamOrSportsItem(item, addonState)
+                );
+              }),
+              activeCloudResumeKeys,
             ),
             settings.language,
+          );
+          const cloudResumeFallback = await hydrateContinueWatchingItems(
+            cloudCw.filter((item) => {
+              const hasSavedResume =
+                (item.progress ?? 0) > 0 ||
+                (item.resumePositionSeconds ?? 0) > 0;
+              return (
+                hasSavedResume &&
+                (item.progress ?? 0) < 90 &&
+                !isHiddenShow(item) &&
+                !isDismissed(item) &&
+                !isLiveStreamOrSportsItem(item, addonState)
+              );
+            }),
+            settings.language,
+          );
+          const finalCw = dedupeContinueWatchingShows(
+            [...cw, ...cloudResumeFallback],
+            activeCloudResumeKeys,
           );
           // Trakt outage guard: when Trakt is connected but every read came back
           // empty, the calls were blocked (Cloudflare challenges the CORS
@@ -1797,14 +1814,14 @@ export function AppProvider({
             const reconcile = (current: MediaItem[]) =>
               upNext.fetchFailures > 0
                 ? mergePartialContinueWatching(
-                    cw,
+                    finalCw,
                     current.filter(
                       (item) => !isHiddenShow(item) && !isDismissed(item),
                     ),
                     cwCompletions,
                   )
-                : cw;
-            if (cw.length) {
+                : finalCw;
+            if (finalCw.length) {
               cwSourceRef.current = "fresh";
               setContinueWatching(reconcile);
               saveCachedList(
@@ -2170,6 +2187,42 @@ export function AppProvider({
       unsubscribe();
     };
   }, [auth, refreshData, view]);
+
+  useEffect(() => {
+    const session = authClient.session;
+    if (!session || view === "login") return undefined;
+    let disposed = false;
+    let initialized = false;
+    let checking = false;
+
+    const checkCloudRevision = async () => {
+      if (disposed || checking || document.visibilityState !== "visible")
+        return;
+      checking = true;
+      try {
+        const before = getRawPayloadRevision(session.userId);
+        await pullRawPayload(authClient);
+        const after = getRawPayloadRevision(session.userId);
+        if (initialized && after > before && !disposed) {
+          await refreshData(undefined, true);
+        }
+        initialized = true;
+      } catch {
+        // SSE and focus/visibility refresh remain available when polling fails.
+      } finally {
+        checking = false;
+      }
+    };
+
+    void checkCloudRevision();
+    const timer = window.setInterval(() => {
+      void checkCloudRevision();
+    }, 10_000);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+    };
+  }, [authClient, refreshData, view]);
 
   useEffect(() => {
     saveStored(settingsKey, settings);

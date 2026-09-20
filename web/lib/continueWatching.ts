@@ -328,7 +328,11 @@ export function preserveActiveCloudResumes(
       item.mediaType === "tv"
         ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
         : `movie:${item.id}`;
-    return activeResumeKeys.has(key) && isPausedContinueWatchingItem(item);
+    const hasSavedResume =
+      (item.progress ?? 0) > 0 || (item.resumePositionSeconds ?? 0) > 0;
+    return (
+      activeResumeKeys.has(key) && hasSavedResume && (item.progress ?? 0) < 90
+    );
   });
   return dedupeContinueWatchingShows(
     [...items, ...activeCloudItems],

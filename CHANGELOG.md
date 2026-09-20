@@ -9,6 +9,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - Profilbezogene Continue-Watching-Einträge und Lösch-Tombstones werden bei Cloud-Pushes nach Zeitstempel zusammengeführt und nicht mehr durch unvollständige Web-Payloads überschrieben.
 - Backend-Version: `1.0.006`.
 
+## [Web 1.0.037] - 2026-09-20
+
+### Einheitliche Continue-Watching- und Cloud-Synchronisation
+
+- Continue Watching nutzt im Web gemeinsam den profilbezogenen Cloud-Snapshot und die Backend-Watch-History; aktive Cloud-Resumes bleiben unabhängig von Trakt, Simkl oder anderen Anbietern sichtbar.
+- Stale oder abgeschlossene Backend-History ersetzt keinen aktiven Snapshot-Resume mehr; aktuelle Cloud-Positionen werden nach dem Provider-Merge nochmals abgesichert.
+- Cloud-Revision-Polling ergänzt SSE, damit Einstellungen und Wiedergabefortschritt auch bei einem abgebrochenen EventSource innerhalb weniger Sekunden auf anderen Geräten aktualisiert werden.
+- Sehr frühe Resumes, etwa 8 Sekunden, zeigen auf Continue-Watching-Kacheln jetzt einen sichtbaren Minimal-Fortschrittsbalken.
+- Web-Version: `1.0.037`.
+
 ## [2.5.027] - 2026-09-19
 
 ### TheIntroDB für Filme und Serien

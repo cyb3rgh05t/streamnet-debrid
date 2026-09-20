@@ -254,6 +254,10 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
       return items === category.items ? category : { ...category, items };
     });
   }, [categories]);
+  const hasContinueWatchingRail = dedupedCategories.some(
+    (category) =>
+      category.id === "continue_watching" && category.items.length > 0,
+  );
   const [heroLogo, setHeroLogo] = useState<string | null>(null);
   const [displayHero, setDisplayHero] = useState<MediaItem | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -474,6 +478,18 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
         />
       ) : (
         <>
+          {continueWatching.length > 0 && !hasContinueWatchingRail ? (
+            <MediaRail
+              category={{
+                id: "continue_watching",
+                title: "Continue Watching",
+                items: continueWatching,
+              }}
+              onOpen={openDetails}
+              onFocus={onCardFocus}
+              posterMode={posterMode}
+            />
+          ) : null}
           {dedupedCategories.map((category) => (
             <MediaRail
               key={category.id}

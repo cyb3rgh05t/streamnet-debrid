@@ -831,8 +831,19 @@ function historyToAndroidCw(
     streamKey: entry.stream_key ?? null,
     streamAddonId: entry.stream_addon_id ?? null,
     streamTitle: entry.stream_title ?? entry.source ?? null,
-    updatedAtMs: Date.now(),
+    updatedAtMs: entry.updated_at ? Date.parse(entry.updated_at) || 0 : 0,
   };
+}
+
+function continueWatchingIdentity(item: {
+  mediaType?: string;
+  id?: number;
+  season?: number | null;
+  episode?: number | null;
+}) {
+  const mediaType =
+    String(item.mediaType ?? "movie").toLowerCase() === "tv" ? "tv" : "movie";
+  return `${mediaType}:${item.id ?? 0}:${mediaType === "tv" ? `${item.season ?? ""}:${item.episode ?? ""}` : ""}`;
 }
 
 function androidContinueWatchingItems(
@@ -2049,7 +2060,20 @@ export async function getContinueWatching(
 ) {
   if (!auth.session) return [];
   const root = await pullRawPayload(auth);
-  return androidContinueWatchingItems(root, profileId)
+  const snapshotItems = androidContinueWatchingItems(root, profileId);
+  const backendItems = await pullCloudWatchHistory(auth, profileId).catch(
+    () => [] as WatchHistoryEntry[],
+  );
+  const merged = new Map<string, AndroidContinueWatchingItem>();
+  snapshotItems.forEach((item) =>
+    merged.set(continueWatchingIdentity(item), item),
+  );
+  backendItems.forEach((entry) => {
+    const item = historyToAndroidCw(entry);
+    const key = continueWatchingIdentity(item);
+    merged.set(key, preferActiveCloudResumeRecord(merged.get(key), item));
+  });
+  return [...merged.values()]
     .map((item) => androidCwToHistory(item, profileId))
     .filter((item): item is WatchHistoryEntry => Boolean(item))
     .filter(
@@ -2062,18 +2086,31 @@ export async function getContinueWatching(
     .slice(0, 50);
 }
 
+const CLOUD_WATCH_HISTORY_TTL_MS = 5_000;
+const cloudWatchHistoryCache = new Map<
+  string,
+  { at: number; rows: WatchHistoryEntry[] }
+>();
+
 export async function pullCloudWatchHistory(
   auth: AuthClient,
   profileId?: string | null,
 ): Promise<WatchHistoryEntry[]> {
   if (!auth.session) return [];
+  const cacheKey = `${auth.session.userId}:${profileId ?? ""}`;
+  const cached = cloudWatchHistoryCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < CLOUD_WATCH_HISTORY_TTL_MS) {
+    return structuredClone(cached.rows);
+  }
   const query = profileId ? `?profile_id=${encodeURIComponent(profileId)}` : "";
   const rows = await backendRequest<WatchHistoryEntry[] & { error?: string }>(
     auth,
     `watch-history${query}`,
     { method: "GET" },
   );
-  return Array.isArray(rows) ? rows : [];
+  const result = Array.isArray(rows) ? rows : [];
+  cloudWatchHistoryCache.set(cacheKey, { at: Date.now(), rows: result });
+  return structuredClone(result);
 }
 
 async function saveBackendWatchHistory(
@@ -2103,6 +2140,9 @@ export async function saveProgress(
 ) {
   if (!auth.session || isLiveStreamOrSportsItem(entry, addons)) return;
   await saveBackendWatchHistory(auth, entry, profileId).catch(() => undefined);
+  cloudWatchHistoryCache.delete(
+    `${auth.session.userId}:${entry.profile_id ?? profileId ?? ""}`,
+  );
   await mutateCloudPayload(auth, (root) => {
     const targetProfileId = entry.profile_id ?? profileId ?? "default";
     const byProfile = objectRecord<unknown>(
@@ -2174,6 +2214,7 @@ export async function removeContinueWatchingProgress(
   await backendRequest(auth, `watch-history?${query.toString()}`, {
     method: "DELETE",
   }).catch(() => undefined);
+  cloudWatchHistoryCache.delete(`${auth.session.userId}:${profileId ?? ""}`);
   const matches = (candidate: AndroidContinueWatchingItem) => {
     if (
       candidate.id !== item.id ||
