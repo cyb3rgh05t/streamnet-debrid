@@ -127,6 +127,12 @@
               Aktualisieren
             </button>
           </div>
+          <p id="accounts-filter-note" class="filter-note hidden">
+            Zeigt nur Accounts mit aktuell online gesehenen Geräten.
+            <button id="clear-online-filter" class="text-button" type="button">
+              Filter entfernen
+            </button>
+          </p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -186,6 +192,7 @@
                   <th>App</th>
                   <th>Letztes Event</th>
                   <th>Zuletzt gesehen</th>
+                  <th>Aktion</th>
                 </tr>
               </thead>
               <tbody id="account-devices-body"></tbody>
@@ -342,11 +349,10 @@
                 </div>
 
                 <label
-                  >Änderungsgrund<input
+                  >Kommentar (optional)<input
                     id="mutation-reason"
                     maxlength="500"
-                    required
-                    placeholder="Warum ist diese Änderung nötig?"
+                    placeholder="Optionaler Hinweis für das Protokoll"
                 /></label>
                 <div id="mutation-warning" class="warning"></div>
                 <button class="button primary" type="submit">
@@ -393,11 +399,10 @@
                   ></textarea>
                 </label>
                 <label
-                  >Änderungsgrund<input
+                  >Kommentar (optional)<input
                     id="payload-edit-reason"
                     maxlength="500"
-                    required
-                    placeholder="Warum ist diese Änderung nötig?"
+                    placeholder="Optionaler Hinweis für das Protokoll"
                 /></label>
                 <div class="payload-edit-buttons">
                   <button class="button primary" type="submit">
@@ -423,6 +428,13 @@
               <p class="eyebrow">NACHVOLLZIEHBAR</p>
               <h2>Letzte Änderungen</h2>
             </div>
+            <button
+              id="clear-audits-button"
+              class="button danger"
+              type="button"
+            >
+              Protokoll leeren
+            </button>
           </div>
           <div class="table-wrap">
             <table>

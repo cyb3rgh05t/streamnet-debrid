@@ -5,6 +5,7 @@ const state = {
   searchTimer: null,
   pendingRequests: 0,
   accounts: { limit: 10, offset: 0, total: 0 },
+  onlineOnly: false,
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
 };
@@ -369,16 +370,23 @@ function renderMetrics(metrics) {
   const definitions = [
     ["accounts", "Accounts", metrics.accounts],
     ["snapshots", "Snapshots", metrics.snapshots],
-    ["sessions", "Geräte online", metrics.online_devices],
-    ["sessions", "Gültige Logins", metrics.active_sessions],
+    ["sessions", "Geräte online", metrics.online_devices, "online-filter"],
+    ["sessions", "Gültige Logins", metrics.active_sessions, "sessions-info"],
     ["events", "Events · 24 h", metrics.events_24h],
     ["database", "Datenbank", formatBytes(metrics.database_bytes)],
   ];
   const container = byId("metrics");
   container.replaceChildren();
-  definitions.forEach(([icon, label, value], index) => {
-    const item = document.createElement("div");
+  definitions.forEach(([icon, label, value, action], index) => {
+    const item = document.createElement(action ? "button" : "div");
     item.className = "metric";
+    if (action) {
+      item.type = "button";
+      item.classList.add("metric-action");
+      item.dataset.action = action;
+    }
+    if (action === "online-filter" && state.onlineOnly)
+      item.classList.add("active");
     item.style.animationDelay = `${index * 35}ms`;
     const iconNode = document.createElement("span");
     iconNode.className = "metric-icon";
@@ -393,6 +401,24 @@ function renderMetrics(metrics) {
     valueNode.textContent = value ?? 0;
     body.append(labelNode, valueNode);
     item.append(iconNode, body);
+    if (action === "online-filter") {
+      item.title = state.onlineOnly
+        ? "Online-Filter entfernen"
+        : "Nur Accounts mit aktuell online gesehenen Geräten anzeigen";
+      item.addEventListener("click", () => {
+        state.onlineOnly = !state.onlineOnly;
+        state.accounts.offset = 0;
+        loadOverview().catch((error) => showToast(error.message, true));
+      });
+    } else if (action === "sessions-info") {
+      item.title =
+        "Gültige Logins sind aktive Refresh-Sessions. Ein Gerät kann mehrere Logins haben; Geräte online basiert auf aktuellen App-/Web-Events.";
+      item.addEventListener("click", () =>
+        showToast(
+          "Gültige Logins = aktive Refresh-Sessions. Revisionen = Cloud-Snapshot-Versionen; jede gespeicherte Account-/Profiländerung erhöht sie um 1.",
+        ),
+      );
+    }
     container.append(item);
   });
 }
@@ -401,13 +427,14 @@ async function loadOverview() {
   const [metrics, accountResult] = await Promise.all([
     api("/admin-api/overview"),
     api(
-      `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}`,
+      `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}&online_only=${state.onlineOnly ? "1" : "0"}`,
     ),
   ]);
   state.accounts.total = accountResult.total;
   state.accounts.limit = accountResult.limit;
   state.accounts.offset = accountResult.offset;
   renderMetrics(metrics);
+  byId("accounts-filter-note").classList.toggle("hidden", !state.onlineOnly);
   renderAccounts(accountResult.accounts);
   renderPagination("accounts-pagination", state.accounts, (offset) => {
     state.accounts.offset = offset;
@@ -531,6 +558,18 @@ function renderDeviceBadges(devices) {
       .join(" ");
     const statusCell = document.createElement("td");
     statusCell.append(status);
+    const actionCell = document.createElement("td");
+    if (device.removable && device.install_id) {
+      const removeButton = document.createElement("button");
+      removeButton.type = "button";
+      removeButton.className = "text-button danger-link";
+      removeButton.textContent = "Entfernen";
+      removeButton.addEventListener("click", () => removeDevice(device));
+      actionCell.append(removeButton);
+    } else {
+      actionCell.textContent = device.kind === "session" ? "Login" : "—";
+      actionCell.className = "muted-cell";
+    }
     row.append(
       statusCell,
       textCell(deviceLabel),
@@ -538,8 +577,30 @@ function renderDeviceBadges(devices) {
       textCell(appLabel || "—"),
       textCell(device.event_name || "—"),
       textCell(formatDate(device.last_seen)),
+      actionCell,
     );
     body.append(row);
+  }
+}
+
+async function removeDevice(device) {
+  const confirmed = await confirmAction({
+    title: "Gerät entfernen",
+    message:
+      "Dieses Gerät wird aus der Admin-Gerätehistorie entfernt. Der Account selbst und gültige Logins bleiben unverändert.",
+    confirmLabel: "Gerät entfernen",
+    danger: true,
+  });
+  if (!confirmed) return;
+  try {
+    const result = await api(
+      `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`,
+      { method: "DELETE" },
+    );
+    showToast(`${result.removed_events || 0} Geräte-Event(s) entfernt.`);
+    await openAccount(state.selectedAccount.account.id);
+  } catch (error) {
+    showToast(error.message, true);
   }
 }
 
@@ -596,11 +657,6 @@ async function openAccount(accountId) {
 }
 
 async function deleteProfile(profileId, profileName) {
-  const reason = await promptReason(
-    `Warum soll das Profil "${profileName}" gelöscht werden?`,
-    true,
-  );
-  if (!reason) return;
   const confirmed = await confirmAction({
     title: "Profil löschen",
     message: `Profil "${profileName}" wirklich unwiderruflich löschen?`,
@@ -617,7 +673,6 @@ async function deleteProfile(profileId, profileName) {
           operation: "delete_profile",
           profileId,
           data: {},
-          reason,
           expectedRevision: state.selectedAccount.snapshot.revision,
         }),
       },
@@ -986,6 +1041,11 @@ byId("refresh-button").addEventListener("click", (event) => {
     .catch((error) => showToast(error.message, true))
     .finally(() => setButtonBusy(button, false));
 });
+byId("clear-online-filter").addEventListener("click", () => {
+  state.onlineOnly = false;
+  state.accounts.offset = 0;
+  loadOverview().catch((error) => showToast(error.message, true));
+});
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
 byId("addon-url").addEventListener("blur", () => normalizeAddonLinkField());
@@ -996,15 +1056,19 @@ byId("mutation-profile").addEventListener("change", () => {
 byId("mutation-form").addEventListener("submit", submitMutation);
 byId("revoke-sessions-button").addEventListener("click", async (event) => {
   const button = event.currentTarget;
-  const reason = await promptReason(
-    "Warum sollen alle gültigen Logins dieses Accounts abgemeldet werden?",
-  );
-  if (!reason) return;
+  const confirmed = await confirmAction({
+    title: "Alle Sitzungen abmelden",
+    message:
+      "Alle gültigen Logins dieses Accounts werden abgemeldet. Geräte können sich danach erneut anmelden.",
+    confirmLabel: "Sitzungen abmelden",
+    danger: true,
+  });
+  if (!confirmed) return;
   setButtonBusy(button, true, "Wird abgemeldet…");
   try {
     const result = await api(
       `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/revoke-all`,
-      { method: "POST", body: JSON.stringify({ reason }) },
+      { method: "POST", body: JSON.stringify({}) },
     );
     showToast(`${result.revoked_count} Sitzung(en) abgemeldet.`);
     await openAccount(state.selectedAccount.account.id);
@@ -1106,6 +1170,32 @@ byId("payload-edit-form").addEventListener("submit", async (event) => {
       await openAccount(state.selectedAccount.account.id);
   } finally {
     setButtonBusy(submitButton, false);
+  }
+});
+byId("clear-audits-button").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  const confirmed = await openAdminDialog({
+    title: "Audit-Protokoll leeren",
+    eyebrow: "GEFÄHRLICH",
+    message:
+      'Zum Bestätigen bitte "LEEREN" eingeben. Dadurch werden alle Admin-Audit-Einträge entfernt.',
+    inputLabel: "Bestätigung",
+    requiredText: "LEEREN",
+    requiredTextError: 'Bitte exakt "LEEREN" eingeben.',
+    confirmLabel: "Protokoll leeren",
+    danger: true,
+  });
+  if (confirmed !== "LEEREN") return;
+  setButtonBusy(button, true, "Wird geleert…");
+  try {
+    const result = await api("/admin-api/audits", { method: "DELETE" });
+    showToast(`${result.deleted_count || 0} Audit-Eintrag/Einträge gelöscht.`);
+    state.audits.offset = 0;
+    await loadAudits();
+  } catch (error) {
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
   }
 });
 byId("account-search").addEventListener("input", () => {

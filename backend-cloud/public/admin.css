@@ -40,13 +40,7 @@ body {
       rgba(229, 162, 9, 0.08),
       transparent 60%
     ),
-    linear-gradient(rgba(229, 162, 9, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(229, 162, 9, 0.02) 1px, transparent 1px),
     var(--bg);
-  background-size:
-    auto,
-    44px 44px,
-    44px 44px;
   font-family:
     Inter,
     ui-sans-serif,
@@ -296,9 +290,19 @@ nav {
     transform 0.15s var(--ease);
   animation: rise 0.35s var(--ease) both;
 }
+button.metric {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .metric:hover {
   border-color: var(--line-strong);
   transform: translateY(-2px);
+}
+.metric.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(229, 162, 9, 0.25);
 }
 .metric-icon {
   display: grid;
@@ -336,6 +340,14 @@ nav {
 
 .toolbar {
   margin: 0 0 16px;
+}
+.filter-note {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 16px;
+  color: var(--muted);
+  font-size: 12px;
 }
 .search-field {
   position: relative;
@@ -554,6 +566,12 @@ textarea {
   color: var(--accent);
   text-align: left;
   transition: opacity 0.15s var(--ease);
+}
+.danger-link {
+  color: var(--danger);
+}
+.muted-cell {
+  color: var(--muted);
 }
 .text-button:hover {
   opacity: 0.8;

@@ -137,16 +137,30 @@ function validAccountId(request, reply) {
   return accountId;
 }
 
+function cleanInstallId(value) {
+  const installId = String(value || "").trim();
+  if (!installId || installId.length > 200) return null;
+  return installId;
+}
+
 function auditDetails(request) {
   const data =
     request.data && typeof request.data === "object" ? request.data : {};
   return {
-    reason: String(request.reason || "").trim(),
+    reason: String(request.reason || "").trim() || null,
     itemId: String(data.id || "").trim() || null,
     itemName: String(data.name || "").trim() || null,
     rootKey: request.rootKey || null,
     field: request.field || null,
   };
+}
+
+function optionalAuditReason(value) {
+  return (
+    String(value || "")
+      .trim()
+      .slice(0, 500) || "Ohne Kommentar"
+  );
 }
 
 function requireReason(request, reply) {
@@ -266,6 +280,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       .trim()
       .toLowerCase()
       .slice(0, 254);
+    const onlineOnly = String(request.query?.online_only || "") === "1";
     const limit = parseLimit(request.query?.limit, 50, 100);
     const offset = parseOffset(request.query?.offset);
     const [accounts, count] = await Promise.all([
@@ -274,28 +289,41 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
                 snapshots.revision, snapshots.updated_at as snapshot_updated_at,
                 case when jsonb_typeof(snapshots.payload->'profiles') = 'array'
                   then jsonb_array_length(snapshots.payload->'profiles') else 0 end as profile_count,
-                (
-                  select count(*)::int
-                    from (
-                      select distinct on (events.install_id) events.install_id, events.created_at
-                        from app_usage_events events
-                       where events.account_id = accounts.id
-                         and coalesce(events.install_id, '') <> ''
-                       order by events.install_id, events.created_at desc
-                    ) latest_events
-                   where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
-                ) as online_device_count
+                online_devices.online_device_count
            from accounts
            left join account_sync_snapshots snapshots on snapshots.account_id = accounts.id
+           left join lateral (
+             select count(*)::int as online_device_count
+               from (
+                 select distinct on (events.install_id) events.install_id, events.created_at
+                   from app_usage_events events
+                  where events.account_id = accounts.id
+                    and coalesce(events.install_id, '') <> ''
+                  order by events.install_id, events.created_at desc
+               ) latest_events
+              where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
+           ) online_devices on true
           where ($1 = '' or accounts.email_normalized like '%' || $1 || '%')
+            and ($4::boolean is false or online_devices.online_device_count > 0)
           order by accounts.created_at desc
           limit $2 offset $3`,
-        [query, limit, offset],
+        [query, limit, offset, onlineOnly],
       ),
       pool.query(
         `select count(*)::int as total from accounts
-          where ($1 = '' or email_normalized like '%' || $1 || '%')`,
-        [query],
+          where ($1 = '' or email_normalized like '%' || $1 || '%')
+            and ($2::boolean is false or exists (
+              select 1
+                from (
+                  select distinct on (events.install_id) events.install_id, events.created_at
+                    from app_usage_events events
+                   where events.account_id = accounts.id
+                     and coalesce(events.install_id, '') <> ''
+                   order by events.install_id, events.created_at desc
+                ) latest_events
+               where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
+            ))`,
+        [query, onlineOnly],
       ),
     ]);
     return {
@@ -316,7 +344,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     await authenticatedAdmin(request, pool, jwtKey);
     const accountId = validAccountId(request, reply);
     if (!accountId) return;
-    const [result, devicesResult] = await Promise.all([
+    const [result, devicesResult, sessionsResult] = await Promise.all([
       pool.query(
         `select accounts.id, accounts.email, accounts.created_at, accounts.updated_at,
                 snapshots.payload, snapshots.revision, snapshots.source,
@@ -345,6 +373,14 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
           limit 50`,
         [accountId],
       ),
+      pool.query(
+        `select id, created_at, expires_at, client_type, device_type, user_agent
+           from account_sessions
+          where account_id = $1 and revoked_at is null and expires_at > now()
+          order by created_at desc
+          limit 20`,
+        [accountId],
+      ),
     ]);
     const account = result.rows[0];
     if (!account) return reply.code(404).send({ error: "Account not found" });
@@ -358,18 +394,38 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         active_sessions: Number(account.active_sessions),
         watch_history_items: Number(account.watch_history_items),
         watch_state_items: Number(account.watch_state_items),
-        devices: devicesResult.rows.map((row) => ({
-          install_id: row.install_id,
-          profile_id: row.profile_id,
-          platform: row.platform,
-          device_type: row.device_type,
-          app_version: row.app_version,
-          app_version_code: row.app_version_code,
-          distribution: row.distribution,
-          event_name: row.event_name,
-          last_seen: row.last_seen,
-          online: row.online === true,
-        })),
+        devices: [
+          ...devicesResult.rows.map((row) => ({
+            kind: "app_event",
+            removable: true,
+            install_id: row.install_id,
+            profile_id: row.profile_id,
+            platform: row.platform,
+            device_type: row.device_type,
+            app_version: row.app_version,
+            app_version_code: row.app_version_code,
+            distribution: row.distribution,
+            event_name: row.event_name,
+            last_seen: row.last_seen,
+            online: row.online === true,
+          })),
+          ...sessionsResult.rows.map((row) => ({
+            kind: "session",
+            removable: false,
+            install_id: row.id,
+            profile_id: null,
+            platform: row.client_type || "login",
+            device_type: row.device_type || row.client_type || "web",
+            app_version: null,
+            app_version_code: null,
+            distribution: "web-login",
+            event_name: "active_session",
+            last_seen: row.created_at,
+            expires_at: row.expires_at,
+            user_agent: row.user_agent,
+            online: true,
+          })),
+        ],
       },
       snapshot: account.payload
         ? {
@@ -392,14 +448,10 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       const accountId = validAccountId(request, reply);
       if (!accountId) return;
       const expectedRevision = request.body?.expectedRevision;
-      const reason = String(request.body?.reason || "").trim();
+      const reason = optionalAuditReason(request.body?.reason);
       if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0) {
         request.backendFailureReason = "invalid_expected_revision";
         return reply.code(400).send({ error: "expectedRevision is required" });
-      }
-      if (reason.length < 3 || reason.length > 500) {
-        request.backendFailureReason = "invalid_change_reason";
-        return reply.code(400).send({ error: "A change reason is required" });
       }
 
       const client = await pool.connect();
@@ -506,8 +558,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       const admin = await authenticatedAdmin(request, pool, jwtKey);
       const accountId = validAccountId(request, reply);
       if (!accountId) return;
-      const reason = requireReason(request, reply);
-      if (!reason) return;
+      const reason = optionalAuditReason(request.body?.reason);
 
       const client = await pool.connect();
       try {
@@ -556,6 +607,25 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       } finally {
         client.release();
       }
+    },
+  );
+
+  app.delete(
+    "/admin-api/accounts/:accountId/devices/:installId",
+    async (request, reply) => {
+      reply.header("Cache-Control", "no-store");
+      await authenticatedAdmin(request, pool, jwtKey);
+      const accountId = validAccountId(request, reply);
+      if (!accountId) return;
+      const installId = cleanInstallId(request.params.installId);
+      if (!installId)
+        return reply.code(400).send({ error: "Invalid device id" });
+      const result = await pool.query(
+        `delete from app_usage_events
+          where account_id = $1 and install_id = $2`,
+        [accountId, installId],
+      );
+      return { accepted: true, removed_events: result.rowCount };
     },
   );
 
@@ -649,5 +719,12 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       limit,
       offset,
     };
+  });
+
+  app.delete("/admin-api/audits", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const result = await pool.query("delete from admin_audit_logs");
+    return { accepted: true, deleted_count: result.rowCount };
   });
 }

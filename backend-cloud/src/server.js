@@ -80,14 +80,48 @@ async function issueAccessToken(account) {
     .sign(jwtKey);
 }
 
-async function issueSession(account) {
+function sessionMetadata(request, defaults = {}) {
+  const body =
+    request?.body && typeof request.body === "object" ? request.body : {};
+  return {
+    clientType:
+      String(body.client_type || defaults.clientType || "")
+        .trim()
+        .slice(0, 40) || null,
+    deviceType:
+      String(body.device_type || defaults.deviceType || "")
+        .trim()
+        .slice(0, 40) || null,
+    requestIp:
+      String(request?.ip || "")
+        .trim()
+        .slice(0, 80) || null,
+    userAgent:
+      String(request?.headers?.["user-agent"] || "")
+        .trim()
+        .slice(0, 500) || null,
+  };
+}
+
+async function issueSession(account, request, defaults = {}) {
   const refreshToken = newRefreshToken();
   const expiresAt = new Date(
     Date.now() + config.refreshTokenTtlDays * 86_400_000,
   );
+  const metadata = sessionMetadata(request, defaults);
   await pool.query(
-    "insert into account_sessions (account_id, refresh_token_hash, expires_at) values ($1, $2, $3)",
-    [account.id, hashToken(refreshToken), expiresAt],
+    `insert into account_sessions
+       (account_id, refresh_token_hash, expires_at, client_type, device_type, request_ip, user_agent)
+     values ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      account.id,
+      hashToken(refreshToken),
+      expiresAt,
+      metadata.clientType,
+      metadata.deviceType,
+      metadata.requestIp,
+      metadata.userAgent,
+    ],
   );
   return {
     access_token: await issueAccessToken(account),
@@ -668,7 +702,7 @@ app.post("/auth-login", async (request, reply) => {
   ) {
     return reply.code(401).send({ error: "Invalid email or password" });
   }
-  return issueSession(account);
+  return issueSession(account, request, { clientType: "web" });
 });
 
 app.post("/cloud-auth-reset", async (request, reply) => {
@@ -784,7 +818,7 @@ app.post("/cloud-auth-email", async (request, reply) => {
        returning id, email, email_normalized`,
       [email, email, await hashScryptPassword(password)],
     );
-    return issueSession(result.rows[0]);
+    return issueSession(result.rows[0], request, { clientType: "web" });
   } catch (error) {
     if (error?.code === "23505") {
       return reply
@@ -803,7 +837,9 @@ app.post("/auth-refresh", async (request, reply) => {
   try {
     await client.query("begin");
     const result = await client.query(
-      `select accounts.id, accounts.email, accounts.email_normalized, account_sessions.id as session_id
+      `select accounts.id, accounts.email, accounts.email_normalized,
+              account_sessions.id as session_id,
+              account_sessions.client_type, account_sessions.device_type
          from account_sessions join accounts on accounts.id = account_sessions.account_id
         where account_sessions.refresh_token_hash = $1 and account_sessions.revoked_at is null and account_sessions.expires_at > now()
         for update`,
@@ -822,9 +858,23 @@ app.post("/auth-refresh", async (request, reply) => {
     const expiresAt = new Date(
       Date.now() + config.refreshTokenTtlDays * 86_400_000,
     );
+    const metadata = sessionMetadata(request, {
+      clientType: account.client_type,
+      deviceType: account.device_type,
+    });
     await client.query(
-      "insert into account_sessions (account_id, refresh_token_hash, expires_at) values ($1, $2, $3)",
-      [account.id, hashToken(nextRefreshToken), expiresAt],
+      `insert into account_sessions
+         (account_id, refresh_token_hash, expires_at, client_type, device_type, request_ip, user_agent)
+       values ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        account.id,
+        hashToken(nextRefreshToken),
+        expiresAt,
+        metadata.clientType,
+        metadata.deviceType,
+        metadata.requestIp,
+        metadata.userAgent,
+      ],
     );
     await client.query("commit");
     return {
@@ -1078,7 +1128,10 @@ async function completeTvAuth(request, reply) {
       return reply.code(401).send({ error: "Invalid email or password" });
     }
   }
-  const tokens = await issueSession(account);
+  const tokens = await issueSession(account, request, {
+    clientType: "tv_pairing",
+    deviceType: "tv",
+  });
   await pool.query(
     `update tv_device_auth_sessions
         set status = 'approved', approved_at = now(), account_id = $2, user_email = $3, access_token = $4, refresh_token = $5

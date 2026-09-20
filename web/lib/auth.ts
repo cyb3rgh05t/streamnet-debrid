@@ -44,6 +44,16 @@ function sessionFromResponse(
   };
 }
 
+function browserDeviceType() {
+  if (typeof navigator === "undefined") return "web";
+  const userAgent = navigator.userAgent || "";
+  if (/Android TV|SMART-TV|SmartTV|Tizen|Web0S|AppleTV|CrKey/i.test(userAgent))
+    return "tv";
+  if (/iPad|Tablet/i.test(userAgent)) return "tablet";
+  if (/Android|iPhone|iPod|Mobile/i.test(userAgent)) return "phone";
+  return "web";
+}
+
 export class AuthClient {
   session = loadStored<AuthSession | null>(SESSION_KEY, null);
   private refreshInFlight: Promise<void> | null = null;
@@ -77,6 +87,8 @@ export class AuthClient {
     const response = await this.cloudAuth<AuthResponse>("auth-login", {
       email,
       password,
+      client_type: "web",
+      device_type: browserDeviceType(),
     });
     this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
@@ -88,6 +100,8 @@ export class AuthClient {
     const response = await this.cloudAuth<AuthResponse>("cloud-auth-email", {
       email,
       password,
+      client_type: "web",
+      device_type: browserDeviceType(),
     });
     this.session = sessionFromResponse(response, email);
     saveStored(SESSION_KEY, this.session);
@@ -114,6 +128,8 @@ export class AuthClient {
       try {
         response = await this.cloudAuth<AuthResponse>("auth-refresh", {
           refresh_token: sourceSession.refreshToken,
+          client_type: "web",
+          device_type: browserDeviceType(),
         });
       } catch (error) {
         const status = (error as { status?: number }).status;
