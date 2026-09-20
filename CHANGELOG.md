@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.006] - 2026-09-20
+
+### Continue-Watching-Synchronisation
+
+- Profilbezogene Continue-Watching-Einträge und Lösch-Tombstones werden bei Cloud-Pushes nach Zeitstempel zusammengeführt und nicht mehr durch unvollständige Web-Payloads überschrieben.
+- Backend-Version: `1.0.006`.
+
 ## [2.5.027] - 2026-09-19
 
 ### TheIntroDB für Filme und Serien
