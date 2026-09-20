@@ -93,3 +93,55 @@ test("server-side push merge keeps newer incoming profile fields", () => {
   assert.equal(merged.profileSettingsById.kids.liveTvLayoutMode, "streamnet");
   assert.equal(merged.fieldUpdatedAt["p:kids:liveTvLayoutMode"], 2000);
 });
+
+test("server-side push merge preserves Android Continue Watching omitted by web", () => {
+  const current = {
+    localContinueWatchingByProfile: {
+      ivory: [
+        {
+          id: 123,
+          mediaType: "MOVIE",
+          progress: 24,
+          updatedAtMs: 3000,
+        },
+      ],
+    },
+  };
+  const incoming = { profileSettingsById: { ivory: { accentColor: "Orange" } } };
+
+  const merged = mergePushPayloadByFieldTimestamps(incoming, current);
+
+  assert.equal(merged.localContinueWatchingByProfile.ivory[0].id, 123);
+  assert.equal(merged.localContinueWatchingByProfile.ivory[0].progress, 24);
+});
+
+test("server-side push merge keeps the newest Continue Watching item and tombstones", () => {
+  const current = {
+    localContinueWatchingByProfile: {
+      ivory: [{ id: 123, mediaType: "MOVIE", progress: 20, updatedAtMs: 3000 }],
+    },
+    dismissedContinueWatchingByProfile: {
+      ivory: "movie:456,3000",
+    },
+  };
+  const incoming = {
+    localContinueWatchingByProfile: {
+      ivory: [{ id: 123, mediaType: "MOVIE", progress: 40, updatedAtMs: 4000 }],
+    },
+    dismissedContinueWatchingByProfile: {
+      ivory: "movie:789,4000",
+    },
+  };
+
+  const merged = mergePushPayloadByFieldTimestamps(incoming, current);
+
+  assert.equal(merged.localContinueWatchingByProfile.ivory[0].progress, 40);
+  assert.match(
+    merged.dismissedContinueWatchingByProfile.ivory,
+    /movie:456,3000/,
+  );
+  assert.match(
+    merged.dismissedContinueWatchingByProfile.ivory,
+    /movie:789,4000/,
+  );
+});

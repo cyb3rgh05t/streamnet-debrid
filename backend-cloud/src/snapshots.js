@@ -106,6 +106,84 @@ function setMergeFieldValue(root, key, value) {
   }
 }
 
+function continueWatchingItemKey(item) {
+  if (!isPlainObject(item)) return null;
+  const mediaType = String(item.mediaType || "movie").toLowerCase() === "tv"
+    ? "tv"
+    : "movie";
+  const id = Number(item.id || 0);
+  if (!Number.isInteger(id) || id === 0) return null;
+  if (mediaType === "tv" && item.season != null && item.episode != null) {
+    return `${mediaType}:${id}:${item.season}:${item.episode}`;
+  }
+  return `${mediaType}:${id}`;
+}
+
+function mergeContinueWatchingProfiles(incoming, current) {
+  const incomingProfiles = isPlainObject(incoming)
+    ? incoming
+    : {};
+  const currentProfiles = isPlainObject(current) ? current : {};
+  const profileIds = new Set([
+    ...Object.keys(currentProfiles),
+    ...Object.keys(incomingProfiles),
+  ]);
+  const mergedProfiles = {};
+  for (const profileId of profileIds) {
+    const itemsByKey = new Map();
+    for (const source of [currentProfiles, incomingProfiles]) {
+      const items = Array.isArray(source[profileId]) ? source[profileId] : [];
+      for (const item of items) {
+        const key = continueWatchingItemKey(item);
+        if (!key) continue;
+        const existing = itemsByKey.get(key);
+        const updatedAt = Number(item.updatedAtMs || 0);
+        if (!existing || updatedAt >= Number(existing.updatedAtMs || 0)) {
+          itemsByKey.set(key, item);
+        }
+      }
+    }
+    if (itemsByKey.size > 0 || Object.hasOwn(currentProfiles, profileId)) {
+      mergedProfiles[profileId] = [...itemsByKey.values()]
+        .sort((left, right) =>
+          Number(right.updatedAtMs || 0) - Number(left.updatedAtMs || 0),
+        )
+        .slice(0, 50);
+    }
+  }
+  return mergedProfiles;
+}
+
+function mergeContinueWatchingDismissals(incoming, current) {
+  const incomingProfiles = isPlainObject(incoming) ? incoming : {};
+  const currentProfiles = isPlainObject(current) ? current : {};
+  const profileIds = new Set([
+    ...Object.keys(currentProfiles),
+    ...Object.keys(incomingProfiles),
+  ]);
+  const mergedProfiles = {};
+  for (const profileId of profileIds) {
+    const timestamps = new Map();
+    for (const source of [currentProfiles, incomingProfiles]) {
+      const encoded = String(source[profileId] || "");
+      for (const entry of encoded.split("|")) {
+        const separator = entry.lastIndexOf(",");
+        if (separator <= 0) continue;
+        const timestamp = Number(entry.slice(separator + 1));
+        if (!Number.isFinite(timestamp)) continue;
+        const key = entry.slice(0, separator);
+        timestamps.set(key, Math.max(timestamps.get(key) || 0, timestamp));
+      }
+    }
+    if (timestamps.size > 0) {
+      mergedProfiles[profileId] = [...timestamps.entries()]
+        .map(([key, timestamp]) => `${key},${timestamp}`)
+        .join("|");
+    }
+  }
+  return mergedProfiles;
+}
+
 export function mergePushPayloadByFieldTimestamps(
   incomingPayload,
   currentPayload,
@@ -128,6 +206,28 @@ export function mergePushPayloadByFieldTimestamps(
       delete incoming.addonsByProfile;
     }
     incoming.addonsUpdatedAt = currentAddonsUpdatedAt;
+  }
+  for (const key of [
+    "localContinueWatchingByProfile",
+    "continueWatchingByProfile",
+    "watchHistoryByProfile",
+  ]) {
+    if (Object.hasOwn(currentPayload, key) || Object.hasOwn(incoming, key)) {
+      incoming[key] = mergeContinueWatchingProfiles(
+        incoming[key],
+        currentPayload[key],
+      );
+    }
+  }
+  if (
+    Object.hasOwn(currentPayload, "dismissedContinueWatchingByProfile") ||
+    Object.hasOwn(incoming, "dismissedContinueWatchingByProfile")
+  ) {
+    incoming.dismissedContinueWatchingByProfile =
+      mergeContinueWatchingDismissals(
+        incoming.dismissedContinueWatchingByProfile,
+        currentPayload.dismissedContinueWatchingByProfile,
+      );
   }
   const incomingTs = isPlainObject(incoming.fieldUpdatedAt)
     ? incoming.fieldUpdatedAt
