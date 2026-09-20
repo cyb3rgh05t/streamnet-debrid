@@ -147,10 +147,11 @@ function setLoading(active) {
 async function api(path, options = {}) {
   setLoading(true);
   try {
+    const hasBody = options.body !== undefined && options.body !== null;
     const response = await fetch(path, {
       ...options,
       headers: {
-        "content-type": "application/json",
+        ...(hasBody ? { "content-type": "application/json" } : {}),
         ...(state.token ? { authorization: `Bearer ${state.token}` } : {}),
         ...(options.headers || {}),
       },

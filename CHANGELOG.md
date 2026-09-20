@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.011] - 2026-09-20
+
+### Admin-Dashboard Audit-Protokoll
+
+- Bodylose Admin-Requests senden keinen JSON-Content-Type mehr, damit das Leeren des Audit-Protokolls nicht als `400 Bad Request` abgewiesen wird.
+- Backend-Version: `1.0.011`.
+
 ## [Backend 1.0.010] - 2026-09-20
 
 ### Admin-Dashboard Account-Details
