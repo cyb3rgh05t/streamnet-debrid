@@ -208,7 +208,7 @@ fun PersonModal(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
-                    LoadingIndicator(color = Pink, size = 64.dp)
+                    LoadingIndicator(size = 64.dp)
                 }
             } else if (person != null) {
                 val isMobile = com.arflix.tv.util.LocalDeviceType.current.isTouchDevice()

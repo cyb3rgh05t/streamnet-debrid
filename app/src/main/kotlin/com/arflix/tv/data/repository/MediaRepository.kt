@@ -2173,7 +2173,8 @@ class MediaRepository @Inject constructor(
         val page = homeServerRepository.loadCatalogItems(
             sourceRef = catalog.sourceRef,
             offset = offset,
-            limit = limit
+            limit = limit,
+            sort = HomeServerLibrarySort.RECENTLY_ADDED
         )
         if (page.items.isEmpty()) {
             return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
@@ -2229,6 +2230,7 @@ class MediaRepository @Inject constructor(
                 subtitle = serverItem.providerName,
                 overview = serverItem.overview,
                 year = serverItem.year?.toString().orEmpty(),
+                releaseDate = serverItem.releaseDate,
                 rating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
                 tmdbRating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
                 mediaType = serverItem.mediaType,

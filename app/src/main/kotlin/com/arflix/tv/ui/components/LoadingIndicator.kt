@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.arflix.tv.ui.theme.Pink
+import com.arflix.tv.ui.skin.resolveAccentColor
 
 /**
  * TV-compatible loading indicator that doesn't use Material3
@@ -27,9 +28,10 @@ import com.arflix.tv.ui.theme.Pink
 fun LoadingIndicator(
     modifier: Modifier = Modifier,
     size: Dp = 64.dp,
-    color: Color = Pink,
+    color: Color? = null,
     strokeWidth: Dp = 4.dp
 ) {
+    val indicatorColor = color ?: resolveAccentColor(fallback = Pink)
     val infiniteTransition = rememberInfiniteTransition(label = "loading")
 
     val rotation by infiniteTransition.animateFloat(
@@ -50,7 +52,7 @@ fun LoadingIndicator(
 
         // Background arc
         drawArc(
-            color = color.copy(alpha = 0.2f),
+            color = indicatorColor.copy(alpha = 0.2f),
             startAngle = 0f,
             sweepAngle = 360f,
             useCenter = false,
@@ -61,7 +63,7 @@ fun LoadingIndicator(
 
         // Animated arc
         drawArc(
-            color = color,
+            color = indicatorColor,
             startAngle = rotation,
             sweepAngle = 90f,
             useCenter = false,
@@ -79,8 +81,9 @@ fun LoadingIndicator(
 fun PulsingLoadingIndicator(
     modifier: Modifier = Modifier,
     size: Dp = 80.dp,
-    color: Color = Pink
+    color: Color? = null
 ) {
+    val indicatorColor = color ?: resolveAccentColor(fallback = Pink)
     val infiniteTransition = rememberInfiniteTransition(label = "pulsing")
 
     val scale by infiniteTransition.animateFloat(
@@ -108,11 +111,11 @@ fun PulsingLoadingIndicator(
     ) {
         val radius = (this.size.minDimension / 2) * scale
         drawCircle(
-            color = color.copy(alpha = alpha * 0.3f),
+            color = indicatorColor.copy(alpha = alpha * 0.3f),
             radius = radius
         )
         drawCircle(
-            color = color.copy(alpha = alpha),
+            color = indicatorColor.copy(alpha = alpha),
             radius = radius * 0.6f
         )
     }

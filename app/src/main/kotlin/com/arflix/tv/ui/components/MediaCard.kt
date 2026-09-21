@@ -74,6 +74,13 @@ private val missingArtworkBrush = Brush.linearGradient(
     )
 )
 
+private fun formatCardReleaseDate(rawDate: String?): String? {
+    val value = rawDate?.trim().orEmpty()
+    if (value.isBlank()) return null
+    val match = Regex("^(\\d{4})-(\\d{2})-(\\d{2})$").matchEntire(value)
+    return match?.let { "${it.groupValues[3]}.${it.groupValues[2]}.${it.groupValues[1]}" } ?: value
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun MediaCard(
@@ -535,7 +542,7 @@ fun MediaCard(
                     if (showProgress && item.subtitle.isNotBlank()) {
                         item.subtitle
                     } else {
-                        val release = item.releaseDate?.takeIf { it.isNotBlank() }
+                        val release = formatCardReleaseDate(item.releaseDate)
                             ?: item.year.takeIf { it.isNotBlank() }
                         release ?: item.subtitle.ifBlank {
                             when (item.mediaType) {
@@ -555,7 +562,11 @@ fun MediaCard(
                             blurRadius = 4f
                         )
                     ),
-                    color = ArvioSkin.colors.textMuted.copy(alpha = 0.85f),
+                    color = if (formatCardReleaseDate(item.releaseDate) != null) {
+                        resolveAccentColor(ArvioSkin.colors.accent).copy(alpha = 0.95f)
+                    } else {
+                        ArvioSkin.colors.textMuted.copy(alpha = 0.85f)
+                    },
                     maxLines = subtitleMaxLines,
                     overflow = TextOverflow.Ellipsis,
                 )

@@ -36,6 +36,7 @@ import {
   Component,
   CSSProperties,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -2606,15 +2607,35 @@ function TvSettingsSection() {
 
 function CatalogsSection() {
   const { settings, updateSettings, setToast } = useApp();
-  const standardCatalogs = mergeCatalogs(
-    safeArray(settings.catalogs),
-    safeArray(settings.hiddenCatalogIds),
-  ).filter((catalog) => catalog.sourceType !== "home-server");
+  const standardCatalogs = useMemo(
+    () =>
+      mergeCatalogs(
+        safeArray(settings.catalogs),
+        safeArray(settings.hiddenCatalogIds),
+      ).filter((catalog) => catalog.sourceType !== "home-server"),
+    [settings.catalogs, settings.hiddenCatalogIds],
+  );
   const [homeServerCatalogs, setHomeServerCatalogs] = useState<CatalogConfig[]>(
     [],
   );
   const [customCatalogUrl, setCustomCatalogUrl] = useState("");
-  const catalogs = [...homeServerCatalogs, ...standardCatalogs];
+  const catalogs = useMemo(() => {
+    const byId = new Map(
+      [...standardCatalogs, ...homeServerCatalogs].map((catalog) => [
+        catalog.id,
+        catalog,
+      ]),
+    );
+    const ordered = safeArray(settings.catalogs)
+      .map((catalog) => byId.get(catalog.id))
+      .filter((catalog): catalog is CatalogConfig => Boolean(catalog));
+    const seen = new Set(ordered.map((catalog) => catalog.id));
+    return [
+      ...ordered,
+      ...standardCatalogs.filter((catalog) => !seen.has(catalog.id)),
+      ...homeServerCatalogs.filter((catalog) => !seen.has(catalog.id)),
+    ];
+  }, [homeServerCatalogs, settings.catalogs, standardCatalogs]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2624,7 +2645,34 @@ function CatalogsSection() {
       safeArray(settings.hiddenHomeServerCatalogIds),
     )
       .then((next) => {
-        if (!cancelled) setHomeServerCatalogs(next);
+        if (cancelled) return;
+        setHomeServerCatalogs(next);
+
+        const byId = new Map(
+          [...standardCatalogs, ...next].map((catalog) => [
+            catalog.id,
+            catalog,
+          ]),
+        );
+        const ordered = safeArray(settings.catalogs)
+          .map((catalog) => byId.get(catalog.id))
+          .filter((catalog): catalog is CatalogConfig => Boolean(catalog));
+        const seen = new Set(ordered.map((catalog) => catalog.id));
+        const canonical = [
+          ...ordered,
+          ...standardCatalogs.filter((catalog) => !seen.has(catalog.id)),
+          ...next.filter((catalog) => !seen.has(catalog.id)),
+        ];
+        const currentIds = safeArray(settings.catalogs).map(
+          (catalog) => catalog.id,
+        );
+        const nextIds = canonical.map((catalog) => catalog.id);
+        if (
+          currentIds.length !== nextIds.length ||
+          currentIds.some((id, index) => id !== nextIds[index])
+        ) {
+          updateSettings({ catalogs: canonical });
+        }
       })
       .catch(() => {
         if (!cancelled) setHomeServerCatalogs([]);
@@ -2636,6 +2684,8 @@ function CatalogsSection() {
     settings.catalogs,
     settings.hiddenHomeServerCatalogIds,
     settings.homeServers,
+    standardCatalogs,
+    updateSettings,
   ]);
 
   const updateCatalogs = (next: CatalogConfig[]) => {

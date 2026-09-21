@@ -49,10 +49,6 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 
-internal fun homeServerCatalogsLast(catalogs: List<CatalogConfig>): List<CatalogConfig> =
-    catalogs.filterNot { it.sourceType == CatalogSourceType.HOME_SERVER } +
-        catalogs.filter { it.sourceType == CatalogSourceType.HOME_SERVER }
-
 @Singleton
 class CatalogRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -708,12 +704,6 @@ class CatalogRepository @Inject constructor(
         val current = getCatalogs().toMutableList()
         var changed = false
 
-        val beforeRemovalSize = current.size
-        current.removeAll { cfg ->
-            cfg.sourceType == CatalogSourceType.HOME_SERVER && !desiredById.containsKey(cfg.id)
-        }
-        if (current.size != beforeRemovalSize) changed = true
-
         current.indices.forEach { index ->
             val existing = current[index]
             val desired = desiredById[existing.id] ?: return@forEach
@@ -738,13 +728,6 @@ class CatalogRepository @Inject constructor(
         val missing = desiredCatalogs.map { (_, config) -> config }.filterNot { it.id in existingIds }
         if (missing.isNotEmpty()) {
             current.addAll(missing)
-            changed = true
-        }
-
-        val ordered = homeServerCatalogsLast(current)
-        if (ordered != current) {
-            current.clear()
-            current.addAll(ordered)
             changed = true
         }
 

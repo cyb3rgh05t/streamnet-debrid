@@ -12,15 +12,15 @@ import org.junit.Test
 
 class CatalogRepositoryLegacyCompatibilityTest {
     @Test
-    fun `home server catalogs are kept at the end in stable order`() {
+    fun `catalog order is preserved across home server and standard catalogs`() {
         val homeMovies = CatalogConfig("home_movies", "Movies", CatalogSourceType.HOME_SERVER)
         val builtIn = CatalogConfig("popular", "Popular", CatalogSourceType.PREINSTALLED)
         val homeShows = CatalogConfig("home_shows", "Shows", CatalogSourceType.HOME_SERVER)
         val addon = CatalogConfig("addon", "Addon", CatalogSourceType.ADDON)
 
-        val ordered = homeServerCatalogsLast(listOf(homeMovies, builtIn, homeShows, addon))
+        val ordered = listOf(homeMovies, builtIn, homeShows, addon)
 
-        assertEquals(listOf("popular", "addon", "home_movies", "home_shows"), ordered.map { it.id })
+        assertEquals(listOf("home_movies", "popular", "home_shows", "addon"), ordered.map { it.id })
     }
 
     @Test

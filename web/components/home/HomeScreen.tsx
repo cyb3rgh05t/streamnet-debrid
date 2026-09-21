@@ -258,6 +258,57 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     (category) =>
       category.id === "continue_watching" && category.items.length > 0,
   );
+  const orderedHomeRails = useMemo(() => {
+    const savedCatalogs = settings.catalogs ?? [];
+    const order = new Map(
+      savedCatalogs.map((catalog, index) => [catalog.id, index]),
+    );
+    const groupRailIds = new Map(
+      savedCatalogs
+        .filter(
+          (catalog) =>
+            String(catalog.kind ?? "").toUpperCase() === "COLLECTION_RAIL",
+        )
+        .map((catalog) => [
+          String(catalog.collectionGroup ?? "FEATURED").toUpperCase(),
+          catalog.id,
+        ]),
+    );
+    const rank = (id: string, fallback: number) =>
+      order.get(id) ?? Number.MAX_SAFE_INTEGER + fallback;
+    const entries = [
+      ...dedupedCategories.map((category, index) => ({
+        kind: "category" as const,
+        category,
+        rank:
+          category.id === "continue_watching" ? -1 : rank(category.id, index),
+      })),
+      ...homeServerRows.map((category, index) => ({
+        kind: "server" as const,
+        category,
+        rank: rank(category.id, index),
+      })),
+      ...homeCatalogEntries.map((entry, index) => ({
+        kind: "catalog" as const,
+        entry,
+        rank:
+          entry.type === "catalog"
+            ? rank(entry.catalog.id, index)
+            : rank(
+                groupRailIds.get(entry.group) ??
+                  entry.catalogs[0]?.id ??
+                  entry.group,
+                index,
+              ),
+      })),
+    ];
+    return entries.sort((left, right) => left.rank - right.rank);
+  }, [
+    dedupedCategories,
+    homeCatalogEntries,
+    homeServerRows,
+    settings.catalogs,
+  ]);
   const [heroLogo, setHeroLogo] = useState<string | null>(null);
   const [displayHero, setDisplayHero] = useState<MediaItem | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -490,45 +541,36 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               posterMode={posterMode}
             />
           ) : null}
-          {dedupedCategories.map((category) => (
-            <MediaRail
-              key={category.id}
-              category={category}
-              onOpen={openDetails}
-              onFocus={onCardFocus}
-              posterMode={posterMode}
-            />
-          ))}
-          {homeServerRows.map((category) => (
-            <MediaRail
-              key={category.id}
-              category={category}
-              onOpen={openDetails}
-              onFocus={onCardFocus}
-              posterMode={posterMode}
-            />
-          ))}
-          {homeCatalogEntries.map((entry, index) =>
-            entry.type === "group" ? (
+          {orderedHomeRails.map((rail, index) =>
+            rail.kind === "category" || rail.kind === "server" ? (
+              <MediaRail
+                key={rail.category.id}
+                category={rail.category}
+                onOpen={openDetails}
+                onFocus={onCardFocus}
+                posterMode={posterMode}
+              />
+            ) : "group" in rail.entry ? (
               <section
                 className="rail collection-picker"
-                key={`group-${entry.group}`}
+                key={`group-${rail.entry.group}`}
               >
                 <div className="rail-head">
                   <h3>
                     {translateUiText(
                       settings.uiLanguage,
-                      collectionGroupTitles[entry.group] ?? entry.group,
+                      collectionGroupTitles[rail.entry.group] ??
+                        rail.entry.group,
                     )}
                   </h3>
                 </div>
                 <RailScroller
                   className="rail-strip collection-strip"
-                  ariaLabel={entry.group}
+                  ariaLabel={rail.entry.group}
                 >
-                  {entry.catalogs.map((catalog) => {
+                  {rail.entry.catalogs.map((catalog) => {
                     const isGenreTile = ["MOVIE_GENRE", "TV_GENRE"].includes(
-                      entry.group,
+                      "group" in rail.entry ? rail.entry.group : "",
                     );
                     const title = catalog.title || catalog.name;
                     return (
@@ -545,7 +587,9 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                             )?.tmdbGenreId;
                             const artwork =
                               (genreId
-                                ? genreFanart.get(`${entry.group}:${genreId}`)
+                                ? genreFanart.get(
+                                    `${"group" in rail.entry ? rail.entry.group : ""}:${genreId}`,
+                                  )
                                 : null) ?? catalog.collectionCoverImageUrl;
                             return artwork ? (
                               <img src={artwork} alt="" loading="lazy" />
@@ -567,8 +611,8 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               </section>
             ) : (
               <LazyRail
-                key={entry.catalog.id}
-                catalog={entry.catalog}
+                key={rail.entry.catalog.id}
+                catalog={rail.entry.catalog}
                 eager={index < 2}
                 onOpen={openDetails}
                 onFocus={onCardFocus}

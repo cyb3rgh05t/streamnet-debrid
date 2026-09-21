@@ -89,7 +89,11 @@ export function parseHomeServerConnectionJson(
       return {
         id: toStr(r.connectionId ?? r.id) || `${type}:${url}`,
         type,
-        name: toStr(r.displayName ?? r.name ?? r.serverName) || "Home Server",
+        name:
+          toStr(r.displayName) ||
+          toStr(r.name) ||
+          toStr(r.serverName) ||
+          "Home Server",
         url,
         token: token || undefined,
         username: toStr(r.userName ?? r.username) || undefined,
@@ -566,6 +570,7 @@ function mapPlexItem(
 async function loadPlexRows(
   server: HomeServerConfig,
   hiddenCatalogIds: Set<string>,
+  catalogOrder: CatalogConfig[] = [],
 ): Promise<Category[]> {
   if (!server.token) return [];
   const base = trimUrl(server.url);
@@ -585,8 +590,7 @@ async function loadPlexRows(
         (collection) =>
           collection.id === section.key && collection.enabled !== false,
       );
-    })
-    .slice(0, 6);
+    });
   const rows = await Promise.all(
     libraries.map(async (library) => {
       const configured = server.collections?.find(
@@ -598,7 +602,11 @@ async function loadPlexRows(
         id: library.key,
         type: configured?.type || library.type,
       });
-      if (hiddenCatalogIds.has(identity.id)) return null;
+      const catalogId =
+        catalogOrder.find((catalog) => catalog.sourceRef === identity.sourceRef)
+          ?.id ?? identity.id;
+      if (hiddenCatalogIds.has(identity.id) || hiddenCatalogIds.has(catalogId))
+        return null;
       const payload = await proxiedGet<{
         MediaContainer?: { Metadata?: PlexItem[] };
       }>(
@@ -611,7 +619,7 @@ async function loadPlexRows(
         .filter((item) => Boolean(item && item.title));
       return mapped.length
         ? {
-            id: identity.id,
+            id: catalogId,
             title: `${server.name} - ${library.title}`,
             items: mapped,
           }
@@ -633,7 +641,9 @@ export async function loadHomeServerRows(
         (server) => server.enabled && server.url && server.type === "plex",
       )
       .map((server) =>
-        loadPlexRows(server, hidden).catch(() => [] as Category[]),
+        loadPlexRows(server, hidden, catalogOrder).catch(
+          () => [] as Category[],
+        ),
       ),
   );
   const active = servers.filter(
@@ -660,8 +670,7 @@ export async function loadHomeServerRows(
               (collection) =>
                 collection.id === view.Id && collection.enabled !== false,
             );
-          })
-          .slice(0, 6);
+          });
         const rows = await Promise.all(
           libraries.map(async (library) => {
             const configured = server.collections?.find(
@@ -673,7 +682,11 @@ export async function loadHomeServerRows(
               id: library.Id,
               type: configured?.type || library.CollectionType || "",
             });
-            if (hidden.has(identity.id)) return null;
+            const catalogId =
+              catalogOrder.find(
+                (catalog) => catalog.sourceRef === identity.sourceRef,
+              )?.id ?? identity.id;
+            if (hidden.has(identity.id) || hidden.has(catalogId)) return null;
             const items = await proxiedGet<{ Items?: JellyfinItem[] }>(
               `${base}/Users/${userId}/Items?ParentId=${library.Id}&Recursive=true&IncludeItemTypes=Movie,Series&SortBy=DateCreated&SortOrder=Descending&Limit=24&Fields=Overview,PrimaryImageAspectRatio,BasicSyncInfo,ImageTags,BackdropImageTags,ProductionYear,CommunityRating&api_key=${token}`,
             ).catch(() => ({ Items: [] as JellyfinItem[] }));
@@ -682,7 +695,7 @@ export async function loadHomeServerRows(
               .filter((m) => Boolean(m && m.title));
             return mapped.length
               ? {
-                  id: identity.id,
+                  id: catalogId,
                   title: `${server.name} - ${library.Name}`,
                   items: mapped,
                 }

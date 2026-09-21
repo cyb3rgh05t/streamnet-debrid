@@ -4011,10 +4011,10 @@ private fun TraktActivationModal(
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = userCode,
-                            style = ArflixTypography.heroTitle.copy(fontSize = 42.sp),
+                            style = ArflixTypography.heroTitle.copy(fontSize = 34.sp),
                             color = accentColor,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                            softWrap = true,
+                            textAlign = TextAlign.Center
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         Row(

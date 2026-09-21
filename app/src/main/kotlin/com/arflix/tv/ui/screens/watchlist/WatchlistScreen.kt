@@ -197,8 +197,16 @@ fun WatchlistScreen(
     } else {
         if (isMobile) ((screenWidth - 62.dp) / 2).coerceIn(138.dp, 210.dp) else 210.dp
     }
-    val libraryCardWidth = if (!isMobile && !usePosterCards) 160.dp else cardWidth
-    val libraryColumns = if (isMobile) 2 else if (usePosterCards) 6 else 4
+    val libraryCardWidth = cardWidth
+    val libraryColumns = if (isMobile) {
+        (((screenWidth - 48.dp) + 12.dp) / (cardWidth + 12.dp))
+            .toInt()
+            .coerceAtLeast(2)
+    } else if (usePosterCards) {
+        6
+    } else {
+        4
+    }
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val rootFocusRequester = remember { FocusRequester() }
     val hasProfile = currentProfile != null
@@ -928,14 +936,15 @@ private fun MobileLibrarySelector(
     onSelect: (Int, HomeServerCatalogCandidate) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val uiAccent = resolveAccentColor(fallback = Pink)
     val selected = libraries.getOrNull(selectedIndex) ?: libraries.first()
-    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 1.dp)) {
+    Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(48.dp)
-                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(6.dp))
-                .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(6.dp))
+                .background(uiAccent.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
+                .border(1.dp, uiAccent.copy(alpha = 0.45f), RoundedCornerShape(6.dp))
                 .clickable { expanded = true }
                 .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -943,7 +952,7 @@ private fun MobileLibrarySelector(
             Box(
                 modifier = Modifier
                     .size(8.dp)
-                    .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
+                    .background(uiAccent, RoundedCornerShape(2.dp))
             )
             Column(modifier = Modifier.padding(start = 10.dp).weight(1f)) {
                 Text(
@@ -956,24 +965,32 @@ private fun MobileLibrarySelector(
                 Text(
                     text = selected.serverName,
                     style = ArflixTypography.caption.copy(fontSize = 10.sp),
-                    color = Color.White.copy(alpha = 0.45f),
+                    color = uiAccent.copy(alpha = 0.85f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Icon(Icons.Outlined.ArrowDropDown, contentDescription = tr("Choose library"), tint = Color.White.copy(alpha = 0.72f))
+            Icon(Icons.Outlined.ArrowDropDown, contentDescription = tr("Choose library"), tint = uiAccent)
         }
         DropdownMenu(
             expanded = expanded,
             onDismissRequest = { expanded = false },
-            modifier = Modifier.background(Color(0xFF151719)).width(280.dp)
+            modifier = Modifier
+                .background(Color(0xFF151719))
+                .border(1.dp, uiAccent.copy(alpha = 0.30f), RoundedCornerShape(8.dp))
+                .width(280.dp)
         ) {
             libraries.forEachIndexed { index, library ->
                 DropdownMenuItem(
+                    modifier = if (index == selectedIndex) {
+                        Modifier.background(uiAccent.copy(alpha = 0.14f))
+                    } else {
+                        Modifier
+                    },
                     text = {
                         Text(
                             text = library.collectionName.ifBlank { library.title },
-                            color = if (index == selectedIndex) Color.White else Color.White.copy(alpha = 0.72f),
+                            color = if (index == selectedIndex) uiAccent else Color.White.copy(alpha = 0.72f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -986,7 +1003,10 @@ private fun MobileLibrarySelector(
                         Box(
                             modifier = Modifier
                                 .size(8.dp)
-                                .background(Color.White.copy(alpha = 0.7f), RoundedCornerShape(2.dp))
+                                .background(
+                                    if (index == selectedIndex) uiAccent else Color.White.copy(alpha = 0.7f),
+                                    RoundedCornerShape(2.dp)
+                                )
                         )
                     }
                 )
@@ -1015,7 +1035,7 @@ private fun LibrarySidebar(
         Text(
             text = activeServerName,
             style = ArflixTypography.body.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold),
-            color = Color.White.copy(alpha = 0.92f),
+            color = uiAccent,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 16.sp,
@@ -1263,19 +1283,24 @@ private fun ColumnScope.LibraryResults(
                         LaunchedEffect(watchlistLogoKey(item)) {
                             onItemVisible(item)
                         }
-                        MediaCard(
-                            item = item,
-                            width = cardWidth,
-                            isLandscape = isLandscape,
-                            logoImageUrl = logoUrls[watchlistLogoKey(item)],
-                            showTitle = true,
-                            titleMaxLines = 2,
-                            isFocusedOverride = index == focusedItemIndex,
-                            enableSystemFocus = false,
-                            onFocused = { onItemFocused(index) },
-                            onClick = { onItemClick(item) },
-                            onLongClick = { onItemLongPress(item) }
-                        )
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.TopStart
+                        ) {
+                            MediaCard(
+                                item = item,
+                                width = cardWidth,
+                                isLandscape = isLandscape,
+                                logoImageUrl = logoUrls[watchlistLogoKey(item)],
+                                showTitle = true,
+                                titleMaxLines = 2,
+                                isFocusedOverride = index == focusedItemIndex,
+                                enableSystemFocus = false,
+                                onFocused = { onItemFocused(index) },
+                                onClick = { onItemClick(item) },
+                                onLongClick = { onItemLongPress(item) }
+                            )
+                        }
                     }
                     if (state.isLoadingMore) {
                         item(key = "library-loading-more", span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {

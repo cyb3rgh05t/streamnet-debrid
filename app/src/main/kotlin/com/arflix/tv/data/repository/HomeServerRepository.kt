@@ -121,6 +121,7 @@ data class HomeServerCatalogItem(
     val title: String,
     val mediaType: MediaType,
     val year: Int?,
+    val releaseDate: String? = null,
     val providerIds: Map<String, String>,
     val overview: String = "",
     val rating: Double? = null,
@@ -2161,7 +2162,7 @@ class HomeServerRepository @Inject constructor(
             "Overview,CommunityRating,ImageTags,BackdropImageTags,DateCreated"
 
     private fun catalogItemFields(): String =
-        "ProviderIds,ProductionYear,Overview,CommunityRating,ImageTags,BackdropImageTags,DateCreated"
+        "ProviderIds,ProductionYear,PremiereDate,Overview,CommunityRating,ImageTags,BackdropImageTags,DateCreated"
 
     private fun buildStreamSources(
         connection: HomeServerConnection,
@@ -2495,6 +2496,7 @@ class HomeServerRepository @Inject constructor(
                 name = string("title"),
                 type = string("type"),
                 productionYear = int("year") ?: string("originallyAvailableAt").take(4).toIntOrNull(),
+                releaseDate = string("originallyAvailableAt").takeIf { it.isNotBlank() },
                 providerIds = providerIds,
                 overview = string("summary"),
                 rating = string("rating").toDoubleOrNull(),
@@ -2523,6 +2525,7 @@ class HomeServerRepository @Inject constructor(
             name = string("Name"),
             type = string("Type"),
             productionYear = year,
+            releaseDate = string("PremiereDate").takeIf { it.isNotBlank() }?.take(10),
             providerIds = providerIds,
             overview = string("Overview"),
             rating = string("CommunityRating").toDoubleOrNull(),
@@ -2670,6 +2673,7 @@ class HomeServerRepository @Inject constructor(
         val name: String,
         val type: String,
         val productionYear: Int?,
+        val releaseDate: String? = null,
         val providerIds: Map<String, String>,
         val overview: String = "",
         val rating: Double? = null,
@@ -2710,6 +2714,7 @@ class HomeServerRepository @Inject constructor(
                 title = name,
                 mediaType = mediaType,
                 year = productionYear,
+                releaseDate = releaseDate,
                 providerIds = providerIds.mapKeys { it.key.lowercase(Locale.US) },
                 overview = overview,
                 rating = rating,

@@ -267,7 +267,9 @@ internal fun projectHomeForIptvOnlyMode(
                     }
                 }
             else -> category.copy(
-                items = category.items.filter { item -> isAvailableInXtreamVod(item, availability) }
+                items = category.items.filter { item ->
+                    item.isHomeServer || isAvailableInXtreamVod(item, availability)
+                }
             ).takeIf { it.items.isNotEmpty() }
         }
     }

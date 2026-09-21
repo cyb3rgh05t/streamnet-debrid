@@ -37,6 +37,69 @@ const PROVIDER_LABELS: Record<HomeServerConfig["type"], string> = {
 };
 const libraryCache = new Map<string, HomeServerLibraryPage>();
 
+function ThemedSortMenu({
+  value,
+  onChange,
+  language,
+}: {
+  value: HomeServerLibrarySort;
+  onChange: (value: HomeServerLibrarySort) => void;
+  language: "de" | "en";
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const selected =
+    LIBRARY_SORT_OPTIONS.find((option) => option.value === value) ??
+    LIBRARY_SORT_OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+
+  return (
+    <div className="themed-sort-menu" ref={menuRef}>
+      <button
+        type="button"
+        className="themed-sort-trigger"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((current) => !current)}
+      >
+        {translateUiText(language, selected.label)}
+        <span className="themed-sort-chevron" aria-hidden="true" />
+      </button>
+      {open && (
+        <div
+          className="themed-sort-options"
+          role="listbox"
+          aria-label={localize(language, "Titel sortieren", "Sort titles")}
+        >
+          {LIBRARY_SORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="option"
+              aria-selected={option.value === value}
+              className={option.value === value ? "is-selected" : ""}
+              onClick={() => {
+                onChange(option.value);
+                setOpen(false);
+              }}
+            >
+              {translateUiText(language, option.label)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function itemKey(item: MediaItem): string {
   return item.isHomeServer
     ? `${item.homeServerId ?? "server"}:${item.homeServerItemId ?? item.id}`
@@ -197,7 +260,7 @@ export function WatchlistScreen() {
       const requestId = ++requestRef.current;
       const cached = libraryCache.get(cacheKey);
       if (cached && !force) setLibraryPage(cached);
-      setLoading(!cached);
+      setLoading(true);
       setLibraryError(false);
       const { loadHomeServerLibraryPage } = await import("@/lib/homeserver");
       try {
@@ -444,24 +507,11 @@ export function WatchlistScreen() {
             </button>
           )}
           {!trackerTab && tab !== "watchlist" && (
-            <select
-              className="library-provider-sort"
+            <ThemedSortMenu
               value={sort}
-              onChange={(event) =>
-                setSort(event.target.value as HomeServerLibrarySort)
-              }
-              aria-label={localize(
-                settings.uiLanguage,
-                "Titel sortieren",
-                "Sort titles",
-              )}
-            >
-              {LIBRARY_SORT_OPTIONS.map(({ value, label }) => (
-                <option key={value} value={value}>
-                  {translateUiText(settings.uiLanguage, label)}
-                </option>
-              ))}
-            </select>
+              onChange={setSort}
+              language={settings.uiLanguage}
+            />
           )}
         </nav>
       </section>
@@ -609,24 +659,11 @@ export function WatchlistScreen() {
                 </div>
               )}
               {tab === "watchlist" && (
-                <select
-                  className="watchlist-sort"
+                <ThemedSortMenu
                   value={sort}
-                  onChange={(event) =>
-                    setSort(event.target.value as HomeServerLibrarySort)
-                  }
-                  aria-label={localize(
-                    settings.uiLanguage,
-                    "Titel sortieren",
-                    "Sort titles",
-                  )}
-                >
-                  {LIBRARY_SORT_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {translateUiText(settings.uiLanguage, label)}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setSort}
+                  language={settings.uiLanguage}
+                />
               )}
               {tab !== "watchlist" && (
                 <label className="library-search">
@@ -639,24 +676,13 @@ export function WatchlistScreen() {
                 </label>
               )}
               {tab !== "watchlist" && (
-                <select
-                  className="watchlist-sort library-mobile-sort"
-                  value={sort}
-                  onChange={(event) =>
-                    setSort(event.target.value as HomeServerLibrarySort)
-                  }
-                  aria-label={localize(
-                    settings.uiLanguage,
-                    "Titel sortieren",
-                    "Sort titles",
-                  )}
-                >
-                  {LIBRARY_SORT_OPTIONS.map(({ value, label }) => (
-                    <option key={value} value={value}>
-                      {translateUiText(settings.uiLanguage, label)}
-                    </option>
-                  ))}
-                </select>
+                <div className="library-mobile-sort">
+                  <ThemedSortMenu
+                    value={sort}
+                    onChange={setSort}
+                    language={settings.uiLanguage}
+                  />
+                </div>
               )}
               {tab !== "watchlist" && (
                 <button

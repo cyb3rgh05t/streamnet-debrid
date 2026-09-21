@@ -3671,7 +3671,7 @@ fun PlayerScreen(
                 androidx.compose.material3.CircularProgressIndicator(
                     modifier = Modifier.size(14.dp),
                     strokeWidth = 2.dp,
-                    color = androidx.compose.ui.graphics.Color(0xFF7EC8F0)
+                    color = playerAccent
                 )
                 Text(
                     text = uiState.matchStatusText.ifBlank { stringResource(R.string.player_match_searching) },

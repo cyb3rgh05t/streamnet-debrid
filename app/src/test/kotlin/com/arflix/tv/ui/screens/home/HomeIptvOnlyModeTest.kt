@@ -117,6 +117,29 @@ class HomeIptvOnlyModeTest {
     }
 
     @Test
+    fun `enabled mode keeps home server items independent from IPTV availability`() {
+        val homeServerMovie = MediaItem(
+            id = 42,
+            title = "Plex Movie",
+            mediaType = MediaType.MOVIE,
+            isHomeServer = true,
+        )
+        val state = HomeUiState(
+            categories = listOf(
+                Category("home_server_movies", "Plex Movies", listOf(homeServerMovie, movie)),
+            ),
+        )
+
+        val projected = projectHomeForIptvOnlyMode(
+            state,
+            enabled = true,
+            availability = IptvRepository.XtreamVodAvailability(emptySet()),
+        )
+
+        assertEquals(listOf(homeServerMovie), projected.categories.single().items)
+    }
+
+    @Test
     fun `external hero is replaced by first IPTV channel`() {
         val state = HomeUiState(
             categories = listOf(

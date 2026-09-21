@@ -2,6 +2,30 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.029] - 2026-09-21
+
+### Home-Server, Katalogreihenfolge und UI-Politur
+
+- Android verwendet die profilbezogene, synchronisierte Katalogreihenfolge für gemischte Home-Server-, Standard- und Collection-Kataloge; fehlende Kataloge werden übersprungen, ohne vorhandene Reihenfolgen umzuschreiben.
+- Home-Server-Kataloge behalten den echten Servernamen und vollständige Releasedates; Android zeigt diese als `TT.MM.JJJJ` im aktiven Theme-Akzent an.
+- Home-Server-Bibliotheken sind nicht mehr an IPTV-only-VOD-Verfügbarkeit gekoppelt.
+- Android-Home-Server-Karten, Bibliotheksauswahl und Fokuszustände entsprechen der lokalen Merkliste und verwenden den StreamNet-Akzent.
+- Android-Loading-Spinner in Personen-, Collection-, Studio-, Franchise-, Genre- und Player-Ansichten verwenden ausschließlich den aktiven Theme-Akzent.
+- Deutsche Android-Bezeichnungen verwenden für Library-Oberflächen „Mediathek“.
+- Android-Version: `2.5.029` / Code `430`.
+
+## [Web 1.0.039] - 2026-09-21
+
+### Home-Server, Katalogreihenfolge und UI-Politur
+
+- Web verwendet die profilbezogene, synchronisierte Katalogreihenfolge für normale Kataloge, Home-Server-Rails und Collection-Rails im Home.
+- Home-Server-Kataloge werden über `sourceRef` mit gespeicherten Katalog-IDs verbunden, damit die Reihenfolge aus den Einstellungen im Home erhalten bleibt.
+- Neue Home-Server-Kataloge werden in die kanonische `settings.catalogs`-Reihenfolge aufgenommen und mit der Cloud synchronisiert.
+- Web lädt alle aktivierten Home-Server-Video-Bibliotheken; IPTV-only-VOD filtert Home-Server-Inhalte nicht aus.
+- Home-Server-Karten, Bibliotheksauswahl, Sortiermenüs, aktive Pills, Suchfokus und Refresh-Animation verwenden den StreamNet-Akzent.
+- Die manuellen Bibliotheksaktualisierungen zeigen den Ladezustand sichtbar an; Continue Watching bleibt beim gemeinsamen Home-Rail-Ordering erhalten.
+- Web-Sortierdropdowns sind thematisierte Listboxen mit sichtbaren Optionen.
+
 ## [2.5.028] - 2026-09-20
 
 ### IPTV-only-Suche

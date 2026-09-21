@@ -2203,8 +2203,9 @@ export async function removeContinueWatchingProgress(
   profileId?: string | null,
 ) {
   if (!auth.session) return;
+  const targetProfileId = profileId ?? "default";
   const query = new URLSearchParams({
-    profile_id: profileId ?? "default",
+    profile_id: targetProfileId,
     media_type: item.mediaType,
     show_tmdb_id: String(item.id),
   });
@@ -2214,7 +2215,7 @@ export async function removeContinueWatchingProgress(
   await backendRequest(auth, `watch-history?${query.toString()}`, {
     method: "DELETE",
   }).catch(() => undefined);
-  cloudWatchHistoryCache.delete(`${auth.session.userId}:${profileId ?? ""}`);
+  cloudWatchHistoryCache.delete(`${auth.session.userId}:${targetProfileId}`);
   const matches = (candidate: AndroidContinueWatchingItem) => {
     if (
       candidate.id !== item.id ||
@@ -2230,7 +2231,6 @@ export async function removeContinueWatchingProgress(
   };
 
   await mutateCloudPayload(auth, (root) => {
-    const targetProfileId = profileId ?? "default";
     for (const key of [
       "localContinueWatchingByProfile",
       "continueWatchingByProfile",
