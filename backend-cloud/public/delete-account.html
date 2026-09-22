@@ -264,6 +264,26 @@
       .danger:hover:not(:disabled) {
         background: #c92e37;
       }
+      button.is-busy {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      button.is-busy::before {
+        content: "";
+        width: 15px;
+        height: 15px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: button-spin 0.7s linear infinite;
+      }
+      @keyframes button-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
       .secondary {
         color: var(--text);
         background: rgba(255, 245, 230, 0.03);
@@ -614,7 +634,7 @@
     </div>
 
     <script>
-      const FUNCTIONS = "/.netlify/functions";
+      const FUNCTIONS = "";
 
       const loginStage = document.getElementById("login-stage");
       const confirmStage = document.getElementById("confirm-stage");
@@ -881,6 +901,7 @@
         event.preventDefault();
         loginMessage.textContent = "";
         verifyButton.disabled = true;
+        verifyButton.classList.add("is-busy");
         const email = document.getElementById("email").value.trim();
         const password = document.getElementById("password").value;
         try {
@@ -907,6 +928,7 @@
           }
         } finally {
           verifyButton.disabled = false;
+          verifyButton.classList.remove("is-busy");
         }
       });
 
@@ -919,6 +941,7 @@
         accessToken = "";
         confirmation.value = "";
         deleteButton.disabled = true;
+        deleteButton.classList.add("is-busy");
         showStage(1);
       });
 
@@ -944,6 +967,7 @@
             error.status,
           );
           deleteButton.disabled = false;
+          deleteButton.classList.remove("is-busy");
         }
       });
 

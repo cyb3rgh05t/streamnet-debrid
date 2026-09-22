@@ -32,8 +32,7 @@
       noCode: "No Code Received",
       noCodeMessage: "Discord did not return a valid authorization response.",
       connected: "Discord Connected!",
-      authorizedPrefix:
-        "Authorized! If StreamNet did not open automatically, ",
+      authorizedPrefix: "Authorized! If StreamNet did not open automatically, ",
       invalidPairing: "Invalid Pairing Session",
       scanAgain: "Please scan the QR code on your TV again.",
       tvConnected: "Your TV is connected. You can close this page.",
@@ -167,7 +166,7 @@
     }
 
     try {
-      var response = await fetch("/.netlify/functions/discord-auth-callback", {
+      var response = await fetch("/discord-auth-callback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ device_code: deviceCode, code: code }),

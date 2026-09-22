@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.017] - 2026-09-22
+
+### Auth-Portal-Dialoge und lokale Routen
+
+- Auth-Portal zeigt thematisierte, vergrößerte Erfolgs- und Fehlerdialoge mit Produktlinks und App-Screenshots.
+- Login-, Registrierungs-, Lösch- und TV-Kopplungsaktionen zeigen sichtbare Ladezustände.
+- Veraltete Netlify-Weiterleitungen und Netlify-Function-Rewrites aus dem Self-Hosted-Backend entfernt.
+- Backend-Version: `1.0.017`.
+
 ## [Web 1.0.043] - 2026-09-22
 
 ### Login- und Profilnavigation

@@ -592,58 +592,7 @@ app.get("/assets/:asset", async (request, reply) => {
 
 app.get("/", async (request, reply) => {
   const page = await readFile(path.join(publicDirectory, "index.html"), "utf8");
-  const selfHostedPage = page
-    .replace(
-      'const FUNCTION_BASE = "/.netlify/functions";',
-      'const FUNCTION_BASE = "";',
-    )
-    .replaceAll(
-      'window.location.href = "https://streamnet-sync.netlify.app";',
-      "return;",
-    )
-    .replaceAll("Angemeldet. Weiterleitung...", "Angemeldet.")
-    .replaceAll("TV gekoppelt. Weiterleitung...", "TV gekoppelt.")
-    .replaceAll("Konto erstellt. Weiterleitung...", "Konto erstellt.")
-    .replaceAll(
-      "Konto erstellt und TV gekoppelt. Weiterleitung...",
-      "Konto erstellt und TV gekoppelt.",
-    )
-    .replaceAll("Signed in. Redirecting...", "Signed in.")
-    .replaceAll("TV paired. Redirecting...", "TV paired.")
-    .replaceAll("Account created. Redirecting...", "Account created.")
-    .replaceAll(
-      "Account created and TV paired. Redirecting...",
-      "Account created and TV paired.",
-    )
-    .replace(
-      "</body>",
-      `<script>
-        const statusNode = document.getElementById("status");
-        const pageLanguage = () => document.documentElement.lang === "de" ? "de" : "en";
-        const showSuccessPage = (pairing) => {
-          const german = pageLanguage() === "de";
-          const title = pairing
-            ? (german ? "TV erfolgreich gekoppelt" : "TV paired successfully")
-            : (german ? "Erfolgreich angemeldet" : "Signed in successfully");
-          const message = pairing
-            ? (german
-              ? "Dein Fernseher wurde mit diesem Konto verbunden. Du kannst dieses Fenster jetzt schliessen."
-              : "Your TV is now connected to this account. You can close this window.")
-            : (german
-              ? "Dein StreamNet Cloud Konto ist bereit. Deine Daten bleiben auf deinen Geraeten synchron."
-              : "Your StreamNet Cloud account is ready. Your data will stay in sync across your devices.");
-          document.body.innerHTML = '<style>@keyframes success-pop{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}@keyframes success-draw{0%{width:0;height:0}45%{width:10px;height:0}100%{width:10px;height:22px}}.success-mark{width:64px;height:64px;margin:0 auto 22px;border:2px solid #6ee7a3;border-radius:50%;display:grid;place-items:center;color:#6ee7a3;animation:success-pop .55s ease-out both}.success-mark span{display:block;width:10px;height:22px;border-right:4px solid #6ee7a3;border-bottom:4px solid #6ee7a3;transform:rotate(45deg) translate(-2px,-2px);transform-origin:center;animation:success-draw .55s .25s ease-out both}</style><main style="min-height:calc(100vh - 56px);display:grid;place-items:center"><section style="width:min(560px,100%);padding:42px 34px;text-align:center;background:rgba(28,23,19,.94);border:1px solid rgba(229,162,9,.28);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.38)"><img src="/assets/streamnet-logo.svg" alt="StreamNet" style="width:min(260px,80%);height:auto;margin-bottom:34px"><div class="success-mark" aria-label="Success"><span></span></div><h1 style="margin:0;color:#f4efe7;font-size:clamp(28px,5vw,42px);line-height:1.1">' + title + '</h1><p style="margin:18px auto 0;max-width:420px;color:#d6cabb;font-size:16px;line-height:1.6">' + message + '</p><div style="margin-top:30px;color:#e5a209;font-size:12px;letter-spacing:.16em;text-transform:uppercase">StreamNet Cloud</div></section></main>';
-        };
-        new MutationObserver(() => {
-          if (!statusNode || !statusNode.classList.contains("ok")) return;
-          const text = statusNode.textContent.toLowerCase();
-          const pairing = Boolean(new URLSearchParams(window.location.search).get("code"));
-          const success = pairing || text.includes("angemeldet") || text.includes("signed in") || text.includes("konto erstellt") || text.includes("account created");
-          if (success && document.body.contains(statusNode)) showSuccessPage(pairing);
-        }).observe(statusNode, { childList: true, characterData: true, attributes: true, subtree: true });
-      </script></body>`,
-    );
-  return reply.type("text/html; charset=utf-8").send(selfHostedPage);
+  return reply.type("text/html; charset=utf-8").send(page);
 });
 
 app.get("/delete-account", async (_request, reply) => {
@@ -651,14 +600,7 @@ app.get("/delete-account", async (_request, reply) => {
     path.join(publicDirectory, "delete-account.html"),
     "utf8",
   );
-  return reply
-    .type("text/html; charset=utf-8")
-    .send(
-      page.replaceAll(
-        'const FUNCTIONS = "/.netlify/functions";',
-        'const FUNCTIONS = "";',
-      ),
-    );
+  return reply.type("text/html; charset=utf-8").send(page);
 });
 
 app.get("/privacy", async (_request, reply) =>
@@ -691,14 +633,7 @@ app.get("/discord/callback.js", async (_request, reply) => {
     path.join(publicDirectory, "discord", "callback.js"),
     "utf8",
   );
-  return reply
-    .type("application/javascript; charset=utf-8")
-    .send(
-      script.replaceAll(
-        "/.netlify/functions/discord-auth-callback",
-        "/discord-auth-callback",
-      ),
-    );
+  return reply.type("application/javascript; charset=utf-8").send(script);
 });
 
 app.post("/auth-login", async (request, reply) => {

@@ -362,31 +362,84 @@
         z-index: 20;
         display: grid;
         place-items: center;
-        padding: 20px;
-        background: rgba(5, 7, 12, 0.72);
+        padding: 28px;
+        background: rgba(5, 7, 12, 0.78);
+        backdrop-filter: blur(5px);
       }
       .feedback-card {
-        width: min(100%, 440px);
-        padding: 26px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        border-radius: 16px;
-        background: #171b24;
-        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+        width: min(100%, 620px);
+        padding: 34px 36px 32px;
+        border: 1px solid rgba(229, 162, 9, 0.42);
+        border-radius: 22px;
+        background:
+          linear-gradient(145deg, rgba(229, 162, 9, 0.13), transparent 34%),
+          var(--card);
+        box-shadow:
+          0 0 0 1px rgba(229, 162, 9, 0.08),
+          0 28px 90px rgba(0, 0, 0, 0.58);
       }
       .feedback-card h2 {
         margin: 0 0 10px;
-        font-size: 22px;
+        font-size: clamp(24px, 3vw, 32px);
+        line-height: 1.12;
       }
       .feedback-card p {
         margin: 0;
         color: var(--muted);
+        font-size: 16px;
         line-height: 1.55;
       }
       .feedback-card.is-success h2 {
-        color: var(--ok);
+        color: var(--accent-1);
       }
       .feedback-card.is-error h2 {
         color: var(--danger);
+      }
+      .feedback-links {
+        display: grid;
+        gap: 10px;
+        margin-top: 22px;
+      }
+      .feedback-link {
+        display: block;
+        padding: 14px 16px;
+        border: 1px solid var(--line-strong);
+        border-radius: 12px;
+        color: var(--text);
+        background: rgba(229, 162, 9, 0.08);
+        text-decoration: none;
+        font-weight: 650;
+        font-size: 15px;
+        text-align: center;
+      }
+      .feedback-link:hover {
+        background: var(--accent-1);
+        color: #17120f;
+      }
+      .feedback-gallery {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 24px;
+      }
+      .feedback-gallery img {
+        width: 100%;
+        aspect-ratio: 16 / 11;
+        object-fit: cover;
+        border-radius: 12px;
+        border: 1px solid rgba(229, 162, 9, 0.28);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.24);
+      }
+      @media (max-width: 560px) {
+        .feedback-dialog {
+          padding: 14px;
+        }
+        .feedback-card {
+          padding: 26px 20px 22px;
+        }
+        .feedback-gallery {
+          gap: 7px;
+        }
       }
 
       .label {
@@ -460,6 +513,26 @@
         opacity: 0.55;
         cursor: not-allowed;
         transform: none;
+      }
+      .btn.is-busy {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+      }
+      .btn.is-busy::before {
+        content: "";
+        width: 15px;
+        height: 15px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: button-spin 0.7s linear infinite;
+      }
+      @keyframes button-spin {
+        to {
+          transform: rotate(360deg);
+        }
       }
 
       .btn.primary {
@@ -883,6 +956,32 @@
             >
               <h2 id="feedbackTitle"></h2>
               <p id="feedbackMessage"></p>
+              <div class="feedback-links" id="feedbackLinks" hidden>
+                <a
+                  class="feedback-link"
+                  id="webPlayerLink"
+                  href="https://web.streamnet.live/"
+                ></a>
+                <a
+                  class="feedback-link"
+                  id="androidAppLink"
+                  href="https://github.com/cyb3rgh05t/streamnet-debrid/releases/latest"
+                ></a>
+              </div>
+              <div class="feedback-gallery" id="feedbackGallery" hidden>
+                <img
+                  src="https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/screenshots/mobile/mobile-home.png"
+                  alt="StreamNet Home"
+                />
+                <img
+                  src="https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/screenshots/mobile/mobile-live.png"
+                  alt="StreamNet Live TV"
+                />
+                <img
+                  src="https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/screenshots/mobile/mobile-profiles.png"
+                  alt="StreamNet Profile"
+                />
+              </div>
             </section>
           </div>
         </section>
@@ -893,6 +992,29 @@
       const FUNCTION_BASE = "";
       const qs = new URLSearchParams(window.location.search);
       const pairCode = (qs.get("code") || "").trim();
+      const requestedRedirectUri = (qs.get("redirect_uri") || "").trim();
+
+      function resolveRedirectUri() {
+        if (!requestedRedirectUri) return "https://web.streamnet.live/";
+        try {
+          const target = new URL(requestedRedirectUri);
+          const allowedHost =
+            target.hostname === "localhost" ||
+            target.hostname === "127.0.0.1" ||
+            target.hostname.endsWith(".netlify.app") ||
+            target.hostname === "mystreamnet.club" ||
+            target.hostname.endsWith(".mystreamnet.club");
+          return target.protocol === "http:" || target.protocol === "https:"
+            ? allowedHost
+              ? target.toString()
+              : "https://web.streamnet.live/"
+            : "https://web.streamnet.live/";
+        } catch {
+          return "https://web.streamnet.live/";
+        }
+      }
+
+      const redirectUri = resolveRedirectUri();
 
       const statusEl = document.getElementById("status");
       const subtitleEl = document.getElementById("subtitle");
@@ -912,6 +1034,10 @@
       const feedbackCard = document.getElementById("feedbackCard");
       const feedbackTitle = document.getElementById("feedbackTitle");
       const feedbackMessage = document.getElementById("feedbackMessage");
+      const feedbackLinks = document.getElementById("feedbackLinks");
+      const feedbackGallery = document.getElementById("feedbackGallery");
+      const webPlayerLink = document.getElementById("webPlayerLink");
+      const androidAppLink = document.getElementById("androidAppLink");
       const langEnBtn = document.getElementById("langEn");
       const langDeBtn = document.getElementById("langDe");
       const hashParams = new URLSearchParams(
@@ -1044,6 +1170,8 @@
             tvPairedTitle: "TV paired successfully",
             tvPairedMessage: "The TV will connect in a few seconds.",
             tvPairingErrorTitle: "TV pairing failed",
+            webPlayerLink: "Open web player",
+            androidAppLink: "Download Android app",
           },
           errors: {
             emailRequired: "Email is required.",
@@ -1194,6 +1322,8 @@
             tvPairedMessage:
               "Das TV-Geraet verbindet sich in wenigen Sekunden.",
             tvPairingErrorTitle: "TV-Kopplung fehlgeschlagen",
+            webPlayerLink: "Webplayer öffnen",
+            androidAppLink: "Android-App herunterladen",
           },
           errors: {
             emailRequired: "E-Mail ist erforderlich.",
@@ -1328,10 +1458,14 @@
         statusEl.className = `status ${type}`.trim();
       }
 
-      function showFeedback(title, message, type) {
+      function showFeedback(title, message, type, showProductLinks = false) {
         feedbackTitle.textContent = title;
         feedbackMessage.textContent = message;
         feedbackCard.className = `feedback-card is-${type}`;
+        feedbackLinks.hidden = !showProductLinks;
+        feedbackGallery.hidden = !showProductLinks;
+        webPlayerLink.textContent = t("feedback.webPlayerLink");
+        androidAppLink.textContent = t("feedback.androidAppLink");
         feedbackDialog.hidden = false;
       }
 
@@ -1340,6 +1474,12 @@
         signUpBtn.disabled = on;
         savePassBtn.disabled = on;
         forgotBtn.disabled = on;
+        [signInBtn, signUpBtn, savePassBtn, forgotBtn].forEach((button) => {
+          button.classList.toggle(
+            "is-busy",
+            on && button.style.display !== "none",
+          );
+        });
       }
 
       const EMAIL_RE = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,63}$/i;
@@ -1689,6 +1829,7 @@
               ? t("feedback.tvPairedMessage")
               : t("feedback.signInMessage"),
             "success",
+            !pairCode,
           );
           setStatus(
             pairCode
@@ -1697,8 +1838,8 @@
             "ok",
           );
           setTimeout(() => {
-            window.location.href = "https://streamnet-sync.netlify.app";
-          }, 900);
+            window.location.href = redirectUri;
+          }, 5000);
         } catch (err) {
           const message = err.message || String(err);
           showFeedback(
@@ -1732,7 +1873,7 @@
             );
             setStatus(t("status.createdAndPairedRedirecting"), "ok");
             setTimeout(() => {
-              window.location.href = "https://streamnet-sync.netlify.app";
+              window.location.href = redirectUri;
             }, 1200);
             return;
           }
@@ -1748,6 +1889,7 @@
               ? t("feedback.tvPairedMessage")
               : t("feedback.signUpMessage"),
             "success",
+            !pairCode,
           );
           setStatus(
             pairCode
@@ -1756,8 +1898,8 @@
             "ok",
           );
           setTimeout(() => {
-            window.location.href = "https://streamnet-sync.netlify.app";
-          }, 1200);
+            window.location.href = redirectUri;
+          }, 5000);
         } catch (err) {
           const msg = err.message || String(err);
           if (
