@@ -291,7 +291,8 @@ private fun VideoCard(
                     PlayerView(ctx).apply {
                         this.player = exoPlayer
                         useController = false
-                        setKeepContentOnPlayerReset(true)
+                        setShutterBackgroundColor(android.graphics.Color.BLACK)
+                        setKeepContentOnPlayerReset(false)
                     }
                 },
                 update = { view ->

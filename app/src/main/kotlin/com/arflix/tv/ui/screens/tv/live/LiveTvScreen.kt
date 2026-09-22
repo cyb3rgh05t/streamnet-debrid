@@ -141,6 +141,8 @@ private const val GuideVisibleFirstRowsAllChannels = 18
 private const val CatchupSeekStepMs = 30_000L
 private const val CatchupUrlAnchorGranularityMs = 60_000L
 private const val IptvPlaybackUserAgent = "VLC/3.0.20 LibVLC/3.0.20"
+private const val LiveBufferRecoveryTimeoutMs = 12_000L
+private const val LiveBufferRecoveryMaxAttempts = 3
 private const val VisibleGuidePastWindowMs = 48L * 60L * 60_000L
 private const val VisibleGuideFutureWindowMs = 48L * 60L * 60_000L
 
@@ -2234,6 +2236,10 @@ fun LiveTvScreen(
     var playerIsBuffering by remember { mutableStateOf(false) }
     var currentVideoFormat by remember { mutableStateOf<Format?>(null) }
     var currentAudioFormat by remember { mutableStateOf<Format?>(null) }
+    var liveBufferRecoveryAttempt by remember { mutableIntStateOf(0) }
+    var liveBufferRecoveryInFlight by remember { mutableStateOf(false) }
+    var liveBufferStalledSinceMs by remember { mutableLongStateOf(0L) }
+    var liveBufferRecoveryFailed by remember { mutableStateOf(false) }
     LaunchedEffect(exoPlayer, playingCatchupProgram, catchupUrlAnchorOffsetMs) {
         while (true) {
             val programDuration = playingCatchupProgram
@@ -2250,11 +2256,18 @@ fun LiveTvScreen(
                 .let { position -> if (duration > 0L) position.coerceAtMost(duration) else position }
             playerIsPlaying = exoPlayer.isPlaying
             playerPlayWhenReady = exoPlayer.playWhenReady
-            playerIsBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING
+            playerIsBuffering = exoPlayer.playbackState == Player.STATE_BUFFERING && !liveBufferRecoveryFailed
             currentVideoFormat = exoPlayer.videoFormat
             currentAudioFormat = exoPlayer.audioFormat
             delay(if (playingCatchupProgram != null) 500L else 1_500L)
         }
+    }
+
+    LaunchedEffect(exoPlayer, playingChannelId, playingCatchupProgram) {
+        liveBufferRecoveryAttempt = 0
+        liveBufferRecoveryInFlight = false
+        liveBufferStalledSinceMs = 0L
+        liveBufferRecoveryFailed = false
     }
 
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -2373,6 +2386,8 @@ fun LiveTvScreen(
         lastPreparedHeaders = headers
         lastPreparedDrmInfo = drmInfo
         lastPreparedCatchupOffsetMs = if (playingCatchupProgram != null) catchupUrlAnchorOffsetMs else -1L
+        liveBufferRecoveryInFlight = false
+        liveBufferRecoveryFailed = false
         if (resetRetry) playerRetryCount = 0
         if (resetRetry) {
             playbackDiagnostic = PlaybackDiagnostic(
@@ -2393,6 +2408,7 @@ fun LiveTvScreen(
         val channelId = playingChannelId ?: return
         val channel = playingChannel?.source ?: return
         playerIsBuffering = true
+        liveBufferRecoveryFailed = false
         playbackDiagnostic = PlaybackDiagnostic(
             title = context.getString(R.string.live_diag_retrying_source),
             detail = context.getString(R.string.live_diag_preparing_source),
@@ -2410,6 +2426,7 @@ fun LiveTvScreen(
                 )
             }.getOrElse { error ->
                 playerIsBuffering = false
+                liveBufferRecoveryInFlight = false
                 playbackDiagnostic = PlaybackDiagnostic(
                     title = context.getString(R.string.live_diag_playback_failed),
                     detail = error.message ?: context.getString(R.string.live_diag_preparing_source),
@@ -2431,6 +2448,51 @@ fun LiveTvScreen(
                 drmInfo = channel.drmInfo,
                 forcePrepare = true,
             )
+        }
+    }
+
+    LaunchedEffect(exoPlayer, playingChannelId, playingCatchupProgram, lastPreparedStreamUrl) {
+        if (playingCatchupProgram != null) return@LaunchedEffect
+        var lastPositionMs = exoPlayer.currentPosition
+        while (true) {
+            delay(1_000L)
+            if (playingChannelId == null || lastPreparedStreamUrl == null) continue
+
+            val currentPositionMs = exoPlayer.currentPosition
+            val positionAdvanced = currentPositionMs > lastPositionMs + 1_000L
+            lastPositionMs = currentPositionMs
+            val stalled = exoPlayer.playbackState == Player.STATE_BUFFERING &&
+                !exoPlayer.isPlaying &&
+                !positionAdvanced
+
+            if (!stalled) {
+                liveBufferStalledSinceMs = 0L
+                continue
+            }
+
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (liveBufferStalledSinceMs == 0L) {
+                liveBufferStalledSinceMs = now
+                continue
+            }
+            if (liveBufferRecoveryInFlight || now - liveBufferStalledSinceMs < LiveBufferRecoveryTimeoutMs) continue
+
+            liveBufferStalledSinceMs = now
+            if (liveBufferRecoveryAttempt >= LiveBufferRecoveryMaxAttempts) {
+                liveBufferRecoveryFailed = true
+                playerIsBuffering = false
+                playbackDiagnostic = PlaybackDiagnostic(
+                    title = context.getString(R.string.live_diag_playback_failed),
+                    detail = context.getString(R.string.live_diag_preparing_source),
+                    severity = PlaybackDiagnosticSeverity.Error,
+                    channel = playingChannel,
+                )
+                continue
+            }
+
+            liveBufferRecoveryAttempt += 1
+            liveBufferRecoveryInFlight = true
+            reloadCurrentLiveStream()
         }
     }
 
@@ -2625,6 +2687,9 @@ fun LiveTvScreen(
                     playerRetryCount = 0
                     playbackDiagnostic = null
                     playerIsBuffering = false
+                    liveBufferRecoveryAttempt = 0
+                    liveBufferRecoveryInFlight = false
+                    liveBufferStalledSinceMs = 0L
                 } else if (playbackState == Player.STATE_ENDED && playingCatchupProgram == null) {
                     val endedChannelId = playingChannel?.id ?: return
                     val endedChannel = playingChannel.source
@@ -2654,7 +2719,11 @@ fun LiveTvScreen(
                             }
                             playbackDiagnostic = PlaybackDiagnostic(
                                 title = context.getString(R.string.live_diag_retrying_source),
-                                detail = "Attempt $resolveAttempt: ${context.getString(R.string.live_diag_preparing_source)}",
+                                detail = context.getString(
+                                    R.string.live_diag_attempt_preparing,
+                                    resolveAttempt,
+                                    context.getString(R.string.live_diag_preparing_source),
+                                ),
                                 severity = PlaybackDiagnosticSeverity.Warning,
                             )
                             delay(10_000L)
@@ -2673,6 +2742,8 @@ fun LiveTvScreen(
 
             override fun onPlayerError(error: PlaybackException) {
                 playerIsBuffering = false
+                liveBufferRecoveryInFlight = false
+                liveBufferStalledSinceMs = 0L
                 val prepared = lastPreparedStreamUrl ?: return
                 if (
                     error.errorCode == PlaybackException.ERROR_CODE_BEHIND_LIVE_WINDOW &&
@@ -2750,7 +2821,11 @@ fun LiveTvScreen(
                         if (retryTarget == null) {
                             playbackDiagnostic = PlaybackDiagnostic(
                                 title = context.getString(R.string.live_diag_retrying_source),
-                                detail = "Attempt $nextAttempt: ${context.getString(R.string.live_diag_preparing_source)}",
+                                detail = context.getString(
+                                    R.string.live_diag_attempt_preparing,
+                                    nextAttempt,
+                                    context.getString(R.string.live_diag_preparing_source),
+                                ),
                                 severity = PlaybackDiagnosticSeverity.Warning,
                             )
                             if (retryProgram != null) return@launch
@@ -2766,9 +2841,18 @@ fun LiveTvScreen(
                     playbackDiagnostic = PlaybackDiagnostic(
                         title = context.getString(R.string.live_diag_retrying_source),
                         detail = if (nextAttempt <= maxRetryCount) {
-                            "Attempt $nextAttempt/$maxRetryCount after ${classifyPlaybackError(error)}"
+                            context.getString(
+                                R.string.live_diag_attempt_after_error,
+                                nextAttempt,
+                                maxRetryCount,
+                                context.getString(classifyPlaybackErrorRes(error)),
+                            )
                         } else {
-                            "Attempt $nextAttempt after ${classifyPlaybackError(error)}"
+                            context.getString(
+                                R.string.live_diag_attempt_after_error_unbounded,
+                                nextAttempt,
+                                context.getString(classifyPlaybackErrorRes(error)),
+                            )
                         },
                         severity = PlaybackDiagnosticSeverity.Warning,
                     )
@@ -3422,7 +3506,8 @@ fun LiveTvScreen(
                             keepScreenOn = true
                             player = exoPlayer
                             useController = false
-                            setKeepContentOnPlayerReset(true)
+                            setShutterBackgroundColor(android.graphics.Color.BLACK)
+                            setKeepContentOnPlayerReset(false)
                             resizeMode = liveTvResizeMode
                         }
                     },
@@ -3648,7 +3733,11 @@ fun LiveTvScreen(
                 attempt++
                 playbackDiagnostic = PlaybackDiagnostic(
                     title = context.getString(R.string.live_diag_retrying_source),
-                    detail = "Attempt $attempt: ${context.getString(R.string.live_diag_preparing_source)}",
+                    detail = context.getString(
+                        R.string.live_diag_attempt_preparing,
+                        attempt,
+                        context.getString(R.string.live_diag_preparing_source),
+                    ),
                     severity = PlaybackDiagnosticSeverity.Warning,
                 )
                 prepareStream(
@@ -3808,6 +3897,18 @@ private fun classifyPlaybackError(error: PlaybackException): String {
         "parser" in name || "manifest" in name -> "stream format issue"
         "decoder" in name || "audio" in name || "video" in name -> "device codec issue"
         else -> "source did not start"
+    }
+}
+
+private fun classifyPlaybackErrorRes(error: PlaybackException): Int {
+    httpResponseCode(error)?.let { return R.string.live_error_http_provider }
+    val name = error.errorCodeName.lowercase()
+    return when {
+        "timeout" in name -> R.string.live_error_network_timeout
+        "network" in name || "io" in name -> R.string.live_error_network_provider
+        "parser" in name || "manifest" in name -> R.string.live_error_stream_format
+        "decoder" in name || "audio" in name || "video" in name -> R.string.live_error_device_codec
+        else -> R.string.live_error_source_not_started
     }
 }
 

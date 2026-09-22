@@ -33,7 +33,7 @@ internal data class CollectionTemplateEntry(
 
 internal object CollectionTemplateManifest {
     private const val ASSET_COMMIT = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
-    private const val FRANCHISE_ASSET_COMMIT = "20bee004466c109d992a78601a78f0609dd2f78a"
+    private const val FRANCHISE_ASSET_COMMIT = "1a759ef57b2db8dbba92d14f7ac35211f1bcc95d"
     private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
     private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
     private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
@@ -750,6 +750,20 @@ internal object CollectionTemplateManifest {
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.7947", sourceAddonId = "aio-metadata", sourceName = "James Bond Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 27, author = "hdlists", url = "https://mdblist.com/lists/hdlists/james-bond-movies")
+            )
+        ),
+        entry(
+            title = "Fast & Furious",
+            group = CollectionGroupKind.FRANCHISE,
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Fast-and-Furious.jpg",
+            tileShape = CollectionTileShape.LANDSCAPE,
+            hideTitle = true,
+            heroVideoUrl = null,
+            sources = listOf(
+                tmdbCollectionSource(9485)
+            ),
+            listMetadata = listOf(
+                metadata(sourceCatalogId = "tmdb.collection.9485", sourceAddonId = null, sourceName = "Fast & Furious Collection", sourceLabel = "TMDB", mediaType = "movie", itemCount = null, author = null, url = "https://www.themoviedb.org/collection/9485-the-fast-and-the-furious-collection")
             )
         ),
         entry(

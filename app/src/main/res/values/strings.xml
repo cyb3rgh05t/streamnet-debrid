@@ -1167,6 +1167,15 @@
     <string name="live_diag_playback_failed">Playback failed</string>
     <string name="live_diag_no_playable_stream">Provider did not return a playable stream.</string>
     <string name="live_diag_retrying_source">Retrying source</string>
+    <string name="live_diag_attempt_preparing">Attempt %1$d: %2$s</string>
+    <string name="live_diag_attempt_after_error">Attempt %1$d/%2$d after: %3$s</string>
+    <string name="live_diag_attempt_after_error_unbounded">Attempt %1$d after: %2$s</string>
+    <string name="live_error_http_provider">Provider returned an HTTP error</string>
+    <string name="live_error_network_timeout">Network timeout</string>
+    <string name="live_error_network_provider">Network or provider error</string>
+    <string name="live_error_stream_format">Incompatible stream format</string>
+    <string name="live_error_device_codec">Incompatible device codec</string>
+    <string name="live_error_source_not_started">Source did not start</string>
 
     <!-- Extracted from code: UI components -->
     <string name="component_qr_code">QR code</string>

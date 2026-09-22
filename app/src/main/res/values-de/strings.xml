@@ -359,6 +359,15 @@
     <string name="live_diag_playback_failed">Wiedergabe fehlgeschlagen</string>
     <string name="live_diag_no_playable_stream">Der Anbieter hat keinen abspielbaren Stream geliefert.</string>
     <string name="live_diag_retrying_source">Quelle wird erneut versucht</string>
+    <string name="live_diag_attempt_preparing">Versuch %1$d: %2$s</string>
+    <string name="live_diag_attempt_after_error">Versuch %1$d/%2$d nach: %3$s</string>
+    <string name="live_diag_attempt_after_error_unbounded">Versuch %1$d nach: %2$s</string>
+    <string name="live_error_http_provider">Anbieter antwortete mit einem HTTP-Fehler</string>
+    <string name="live_error_network_timeout">Netzwerk-Timeout</string>
+    <string name="live_error_network_provider">Netzwerk- oder Anbieterfehler</string>
+    <string name="live_error_stream_format">Streamformat nicht kompatibel</string>
+    <string name="live_error_device_codec">Geräte-Codec nicht kompatibel</string>
+    <string name="live_error_source_not_started">Quelle konnte nicht gestartet werden</string>
 
     <!-- App-Update -->
     <string name="update_github_releases">GitHub-Releases</string>
