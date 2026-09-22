@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.018] - 2026-09-22
+
+### Auth-Portal-Testpflege
+
+- Backend-Version auf `1.0.018` erhöht.
+- TV-Auth-Test an den aktuellen Self-Hosted-Auth-Portal-Flow angepasst.
+- Backend-Version: `1.0.018`.
+
 ## [Backend 1.0.017] - 2026-09-22
 
 ### Auth-Portal-Dialoge und lokale Routen

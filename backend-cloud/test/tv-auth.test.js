@@ -37,8 +37,5 @@ test("web auth page derives pairing mode from the code parameter", () => {
     pageSource,
     /const pairCode = \(qs\.get\("code"\) \|\| ""\)\.trim\(\)/,
   );
-  assert.doesNotMatch(
-    pageSource,
-    /showSuccessPage/,
-  );
+  assert.doesNotMatch(pageSource, /showSuccessPage/);
 });
