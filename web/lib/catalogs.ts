@@ -139,7 +139,7 @@ function mdblistAddonSource(
 const androidAssetBase =
   "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/9cc3dde7f7960c9256f0d81a761aa3ccbad4b976/";
 const franchiseAssetBase =
-  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/20bee004466c109d992a78601a78f0609dd2f78a/images/Franchises/";
+  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/1a759ef57b2db8dbba92d14f7ac35211f1bcc95d/images/Franchises/";
 const streamingImageBase = `${androidAssetBase}images/Landscape%20Streaming%20Services/`;
 const videoBase = `${androidAssetBase}networks%20videos/`;
 
@@ -261,6 +261,10 @@ const androidCollectionArtwork: Record<
   "DC Universe": { cover: `${franchiseAssetBase}DC.jpg`, hideTitle: true },
   "Star Wars": { cover: `${franchiseAssetBase}Star-Wars.jpg`, hideTitle: true },
   "James Bond": { cover: `${franchiseAssetBase}007.jpg`, hideTitle: true },
+  "Fast & Furious": {
+    cover: `${franchiseAssetBase}Fast-and-Furious.jpg`,
+    hideTitle: true,
+  },
   "Harry Potter": {
     cover: `${franchiseAssetBase}Harry-Potter.jpg`,
     hideTitle: true,
@@ -403,6 +407,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
     "DC Universe",
     "Star Wars",
     "James Bond",
+    "Fast & Furious",
     "Harry Potter",
     "Alien vs Predator",
     "Pirates of the Caribbean",
@@ -443,6 +448,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
         ),
       ],
       "James Bond": [mdblistAddonSource("movie", "mdblist.7947")],
+      "Fast & Furious": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 9485 }],
       "Harry Potter": [mdblistAddonSource("movie", "mdblist.102972")],
       "Alien vs Predator": [
         mdblistAddonSource("all", "mdblist.101434"),

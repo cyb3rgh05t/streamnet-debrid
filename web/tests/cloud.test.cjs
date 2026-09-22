@@ -40,6 +40,8 @@ test("an Android home server value still maps to web settings", async () => {
         name: "Media",
         url: "https://media.example",
         token: "token",
+        username: undefined,
+        password: undefined,
         enabled: true,
         serverId: undefined,
         userId: undefined,

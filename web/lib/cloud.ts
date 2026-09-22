@@ -1,5 +1,5 @@
 import type { AuthClient } from "./auth";
-import { writeCatalogProfileState } from "./catalogSync";
+import { writeCatalogProfileState } from "./catalogSync.ts";
 import { config } from "./config";
 import {
   parseHomeServerConnectionJson,

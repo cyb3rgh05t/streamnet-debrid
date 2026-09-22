@@ -81,7 +81,7 @@ test("catalog labels use the requested German upcoming names", async () => {
 test("Web fallback catalogs follow the current Android order", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
 
-  assert.equal(defaultCatalogs.length, 97);
+  assert.equal(defaultCatalogs.length, 98);
   assert.deepEqual(
     defaultCatalogs.slice(0, 14).map((catalog) => catalog.id),
     [

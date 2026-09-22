@@ -1,6 +1,6 @@
 {
   "name": "streamnet-web",
-  "version": "1.0.043",
+  "version": "1.0.044",
   "private": true,
   "engines": {
     "node": ">=22.19.0"
@@ -12,7 +12,7 @@
     "dev": "next dev",
     "setup:selfhost": "node scripts/selfhost.mjs setup",
     "check:selfhost": "node scripts/selfhost.mjs check",
-    "test": "node --experimental-strip-types --test tests/*.test.cjs",
+    "test": "node --experimental-strip-types --experimental-loader ./tests/ts-resolution-loader.mjs --test tests/*.test.cjs",
     "build": "node scripts/build.mjs",
     "start": "next start",
     "lint": "next lint"
