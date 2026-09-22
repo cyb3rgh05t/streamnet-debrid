@@ -536,7 +536,15 @@ async function loadCollectionCatalog(
       ),
     ),
   );
-  return dedupeItems(batches.flat());
+  const items = dedupeItems(batches.flat());
+  if (String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE") {
+    return items.sort((left, right) =>
+      (left.releaseDate ?? "9999-99-99").localeCompare(
+        right.releaseDate ?? "9999-99-99",
+      ),
+    );
+  }
+  return items;
 }
 
 async function loadCollectionSource(
@@ -576,9 +584,19 @@ async function loadCollectionSource(
       `collection/${source.tmdbCollectionId}`,
       { language },
     );
-    return (response.parts ?? []).map((item) =>
-      mapTmdbItem({ ...item, media_type: item.media_type ?? "movie" }, "movie"),
-    );
+    return (response.parts ?? [])
+      .slice()
+      .sort((left, right) =>
+        (left.release_date ?? "9999-99-99").localeCompare(
+          right.release_date ?? "9999-99-99",
+        ),
+      )
+      .map((item) =>
+        mapTmdbItem(
+          { ...item, media_type: item.media_type ?? "movie" },
+          "movie",
+        ),
+      );
   }
   if (kind === "TMDB_PERSON" && source.tmdbPersonId) {
     const response = await tmdb<TmdbCombinedCredits>(

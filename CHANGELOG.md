@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.045] - 2026-09-22
+
+### Chronologische Franchise-Reihenfolge
+
+- Franchise-Collections werden nach Veröffentlichungsdatum sortiert, damit Filme in der vorgesehenen Release-Reihenfolge erscheinen.
+- TMDB-Collection-Items und gemischte Franchise-Quellen werden vor dem Anzeigen chronologisch zusammengeführt.
+- Web-Version: `1.0.045`.
+
 ## [Web 1.0.044] - 2026-09-22
 
 ### Fast-&-Furious-Franchise
