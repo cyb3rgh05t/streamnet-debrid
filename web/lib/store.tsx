@@ -824,6 +824,7 @@ export interface AppStore {
     email: string,
     password: string,
     mode: "sign-in" | "sign-up",
+    navigateToProfiles?: boolean,
   ) => Promise<void>;
   signOut: () => void;
   beginTrakt: () => Promise<void>;
@@ -3349,7 +3350,12 @@ export function AppProvider({
   );
 
   const signIn = useCallback(
-    async (email: string, password: string, mode: "sign-in" | "sign-up") => {
+    async (
+      email: string,
+      password: string,
+      mode: "sign-in" | "sign-up",
+      navigateToProfiles = true,
+    ) => {
       const trimmedEmail = email.trim();
       if (!trimmedEmail || !password)
         throw new Error("Enter your email and password.");
@@ -3377,7 +3383,7 @@ export function AppProvider({
         }
         setCloudProfilesHydrated(false);
         setAuth(session);
-        setView("profiles");
+        if (navigateToProfiles) setView("profiles");
       } catch (error) {
         const message =
           error instanceof Error ? error.message : "Authentication failed.";

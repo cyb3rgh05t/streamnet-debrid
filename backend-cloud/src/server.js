@@ -158,11 +158,29 @@ async function sendPasswordResetEmail(account, token) {
       from: config.emailFrom,
       to: [account.email],
       subject: "StreamNet Cloud password reset",
+      text: `StreamNet Cloud password reset / Passwort zurücksetzen
+
+English:
+Reset your StreamNet Cloud password:
+${resetUrl}
+This link is valid for ${config.passwordResetTtlMinutes} minutes and can be used once.
+If you did not request this, you can ignore this email.
+
+Deutsch:
+Setze dein StreamNet-Cloud-Passwort zurück:
+${resetUrl}
+Dieser Link ist ${config.passwordResetTtlMinutes} Minuten gültig und kann nur einmal verwendet werden.
+Wenn du dies nicht angefordert hast, kannst du diese E-Mail ignorieren.`,
       html: `<!doctype html><html><body style="font-family:Arial,sans-serif;color:#222;line-height:1.5">
         <h2>Reset your StreamNet Cloud password</h2>
         <p>This link is valid for ${config.passwordResetTtlMinutes} minutes and can be used once.</p>
         <p><a href="${resetUrl}" style="display:inline-block;background:#e5a209;color:#18120a;padding:12px 18px;text-decoration:none;border-radius:6px">Choose a new password</a></p>
         <p>If you did not request this, you can ignore this email.</p>
+        <hr style="border:0;border-top:1px solid #ddd;margin:28px 0">
+        <h2>StreamNet-Cloud-Passwort zurücksetzen</h2>
+        <p>Dieser Link ist ${config.passwordResetTtlMinutes} Minuten gültig und kann nur einmal verwendet werden.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;background:#e5a209;color:#18120a;padding:12px 18px;text-decoration:none;border-radius:6px">Neues Passwort wählen</a></p>
+        <p>Wenn du dies nicht angefordert hast, kannst du diese E-Mail ignorieren.</p>
         <p style="color:#666;font-size:12px">${escapeHtml(resetUrl)}</p>
       </body></html>`,
     }),
@@ -769,6 +787,19 @@ app.post("/auth-password-complete", async (request, reply) => {
         .code(400)
         .send({ error: "This password link is no longer valid" });
     }
+    const claimed = await client.query(
+      `update password_reset_tokens
+          set used_at = now()
+        where id = $1 and used_at is null and expires_at > now()
+      returning id`,
+      [reset.token_id],
+    );
+    if (!claimed.rowCount) {
+      await client.query("rollback");
+      return reply
+        .code(400)
+        .send({ error: "This password link is no longer valid" });
+    }
     await client.query(
       `update accounts
           set password_hash = $1, password_hash_scheme = 'scrypt_v1', updated_at = now()
@@ -778,10 +809,6 @@ app.post("/auth-password-complete", async (request, reply) => {
     await client.query(
       "update account_sessions set revoked_at = now() where account_id = $1 and revoked_at is null",
       [reset.account_id],
-    );
-    await client.query(
-      "update password_reset_tokens set used_at = now() where id = $1",
-      [reset.token_id],
     );
     await client.query("commit");
     return { ok: true };

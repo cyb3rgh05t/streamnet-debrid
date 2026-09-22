@@ -2032,6 +2032,144 @@ a.login-submit {
   margin-top: 24px;
 }
 
+.login-feedback-scrim {
+  z-index: 260;
+  background: rgba(0, 0, 0, 0.76);
+  backdrop-filter: blur(14px);
+  animation: login-feedback-fade-in 160ms ease both;
+}
+
+.login-feedback-dialog {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  width: min(520px, 100%);
+  padding: 24px 54px 24px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  background: #15171b;
+  box-shadow: 0 28px 90px rgba(0, 0, 0, 0.66);
+  animation: login-feedback-rise-in 220ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.login-feedback-dialog.is-success {
+  border-color: rgba(16, 185, 129, 0.42);
+}
+
+.login-feedback-dialog.is-error {
+  border-color: rgba(248, 113, 113, 0.42);
+}
+
+.login-feedback-icon {
+  display: grid;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+}
+
+.is-success .login-feedback-icon {
+  color: #34d399;
+  background: rgba(16, 185, 129, 0.14);
+}
+
+.is-error .login-feedback-icon {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.14);
+}
+
+.login-feedback-copy {
+  min-width: 0;
+}
+
+.login-feedback-copy h2 {
+  margin: 1px 0 7px;
+  color: #fff;
+  font-size: 18px;
+}
+
+.login-feedback-copy p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.login-feedback-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.58);
+  cursor: pointer;
+}
+
+.login-feedback-close:hover,
+.login-feedback-close:focus-visible {
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.login-config-note {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 20;
+  width: min(360px, calc(100vw - 48px));
+  padding: 12px 14px;
+  border: 1px solid rgba(248, 113, 113, 0.32);
+  border-radius: 10px;
+  background: rgba(127, 29, 29, 0.32);
+  color: #fecaca;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+@keyframes login-feedback-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes login-feedback-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (max-width: 560px) {
+  .login-feedback-scrim {
+    padding: 16px;
+  }
+
+  .login-feedback-dialog {
+    padding: 20px 48px 20px 16px;
+  }
+
+  .login-config-note {
+    right: 16px;
+    bottom: 16px;
+    width: calc(100vw - 32px);
+  }
+}
+
 /* ---- Empty addon onboarding dialog ---- */
 .no-addons-scrim {
   z-index: 240;

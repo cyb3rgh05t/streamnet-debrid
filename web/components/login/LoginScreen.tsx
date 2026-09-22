@@ -2,7 +2,14 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { ArrowLeft, KeyRound, Tv } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle,
+  KeyRound,
+  Tv,
+  X,
+} from "lucide-react";
 import { hasCloudBackendConfig } from "@/lib/config";
 import { useApp } from "@/lib/store";
 import { localize } from "@/lib/i18n";
@@ -28,9 +35,23 @@ export function LoginScreen() {
   const [mode, setMode] = useState<LoginMode>("sign-in");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [successTitle, setSuccessTitle] = useState<string | null>(null);
 
   const canGoBack = Boolean(auth && !cloudLoginRequired);
+  const feedback = error
+    ? { kind: "error" as const, message: error }
+    : success
+      ? { kind: "success" as const, message: success }
+      : null;
+
+  const closeFeedback = () => {
+    setError(null);
+    setErrorTitle(null);
+    setSuccess(null);
+    setSuccessTitle(null);
+  };
 
   useEffect(() => {
     setMounted(true);
@@ -53,10 +74,30 @@ export function LoginScreen() {
     event.preventDefault();
     setBusy(true);
     setError(null);
+    setErrorTitle(null);
     setSuccess(null);
+    setSuccessTitle(null);
     try {
       if (mode === "sign-in" || mode === "sign-up") {
-        await signIn(email, password, mode);
+        await signIn(email, password, mode, false);
+        setSuccessTitle(
+          localize(
+            settings.uiLanguage,
+            mode === "sign-up"
+              ? "Konto erfolgreich erstellt"
+              : "Erfolgreich angemeldet",
+            mode === "sign-up"
+              ? "Account created successfully"
+              : "Signed in successfully",
+          ),
+        );
+        setSuccess(
+          localize(
+            settings.uiLanguage,
+            "Dein StreamNet-Cloud-Konto ist bereit. Du kannst diese Seite jetzt schließen.",
+            "Your StreamNet Cloud account is ready. You can close this page now.",
+          ),
+        );
       } else if (mode === "recovery") {
         await jsonRequest("/api/cloud-auth/cloud-auth-reset", {
           method: "POST",
@@ -102,6 +143,21 @@ export function LoginScreen() {
         setTimeout(() => setMode("sign-in"), 3000);
       }
     } catch (cause) {
+      setErrorTitle(
+        localize(
+          settings.uiLanguage,
+          mode === "sign-up"
+            ? "Konto konnte nicht erstellt werden"
+            : mode === "sign-in"
+              ? "Anmeldung fehlgeschlagen"
+              : "Aktion fehlgeschlagen",
+          mode === "sign-up"
+            ? "Account could not be created"
+            : mode === "sign-in"
+              ? "Sign-in failed"
+              : "Operation failed",
+        ),
+      );
       setError(
         cause instanceof Error
           ? cause.message
@@ -209,16 +265,6 @@ export function LoginScreen() {
 
         <div className="login-card">
           <p className="login-card-title">{titleText()}</p>
-
-          {!cloudConfigured && (
-            <p className="login-error">
-              {localize(
-                settings.uiLanguage,
-                "StreamNet Cloud ist nicht konfiguriert. Prüfe die Backend-URL in der Web-Konfiguration.",
-                "StreamNet Cloud is not configured. Check the backend URL in the web configuration.",
-              )}
-            </p>
-          )}
 
           <form className="login-form" onSubmit={submit}>
             {mode === "tv-pair" && (
@@ -333,20 +379,6 @@ export function LoginScreen() {
                 }
                 required
               />
-            )}
-
-            {error && <p className="login-error">{error}</p>}
-            {success && (
-              <p
-                className="login-error"
-                style={{
-                  background: "rgba(16,185,129,0.15)",
-                  color: "#10b981",
-                  border: "1px solid rgba(16,185,129,0.3)",
-                }}
-              >
-                {success}
-              </p>
             )}
 
             <button
@@ -474,6 +506,65 @@ export function LoginScreen() {
           </form>
         </div>
       </div>
+      {!cloudConfigured && !feedback && (
+        <div className="login-config-note">
+          {localize(
+            settings.uiLanguage,
+            "StreamNet Cloud ist nicht konfiguriert. Prüfe die Backend-URL in der Web-Konfiguration.",
+            "StreamNet Cloud is not configured. Check the backend URL in the web configuration.",
+          )}
+        </div>
+      )}
+      {feedback && (
+        <div
+          className="modal-scrim login-feedback-scrim"
+          role="presentation"
+          onClick={closeFeedback}
+        >
+          <section
+            className={`login-feedback-dialog is-${feedback.kind}`}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="login-feedback-title"
+            aria-describedby="login-feedback-message"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="login-feedback-icon" aria-hidden="true">
+              {feedback.kind === "success" ? (
+                <CheckCircle size={24} />
+              ) : (
+                <AlertCircle size={24} />
+              )}
+            </div>
+            <div className="login-feedback-copy">
+              <h2 id="login-feedback-title">
+                {feedback.kind === "success"
+                  ? (successTitle ??
+                    localize(settings.uiLanguage, "Erfolgreich", "Success"))
+                  : (errorTitle ??
+                    localize(
+                      settings.uiLanguage,
+                      "Das hat nicht geklappt",
+                      "Something went wrong",
+                    ))}
+              </h2>
+              <p id="login-feedback-message">{feedback.message}</p>
+            </div>
+            <button
+              type="button"
+              className="login-feedback-close"
+              onClick={closeFeedback}
+              aria-label={localize(
+                settings.uiLanguage,
+                "Meldung schließen",
+                "Close message",
+              )}
+            >
+              <X size={20} />
+            </button>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

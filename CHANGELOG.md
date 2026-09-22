@@ -2,6 +2,22 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.041] - 2026-09-22
+
+### Authentifizierungsdialoge
+
+- Anmeldung und Kontoerstellung zeigen jetzt eigene Erfolgs- und Fehlerdialoge statt generischer Meldungen in der Login-Karte.
+- Erfolgreiche Authentifizierung weist darauf hin, dass die Cloud-Seite anschließend geschlossen werden kann.
+- Web-Version: `1.0.041`.
+
+## [Backend 1.0.015] - 2026-09-22
+
+### Passwort-Reset-Mail und Einmal-Token
+
+- Passwort-Reset-E-Mails enthalten jetzt eine englische und eine deutsche Version in HTML und Plaintext.
+- Reset-Tokens werden atomar als verwendet markiert und können auch bei parallelen Requests nur einmal erfolgreich eingelöst werden.
+- Backend-Version: `1.0.015`.
+
 ## [Web 1.0.040] - 2026-09-22
 
 ### Android-Katalogparität und Web-UI
