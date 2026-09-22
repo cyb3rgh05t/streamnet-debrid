@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.020] - 2026-09-22
+
+### Zentrierter Auth-Erfolgsdialog
+
+- Überschrift, Checkmark, Nachricht und Countdown im Erfolgsdialog sind mittig ausgerichtet.
+- Fehlerdialoge, Aktionsbuttons und Galerie bleiben unverändert.
+- Backend-Version: `1.0.020`.
+
 ## [Backend 1.0.019] - 2026-09-22
 
 ### Auth-Portal-Erfolgsdialog
