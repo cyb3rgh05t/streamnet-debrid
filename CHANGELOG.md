@@ -19,7 +19,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - Web verwendet dasselbe gepinnte Franchise-Cover wie Android.
 - Web-Version: `1.0.044`.
 
-## [Android 2.5.032] - 2026-09-22
+## [2.5.032] - 2026-09-22
 
 ### Fast-&-Furious-Franchise und Live-TV
 
