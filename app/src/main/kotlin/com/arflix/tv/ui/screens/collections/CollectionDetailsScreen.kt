@@ -954,6 +954,23 @@ private fun CollectionItemsGrid(
         }
 
         if (isLoading) {
+            item(
+                span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+                contentType = "loading_indicator"
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        color = loadingAccent,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
             val cardHeight = if (usePosterCards) cardWidth * 1.5f else cardWidth * 9f / 16f
             itemsIndexed((1..gridColumns * 3).toList(), contentType = { _, _ -> "skeleton" }) { _, _ ->
                 Box(

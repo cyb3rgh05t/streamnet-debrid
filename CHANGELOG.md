@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.034] - 2026-09-22
+
+### Fast-&-Furious-Franchise und Live-TV
+
+- Spinner bei Franchise laden, besser für User.
+- Live-TV-Recovery, lokalisierte Fehlermeldungen und Surface-Shutter beim Mini-/Fullscreen-Wechsel sind enthalten.
+- Android-Version: `2.5.034` / Code `435`.
+
 ## [2.5.033] - 2026-09-22
 
 ### Fast-&-Furious-Franchise und Live-TV
