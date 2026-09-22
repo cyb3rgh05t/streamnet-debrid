@@ -823,6 +823,10 @@
     <string name="settings_cloud_pull_restored_toast">Cloud pull complete</string>
     <string name="settings_cloud_pull_no_backup_toast">No cloud backup found</string>
     <string name="settings_cloud_pull_upload_error_default">Upload failed or timed out</string>
+    <string name="cloud_login_success">StreamNet Cloud login successful</string>
+    <string name="cloud_login_account_created">Account created and StreamNet Cloud login successful</string>
+    <string name="cloud_login_restored">StreamNet Cloud login successful; cloud data restored</string>
+    <string name="cloud_login_restore_failed">StreamNet Cloud login successful, but cloud restore failed</string>
     <string name="settings_go_to">Go to: %1$s</string>
     <string name="settings_cd_paste">Paste</string>
     <string name="settings_paste_from_clipboard">Paste from Clipboard</string>

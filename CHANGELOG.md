@@ -2,6 +2,18 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Android 2.5.030] - 2026-09-22
+
+### Cloud-Login, Continue Watching und Touch-UI
+
+- Cloud-Login-Fehler bleiben im Anmeldedialog sichtbar; erfolgreiche Anmeldungen stellen Cloud-Daten vor dem Profilwechsel wieder her.
+- Während Anmeldung und Cloud-Restore zeigt der Dialog einen sichtbaren Ladezustand und verhindert versehentliche Mehrfachaktionen.
+- Gemeinsame UI-Toasts verwenden einen einheitlichen Pill-Stil.
+- Continue Watching berücksichtigt Wiedergabe ab einer Sekunde und zeigt auch sehr kleine Fortschritte sichtbar an.
+- Continue-Watching-Labels im Touch-UI verwenden den aktiven Theme-Akzent.
+- Realtime-Continue-Watching übernimmt Cloud-Zeitstempel und verhindert sichtbare Rücksprünge auf ältere Fortschrittsstände bei mehreren Geräten.
+- Android-Version: `2.5.030` / Code `431`.
+
 ## [Web 1.0.041] - 2026-09-22
 
 ### Authentifizierungsdialoge

@@ -3052,6 +3052,7 @@ class SettingsViewModel @Inject constructor(
         password: String,
         createAccount: Boolean
     ) {
+        pendingProfileSwitchAfterCloudLogin = false
         val trimmedEmail = AuthEmailValidator.normalize(email)
         AuthEmailValidator.validate(trimmedEmail, rejectDisposable = createAccount)?.let { messageRes ->
             val message = context.getString(messageRes)
@@ -3073,32 +3074,58 @@ class SettingsViewModel @Inject constructor(
 
         if (usesDirectCloudAuth) {
             viewModelScope.launch {
-                _uiState.value = _uiState.value.copy(isCloudAuthWorking = true)
+                _uiState.value = _uiState.value.copy(
+                    isCloudAuthWorking = true,
+                    shouldSwitchProfile = false,
+                )
                 val result = if (createAccount) {
                     authRepository.signUp(trimmedEmail, password)
                 } else {
                     authRepository.signIn(trimmedEmail, password)
                 }
                 _uiState.value = if (result.isSuccess) {
+                    var restoreResult = withTimeoutOrNull(15_000L) {
+                        restoreCloudStateToLocalInternal(
+                            silent = true,
+                            pushPendingLocalFirst = false,
+                            forceApplyRemote = true,
+                        )
+                    } ?: CloudRestoreResult.FAILED
+                    if (restoreResult == CloudRestoreResult.FAILED) {
+                        delay(1_200L)
+                        restoreResult = withTimeoutOrNull(15_000L) {
+                            restoreCloudStateToLocalInternal(
+                                silent = true,
+                                pushPendingLocalFirst = false,
+                                forceApplyRemote = true,
+                            )
+                        } ?: CloudRestoreResult.FAILED
+                    }
                     _uiState.value.copy(
                         showCloudEmailPasswordDialog = false,
                         isCloudAuthWorking = false,
                         cloudEmailPasswordError = null,
                         shouldSwitchProfile = true,
-                        toastMessage = if (createAccount) {
-                            "Self-hosted account created"
-                        } else {
-                            "Signed in to self-hosted cloud"
+                        toastMessage = when {
+                            createAccount -> context.getString(R.string.cloud_login_account_created)
+                            restoreResult == CloudRestoreResult.RESTORED -> context.getString(R.string.cloud_login_restored)
+                            restoreResult == CloudRestoreResult.NO_BACKUP -> context.getString(R.string.cloud_login_success)
+                            else -> context.getString(R.string.cloud_login_restore_failed)
                         },
-                        toastType = ToastType.SUCCESS
+                        toastType = if (restoreResult == CloudRestoreResult.FAILED) ToastType.ERROR else ToastType.SUCCESS
                     )
                 } else {
+                    val errorMessage = result.exceptionOrNull()?.message
+                        ?: context.getString(R.string.auth_signin_failed)
+                    pendingProfileSwitchAfterCloudLogin = false
                     _uiState.value.copy(
+                        showCloudEmailPasswordDialog = true,
+                        showCloudPairDialog = false,
                         isCloudAuthWorking = false,
-                        cloudEmailPasswordError = result.exceptionOrNull()?.message
-                            ?: context.getString(R.string.auth_signin_failed),
-                        toastMessage = result.exceptionOrNull()?.message
-                            ?: context.getString(R.string.auth_signin_failed),
+                        shouldSwitchProfile = false,
+                        cloudAuthStatusMessage = null,
+                        cloudEmailPasswordError = errorMessage,
+                        toastMessage = errorMessage,
                         toastType = ToastType.ERROR
                     )
                 }
@@ -3111,7 +3138,13 @@ class SettingsViewModel @Inject constructor(
             val sessionReady = ensureCloudAuthSession(startPolling = false)
             if (sessionReady.isFailure) {
                 clearCloudAuthSession()
+                pendingProfileSwitchAfterCloudLogin = false
                 _uiState.value = _uiState.value.copy(
+                    showCloudEmailPasswordDialog = true,
+                    showCloudPairDialog = false,
+                    shouldSwitchProfile = false,
+                    cloudEmailPasswordError = sessionReady.exceptionOrNull()?.message
+                        ?: context.getString(R.string.cloud_signin_could_not_start),
                     toastMessage = sessionReady.exceptionOrNull()?.message ?: context.getString(R.string.cloud_signin_could_not_start),
                     toastType = ToastType.ERROR,
                     cloudAuthStatusMessage = null,
@@ -3123,7 +3156,12 @@ class SettingsViewModel @Inject constructor(
             val userCode = cloudUserCode
             if (userCode.isNullOrBlank()) {
                 clearCloudAuthSession()
+                pendingProfileSwitchAfterCloudLogin = false
                 _uiState.value = _uiState.value.copy(
+                    showCloudEmailPasswordDialog = true,
+                    showCloudPairDialog = false,
+                    shouldSwitchProfile = false,
+                    cloudEmailPasswordError = context.getString(R.string.cloud_signin_could_not_start),
                     toastMessage = context.getString(R.string.cloud_signin_could_not_start),
                     toastType = ToastType.ERROR,
                     cloudAuthStatusMessage = null,
@@ -3148,7 +3186,12 @@ class SettingsViewModel @Inject constructor(
                 )
                 startCloudPolling()
             }.onFailure { error ->
+                pendingProfileSwitchAfterCloudLogin = false
                 _uiState.value = _uiState.value.copy(
+                    showCloudEmailPasswordDialog = true,
+                    showCloudPairDialog = false,
+                    shouldSwitchProfile = false,
+                    cloudEmailPasswordError = error.message ?: context.getString(R.string.tv_link_failed),
                     toastMessage = error.message ?: context.getString(R.string.tv_link_failed),
                     toastType = ToastType.ERROR,
                     cloudAuthStatusMessage = null,
@@ -3235,9 +3278,9 @@ class SettingsViewModel @Inject constructor(
                                 cloudAuthStatusMessage = null,
                                 shouldSwitchProfile = true,
                                 toastMessage = when (restoreResult) {
-                                    CloudRestoreResult.RESTORED -> "Signed in and restored from cloud"
-                                    CloudRestoreResult.NO_BACKUP -> "Signed in successfully"
-                                    CloudRestoreResult.FAILED -> "Signed in, but cloud restore failed"
+                                    CloudRestoreResult.RESTORED -> context.getString(R.string.cloud_login_restored)
+                                    CloudRestoreResult.NO_BACKUP -> context.getString(R.string.cloud_login_success)
+                                    CloudRestoreResult.FAILED -> context.getString(R.string.cloud_login_restore_failed)
                                 },
                                 toastType = when (restoreResult) {
                                     CloudRestoreResult.FAILED -> ToastType.ERROR

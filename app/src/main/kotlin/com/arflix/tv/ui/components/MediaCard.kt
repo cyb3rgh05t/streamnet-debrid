@@ -562,7 +562,7 @@ fun MediaCard(
                             blurRadius = 4f
                         )
                     ),
-                    color = if (formatCardReleaseDate(item.releaseDate) != null) {
+                    color = if (showProgress || formatCardReleaseDate(item.releaseDate) != null) {
                         resolveAccentColor(ArvioSkin.colors.accent).copy(alpha = 0.95f)
                     } else {
                         ArvioSkin.colors.textMuted.copy(alpha = 0.85f)

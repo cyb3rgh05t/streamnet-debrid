@@ -54,7 +54,8 @@ class LoginViewModel @Inject constructor(
             return
         }
         if (password.isBlank()) {
-            _uiState.update { it.copy(error = context.getString(R.string.login_error_enter_password)) }
+            val message = context.getString(R.string.login_error_enter_password)
+            _uiState.update { it.copy(error = message) }
             return
         }
 
@@ -96,19 +97,22 @@ class LoginViewModel @Inject constructor(
             return
         }
         if (password.isBlank()) {
-            _uiState.update { it.copy(error = context.getString(R.string.login_error_enter_password)) }
+            val message = context.getString(R.string.login_error_enter_password)
+            _uiState.update { it.copy(error = message) }
             return
         }
 
         if (password.length < 6) {
-            _uiState.update { it.copy(error = context.getString(R.string.login_error_password_short)) }
+            val message = context.getString(R.string.login_error_password_short)
+            _uiState.update { it.copy(error = message) }
             return
         }
         val now = System.currentTimeMillis()
         val remainingCooldownMs = 60_000L - (now - lastSignUpAttemptMs)
         if (remainingCooldownMs > 0L) {
             val seconds = ((remainingCooldownMs + 999L) / 1000L).coerceAtLeast(1L)
-            _uiState.update { it.copy(error = context.getString(R.string.login_error_wait_seconds, seconds)) }
+            val message = context.getString(R.string.login_error_wait_seconds, seconds)
+            _uiState.update { it.copy(error = message) }
             return
         }
         lastSignUpAttemptMs = now
@@ -129,6 +133,10 @@ class LoginViewModel @Inject constructor(
 
     fun onLoginNavigationHandled() {
         _uiState.update { it.copy(loginReady = false) }
+    }
+
+    fun clearError() {
+        _uiState.update { it.copy(error = null) }
     }
 
 }

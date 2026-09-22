@@ -33,6 +33,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
@@ -44,7 +46,6 @@ import com.arflix.tv.data.repository.AuthState
 import com.arflix.tv.ui.components.*
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.*
-import com.arflix.tv.util.LocalDeviceType
 
 /**
  * Login Screen with Email/Password - Optimized for TV
@@ -70,7 +71,6 @@ fun LoginScreen(
     val privacyFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
     val context = LocalContext.current
-    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
 
     // Handle successful login
     LaunchedEffect(uiState.loginReady) {
@@ -319,14 +319,6 @@ fun LoginScreen(
 
                 Spacer(modifier = Modifier.height(28.dp))
 
-                if (!isTouchDevice && uiState.error != null) {
-                    LoginErrorBanner(
-                        message = uiState.error!!,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                }
-
                 // Email field
                 PremiumTextField(
                     value = email,
@@ -451,15 +443,67 @@ fun LoginScreen(
             }
         }
 
-        if (isTouchDevice && uiState.error != null) {
-            LoginErrorBanner(
+        if (uiState.error != null) {
+            LoginTouchErrorDialog(
                 message = uiState.error!!,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .windowInsetsPadding(WindowInsets.safeDrawing)
-                    .padding(horizontal = 20.dp, vertical = 16.dp)
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp)
+                accentColor = accentColor,
+                onDismiss = viewModel::clearError,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LoginTouchErrorDialog(
+    message: String,
+    accentColor: Color,
+    onDismiss: () -> Unit,
+) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true,
+            usePlatformDefaultWidth = false,
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .widthIn(max = 520.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(BackgroundCard.copy(alpha = 0.98f))
+                .border(1.dp, ErrorRed.copy(alpha = 0.72f), RoundedCornerShape(20.dp))
+                .padding(28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                text = "StreamNet Cloud",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = accentColor,
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Text(
+                text = stringResource(R.string.settings_cloud_signin_title),
+                fontSize = 22.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = TextPrimary,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = message,
+                fontSize = 15.sp,
+                color = TextSecondary,
+            )
+            Spacer(modifier = Modifier.height(22.dp))
+            GradientButton(
+                onClick = onDismiss,
+                text = stringResource(android.R.string.ok),
+                isPrimary = true,
+                isFocused = false,
+                enabled = true,
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

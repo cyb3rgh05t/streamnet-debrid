@@ -808,7 +808,7 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(uiState.shouldSwitchProfile) {
-        if (uiState.shouldSwitchProfile) {
+        if (uiState.shouldSwitchProfile && uiState.isLoggedIn) {
             viewModel.onCloudProfileSwitchHandled()
             onSwitchProfile()
         }
@@ -2689,6 +2689,7 @@ fun SettingsScreen(
                 onPasswordChange = { cloudDialogPassword = it },
                 onDismiss = { viewModel.closeCloudEmailPasswordDialog() },
                 errorMessage = uiState.cloudEmailPasswordError,
+                isWorking = uiState.isCloudAuthWorking,
                 onSignIn = { viewModel.completeCloudAuthWithEmailPassword(cloudDialogEmail, cloudDialogPassword, createAccount = false) },
                 onCreateAccount = { viewModel.completeCloudAuthWithEmailPassword(cloudDialogEmail, cloudDialogPassword, createAccount = true) },
                 onOpenPrivacy = { openExternalUrl(context, PRIVACY_POLICY_URL) }
@@ -3317,6 +3318,7 @@ private fun CloudEmailPasswordModal(
     onPasswordChange: (String) -> Unit,
     onDismiss: () -> Unit,
     errorMessage: String?,
+    isWorking: Boolean,
     onSignIn: () -> Unit,
     onCreateAccount: () -> Unit,
     onOpenPrivacy: () -> Unit
@@ -3338,8 +3340,8 @@ private fun CloudEmailPasswordModal(
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
         properties = androidx.compose.ui.window.DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
+            dismissOnBackPress = !isWorking,
+            dismissOnClickOutside = false,
             usePlatformDefaultWidth = false
         )
     ) {
@@ -3355,7 +3357,7 @@ private fun CloudEmailPasswordModal(
                         if (event.type == KeyEventType.KeyDown) {
                             when (event.key) {
                                 Key.Back, Key.Escape -> {
-                                    onDismiss()
+                                    if (!isWorking) onDismiss()
                                     true
                                 }
                                 Key.DirectionUp -> {
@@ -3393,6 +3395,7 @@ private fun CloudEmailPasswordModal(
                                     true
                                 }
                                 Key.Enter, Key.DirectionCenter -> {
+                                    if (isWorking) return@onPreviewKeyEvent true
                                     when (focusedIndex) {
                                         2 -> { onDismiss(); true }
                                         3 -> { onSignIn(); true }
@@ -3424,6 +3427,7 @@ private fun CloudEmailPasswordModal(
                     androidx.compose.material3.TextField(
                         value = email,
                         onValueChange = onEmailChange,
+                        enabled = !isWorking,
                         singleLine = true,
                         textStyle = ArflixTypography.body.copy(color = TextPrimary),
                         colors = androidx.compose.material3.TextFieldDefaults.colors(
@@ -3458,6 +3462,7 @@ private fun CloudEmailPasswordModal(
                     androidx.compose.material3.TextField(
                         value = password,
                         onValueChange = onPasswordChange,
+                        enabled = !isWorking,
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
                         textStyle = ArflixTypography.body.copy(color = TextPrimary),
@@ -3507,7 +3512,7 @@ private fun CloudEmailPasswordModal(
                             .background(
                                 color = if (isCancelFocused) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f)
                             )
-                            .clickable { onDismiss() }
+                            .clickable(enabled = !isWorking) { onDismiss() }
                             .border(
                                 width = if (isCancelFocused) 2.dp else 0.dp,
                                 color = if (isCancelFocused) accentColor else Color.Transparent,
@@ -3531,7 +3536,7 @@ private fun CloudEmailPasswordModal(
                             .background(
                                 color = if (isSignInFocused) accentColor else accentColor.copy(alpha = 0.56f)
                             )
-                            .clickable { onSignIn() }
+                            .clickable(enabled = !isWorking) { onSignIn() }
                             .border(
                                 width = if (isSignInFocused) 2.dp else 0.dp,
                                 color = if (isSignInFocused) accentColor.copy(alpha = 0.7f) else Color.Transparent,
@@ -3555,7 +3560,7 @@ private fun CloudEmailPasswordModal(
                             .background(
                                 color = if (isCreateFocused) accentColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f)
                             )
-                            .clickable { onCreateAccount() }
+                            .clickable(enabled = !isWorking) { onCreateAccount() }
                             .border(
                                 width = if (isCreateFocused) 2.dp else 1.dp,
                                 color = if (isCreateFocused) accentColor else Color.White.copy(alpha = 0.16f),
@@ -3573,6 +3578,28 @@ private fun CloudEmailPasswordModal(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
+                if (isWorking) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        androidx.compose.material3.CircularProgressIndicator(
+                            modifier = Modifier.size(22.dp),
+                            color = accentColor,
+                            strokeWidth = 2.5.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = stringResource(R.string.settings_cloud_pair_loading_data),
+                            style = ArflixTypography.caption,
+                            color = accentColor
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 Text(
                     text = stringResource(R.string.login_privacy_notice),
                     style = ArflixTypography.caption,

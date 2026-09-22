@@ -94,12 +94,12 @@ fun AppNotificationSurface(
     content: @Composable RowScope.() -> Unit,
 ) {
     val themeAccent = resolveAccentColor(fallback = AccentYellow)
-    val notificationShape = RoundedCornerShape(8.dp)
+    val notificationShape = RoundedCornerShape(100.dp)
     Row(
         modifier = modifier
             .widthIn(max = 560.dp)
             .wrapContentWidth()
-            .heightIn(min = 58.dp)
+            .heightIn(min = 56.dp)
             .shadow(
                 elevation = 18.dp,
                 shape = notificationShape,

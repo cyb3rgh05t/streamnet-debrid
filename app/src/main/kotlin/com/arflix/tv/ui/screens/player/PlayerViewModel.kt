@@ -4029,6 +4029,8 @@ class PlayerViewModel @Inject constructor(
 
         // Guard against replaying a bad source from failed startup attempts at 00:00.
         // Only trust persisted stream affinity when we have meaningful progress.
+        // Continue Watching itself may still appear after one second; keep the
+        // longer source-affinity guard to avoid locking onto failed stream starts.
         val hasMeaningfulProgress = finalPositionMs >= 30_000L
 
         return ResumeData(

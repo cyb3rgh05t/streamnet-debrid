@@ -504,12 +504,10 @@ class AuthRepository @Inject constructor(
         val normalizedEmail = AuthEmailValidator.normalize(email)
         AuthEmailValidator.validate(normalizedEmail, rejectDisposable = false)?.let { messageRes ->
             val message = context.getString(messageRes)
-            _authState.value = AuthState.Error(message)
             return Result.failure(Exception(message))
         }
         return try {
             AppLogger.breadcrumb("Auth", "email_sign_in_start")
-            _authState.value = AuthState.Loading
 
             if (Constants.CLOUD_SYNC_ENABLED) {
                 val tokens = signInCloudAccountSession(normalizedEmail, password)
@@ -521,13 +519,11 @@ class AuthRepository @Inject constructor(
             }
 
             val message = context.getString(R.string.auth_signin_failed)
-            _authState.value = AuthState.Error(message)
             Result.failure(Exception(message))
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
 
             val message = safeErrorMessage(e, context.getString(R.string.auth_signin_failed))
-            _authState.value = AuthState.Error(message)
             AppLogger.breadcrumb("Auth", "email_sign_in_failed ${e::class.java.simpleName}", severity = "warning")
             Result.failure(Exception(message))
         }
@@ -540,12 +536,10 @@ class AuthRepository @Inject constructor(
         val normalizedEmail = AuthEmailValidator.normalize(email)
         AuthEmailValidator.validate(normalizedEmail)?.let { messageRes ->
             val message = context.getString(messageRes)
-            _authState.value = AuthState.Error(message)
             return Result.failure(Exception(message))
         }
         return try {
             AppLogger.breadcrumb("Auth", "email_sign_up_start")
-            _authState.value = AuthState.Loading
 
             val tokens = createCloudAccountSession(normalizedEmail, password)
             signInWithSessionTokens(tokens.accessToken, tokens.refreshToken).also {
@@ -557,7 +551,6 @@ class AuthRepository @Inject constructor(
             if (e is kotlinx.coroutines.CancellationException) throw e
 
             val message = safeErrorMessage(e, context.getString(R.string.auth_signup_failed))
-            _authState.value = AuthState.Error(message)
             AppLogger.recordException(
                 throwable = e,
                 context = mapOf(

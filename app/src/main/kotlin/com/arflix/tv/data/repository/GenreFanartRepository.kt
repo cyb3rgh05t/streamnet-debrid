@@ -93,7 +93,7 @@ class GenreFanartRepository @Inject constructor(
         val fresh = runCatching {
             okHttpClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return@use emptyList()
-                val body = response.body.string()
+                val body = response.body?.string() ?: return@use emptyList()
                 parseEntries(body).also { entries ->
                     if (entries.isNotEmpty()) {
                         cachePreferences.edit()

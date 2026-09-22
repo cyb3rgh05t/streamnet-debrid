@@ -2469,7 +2469,11 @@ class HomeViewModel @Inject constructor(
                                 if (match != null) {
                                     val storedProgress = (match.progress * 100f).toInt()
                                     val derivedProgress = if (storedProgress <= 0 && match.duration_seconds > 0 && match.position_seconds > 0) {
-                                        ((match.position_seconds.toFloat() / match.duration_seconds.toFloat()) * 100f).toInt()
+                                        ((match.position_seconds.toFloat() / match.duration_seconds.toFloat()) * 100f)
+                                            .toInt()
+                                            .coerceAtLeast(1)
+                                    } else if (storedProgress <= 0 && match.position_seconds > 0) {
+                                        1
                                     } else {
                                         storedProgress
                                     }
@@ -4530,10 +4534,29 @@ class HomeViewModel @Inject constructor(
                         persistContinueWatchingCache(resolvedContinueWatching)
                     }
                     val mergedContinueWatching = mergeContinueWatchingResumeData(resolvedContinueWatching)
+                    val visibleContinueWatching = _uiState.value.categories
+                        .firstOrNull { it.id == "continue_watching" }
+                        ?.items
+                        .orEmpty()
+                        .associateBy { item ->
+                            val episode = item.nextEpisode
+                            "${item.mediaType}:${item.id}:${episode?.seasonNumber ?: -1}:${episode?.episodeNumber ?: -1}"
+                        }
+                    val categoryItems = mergedContinueWatching.map { item ->
+                        val mediaItem = item.toMediaItem(context)
+                        val episode = mediaItem.nextEpisode
+                        val key = "${mediaItem.mediaType}:${mediaItem.id}:${episode?.seasonNumber ?: -1}:${episode?.episodeNumber ?: -1}"
+                        val visibleItem = visibleContinueWatching[key]
+                        if (visibleItem != null && visibleItem.progress > mediaItem.progress) {
+                            visibleItem
+                        } else {
+                            mediaItem
+                        }
+                    }
                     val continueWatchingCategory = Category(
                         id = "continue_watching",
                         title = "Continue Watching",
-                        items = mergedContinueWatching.map { it.toMediaItem(context) }
+                        items = categoryItems
                     )
                     continueWatchingCategory.items.forEach { mediaRepository.cacheItem(it) }
                     lastContinueWatchingItems = continueWatchingCategory.items
@@ -4638,7 +4661,8 @@ class HomeViewModel @Inject constructor(
                     episode = entry.episode,
                     episodeTitle = entry.episode_title,
                     backdropPath = entry.backdrop_path,
-                    posterPath = entry.poster_path
+                    posterPath = entry.poster_path,
+                    updatedAtMs = parseContinueWatchingUpdatedAt(entry.updated_at, entry.paused_at)
                 )
             }
             mapped

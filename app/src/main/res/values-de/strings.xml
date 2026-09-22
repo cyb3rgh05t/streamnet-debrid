@@ -1547,6 +1547,10 @@
     <string name="settings_cloud_pull_restored_toast">Cloud-Daten geladen</string>
     <string name="settings_cloud_pull_no_backup_toast">Keine Cloud-Sicherung gefunden</string>
     <string name="settings_cloud_pull_upload_error_default">Upload fehlgeschlagen oder Zeitüberschreitung</string>
+    <string name="cloud_login_success">StreamNet Cloud erfolgreich angemeldet</string>
+    <string name="cloud_login_account_created">Konto erstellt und StreamNet Cloud erfolgreich angemeldet</string>
+    <string name="cloud_login_restored">StreamNet Cloud erfolgreich angemeldet; Cloud-Daten wiederhergestellt</string>
+    <string name="cloud_login_restore_failed">StreamNet Cloud erfolgreich angemeldet, aber Cloud-Wiederherstellung fehlgeschlagen</string>
     <string name="login_privacy_notice">Beim Erstellen eines Kontos werden deine E-Mail-Adresse und die Cloud-Daten gespeichert, die du synchronisieren möchtest.</string>
     <string name="login_read_privacy_policy">Datenschutzerklärung lesen</string>
     <string name="settings_connected_as">Verbunden als %1$s</string>

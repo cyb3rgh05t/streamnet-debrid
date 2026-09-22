@@ -79,9 +79,8 @@ object Constants {
     // Progress thresholds.
     const val WATCHED_THRESHOLD = 90
     const val MIN_PROGRESS_THRESHOLD = 1
-    // A saved resume position at/above this counts as a real session even when
-    // the rounded percentage still reads 0% (long content, a few seconds in).
-    const val MEANINGFUL_POSITION_SECONDS = 5L
+    // Any playback beyond the first second is enough to show Continue Watching.
+    const val MEANINGFUL_POSITION_SECONDS = 1L
     // Minimum visible progress-bar width (%) once a real session is meaningful,
     // so a sub-1% resume still renders as a thin sliver instead of an empty bar.
     const val MIN_VISIBLE_PROGRESS_PERCENT = 2
