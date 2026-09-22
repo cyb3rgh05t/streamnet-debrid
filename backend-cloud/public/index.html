@@ -390,10 +390,36 @@
         line-height: 1.55;
       }
       .feedback-card.is-success h2 {
-        color: var(--accent-1);
+        color: var(--text);
       }
       .feedback-card.is-error h2 {
         color: var(--danger);
+      }
+      .feedback-icon {
+        display: none;
+        width: 46px;
+        height: 46px;
+        margin: 4px 0 14px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        border: 2px solid var(--accent-1);
+        color: var(--accent-1);
+      }
+      .feedback-card.is-success .feedback-icon {
+        display: flex;
+      }
+      .feedback-icon svg {
+        width: 24px;
+        height: 24px;
+      }
+      .feedback-countdown[hidden] {
+        display: none;
+      }
+      .feedback-countdown {
+        margin: 14px 0 0;
+        font-size: 14px;
+        color: var(--muted);
       }
       .feedback-links {
         display: grid;
@@ -955,7 +981,20 @@
               aria-describedby="feedbackMessage"
             >
               <h2 id="feedbackTitle"></h2>
+              <div class="feedback-icon" id="feedbackIcon" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2.5"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
               <p id="feedbackMessage"></p>
+              <p class="feedback-countdown" id="feedbackCountdown" hidden></p>
               <div class="feedback-links" id="feedbackLinks" hidden>
                 <a
                   class="feedback-link"
@@ -1036,6 +1075,7 @@
       const feedbackMessage = document.getElementById("feedbackMessage");
       const feedbackLinks = document.getElementById("feedbackLinks");
       const feedbackGallery = document.getElementById("feedbackGallery");
+      const feedbackCountdown = document.getElementById("feedbackCountdown");
       const webPlayerLink = document.getElementById("webPlayerLink");
       const androidAppLink = document.getElementById("androidAppLink");
       const langEnBtn = document.getElementById("langEn");
@@ -1172,6 +1212,7 @@
             tvPairingErrorTitle: "TV pairing failed",
             webPlayerLink: "Open web player",
             androidAppLink: "Download Android app",
+            redirectingIn: "Opening web player in {seconds}s...",
           },
           errors: {
             emailRequired: "Email is required.",
@@ -1324,6 +1365,7 @@
             tvPairingErrorTitle: "TV-Kopplung fehlgeschlagen",
             webPlayerLink: "Webplayer öffnen",
             androidAppLink: "Android-App herunterladen",
+            redirectingIn: "Webplayer öffnet in {seconds}s...",
           },
           errors: {
             emailRequired: "E-Mail ist erforderlich.",
@@ -1464,9 +1506,32 @@
         feedbackCard.className = `feedback-card is-${type}`;
         feedbackLinks.hidden = !showProductLinks;
         feedbackGallery.hidden = !showProductLinks;
+        feedbackCountdown.hidden = true;
+        feedbackCountdown.textContent = "";
         webPlayerLink.textContent = t("feedback.webPlayerLink");
         androidAppLink.textContent = t("feedback.androidAppLink");
         feedbackDialog.hidden = false;
+      }
+
+      // Visible countdown before the automatic redirect to the web player.
+      function startRedirectCountdown(seconds, targetUrl) {
+        let remaining = seconds;
+        feedbackCountdown.hidden = false;
+        const render = () => {
+          feedbackCountdown.textContent = t("feedback.redirectingIn", {
+            seconds: remaining,
+          });
+        };
+        render();
+        const timer = setInterval(() => {
+          remaining -= 1;
+          if (remaining <= 0) {
+            clearInterval(timer);
+            window.location.href = targetUrl;
+            return;
+          }
+          render();
+        }, 1000);
       }
 
       function setBusy(on) {
@@ -1837,9 +1902,13 @@
               : t("status.signedInRedirecting"),
             "ok",
           );
-          setTimeout(() => {
-            window.location.href = redirectUri;
-          }, 5000);
+          if (pairCode) {
+            setTimeout(() => {
+              window.location.href = redirectUri;
+            }, 5000);
+          } else {
+            startRedirectCountdown(5, redirectUri);
+          }
         } catch (err) {
           const message = err.message || String(err);
           showFeedback(
@@ -1897,9 +1966,13 @@
               : t("status.createdRedirecting"),
             "ok",
           );
-          setTimeout(() => {
-            window.location.href = redirectUri;
-          }, 5000);
+          if (pairCode) {
+            setTimeout(() => {
+              window.location.href = redirectUri;
+            }, 5000);
+          } else {
+            startRedirectCountdown(5, redirectUri);
+          }
         } catch (err) {
           const msg = err.message || String(err);
           if (

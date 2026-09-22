@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.019] - 2026-09-22
+
+### Auth-Portal-Erfolgsdialog
+
+- Der Titel „Erfolgreich angemeldet“ nutzt jetzt eine neutrale Textfarbe statt der goldenen Akzentfarbe.
+- Unter dem Titel erscheint im Erfolgsfall ein Checkmark-Icon.
+- Vor dem automatischen Öffnen des Webplayers läuft ein sichtbarer 5-Sekunden-Countdown (DE/EN) anstelle der bisherigen festen Verzögerung.
+- Die TV-Kopplung bleibt unverändert ohne Countdown, da dort keine Produktlinks angezeigt werden.
+- Backend-Version: `1.0.019`.
+
 ## [Web 1.0.046] - 2026-09-22
 
 ### Franchise-Parität mit Android
