@@ -2,14 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle,
-  KeyRound,
-  Tv,
-  X,
-} from "lucide-react";
+import { AlertCircle, CheckCircle, KeyRound, Tv, X } from "lucide-react";
 import { hasCloudBackendConfig } from "@/lib/config";
 import { useApp } from "@/lib/store";
 import { localize } from "@/lib/i18n";
@@ -39,7 +32,6 @@ export function LoginScreen() {
   const [success, setSuccess] = useState<string | null>(null);
   const [successTitle, setSuccessTitle] = useState<string | null>(null);
 
-  const canGoBack = Boolean(auth && !cloudLoginRequired);
   const feedback = error
     ? { kind: "error" as const, message: error }
     : success
@@ -70,6 +62,10 @@ export function LoginScreen() {
     }
   }, []);
 
+  useEffect(() => {
+    if (auth && !cloudLoginRequired) backToProfiles();
+  }, [auth, cloudLoginRequired, backToProfiles]);
+
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setBusy(true);
@@ -79,7 +75,7 @@ export function LoginScreen() {
     setSuccessTitle(null);
     try {
       if (mode === "sign-in" || mode === "sign-up") {
-        await signIn(email, password, mode, false);
+        await signIn(email, password, mode, true);
       } else if (mode === "recovery") {
         await jsonRequest("/api/cloud-auth/cloud-auth-reset", {
           method: "POST",
@@ -190,17 +186,6 @@ export function LoginScreen() {
 
   return (
     <main className="login-shell">
-      {canGoBack && (
-        <button
-          type="button"
-          className="login-back"
-          onClick={backToProfiles}
-          aria-label={localize(settings.uiLanguage, "Zurück", "Back")}
-        >
-          <ArrowLeft size={20} />{" "}
-          {localize(settings.uiLanguage, "Zurück", "Back")}
-        </button>
-      )}
       <div className="login-hero">
         <div className="login-copy">
           <div className="login-brand-lockup">
@@ -365,7 +350,7 @@ export function LoginScreen() {
 
             <button
               type="submit"
-              className="primary login-submit"
+              className={`primary login-submit${busy ? " is-busy" : ""}`}
               disabled={busy}
             >
               {busy

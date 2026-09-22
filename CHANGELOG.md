@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.043] - 2026-09-22
+
+### Login- und Profilnavigation
+
+- Authentifizierte Webplayer-Sessions wechseln zuverlässig zur Profilauswahl, auch wenn die Login-Ansicht nach einer Abmeldung noch aktiv war.
+- Der Zurück-Button erscheint nicht mehr auf dem Login-Screen, wenn bereits eine gültige Session besteht.
+- Login-Aktionen zeigen während der Anfrage einen Spinner und sind gegen Mehrfachklicks gesperrt.
+- Web-Version: `1.0.043`.
+
 ## [Backend 1.0.016] - 2026-09-22
 
 ### Auth-Portal-Release

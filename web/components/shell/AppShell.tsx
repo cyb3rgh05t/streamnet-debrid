@@ -21,8 +21,16 @@ import { Toast } from "./Toast";
 import { TopNav } from "./TopNav";
 
 export function AppShell() {
-  const { view, section, settings, selected, activeStream, activeChannel } =
-    useApp();
+  const {
+    view,
+    section,
+    settings,
+    selected,
+    activeStream,
+    activeChannel,
+    auth,
+    cloudLoginRequired,
+  } = useApp();
   const [mounted, setMounted] = useState(false);
   const [homeResetKey, setHomeResetKey] = useState(0);
 
@@ -76,7 +84,10 @@ export function AppShell() {
     );
   }
 
-  if (view === "login") return <LoginScreen />;
+  if (view === "login") {
+    if (auth && !cloudLoginRequired) return <ProfileSelectionScreen />;
+    return <LoginScreen />;
+  }
   if (view === "profiles") return <ProfileSelectionScreen />;
 
   const accent = accentColor(settings.accentColor);

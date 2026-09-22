@@ -1884,6 +1884,26 @@ input:focus {
 .login-submit {
   width: 100%;
 }
+.login-submit.is-busy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.login-submit.is-busy::before {
+  content: "";
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: login-button-spin 0.7s linear infinite;
+}
+@keyframes login-button-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 /* Sign-up variant: the submit is an <a> to the auth site. Keep it identical to
    the .primary button and centre its label. */
 a.login-submit {
