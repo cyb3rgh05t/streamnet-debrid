@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.033] - 2026-09-22
+
+### Fast-&-Furious-Franchise und Live-TV
+
+- Fast & Furious ist in der bestehenden Franchise-Rail verfügbar und nutzt die TMDB-Collection `9485`.
+- Android und Web verwenden denselben gepinnten Franchise-Asset-Commit.
+- Live-TV-Recovery, lokalisierte Fehlermeldungen und Surface-Shutter beim Mini-/Fullscreen-Wechsel sind enthalten.
+- Android-Version: `2.5.033` / Code `434`.
+
 ## [Web 1.0.045] - 2026-09-22
 
 ### Chronologische Franchise-Reihenfolge
