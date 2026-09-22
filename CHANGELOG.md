@@ -2,6 +2,17 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.046] - 2026-09-22
+
+### Franchise-Parität mit Android
+
+- Web-Franchises verwenden jetzt die Android-kuratierten Reihenfolgen für Marvel, DC Universe und Star Wars.
+- Kuratierte Quellen werden nicht mehr durch die chronologische Release-Sortierung überschrieben.
+- Android-Legacy-Fallbacks für MDBList werden im Web über die öffentlichen MDBList-JSON-Listen geladen statt als Addon-Kataloge.
+- Fehlende TMDB-/MDBList-Fallbacks für bestehende Franchises wurden ergänzt; leere Franchise-Rails bleiben sichtbar.
+- Doppelte Home-Rail-Keys sowie der zugehörige Runtime-Fehler in `HomeScreen` wurden behoben.
+- Web-Version: `1.0.046`.
+
 ## [2.5.034] - 2026-09-22
 
 ### Fast-&-Furious-Franchise und Live-TV

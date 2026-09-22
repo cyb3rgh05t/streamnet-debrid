@@ -537,7 +537,13 @@ async function loadCollectionCatalog(
     ),
   );
   const items = dedupeItems(batches.flat());
-  if (String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE") {
+  const hasCuratedSource = sources.some(
+    (source) => String(source.kind ?? "").toUpperCase() === "CURATED_IDS",
+  );
+  if (
+    String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE" &&
+    !hasCuratedSource
+  ) {
     return items.sort((left, right) =>
       (left.releaseDate ?? "9999-99-99").localeCompare(
         right.releaseDate ?? "9999-99-99",

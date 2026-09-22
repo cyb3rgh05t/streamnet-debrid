@@ -136,6 +136,125 @@ function mdblistAddonSource(
   return addonSource("aio-metadata", addonCatalogType, addonCatalogId);
 }
 
+function mdblistPublicSource(mdblistSlug: string) {
+  return { kind: "MDBLIST_PUBLIC", mdblistSlug };
+}
+
+function curatedSource(...curatedRefs: string[]) {
+  return { kind: "CURATED_IDS", curatedRefs };
+}
+
+const marvelCuratedRefs = [
+  "movie:1726",
+  "movie:1724",
+  "movie:10138",
+  "movie:10195",
+  "movie:1771",
+  "movie:24428",
+  "movie:68721",
+  "movie:76338",
+  "movie:100402",
+  "movie:118340",
+  "movie:99861",
+  "movie:102899",
+  "movie:271110",
+  "movie:284052",
+  "movie:283995",
+  "movie:315635",
+  "movie:284053",
+  "movie:284054",
+  "movie:299536",
+  "movie:363088",
+  "movie:299537",
+  "movie:299534",
+  "movie:429617",
+  "tv:85271",
+  "tv:88396",
+  "tv:84958",
+  "movie:497698",
+  "tv:92749",
+  "movie:566525",
+  "tv:88329",
+  "movie:524434",
+  "movie:634649",
+  "tv:92782",
+  "movie:453395",
+  "tv:92783",
+  "movie:616037",
+  "tv:92785",
+  "movie:505642",
+  "movie:640146",
+  "tv:114472",
+  "movie:447365",
+  "movie:609681",
+  "tv:138501",
+  "movie:533535",
+  "tv:202412",
+  "tv:202555",
+  "movie:822119",
+  "movie:986056",
+  "tv:114471",
+  "movie:617126",
+];
+
+const dcCuratedRefs = [
+  "movie:49521",
+  "movie:209112",
+  "movie:297761",
+  "movie:297762",
+  "movie:141052",
+  "movie:297802",
+  "movie:287947",
+  "movie:495764",
+  "movie:464052",
+  "movie:791373",
+  "movie:436270",
+  "movie:594767",
+  "movie:298618",
+  "movie:565770",
+  "movie:572802",
+  "movie:414906",
+  "movie:475557",
+  "movie:698687",
+  "movie:1287536",
+  "tv:1435",
+  "tv:62688",
+  "tv:1412",
+  "tv:60735",
+  "tv:62286",
+  "tv:105248",
+  "tv:116244",
+];
+
+const starWarsCuratedRefs = [
+  "movie:1893",
+  "movie:1894",
+  "movie:12180",
+  "tv:4194",
+  "movie:1895",
+  "tv:105971",
+  "tv:60554",
+  "movie:348350",
+  "tv:83867",
+  "tv:92830",
+  "movie:330459",
+  "movie:11",
+  "movie:1891",
+  "movie:1892",
+  "tv:82856",
+  "tv:115036",
+  "tv:114461",
+  "tv:202879",
+  "tv:203085",
+  "tv:251091",
+  "movie:140607",
+  "movie:181808",
+  "movie:181812",
+  "tv:114479",
+  "tv:79093",
+  "tv:114410",
+];
+
 const androidAssetBase =
   "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/9cc3dde7f7960c9256f0d81a761aa3ccbad4b976/";
 const franchiseAssetBase =
@@ -427,29 +546,46 @@ const androidCollectionDefaults: CatalogConfig[] = [
   ].map((title) => {
     const sources = {
       Marvel: [
+        curatedSource(...marvelCuratedRefs),
         addonSource(
           "com.joaogonp.marveladdon.custom.marvel-mcu",
           "Marvel",
           "marvel-mcu",
         ),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 86311 },
+        mdblistPublicSource("lt3dave/marvel-cinematic-universe-mcu-collection"),
+        mdblistPublicSource("at0microuton/mcu-tv-shows"),
       ],
       "DC Universe": [
+        curatedSource(...dcCuratedRefs),
         addonSource(
           "com.tapframe.dcaddon.custom.dc-chronological",
           "DC",
           "dc-chronological",
         ),
+        mdblistPublicSource("kingkearney/dc-universe"),
+        mdblistPublicSource("kraftynic/dc-tv-shows1"),
       ],
       "Star Wars": [
+        curatedSource(...starWarsCuratedRefs),
         addonSource(
           "com.starwars.addon.custom.sw-movies-series-chronological",
           "StarWars",
           "sw-movies-series-chronological",
         ),
+        mdblistPublicSource("jxduffy/star-wars-chronological-order"),
       ],
-      "James Bond": [mdblistAddonSource("movie", "mdblist.7947")],
+      "James Bond": [
+        mdblistAddonSource("movie", "mdblist.7947"),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 645 },
+      ],
       "Fast & Furious": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 9485 }],
-      "Harry Potter": [mdblistAddonSource("movie", "mdblist.102972")],
+      "Harry Potter": [
+        mdblistAddonSource("movie", "mdblist.102972"),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 1241 },
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 435259 },
+        mdblistPublicSource("thebirdod/harry-potter-collection"),
+      ],
       "Alien vs Predator": [
         mdblistAddonSource("all", "mdblist.101434"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 8091 },
@@ -464,13 +600,36 @@ const androidCollectionDefaults: CatalogConfig[] = [
         mdblistAddonSource("all", "mdblist.125458"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 528 },
       ],
-      "Mission Impossible": [mdblistAddonSource("movie", "mdblist.42716")],
-      "Jurassic Park": [mdblistAddonSource("all", "mdblist.120197")],
+      "Mission Impossible": [
+        mdblistAddonSource("movie", "mdblist.42716"),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 87359 },
+      ],
+      "Jurassic Park": [
+        mdblistAddonSource("all", "mdblist.120197"),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 328 },
+      ],
       "The Matrix": [
         mdblistAddonSource("movie", "mdblist.125142"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 2344 },
       ],
-      "Lord of the Rings": [mdblistAddonSource("movie", "mdblist.94304")],
+      "Lord of the Rings": [
+        mdblistAddonSource("movie", "mdblist.94304"),
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 119 },
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 121938 },
+      ],
+      "X-Men": [
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 748 },
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 453993 },
+        { kind: "TMDB_COLLECTION", tmdbCollectionId: 556 },
+        mdblistPublicSource("jxduffy/x-men-chronological-order"),
+      ],
+      "Hunger Games": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 131635 }],
+      Avatar: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 87096 }],
+      Dune: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 726871 }],
+      "Indiana Jones": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 84 }],
+      "The Godfather": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 230 }],
+      "John Wick": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 404609 }],
+      Transformers: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 8650 }],
     }[title];
     return collectionDefault(title, "FRANCHISE", sources);
   }),

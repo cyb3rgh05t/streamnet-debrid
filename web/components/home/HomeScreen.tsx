@@ -299,7 +299,20 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               ),
       })),
     ];
-    return entries.sort((left, right) => left.rank - right.rank);
+    const seenRailIds = new Set<string>();
+    return entries
+      .sort((left, right) => left.rank - right.rank)
+      .filter((entry) => {
+        const railId =
+          entry.kind === "category" || entry.kind === "server"
+            ? entry.category.id
+            : entry.entry.type === "catalog"
+              ? entry.entry.catalog.id
+              : `group-${entry.entry.group}`;
+        if (seenRailIds.has(railId)) return false;
+        seenRailIds.add(railId);
+        return true;
+      });
   }, [
     dedupedCategories,
     homeCatalogEntries,

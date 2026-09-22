@@ -121,7 +121,20 @@ export function LazyRail({
       />
     );
   }
-  if (done) return null;
+  if (done) {
+    return (
+      <section ref={ref} className="rail rail-empty">
+        <div className="rail-head">
+          <h3>{localizedCatalogName(catalog, settings.uiLanguage)}</h3>
+        </div>
+        <div className="rail-empty-state">
+          {settings.uiLanguage === "de"
+            ? "Keine Inhalte verfügbar"
+            : "No content available"}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section
