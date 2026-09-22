@@ -353,6 +353,42 @@
         color: var(--ok);
       }
 
+      .feedback-dialog[hidden] {
+        display: none;
+      }
+      .feedback-dialog {
+        position: fixed;
+        inset: 0;
+        z-index: 20;
+        display: grid;
+        place-items: center;
+        padding: 20px;
+        background: rgba(5, 7, 12, 0.72);
+      }
+      .feedback-card {
+        width: min(100%, 440px);
+        padding: 26px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-radius: 16px;
+        background: #171b24;
+        box-shadow: 0 24px 70px rgba(0, 0, 0, 0.4);
+      }
+      .feedback-card h2 {
+        margin: 0 0 10px;
+        font-size: 22px;
+      }
+      .feedback-card p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .feedback-card.is-success h2 {
+        color: var(--ok);
+      }
+      .feedback-card.is-error h2 {
+        color: var(--danger);
+      }
+
       .label {
         display: block;
         font-size: 12px;
@@ -836,6 +872,19 @@
               </div>
             </section>
           </div>
+          <div class="feedback-dialog" id="feedbackDialog" hidden>
+            <section
+              class="feedback-card"
+              id="feedbackCard"
+              role="alertdialog"
+              aria-modal="true"
+              aria-labelledby="feedbackTitle"
+              aria-describedby="feedbackMessage"
+            >
+              <h2 id="feedbackTitle"></h2>
+              <p id="feedbackMessage"></p>
+            </section>
+          </div>
         </section>
       </main>
     </div>
@@ -859,6 +908,10 @@
       const signUpBtn = document.getElementById("signup");
       const savePassBtn = document.getElementById("savepass");
       const forgotBtn = document.getElementById("forgot");
+      const feedbackDialog = document.getElementById("feedbackDialog");
+      const feedbackCard = document.getElementById("feedbackCard");
+      const feedbackTitle = document.getElementById("feedbackTitle");
+      const feedbackMessage = document.getElementById("feedbackMessage");
       const langEnBtn = document.getElementById("langEn");
       const langDeBtn = document.getElementById("langDe");
       const hashParams = new URLSearchParams(
@@ -980,6 +1033,17 @@
               "New password email sent to {email}. Check your inbox and spam folder.",
             savingPassword: "Saving new password...",
             passwordUpdated: "Password updated. Redirecting to sign in...",
+          },
+          feedback: {
+            signInTitle: "Signed in successfully",
+            signInMessage: "Your account is ready. Returning to StreamNet now.",
+            signUpTitle: "Account created successfully",
+            signUpMessage: "Your account is ready. Returning to StreamNet now.",
+            signInErrorTitle: "Sign-in failed",
+            signUpErrorTitle: "Account creation failed",
+            tvPairedTitle: "TV paired successfully",
+            tvPairedMessage: "The TV will connect in a few seconds.",
+            tvPairingErrorTitle: "TV pairing failed",
           },
           errors: {
             emailRequired: "Email is required.",
@@ -1117,6 +1181,20 @@
             passwordUpdated:
               "Passwort aktualisiert. Weiterleitung zur Anmeldung...",
           },
+          feedback: {
+            signInTitle: "Erfolgreich angemeldet",
+            signInMessage:
+              "Dein Konto ist bereit. StreamNet wird jetzt geoeffnet.",
+            signUpTitle: "Konto erfolgreich erstellt",
+            signUpMessage:
+              "Dein Konto ist bereit. StreamNet wird jetzt geoeffnet.",
+            signInErrorTitle: "Anmeldung fehlgeschlagen",
+            signUpErrorTitle: "Konto konnte nicht erstellt werden",
+            tvPairedTitle: "TV erfolgreich gekoppelt",
+            tvPairedMessage:
+              "Das TV-Geraet verbindet sich in wenigen Sekunden.",
+            tvPairingErrorTitle: "TV-Kopplung fehlgeschlagen",
+          },
           errors: {
             emailRequired: "E-Mail ist erforderlich.",
             emailInvalid: "Gib eine gueltige E-Mail-Adresse ein.",
@@ -1248,6 +1326,13 @@
       function setStatus(msg, type = "") {
         statusEl.textContent = msg || "";
         statusEl.className = `status ${type}`.trim();
+      }
+
+      function showFeedback(title, message, type) {
+        feedbackTitle.textContent = title;
+        feedbackMessage.textContent = message;
+        feedbackCard.className = `feedback-card is-${type}`;
+        feedbackDialog.hidden = false;
       }
 
       function setBusy(on) {
@@ -1598,6 +1683,13 @@
           if (pairCode) {
             await approveTvViaServer(creds.email, creds.password);
           }
+          showFeedback(
+            pairCode ? t("feedback.tvPairedTitle") : t("feedback.signInTitle"),
+            pairCode
+              ? t("feedback.tvPairedMessage")
+              : t("feedback.signInMessage"),
+            "success",
+          );
           setStatus(
             pairCode
               ? t("status.tvPairedRedirecting")
@@ -1608,7 +1700,15 @@
             window.location.href = "https://streamnet-sync.netlify.app";
           }, 900);
         } catch (err) {
-          setStatus(err.message || String(err), "error");
+          const message = err.message || String(err);
+          showFeedback(
+            pairCode
+              ? t("feedback.tvPairingErrorTitle")
+              : t("feedback.signInErrorTitle"),
+            message,
+            "error",
+          );
+          setStatus(message, "error");
         } finally {
           setBusy(false);
         }
@@ -1625,6 +1725,11 @@
           if (pairCode) {
             setStatus(t("status.creatingAccountAndPairing"));
             await signUpAndPairViaServer(email, password);
+            showFeedback(
+              t("feedback.tvPairedTitle"),
+              t("feedback.tvPairedMessage"),
+              "success",
+            );
             setStatus(t("status.createdAndPairedRedirecting"), "ok");
             setTimeout(() => {
               window.location.href = "https://streamnet-sync.netlify.app";
@@ -1637,6 +1742,13 @@
           if (pairCode) {
             await approveTvViaServer(email, password);
           }
+          showFeedback(
+            pairCode ? t("feedback.tvPairedTitle") : t("feedback.signUpTitle"),
+            pairCode
+              ? t("feedback.tvPairedMessage")
+              : t("feedback.signUpMessage"),
+            "success",
+          );
           setStatus(
             pairCode
               ? t("status.createdAndPairedRedirecting")
@@ -1654,6 +1766,7 @@
           ) {
             setStatus(t("status.createdCheckEmail"), "ok");
           } else {
+            showFeedback(t("feedback.signUpErrorTitle"), msg, "error");
             setStatus(msg, "error");
           }
         } finally {

@@ -80,24 +80,6 @@ export function LoginScreen() {
     try {
       if (mode === "sign-in" || mode === "sign-up") {
         await signIn(email, password, mode, false);
-        setSuccessTitle(
-          localize(
-            settings.uiLanguage,
-            mode === "sign-up"
-              ? "Konto erfolgreich erstellt"
-              : "Erfolgreich angemeldet",
-            mode === "sign-up"
-              ? "Account created successfully"
-              : "Signed in successfully",
-          ),
-        );
-        setSuccess(
-          localize(
-            settings.uiLanguage,
-            "Dein StreamNet-Cloud-Konto ist bereit. Du kannst diese Seite jetzt schließen.",
-            "Your StreamNet Cloud account is ready. You can close this page now.",
-          ),
-        );
       } else if (mode === "recovery") {
         await jsonRequest("/api/cloud-auth/cloud-auth-reset", {
           method: "POST",

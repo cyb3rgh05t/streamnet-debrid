@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.042] - 2026-09-22
+
+### Cloud-Auth-Weiterleitung
+
+- Erfolgreiche Anmeldung und Registrierung öffnen wieder direkt die Web-Profilauswahl, ohne dass die Cloud-Seite vorher geschlossen werden muss.
+- Die Auth-Portal-Dialoge bleiben auf `auth.mystreamnet.club` konzentriert.
+- Web-Version: `1.0.042`.
+
 ## [Android 2.5.030] - 2026-09-22
 
 ### Cloud-Login, Continue Watching und Touch-UI
@@ -16,10 +24,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Web 1.0.041] - 2026-09-22
 
-### Authentifizierungsdialoge
+### Authentifizierungsdialoge im Cloud-Portal
 
-- Anmeldung und Kontoerstellung zeigen jetzt eigene Erfolgs- und Fehlerdialoge statt generischer Meldungen in der Login-Karte.
-- Erfolgreiche Authentifizierung weist darauf hin, dass die Cloud-Seite anschließend geschlossen werden kann.
+- Die Cloud-Auth-Seite unter `auth.mystreamnet.club` zeigt für Anmeldung und Kontoerstellung eigene Erfolgs- und Fehlerdialoge statt generischer Statusmeldungen.
+- Nach erfolgreicher Authentifizierung wird die StreamNet-Web-App direkt geöffnet; die Web-App navigiert anschließend wie vorgesehen zur Profilauswahl.
 - Web-Version: `1.0.041`.
 
 ## [Backend 1.0.015] - 2026-09-22
