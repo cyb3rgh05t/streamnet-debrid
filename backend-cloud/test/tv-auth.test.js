@@ -27,18 +27,18 @@ test("TV pairing consumes a session while returning its original tokens", () => 
   );
 });
 
-test("web success page derives pairing mode from the code parameter", () => {
-  const serverSource = readFileSync(
-    new URL("../src/server.js", import.meta.url),
+test("web auth page derives pairing mode from the code parameter", () => {
+  const pageSource = readFileSync(
+    new URL("../public/index.html", import.meta.url),
     "utf8",
   );
 
   assert.match(
-    serverSource,
-    /const pairing = Boolean\(new URLSearchParams\(window\.location\.search\)\.get\("code"\)\)/,
+    pageSource,
+    /const pairCode = \(qs\.get\("code"\) \|\| ""\)\.trim\(\)/,
   );
   assert.doesNotMatch(
-    serverSource,
-    /const pairing = text\.includes\("gekoppelt"\)/,
+    pageSource,
+    /showSuccessPage/,
   );
 });
