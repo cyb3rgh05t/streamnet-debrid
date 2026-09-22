@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.016] - 2026-09-22
+
+### Auth-Portal-Release
+
+- Backend-Version auf `1.0.016` erhöht.
+- Die Auth-Portal-Änderungen sind im separaten Web/Auth-Commit `b20b1038` enthalten.
+
 ## [Web 1.0.042] - 2026-09-22
 
 ### Cloud-Auth-Weiterleitung
