@@ -596,7 +596,9 @@ function androidProfileSettings(settings: AppSettings) {
   };
 }
 
-function settingsFromAndroidProfile(value: unknown): Partial<AppSettings> {
+export function settingsFromAndroidProfile(
+  value: unknown,
+): Partial<AppSettings> {
   const state = objectRecord(value);
   const partial: Partial<AppSettings> = {};
   if ("accentColor" in state)
@@ -666,16 +668,18 @@ function settingsFromAndroidProfile(value: unknown): Partial<AppSettings> {
     );
   if (
     "homeServerConnectionJson" in state &&
-    typeof state.homeServerConnectionJson === "string" &&
-    state.homeServerConnectionJson.trim()
+    typeof state.homeServerConnectionJson === "string"
   ) {
-    // The Android app writes { connections: [...] } with its own field names;
-    // parseHomeServerConnectionJson handles that shape, a bare array, or a
-    // single object, and maps to the web HomeServerConfig.
-    const parsed = parseHomeServerConnectionJson(
-      state.homeServerConnectionJson,
-    );
-    if (parsed.length) partial.homeServers = parsed;
+    const connectionJson = state.homeServerConnectionJson;
+    if (!connectionJson.trim()) {
+      partial.homeServers = [];
+    } else {
+      // The Android app writes { connections: [...] } with its own field names;
+      // parseHomeServerConnectionJson handles that shape, a bare array, or a
+      // single object, and maps to the web HomeServerConfig.
+      const parsed = parseHomeServerConnectionJson(connectionJson);
+      if (parsed.length) partial.homeServers = parsed;
+    }
   }
   if ("cardLayoutMode" in state)
     partial.cardLayoutMode =

@@ -4563,7 +4563,8 @@ select:focus {
 
   .settings-shell {
     display: block !important;
-    padding: 16px var(--phone-gutter, 16px) 32px !important;
+    padding: calc(clamp(74px, 9.1vh, 98px) + 24px) var(--phone-gutter, 16px)
+      32px !important;
     min-height: auto !important;
   }
 
@@ -4584,13 +4585,16 @@ select:focus {
   }
 
   .settings-floating-menu-btn {
+    position: fixed;
+    top: calc(clamp(74px, 9.1vh, 98px) + 12px);
+    left: 16px;
     display: inline-flex !important;
     align-items: center;
     justify-content: center;
     width: 40px;
     height: 40px;
     flex: 0 0 40px;
-    margin-bottom: 14px;
+    margin: 0;
     background: rgba(14, 16, 22, 0.7) !important;
     backdrop-filter: blur(20px) !important;
     -webkit-backdrop-filter: blur(20px) !important;
@@ -4598,7 +4602,7 @@ select:focus {
     border-radius: 12px;
     color: #ffffff;
     cursor: pointer;
-    z-index: 57 !important;
+    z-index: 70 !important;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
     transition:
       background-color 0.18s ease,
@@ -9587,6 +9591,12 @@ button,
     0 0 0 1px color-mix(in srgb, var(--accent, var(--orange)) 30%, transparent);
 }
 
+.settings-panel-card .primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent, var(--orange)) 84%, #ffffff 16%);
+  color: #141414;
+  filter: saturate(1.08) brightness(1.06);
+}
+
 .settings-panel-card .primary:focus-visible,
 .settings-panel-card .secondary:focus-visible,
 .settings-panel-card .text-button:focus-visible,
@@ -9981,9 +9991,11 @@ button,
 }
 
 .streamnet-tv-preset {
-  margin: 18px 0;
-  padding: 18px 0;
-  border-block: 1px solid rgba(255, 255, 255, 0.12);
+  margin: 20px 0;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .streamnet-tv-preset-head {
@@ -10022,6 +10034,116 @@ button,
   font-size: 14px;
 }
 
+.playlist-add-card,
+.playlist-library {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.playlist-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--text);
+}
+
+.playlist-card-heading strong,
+.playlist-card-heading span {
+  display: block;
+}
+
+.playlist-card-heading strong {
+  font-size: 16px;
+}
+
+.playlist-card-heading span {
+  margin-top: 4px;
+  color: var(--soft);
+  font-size: 12px;
+}
+
+.playlist-card-heading > svg {
+  flex: 0 0 auto;
+  color: var(--accent, var(--orange));
+}
+
+.playlist-add-form {
+  padding: 24px 0 0;
+}
+
+.inline-form.wide.playlist-add-form {
+  padding: 20px 0 0;
+}
+
+.playlist-add-form input {
+  min-width: 0;
+}
+
+.playlist-add-form > .primary {
+  min-width: 240px;
+  margin-left: auto;
+}
+
+.tv-refresh-action {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 56px;
+}
+
+.tv-refresh-button {
+  min-width: 220px;
+  display: flex;
+  width: fit-content;
+}
+
+.iptv-sort-card {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.iptv-sort-control {
+  width: min(100%, 520px);
+  padding-top: 16px;
+}
+
+.iptv-sort-control .option-button {
+  width: 100%;
+  min-height: 52px;
+  height: auto;
+  padding-block: 10px;
+}
+
+.iptv-sort-control .option-button span {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  line-height: 1.25;
+}
+
+.playlist-library {
+  padding-bottom: 14px;
+}
+
+.playlist-library-heading {
+  padding-bottom: 4px;
+}
+
+.playlist-library .settings-list {
+  margin-top: 14px;
+}
+
+.playlist-library .settings-list-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.16);
+}
+
 @media (max-width: 860px) {
   /* Keep the three short status chips (Cloud / Trakt / Sync) side by side —
      stacking them full-width made them tall, unbalanced bars. */
@@ -10055,6 +10177,41 @@ button,
     grid-template-columns: 1fr;
   }
 
+  .playlist-add-card,
+  .playlist-library,
+  .streamnet-tv-preset,
+  .iptv-sort-card {
+    padding: 16px;
+  }
+
+  .playlist-add-form {
+    display: grid;
+    grid-template-columns: minmax(0, 680px);
+    gap: 12px;
+    max-width: 680px;
+  }
+
+  .inline-form.wide.playlist-add-form {
+    padding-top: 20px;
+  }
+
+  .playlist-add-form input {
+    width: 100%;
+  }
+
+  .playlist-add-form .primary {
+    justify-self: end;
+    margin-left: 0;
+  }
+
+  .tv-refresh-button {
+    min-width: 220px;
+  }
+
+  .iptv-sort-control {
+    width: 100%;
+  }
+
   .settings-list-row.catalog-row > span,
   .settings-list-row.catalog-row > .option-button,
   .settings-list-row.catalog-row > .catalog-source-line,
@@ -10070,6 +10227,15 @@ button,
 }
 
 @media (max-width: 560px) {
+  .playlist-add-form {
+    grid-template-columns: 1fr;
+    max-width: none;
+  }
+
+  .playlist-add-form .primary {
+    justify-self: stretch;
+  }
+
   .option-sheet-backdrop {
     align-items: end;
     padding: 0;

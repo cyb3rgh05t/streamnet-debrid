@@ -262,7 +262,7 @@ function qualityPresetFilters(
 export function SettingsScreen() {
   const { settings } = useApp();
   const [section, setSection] = useState<SectionId>("accounts");
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const activeSectionObj = SECTIONS.find((s) => s.id === section);
@@ -2357,24 +2357,6 @@ function TvSettingsSection() {
 
   return (
     <Panel title="TV (IPTV)">
-      <Row
-        label="Sort order"
-        hint="Choose how live channels and groups are ordered in the list"
-      >
-        <Select
-          value={settings.iptvSortOrder ?? "provider"}
-          onChange={(v) =>
-            updateSettings({
-              iptvSortOrder: v as "provider" | "number" | "name",
-            })
-          }
-          options={[
-            ["provider", "Provider Order (Default)"],
-            ["number", "Channel Number"],
-            ["name", "Alphabetical (A-Z)"],
-          ]}
-        />
-      </Row>
       <p className="empty">
         {localize(
           settings.uiLanguage,
@@ -2382,7 +2364,7 @@ function TvSettingsSection() {
           `${playlists.length} playlist(s) configured. They are saved locally and synchronized when StreamNet Cloud is connected.`,
         )}
       </p>
-      <section className="streamnet-tv-preset">
+      <section className="streamnet-tv-preset settings-tv-card">
         <div className="streamnet-tv-preset-head">
           <strong>STREAMNET TV</strong>
           <span>
@@ -2448,157 +2430,221 @@ function TvSettingsSection() {
           )}
         </div>
       </section>
-      <div className="inline-form wide">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder={localize(
-            settings.uiLanguage,
-            "Name der Wiedergabeliste",
-            "Playlist name",
-          )}
-        />
-        <input
-          value={m3uUrl}
-          onChange={(e) => setM3uUrl(e.target.value)}
-          placeholder={localize(
-            settings.uiLanguage,
-            "M3U-Wiedergabelisten-URL",
-            "M3U playlist URL",
-          )}
-        />
-        <input
-          value={epgUrl}
-          onChange={(e) => setEpgUrl(e.target.value)}
-          placeholder={localize(
-            settings.uiLanguage,
-            "EPG-XMLTV-URL (optional)",
-            "EPG XMLTV URL (optional)",
-          )}
-        />
-        <button type="button" className="primary" onClick={addPlaylist}>
-          <Plus size={18} />{" "}
-          {localize(
-            settings.uiLanguage,
-            "Wiedergabeliste hinzufügen",
-            "Add playlist",
-          )}
-        </button>
-      </div>
-      <div className="settings-list">
-        {customPlaylists.map((playlist, index) => (
-          <div
-            className="settings-list-row iptv-row"
-            key={fallbackId("playlist", index, playlist.id)}
-          >
-            <button
-              type="button"
-              className="icon-button"
-              onClick={() =>
-                updatePlaylists(
-                  playlists.map((item) =>
-                    item.id === playlist.id
-                      ? { ...item, enabled: !item.enabled }
-                      : item,
-                  ),
-                )
-              }
-            >
-              {playlist.enabled ? <Eye size={18} /> : <EyeOff size={18} />}
-            </button>
-            <input
-              value={playlist.name}
-              onChange={(e) =>
-                updatePlaylists(
-                  playlists.map((item) =>
-                    item.id === playlist.id
-                      ? { ...item, name: e.target.value }
-                      : item,
-                  ),
-                )
-              }
-            />
-            <input
-              value={playlist.m3uUrl}
-              onChange={(e) =>
-                updatePlaylists(
-                  playlists.map((item) =>
-                    item.id === playlist.id
-                      ? { ...item, m3uUrl: e.target.value }
-                      : item,
-                  ),
-                )
-              }
-            />
-            <input
-              value={playlist.epgUrl ?? ""}
-              onChange={(e) =>
-                updatePlaylists(
-                  playlists.map((item) =>
-                    item.id === playlist.id
-                      ? { ...item, epgUrl: e.target.value }
-                      : item,
-                  ),
-                )
-              }
-              placeholder={localize(settings.uiLanguage, "EPG-URL", "EPG URL")}
-            />
-            <button
-              type="button"
-              className="icon-button danger"
-              onClick={() =>
-                updatePlaylists(
-                  playlists.filter((item) => item.id !== playlist.id),
-                )
-              }
-            >
-              <Trash2 size={18} />
-            </button>
+      <div className="playlist-add-card">
+        <div className="playlist-card-heading">
+          <div>
+            <strong>
+              {localize(
+                settings.uiLanguage,
+                "Playlist hinzufügen",
+                "Add playlist",
+              )}
+            </strong>
+            <span>
+              {localize(
+                settings.uiLanguage,
+                "M3U und optionales EPG für deine Senderliste",
+                "M3U and optional EPG for your channel list",
+              )}
+            </span>
           </div>
-        ))}
-        {!customPlaylists.length && (
-          <p className="empty">
+          <Plus size={20} />
+        </div>
+        <div className="inline-form wide playlist-add-form">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={localize(
+              settings.uiLanguage,
+              "Name der Wiedergabeliste",
+              "Playlist name",
+            )}
+          />
+          <input
+            value={m3uUrl}
+            onChange={(e) => setM3uUrl(e.target.value)}
+            placeholder={localize(
+              settings.uiLanguage,
+              "M3U-Wiedergabelisten-URL",
+              "M3U playlist URL",
+            )}
+          />
+          <input
+            value={epgUrl}
+            onChange={(e) => setEpgUrl(e.target.value)}
+            placeholder={localize(
+              settings.uiLanguage,
+              "EPG-XMLTV-URL (optional)",
+              "EPG XMLTV URL (optional)",
+            )}
+          />
+          <button type="button" className="primary" onClick={addPlaylist}>
+            <Plus size={18} />{" "}
             {localize(
               settings.uiLanguage,
-              "Keine weiteren IPTV-Wiedergabelisten eingerichtet.",
-              "No additional IPTV playlists configured.",
+              "Wiedergabeliste hinzufügen",
+              "Add playlist",
             )}
-          </p>
-        )}
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        className="secondary text-button"
-        disabled={isLoadingTv}
-        onClick={() => void refreshIptv()}
-      >
-        <RefreshCw size={18} />{" "}
-        {isLoadingTv
-          ? localize(
-              settings.uiLanguage,
-              "Wird aktualisiert ...",
-              "Refreshing...",
-            )
-          : localize(
-              settings.uiLanguage,
-              "TV jetzt aktualisieren",
-              "Refresh TV now",
-            )}
-      </button>
-      <Row label="Stalker portal URL">
-        <input
-          value={settings.iptvStalkerUrl}
-          onChange={(e) => updateSettings({ iptvStalkerUrl: e.target.value })}
-          placeholder="http://portal.example.com/c/"
-        />
-      </Row>
-      <Row label="Stalker MAC address">
-        <input
-          value={settings.iptvStalkerMac}
-          onChange={(e) => updateSettings({ iptvStalkerMac: e.target.value })}
-          placeholder="00:1A:79:00:00:00"
-        />
-      </Row>
+      <div className="playlist-library">
+        <div className="playlist-card-heading playlist-library-heading">
+          <div>
+            <strong>
+              {localize(
+                settings.uiLanguage,
+                "Deine Playlists",
+                "Your playlists",
+              )}
+            </strong>
+            <span>
+              {localize(
+                settings.uiLanguage,
+                `${customPlaylists.length} eigene Playlist${customPlaylists.length === 1 ? "" : "s"}`,
+                `${customPlaylists.length} custom playlist${customPlaylists.length === 1 ? "" : "s"}`,
+              )}
+            </span>
+          </div>
+        </div>
+        <div className="settings-list">
+          {customPlaylists.map((playlist, index) => (
+            <div
+              className="settings-list-row iptv-row"
+              key={fallbackId("playlist", index, playlist.id)}
+            >
+              <button
+                type="button"
+                className="icon-button"
+                onClick={() =>
+                  updatePlaylists(
+                    playlists.map((item) =>
+                      item.id === playlist.id
+                        ? { ...item, enabled: !item.enabled }
+                        : item,
+                    ),
+                  )
+                }
+              >
+                {playlist.enabled ? <Eye size={18} /> : <EyeOff size={18} />}
+              </button>
+              <input
+                value={playlist.name}
+                onChange={(e) =>
+                  updatePlaylists(
+                    playlists.map((item) =>
+                      item.id === playlist.id
+                        ? { ...item, name: e.target.value }
+                        : item,
+                    ),
+                  )
+                }
+              />
+              <input
+                value={playlist.m3uUrl}
+                onChange={(e) =>
+                  updatePlaylists(
+                    playlists.map((item) =>
+                      item.id === playlist.id
+                        ? { ...item, m3uUrl: e.target.value }
+                        : item,
+                    ),
+                  )
+                }
+              />
+              <input
+                value={playlist.epgUrl ?? ""}
+                onChange={(e) =>
+                  updatePlaylists(
+                    playlists.map((item) =>
+                      item.id === playlist.id
+                        ? { ...item, epgUrl: e.target.value }
+                        : item,
+                    ),
+                  )
+                }
+                placeholder={localize(
+                  settings.uiLanguage,
+                  "EPG-URL",
+                  "EPG URL",
+                )}
+              />
+              <button
+                type="button"
+                className="icon-button danger"
+                onClick={() =>
+                  updatePlaylists(
+                    playlists.filter((item) => item.id !== playlist.id),
+                  )
+                }
+              >
+                <Trash2 size={18} />
+              </button>
+            </div>
+          ))}
+          {!customPlaylists.length && (
+            <p className="empty">
+              {localize(
+                settings.uiLanguage,
+                "Keine weiteren IPTV-Wiedergabelisten eingerichtet.",
+                "No additional IPTV playlists configured.",
+              )}
+            </p>
+          )}
+        </div>
+      </div>
+      <section className="iptv-sort-card">
+        <div className="playlist-card-heading">
+          <div>
+            <strong>
+              {localize(settings.uiLanguage, "Sortierung", "Sorting")}
+            </strong>
+            <span>
+              {localize(
+                settings.uiLanguage,
+                "Lege fest, wie Live-Sender und Gruppen in der Liste sortiert werden.",
+                "Choose how live channels and groups are ordered in the list.",
+              )}
+            </span>
+          </div>
+        </div>
+        <div className="iptv-sort-control">
+          <Select
+            value={settings.iptvSortOrder ?? "provider"}
+            onChange={(v) =>
+              updateSettings({
+                iptvSortOrder: v as "provider" | "number" | "name",
+              })
+            }
+            options={[
+              ["provider", "Provider Order (Default)"],
+              ["number", "Channel Number"],
+              ["name", "Alphabetical (A-Z)"],
+            ]}
+          />
+        </div>
+      </section>
+      <div className="tv-refresh-action">
+        <button
+          type="button"
+          className="secondary text-button tv-refresh-button"
+          disabled={isLoadingTv}
+          onClick={() => void refreshIptv()}
+        >
+          <RefreshCw size={18} />{" "}
+          {isLoadingTv
+            ? localize(
+                settings.uiLanguage,
+                "Wird aktualisiert ...",
+                "Refreshing...",
+              )
+            : localize(
+                settings.uiLanguage,
+                "TV jetzt aktualisieren",
+                "Refresh TV now",
+              )}
+        </button>
+      </div>
     </Panel>
   );
 }
@@ -2636,6 +2682,13 @@ function CatalogsSection() {
       ...homeServerCatalogs.filter((catalog) => !seen.has(catalog.id)),
     ];
   }, [homeServerCatalogs, settings.catalogs, standardCatalogs]);
+  const editableCatalogs = useMemo(
+    () =>
+      catalogs.filter(
+        (catalog) => String(catalog.kind ?? "").toUpperCase() !== "COLLECTION",
+      ),
+    [catalogs],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -2779,7 +2832,7 @@ function CatalogsSection() {
         </button>
       </div>
       <div className="settings-list">
-        {catalogs.map((catalog, index) => (
+        {editableCatalogs.map((catalog, index) => (
           <div
             className="settings-list-row catalog-row"
             key={fallbackId("catalog", index, catalog.id)}

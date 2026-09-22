@@ -20,7 +20,11 @@ import {
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
 import { accentProfileColor, normalizeAccentName } from "./accent";
 import { config, getAuthPortalUrl } from "./config";
-import { defaultCatalogs, mergeCatalogs } from "./catalogs";
+import {
+  collectionRailIdForGroup,
+  defaultCatalogs,
+  mergeCatalogs,
+} from "./catalogs";
 import {
   getContinueWatching,
   isLiveStreamOrSportsItem,
@@ -1126,10 +1130,21 @@ export function AppProvider({
       settings.catalogs,
       settings.hiddenCatalogIds,
     );
+    const enabledIds = new Set(
+      effectiveCatalogs
+        .filter((catalog) => catalog.enabled)
+        .map((catalog) => catalog.id),
+    );
     setCatalogConfigs(
-      effectiveCatalogs.filter(
-        (catalog) => catalog.enabled && catalog.sourceType !== "home-server",
-      ),
+      effectiveCatalogs.filter((catalog) => {
+        if (!catalog.enabled || catalog.sourceType === "home-server") {
+          return false;
+        }
+        const kind = String(catalog.kind ?? "").toUpperCase();
+        if (kind !== "COLLECTION") return true;
+        const railId = collectionRailIdForGroup(catalog.collectionGroup);
+        return !railId || enabledIds.has(railId);
+      }),
     );
   }, [settings.catalogs, settings.hiddenCatalogIds]);
 
@@ -1699,6 +1714,82 @@ export function AppProvider({
             ...cloudWatchedKeys,
             ...(upNext.watchedKeys ?? []),
           ]);
+
+          // Build the two Android-compatible Recently Watched rails from the
+          // provider rows plus cloud-synced watched keys. Cloud keys are enough
+          // to recover local-only Android history even when Trakt is disabled.
+          const watchedSeeds = new Map<string, MediaItem>();
+          const addWatchedSeed = (item: MediaItem) => {
+            if (item.id > 0) {
+              watchedSeeds.set(`${item.mediaType}:${item.id}`, {
+                ...item,
+                isWatched: true,
+              });
+            }
+          };
+          watchedMoviesRows.forEach((row) =>
+            addWatchedSeed(traktItemToMedia(row)),
+          );
+          watchedShowsRows.forEach((row) =>
+            addWatchedSeed(traktItemToMedia(row)),
+          );
+          cloudWatchedKeys.forEach((key) => {
+            const [type, rawId] = key.split(":");
+            const id = Number(rawId);
+            if ((type === "movie" || type === "tv") && Number.isFinite(id)) {
+              addWatchedSeed({
+                id,
+                title: `${type === "movie" ? "Movie" : "Series"} ${id}`,
+                mediaType: type === "movie" ? "movie" : "tv",
+              });
+            }
+          });
+          const watchedSeedItems = ["movie", "tv"].flatMap((type) =>
+            [...watchedSeeds.values()]
+              .filter((item) => item.mediaType === type)
+              .sort(
+                (left, right) =>
+                  (right.activityAt ?? 0) - (left.activityAt ?? 0),
+              )
+              .slice(0, 20),
+          );
+          const watchedRailItems = await hydrateTraktItems(watchedSeedItems);
+          if (isCurrent() && watchedRailItems.length) {
+            const movies = watchedRailItems
+              .filter((item) => item.mediaType === "movie")
+              .slice(0, 20);
+            const series = watchedRailItems
+              .filter((item) => item.mediaType === "tv")
+              .slice(0, 20);
+            setCategories((current) => {
+              const withoutRecent = current.filter(
+                (category) =>
+                  category.id !== "recently_watched_movies" &&
+                  category.id !== "recently_watched_series",
+              );
+              return [
+                ...(movies.length
+                  ? [
+                      {
+                        id: "recently_watched_movies",
+                        title: "Recently Watched Movies",
+                        items: movies,
+                      },
+                    ]
+                  : []),
+                ...(series.length
+                  ? [
+                      {
+                        id: "recently_watched_series",
+                        title: "Recently Watched Series",
+                        items: series,
+                      },
+                    ]
+                  : []),
+                ...withoutRecent,
+              ];
+            });
+          }
           // Cloud watched flags may be older than a provider's reset/progress response.
           // Keep those flags for badges, but do not let them veto tracker Continue Watching.
           const traktCw = mergeTraktWithLocalResume(

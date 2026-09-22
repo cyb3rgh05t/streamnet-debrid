@@ -2,6 +2,17 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.040] - 2026-09-22
+
+### Android-Katalogparität und Web-UI
+
+- Web übernimmt die 97 vorinstallierten Android-Katalogdefaults inklusive Collection-Rails, Reihenfolge, IDs, Quellen und Artwork-Metadaten.
+- Featured- und Decade-Collections werden im Web-Home ausgeblendet; die sichtbaren Collection-Kinder werden im Katalogmanager nicht separat schaltbar.
+- Collection-Rails können vollständig aktiviert oder deaktiviert werden.
+- Recently Watched Movies und Recently Watched Series nutzen Trakt-Daten sowie Cloud-synchronisierte lokale Watched-Keys und werden auf maximal 20 Einträge je Rail begrenzt.
+- IPTV-Einstellungen wurden um strukturiertes Playlist-Layout, Rail-Sortierung, responsive Navigation und verbesserte Button-/Hover-Zustände ergänzt.
+- Web-Version: `1.0.040`.
+
 ## [2.5.029] - 2026-09-21
 
 ### Home-Server, Katalogreihenfolge und UI-Politur

@@ -49,7 +49,7 @@ test("catalog migration removes retired rows and adds current Android defaults",
   ]);
   const ids = catalogs.map((catalog) => catalog.id);
 
-  assert.equal(ids.includes("collection_featured_latest_movies"), false);
+  assert.equal(ids.includes("collection_featured_latest_movies"), true);
   assert.equal(ids.includes("collection_decade_1990s"), false);
   assert.equal(ids.includes("action"), false);
   assert.equal(ids.includes("custom_keep"), true);
@@ -81,23 +81,36 @@ test("catalog labels use the requested German upcoming names", async () => {
 test("Web fallback catalogs follow the current Android order", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
 
+  assert.equal(defaultCatalogs.length, 97);
   assert.deepEqual(
-    defaultCatalogs.map((catalog) => catalog.id),
+    defaultCatalogs.slice(0, 14).map((catalog) => catalog.id),
     [
       "recent_tv",
       "favorite_tv",
+      "collection_rail_service",
+      "collection_rail_franchise",
       "trending_movies",
       "top10_movies_today",
       "top_movies_week",
+      "collection_rail_movie_genre",
       "trending_tv",
       "top10_shows_today",
+      "collection_rail_tv_genre",
       "trending_anime",
       "new_kdramas",
       "coming_soon",
-      "upcoming_series",
-      "just_added",
-      "recently_watched_movies",
-      "recently_watched_series",
     ],
+  );
+  assert.equal(
+    defaultCatalogs.some(
+      (catalog) => catalog.id === "collection_service_netflix",
+    ),
+    true,
+  );
+  assert.equal(
+    defaultCatalogs.some(
+      (catalog) => catalog.id === "collection_movie_genre_science_fiction",
+    ),
+    true,
   );
 });
