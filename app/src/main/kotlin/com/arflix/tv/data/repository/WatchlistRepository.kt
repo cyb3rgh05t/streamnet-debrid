@@ -80,6 +80,47 @@ internal fun isWatchlistItemRemoved(removals: Map<String, Long>, key: String, ad
     return (removals[key] ?: 0L) >= addedAt
 }
 
+/** Merges enabled tracker entries without dropping titles saved only in StreamNet. */
+internal fun mergeRemoteWatchlistItems(
+    localItems: List<LocalWatchlistItem>,
+    remoteItems: List<MediaItem>,
+    now: Long = System.currentTimeMillis()
+): List<LocalWatchlistItem> {
+    val localByKey = localItems.associateBy { watchlistItemKey(it.mediaType, it.tmdbId) }
+    val remoteKeys = LinkedHashSet<String>()
+    val merged = LinkedHashMap(localByKey)
+
+    remoteItems.forEachIndexed { index, item ->
+        val mediaType = if (item.mediaType == MediaType.TV) "tv" else "movie"
+        val key = watchlistItemKey(mediaType, item.id)
+        if (!remoteKeys.add(key)) return@forEachIndexed
+        val remoteAddedAt = item.addedAt.takeIf { it > 0L } ?: (now - index)
+        val local = localByKey[key]
+        merged[key] = local?.copy(
+            title = item.title.ifBlank { local.title },
+            posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false)
+                ?: normalizeWatchlistArtworkUrl(local.posterPath, isBackdrop = false),
+            backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true)
+                ?: normalizeWatchlistArtworkUrl(local.backdropPath, isBackdrop = true),
+            addedAt = maxOf(local.addedAt, remoteAddedAt),
+            sourceOrder = if (remoteAddedAt >= local.addedAt) index else local.sourceOrder
+        ) ?: LocalWatchlistItem(
+            tmdbId = item.id,
+            mediaType = mediaType,
+            title = item.title,
+            posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false),
+            backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true),
+            addedAt = remoteAddedAt,
+            sourceOrder = index
+        )
+    }
+
+    return remoteKeys.mapNotNull(merged::get) + merged
+        .filterKeys { it !in remoteKeys }
+        .values
+        .sortedByDescending(LocalWatchlistItem::addedAt)
+}
+
 internal fun normalizeWatchlistArtworkUrl(rawValue: String?, isBackdrop: Boolean): String? {
     val value = rawValue?.trim()?.takeIf { it.isNotEmpty() } ?: return null
     if (
@@ -248,6 +289,48 @@ class WatchlistRepository @Inject constructor(
     }
 
     /**
+     * Imports only new, resolved Home Server saves. This is deliberately
+     * additive: removing a favourite on Plex/Jellyfin/Emby never removes a
+     * profile's StreamNet Cloud copy.
+     */
+    suspend fun importHomeServerWatchlistItems(items: List<MediaItem>): Boolean {
+        val importable = items.filter { it.id > 0 }
+        if (importable.isEmpty()) return false
+        val existing = loadWatchlistRaw()
+        val existingKeys = existing.map { watchlistItemKey(it.mediaType, it.tmdbId) }.toSet()
+        val additions = importable
+            .distinctBy { item -> watchlistItemKey(if (item.mediaType == MediaType.TV) "tv" else "movie", item.id) }
+            .filter { item ->
+                watchlistItemKey(if (item.mediaType == MediaType.TV) "tv" else "movie", item.id) !in existingKeys
+            }
+        if (additions.isEmpty()) return false
+
+        val imported = additions.mapIndexed { index, item ->
+            LocalWatchlistItem(
+                tmdbId = item.id,
+                mediaType = if (item.mediaType == MediaType.TV) "tv" else "movie",
+                title = item.title,
+                posterPath = item.image,
+                backdropPath = item.backdrop,
+                addedAt = item.addedAt.takeIf { it > 0L } ?: (System.currentTimeMillis() - index),
+                sourceOrder = Int.MAX_VALUE
+            )
+        }
+        val updated = imported + existing
+        saveWatchlist(updated)
+        cacheMutex.withLock {
+            val current = updated.map { it.toBasicMediaItem() }
+            itemsCache.clear()
+            itemsCache.addAll(current)
+            keyCache.clear()
+            current.forEach { item -> keyCache.add(cacheKey(item.mediaType, item.id)) }
+            _watchlistItems.value = current
+            cacheLoaded = true
+        }
+        return true
+    }
+
+    /**
      * Remove item from watchlist
      */
     suspend fun removeFromWatchlist(mediaType: MediaType, tmdbId: Int) {
@@ -375,45 +458,10 @@ class WatchlistRepository @Inject constructor(
         getWatchlistItems()
     }
 
-    /**
-     * Reorder the local watchlist to match Trakt's newest-first list.
-     * Mirrors Trakt's newest-first order and drops stale local entries. Keeping
-     * local-only items here lets old bad title-search matches survive forever
-     * after Trakt has the correct IDs.
-     */
+    /** Merges the tracker list into the profile watchlist without losing local/cloud entries. */
     suspend fun syncFromTraktOrder(traktItems: List<MediaItem>) = withContext(Dispatchers.IO) {
         val existing = loadWatchlistRaw()
-        val existingByKey = existing.associateBy { "${it.mediaType}:${it.tmdbId}" }
-
-        val ordered = mutableListOf<LocalWatchlistItem>()
-
-        // Trakt items are already newest-first by listed_at.
-        val orderedTraktItems = traktItems.toTraktOrder()
-        for ((index, item) in orderedTraktItems.withIndex()) {
-            val typeStr = if (item.mediaType == MediaType.TV) "tv" else "movie"
-            val key = "$typeStr:${item.id}"
-            val local = existingByKey[key]
-            val traktOrderAddedAt = item.addedAt.takeIf { it > 0L } ?: (System.currentTimeMillis() - index)
-            ordered.add(
-                local?.copy(
-                    title = item.title.ifBlank { local.title },
-                    posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false)
-                        ?: normalizeWatchlistArtworkUrl(local.posterPath, isBackdrop = false),
-                    backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true)
-                        ?: normalizeWatchlistArtworkUrl(local.backdropPath, isBackdrop = true),
-                    addedAt = traktOrderAddedAt,
-                    sourceOrder = index
-                ) ?: LocalWatchlistItem(
-                    tmdbId = item.id,
-                    mediaType = typeStr,
-                    title = item.title,
-                    posterPath = normalizeWatchlistArtworkUrl(item.image, isBackdrop = false),
-                    backdropPath = normalizeWatchlistArtworkUrl(item.backdrop, isBackdrop = true),
-                    addedAt = traktOrderAddedAt,
-                    sourceOrder = index
-                )
-            )
-        }
+        val ordered = mergeRemoteWatchlistItems(existing, traktItems.toTraktOrder())
 
         saveWatchlist(ordered)
 

@@ -1158,6 +1158,34 @@ class IptvRepository @Inject constructor(
         }
     }
 
+    /**
+     * A first Home Server connection is external VOD content just like the
+     * first VOD addon. Disable IPTV-only once, then preserve later user choices.
+     */
+    suspend fun reconcileIptvOnlyModeWithHomeServer(hasHomeServer: Boolean) {
+        var changed = false
+        context.settingsDataStore.edit { prefs ->
+            val seenKey = iptvOnlyHomeServerSeenKey()
+            val seen = prefs[seenKey] ?: false
+            if (hasHomeServer && !seen) {
+                if (prefs[iptvOnlyModeKey()] != false) {
+                    prefs[iptvOnlyModeKey()] = false
+                    changed = true
+                }
+                prefs[seenKey] = true
+            } else if (!hasHomeServer && seen) {
+                prefs[seenKey] = false
+            }
+        }
+        if (changed) {
+            invalidationBus.markDirty(
+                CloudSyncScope.IPTV,
+                profileManager.getProfileIdSync(),
+                "reconcile iptv only mode with Home Server"
+            )
+        }
+    }
+
     suspend fun saveSortOrder(sortOrder: String) {
         val normalizedSortOrder = normalizeIptvSortOrder(sortOrder)
         context.settingsDataStore.edit { prefs ->
@@ -3531,6 +3559,9 @@ class IptvRepository @Inject constructor(
         booleanPreferencesKey("profile_${profileId}_iptv_show_special_categories")
     private fun iptvOnlyModeKey(): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_only_mode")
+
+    private fun iptvOnlyHomeServerSeenKey(): Preferences.Key<Boolean> =
+        booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_only_home_server_seen_v1")
     private fun iptvOnlyVodAddonSeenKey(): Preferences.Key<Boolean> =
         booleanPreferencesKey("profile_${profileManager.getProfileIdSync()}_iptv_only_vod_addon_seen")
     private fun iptvOnlyModeKeyFor(profileId: String): Preferences.Key<Boolean> =

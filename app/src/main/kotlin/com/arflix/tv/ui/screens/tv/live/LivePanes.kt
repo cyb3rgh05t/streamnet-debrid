@@ -97,10 +97,14 @@ fun EmptyStatePane(
             } else {
                 Modifier
             }
-            val background = if (isFocused) Color.White else Color.Black
-            val contentColor = if (isFocused) Color.Black else Color.White
+            val background = if (isFocused) LiveColors.Accent else Color.Black
+            val contentColor = if (isFocused) LiveColors.Bg else Color.White
             val borderModifier = if (isFocused) {
-                Modifier
+                Modifier.border(
+                    width = 1.dp,
+                    color = LiveColors.Accent,
+                    shape = RoundedCornerShape(8.dp)
+                )
             } else {
                 Modifier.border(
                     width = 1.dp,

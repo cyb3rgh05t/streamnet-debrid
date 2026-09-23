@@ -982,6 +982,9 @@ class SettingsViewModel @Inject constructor(
                     homeServerConnection = connections.firstOrNull(),
                     homeServerConnections = connections
                 )
+                if (connections.any { it.collections.isNotEmpty() }) {
+                    syncHomeServerCatalogsFromConnections()
+                }
             }
         }
     }
@@ -3392,7 +3395,10 @@ class SettingsViewModel @Inject constructor(
             )
             val result = homeServerRepository.connect(serverUrl, username, password, displayName)
             result.onSuccess { connection ->
-                syncHomeServerCatalogsFromConnections()
+                iptvRepository.reconcileIptvOnlyModeWithHomeServer(hasHomeServer = true)
+                if (connection.collections.isNotEmpty()) {
+                    syncHomeServerCatalogsFromConnections()
+                }
                 val connections = homeServerRepository.currentConnections()
                 _uiState.value = _uiState.value.copy(
                     isHomeServerConnecting = false,
@@ -3510,6 +3516,7 @@ class SettingsViewModel @Inject constructor(
                 )
                 runCatching {
                     syncHomeServerCatalogsFromConnections()
+                    iptvRepository.reconcileIptvOnlyModeWithHomeServer(hasHomeServer = true)
                     val connections = homeServerRepository.currentConnections()
                     plexHomeServerUrl = null
                     plexHomeServerDisplayName = null

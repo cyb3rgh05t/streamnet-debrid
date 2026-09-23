@@ -2,6 +2,21 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.037] - 2026-09-23
+
+### Home Server, IPTV und Home-UI
+
+- Home-Server-Watchlists werden profilbezogen in die StreamNet-Merkliste importiert und über die bestehende Cloud-Synchronisierung auf andere Geräte verteilt. Das Entfernen eines Titels auf Plex/Jellyfin/Emby löscht den bereits importierten StreamNet-Eintrag nicht automatisch.
+- Home-Server-Bibliotheken bleiben als eigene Quellen verfügbar. Veraltete oder deaktivierte Home-Server-Kataloge werden beim nächsten erfolgreichen Library-Abgleich aus den Home-Katalogen entfernt.
+- Das erstmalige Einbinden eines Home Servers beendet die IPTV-only-Projektion einmalig, sobald externe Home-Server-Inhalte verfügbar sind. Eine spätere manuelle IPTV-only-Auswahl bleibt erhalten.
+- Plex-Code-Verbindungen bevorzugen bekannte öffentliche Server-URLs und warten nicht mehr zuerst auf unerreichbare interne Docker-`plex.direct`-Adressen. Die Plex-Suche verarbeitet zusätzlich Ergebnisse aus `MediaContainer.Hub`.
+- Die Verbindung zeigt den Home Server nach erfolgreicher Authentifizierung und Erreichbarkeit sofort an; die Library-Erkennung und Katalogsynchronisierung laufen danach im Hintergrund.
+- Home-Refreshes bewahren vorhandene Badge-, Artwork- und Metadaten während des asynchronen Neuaufbaus, wodurch Watched-Markierungen, Hero-Daten und Continue Watching nicht mehr kurzzeitig auf einen rohen Zwischenstand zurückfallen.
+- Die Watchlist-Navigation folgt dem D-pad-Fokus jetzt automatisch in der Library-Seitenleiste.
+- Watched- und Partial-Watched-Markierungen auf Media Cards verwenden die normalen Statusfarben und kleinere Marker statt des aktiven Theme-Akzents.
+- Die StreamNet-TV-Einstellkarte richtet ihre Aktionsbuttons mittig am Textblock aus und reduziert doppelte Abstände zwischen den Buttons.
+- Android-Version: `2.5.037` / Code `438`.
+
 ## [2.5.035] - 2026-09-23
 
 ### Scream-Franchise
@@ -1204,7 +1219,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 ### StreamNet Cloud, Profile und Kontosicherheit
 
 - Wechselndes gemischtes Film- und Serien-Artwork wurde zum Ladebildschirm beim App-Start und zur Profilauswahl hinzugefügt und wechselt alle fünf Sekunden aus einem gemeinsamen Vorladepool.
-- Die Profilauswahl wurde durch Entfernen der Überschrift und des äußeren Profilcontainers vereinfacht; unter dem StreamNet-Logo wurde eine kompakte, D-Pad-fokussierte Aktion `myStreamNet Cloud` hinzugefügt.
+- Die Profilauswahl wurde durch Entfernen der Überschrift und des äußeren Profilcontainers vereinfacht; unter dem StreamNet-Logo wurde eine kompakte, D-Pad-fokussierte Aktion `StreamNet Cloud` hinzugefügt.
 - Sichtbare Verweise auf den Cloud-Dienst wurden in StreamNet Cloud umbenannt und das StreamNet Club-Logo auf den selbst gehosteten Seiten für Anmeldung, Datenschutz, Löschung und Erfolg eingeführt.
 - Die Behandlung von Anmeldung und abgelaufenen Sitzungen wurde verbessert, sodass ungültige StreamNet Cloud-Zugangsdaten und widerrufene Sitzungen klarere Fehler erzeugen und veraltete lokale Authentifizierungen entfernt werden.
 - Die dauerhafte Kontolöschung wurde robuster gemacht, sodass Kontositzungen, Snapshots, Kopplungssitzungen, Nutzungsereignisse, Wiedergabeverlauf und Wiedergabestatus transaktional entfernt werden; PostgreSQL-Kaskadenbedingungen und Regressionstests wurden hinzugefügt.

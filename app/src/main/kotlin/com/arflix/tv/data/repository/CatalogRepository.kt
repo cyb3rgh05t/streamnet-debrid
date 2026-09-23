@@ -731,6 +731,17 @@ class CatalogRepository @Inject constructor(
             changed = true
         }
 
+        // Library visibility/removal is authoritative when discovery returned
+        // candidates. Without this cleanup, a hidden or deleted server library
+        // remained as a stale Home catalog forever.
+        if (candidates.isNotEmpty()) {
+            val removed = current.removeAll { catalog ->
+                catalog.sourceType == CatalogSourceType.HOME_SERVER &&
+                    catalog.id !in desiredById
+            }
+            changed = changed || removed
+        }
+
         if (changed) saveCatalogs(current)
         return changed
     }

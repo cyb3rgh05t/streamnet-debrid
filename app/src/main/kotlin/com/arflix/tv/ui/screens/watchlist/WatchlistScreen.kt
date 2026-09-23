@@ -1023,6 +1023,12 @@ private fun LibrarySidebar(
     onSelect: (Int, HomeServerCatalogCandidate) -> Unit
 ) {
     val uiAccent = resolveAccentColor(fallback = Pink)
+    val listState = rememberLazyListState()
+    LaunchedEffect(focusedIndex, libraries.size) {
+        if (libraries.isNotEmpty() && focusedIndex in libraries.indices) {
+            listState.animateScrollToItem(focusedIndex)
+        }
+    }
     Column(
         modifier = Modifier
             .width(184.dp)
@@ -1047,7 +1053,10 @@ private fun LibrarySidebar(
             color = Color.White.copy(alpha = 0.4f),
             modifier = Modifier.padding(start = 10.dp, top = 2.dp, bottom = 7.dp)
         )
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(5.dp)
+        ) {
             itemsIndexed(libraries, key = { _, item -> item.sourceRef }) { index, library ->
                 val selected = index == selectedIndex
                 val focused = index == focusedIndex

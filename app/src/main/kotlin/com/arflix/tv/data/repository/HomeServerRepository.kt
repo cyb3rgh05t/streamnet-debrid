@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -342,6 +343,7 @@ class HomeServerRepository @Inject constructor(
 
     private val sourceCacheLock = Any()
     private val sourceRequestScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val libraryRefreshScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val sourceCache = object : LinkedHashMap<String, CachedHomeServerSources>(64, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CachedHomeServerSources>?): Boolean {
             return size > SOURCE_CACHE_MAX_ENTRIES
@@ -406,9 +408,9 @@ class HomeServerRepository @Inject constructor(
                     accountToken = auth.accountToken,
                     lastConnectedAt = System.currentTimeMillis()
                 )
-                val connection = connectionShell.copy(collections = fetchCollections(connectionShell))
-                saveConnection(connection)
-                connection
+                saveConnection(connectionShell)
+                refreshLibrariesInBackground(connectionShell)
+                connectionShell
             }
         }
 
@@ -429,6 +431,7 @@ class HomeServerRepository @Inject constructor(
                     onProgress = onProgress
                 )
                 saveConnection(connection)
+                refreshLibrariesInBackground(connection)
                 connection
             }
         }
@@ -665,6 +668,52 @@ class HomeServerRepository @Inject constructor(
                     .map { collection -> connection.toCatalogCandidate(collection) }
             }
             .distinctBy { it.sourceRef }
+    }
+
+    /** Loads only explicit user-saved server items, never whole libraries. */
+    suspend fun loadWatchlistItems(): List<HomeServerCatalogItem> = withContext(Dispatchers.IO) {
+        currentConnections()
+            .filter { it.isUsable }
+            .flatMap { connection ->
+                runCatching {
+                    val sourceRef = "home_server_watchlist:${catalogServerKey(connection)}"
+                    val items = if (connection.serverKind == HomeServerKind.PLEX) {
+                        val accountConnection = connection.copy(
+                            serverUrl = "https://discover.provider.plex.tv",
+                            accessToken = connection.accountToken.ifBlank { connection.accessToken }
+                        )
+                        getJson(
+                            buildUrl(
+                                accountConnection.serverUrl,
+                                "/library/sections/watchlist/all",
+                                mapOf("includeGuids" to "1")
+                            ),
+                            accountConnection
+                        ).metadataItems(HomeServerKind.PLEX)
+                    } else {
+                        getJson(
+                            buildUrl(
+                                connection.serverUrl,
+                                "/Users/${connection.userId}/Items",
+                                mapOf(
+                                    "Recursive" to "true",
+                                    "IncludeItemTypes" to "Movie,Series",
+                                    "IsFavorite" to "true",
+                                    "SortBy" to "DateCreated",
+                                    "SortOrder" to "Descending",
+                                    "Limit" to "250",
+                                    "Fields" to catalogItemFields()
+                                )
+                            ),
+                            connection
+                        ).items()
+                    }
+                    items.mapNotNull { item ->
+                        item.toCatalogItem(connection, sourceRef)
+                    }
+                }.getOrDefault(emptyList())
+            }
+            .distinctBy { "${it.mediaType}:${it.providerIds["tmdb"] ?: it.providerIds["imdb"] ?: it.id}" }
     }
 
     suspend fun loadCatalogItems(
@@ -1299,10 +1348,19 @@ class HomeServerRepository @Inject constructor(
                     )
                 }.getOrNull()
             }
-        val accountName = validatePlexAccount(trimmedAccountToken)
-            .ifBlank { preferredUsername.ifBlank { "Account" } }
+        val accountName = preferredUsername
+            .takeIf { it.isNotBlank() }
+            ?: preferredIdentity?.serverName?.takeIf { it.isNotBlank() }
+            ?: validatePlexAccount(trimmedAccountToken).ifBlank { "Account" }
         onProgress(HomeServerCodeAuthPhase.LOCATING_SERVER)
-        val resources = fetchPlexResources(trimmedAccountToken)
+        // When the user supplied a Plex server URL, it is already the fastest
+        // authoritative route. Account resource discovery is only needed when
+        // Plex must locate a server without a preferred endpoint.
+        val resources = if (normalizedPreferredUrl.isBlank()) {
+            fetchPlexResources(trimmedAccountToken)
+        } else {
+            emptyList()
+        }
         val targetDevice = selectPlexResourceDevice(
             resources = resources,
             preferredServerId = preferredIdentity?.serverId.orEmpty(),
@@ -1313,8 +1371,12 @@ class HomeServerRepository @Inject constructor(
             ?: preferredIdentity?.serverId.orEmpty()
         val serverToken = targetDevice?.accessToken
             ?.takeIf { it.isNotBlank() }
-            ?: resolvePlexServerToken(trimmedAccountToken, targetServerId)
-                .takeIf { it.isNotBlank() }
+            ?: if (normalizedPreferredUrl.isBlank()) {
+                resolvePlexServerToken(trimmedAccountToken, targetServerId)
+                    .takeIf { it.isNotBlank() }
+            } else {
+                null
+            }
             ?: trimmedAccountToken
         val candidateUrls = plexCandidateServerUrls(normalizedPreferredUrl, targetDevice)
         require(candidateUrls.isNotEmpty()) { context.getString(R.string.homeserver_no_reachable_url) }
@@ -1358,19 +1420,31 @@ class HomeServerRepository @Inject constructor(
                 serverId = info.serverId.ifBlank { candidate.serverId },
                 lastConnectedAt = System.currentTimeMillis()
             )
-            onProgress(HomeServerCodeAuthPhase.LOADING_LIBRARIES)
-            val collections = try { Result.success(fetchCollections(shell)) } catch (e: Exception) { if (e is kotlinx.coroutines.CancellationException) throw e; Result.failure(e) }
-                .getOrElse { error ->
-                    lastError = error
-                    emptyList()
-                }
-            if (collections.isNotEmpty()) {
-                return shell.copy(collections = collections)
-            }
+            // Authentication and server reachability are enough to finish setup.
+            // Library discovery is refreshed asynchronously after this connection
+            // is persisted, so a slow/large library cannot block the success UI.
+            return shell
         }
 
         val message = lastError?.message?.takeIf { it.isNotBlank() }
         error(message ?: context.getString(R.string.homeserver_no_libraries))
+    }
+
+    private fun refreshLibrariesInBackground(connection: HomeServerConnection) {
+        libraryRefreshScope.launch {
+            val collections = runCatching { fetchCollections(connection) }
+                .getOrDefault(emptyList())
+            if (collections.isEmpty()) return@launch
+            val current = currentConnections()
+            val updated = current.map { existing ->
+                if (connectionIdentity(existing) != connectionIdentity(connection)) {
+                    existing
+                } else {
+                    existing.copy(collections = mergeCollectionStates(collections, existing.collections))
+                }
+            }
+            saveConnections(updated)
+        }
     }
 
     private fun fetchPlexResources(accountToken: String): List<PlexResourceDevice> {
@@ -1455,11 +1529,12 @@ class HomeServerRepository @Inject constructor(
         preferredServerUrl: String,
         device: PlexResourceDevice?
     ): List<String> {
-        return buildList {
+        val candidates = buildList {
             preferredServerUrl.takeIf { it.isNotBlank() }?.let { add(it) }
             device?.connections
                 ?.sortedWith(
-                    compareByDescending<PlexResourceConnection> { it.local && !it.relay }
+                    compareBy<PlexResourceConnection> { isUnroutablePlexDirect(it.uri) }
+                        .thenByDescending { it.local && !it.relay }
                         .thenBy { it.relay }
                         .thenByDescending { it.uri.startsWith("https://", ignoreCase = true) }
                 )
@@ -1468,6 +1543,25 @@ class HomeServerRepository @Inject constructor(
             .map { normalizeServerUrl(it) }
             .filter { it.isNotBlank() }
             .distinctBy { it.lowercase(Locale.US) }
+        val publicCandidates = candidates.filterNot(::isUnroutablePlexDirect)
+        return if (publicCandidates.isNotEmpty()) {
+            publicCandidates + candidates.filter(::isUnroutablePlexDirect)
+        } else {
+            candidates
+        }
+    }
+
+    private fun isUnroutablePlexDirect(rawUrl: String): Boolean {
+        val host = rawUrl.toHttpUrlOrNull()?.host?.lowercase(Locale.US) ?: return false
+        if (!host.endsWith(".plex.direct")) return false
+        val firstLabel = host.substringBefore('.')
+        return firstLabel.startsWith("10-") ||
+            firstLabel.startsWith("127-") ||
+            firstLabel.startsWith("172-16-") ||
+            firstLabel.startsWith("172-17-") ||
+            firstLabel.startsWith("172-18-") ||
+            firstLabel.startsWith("172-19-") ||
+            firstLabel.startsWith("192-168-")
     }
 
     private fun sameServerEndpoint(left: String, right: String): Boolean {
@@ -2473,8 +2567,16 @@ class HomeServerRepository @Inject constructor(
     private fun JsonObject.itemsArray(): List<JsonElement> = array("Items")
 
     private fun JsonObject.metadataItems(kind: HomeServerKind): List<HomeServerItem> {
-        return array("MediaContainer", "Metadata").mapNotNull { it.asJsonObjectOrNull()?.toHomeServerItem(kind) }
+        val direct = array("MediaContainer", "Metadata")
+            .mapNotNull { it.asJsonObjectOrNull()?.toHomeServerItem(kind) }
             .ifEmpty { array("Metadata").mapNotNull { it.asJsonObjectOrNull()?.toHomeServerItem(kind) } }
+        if (direct.isNotEmpty()) return direct
+        // Plex /search wraps results in MediaContainer.Hub[].Metadata rather
+        // than MediaContainer.Metadata; ignoring hubs made valid local titles
+        // look absent whenever GUID lookup did not find them first.
+        return array("MediaContainer", "Hub")
+            .flatMap { hub -> hub.asJsonObjectOrNull()?.array("Metadata").orEmpty() }
+            .mapNotNull { it.asJsonObjectOrNull()?.toHomeServerItem(kind) }
     }
 
     private fun JsonObject.mediaSources(): List<HomeServerMediaSource> {

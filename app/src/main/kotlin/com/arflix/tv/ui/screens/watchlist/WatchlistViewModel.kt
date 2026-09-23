@@ -8,6 +8,7 @@ import com.arflix.tv.data.model.CatalogConfig
 import com.arflix.tv.data.model.CatalogKind
 import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.MediaItem
+import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.MediaType.MOVIE
 import com.arflix.tv.data.model.MediaType.TV
 import com.arflix.tv.data.repository.CatalogRepository
@@ -225,6 +226,7 @@ class WatchlistViewModel @Inject constructor(
     private var enrichmentInFlight = false
     private var enrichmentRequested = false
     private val logoRequestsInFlight = mutableSetOf<String>()
+    private var homeServerWatchlistItems: List<MediaItem> = emptyList()
 
     private fun watchlistDiagnosticContext(
         phase: String,
@@ -244,6 +246,31 @@ class WatchlistViewModel @Inject constructor(
 
     private fun List<MediaItem>.needsArtworkEnrichment(): Boolean {
         return any { item -> item.image.isBlank() && item.backdrop.isNullOrBlank() }
+    }
+
+    private fun mergeHomeServerWatchlistItems(items: List<MediaItem>): List<MediaItem> {
+        val merged = LinkedHashMap<Pair<MediaType, Int>, MediaItem>()
+        (items + homeServerWatchlistItems).forEach { item ->
+            val key = item.mediaType to item.id
+            val current = merged[key]
+            if (current == null || item.addedAt > current.addedAt) merged[key] = item
+        }
+        return merged.values.sortedWith(
+            compareBy<MediaItem> { it.sourceOrder }.thenByDescending { it.addedAt }
+        )
+    }
+
+    private suspend fun refreshHomeServerWatchlistItems() {
+        val serverItems = runCatching {
+            mediaRepository.loadHomeServerWatchlistItems()
+        }.getOrDefault(emptyList())
+        val imported = watchlistRepository.importHomeServerWatchlistItems(serverItems)
+        homeServerWatchlistItems = if (imported) {
+            // The imported records are now supplied by the profile watchlist.
+            serverItems.filter { it.id <= 0 }
+        } else {
+            serverItems
+        }
     }
 
     init {
@@ -283,7 +310,9 @@ class WatchlistViewModel @Inject constructor(
             watchlistRepository.watchlistItems.collect { items ->
                 if (traktSyncInFlight) return@collect
                 if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
-                    val orderedItems = items.watchlistDisplayOrder().enrichWithPlaybackProgress()
+                    val orderedItems = mergeHomeServerWatchlistItems(items)
+                        .watchlistDisplayOrder()
+                        .enrichWithPlaybackProgress()
                     sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = orderedItems
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -949,20 +978,22 @@ class WatchlistViewModel @Inject constructor(
 
     private fun loadWatchlistInstant() {
         sourceLoadJob = viewModelScope.launch {
+            refreshHomeServerWatchlistItems()
             val initialLocalItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()
-            if (initialLocalItems.isNotEmpty()) {
-                sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = initialLocalItems
+            val initialMergedItems = mergeHomeServerWatchlistItems(initialLocalItems)
+            if (initialMergedItems.isNotEmpty()) {
+                sourceItemsCache[WatchlistSourceItem.MyWatchlist.id] = initialMergedItems
                 if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
-                        movies = initialLocalItems.filter { it.mediaType == MOVIE },
-                        series = initialLocalItems.filter { it.mediaType == TV }
+                        movies = initialMergedItems.filter { it.mediaType == MOVIE },
+                        series = initialMergedItems.filter { it.mediaType == TV }
                     )
-                    fetchLogos(initialLocalItems)
+                    fetchLogos(initialMergedItems)
                 }
             }
 
-            if (initialLocalItems.isEmpty()) {
+            if (initialMergedItems.isEmpty()) {
                 withTimeoutOrNull(3_500) {
                     runCatching { cloudSyncRepository.pullFromCloud() }
                         .onFailure { error ->

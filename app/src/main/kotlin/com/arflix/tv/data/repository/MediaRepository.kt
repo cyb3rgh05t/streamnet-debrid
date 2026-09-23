@@ -2248,6 +2248,33 @@ class MediaRepository @Inject constructor(
         return CategoryPageResult(items = items, hasMore = page.hasMore)
     }
 
+    suspend fun loadHomeServerWatchlistItems(): List<MediaItem> {
+        val items = homeServerRepository.loadWatchlistItems().map { serverItem ->
+            val tmdbId = serverItem.providerIds["tmdb"]?.toIntOrNull()?.takeIf { it > 0 }
+            MediaItem(
+                id = tmdbId ?: HomeServerLibraryIdentity.stableNativeId(serverItem.sourceRef, serverItem.id),
+                title = serverItem.title,
+                subtitle = serverItem.providerName,
+                overview = serverItem.overview,
+                year = serverItem.year?.toString().orEmpty(),
+                releaseDate = serverItem.releaseDate,
+                rating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
+                tmdbRating = serverItem.rating?.let { String.format(Locale.US, "%.1f", it) }.orEmpty(),
+                mediaType = serverItem.mediaType,
+                image = serverItem.imageUrl,
+                backdrop = serverItem.backdropUrl,
+                addedAt = serverItem.addedAt,
+                isHomeServer = true,
+                homeServerItemId = serverItem.id,
+                homeServerSourceRef = serverItem.sourceRef,
+                homeServerProvider = serverItem.providerName,
+                homeServerImdbId = serverItem.providerIds["imdb"]
+            )
+        }
+        cacheItems(items)
+        return items
+    }
+
     private suspend fun resolveHomeServerCatalogItem(item: HomeServerCatalogItem): MediaItem? {
         val providers = item.providerIds.mapKeys { it.key.lowercase(Locale.US) }
         providers["tmdb"]?.toIntOrNull()?.let { tmdbId ->

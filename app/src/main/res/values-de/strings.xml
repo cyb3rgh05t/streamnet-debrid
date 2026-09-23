@@ -76,7 +76,7 @@
     <string name="settings_lock_enabled_toast">Einstellungen-Sperre aktiviert</string>
     <string name="settings_lock_disabled_toast">Einstellungen-Sperre deaktiviert</string>
     <string name="connect_to_cloud">Mit StreamNet Cloud verbinden</string>
-    <string name="profile_cloud_button">myStreamNet Cloud</string>
+    <string name="profile_cloud_button">StreamNet Cloud</string>
     <string name="next">Weiter</string>
     <string name="player_loading_video_stream">Videostream wird geladen…</string>
     <string name="player_loading_subtitles">Untertitel werden geladen…</string>

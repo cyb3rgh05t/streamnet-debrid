@@ -3627,6 +3627,36 @@ class HomeViewModel @Inject constructor(
                     chooseInitialHero(categories)
                 }
 
+                // Keep the last rendered presentation while the background
+                // badge/artwork jobs catch up with a fresh catalog snapshot.
+                val previousItems = _uiState.value.categories
+                    .asSequence()
+                    .flatMap { it.items.asSequence() }
+                    .associateBy { "${it.mediaType.name}:${it.id}" }
+                val stabilizedCategories = categories.map { category ->
+                    category.copy(
+                        items = category.items.map { item ->
+                            val previous = previousItems["${item.mediaType.name}:${item.id}"]
+                                ?: return@map item
+                            item.copy(
+                                image = item.image.ifBlank { previous.image },
+                                backdrop = item.backdrop ?: previous.backdrop,
+                                year = item.year.ifBlank { previous.year },
+                                releaseDate = item.releaseDate ?: previous.releaseDate,
+                                overview = item.overview.ifBlank { previous.overview },
+                                isWatched = item.isWatched || previous.isWatched,
+                                isPartiallyWatched = item.isPartiallyWatched || previous.isPartiallyWatched,
+                            )
+                        }
+                    )
+                }
+                val stabilizedHero = heroItem?.let { hero ->
+                    stabilizedCategories.asSequence()
+                        .flatMap { it.items.asSequence() }
+                        .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
+                        ?: hero
+                }
+
                 // The catalog rows are complete enough to use now. Logo lookups and
                 // image preloads continue below and update decoration independently.
                 // Previously the whole page stayed in skeleton state until every logo
@@ -3634,9 +3664,9 @@ class HomeViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
                     isInitialLoad = false,
-                    categories = categories,
+                    categories = stabilizedCategories,
                     collectionRows = collectionRows,
-                    heroItem = heroItem,
+                    heroItem = stabilizedHero,
                     categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
                     error = null
                 )
@@ -3644,7 +3674,7 @@ class HomeViewModel @Inject constructor(
                 // Preload logos for the first visible rows so card overlays appear immediately.
                 // Skip IPTV items — their channel logo is already in item.image.
                 // Skip items with disk-cached logos — no network call needed.
-                val itemsToPreload = categories
+                val itemsToPreload = stabilizedCategories
                     .take(initialLogoPrefetchRows)
                     .flatMap { it.items.take(initialLogoPrefetchItemsPerRow) }
                     .filter { isActionableMediaItem(it) && !isIptvItem(it) }

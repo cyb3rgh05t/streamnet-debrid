@@ -8476,6 +8476,7 @@ private fun IptvSettings(
                 Column(modifier = Modifier.settingsFocusSlot(rowIndex).fillMaxWidth().background(if (focusedIndex == rowIndex) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp)).border(width = if (focusedIndex == rowIndex) 2.dp else 0.dp, color = if (focusedIndex == rowIndex) focusRingColor else Color.Transparent, shape = RoundedCornerShape(12.dp)).clickable { onEditPlaylist(index) }.padding(horizontal = 18.dp, vertical = if (isStreamNetPreset) 18.dp else 16.dp)) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(imageVector = Icons.Default.LiveTv, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(22.dp))
@@ -8495,26 +8496,17 @@ private fun IptvSettings(
                                 )
                             }
                         }
-                    }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
                         CatalogActionChip(
                             icon = Icons.Default.Edit,
                             isFocused = focusedIndex == rowIndex && focusedActionIndex == 0,
                             onClick = { onEditPlaylist(index) }
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         CatalogActionChip(
                             icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
                             isFocused = focusedIndex == rowIndex && focusedActionIndex == 1,
                             enabled = isConfigured,
                             onClick = { onTogglePlaylist(index) }
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         CatalogActionChip(
                             icon = Icons.Default.List,
                             label = stringResource(R.string.settings_iptv_live_categories),
@@ -8522,7 +8514,6 @@ private fun IptvSettings(
                             enabled = isConfigured,
                             onClick = { onManageCategories(playlist.id) }
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
                         if (isStreamNetPreset) {
                             CatalogActionChip(
                                 icon = Icons.Default.Movie,
@@ -8537,13 +8528,11 @@ private fun IptvSettings(
                                 isFocused = focusedIndex == rowIndex && focusedActionIndex == 3,
                                 onClick = { onMovePlaylistUp(index) }
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
                             CatalogActionChip(
                                 icon = Icons.Default.ArrowDownward,
                                 isFocused = focusedIndex == rowIndex && focusedActionIndex == 4,
                                 onClick = { onMovePlaylistDown(index) }
                             )
-                            Spacer(modifier = Modifier.width(6.dp))
                             CatalogActionChip(
                                 icon = Icons.Default.Delete,
                                 isFocused = focusedIndex == rowIndex && focusedActionIndex == 5,

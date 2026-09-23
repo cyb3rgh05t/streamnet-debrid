@@ -367,18 +367,23 @@ fun MediaCard(
 
                 // Continue-Watching cards also show a partial-progress marker.
                 if (showWatched && (item.isWatched || item.isPartiallyWatched)) {
+                    val markColor = if (item.isPartiallyWatched && !item.isWatched) {
+                        Color.White.copy(alpha = 0.78f)
+                    } else {
+                        ArvioSkin.colors.watchedGreen
+                    }
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                        .padding(top = 7.dp, end = 7.dp)
-                        .size(20.dp)
+                        .padding(top = 8.dp, end = 8.dp)
+                        .size(16.dp)
                         .background(
                             color = Color.Black.copy(alpha = 0.72f),
                             shape = CircleShape
                         )
                         .border(
-                            width = 1.5.dp,
-                            color = progressAccentColor,
+                            width = 1.dp,
+                            color = markColor,
                             shape = CircleShape
                         ),
                     contentAlignment = Alignment.Center
@@ -387,15 +392,15 @@ fun MediaCard(
                         Icon(
                             imageVector = Icons.Default.Remove,
                             contentDescription = null,
-                            tint = progressAccentColor,
-                            modifier = Modifier.size(13.dp),
+                            tint = markColor,
+                            modifier = Modifier.size(10.dp),
                         )
                     } else {
                         Icon(
                             imageVector = Icons.Default.Check,
                             contentDescription = null,
-                            tint = progressAccentColor,
-                            modifier = Modifier.size(13.dp)
+                            tint = markColor,
+                            modifier = Modifier.size(10.dp)
                         )
                     }
                 }

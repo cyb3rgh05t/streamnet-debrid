@@ -274,7 +274,7 @@
     <string name="done">Done</string>
     <string name="save">Save</string>
     <string name="connect_to_cloud">Connect to StreamNet Cloud</string>
-    <string name="profile_cloud_button">myStreamNet Cloud</string>
+    <string name="profile_cloud_button">StreamNet Cloud</string>
     <string name="view_collection">View Collection</string>
 
     <!-- In-player subtitle settings panel -->
