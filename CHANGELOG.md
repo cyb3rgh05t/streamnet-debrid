@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.038] - 2026-09-23
+
+### Franchise-Serien und IPTV-Modus
+
+- Gemischte Franchise-Quellen filtern kuratierte Film-/Serien-Refs jetzt pro Tab, sodass Marvel-, DC- und Star-Wars-Serien nicht mehr durch die vorherigen Film-Refs leer erscheinen.
+- Die Marvel-TV-MDBList-Quelle ist explizit als Serienquelle markiert.
+- Die Jurassic-Franchise nutzt zusätzlich die Web-kompatible MDBList-Fallbackquelle.
+- Beim Start wird der IPTV-only-Modus beendet, wenn bereits ein Home Server vorhanden ist und die einmalige Umstellung bisher noch nicht erfasst wurde.
+- Android-Version: `2.5.038` / Code `439`.
+
 ## [Web 1.0.049] - 2026-09-23
 
 ### Franchise-Ansichten und Artwork

@@ -957,8 +957,9 @@ class MediaRepository @Inject constructor(
             // after /lists/ — e.g. "jxduffy/star-wars-chronological-order". Used
             // as a completeness fill-in behind curated lists: curated entries win
             // the ordering; mdblist-only items get appended at the end.
-            fun mdblistSource(slug: String) = CollectionSourceConfig(
+            fun mdblistSource(slug: String, mediaType: String? = null) = CollectionSourceConfig(
                 kind = CollectionSourceKind.MDBLIST_PUBLIC,
+                mediaType = mediaType,
                 mdblistSlug = slug
             )
             fun collection(
@@ -1383,7 +1384,7 @@ class MediaRepository @Inject constructor(
                     // the live-action MCU TV catalog (separate list so both
                     // flows populate from community-curated sources).
                     mdblistSource("lt3dave/marvel-cinematic-universe-mcu-collection"),
-                    mdblistSource("at0microuton/mcu-tv-shows")
+                    mdblistSource("at0microuton/mcu-tv-shows", mediaType = "series")
                 )
             ),
             collection(
@@ -1498,6 +1499,7 @@ class MediaRepository @Inject constructor(
                 hero = "https://image.tmdb.org/t/p/original/9xDQLI2rMokcQe4bJnb2optuuOO.jpg",
                 clearLogo = "https://image.tmdb.org/t/p/original/ec4wy0iZFkHTxw04HyX4r06DwrH.png",
                 sources = listOf(
+                    addonCollectionSource("aio-metadata", "all", "mdblist.120197"),
                     tmdbCollectionSource(328)
                 )
             ),

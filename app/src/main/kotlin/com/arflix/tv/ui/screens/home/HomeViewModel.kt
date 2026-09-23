@@ -2375,6 +2375,16 @@ class HomeViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
+            homeServerRepository.connections
+                .distinctUntilChanged()
+                .collect { connections ->
+                    iptvRepository.reconcileIptvOnlyModeWithHomeServer(
+                        hasHomeServer = connections.any { it.isUsable }
+                    )
+                }
+        }
+
+        viewModelScope.launch {
             profileManager.activeProfileId
                 .distinctUntilChanged()
                 .collect { profileId ->

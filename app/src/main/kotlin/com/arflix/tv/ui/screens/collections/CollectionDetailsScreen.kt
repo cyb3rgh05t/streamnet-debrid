@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Movie
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -409,7 +411,22 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {
-        val filteredSources = catalog.collectionSources.filter { sourceMatchesTab(it, tab) }
+        val filteredSources = catalog.collectionSources.flatMap { source ->
+            if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank()) {
+                val refs = source.curatedRefs.orEmpty().filter { ref ->
+                    when (ref.substringBefore(':').lowercase()) {
+                        "movie" -> tab == CollectionTab.MOVIES
+                        "tv", "series", "show" -> tab == CollectionTab.SERIES
+                        else -> false
+                    }
+                }
+                if (refs.isEmpty()) emptyList() else listOf(source.copy(curatedRefs = refs))
+            } else if (sourceMatchesTab(source, tab)) {
+                listOf(source)
+            } else {
+                emptyList()
+            }
+        }
         return catalog.copy(collectionSources = filteredSources)
     }
 
@@ -1053,10 +1070,41 @@ private fun CollectionEmptyState(message: String) {
             .height(320.dp),
         contentAlignment = Alignment.Center
     ) {
-        androidx.tv.material3.Text(
-            text = message,
-            color = TextSecondary,
-            style = ArflixTypography.body
-        )
+        val accent = resolveAccentColor(NeutralLogoBrandGradient.first())
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 24.dp)
+                .background(
+                    color = Color.White.copy(alpha = 0.055f),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .border(
+                    width = 1.dp,
+                    color = accent.copy(alpha = 0.35f),
+                    shape = RoundedCornerShape(14.dp)
+                )
+                .padding(horizontal = 28.dp, vertical = 22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .background(accent.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Default.Movie,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+            androidx.tv.material3.Text(
+                text = message,
+                color = TextPrimary,
+                style = ArflixTypography.body.copy(fontWeight = FontWeight.SemiBold)
+            )
+        }
     }
 }
