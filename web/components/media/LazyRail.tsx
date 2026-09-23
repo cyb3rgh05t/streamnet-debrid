@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Film } from "lucide-react";
 import { loadStored, saveStored } from "@/lib/storage";
 import { useApp } from "@/lib/store";
 import { localizedCatalogName } from "@/lib/catalogs";
@@ -20,6 +21,7 @@ export function LazyRail({
   onOpen,
   onFocus,
   onLoaded,
+  onEmpty,
   mediaTypeFilter,
   focusFirstItem = false,
 }: {
@@ -29,6 +31,7 @@ export function LazyRail({
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   onLoaded?: (category: Category) => void;
+  onEmpty?: () => void;
   mediaTypeFilter?: MediaItem["mediaType"];
   focusFirstItem?: boolean;
 }) {
@@ -73,11 +76,14 @@ export function LazyRail({
             setCategory(filteredRow);
             writeCachedCatalog(cacheKey, row);
             onLoaded?.(filteredRow);
+          } else {
+            onEmpty?.();
           }
         })
         .catch(() => {
           setLoading(false);
           setDone(true);
+          onEmpty?.();
         });
     };
 
@@ -128,9 +134,28 @@ export function LazyRail({
           <h3>{localizedCatalogName(catalog, settings.uiLanguage)}</h3>
         </div>
         <div className="rail-empty-state">
-          {settings.uiLanguage === "de"
-            ? "Keine Inhalte verfügbar"
-            : "No content available"}
+          <div
+            className="rail-empty-art"
+            style={
+              catalog.collectionCoverImageUrl
+                ? { backgroundImage: `url(${catalog.collectionCoverImageUrl})` }
+                : undefined
+            }
+          >
+            <Film size={34} strokeWidth={1.5} />
+          </div>
+          <div className="rail-empty-copy">
+            <strong>
+              {settings.uiLanguage === "de"
+                ? "Noch keine Inhalte"
+                : "No content yet"}
+            </strong>
+            <span>
+              {settings.uiLanguage === "de"
+                ? "Für diese Ansicht wurden keine passenden Titel gefunden."
+                : "No matching titles were found for this view."}
+            </span>
+          </div>
         </div>
       </section>
     );

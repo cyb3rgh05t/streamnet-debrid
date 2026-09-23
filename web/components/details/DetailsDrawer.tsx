@@ -26,6 +26,7 @@ import { createPortal } from "react-dom";
 import { MediaCard } from "@/components/media/MediaCard";
 import { RailScroller } from "@/components/media/RailScroller";
 import { config } from "@/lib/config";
+import { tmdbOriginalBackdropUrl } from "@/lib/mediaImages";
 import { accentColor } from "@/lib/accent";
 import { localize, type UiLanguage } from "@/lib/i18n";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
@@ -499,7 +500,7 @@ function DetailsView({ item }: { item: MediaItem }) {
         className="detail-backdrop"
         style={{
           backgroundImage: displayItem.backdrop
-            ? `url(${displayItem.backdrop})`
+            ? `url(${tmdbOriginalBackdropUrl(displayItem.backdrop)})`
             : undefined,
         }}
       />

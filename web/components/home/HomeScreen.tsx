@@ -6,6 +6,7 @@ import { IMDB_LOGO } from "@/lib/serviceLogos";
 import { genreNamesFromIds, getCardMeta, getLogoUrl } from "@/lib/tmdb";
 import { getImdbRating } from "@/lib/imdbRatings";
 import { loadGenreFanart } from "@/lib/genreFanart";
+import { tmdbOriginalBackdropUrl } from "@/lib/mediaImages";
 import { useApp } from "@/lib/store";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
@@ -472,7 +473,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
           style={{
             backgroundImage:
               displayHero.backdrop || displayHero.image
-                ? `url(${displayHero.backdrop || displayHero.image})`
+                ? `url(${tmdbOriginalBackdropUrl(displayHero.backdrop || displayHero.image)})`
                 : undefined,
           }}
         >

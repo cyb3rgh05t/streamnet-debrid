@@ -283,35 +283,6 @@ test("watchlist merges cloud and tracker items without duplicate titles", async 
   );
 });
 
-test("plex resume entries merge by Plex ratingKey instead of duplicate media ids", async () => {
-  const { mergePlexResumeItems } = await import(moduleUrl);
-  const cloudItem = {
-    id: 555,
-    mediaType: "tv",
-    title: "Plex Show",
-    seasonNumber: 2,
-    episodeNumber: 5,
-    activityAt: 2_000,
-    progress: 0.12,
-    homeServerType: "plex",
-    homeServerId: "plex-1",
-    homeServerItemId: "rating-42",
-  };
-  const localItem = {
-    ...cloudItem,
-    id: 777,
-    progress: 0.4,
-    activityAt: 5_000,
-    title: "Plex Show",
-  };
-
-  const merged = mergePlexResumeItems([cloudItem], [localItem]);
-  assert.equal(merged.length, 1);
-  assert.equal(merged[0].id, 777);
-  assert.equal(merged[0].progress, 0.4);
-  assert.equal(merged[0].activityAt, 5_000);
-});
-
 test("active cloud resume wins over newer completed history for the same title", async () => {
   const { preferActiveCloudResumeRecord } = await import(moduleUrl);
   const activeBull = {

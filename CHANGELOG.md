@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.049] - 2026-09-23
+
+### Franchise-Ansichten und Artwork
+
+- Home-Server-Continue-Watching-Sonderlogik aus dem Web entfernt; Continue Watching folgt wieder dem normalen StreamNet-/Cloud-/optionalen-Tracker-Vertrag wie Android.
+- Franchise-Film-/Serien-Tabs bleiben sichtbar, wenn eine unterstützte Ansicht leer ist; die Auswahl springt nicht mehr automatisch zurück auf Filme.
+- Leere Franchise-Ansichten zeigen jetzt einen gestalteten Empty State mit Franchise-Cover, Icon und erklärendem Text.
+- Große Home-Hero- und Details-Backdrops laden die TMDB-Originalauflösung, während Karten weiterhin kleinere Bildvarianten verwenden.
+- Web-Version: `1.0.049`.
+
 ## [Web 1.0.048] - 2026-09-23
 
 ### Home Server und Hero-Darstellung
