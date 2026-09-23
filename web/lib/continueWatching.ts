@@ -278,16 +278,25 @@ export function preferActiveCloudResumeRecord<
     : current;
 }
 
+function plexIdentityKey(item: MediaItem): string | null {
+  if (item.homeServerType !== "plex" || !item.homeServerItemId) return null;
+  return `plex:${item.homeServerId ?? "global"}:${item.homeServerItemId}`;
+}
+
 /** Active cloud episodes win same-show arbitration before completion filtering. */
 export function dedupeContinueWatchingShows(
   items: MediaItem[],
   activeResumeKeys: Set<string> = new Set(),
 ): MediaItem[] {
-  const exactKey = (item: MediaItem) =>
-    item.mediaType === "tv"
+  const exactKey = (item: MediaItem) => {
+    const plexKey = plexIdentityKey(item);
+    if (plexKey) return plexKey;
+    return item.mediaType === "tv"
       ? `tv:${item.id}:${item.seasonNumber}:${item.episodeNumber}`
       : `movie:${item.id}`;
-  const showKey = (item: MediaItem) => `${item.mediaType}:${item.id}`;
+  };
+  const showKey = (item: MediaItem) =>
+    plexIdentityKey(item) ?? `${item.mediaType}:${item.id}`;
   const isNewer = (candidate: MediaItem, current: MediaItem) =>
     (candidate.activityAt ?? 0) > (current.activityAt ?? 0) ||
     ((candidate.activityAt ?? 0) === (current.activityAt ?? 0) &&
@@ -315,6 +324,63 @@ export function dedupeContinueWatchingShows(
   }
   return [...newestByShow.values()].sort(
     (a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0),
+  );
+}
+
+export function mergePlexResumeItems(
+  localItems: MediaItem[],
+  cloudItems: MediaItem[],
+): MediaItem[] {
+  const pickNewer = (current: MediaItem, candidate: MediaItem): MediaItem => {
+    const currentTs = current.activityAt ?? 0;
+    const candidateTs = candidate.activityAt ?? 0;
+    if (candidateTs !== currentTs) {
+      return candidateTs > currentTs ? candidate : current;
+    }
+    const currentProgress = Number(
+      current.progress ?? current.resumePositionSeconds ?? 0,
+    );
+    const candidateProgress = Number(
+      candidate.progress ?? candidate.resumePositionSeconds ?? 0,
+    );
+    if (candidateProgress !== currentProgress) {
+      return candidateProgress > currentProgress ? candidate : current;
+    }
+    return (candidate.resumePositionSeconds ?? 0) >
+      (current.resumePositionSeconds ?? 0)
+      ? candidate
+      : current;
+  };
+
+  const newestByIdentity = new Map<string, MediaItem>();
+  for (const item of [...localItems, ...cloudItems]) {
+    const key = plexIdentityKey(item) ?? `${item.mediaType}:${item.id}`;
+    const current = newestByIdentity.get(key);
+    newestByIdentity.set(key, current ? pickNewer(current, item) : item);
+  }
+
+  return [...newestByIdentity.values()].sort(
+    (a, b) => (b.activityAt ?? 0) - (a.activityAt ?? 0),
+  );
+}
+
+/**
+ * A unified watchlist is a union of every enabled source. When sources describe
+ * the same title, retain one card and use the most recently changed record.
+ */
+export function mergeWatchlistItems(...sources: MediaItem[][]): MediaItem[] {
+  const identity = (item: MediaItem) =>
+    `${item.mediaType}:${item.tmdbId ?? item.id}`;
+  const newestByIdentity = new Map<string, MediaItem>();
+  for (const item of sources.flat()) {
+    const key = identity(item);
+    const current = newestByIdentity.get(key);
+    if (!current || (item.activityAt ?? 0) > (current.activityAt ?? 0)) {
+      newestByIdentity.set(key, item);
+    }
+  }
+  return [...newestByIdentity.values()].sort(
+    (left, right) => (right.activityAt ?? 0) - (left.activityAt ?? 0),
   );
 }
 

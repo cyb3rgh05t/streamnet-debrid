@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.048] - 2026-09-23
+
+### Home Server und Hero-Darstellung
+
+- Home-Server-Watchlists werden im Web gelesen, mit Cloud- und optionalen Tracker-Watchlists gemerged und neue Einträge profilbezogen in StreamNet Cloud importiert.
+- Plex, Jellyfin und Emby bleiben als separate browsebare Library-Quellen erhalten; die Home-Server-Library-Anzeige wird nicht als eigene Merkliste behandelt.
+- Vordefinierte Franchise-Karten werden bei bestehenden Katalogzuständen wieder in die kanonische Android-Reihenfolge eingeordnet, damit neue Karten wie Fast & Furious nicht nur im Web hinten angehängt werden.
+- Hero- und Details-Backdrops verwenden eine obere Bildausrichtung, damit wichtige Artwork-Bereiche am oberen Rand nicht durch das vertikale `cover`-Cropping verloren gehen.
+- Web-Version: `1.0.048`.
+
 ## [2.5.037] - 2026-09-23
 
 ### Home Server, IPTV und Home-UI

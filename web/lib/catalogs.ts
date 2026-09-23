@@ -960,5 +960,33 @@ export function mergeCatalogs(
       enabled,
     });
   }
+
+  // Existing cloud snapshots can contain collection cards in the order from an
+  // older Web build. Keep user state (enabled/hidden/settings), but place the
+  // preinstalled collection cards back into the canonical Android order so a
+  // newly added franchise cannot appear at the end of the rail only on Web.
+  const canonicalCollections = new Set(
+    defaultCatalogs
+      .filter((catalog) => {
+        const kind = String(catalog.kind ?? "").toUpperCase();
+        return kind === "COLLECTION" && catalog.isPreinstalled;
+      })
+      .map((catalog) => catalog.id),
+  );
+  const collectionSlots = result
+    .map((catalog, index) => ({ catalog, index }))
+    .filter(({ catalog }) => canonicalCollections.has(catalog.id));
+  const orderedCollections = [...collectionSlots]
+    .map(({ catalog }) => catalog)
+    .sort(
+      (left, right) =>
+        (defaultCatalogs.findIndex((catalog) => catalog.id === left.id) ??
+          Number.MAX_SAFE_INTEGER) -
+        (defaultCatalogs.findIndex((catalog) => catalog.id === right.id) ??
+          Number.MAX_SAFE_INTEGER),
+    );
+  collectionSlots.forEach(({ index }, slotIndex) => {
+    result[index] = orderedCollections[slotIndex];
+  });
   return result;
 }

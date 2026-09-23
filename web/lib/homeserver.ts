@@ -718,6 +718,55 @@ export async function loadHomeServerRows(
   );
 }
 
+/**
+ * Loads user-saved home-server titles without treating an entire library as a
+ * watchlist. Plex uses its account Watchlist; Jellyfin and Emby use favourites.
+ */
+export async function loadHomeServerWatchlistItems(
+  servers: HomeServerConfig[],
+): Promise<MediaItem[]> {
+  const active = servers.filter((server) => server.enabled && server.url);
+  const rows = await Promise.all(
+    active.map(async (server) => {
+      if (server.type === "plex") {
+        const token = server.accountToken ?? server.token;
+        if (!token) return [];
+        const payload = await proxiedGet<{
+          MediaContainer?: { Metadata?: PlexItem[] };
+        }>(
+          `https://discover.provider.plex.tv/library/sections/watchlist/all?includeGuids=1&X-Plex-Token=${encodeURIComponent(token)}`,
+          { Accept: "application/json", "X-Plex-Token": token },
+        ).catch(() => null);
+        return (payload?.MediaContainer?.Metadata ?? [])
+          .filter((item) => item.type === "movie" || item.type === "show")
+          .map((item) =>
+            mapPlexItem(
+              "https://metadata.provider.plex.tv",
+              token,
+              item,
+              server,
+            ),
+          );
+      }
+
+      const session = await ensureSession(server).catch(() => null);
+      if (!session) return [];
+      const base = trimUrl(server.url);
+      const payload = await proxiedGet<{ Items?: JellyfinItem[] }>(
+        `${base}/Users/${session.userId}/Items?Recursive=true&IncludeItemTypes=Movie,Series&IsFavorite=true&SortBy=DateCreated&SortOrder=Descending&Limit=250&Fields=Overview,ImageTags,BackdropImageTags,PrimaryImageTag,ProductionYear,CommunityRating,ProviderIds,DateCreated,PremiereDate&api_key=${encodeURIComponent(session.token)}`,
+        {
+          "X-Emby-Token": session.token,
+          "X-MediaBrowser-Token": session.token,
+        },
+      ).catch(() => null);
+      return (payload?.Items ?? []).map((item) =>
+        mapItem(base, session.token, item, server),
+      );
+    }),
+  );
+  return rows.flat();
+}
+
 export function clearHomeServerSessions() {
   sessionCache.clear();
 }

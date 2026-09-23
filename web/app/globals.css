@@ -4883,7 +4883,7 @@ select:focus {
   inset: 0 0 auto;
   height: clamp(520px, 75vh, 820px);
   background-size: cover;
-  background-position: center right;
+  background-position: center top;
 }
 
 .detail-backdrop::after {
@@ -11045,7 +11045,7 @@ button,
 .hero {
   min-height: clamp(620px, 82vh, 880px) !important;
   padding: clamp(145px, 17.5vh, 200px) 3.35vw clamp(150px, 20vh, 240px) !important;
-  background-position: 68% center !important;
+  background-position: 68% top !important;
   background-size: cover !important;
   isolation: isolate;
 }

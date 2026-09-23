@@ -58,6 +58,7 @@ import {
   watchedKeysFromShowProgress,
   mergePartialContinueWatching,
   mergeTrackerContinueWatching,
+  mergeWatchlistItems,
   preserveActiveCloudResumes,
   pruneCompletedResume,
   traktProgressActivityKey,
@@ -68,7 +69,7 @@ import { externalLaunchMode, openExternalPlayer } from "./externalPlayers";
 import { playbackPlan } from "./streamCompatibility";
 import { prepareBrowserStream } from "./prepareBrowserStream";
 import { reportHomeServerPlayback } from "./homeServerPlayback";
-import { loadHomeServerRows } from "./homeserver";
+import { loadHomeServerRows, loadHomeServerWatchlistItems } from "./homeserver";
 import {
   buildXtreamCatchupUrl,
   iptvPlaylistSignature,
@@ -569,8 +570,16 @@ function mergeTraktWithLocalResume(
   activeResumeKeys: Set<string> = new Set(),
 ) {
   if (!localItems.length) return traktItems;
-  const exactKey = (item: MediaItem) =>
-    `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`;
+  const exactKey = (item: MediaItem) => {
+    const plexKey =
+      item.homeServerType === "plex" && item.homeServerItemId
+        ? `plex:${item.homeServerId ?? "global"}:${item.homeServerItemId}`
+        : null;
+    return (
+      plexKey ??
+      `${item.mediaType}:${item.id}:${item.seasonNumber ?? ""}:${item.episodeNumber ?? ""}`
+    );
+  };
   const isNewer = (candidate: MediaItem, current: MediaItem) =>
     (candidate.activityAt ?? 0) > (current.activityAt ?? 0) ||
     ((candidate.activityAt ?? 0) === (current.activityAt ?? 0) &&
@@ -1517,6 +1526,7 @@ export function AppProvider({
             watchedMoviesRows,
             watchedShowsRows,
             cloudWatchlistRows,
+            homeServerWatchlistRows,
             cloudWatchedKeys,
             cloudDismissals,
             hiddenShowIds,
@@ -1539,6 +1549,9 @@ export function AppProvider({
             authClient.session
               ? pullCloudWatchlist(authClient, profileId).catch(() => [])
               : Promise.resolve([]),
+            loadHomeServerWatchlistItems(effectiveSettings.homeServers).catch(
+              () => [],
+            ),
             authClient.session
               ? pullCloudWatchedKeys(authClient, profileId).catch(
                   () => new Set<string>(),
@@ -1623,9 +1636,43 @@ export function AppProvider({
           // ~1s, WITHOUT waiting on loadTraktUpNext (~120 per-show progress calls)
           // or the per-item TMDB hydration below. The richer Trakt up-next data
           // enriches CW a moment later.
-          const fastWatchlistSource = traktRows.length
-            ? dedupeMedia(traktRows.map(traktItemToMedia))
-            : cloudWatchlistRows;
+          const fastWatchlistSource = mergeWatchlistItems(
+            traktRows.map(traktItemToMedia),
+            cloudWatchlistRows,
+            homeServerWatchlistRows,
+          );
+          // A saved home-server title is an additive import into the StreamNet
+          // profile list. Removing it on Plex/Jellyfin/Emby never deletes the
+          // user's Cloud copy; removing it in StreamNet remains explicit.
+          void hydrateTraktItems(homeServerWatchlistRows)
+            .then(async (hydratedHomeItems) => {
+              if (!isCurrent()) return;
+              const importable = hydratedHomeItems.filter(
+                (item) => item.id > 0,
+              );
+              const importedWatchlist = mergeWatchlistItems(
+                cloudWatchlistRows,
+                importable,
+              );
+              const cloudKeys = new Set(
+                cloudWatchlistRows.map(
+                  (item) => `${item.mediaType}:${item.id}`,
+                ),
+              );
+              if (
+                importable.some(
+                  (item) => !cloudKeys.has(`${item.mediaType}:${item.id}`),
+                ) &&
+                authClient.session
+              ) {
+                await saveCloudWatchlist(
+                  authClient,
+                  importedWatchlist,
+                  profileId,
+                ).catch(() => undefined);
+              }
+            })
+            .catch(() => undefined);
           if (fastWatchlistSource.length) {
             void hydrateTraktItems(fastWatchlistSource)
               .then((hydrated) => {
@@ -1950,10 +1997,13 @@ export function AppProvider({
             }
           }
           // Refresh the watchlist with the authoritative Trakt list if it differs.
-          const watchlistSource =
+          const watchlistSource = mergeWatchlistItems(
             watchlistReady && !readFailures.has("watchlist")
-              ? dedupeMedia(traktRows.map(traktItemToMedia))
-              : cloudWatchlistRows;
+              ? traktRows.map(traktItemToMedia)
+              : [],
+            cloudWatchlistRows,
+            homeServerWatchlistRows,
+          );
           const hydratedWatchlist = await hydrateTraktItems(watchlistSource);
           if (!readFailures.has("watchlist") && isCurrent()) {
             setWatchlist(hydratedWatchlist);
