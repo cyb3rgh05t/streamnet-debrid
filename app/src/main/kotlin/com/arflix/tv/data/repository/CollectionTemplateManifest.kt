@@ -33,7 +33,7 @@ internal data class CollectionTemplateEntry(
 
 internal object CollectionTemplateManifest {
     private const val ASSET_COMMIT = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
-    private const val FRANCHISE_ASSET_COMMIT = "1a759ef57b2db8dbba92d14f7ac35211f1bcc95d"
+    private const val FRANCHISE_ASSET_COMMIT = "d6d01a462a006203757ae0e6afa6c839b32c458e"
     private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
     private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
     private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
@@ -963,6 +963,20 @@ internal object CollectionTemplateManifest {
             heroVideoUrl = null,
             sources = emptyList(),
             listMetadata = emptyList()
+        ),
+        entry(
+            title = "Scream",
+            group = CollectionGroupKind.FRANCHISE,
+            coverImageUrl = "${FRANCHISE_IMAGE_BASE}Scream.jpg",
+            tileShape = CollectionTileShape.LANDSCAPE,
+            hideTitle = true,
+            heroVideoUrl = null,
+            sources = listOf(
+                tmdbCollectionSource(2602)
+            ),
+            listMetadata = listOf(
+                metadata(sourceCatalogId = "tmdb.collection.2602", sourceAddonId = null, sourceName = "Scream Collection", sourceLabel = "TMDB", mediaType = "movie", itemCount = null, author = null, url = "https://www.themoviedb.org/collection/2602-scream-collection")
+            )
         )
     )
 

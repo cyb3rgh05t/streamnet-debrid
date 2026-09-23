@@ -2,6 +2,22 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.035] - 2026-09-23
+
+### Scream-Franchise
+
+- Neues Franchise „Scream“ ist verfügbar und nutzt die TMDB-Collection `2602`.
+- Der gepinnte Franchise-Asset-Commit wurde auf `d6d01a462a006203757ae0e6afa6c839b32c458e` aktualisiert, damit `Scream.jpg` geladen wird.
+- Android-Version: `2.5.035` / Code `436`.
+
+## [Web 1.0.047] - 2026-09-23
+
+### Scream-Franchise
+
+- Neues Franchise „Scream“ ist verfügbar und nutzt die TMDB-Collection `2602`.
+- Der gepinnte Franchise-Asset-Commit wurde auf `d6d01a462a006203757ae0e6afa6c839b32c458e` aktualisiert, damit `Scream.jpg` geladen wird.
+- Web-Version: `1.0.047`.
+
 ## [Backend 1.0.020] - 2026-09-22
 
 ### Zentrierter Auth-Erfolgsdialog

@@ -258,7 +258,7 @@ const starWarsCuratedRefs = [
 const androidAssetBase =
   "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/9cc3dde7f7960c9256f0d81a761aa3ccbad4b976/";
 const franchiseAssetBase =
-  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/1a759ef57b2db8dbba92d14f7ac35211f1bcc95d/images/Franchises/";
+  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/d6d01a462a006203757ae0e6afa6c839b32c458e/images/Franchises/";
 const streamingImageBase = `${androidAssetBase}images/Landscape%20Streaming%20Services/`;
 const videoBase = `${androidAssetBase}networks%20videos/`;
 
@@ -430,6 +430,7 @@ const androidCollectionArtwork: Record<
     cover: `${franchiseAssetBase}Transformers.jpg`,
     hideTitle: true,
   },
+  Scream: { cover: `${franchiseAssetBase}Scream.jpg`, hideTitle: true },
 };
 
 const androidCollectionDefaults: CatalogConfig[] = [
@@ -543,6 +544,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
     "The Godfather",
     "John Wick",
     "Transformers",
+    "Scream",
   ].map((title) => {
     const sources = {
       Marvel: [
@@ -630,6 +632,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
       "The Godfather": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 230 }],
       "John Wick": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 404609 }],
       Transformers: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 8650 }],
+      Scream: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 2602 }],
     }[title];
     return collectionDefault(title, "FRANCHISE", sources);
   }),
