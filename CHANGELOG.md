@@ -2,7 +2,7 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
-## [2.5.039] - 2026-09-24
+## [2.5.040] - 2026-09-24
 
 ### MDBList-Katalogquellen
 
