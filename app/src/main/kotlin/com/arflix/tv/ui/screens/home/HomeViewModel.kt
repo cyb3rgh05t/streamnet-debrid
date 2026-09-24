@@ -54,6 +54,7 @@ import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.detectDeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -867,7 +868,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun sanitizeContinueWatchingItems(items: List<ContinueWatchingItem>): List<ContinueWatchingItem> {
+    private suspend fun sanitizeContinueWatchingItems(
+        items: List<ContinueWatchingItem>,
+        allowNetwork: Boolean = true,
+    ): List<ContinueWatchingItem> {
         val installedAddons = streamRepository.installedAddons.first()
         val nonLiveItems = items.filterNot { item ->
             SportsAddonCapabilities.isLiveStreamOrSportsItem(
@@ -891,6 +895,9 @@ class HomeViewModel @Inject constructor(
             val season = item.season
             val episode = item.episode
             if (season == null || episode == null) {
+                return@mapNotNull item
+            }
+            if (!allowNetwork) {
                 return@mapNotNull item
             }
 
@@ -1582,6 +1589,12 @@ class HomeViewModel @Inject constructor(
     }
 
     private fun chooseInitialHero(categories: List<Category>): MediaItem? {
+        val continueWatchingHero = categories
+            .firstOrNull { it.id == "continue_watching" }
+            ?.items
+            ?.firstOrNull { !it.isPlaceholder }
+        if (continueWatchingHero != null) return continueWatchingHero
+
         val preferredRow = categories.firstOrNull { category ->
             !category.id.startsWith("collection_row_") && category.items.any { !it.isPlaceholder }
         }
@@ -1703,25 +1716,30 @@ class HomeViewModel @Inject constructor(
     private fun warmFirstIptvRailArtwork(categories: List<Category>) {
         val firstItems = categories
             .filter { isIptvLiveHomeCategory(it.id) }
-            .mapNotNull { it.items.firstOrNull() }
+            .flatMap { it.items.take(6) }
             .distinctBy { it.id }
         if (firstItems.isEmpty()) return
 
         iptvHomeArtworkWarmupJob?.cancel()
         iptvHomeArtworkWarmupJob = viewModelScope.launch(networkDispatcher) {
-            firstItems.forEach { item ->
-                val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@forEach
-                coroutineScope {
-                    val backdrop = async {
-                        lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+            val semaphore = Semaphore(2)
+            firstItems.mapNotNull { item ->
+                val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                async {
+                    semaphore.withPermit {
+                        coroutineScope {
+                            val backdrop = async {
+                                lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                            }
+                            val logo = async {
+                                lookupIptvProgramLogo(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                            }
+                            backdrop.await()?.let { preloadBackdropImages(listOf(it)) }
+                            logo.await()?.let { preloadLogoImages(listOf(it), batchLimit = 1) }
+                        }
                     }
-                    val logo = async {
-                        lookupIptvProgramLogo(title, item.liveProgramStartMs, item.liveProgramEndMs)
-                    }
-                    backdrop.await()?.let { preloadBackdropImages(listOf(it)) }
-                    logo.await()?.let { preloadLogoImages(listOf(it), batchLimit = 1) }
                 }
-            }
+            }.awaitAll()
         }
     }
 
@@ -1862,6 +1880,7 @@ class HomeViewModel @Inject constructor(
     private val networkDispatcher = Dispatchers.IO.limitedParallelism(networkParallelism)
     private var lastContinueWatchingItems: List<MediaItem> = emptyList()
     private var lastContinueWatchingUpdateMs: Long = 0L
+    private var lastForcedContinueWatchingRefreshMs: Long = 0L
     private var lastResolvedBaseCategories: List<Category> = emptyList()
     private val dismissedContinueWatchingAt = Collections.synchronizedMap(mutableMapOf<String, Long>())
     private val CONTINUE_WATCHING_REFRESH_MS = 45_000L
@@ -1926,6 +1945,7 @@ class HomeViewModel @Inject constructor(
     private var loadHomeJob: Job? = null
     private var refreshContinueWatchingJob: Job? = null
     private var watchedBadgesJob: Job? = null
+    private val initialCategoriesCacheReady = CompletableDeferred<Unit>()
     private var loadHomeRequestId: Long = 0L
     private var activeRuntimeProfileId: String? = null
     private var observedContentLanguage: String? = null
@@ -1998,6 +2018,8 @@ class HomeViewModel @Inject constructor(
     private val logoFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
     private val heroDetailsCache = ConcurrentHashMap<String, HeroDetailsSnapshot>()
     private val heroDetailsFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
+    private val heroTrailerFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
+    private val heroTrailerResolved = Collections.synchronizedSet(mutableSetOf<String>())
     private val heroDetailsPrefetchSemaphore = Semaphore(if (isLowRamDevice) 1 else 2)
     private val savedCatalogById = ConcurrentHashMap<String, CatalogConfig>()
     private val categoryPaginationStates = ConcurrentHashMap<String, CategoryPaginationState>()
@@ -2035,7 +2057,7 @@ class HomeViewModel @Inject constructor(
 
     private fun scheduleInitialHomeLoad() {
         viewModelScope.launch {
-            applyContentLanguageFromPrefs()
+            initialCategoriesCacheReady.await()
             if (
                 usedPreloadedData ||
                 _uiState.value.categories.isNotEmpty() ||
@@ -2309,6 +2331,8 @@ class HomeViewModel @Inject constructor(
         logoCacheDiskWriteJob?.cancel()
         heroDetailsCache.clear()
         heroDetailsFetchInFlight.clear()
+        heroTrailerFetchInFlight.clear()
+        heroTrailerResolved.clear()
         synchronized(logoCacheLock) {
             logoCacheLanguage = normalizeLogoCacheLanguage(contentLanguage)
             logoCache.clear()
@@ -2548,7 +2572,8 @@ class HomeViewModel @Inject constructor(
         // (catalogs, addons, settings pushed by TV/phone). This ensures the UI
         // reflects the latest state without waiting for the next ON_RESUME.
         viewModelScope.launch {
-            realtimeSyncManager.accountSyncEvents.collect {
+            realtimeSyncManager.accountSyncEvents.collectLatest {
+                delay(750L)
                 loadHomeData()
                 runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
             }
@@ -2632,8 +2657,10 @@ class HomeViewModel @Inject constructor(
                         }
                     }
                 }
-                    } catch (e: Exception) {
+            } catch (e: Exception) {
                 if (e is CancellationException) throw e
+            } finally {
+                initialCategoriesCacheReady.complete(Unit)
             }
         }
 
@@ -3052,7 +3079,7 @@ class HomeViewModel @Inject constructor(
             // leave the CW row empty for minutes (especially when the Trakt
             // progress endpoint throttles with HTTP 429).
             val instant = try {
-                resolveContinueWatchingItemsStable(forceFresh = false)
+                resolveContinueWatchingItemsStable(forceFresh = false, allowNetwork = false)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (error: Exception) {
@@ -3067,20 +3094,21 @@ class HomeViewModel @Inject constructor(
             }
             if (instant.isNotEmpty() && continueWatchingUpdates.revision == localUpdateRevision) {
                 publishContinueWatching(instant)
-                val hydratedInstant = repairContinueWatchingMetadataIfNeeded(instant)
-                if (
-                    hydratedInstant != instant &&
-                    continueWatchingUpdates.revision == localUpdateRevision
-                ) {
-                    publishContinueWatching(hydratedInstant)
-                }
             }
 
             // SLOW PATH — do a freshness refresh in the background. If it
             // returns something different, republish. Swallows transient
             // Trakt 429s so the visible row doesn't blink back to empty.
+            delayUntilStartupSettled(extraDelayMs = 4_000L)
+            val hydratedInstant = repairContinueWatchingMetadataIfNeeded(instant)
+            if (
+                hydratedInstant != instant &&
+                continueWatchingUpdates.revision == localUpdateRevision
+            ) {
+                publishContinueWatching(hydratedInstant)
+            }
             val fresh = try {
-                resolveContinueWatchingItemsStable(forceFresh = true)
+                resolveContinueWatchingItemsStable(forceFresh = true, allowNetwork = true)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (error: Exception) {
@@ -3181,12 +3209,13 @@ class HomeViewModel @Inject constructor(
                     )
                     if (requestId != loadHomeRequestId) return@loadHome
                     if (persistedSkeleton.isNotEmpty()) {
+                        val currentHero = _uiState.value.heroItem
                         _uiState.value = _uiState.value.copy(
                             isLoading = true,
                             isInitialLoad = false,
                             categories = persistedSkeleton,
-                            heroItem = null,
-                            heroLogoUrl = null,
+                            heroItem = currentHero,
+                            heroLogoUrl = _uiState.value.heroLogoUrl,
                             error = null
                         )
                     }
@@ -3210,12 +3239,14 @@ class HomeViewModel @Inject constructor(
                     )
                     if (requestId != loadHomeRequestId) return@loadHome
                     if (earlySkeleton.isNotEmpty()) {
+                        val currentHero = _uiState.value.heroItem
                         _uiState.value = _uiState.value.copy(
                             isLoading = true,
                             isInitialLoad = false,
                             categories = earlySkeleton,
-                            heroItem = earlySkeleton.firstOrNull()?.items?.firstOrNull { !it.isPlaceholder },
-                            heroLogoUrl = null,
+                            heroItem = currentHero
+                                ?: earlySkeleton.firstOrNull()?.items?.firstOrNull { !it.isPlaceholder },
+                            heroLogoUrl = _uiState.value.heroLogoUrl,
                             error = null
                         )
                     }
@@ -3680,6 +3711,13 @@ class HomeViewModel @Inject constructor(
                     categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
                     error = null
                 )
+                stabilizedHero?.let { item ->
+                    if (isStartupSettling()) {
+                        scheduleStartupHeroHydration(item)
+                    } else {
+                        hydrateHeroDetailsIfNeeded(item)
+                    }
+                }
 
                 // Preload logos for the first visible rows so card overlays appear immediately.
                 // Skip IPTV items — their channel logo is already in item.image.
@@ -3726,13 +3764,6 @@ class HomeViewModel @Inject constructor(
                             heroLogoUrl = heroLogoFromCache ?: _uiState.value.heroLogoUrl,
                             categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore }
                         )
-                        heroItem?.let { item ->
-                            if (isStartupSettling()) {
-                                scheduleStartupHeroHydration(item)
-                            } else {
-                                hydrateHeroDetailsIfNeeded(item)
-                            }
-                        }
                         replaceCardLogoState(snapshotLogoCache())
                     }
                 }
@@ -4544,6 +4575,10 @@ class HomeViewModel @Inject constructor(
     }
 
     fun refreshContinueWatchingOnly(force: Boolean = false) {
+        val now = SystemClock.elapsedRealtime()
+        if (force && now - lastForcedContinueWatchingRefreshMs < 3_000L) return
+        if (force) lastForcedContinueWatchingRefreshMs = now
+        if (!force && cwFetchJob?.isActive == true) return
         // Don't cancel an in-progress Trakt fetch - restarting a fetch that takes
         // 10+ seconds (424 watched shows, 41 filtered, 50 progress API calls) wastes
         // time and causes Continue Watching to never appear. Multiple callers
@@ -4713,7 +4748,9 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun loadContinueWatchingFromHistoryStable(): List<ContinueWatchingItem> {
+    private suspend fun loadContinueWatchingFromHistoryStable(
+        allowNetwork: Boolean = true,
+    ): List<ContinueWatchingItem> {
         return try {
             val entries = watchHistoryRepository.getContinueWatching()
             if (entries.isEmpty()) return emptyList()
@@ -4752,7 +4789,16 @@ class HomeViewModel @Inject constructor(
                     updatedAtMs = parseContinueWatchingUpdatedAt(entry.updated_at, entry.paused_at)
                 )
             }
-            traktRepository.enrichContinueWatchingItems(mapped)
+            if (!allowNetwork || mapped.isEmpty()) {
+                mapped
+            } else {
+                val enrichedFirst = traktRepository
+                    .enrichContinueWatchingItems(mapped.take(1))
+                    .firstOrNull()
+                if (enrichedFirst == null) mapped else {
+                    listOf(enrichedFirst) + mapped.drop(1)
+                }
+            }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
         } catch (_: Exception) {
@@ -4760,7 +4806,10 @@ class HomeViewModel @Inject constructor(
         }
     }
 
-    private suspend fun resolveContinueWatchingItemsStable(forceFresh: Boolean): List<ContinueWatchingItem> {
+    private suspend fun resolveContinueWatchingItemsStable(
+        forceFresh: Boolean,
+        allowNetwork: Boolean = true,
+    ): List<ContinueWatchingItem> {
         val useRemoteSync = try {
             remoteSyncManager.isRemoteConnected(TrackingFeature.CONTINUE_WATCHING)
         } catch (e: kotlinx.coroutines.CancellationException) {
@@ -4808,14 +4857,14 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) {
                 emptyList()
             }
-            val historyItems = loadContinueWatchingFromHistoryStable()
+            val historyItems = loadContinueWatchingFromHistoryStable(allowNetwork = allowNetwork)
             mergeTraktAndRecentLocalContinueWatching(
                 traktItems = remoteItems,
                 localItems = localItems,
                 historyItems = historyItems
             )
         } else {
-            val historyItems = loadContinueWatchingFromHistoryStable()
+            val historyItems = loadContinueWatchingFromHistoryStable(allowNetwork = allowNetwork)
             val localItems = try {
                 traktRepository.getLocalContinueWatchingSnapshot()
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -4830,7 +4879,7 @@ class HomeViewModel @Inject constructor(
             )
         }
 
-        val sanitizedItems = sanitizeContinueWatchingItems(items)
+        val sanitizedItems = sanitizeContinueWatchingItems(items, allowNetwork = allowNetwork)
         val visibleItems = applyContinueWatchingDismissals(sanitizedItems)
         return visibleItems.filter { item ->
                 if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
@@ -4866,13 +4915,11 @@ class HomeViewModel @Inject constructor(
             }
         }
 
-        val repairedItems = repairContinueWatchingMetadataIfNeeded(items, prioritizeFirstItem = true)
-        val sanitizedItems = applyContinueWatchingDismissals(sanitizeContinueWatchingItems(repairedItems))
-        // Merge local watch history before publishing the startup snapshot. Without
-        // this, Home can render the stale disk cache first and only gain the current
-        // position after the title is opened and played again.
-        val historyMergedItems = mergeContinueWatchingResumeData(sanitizedItems)
-        return historyMergedItems
+        // Keep this path disk-only. Metadata repair and cloud history merging happen
+        // in launchContinueWatchingFetch after the cached Home presentation is visible.
+        return applyContinueWatchingDismissals(
+            sanitizeContinueWatchingItems(items, allowNetwork = false)
+        )
             .filter { item ->
                 item.progress in 0..99 || item.resumePositionSeconds > 0L
             }
@@ -4999,6 +5046,20 @@ class HomeViewModel @Inject constructor(
                         updatedCategories.asSequence()
                             .flatMap { it.items.asSequence() }
                             .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
+                            ?.let { candidate ->
+                                candidate.copy(
+                                    image = candidate.image.ifBlank { hero.image },
+                                    backdrop = candidate.backdrop ?: hero.backdrop,
+                                    duration = candidate.duration.ifBlank { hero.duration },
+                                    releaseDate = candidate.releaseDate ?: hero.releaseDate,
+                                    imdbRating = candidate.imdbRating.ifBlank { hero.imdbRating },
+                                    tmdbRating = candidate.tmdbRating.ifBlank { hero.tmdbRating },
+                                    certification = candidate.certification ?: hero.certification,
+                                    budget = candidate.budget ?: hero.budget,
+                                    overview = candidate.overview.ifBlank { hero.overview },
+                                    primaryNetworkLogo = candidate.primaryNetworkLogo ?: hero.primaryNetworkLogo,
+                                )
+                            }
                             ?: hero
                     }
                     _uiState.value = currentState.copy(
@@ -5172,7 +5233,24 @@ class HomeViewModel @Inject constructor(
         val currentState = _uiState.value
         val currentHero = currentState.heroItem
         val cachedDetails = getCachedHeroDetailsSnapshot(item)
-        val heroItem = cachedDetails?.let { item.withHeroDetails(it) } ?: item
+        val sameHero = currentHero?.id == item.id && currentHero.mediaType == item.mediaType
+        val presentationItem = if (sameHero) {
+            item.copy(
+                image = item.image.ifBlank { currentHero!!.image },
+                backdrop = item.backdrop ?: currentHero!!.backdrop,
+                duration = item.duration.ifBlank { currentHero!!.duration },
+                releaseDate = item.releaseDate ?: currentHero!!.releaseDate,
+                imdbRating = item.imdbRating.ifBlank { currentHero!!.imdbRating },
+                tmdbRating = item.tmdbRating.ifBlank { currentHero!!.tmdbRating },
+                certification = item.certification ?: currentHero!!.certification,
+                budget = item.budget ?: currentHero!!.budget,
+                overview = item.overview.ifBlank { currentHero!!.overview },
+                primaryNetworkLogo = item.primaryNetworkLogo ?: currentHero!!.primaryNetworkLogo,
+            )
+        } else {
+            item
+        }
+        val heroItem = cachedDetails?.let { presentationItem.withHeroDetails(it) } ?: presentationItem
         if (currentHero?.id == item.id &&
             currentHero.mediaType == item.mediaType &&
             currentState.heroLogoUrl == logoUrl &&
@@ -5191,8 +5269,8 @@ class HomeViewModel @Inject constructor(
             heroItem = heroItem,
             heroLogoUrl = logoUrl,
             heroOverviewOverride = cachedDetails?.overview?.ifBlank { heroItem.overview },
-            heroTrailerKey = null,
-            isHeroTransitioning = true
+            heroTrailerKey = if (sameHero) currentState.heroTrailerKey else null,
+            isHeroTransitioning = !sameHero
         )
     }
 
@@ -5204,9 +5282,10 @@ class HomeViewModel @Inject constructor(
         // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
         if (_uiState.value.trailerAutoPlay &&
             !isIptvItem(item) &&
-            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null)
+            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null) &&
+            "${item.mediaType}:${item.id}" !in heroTrailerResolved &&
+            heroTrailerFetchInFlight.add("${item.mediaType}:${item.id}")
         ) {
-            _uiState.value = _uiState.value.copy(heroTrailerKey = null)
             viewModelScope.launch(networkDispatcher) {
                 try {
                     val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
@@ -5220,6 +5299,10 @@ class HomeViewModel @Inject constructor(
                         } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
+                            finally {
+                                heroTrailerFetchInFlight.remove("${item.mediaType}:${item.id}")
+                                heroTrailerResolved.add("${item.mediaType}:${item.id}")
+                            }
             }
         }
 
@@ -5244,19 +5327,28 @@ class HomeViewModel @Inject constructor(
                 applyHeroDetailsSnapshotIfCurrent(item, snapshot)
                 snapshot.primaryNetworkLogo?.let { preloadLogoImages(listOf(it)) }
 
-                // Fetch trailer key for hero (YouTube)
-                try {
-                    val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
-                    if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
-                        android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
-                        _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
-                        prefetchTrailerUrl(trailerKey)
-                    } else {
-                        android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
+                // Fetch trailer key for hero (YouTube) only once per Home run.
+                val trailerRequestKey = "${item.mediaType}:${item.id}"
+                if (
+                    trailerRequestKey !in heroTrailerResolved &&
+                    heroTrailerFetchInFlight.add(trailerRequestKey)
+                ) {
+                    try {
+                        val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
+                        if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
+                            android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
+                            _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
+                            prefetchTrailerUrl(trailerKey)
+                        } else {
+                            android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
+                        }
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                    } finally {
+                        heroTrailerFetchInFlight.remove(trailerRequestKey)
+                        heroTrailerResolved.add(trailerRequestKey)
                     }
-                        } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
+                }
                     } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
@@ -5277,9 +5369,10 @@ class HomeViewModel @Inject constructor(
         // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
         if (_uiState.value.trailerAutoPlay &&
             !isIptvItem(item) &&
-            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null)
+            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null) &&
+            "${item.mediaType}:${item.id}" !in heroTrailerResolved &&
+            heroTrailerFetchInFlight.add("${item.mediaType}:${item.id}")
         ) {
-            _uiState.value = _uiState.value.copy(heroTrailerKey = null)
             viewModelScope.launch(networkDispatcher) {
                 try {
                     val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
@@ -5290,6 +5383,10 @@ class HomeViewModel @Inject constructor(
                         } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
+                            finally {
+                                heroTrailerFetchInFlight.remove("${item.mediaType}:${item.id}")
+                                heroTrailerResolved.add("${item.mediaType}:${item.id}")
+                            }
             }
         }
 
@@ -5299,6 +5396,8 @@ class HomeViewModel @Inject constructor(
             if (cachedDetails != null) {
                 applyHeroDetailsSnapshotIfCurrent(item, cachedDetails)
                 if (cachedDetails.fullyLoaded) return@launch
+                // Keep the partial snapshot visible while the full snapshot
+                // fills in missing provider/FSK/budget fields in place.
             }
 
             val currentHero = _uiState.value.heroItem
@@ -5321,6 +5420,7 @@ class HomeViewModel @Inject constructor(
      * Call this when focus changes to preload nearby items
      */
     private suspend fun prefetchHeroDetailsForFocusWindow(items: List<MediaItem>) {
+        if (isStartupSettling()) return
         val itemsToLoad = items
             .asSequence()
             .filter { item -> !isIptvItem(item) && !isCollectionItem(item) }

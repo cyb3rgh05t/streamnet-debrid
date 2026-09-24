@@ -305,8 +305,10 @@ class MediaRepository @Inject constructor(
     private val agregarrRatingMisses = ConcurrentHashMap<String, Long>()
     private val ratingMissCacheMs = 2 * 60_000L
     private val imdbEpisodeRatingsCache = ConcurrentHashMap<String, CacheEntry<Map<Pair<Int, Int>, String>>>()
+    private val imdbEpisodeRatingsInFlight = ConcurrentHashMap<String, CompletableDeferred<Map<Pair<Int, Int>, String>>>()
     private val imdbRatingsByIdCache = ConcurrentHashMap<String, CacheEntry<String>>()
     private val episodeImdbIdCache = ConcurrentHashMap<String, CacheEntry<String>>()
+    private val episodeImdbIdInFlight = ConcurrentHashMap<String, CompletableDeferred<String?>>()
     private val imdbIdCache = ConcurrentHashMap<String, String>()
     private val addonImdbToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
@@ -725,9 +727,25 @@ class MediaRepository @Inject constructor(
         val cacheKey = "series_$resolvedImdbId"
         getFromCache(imdbEpisodeRatingsCache, cacheKey)?.let { return it }
 
-        val ratings = fetchCinemetaEpisodeRatings(resolvedImdbId)
-        imdbEpisodeRatingsCache[cacheKey] = CacheEntry(ratings, System.currentTimeMillis())
-        return ratings
+        val pending = CompletableDeferred<Map<Pair<Int, Int>, String>>()
+        val active = imdbEpisodeRatingsInFlight.putIfAbsent(cacheKey, pending)
+        if (active != null) return active.await()
+
+        try {
+            getFromCache(imdbEpisodeRatingsCache, cacheKey)?.let {
+                pending.complete(it)
+                return it
+            }
+            val ratings = fetchCinemetaEpisodeRatings(resolvedImdbId)
+            imdbEpisodeRatingsCache[cacheKey] = CacheEntry(ratings, System.currentTimeMillis())
+            pending.complete(ratings)
+            return ratings
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            imdbEpisodeRatingsInFlight.remove(cacheKey, pending)
+        }
     }
 
     private suspend fun resolveEpisodeImdbIds(
@@ -740,13 +758,28 @@ class MediaRepository @Inject constructor(
             async(Dispatchers.IO) {
                 val cacheKey = "tv_${tvId}_s${seasonNumber}_e$episodeNumber"
                 getFromCache(episodeImdbIdCache, cacheKey)?.let { return@async episodeNumber to it }
-                val episodeImdbId = limiter.withPermit {
-                    runCatching {
-                        tmdbApi.getTvEpisodeExternalIds(tvId, seasonNumber, episodeNumber, apiKey)
-                            .imdbId
-                            ?.trim()
-                            ?.takeIf { it.startsWith("tt", ignoreCase = true) }
-                    }.getOrNull()
+                val pending = CompletableDeferred<String?>()
+                val active = episodeImdbIdInFlight.putIfAbsent(cacheKey, pending)
+                val episodeImdbId = if (active != null) {
+                    active.await()
+                } else {
+                    try {
+                        val resolved = limiter.withPermit {
+                            runCatching {
+                                tmdbApi.getTvEpisodeExternalIds(tvId, seasonNumber, episodeNumber, apiKey)
+                                    .imdbId
+                                    ?.trim()
+                                    ?.takeIf { it.startsWith("tt", ignoreCase = true) }
+                            }.getOrNull()
+                        }
+                        pending.complete(resolved)
+                        resolved
+                    } catch (error: Throwable) {
+                        pending.completeExceptionally(error)
+                        throw error
+                    } finally {
+                        episodeImdbIdInFlight.remove(cacheKey, pending)
+                    }
                 }
                 if (!episodeImdbId.isNullOrBlank()) {
                     episodeImdbIdCache[cacheKey] = CacheEntry(episodeImdbId, System.currentTimeMillis())

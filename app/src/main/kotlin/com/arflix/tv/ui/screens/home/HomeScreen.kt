@@ -865,7 +865,6 @@ fun HomeScreen(
         // Prevent stale select key events from previous screen from reopening details.
         suppressSelectUntilMs = SystemClock.elapsedRealtime() + 150L
         viewModel.refreshIptvHomeCatalogs()
-        viewModel.refreshContinueWatchingOnly(force = true)
     }
 
     DisposableEffect(lifecycleOwner) {

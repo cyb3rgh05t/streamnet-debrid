@@ -48,7 +48,8 @@ data class IntroDbSegmentsResponse(
     @SerializedName("episode") val episode: Int? = null,
     @SerializedName("intro") val intro: IntroDbSegment? = null,
     @SerializedName("recap") val recap: IntroDbSegment? = null,
-    @SerializedName("outro") val outro: IntroDbSegment? = null
+    @SerializedName("outro") val outro: IntroDbSegment? = null,
+    @SerializedName("post_credits") val postCredits: IntroDbSegment? = null
 )
 
 @Keep

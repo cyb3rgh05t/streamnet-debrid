@@ -2,6 +2,18 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.040] - 2026-09-24
+
+### Home-, Hero- und CloudSync-Performance
+
+- Home startet cache-first; Continue Watching bleibt im ersten Pass lokal und wird als initialer Hero bevorzugt.
+- BigHero bewahrt Budget, FSK, Provider-Logo, Artwork und Trailer-Key bei Kategorie-, Watched- und Cloud-Refreshes.
+- Hero-Trailer- und Watch-History-Requests werden zusammengeführt; IPTV-Favorite-/Recent-TV-Artwork wärmt die ersten sichtbaren Karten begrenzt vor.
+- SSE-CloudSync-Pulls werden gebündelt; identische semantische Payloads werden nicht erneut angewendet.
+- IntroDB-Post-Credits und Skip-Diagnose-Logs ergänzt.
+- Android-Version: `2.5.040` / Code `441`.
+- Technische Doku: `docs/superpowers/android-2.5.040-home-cloudsync-performance-2026-09-24.md`.
+
 ## [2.5.039] - 2026-09-24
 
 ### MDBList-Katalogquellen

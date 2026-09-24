@@ -1372,8 +1372,18 @@ class PlayerViewModel @Inject constructor(
         activeSkipRequestKey = requestKey
         skipIntervalsJob?.cancel()
         skipIntervalsJob = viewModelScope.launch {
+            android.util.Log.i(
+                "SkipIntro",
+                "request type=$mediaType tmdb=$tmdbId imdb=${imdbId.orEmpty()} season=${season ?: 0} episode=${episode ?: 0}"
+            )
             val intervals = skipIntroRepository.getSkipIntervals(mediaType, tmdbId, imdbId, season, episode)
             if (activeSkipRequestKey != requestKey) return@launch
+            android.util.Log.i(
+                "SkipIntro",
+                "resolved count=${intervals.size} intervals=${intervals.joinToString { interval ->
+                    "${interval.type}:${interval.startMs}-${interval.endMs}:${interval.provider}"
+                }}"
+            )
             skipIntervals = intervals
             // Force a recompute on the next position tick.
             lastActiveSkipType = null
@@ -1410,6 +1420,7 @@ class PlayerViewModel @Inject constructor(
             val key = "${active.type}:${active.startMs}:${active.endMs}:${active.provider}"
             if (currentActive == null || key != lastActiveSkipType) {
                 lastActiveSkipType = key
+                android.util.Log.i("SkipIntro", "active $key positionMs=$positionMs")
                 _uiState.value = _uiState.value.copy(activeSkipInterval = active, skipIntervalDismissed = false)
             }
         } else if (currentActive != null) {

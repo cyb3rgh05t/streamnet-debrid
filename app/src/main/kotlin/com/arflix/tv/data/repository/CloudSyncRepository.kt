@@ -1649,9 +1649,7 @@ class CloudSyncRepository @Inject constructor(
         }
 
         var uploadedPayload = effectivePayload
-        var payloadHash = runCatching {
-            JSONObject(effectivePayload).apply { remove("updatedAt") }.toString().hashCode()
-        }.getOrNull()
+        var payloadHash = cloudPayloadHash(effectivePayload)
 
         if (!force && payloadHash != null && payloadHash == lastPushedPayloadHash && !isPushDirty && pushFailureCount == 0) {
             AppLogger.breadcrumb(
@@ -1667,9 +1665,7 @@ class CloudSyncRepository @Inject constructor(
         val conflictPayload = conflict?.currentPayload?.takeIf { it.isNotBlank() }
         if (conflictPayload != null) {
             uploadedPayload = mergePayloadForPush(uploadedPayload, conflictPayload)
-            payloadHash = runCatching {
-                JSONObject(uploadedPayload).apply { remove("updatedAt") }.toString().hashCode()
-            }.getOrNull()
+            payloadHash = cloudPayloadHash(uploadedPayload)
             AppLogger.breadcrumb(
                 tag = "CloudSync",
                 message = "push_revision_conflict_retry revision=${conflict.currentRevision}",
@@ -1818,6 +1814,13 @@ class CloudSyncRepository @Inject constructor(
         if (source.has(field)) target.put(field, source.opt(field)) else target.remove(field)
     }
 
+    private fun cloudPayloadHash(payload: String): Int? = runCatching {
+        JSONObject(payload).apply {
+            remove("updatedAt")
+            remove("revision")
+        }.toString().hashCode()
+    }.getOrNull()
+
     // ══════════════════════════════════════════════════════════
     //  PULL CLOUD STATE TO LOCAL
     // ══════════════════════════════════════════════════════════
@@ -1950,9 +1953,12 @@ class CloudSyncRepository @Inject constructor(
 
         val prefs = context.settingsDataStore.data.first()
         val lastAppliedHash = prefs[androidx.datastore.preferences.core.intPreferencesKey("cloud_sync_last_applied_hash")]
-        val payloadHash = payload.hashCode()
+        val payloadHash = cloudPayloadHash(payload)
 
-        if (!forceApplyRemote && lastAppliedHash == payloadHash) {
+        // A new SSE revision does not necessarily mean the payload changed for
+        // this device. Never reapply an identical snapshot: applying it walks
+        // every repository, emits observers, and can trigger another Home load.
+        if (payloadHash != null && lastAppliedHash == payloadHash) {
             Log.i(TAG, "Pull skipped identical payload")
             AppLogger.breadcrumb(
                 tag = "CloudSync",
@@ -1969,7 +1975,7 @@ class CloudSyncRepository @Inject constructor(
                 }
                 applyCloudPayload(payload, forceApplyRemote = forceApplyRemote)
             }
-            markCloudPayloadApplied(payload, payloadHash)
+            markCloudPayloadApplied(payload, payloadHash ?: payload.hashCode())
         }.fold(
             onSuccess = {
                 Log.i(TAG, "Pull restored size=${payloadSizeBucket(payload)}")
@@ -2624,7 +2630,9 @@ class CloudSyncRepository @Inject constructor(
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_local_watched")) }
 
         traktRepository.clearAllProfileCaches()
-        watchHistoryRepository.clearProfileCaches()
+        // Continue Watching is backed by the separate /watch-history API. An
+        // account snapshot restore does not change that data, so keep its cache
+        // warm and avoid refetching it after every CloudSync pull.
 
         // Restore plugin repositories and scrapers
         runCatching {

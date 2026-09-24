@@ -122,6 +122,7 @@ class SkipIntroRepository @Inject constructor(
             addIfValid("recap", body.recap)
             addIfValid("intro", body.intro)
             addIfValid("outro", body.outro)
+            addIfValid("credits", body.postCredits)
 
             out.sortedBy { it.startMs }
         } catch (_: HttpException) {

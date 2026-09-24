@@ -54,6 +54,7 @@ class RealtimeSyncManager @Inject constructor(
         private const val MAX_RECONNECT_DELAY_MS = 30_000L
         private const val PERIODIC_SYNC_INTERVAL_MS = 60_000L
         private const val DEBOUNCE_MS = 500L
+        private const val MIN_REALTIME_PULL_INTERVAL_MS = 3_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -78,6 +79,8 @@ class RealtimeSyncManager @Inject constructor(
 
     @Volatile
     private var lastPushTimestamp = 0L
+    @Volatile
+    private var lastRealtimePullStartedAt = 0L
     @Volatile
     private var lastLocalWatchHistoryWriteTimestamp = 0L
 
@@ -218,8 +221,12 @@ class RealtimeSyncManager @Inject constructor(
         }
 
         pendingPullJob?.cancel()
+        val now = System.currentTimeMillis()
+        val waitForRateLimit = (lastRealtimePullStartedAt + MIN_REALTIME_PULL_INTERVAL_MS - now)
+            .coerceAtLeast(0L)
         pendingPullJob = scope.launch {
-            delay(DEBOUNCE_MS)
+            delay(maxOf(DEBOUNCE_MS, waitForRateLimit))
+            lastRealtimePullStartedAt = System.currentTimeMillis()
             Log.i(TAG, "Pulling cloud state after realtime notification")
             try {
                 // An SSE revision is an authoritative invalidation signal; bypass the
