@@ -732,7 +732,8 @@ export const defaultCatalogs: CatalogConfig[] = [
     name: "Top 10 Movies Today",
     sourceType: "mdblist",
     mediaType: "movie",
-    sourceUrl: "https://mdblist.com/lists/snoak/top-10-movies-of-the-day",
+    sourceUrl:
+      "https://mdblist.com/lists/snoak/most-popular-movies-on-rotten-tomatoes",
     enabled: true,
     isPreinstalled: true,
   },
@@ -741,7 +742,8 @@ export const defaultCatalogs: CatalogConfig[] = [
     name: "Top 10 Shows Today",
     sourceType: "mdblist",
     mediaType: "tv",
-    sourceUrl: "https://mdblist.com/lists/snoak/top-10-shows-of-the-day",
+    sourceUrl:
+      "https://mdblist.com/lists/snoak/most-popular-shows-on-rotten-tomatoes",
     enabled: true,
     isPreinstalled: true,
   },

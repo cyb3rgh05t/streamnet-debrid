@@ -2,6 +2,22 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.039] - 2026-09-24
+
+### MDBList-Katalogquellen
+
+- Der vorinstallierte Filmkatalog „Top 10 Movies Today“ verwendet jetzt die MDBList-Liste `most-popular-movies-on-rotten-tomatoes`.
+- Der vorinstallierte Serienkatalog „Top 10 Shows Today“ verwendet jetzt die MDBList-Liste `most-popular-shows-on-rotten-tomatoes`.
+- Android-Version: `2.5.039` / Code `440`.
+
+## [Web 1.0.050] - 2026-09-24
+
+### MDBList-Katalogquellen und Dokumentation
+
+- Die Web-Defaults und die Packs `cinema-essentials.json` sowie `tv-binge.json` verwenden jetzt die neuen Rotten-Tomatoes-MDBList-Quellen für Filme und Serien.
+- Die vollständige Quellenübersicht und der Self-Hosting-Plan wurden in `docs/superpowers/catalog-sources-and-self-hosting.md` dokumentiert.
+- Web-Version: `1.0.050`.
+
 ## [2.5.038] - 2026-09-23
 
 ### Franchise-Serien und IPTV-Modus
