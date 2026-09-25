@@ -301,6 +301,8 @@ class DetailsViewModel @Inject constructor(
         lastPlayedIdentity = identity
     }
     private var vodAppendJob: kotlinx.coroutines.Job? = null
+    private var vodCompletedRequestId: Long = -1L
+    private var vodCompletionCountedRequestId: Long = -1L
     private var homeServerAppendJob: kotlinx.coroutines.Job? = null
     private var loadStreamsJob: kotlinx.coroutines.Job? = null
     private var loadStreamsRequestId: Long = 0L
@@ -1815,6 +1817,8 @@ class DetailsViewModel @Inject constructor(
             streamSearchStartTime = System.currentTimeMillis(),
             pluginScrapersLoading = false
         )
+        vodCompletedRequestId = -1L
+        vodCompletionCountedRequestId = -1L
         val requestId = ++loadStreamsRequestId
         val requestMediaType = currentMediaType
         val requestMediaId = currentMediaId
@@ -1880,6 +1884,9 @@ class DetailsViewModel @Inject constructor(
                 val canonicalEpisode = identity?.tmdbEpisode
                 val animeQueryOverride = identity?.kitsuQuery
                 val hasHomeServerConnections = streamRepository.hasHomeServerConnections()
+                val iptvVodAddonEnabled = runCatching {
+                    streamRepository.isIptvVodSearchEnabled()
+                }.getOrDefault(false)
                 // Start VOD append in background - runs parallel to addon stream fetch
                 homeServerAppendJob = viewModelScope.launch {
                     appendHomeServerSourcesInBackground(
@@ -1893,19 +1900,24 @@ class DetailsViewModel @Inject constructor(
                     )
                 }
                 vodAppendJob?.cancel()
-                vodAppendJob = viewModelScope.launch {
-                    // VOD lookups use disk-cached catalogs (near-instant on warm starts).
-                    // On rare true cold starts, catalog download can take 15-30s for large providers.
-                    val vodTimeout = if (currentMediaType == MediaType.MOVIE) 30_000L else 45_000L
-                    appendVodSourceInBackground(
-                        imdbId = resolvedImdbId,
-                        season = canonicalSeason,
-                        episode = canonicalEpisode,
-                        timeoutMs = vodTimeout,
-                        requestId = requestId,
-                        requestMediaType = requestMediaType,
-                        requestMediaId = requestMediaId
-                    )
+                vodAppendJob = if (iptvVodAddonEnabled) {
+                    viewModelScope.launch {
+                        // VOD lookups use disk-cached catalogs (near-instant on warm starts).
+                        // On rare true cold starts, catalog download can take 15-30s for large providers.
+                        val vodTimeout = if (currentMediaType == MediaType.MOVIE) 30_000L else 45_000L
+                        appendVodSourceInBackground(
+                            imdbId = resolvedImdbId,
+                            season = canonicalSeason,
+                            episode = canonicalEpisode,
+                            countAsAddon = true,
+                            timeoutMs = vodTimeout,
+                            requestId = requestId,
+                            requestMediaType = requestMediaType,
+                            requestMediaId = requestMediaId
+                        )
+                    }
+                } else {
+                    null
                 }
 
                 var pluginScraperJob: kotlinx.coroutines.Job? = null
@@ -2027,8 +2039,11 @@ class DetailsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             isLoadingStreams = mergedStreams.isEmpty() &&
                                 (!progressive.isFinal || hasHomeServerConnections || supplementalSourcesStillLoading || pluginScraperJob?.isActive == true),
-                            completedAddons = progressive.completedAddons,
-                            totalAddons = progressive.totalAddons,
+                            completedAddons = progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0,
+                            totalAddons = maxOf(
+                                progressive.totalAddons + if (iptvVodAddonEnabled) 1 else 0,
+                                progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0
+                            ),
                             streams = mergedStreams,
                             subtitles = progressive.subtitles,
                             hasStreamingAddons = addonCount > 0 || hasHomeServerConnections
@@ -2084,8 +2099,11 @@ class DetailsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             isLoadingStreams = mergedStreams.isEmpty() &&
                                 (!progressive.isFinal || hasHomeServerConnections || supplementalSourcesStillLoading || pluginScraperJob?.isActive == true),
-                            completedAddons = progressive.completedAddons,
-                            totalAddons = progressive.totalAddons,
+                            completedAddons = progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0,
+                            totalAddons = maxOf(
+                                progressive.totalAddons + if (iptvVodAddonEnabled) 1 else 0,
+                                progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0
+                            ),
                             streams = mergedStreams,
                             subtitles = progressive.subtitles,
                             hasStreamingAddons = addonCount > 0 || hasHomeServerConnections
@@ -3128,6 +3146,7 @@ class DetailsViewModel @Inject constructor(
         imdbId: String?,
         season: Int?,
         episode: Int?,
+        countAsAddon: Boolean,
         timeoutMs: Long,
         requestId: Long,
         requestMediaType: MediaType,
@@ -3141,24 +3160,42 @@ class DetailsViewModel @Inject constructor(
         }
         val itemTitle = _uiState.value.item?.title.orEmpty()
 
-        val vodSources = if (requestMediaType == MediaType.MOVIE) {
-            streamRepository.resolveMovieVodSources(
-                imdbId = imdbId,
-                title = itemTitle,
-                year = _uiState.value.item?.year?.toIntOrNull(),
-                tmdbId = currentMediaId,
-                timeoutMs = timeoutMs
-            )
-        } else {
-            streamRepository.resolveEpisodeVodSources(
-                imdbId = imdbId,
-                season = season ?: 1,
-                episode = episode ?: 1,
-                title = itemTitle,
-                tmdbId = currentMediaId,
-                tvdbId = _uiState.value.tvdbId,
-                timeoutMs = timeoutMs
-            )
+        val vodSources = try {
+            if (requestMediaType == MediaType.MOVIE) {
+                streamRepository.resolveMovieVodSources(
+                    imdbId = imdbId,
+                    title = itemTitle,
+                    year = _uiState.value.item?.year?.toIntOrNull(),
+                    tmdbId = currentMediaId,
+                    timeoutMs = timeoutMs
+                )
+            } else {
+                streamRepository.resolveEpisodeVodSources(
+                    imdbId = imdbId,
+                    season = season ?: 1,
+                    episode = episode ?: 1,
+                    title = itemTitle,
+                    tmdbId = currentMediaId,
+                    tvdbId = _uiState.value.tvdbId,
+                    timeoutMs = timeoutMs
+                )
+            }
+        } finally {
+            if (requestId == loadStreamsRequestId && currentMediaType == requestMediaType && currentMediaId == requestMediaId) {
+                if (countAsAddon) {
+                    vodCompletedRequestId = requestId
+                    if (vodCompletionCountedRequestId != requestId) {
+                        vodCompletionCountedRequestId = requestId
+                        val current = _uiState.value
+                        _uiState.value = current.copy(
+                            completedAddons = current.completedAddons + 1,
+                            isLoadingStreams = current.isLoadingStreams &&
+                                current.streams.isEmpty() &&
+                                current.completedAddons + 1 < current.totalAddons
+                        )
+                    }
+                }
+            }
         }
         val validVodSources = vodSources.filter { !it.url.isNullOrBlank() }
         if (validVodSources.isEmpty()) {

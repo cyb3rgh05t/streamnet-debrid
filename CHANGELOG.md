@@ -2,6 +2,21 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.042] - 2026-09-25
+
+- Quellen-Dialog: IPTV-VOD wird nur dann als zusätzlich geprüfte Quelle gezählt, wenn die IPTV-VOD-Suche aktiviert ist. Deaktiviert bleibt die Anzeige bei `1/1`; aktiviert wird der VOD-Slot korrekt als `2/2` berücksichtigt.
+- Die IPTV-VOD-Suche wird bei deaktivierter Einstellung nicht mehr als Hintergrundjob gestartet. Request-bezogene Abschlussmarker verhindern außerdem doppelte oder veraltete Fortschrittszählungen.
+- Die bestehenden Quellen-, Continue-Watching-, Serienlabel- und UI-Akzentänderungen bleiben in diesem Android-Release enthalten.
+- Android-Version: `2.5.042` / Code `443`.
+
+## [Web 1.0.051] - 2026-09-25
+
+- Quellenkarten zeigen bevorzugt den echten Dateinamen aus `behaviorHints.filename`; wenn dieser fehlt, wird der Quellentitel beziehungsweise der Medientitel verwendet, nicht der Addonname.
+- Quellenkarten können bei echten Addon-Quellen ein Sprach-Badge mit Sprachkürzel und Flagge anzeigen. IPTV-VOD-Playlisten erhalten dieses Badge ausdrücklich nicht.
+- Der Suchfeld-Fokus verwendet den aktiven Theme-Akzent über die gesamte Suchbox; der globale weiße Input-Fokusrahmen wird dort unterdrückt.
+- Der Ladezustand der Suche ist im Viewport zentriert und zeigt Spinner sowie Label im aktiven Theme-Akzent.
+- Web-Version: `1.0.051`.
+
 ## [2.5.041] - 2026-09-25
 
 ### Home-, Hero- und CloudSync-Performance

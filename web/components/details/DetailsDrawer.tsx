@@ -1314,6 +1314,13 @@ function SourcePickerModal({
             const uncached = isUncachedDebridStream(stream);
             const plan = playbackPlan(stream);
             const playback = sourcePlaybackPresentation(stream, plan, uncached);
+            const filename = stream.behaviorHints?.filename?.trim();
+            const sourceTitle =
+              filename ||
+              (stream.source.trim().toLowerCase() !==
+              stream.addonName.trim().toLowerCase()
+                ? stream.source
+                : title);
             const StatusIcon =
               playback.state === "blocked" ? TriangleAlert : Info;
             return (
@@ -1323,7 +1330,7 @@ function SourcePickerModal({
               >
                 <span className="source-rank">{index + 1}</span>
                 <span className="source-main">
-                  <strong>{stream.source || stream.addonName}</strong>
+                  <strong>{sourceTitle || stream.addonName}</strong>
                   <em>
                     {stream.addonName}
                     {stream.description ? ` - ${stream.description}` : ""}
@@ -1354,14 +1361,16 @@ function SourcePickerModal({
                     )}
                   </span>
                   <span className="stream-badges">
-                    {streamBadges(stream).map((badge) => (
-                      <span
-                        key={badge.label}
-                        className={`stream-badge ${badge.tone ?? ""}`}
-                      >
-                        {badge.label}
-                      </span>
-                    ))}
+                    {streamBadges(stream, item.originalLanguage).map(
+                      (badge) => (
+                        <span
+                          key={badge.label}
+                          className={`stream-badge ${badge.tone ?? ""}`}
+                        >
+                          {badge.label}
+                        </span>
+                      ),
+                    )}
                   </span>
                 </span>
                 <span className="source-side">
@@ -1645,13 +1654,18 @@ function formatDate(date: string) {
   });
 }
 
-function streamBadges(stream: StreamSource) {
+function streamBadges(stream: StreamSource, itemLanguage?: string | null) {
   const text =
     `${stream.source} ${stream.description ?? ""} ${stream.size ?? ""}`.toLowerCase();
   const labels: Array<{ label: string; tone?: string }> = [];
   const quality = stream.quality || detectSourceBadge(text);
   if (quality)
     labels.push({ label: quality, tone: quality === "4K" ? "orange" : "" });
+  const language =
+    stream.addonId === "iptv_xtream_vod"
+      ? undefined
+      : detectLanguageBadge(text, itemLanguage);
+  if (language) labels.push({ label: language });
   if (text.includes("hdr10+") || text.includes("hdr"))
     labels.push({ label: "HDR" });
   if (text.includes("dolby vision") || /\bdv\b/i.test(text))
@@ -1683,6 +1697,24 @@ function streamBadges(stream: StreamSource) {
       return true;
     })
     .slice(0, 7);
+}
+
+function detectLanguageBadge(text: string, itemLanguage?: string | null) {
+  const languagePatterns: Array<[RegExp, string]> = [
+    [/\b(?:german|deutsch|deu|ger|de)\b/i, "🇩🇪 DE"],
+    [/\b(?:english|englisch|eng|en)\b/i, "🇬🇧 EN"],
+    [/\b(?:french|französisch|fra|fre|fr)\b/i, "🇫🇷 FR"],
+    [/\b(?:spanish|spanisch|spa|es)\b/i, "🇪🇸 ES"],
+    [/\b(?:italian|italienisch|ita|it)\b/i, "🇮🇹 IT"],
+    [/\b(?:japanese|japanisch|jpn|ja)\b/i, "🇯🇵 JA"],
+  ];
+  const explicit = languagePatterns.find(([pattern]) => pattern.test(text));
+  if (explicit) return explicit[1];
+
+  const normalized = itemLanguage?.trim().toLowerCase();
+  return languagePatterns.find(([pattern]) =>
+    pattern.test(normalized ?? ""),
+  )?.[1];
 }
 
 function detectSourceBadge(text: string) {

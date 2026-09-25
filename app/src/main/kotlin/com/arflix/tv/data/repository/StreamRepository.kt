@@ -2480,6 +2480,8 @@ class StreamRepository @Inject constructor(
         }.orEmpty()
     }
 
+    suspend fun isIptvVodSearchEnabled(): Boolean = iptvRepository.isVodSearchEnabled()
+
     /**
      * Process raw streams into StreamSource objects -  processStreams
      */
