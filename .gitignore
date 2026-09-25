@@ -30,6 +30,7 @@ proguard/
 
 # Log Files
 *.log
+/docs/superpowers/
 
 # Android Studio Navigation editor temp files
 .navigation/
