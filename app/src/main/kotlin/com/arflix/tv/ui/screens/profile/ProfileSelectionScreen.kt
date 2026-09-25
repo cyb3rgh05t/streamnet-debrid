@@ -613,7 +613,7 @@ private fun AddProfileButton(
                 ),
                 border = ClickableSurfaceDefaults.border(
                     border = androidx.tv.material3.Border(
-                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White.copy(alpha = 0.3f)),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, accentColor.copy(alpha = 0.55f)),
                         shape = RoundedCornerShape(8.dp)
                     ),
                     focusedBorder = androidx.tv.material3.Border(

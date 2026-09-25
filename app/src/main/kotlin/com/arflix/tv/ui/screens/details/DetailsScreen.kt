@@ -172,6 +172,7 @@ import com.arflix.tv.ui.skin.ArvioFocusableSurface
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.rememberArvioCardShape
 import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.contrastingContentColor
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.AccentYellow
@@ -4129,13 +4130,14 @@ private fun SeasonButton(
     onLongClick: (() -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(8.dp)
+    val accentColor = resolveAccentColor(fallback = Color.White)
     val backgroundColor = when {
-        isFocused -> Color.White
+        isFocused -> accentColor
         isSelected -> Color.White.copy(alpha = 0.2f)
         else -> Color.White.copy(alpha = 0.08f)
     }
     val textColor = when {
-        isFocused -> Color.Black
+        isFocused -> contrastingContentColor(accentColor)
         isSelected -> Color.White
         else -> Color.White.copy(alpha = 0.6f)
     }
@@ -4160,6 +4162,11 @@ private fun SeasonButton(
     Row(
         modifier = clickModifier
             .background(backgroundColor, shape)
+            .border(
+                width = if (isFocused) 2.dp else 1.dp,
+                color = if (isFocused) accentColor else accentColor.copy(alpha = 0.5f),
+                shape = shape
+            )
             .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
