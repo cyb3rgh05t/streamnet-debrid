@@ -801,6 +801,7 @@ class HomeViewModel @Inject constructor(
         if (currentHero?.id != item.id || currentHero.mediaType != item.mediaType) return false
 
         val updatedHero = currentHero.withHeroDetails(snapshot)
+        if (updatedHero == currentHero && !_uiState.value.isHeroTransitioning) return false
         mediaRepository.cacheItem(updatedHero)
         _uiState.value = _uiState.value.copy(
             heroItem = updatedHero,
@@ -2939,7 +2940,7 @@ class HomeViewModel @Inject constructor(
         // Freshly rebuilt categories always start with isWatched=false; the 90s
         // debounce must not skip re-applying badges here or checkmarks stay
         // missing until the cooldown lapses on its own.
-        refreshWatchedBadges(immediate = true)
+        refreshWatchedBadges(immediate = false)
     }
 
     private var cwFetchJob: Job? = null
@@ -3844,7 +3845,7 @@ class HomeViewModel @Inject constructor(
                 // categories was just replaced wholesale (isWatched resets to false);
                 // skipping this due to the 90s debounce is what leaves checkmarks
                 // missing after frequent loadHomeData reloads (catalog/IPTV/cloud sync).
-                refreshWatchedBadges(immediate = true)
+                refreshWatchedBadges(immediate = false)
                 scheduleStartupCatalogImageWarmup(categories)
                 scheduleRecentlyWatchedHydration()
 

@@ -316,6 +316,38 @@ class PlayerViewModel @Inject constructor(
         return fallbackAdjacentEpisodeIdentity(current, forward)
     }
 
+    private suspend fun resolveNextEpisodeIdentity(): EpisodeIdentity? {
+        val season = currentSeason ?: return null
+        val episode = currentEpisode ?: return null
+        val currentSeasonDetails = tmdbApi.getTvSeason(currentMediaId, season, Constants.TMDB_API_KEY)
+        val nextInSeason = currentSeasonDetails.episodes
+            .filter { it.seasonNumber == season && it.episodeNumber > episode }
+            .minByOrNull { it.episodeNumber }
+        if (nextInSeason != null) {
+            return EpisodeIdentity(
+                displaySeason = currentDisplaySeason ?: season,
+                displayEpisode = (currentDisplayEpisode ?: episode) + 1,
+                tmdbSeason = season,
+                tmdbEpisode = nextInSeason.episodeNumber
+            )
+        }
+
+        val nextSeason = currentSeasonDetails.seasonNumber + 1
+        val nextSeasonDetails = runCatching {
+            tmdbApi.getTvSeason(currentMediaId, nextSeason, Constants.TMDB_API_KEY)
+        }.getOrNull() ?: return null
+        val firstEpisode = nextSeasonDetails.episodes
+            .filter { it.seasonNumber == nextSeason && it.episodeNumber > 0 }
+            .minByOrNull { it.episodeNumber }
+            ?: return null
+        return EpisodeIdentity(
+            displaySeason = (currentDisplaySeason ?: season) + 1,
+            displayEpisode = firstEpisode.episodeNumber,
+            tmdbSeason = nextSeason,
+            tmdbEpisode = firstEpisode.episodeNumber
+        )
+    }
+
     internal suspend fun resolveNextEpisodeAirDate(
         tmdbId: Int,
         target: EpisodeIdentity,
@@ -4383,24 +4415,25 @@ class PlayerViewModel @Inject constructor(
                                     currentDisplaySeason ?: cwSeason,
                                     currentDisplayEpisode ?: cwEpisode
                                 )
+                                ?: resolveNextEpisodeIdentity()
                         }.getOrNull()
-                        val nextSeason = nextIdentity?.tmdbSeason ?: cwSeason
-                        val nextEpisode = nextIdentity?.tmdbEpisode ?: (cwEpisode + 1)
-                        traktRepository.saveLocalContinueWatching(
-                            mediaType = currentMediaType,
-                            tmdbId = currentMediaId,
-                            title = currentItemTitle.ifEmpty { currentTitle },
-                            posterPath = currentPoster,
-                            backdropPath = currentBackdrop,
-                            season = nextSeason,
-                            episode = nextEpisode,
-                            displaySeason = nextIdentity?.displaySeason ?: nextSeason,
-                            displayEpisode = nextIdentity?.displayEpisode ?: nextEpisode,
-                            episodeTitle = null,
-                            progress = 3, // Keep next episodes above the minimum progress filter.
-                            positionSeconds = 0L, // next episode: no resume position yet
-                            durationSeconds = 0L  // next episode: unknown duration
-                        )
+                        if (nextIdentity != null) {
+                            traktRepository.saveLocalContinueWatching(
+                                mediaType = currentMediaType,
+                                tmdbId = currentMediaId,
+                                title = currentItemTitle.ifEmpty { currentTitle },
+                                posterPath = currentPoster,
+                                backdropPath = currentBackdrop,
+                                season = nextIdentity.tmdbSeason,
+                                episode = nextIdentity.tmdbEpisode,
+                                displaySeason = nextIdentity.displaySeason,
+                                displayEpisode = nextIdentity.displayEpisode,
+                                episodeTitle = null,
+                                progress = 3,
+                                positionSeconds = 0L,
+                                durationSeconds = 0L
+                            )
+                        }
                     } catch (_: Exception) {
                         // Best-effort: don't let CW save failure affect playback
                     }

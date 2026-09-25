@@ -2,6 +2,18 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.041] - 2026-09-25
+
+### Home-, Hero- und CloudSync-Performance
+
+- Home-Rail-Metadaten und Logos laden lazy: zuerst der lokale Cache, danach das fokussierte Item nach ca. 320 ms Navigationsruhe und anschließend wenige benachbarte Karten. Trailer werden nur für den aktiven Hero geladen, wenn Trailer-Autoplay aktiviert ist.
+- Details-Staffel-Tabs verwenden für den Fokus den aktiven Theme-Akzent, für inaktive Zustände einen dunkleren Hintergrund und eine dezente Akzent-Border.
+- Der Profil-„+“-Button und die Profilverwaltung verwenden auch im inaktiven Zustand den aktiven Theme-Akzent für ihre Border.
+- Unbegonnene Serien zeigen im Play-Button `S01 E01 starten`; Fortsetzen-Labels verwenden das Format `S01 E01 fortsetzen`.
+- Nach vollständig abgespielten Episoden wird die nächste tatsächlich vorhandene Episode als Continue-Watching-Ziel gespeichert.
+- Anime-/IPTV-Parsing-Experimente mit M3U- und Absolutnummern-Fallbacks wurden zurückgenommen; der bestehende Xtream-Resolver für normale Serien und Filme bleibt unverändert.
+- Android-Version: `2.5.041` / Code `442`.
+
 ## [2.5.040] - 2026-09-24
 
 ### Home-, Hero- und CloudSync-Performance

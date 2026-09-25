@@ -446,12 +446,14 @@ class DetailsViewModel @Inject constructor(
                     episodes = cachedEpisodes ?: emptyList(),
                     currentSeason = seasonToLoad,
                     totalSeasons = cachedTotalSeasons,
-                    playSeason = initialSeason,
-                    playEpisode = initialEpisode,
+                    playSeason = initialSeason ?: if (mediaType == MediaType.TV) 1 else null,
+                    playEpisode = initialEpisode ?: if (mediaType == MediaType.TV) 1 else null,
                     playTmdbSeason = initialSeason,
                     playTmdbEpisode = initialEpisode,
-                    playLabel = if (mediaType == MediaType.TV && initialSeason != null && initialEpisode != null) {
-                        if (initialSeason == 1 && initialEpisode == 1) {
+                    playLabel = if (mediaType == MediaType.TV) {
+                        if (initialSeason == null && initialEpisode == null) {
+                            context.getString(R.string.play_start_s1e1)
+                        } else if (initialSeason == 1 && initialEpisode == 1) {
                             context.getString(R.string.play_start_s1e1)
                         } else {
                             context.getString(R.string.continue_season_episode, initialSeason, initialEpisode)

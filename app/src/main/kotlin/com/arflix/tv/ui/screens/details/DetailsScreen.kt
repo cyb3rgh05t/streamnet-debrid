@@ -4134,7 +4134,7 @@ private fun SeasonButton(
     val backgroundColor = when {
         isFocused -> accentColor
         isSelected -> Color.White.copy(alpha = 0.2f)
-        else -> Color.White.copy(alpha = 0.08f)
+        else -> Color.Black.copy(alpha = 0.55f)
     }
     val textColor = when {
         isFocused -> contrastingContentColor(accentColor)

@@ -1258,15 +1258,15 @@
     <string name="context_quick_actions">Schnellaktionen</string>
 
     <!-- Datenebene und ViewModels -->
-    <string name="continue_season_episode">S%1$dE%2$d fortsetzen</string>
-    <string name="continue_season_episode_at">S%1$dE%2$d bei %3$s fortsetzen</string>
+    <string name="continue_season_episode">S%1$02d E%2$02d fortsetzen</string>
+    <string name="continue_season_episode_at">S%1$02d E%2$02d bei %3$s fortsetzen</string>
     <string name="continue_at">Bei %1$s fortsetzen</string>
     <string name="continue_from">Ab %1$s fortsetzen</string>
     <string name="continue_label">Fortsetzen</string>
     <string name="continue_time_left_minutes">Noch %1$d Min.</string>
     <string name="continue_time_left_hours">Noch %1$d Std.</string>
     <string name="continue_time_left_hours_minutes">Noch %1$d Std. %2$d Min.</string>
-    <string name="play_start_s1e1">S1E1 starten</string>
+    <string name="play_start_s1e1">S01 E01 starten</string>
     <string name="launcher_continue_from">%1$s ab %2$s</string>
     <string name="added_to_watchlist">Zur Merkliste hinzugefügt</string>
     <string name="update_check_failed">Suche nach Updates fehlgeschlagen</string>
