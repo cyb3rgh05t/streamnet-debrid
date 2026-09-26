@@ -33,7 +33,7 @@ import {
   pullRawPayload,
   pullCloudProfiles,
   pullCloudTrackingSelection,
-  pullCloudWatchedKeys,
+  pullCloudWatchedState,
   pullCloudWatchlist,
   removeContinueWatchingProgress,
   saveCloudAddons,
@@ -55,6 +55,7 @@ import {
   isPausedContinueWatchingItem,
   isUnwatchedContinueWatching,
   isWatchedShowEpisode,
+  mediaWatchKey,
   watchedKeysFromShowProgress,
   mergePartialContinueWatching,
   mergeTrackerContinueWatching,
@@ -85,6 +86,7 @@ import {
   historyToItem,
   hydrateTraktItems,
   traktItemToMedia,
+  traktWatchedToMedia,
   traktPlaybackToMedia,
   traktUpNextToMedia,
 } from "./mappers";
@@ -330,6 +332,7 @@ export const defaultSettings: AppSettings = {
   aiApiKey: "",
   defaultPlayer: "browser",
   cardLayoutMode: "landscape",
+  catalogueRowLayoutModes: {},
   deviceModeOverride: "auto",
   oledBlack: false,
   clockFormat: "24h",
@@ -378,24 +381,6 @@ const emptyIptv: IptvSnapshot = {
   loadedAt: 0,
 };
 
-function mediaWatchKey(
-  item: MediaItem,
-  seasonNumber?: number | null,
-  episodeNumber?: number | null,
-) {
-  if (item.mediaType === "movie") return `movie:${item.id}`;
-  const season = seasonNumber ?? item.seasonNumber ?? null;
-  const episode = episodeNumber ?? item.episodeNumber ?? null;
-  if (
-    season !== null &&
-    episode !== null &&
-    season !== undefined &&
-    episode !== undefined
-  )
-    return `tv:${item.id}:${season}:${episode}`;
-  return `tv:${item.id}`;
-}
-
 function traktWatchedKeys(movies: unknown[], shows: unknown[]) {
   const keys = new Set<string>();
   movies.forEach((raw) => {
@@ -433,12 +418,9 @@ function traktWatchedKeys(movies: unknown[], shows: unknown[]) {
         if (seasonNumber > 0) watchedEpisodes += 1;
       });
     });
-    // If entire show marked completed, or all aired episodes watched, badge whole show
+    // Only badge the whole show when all aired episodes are accounted for.
     const aired = item.show?.aired_episodes;
-    if (
-      item.status === "completed" ||
-      (typeof aired === "number" && aired > 0 && watchedEpisodes >= aired)
-    ) {
+    if (typeof aired === "number" && aired > 0 && watchedEpisodes >= aired) {
       keys.add(`tv:${tmdb}`);
     }
   });
@@ -472,7 +454,6 @@ function isMediaWatched(
   seasonNumber?: number | null,
   episodeNumber?: number | null,
 ) {
-  if (item.isWatched) return true;
   return isWatchedShowEpisode(item, watchedKeys, seasonNumber, episodeNumber);
 }
 
@@ -1527,7 +1508,7 @@ export function AppProvider({
             watchedShowsRows,
             cloudWatchlistRows,
             homeServerWatchlistRows,
-            cloudWatchedKeys,
+            cloudWatchedState,
             cloudDismissals,
             hiddenShowIds,
             cwMovies,
@@ -1553,10 +1534,18 @@ export function AppProvider({
               () => [],
             ),
             authClient.session
-              ? pullCloudWatchedKeys(authClient, profileId).catch(
-                  () => new Set<string>(),
+              ? pullCloudWatchedState(authClient, profileId ?? "default").catch(
+                  () => ({
+                    keys: new Set<string>(),
+                    activityAt: new Map<string, number>(),
+                    removedAt: new Map<string, number>(),
+                  }),
                 )
-              : Promise.resolve(new Set<string>()),
+              : Promise.resolve({
+                  keys: new Set<string>(),
+                  activityAt: new Map<string, number>(),
+                  removedAt: new Map<string, number>(),
+                }),
             authClient.session
               ? pullCloudContinueWatchingDismissals(
                   authClient,
@@ -1759,9 +1748,31 @@ export function AppProvider({
           const upNextRows = upNext.items;
           const watchedKeys = new Set([
             ...traktWatchedKeys(watchedMoviesRows, watchedShowsRows),
-            ...cloudWatchedKeys,
+            ...cloudWatchedState.keys,
             ...(upNext.watchedKeys ?? []),
           ]);
+          const trackerCompletions = completionTimes(
+            watchedMoviesRows,
+            watchedShowsRows,
+          );
+          cloudWatchedState.removedAt.forEach((removedAt, key) => {
+            if (removedAt < (trackerCompletions.get(key) ?? 0)) return;
+            watchedKeys.delete(key);
+            if (key.startsWith("tv:")) {
+              const showKey = key.split(":").slice(0, 2).join(":");
+              const showWatchedAt = Math.max(
+                0,
+                ...watchedShowsRows
+                  .filter(
+                    (row) =>
+                      (row as { show?: { ids?: { tmdb?: number } } }).show?.ids
+                        ?.tmdb === Number(key.split(":")[1]),
+                  )
+                  .map(traktActivityTime),
+              );
+              if (removedAt >= showWatchedAt) watchedKeys.delete(showKey);
+            }
+          });
 
           // Build the two Android-compatible Recently Watched rails from the
           // provider rows plus cloud-synced watched keys. Cloud keys are enough
@@ -1769,19 +1780,29 @@ export function AppProvider({
           const watchedSeeds = new Map<string, MediaItem>();
           const addWatchedSeed = (item: MediaItem) => {
             if (item.id > 0) {
-              watchedSeeds.set(`${item.mediaType}:${item.id}`, {
+              const key = `${item.mediaType}:${item.id}`;
+              const previous = watchedSeeds.get(key);
+              watchedSeeds.set(key, {
+                ...previous,
                 ...item,
+                title: previous?.title ?? item.title,
+                activityAt: Math.max(
+                  previous?.activityAt ?? 0,
+                  item.activityAt ?? 0,
+                ),
                 isWatched: true,
               });
             }
           };
-          watchedMoviesRows.forEach((row) =>
-            addWatchedSeed(traktItemToMedia(row)),
+          watchedMoviesRows.forEach(
+            (row) =>
+              watchedKeys.has(`movie:${traktWatchedToMedia(row).id}`) &&
+              addWatchedSeed(traktWatchedToMedia(row)),
           );
           watchedShowsRows.forEach((row) =>
-            addWatchedSeed(traktItemToMedia(row)),
+            addWatchedSeed(traktWatchedToMedia(row)),
           );
-          cloudWatchedKeys.forEach((key) => {
+          cloudWatchedState.keys.forEach((key) => {
             const [type, rawId] = key.split(":");
             const id = Number(rawId);
             if ((type === "movie" || type === "tv") && Number.isFinite(id)) {
@@ -1789,12 +1810,23 @@ export function AppProvider({
                 id,
                 title: `${type === "movie" ? "Movie" : "Series"} ${id}`,
                 mediaType: type === "movie" ? "movie" : "tv",
+                activityAt: cloudWatchedState.activityAt.get(key) ?? 0,
               });
             }
           });
           const watchedSeedItems = ["movie", "tv"].flatMap((type) =>
             [...watchedSeeds.values()]
-              .filter((item) => item.mediaType === type)
+              .filter(
+                (item) =>
+                  item.mediaType === type &&
+                  (type === "movie"
+                    ? watchedKeys.has(`movie:${item.id}`)
+                    : [...watchedKeys].some(
+                        (key) =>
+                          key === `tv:${item.id}` ||
+                          key.startsWith(`tv:${item.id}:`),
+                      )),
+              )
               .sort(
                 (left, right) =>
                   (right.activityAt ?? 0) - (left.activityAt ?? 0),
@@ -1802,7 +1834,7 @@ export function AppProvider({
               .slice(0, 20),
           );
           const watchedRailItems = await hydrateTraktItems(watchedSeedItems);
-          if (isCurrent() && watchedRailItems.length) {
+          if (isCurrent()) {
             const movies = watchedRailItems
               .filter((item) => item.mediaType === "movie")
               .slice(0, 20);
@@ -2634,10 +2666,20 @@ export function AppProvider({
         episodeNumber: item.episode ?? null,
       } as unknown as MediaItem;
       const key = mediaWatchKey(target, item.season, item.episode);
+      if (!key) return;
       setWatchedKeys((prev) => {
         const next = new Set(prev);
         if (watched) next.add(key);
-        else next.delete(key);
+        else {
+          next.delete(key);
+          if (
+            item.mediaType === "tv" &&
+            item.season != null &&
+            item.episode != null
+          ) {
+            next.delete(`tv:${item.id}`);
+          }
+        }
         return next;
       });
       if (watched) {

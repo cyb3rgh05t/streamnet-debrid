@@ -114,3 +114,49 @@ test("Web fallback catalogs follow the current Android order", async () => {
     true,
   );
 });
+
+test("Marvel addon chronology is the primary web source with fallbacks retained", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const rail = defaultCatalogs.find(
+    (catalog) => catalog.id === "collection_franchise_marvel",
+  );
+  const sources = rail?.collectionSources ?? [];
+
+  assert.equal(sources[0]?.kind, "ADDON_CATALOG");
+  assert.equal(sources[0]?.addonCatalogId, "marvel-mcu");
+  assert.equal(
+    sources[0]?.addonManifestUrl,
+    "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+  );
+  assert.equal(
+    sources.some((source) => source.kind === "CURATED_IDS"),
+    true,
+  );
+  assert.equal(
+    sources.some(
+      (source) =>
+        source.kind === "MDBLIST_PUBLIC" &&
+        source.mdblistSlug ===
+          "lt3dave/marvel-cinematic-universe-mcu-collection",
+    ),
+    true,
+  );
+});
+
+test("catalogs without a row override inherit the global card layout", async () => {
+  const { mergeCatalogs, resolveRailPosterMode } = await import(moduleUrl);
+  const catalog = mergeCatalogs([
+    {
+      id: "trending_movies",
+      name: "Trending Movies",
+      sourceType: "preinstalled",
+      enabled: true,
+    },
+  ]).find((entry) => entry.id === "trending_movies");
+
+  assert.equal(catalog?.layout, undefined);
+  assert.equal(resolveRailPosterMode("poster"), true);
+  assert.equal(resolveRailPosterMode("landscape"), false);
+  assert.equal(resolveRailPosterMode("poster", false), false);
+  assert.equal(resolveRailPosterMode("landscape", true), true);
+});

@@ -30,7 +30,7 @@ import { tmdbOriginalBackdropUrl } from "@/lib/mediaImages";
 import { accentColor } from "@/lib/accent";
 import { localize, type UiLanguage } from "@/lib/i18n";
 import { createPendingExternalPlayback } from "@/lib/externalPlayback";
-import { saveWatchedState } from "@/lib/cloud";
+import { saveWatchedEpisodesState, saveWatchedState } from "@/lib/cloud";
 import {
   copyStreamUrl,
   downloadStreamUrl,
@@ -397,6 +397,106 @@ function DetailsView({ item }: { item: MediaItem }) {
     const season = selectedEpisode?.season ?? item.seasonNumber ?? null;
     const episode = selectedEpisode?.episode ?? item.episodeNumber ?? null;
     const alreadyWatched = detailWatched;
+    if (displayItem.mediaType === "tv" && (season == null || episode == null)) {
+      try {
+        const seasons = (displayItem.seasons ?? []).filter(
+          (entry) => settings.includeSpecials || entry.seasonNumber > 0,
+        );
+        const groups = await Promise.all(
+          seasons.map(async (entry) => ({
+            seasonNumber: entry.seasonNumber,
+            episodes: await getSeasonEpisodes(
+              displayItem.id,
+              entry.seasonNumber,
+              settings.uiLanguage === "de" ? "de-DE" : "en-US",
+              priorityConfig,
+              {
+                tvdbId: displayItem.tvdbId,
+                anilistId: displayItem.anilistId,
+                isAnime: displayItem.isAnime,
+              },
+            ),
+          })),
+        );
+        if (!groups.length || groups.some((group) => !group.episodes.length)) {
+          throw new Error(
+            localize(
+              settings.uiLanguage,
+              "Staffelfolgen konnten nicht geladen werden.",
+              "Could not load season episodes.",
+            ),
+          );
+        }
+        const targetEpisodes = groups.flatMap((group) =>
+          group.episodes.map((entry) => ({
+            seasonNumber: group.seasonNumber,
+            episodeNumber: entry.episodeNumber,
+          })),
+        );
+        const changedEpisodes = targetEpisodes.filter(
+          (entry) =>
+            isWatched(displayItem, entry.seasonNumber, entry.episodeNumber) ===
+            alreadyWatched,
+        );
+        if (authClient.session && changedEpisodes.length) {
+          await saveWatchedEpisodesState(
+            authClient,
+            displayItem.id,
+            changedEpisodes,
+            !alreadyWatched,
+            activeProfile?.id,
+          );
+        }
+        if (syncClient().isConnected) {
+          for (const group of groups) {
+            const numbers = changedEpisodes
+              .filter((entry) => entry.seasonNumber === group.seasonNumber)
+              .map((entry) => entry.episodeNumber);
+            if (numbers.length)
+              await syncSeasonWatched(
+                { mediaType: "tv", tmdbId: displayItem.id },
+                group.seasonNumber,
+                numbers,
+                !alreadyWatched,
+              );
+          }
+        }
+        changedEpisodes.forEach((entry) =>
+          markWatchedLocally(
+            {
+              mediaType: "tv",
+              id: displayItem.id,
+              season: entry.seasonNumber,
+              episode: entry.episodeNumber,
+            },
+            !alreadyWatched,
+          ),
+        );
+        setToast(
+          localize(
+            settings.uiLanguage,
+            alreadyWatched
+              ? "Serie als ungesehen markiert."
+              : "Serie als gesehen markiert.",
+            alreadyWatched
+              ? "Series marked as unwatched."
+              : "Series marked as watched.",
+          ),
+        );
+        void refreshData();
+      } catch (error) {
+        setToast(
+          error instanceof Error
+            ? error.message
+            : localize(
+                settings.uiLanguage,
+                "Der Gesehen-Status konnte nicht aktualisiert werden.",
+                "Could not update watched state.",
+              ),
+        );
+      }
+      return;
+    }
     // Update the badge + Continue Watching instantly, before Trakt round-trips.
     markWatchedLocally(
       { mediaType: displayItem.mediaType, id: displayItem.id, season, episode },
@@ -1812,7 +1912,15 @@ function SeasonEpisodes({
   ) => boolean;
   onPlayEpisode: (season: number, episode: number) => void;
 }) {
-  const { openContextMenu, setToast, settings, toggleWatched } = useApp();
+  const {
+    openContextMenu,
+    setToast,
+    settings,
+    toggleWatched,
+    markWatchedLocally,
+    activeProfile,
+    refreshData,
+  } = useApp();
   const seasons = item.seasons ?? [];
   const [season, setSeason] = useState(seasons[0]?.seasonNumber ?? 1);
   const [episodes, setEpisodes] = useState<EpisodeInfo[]>([]);
@@ -1869,6 +1977,18 @@ function SeasonEpisodes({
       const changedEpisodes = targetEpisodes.filter(
         (ep) => isWatched(item, seasonNum, ep.episodeNumber) !== watched,
       );
+      if (authClient.session && changedEpisodes.length) {
+        await saveWatchedEpisodesState(
+          authClient,
+          item.id,
+          changedEpisodes.map((ep) => ({
+            seasonNumber: seasonNum,
+            episodeNumber: ep.episodeNumber,
+          })),
+          watched,
+          activeProfile?.id,
+        );
+      }
       await syncSeasonWatched(
         {
           mediaType: "tv",
@@ -1881,11 +2001,18 @@ function SeasonEpisodes({
         changedEpisodes.map((ep) => ep.episodeNumber),
         watched,
       );
-      for (const ep of targetEpisodes) {
-        if (isWatched(item, seasonNum, ep.episodeNumber) !== watched) {
-          await toggleWatched(item, seasonNum, ep.episodeNumber, true);
-        }
-      }
+      changedEpisodes.forEach((ep) =>
+        markWatchedLocally(
+          {
+            mediaType: "tv",
+            id: item.id,
+            season: seasonNum,
+            episode: ep.episodeNumber,
+          },
+          watched,
+        ),
+      );
+      void refreshData();
       setToast(
         localize(
           settings.uiLanguage,
@@ -2086,6 +2213,7 @@ function SeasonEpisodes({
               (episode.voteAverage && episode.voteAverage > 0
                 ? episode.voteAverage.toFixed(1)
                 : "");
+            const episodeArtwork = episode.still || item.backdrop || item.image;
             const watched = isWatched(item, season, episode.episodeNumber);
             return (
               <button
@@ -2096,8 +2224,8 @@ function SeasonEpisodes({
                 onContextMenu={(e) => handleEpisodeContextMenu(e, episode)}
               >
                 <div className="episode-still">
-                  {episode.still ? (
-                    <img src={episode.still} alt="" />
+                  {episodeArtwork ? (
+                    <img src={episodeArtwork} alt="" />
                   ) : (
                     <Clapperboard size={24} />
                   )}

@@ -2863,14 +2863,23 @@ function CatalogsSection() {
             />
             <span>{(catalog.sourceType || "custom").toUpperCase()}</span>
             <Select
-              value={catalog.layout ?? "landscape"}
-              onChange={(layout) =>
+              value={
+                settings.catalogueRowLayoutModes[`home:${catalog.id}`] ??
+                settings.cardLayoutMode
+              }
+              onChange={(layout) => {
                 updateCatalogs(
                   catalogs.map((c) =>
                     c.id === catalog.id ? { ...c, layout } : c,
                   ),
-                )
-              }
+                );
+                updateSettings({
+                  catalogueRowLayoutModes: {
+                    ...settings.catalogueRowLayoutModes,
+                    [`home:${catalog.id}`]: layout,
+                  },
+                });
+              }}
               options={[
                 ["landscape", "Landscape"],
                 ["poster", "Poster"],

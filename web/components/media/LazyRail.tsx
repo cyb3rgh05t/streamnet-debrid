@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Film } from "lucide-react";
 import { loadStored, saveStored } from "@/lib/storage";
 import { useApp } from "@/lib/store";
-import { localizedCatalogName } from "@/lib/catalogs";
+import { localizedCatalogName, resolveRailPosterMode } from "@/lib/catalogs";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
 import { MediaRail } from "./MediaRail";
 
@@ -42,10 +42,10 @@ export function LazyRail({
   const [category, setCategory] = useState<Category | null>(() =>
     filterCategory(readCachedCatalog(cacheKey), mediaTypeFilter),
   );
-  const effectivePosterMode =
-    catalog.layout === "poster" ||
-    category?.layout === "poster" ||
-    (posterMode ?? settings.cardLayoutMode === "poster");
+  const effectivePosterMode = resolveRailPosterMode(
+    settings.cardLayoutMode,
+    posterMode,
+  );
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
 

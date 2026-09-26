@@ -698,6 +698,7 @@ async function loadCollectionSource(
         sourceType: "addon",
         mediaType,
         addonId: source.addonId,
+        sourceUrl: source.addonManifestUrl,
         addonCatalogType: source.addonCatalogType,
         addonCatalogId: source.addonCatalogId,
         enabled: true,

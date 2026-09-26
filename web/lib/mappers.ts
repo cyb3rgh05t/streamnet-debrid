@@ -85,6 +85,18 @@ export function traktItemToMedia(raw: unknown): MediaItem {
   };
 }
 
+export function traktWatchedToMedia(raw: unknown): MediaItem {
+  const item = raw as {
+    last_watched_at?: string;
+    last_updated_at?: string;
+  };
+  return {
+    ...traktItemToMedia(raw),
+    activityAt:
+      Date.parse(item.last_watched_at ?? item.last_updated_at ?? "") || 0,
+  };
+}
+
 export function traktPlaybackToMedia(raw: unknown): MediaItem {
   const item = raw as {
     progress?: number;

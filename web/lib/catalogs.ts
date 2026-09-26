@@ -28,6 +28,14 @@ export function localizedCatalogName(
     : catalog.name;
 }
 
+export function resolveRailPosterMode(
+  globalLayout: "landscape" | "poster",
+  rowOverride?: boolean,
+): boolean {
+  if (rowOverride !== undefined) return rowOverride;
+  return globalLayout === "poster";
+}
+
 const androidCollectionGroups = {
   featured: "FEATURED",
   service: "SERVICE",
@@ -97,8 +105,15 @@ function addonSource(
   addonId: string,
   addonCatalogType: string,
   addonCatalogId: string,
+  addonManifestUrl?: string,
 ): NonNullable<CatalogConfig["collectionSources"]>[number] {
-  return { kind: "ADDON_CATALOG", addonId, addonCatalogType, addonCatalogId };
+  return {
+    kind: "ADDON_CATALOG",
+    addonId,
+    addonCatalogType,
+    addonCatalogId,
+    addonManifestUrl,
+  };
 }
 
 function providerSource(
@@ -120,7 +135,6 @@ function serviceSources(
   extraProviderIds: number[] = [],
 ) {
   return [
-    addonSource("aio-metadata", "movie", addonCatalogId),
     addonSource("aio-metadata", "series", addonCatalogId),
     ...[providerId, ...extraProviderIds].flatMap((id) => [
       providerSource("movie", id),
@@ -548,12 +562,13 @@ const androidCollectionDefaults: CatalogConfig[] = [
   ].map((title) => {
     const sources = {
       Marvel: [
-        curatedSource(...marvelCuratedRefs),
         addonSource(
-          "com.joaogonp.marveladdon.custom.marvel-mcu",
+          "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
           "Marvel",
           "marvel-mcu",
+          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
         ),
+        curatedSource(...marvelCuratedRefs),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 86311 },
         mdblistPublicSource("lt3dave/marvel-cinematic-universe-mcu-collection"),
         mdblistPublicSource("at0microuton/mcu-tv-shows"),
@@ -891,7 +906,8 @@ function normalizedLayout(catalog: CatalogConfig): CatalogConfig["layout"] {
     .trim()
     .toLowerCase();
   if (shape === "poster") return "poster";
-  return catalog.layout ?? "landscape";
+  if (shape === "landscape") return catalog.layout ?? "landscape";
+  return catalog.layout;
 }
 
 function normalizedCatalog(catalog: CatalogConfig): CatalogConfig {

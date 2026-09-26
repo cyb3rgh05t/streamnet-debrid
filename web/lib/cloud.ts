@@ -585,8 +585,9 @@ function androidProfileSettings(settings: AppSettings) {
       settings.homeServers,
     ),
     torrServerBaseUrl: settings.torrServerBaseUrl || null,
-    catalogueRowLayoutModes: {},
-    cardLayoutMode: settings.cardLayoutMode,
+    catalogueRowLayoutModes: settings.catalogueRowLayoutModes,
+    cardLayoutMode:
+      settings.cardLayoutMode === "poster" ? "Poster" : "Landscape",
     frameRateMatchingMode: androidFrameRateMode(settings.frameRateMatchingMode),
     autoPlayNext: settings.autoPlayNext,
     autoPlaySingleSource: settings.autoPlaySingleSource,
@@ -683,7 +684,18 @@ export function settingsFromAndroidProfile(
   }
   if ("cardLayoutMode" in state)
     partial.cardLayoutMode =
-      String(state.cardLayoutMode) === "poster" ? "poster" : "landscape";
+      String(state.cardLayoutMode).trim().toLowerCase() === "poster"
+        ? "poster"
+        : "landscape";
+  if ("catalogueRowLayoutModes" in state) {
+    const modes = objectRecord(state.catalogueRowLayoutModes);
+    partial.catalogueRowLayoutModes = Object.fromEntries(
+      Object.entries(modes).map(([rowKey, mode]) => [
+        rowKey,
+        String(mode).trim().toLowerCase() === "poster" ? "poster" : "landscape",
+      ]),
+    );
+  }
   if ("frameRateMatchingMode" in state)
     partial.frameRateMatchingMode = webFrameRateMode(
       state.frameRateMatchingMode,
@@ -1382,7 +1394,8 @@ export async function saveCloudSettings(
     //    profileSettingsById below). Kept for backward compat; not timestamp-managed.
     root.defaultSubtitle = settings.defaultSubtitle || "Off";
     root.defaultAudioLanguage = settings.audioLanguage || "Auto (Original)";
-    root.cardLayoutMode = settings.cardLayoutMode;
+    root.cardLayoutMode =
+      settings.cardLayoutMode === "poster" ? "Poster" : "Landscape";
     root.frameRateMatchingMode = androidFrameRateMode(
       settings.frameRateMatchingMode,
     );
@@ -1427,7 +1440,6 @@ export async function saveCloudSettings(
       // Fields the web doesn't genuinely own (always sends empty) — never write them, so they can't
       // wipe a phone's value. defaultSubtitle keeps its own timestamp logic (handled below).
       const skip = new Set([
-        "catalogueRowLayoutModes",
         "subtitleUsageJson",
         "defaultSubtitle",
         "subtitleSettingsUpdatedAt",
@@ -1438,7 +1450,13 @@ export async function saveCloudSettings(
           !baseProfile ||
           !sameFieldValue(newProfile[field], baseProfile[field])
         ) {
-          merged[field] = newProfile[field];
+          merged[field] =
+            field === "catalogueRowLayoutModes"
+              ? {
+                  ...objectRecord(merged[field]),
+                  ...objectRecord(newProfile[field]),
+                }
+              : newProfile[field];
           bumpFieldTs(root, `p:${profileId}:${field}`, changedAt);
         }
       }
@@ -1862,26 +1880,22 @@ export async function saveCloudWatchlist(
   });
 }
 
-export async function pullCloudWatchedKeys(
-  auth: AuthClient,
-  profileId?: string | null,
-): Promise<Set<string>> {
-  const root = await pullRawPayload(auth);
+export function watchedStateFromPayload(root: RawPayload, profileId: string) {
   const keys = new Set<string>();
-  const movieProfiles = objectRecord<unknown>(root.localWatchedMoviesByProfile);
-  const episodeProfiles = objectRecord<unknown>(
-    root.localWatchedEpisodesByProfile,
+  const activityAt = new Map<string, number>();
+  const removedAt = new Map<string, number>();
+  const movies = arrayValue<number>(
+    objectRecord(root.localWatchedMoviesByProfile)[profileId],
   );
-  const movies = profileId
-    ? arrayValue<number>(movieProfiles[profileId])
-    : Object.values(movieProfiles).flatMap((value) =>
-        arrayValue<number>(value),
-      );
-  const episodes = profileId
-    ? arrayValue<string>(episodeProfiles[profileId])
-    : Object.values(episodeProfiles).flatMap((value) =>
-        arrayValue<string>(value),
-      );
+  const episodes = arrayValue<string>(
+    objectRecord(root.localWatchedEpisodesByProfile)[profileId],
+  );
+  const movieChanges = parseDismissedContinueWatching(
+    objectRecord(root.localWatchedMovieChangesByProfile)[profileId],
+  );
+  const episodeChanges = parseDismissedContinueWatching(
+    objectRecord(root.localWatchedEpisodeChangesByProfile)[profileId],
+  );
   movies.forEach((id) => {
     const value = Number(id);
     if (value > 0) keys.add(`movie:${value}`);
@@ -1890,7 +1904,24 @@ export async function pullCloudWatchedKeys(
     const match = /^show_tmdb:(\d+):(\d+):(\d+)$/.exec(String(value));
     if (match) keys.add(`tv:${match[1]}:${match[2]}:${match[3]}`);
   });
-  return keys;
+  movieChanges.forEach((timestamp, id) => {
+    const key = `movie:${id}`;
+    (keys.has(key) ? activityAt : removedAt).set(key, timestamp);
+  });
+  episodeChanges.forEach((timestamp, episodeKey) => {
+    const match = /^show_tmdb:(\d+):(\d+):(\d+)$/.exec(episodeKey);
+    if (!match) return;
+    const key = `tv:${match[1]}:${match[2]}:${match[3]}`;
+    (keys.has(key) ? activityAt : removedAt).set(key, timestamp);
+  });
+  return { keys, activityAt, removedAt };
+}
+
+export async function pullCloudWatchedState(
+  auth: AuthClient,
+  profileId: string,
+) {
+  return watchedStateFromPayload(await pullRawPayload(auth), profileId);
 }
 
 export async function pullCloudContinueWatchingDismissals(
@@ -2267,6 +2298,17 @@ export async function saveWatchedState(
 ) {
   if (!auth.session) return;
   const targetProfileId = profileId ?? "default";
+  if (item.mediaType === "tv") {
+    if (item.seasonNumber == null || item.episodeNumber == null) return;
+    await saveWatchedEpisodesState(
+      auth,
+      item.id,
+      [{ seasonNumber: item.seasonNumber, episodeNumber: item.episodeNumber }],
+      watched,
+      targetProfileId,
+    );
+    return;
+  }
   await mutateCloudPayload(auth, (root) => {
     if (item.mediaType === "movie") {
       const byProfile = objectRecord<unknown>(root.localWatchedMoviesByProfile);
@@ -2279,26 +2321,26 @@ export async function saveWatchedState(
       else ids.delete(item.id);
       byProfile[targetProfileId] = [...ids].sort((a, b) => a - b);
       root.localWatchedMoviesByProfile = byProfile;
-    } else if (item.seasonNumber != null && item.episodeNumber != null) {
-      const byProfile = objectRecord<unknown>(
-        root.localWatchedEpisodesByProfile,
+      const changesByProfile = objectRecord(
+        root.localWatchedMovieChangesByProfile,
       );
-      const episodeKey = `show_tmdb:${item.id}:${item.seasonNumber}:${item.episodeNumber}`;
-      const keys = new Set(
-        arrayValue<string>(byProfile[targetProfileId])
-          .map(String)
-          .filter(Boolean),
+      const changes = parseDismissedContinueWatching(
+        changesByProfile[targetProfileId],
       );
-      if (watched) keys.add(episodeKey);
-      else keys.delete(episodeKey);
-      byProfile[targetProfileId] = [...keys].sort();
-      root.localWatchedEpisodesByProfile = byProfile;
+      changes.set(String(item.id), Date.now());
+      changesByProfile[targetProfileId] =
+        encodeDismissedContinueWatching(changes);
+      root.localWatchedMovieChangesByProfile = changesByProfile;
     }
 
     if (watched) {
       const matches = (candidate: AndroidContinueWatchingItem) =>
         candidate.id === item.id &&
-        String(candidate.mediaType ?? "").toLowerCase() === item.mediaType;
+        String(candidate.mediaType ?? "").toLowerCase() === item.mediaType &&
+        (item.mediaType === "movie" ||
+          (item.seasonNumber == null && item.episodeNumber == null) ||
+          (candidate.season === item.seasonNumber &&
+            candidate.episode === item.episodeNumber));
       const byProfile = objectRecord<unknown>(
         root.localContinueWatchingByProfile,
       );
@@ -2308,6 +2350,71 @@ export async function saveWatchedState(
       root.localContinueWatchingByProfile = byProfile;
     }
   });
+}
+
+export function updateWatchedEpisodesInPayload(
+  root: RawPayload,
+  profileId: string,
+  showId: number,
+  episodes: Array<{ seasonNumber: number; episodeNumber: number }>,
+  watched: boolean,
+  changedAt: number,
+) {
+  const byProfile = objectRecord(root.localWatchedEpisodesByProfile);
+  const keys = new Set(arrayValue<string>(byProfile[profileId]));
+  const changesByProfile = objectRecord(
+    root.localWatchedEpisodeChangesByProfile,
+  );
+  const changes = parseDismissedContinueWatching(changesByProfile[profileId]);
+  const continueByProfile = objectRecord(root.localContinueWatchingByProfile);
+  const selected = new Set(
+    episodes.map(
+      ({ seasonNumber, episodeNumber }) =>
+        `show_tmdb:${showId}:${seasonNumber}:${episodeNumber}`,
+    ),
+  );
+  selected.forEach((key) => {
+    if (watched) keys.add(key);
+    else keys.delete(key);
+    changes.set(key, changedAt);
+  });
+  byProfile[profileId] = [...keys].sort();
+  changesByProfile[profileId] = encodeDismissedContinueWatching(changes);
+  root.localWatchedEpisodesByProfile = byProfile;
+  root.localWatchedEpisodeChangesByProfile = changesByProfile;
+  if (watched) {
+    continueByProfile[profileId] = arrayValue<AndroidContinueWatchingItem>(
+      continueByProfile[profileId],
+    ).filter(
+      (candidate) =>
+        candidate.id !== showId ||
+        String(candidate.mediaType ?? "").toLowerCase() !== "tv" ||
+        !selected.has(
+          `show_tmdb:${showId}:${candidate.season}:${candidate.episode}`,
+        ),
+    );
+    root.localContinueWatchingByProfile = continueByProfile;
+  }
+}
+
+export async function saveWatchedEpisodesState(
+  auth: AuthClient,
+  showId: number,
+  episodes: Array<{ seasonNumber: number; episodeNumber: number }>,
+  watched: boolean,
+  profileId?: string | null,
+) {
+  if (!auth.session || !episodes.length) return;
+  await mutateCloudPayload(auth, (root) =>
+    updateWatchedEpisodesInPayload(
+      root,
+      profileId ?? "default",
+      showId,
+      episodes,
+      watched,
+      Date.now(),
+    ),
+  );
 }
 
 export async function markWatched(

@@ -42,7 +42,7 @@ internal object CollectionTemplateManifest {
     private const val GENRE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Genres/"
     private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/images/Franchises/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
-    private const val MARVEL_ADDON_URL = "https://addon-marvel.onrender.com/catalog/marvel-mcu/manifest.json"
+    private const val MARVEL_ADDON_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json"
     private const val DC_ADDON_URL = "https://addon-dc-cq85.onrender.com/catalog/dc-chronological/manifest.json"
     private const val STAR_WARS_ADDON_URL = "https://addon-star-wars-u9e3.onrender.com/catalog/sw-movies-series-chronological/manifest.json"
     private const val TEMPLATE_IMAGE_BASE = IMAGE_BASE
@@ -704,10 +704,10 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.joaogonp.marveladdon.custom.marvel-mcu", type = "Marvel", catalogId = "marvel-mcu")
+                source(addonId = "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series", type = "Marvel", catalogId = "marvel-mcu")
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.joaogonp.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = null)
+                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = null)
             )
         ),
         entry(
@@ -1138,7 +1138,7 @@ internal object CollectionTemplateManifest {
         val addonIds = entry.sources.mapNotNull { it.addonId }.toSet()
         return buildList {
             if (addonIds.contains("pw.ers.netflix-catalog")) add(STREAMING_ADDON_URL)
-            if (addonIds.contains("com.joaogonp.marveladdon.custom.marvel-mcu")) add(MARVEL_ADDON_URL)
+            if (addonIds.contains("com.joaogonp.marveladdon.custom.marvel-mcu.movies.series")) add(MARVEL_ADDON_URL)
             if (addonIds.contains("com.btmv.addon.dcuniverse.custom.dc-chronological")) add(DC_ADDON_URL)
             if (addonIds.contains("com.starwars.addon.custom.sw-movies-series-chronological")) add(STAR_WARS_ADDON_URL)
         }

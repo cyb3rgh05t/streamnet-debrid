@@ -10,6 +10,14 @@ import org.junit.Test
 class HomeRowStateTest {
 
     @Test
+    fun `recently watched titles use watched change time before fallback order`() {
+        assertThat(recentlyWatchedFirst(listOf(12, 80, 35), mapOf(12 to 300L, 35 to 200L)))
+            .containsExactly(12, 35, 80).inOrder()
+        assertThat(recentlyWatchedFirst(listOf(12, 80, 35), emptyMap()))
+            .containsExactly(35, 80, 12).inOrder()
+    }
+
+    @Test
     fun `IPTV Home category fallback uses artwork but never country flags`() {
         assertThat(iptvHomeCategoryBackdrop("SKY Premium")).endsWith("sky_premium.webp")
         assertThat(iptvHomeCategoryBackdrop("Regional Fussball")).endsWith("fussball.webp")

@@ -243,7 +243,14 @@ object AppTranslations {
         val normalized = text.trim().replace("â€¢", "•")
         val table = localeKeys(locale).firstNotNullOfOrNull { translations[it] } ?: return text
         translateDynamic(normalized, table)?.let { return it }
-        return table[normalized] ?: text
+        return table[normalized] ?: when (normalized) {
+            "Skip Intro" -> if (language == "de") "Intro überspringen" else text
+            "Skip Recap" -> if (language == "de") "Zusammenfassung überspringen" else text
+            "Skip Credits" -> if (language == "de") "Abspann überspringen" else text
+            "Skip Preview" -> if (language == "de") "Vorschau überspringen" else text
+            "Skip" -> if (language == "de") "Überspringen" else text
+            else -> text
+        }
     }
 
     private fun localeKeys(locale: Locale): List<String> {

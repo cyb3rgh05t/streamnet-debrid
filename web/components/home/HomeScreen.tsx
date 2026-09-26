@@ -156,6 +156,10 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     settings,
   } = useApp();
   const posterMode = settings.cardLayoutMode === "poster";
+  const posterModeForHomeRow = (rowId: string) => {
+    const rowMode = settings.catalogueRowLayoutModes[`home:${rowId}`];
+    return rowMode === undefined ? posterMode : rowMode === "poster";
+  };
   const [openCollection, setOpenCollection] = useState<CatalogConfig | null>(
     null,
   );
@@ -549,7 +553,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               }}
               onOpen={openDetails}
               onFocus={onCardFocus}
-              posterMode={posterMode}
+              posterMode={posterModeForHomeRow("continue_watching")}
             />
           ) : null}
           {orderedHomeRails.map((rail, index) =>
@@ -559,7 +563,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                 category={rail.category}
                 onOpen={openDetails}
                 onFocus={onCardFocus}
-                posterMode={posterMode}
+                posterMode={posterModeForHomeRow(rail.category.id)}
               />
             ) : "group" in rail.entry ? (
               <section
@@ -624,6 +628,7 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               <LazyRail
                 key={rail.entry.catalog.id}
                 catalog={rail.entry.catalog}
+                posterMode={posterModeForHomeRow(rail.entry.catalog.id)}
                 eager={index < 2}
                 onOpen={openDetails}
                 onFocus={onCardFocus}

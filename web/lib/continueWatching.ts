@@ -1,5 +1,22 @@
 import type { MediaItem } from "./types";
 
+export function mediaWatchKey(
+  item: Pick<MediaItem, "id" | "mediaType" | "seasonNumber" | "episodeNumber">,
+  seasonNumber?: number | null,
+  episodeNumber?: number | null,
+): string | null {
+  if (item.mediaType === "movie") return `movie:${item.id}`;
+  const season = seasonNumber ?? item.seasonNumber ?? null;
+  const episode = episodeNumber ?? item.episodeNumber ?? null;
+  if (season !== null && episode !== null) {
+    return `tv:${item.id}:${season}:${episode}`;
+  }
+  if (season === null && episode === null) {
+    return `tv:${item.id}`;
+  }
+  return null;
+}
+
 export function watchedKeysFromShowProgress(
   tmdbId: number,
   progress: unknown,
@@ -95,22 +112,28 @@ export function isWatchedShowEpisode(
   const showKey = `tv:${item.id}`;
   if (watchedKeys.has(showKey)) return true;
 
+  if (season == null && episode == null) {
+    const seasons = (item.seasons ?? []).filter(
+      (entry) => entry.seasonNumber > 0,
+    );
+    return (
+      seasons.length > 0 &&
+      seasons.every(
+        (entry) =>
+          (entry.episodeCount ?? 0) > 0 &&
+          Array.from(
+            { length: entry.episodeCount! },
+            (_, index) => index + 1,
+          ).every((number) =>
+            watchedKeys.has(`tv:${item.id}:${entry.seasonNumber}:${number}`),
+          ),
+      )
+    );
+  }
   if (season == null || episode == null) return false;
 
   const exactKey = `tv:${item.id}:${season}:${episode}`;
-  if (watchedKeys.has(exactKey)) return true;
-
-  const seasonPrefix = `tv:${item.id}:${season}:`;
-  let latestWatchedEpisode = -Infinity;
-  for (const key of watchedKeys) {
-    if (!key.startsWith(seasonPrefix)) continue;
-    const watchedEpisode = Number.parseInt(key.slice(seasonPrefix.length), 10);
-    if (Number.isFinite(watchedEpisode)) {
-      latestWatchedEpisode = Math.max(latestWatchedEpisode, watchedEpisode);
-    }
-  }
-
-  return latestWatchedEpisode >= episode;
+  return watchedKeys.has(exactKey);
 }
 
 /** Only positive completion evidence can prune a saved rail during a partial outage. */

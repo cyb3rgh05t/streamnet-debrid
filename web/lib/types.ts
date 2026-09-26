@@ -183,6 +183,7 @@ export interface CollectionSourceConfig {
   kind: string;
   mediaType?: string | null;
   addonId?: string | null;
+  addonManifestUrl?: string | null;
   addonCatalogType?: string | null;
   addonCatalogId?: string | null;
   tmdbGenreId?: number | null;
@@ -527,6 +528,7 @@ export interface AppSettings {
   defaultPlayer: "browser" | "vlc" | "infuse";
   // Appearance
   cardLayoutMode: "landscape" | "poster";
+  catalogueRowLayoutModes: Record<string, "landscape" | "poster">;
   deviceModeOverride: "auto" | "tv" | "tablet" | "phone" | "desktop";
   oledBlack: boolean;
   clockFormat: "12h" | "24h";

@@ -91,6 +91,9 @@ import kotlin.math.abs
 internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
     channelIds.asReversed().map { it.trim() }.filter { it.isNotBlank() }.distinct()
 
+internal fun <T> recentlyWatchedFirst(keys: List<T>, changedAt: Map<T, Long>): List<T> =
+    keys.asReversed().sortedByDescending { changedAt[it] ?: 0L }
+
 internal fun normalizeLogoCacheLanguage(language: String): String =
     language.ifBlank { "en-US" }
         .replace('_', '-')
@@ -1333,16 +1336,20 @@ class HomeViewModel @Inject constructor(
                 if (error is CancellationException) throw error
             }
 
-        // Both caches are insertion-ordered (oldest watched first, newest last), so the
-        // most recently watched titles must be read from the tail, not the head.
-        val watchedMovieIds = traktRepository.getWatchedMoviesFromCache()
-            .filter { it > 0 }
-            .toList()
-            .asReversed()
+        val (movieChanges, episodeChanges) = traktRepository.getLocalWatchedChangeTimes()
+        val movieChangeTimes = movieChanges.mapNotNull { (key, timestamp) ->
+            key.toIntOrNull()?.let { id -> id to timestamp }
+        }.toMap()
+        val watchedMovieIds = recentlyWatchedFirst(
+            traktRepository.getWatchedMoviesFromCache().filter { it > 0 }.toList(),
+            movieChangeTimes
+        )
             .take(20)
-        val watchedSeriesIds = traktRepository.getWatchedEpisodesFromCache()
-            .toList()
-            .asReversed()
+        val watchedEpisodeKeys = recentlyWatchedFirst(
+            traktRepository.getWatchedEpisodesFromCache().toList(),
+            episodeChanges
+        )
+        val watchedSeriesIds = watchedEpisodeKeys
             .mapNotNull { key ->
                 key.removePrefix("show_tmdb:")
                     .substringBefore(':')
@@ -1351,7 +1358,7 @@ class HomeViewModel @Inject constructor(
             }
             .distinct()
             .take(20)
-        val latestWatchedEpisodeBySeries = traktRepository.getWatchedEpisodesFromCache()
+        val latestWatchedEpisodeBySeries = watchedEpisodeKeys
             .mapNotNull { key ->
                 val parts = key.removePrefix("show_tmdb:").split(':')
                 if (parts.size != 3) return@mapNotNull null
@@ -1360,8 +1367,8 @@ class HomeViewModel @Inject constructor(
                 val episode = parts[2].toIntOrNull() ?: return@mapNotNull null
                 seriesId to (season to episode)
             }
-            .groupBy({ it.first }, { it.second })
-            .mapValues { (_, episodes) -> episodes.maxWithOrNull(compareBy<Pair<Int, Int>> { it.first }.thenBy { it.second }) }
+            .distinctBy { it.first }
+            .toMap()
 
         val detailSemaphore = kotlinx.coroutines.sync.Semaphore(5)
         val movies = watchedMovieIds.map { id ->
@@ -3257,10 +3264,18 @@ class HomeViewModel @Inject constructor(
                 val mergedCachedContinueWatching = mergeContinueWatchingResumeData(cachedContinueWatching)
                 val savedCatalogs = withContext(networkDispatcher) {
                     runCatching {
+                        val marvelAddonUrls = CollectionTemplateManifest.entries
+                            .firstOrNull { it.title.equals("Marvel", ignoreCase = true) }
+                            ?.let(CollectionTemplateManifest::requiredAddonUrlsFor)
+                            .orEmpty()
                         streamRepository.removeCustomAddonsByUrl(
-                            CollectionTemplateManifest.autoInstalledAddonUrls() +
-                                listOf(MediaRepository.STREAMING_COLLECTION_ADDON_URL)
+                            (
+                                CollectionTemplateManifest.autoInstalledAddonUrls() +
+                                    MediaRepository.STREAMING_COLLECTION_ADDON_URL +
+                                    "https://addon-marvel.onrender.com/catalog/marvel-mcu/manifest.json"
+                                ).filterNot { it in marvelAddonUrls }
                         )
+                        streamRepository.ensureCustomAddons(marvelAddonUrls)
                         val addons = streamRepository.installedAddons.first()
                         catalogRepository.syncAddonCatalogs(addons)
                         catalogRepository.syncHomeServerCatalogs(homeServerRepository.getCatalogCandidates())

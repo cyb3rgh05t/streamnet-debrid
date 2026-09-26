@@ -982,7 +982,9 @@ class StreamRepository @Inject constructor(
             }
         }
 
-        return addons.firstOrNull { it.id == preferred && matches(it) }?.id
+        return addons.firstOrNull {
+            (it.id == preferred || it.manifest?.id == preferred) && matches(it)
+        }?.id
             ?: addons.firstOrNull { matches(it) }?.id
     }
 

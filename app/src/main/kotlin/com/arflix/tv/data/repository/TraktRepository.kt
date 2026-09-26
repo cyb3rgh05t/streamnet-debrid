@@ -4679,6 +4679,12 @@ class TraktRepository @Inject constructor(
         return watchedEpisodesCache.toSet()
     }
 
+    suspend fun getLocalWatchedChangeTimes(): Pair<Map<String, Long>, Map<String, Long>> {
+        val prefs = context.traktDataStore.data.first()
+        return parseDismissedMap(prefs[localWatchedMovieChangesKey()]) to
+            parseDismissedMap(prefs[localWatchedEpisodeChangesKey()])
+    }
+
     /**
      * Check if show has any watched episodes - optimized to avoid full iteration
      */

@@ -43,6 +43,8 @@ import com.arflix.tv.data.repository.SkipInterval
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.util.AppTranslations
+import com.arflix.tv.util.LocalAppLanguage
 import kotlinx.coroutines.delay
 
 /**
@@ -155,10 +157,11 @@ fun SkipIntroButton(
     }
 }
 
+@Composable
 private fun skipLabel(type: String?): String = when (type) {
-    "op", "mixed-op", "intro" -> "Skip Intro"
-    "recap" -> "Skip Recap"
-    "ed", "mixed-ed", "outro", "credits" -> "Skip Credits"
-    "preview" -> "Skip Preview"
-    else -> "Skip"
+    "op", "mixed-op", "intro" -> AppTranslations.translate("Skip Intro", LocalAppLanguage.current)
+    "recap" -> AppTranslations.translate("Skip Recap", LocalAppLanguage.current)
+    "ed", "mixed-ed", "outro", "credits" -> AppTranslations.translate("Skip Credits", LocalAppLanguage.current)
+    "preview" -> AppTranslations.translate("Skip Preview", LocalAppLanguage.current)
+    else -> AppTranslations.translate("Skip", LocalAppLanguage.current)
 }

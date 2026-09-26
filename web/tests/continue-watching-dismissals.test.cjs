@@ -7,6 +7,23 @@ const moduleUrl = pathToFileURL(
   path.join(__dirname, "..", "lib", "continueWatching.ts"),
 ).href;
 
+test("recently watched uses the watch time, not the watchlist date", async () => {
+  const { traktItemToMedia, traktWatchedToMedia } = await import(
+    pathToFileURL(path.join(__dirname, "..", "lib", "mappers.ts")).href
+  );
+  const row = {
+    movie: { title: "Film", ids: { tmdb: 123 } },
+    listed_at: "2020-01-01T00:00:00Z",
+    last_watched_at: "2026-09-26T12:00:00Z",
+  };
+
+  assert.equal(traktItemToMedia(row).activityAt, Date.parse(row.listed_at));
+  assert.equal(
+    traktWatchedToMedia(row).activityAt,
+    Date.parse(row.last_watched_at),
+  );
+});
+
 test("cloud dismissals prune stale cached Continue Watching items", async () => {
   const { filterDismissedContinueWatching } = await import(moduleUrl);
   const stale = {
@@ -116,7 +133,7 @@ test("completed season advances to the first episode of the next season", async 
   assert.equal(nextEpisodeAfter(show, 2, 8), null);
 });
 
-test("earlier episodes in the same season count as watched for details badges", async () => {
+test("episode badges use exact keys so unwatching an earlier episode sticks", async () => {
   const { isWatchedShowEpisode } = await import(moduleUrl);
 
   const watchedKeys = new Set(["tv:123:2:7", "tv:123:2:9"]);
@@ -125,7 +142,7 @@ test("earlier episodes in the same season count as watched for details badges", 
       { id: 123, mediaType: "tv", seasonNumber: 2, episodeNumber: 8 },
       watchedKeys,
     ),
-    true,
+    false,
   );
   assert.equal(
     isWatchedShowEpisode(
@@ -141,6 +158,45 @@ test("earlier episodes in the same season count as watched for details badges", 
     ),
     false,
   );
+});
+
+test("partial season episode keys never collapse into show-wide watched state", async () => {
+  const { isWatchedShowEpisode } = await import(moduleUrl);
+
+  const show = { id: 123, mediaType: "tv" };
+  const watchedKeys = new Set(["tv:123:2:7"]);
+
+  assert.equal(isWatchedShowEpisode(show, watchedKeys), false);
+  assert.equal(
+    isWatchedShowEpisode({ ...show, seasonNumber: 2 }, watchedKeys),
+    false,
+  );
+  assert.equal(
+    isWatchedShowEpisode(
+      { ...show, seasonNumber: 2, episodeNumber: 7 },
+      watchedKeys,
+    ),
+    true,
+  );
+});
+
+test("a series is watched only when every known non-special episode is watched", async () => {
+  const { isWatchedShowEpisode } = await import(moduleUrl);
+  const show = {
+    id: 123,
+    mediaType: "tv",
+    seasons: [
+      { seasonNumber: 1, episodeCount: 2 },
+      { seasonNumber: 2, episodeCount: 1 },
+    ],
+  };
+  const keys = new Set(["tv:123:1:1", "tv:123:1:2"]);
+
+  assert.equal(isWatchedShowEpisode(show, keys), false);
+  keys.add("tv:123:2:1");
+  assert.equal(isWatchedShowEpisode(show, keys), true);
+  keys.delete("tv:123:1:1");
+  assert.equal(isWatchedShowEpisode(show, keys), false);
 });
 
 test("Trakt progress contributes completed season episodes to detail badges", async () => {

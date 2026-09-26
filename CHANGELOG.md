@@ -2,6 +2,22 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.043] - 2026-09-26
+
+- Skip Intro/Recap/Credits/Preview folgt der gewählten App-Sprache; der Skip-Button wird wieder korrekt als Compose-Komponente kompiliert.
+- „Zuletzt gesehene Filme/Serien“ nutzt vorhandene profilbezogene Watched-Änderungszeiten statt der nach ID sortierten Snapshot-Reihenfolge. Für ältere Einträge ohne Zeitstempel bleibt die bisherige Reihenfolge erhalten.
+- Die Marvel-Franchise installiert und verwendet jetzt das erreichbare, chronologische Addon auf `marvel.mystreamnet.club`; kuratierte MCU- und MDBList-Fallbacks bleiben erhalten.
+- Android-Version: `2.5.043` / Code `444`.
+
+## [Web 1.0.052] - 2026-09-26
+
+- Poster-/Landscape-Einstellung liest Androids `Poster`/`Landscape` korrekt und schreibt die Android-Werte profilbezogen zurück.
+- Watched-/Unwatched-Aktionen für Filme, Episoden, Staffeln und ganze Serien persistieren exakte Episoden-Keys samt Änderungszeitstempeln. Teilweise gesehene Staffeln markieren nicht die ganze Serie; andere Folgen behalten ihre Continue-Watching-Einträge.
+- „Zuletzt gesehen“ sortiert nach Tracker-Watch-Zeit oder Android-Cloud-Änderungszeit, erhält Tracker-Metadaten und entfernt beim Leeren des Verlaufs auch die letzte alte Kategorie.
+- Der Marvel-Franchise-Katalog lädt das erreichbare Marvel-Manifest direkt von `marvel.mystreamnet.club`, auch ohne separate Addon-Installation; kuratierte, TMDB- und MDBList-Fallbacks bleiben bestehen.
+- Episodenkarten ohne eigenes Still zeigen jetzt das Serien-Backdrop und als letzten Fallback das Serien-Poster.
+- Web-Version: `1.0.052`.
+
 ## [2.5.042] - 2026-09-25
 
 - Quellen-Dialog: IPTV-VOD wird nur dann als zusätzlich geprüfte Quelle gezählt, wenn die IPTV-VOD-Suche aktiviert ist. Deaktiviert bleibt die Anzeige bei `1/1`; aktiviert wird der VOD-Slot korrekt als `2/2` berücksichtigt.
