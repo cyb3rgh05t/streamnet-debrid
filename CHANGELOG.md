@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.053] - 2026-09-26
+
+- Poster-/Landscape-Einstellung liest Androids `Poster`/`Landscape` korrekt und schreibt die Android-Werte profilbezogen zurück.
+- Watched-/Unwatched-Aktionen für Filme, Episoden, Staffeln und ganze Serien persistieren exakte Episoden-Keys samt Änderungszeitstempeln. Teilweise gesehene Staffeln markieren nicht die ganze Serie; andere Folgen behalten ihre Continue-Watching-Einträge.
+- „Zuletzt gesehen“ sortiert nach Tracker-Watch-Zeit oder Android-Cloud-Änderungszeit, erhält Tracker-Metadaten und entfernt beim Leeren des Verlaufs auch die letzte alte Kategorie.
+- Der Marvel-Franchise-Katalog lädt das erreichbare Marvel-Manifest direkt von `marvel.mystreamnet.club`, auch ohne separate Addon-Installation; kuratierte, TMDB- und MDBList-Fallbacks bleiben bestehen.
+- Episodenkarten ohne eigenes Still zeigen jetzt das Serien-Backdrop und als letzten Fallback das Serien-Poster.
+- Web-Version: `1.0.053`.
+
 ## [2.5.043] - 2026-09-26
 
 - Skip Intro/Recap/Credits/Preview folgt der gewählten App-Sprache; der Skip-Button wird wieder korrekt als Compose-Komponente kompiliert.
