@@ -64,7 +64,10 @@ import {
 } from "@/lib/serviceLogos";
 import { getImdbRating } from "@/lib/imdbRatings";
 import { mdblistClient, type MdbExternalRating } from "@/lib/mdblist";
-import { sourcePickerScore } from "@/lib/sourceRank";
+import {
+  compareAddonIdsByOrder,
+  compareSourcePickerOrder,
+} from "@/lib/sourceRank";
 import {
   playbackCompatibilityRevision,
   playbackPlan,
@@ -959,6 +962,13 @@ function SourcePickerModal({
   // Addon subtitles for this title, fetched in the background when the panel
   // opens so the VLC/Infuse buttons can attach them synchronously on click.
   const [panelSubtitles, setPanelSubtitles] = useState<SubtitleTrack[]>([]);
+  const addonOrder = useMemo(
+    () =>
+      new Map(
+        installedAddons.map((addon, index) => [addon.id, index] as const),
+      ),
+    [installedAddons],
+  );
 
   useEffect(() => {
     if (!visible) return undefined;
@@ -1013,8 +1023,10 @@ function SourcePickerModal({
         count: (existing?.count ?? 0) + 1,
       });
     });
-    return Array.from(unique.values());
-  }, [installedAddons, streams]);
+    return Array.from(unique.values()).sort((a, b) =>
+      compareAddonIdsByOrder(a.id, b.id, addonOrder),
+    );
+  }, [addonOrder, installedAddons, streams]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -1031,11 +1043,8 @@ function SourcePickerModal({
           .includes(needle);
         // Keep quality-first ordering independent of the playback warning.
       })
-      .sort(
-        (a, b) =>
-          sourcePickerScore(b, "external") - sourcePickerScore(a, "external"),
-      );
-  }, [addonFilter, query, streams]);
+      .sort((a, b) => compareSourcePickerOrder(a, b, addonOrder));
+  }, [addonFilter, addonOrder, query, streams]);
 
   // Warm the direct CDN URLs of the top debrid picks while the user is still
   // looking at the list — pressing Play then skips the resolver round-trips

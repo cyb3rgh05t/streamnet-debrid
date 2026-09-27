@@ -54,7 +54,11 @@ import {
 } from "@/lib/player";
 import { resolverMediaUrl, resolverSubtitleUrl } from "@/lib/resolver";
 import { getSeasonEpisodes } from "@/lib/tmdb";
-import { sourcePickerScore, streamSizeBytes } from "@/lib/sourceRank";
+import {
+  compareSourcePickerOrder,
+  sourcePickerScore,
+  streamSizeBytes,
+} from "@/lib/sourceRank";
 import {
   playbackPlan,
   streamPlayability,
@@ -1060,14 +1064,24 @@ function VideoPlayer({
     };
   }, [item?.id, item?.mediaType, item?.isHomeServer, item]);
 
-  // Same ranked order as the details source picker — the panel and the
-  // auto-hop must both walk sources best-first, not raw addon order.
+  // The manual picker follows the user's addon order, with IPTV VOD first.
+  const addonOrder = useMemo(
+    () => new Map(addons.map((addon, index) => [addon.id, index] as const)),
+    [addons],
+  );
   const sourceList = useMemo(() => {
     const playable = streams.filter((candidate) => Boolean(candidate.url));
     const base = playable.length ? playable : [stream];
-    // Always the browser ordering here: this list is the in-player picker and
-    // the auto-hop fallback, so every candidate has to decode in this browser
-    // no matter what the user's default player is elsewhere.
+    return [...base].sort((a, b) =>
+      compareSourcePickerOrder(a, b, addonOrder, "browser"),
+    );
+  }, [addonOrder, streams, stream]);
+
+  // Automatic recovery remains best-first by browser compatibility, independent
+  // of the manual picker order.
+  const autoHopSourceList = useMemo(() => {
+    const playable = streams.filter((candidate) => Boolean(candidate.url));
+    const base = playable.length ? playable : [stream];
     return [...base].sort(
       (a, b) =>
         sourcePickerScore(b, "browser") - sourcePickerScore(a, "browser"),
@@ -1086,8 +1100,8 @@ function VideoPlayer({
   // hop, a remux escalation or a stall reload. Without this every switch
   // restarted at 0, which is punishing 40 minutes into a film.
   const resumeAtRef = useRef(stream.resumePositionSeconds ?? 0);
-  const sourceListRef = useRef(sourceList);
-  sourceListRef.current = sourceList;
+  const sourceListRef = useRef(autoHopSourceList);
+  sourceListRef.current = autoHopSourceList;
   const currentStreamRef = useRef(stream);
   currentStreamRef.current = stream;
   useEffect(() => {

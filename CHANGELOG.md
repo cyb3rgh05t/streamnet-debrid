@@ -2,6 +2,12 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.054] - 2026-09-27
+
+- Add-on-Schalter bleiben beim Aus- und Wiedereinschalten sowie beim Cloud-Wiederherstellen zwischen Web- und Android-Kompatibilitätsfeldern synchron.
+- Quellenlisten im Detailsdialog und Playerpanel folgen der installierten Add-on-Reihenfolge; Xtream-IPTV-VOD steht bei vorhandenen Treffern immer zuerst. Die Qualitätsreihenfolge innerhalb eines Add-ons und der browserkompatible automatische Quellenwechsel bleiben erhalten.
+- Web-Version: `1.0.054`.
+
 ## [Web 1.0.053] - 2026-09-26
 
 - Poster-/Landscape-Einstellung liest Androids `Poster`/`Landscape` korrekt und schreibt die Android-Werte profilbezogen zurück.

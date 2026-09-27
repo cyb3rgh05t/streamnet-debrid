@@ -60,6 +60,7 @@ import {
 } from "@/lib/externalPlayers";
 import { buildHomeServerCatalogConfigs } from "@/lib/homeserver";
 import { buildStreamNetTvPlaylist } from "@/lib/streamnetTv";
+import { withAddonEnabled } from "@/lib/addons";
 import { accentColor } from "@/lib/accent";
 import { formatTime24Hour } from "@/lib/dateTime";
 import { defaultSettings, useApp } from "@/lib/store";
@@ -3051,7 +3052,7 @@ function AddonsSection() {
                   setAddonsState(
                     addons.map((a) =>
                       a.id === addon.id
-                        ? { ...a, enabled: a.enabled === false }
+                        ? withAddonEnabled(a, a.enabled === false)
                         : a,
                     ),
                   )

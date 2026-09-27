@@ -1,6 +1,6 @@
 {
   "name": "streamnet-web",
-  "version": "1.0.053",
+  "version": "1.0.054",
   "private": true,
   "engines": {
     "node": ">=22.19.0"

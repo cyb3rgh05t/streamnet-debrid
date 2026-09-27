@@ -208,6 +208,10 @@ export function normalizeAddons(addons: unknown) {
   });
 }
 
+export function withAddonEnabled(addon: InstalledAddon, enabled: boolean) {
+  return { ...addon, enabled, isEnabled: enabled };
+}
+
 function supportsResource(addon: InstalledAddon, resource: string) {
   if (!Array.isArray(addon.resources) || addon.resources.length === 0)
     return true;

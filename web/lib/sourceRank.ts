@@ -29,6 +29,35 @@ export function isXtreamVodSource(stream: StreamSource): boolean {
   return stream.addonId === "iptv_xtream_vod";
 }
 
+export function compareAddonIdsByOrder(
+  aId: string,
+  bId: string,
+  addonOrder: ReadonlyMap<string, number>,
+) {
+  const aIsIptvVod = aId === "iptv_xtream_vod";
+  const bIsIptvVod = bId === "iptv_xtream_vod";
+  if (aIsIptvVod !== bIsIptvVod) return aIsIptvVod ? -1 : 1;
+  return (
+    (addonOrder.get(aId) ?? Number.MAX_SAFE_INTEGER) -
+    (addonOrder.get(bId) ?? Number.MAX_SAFE_INTEGER)
+  );
+}
+
+export function compareSourcePickerOrder(
+  a: StreamSource,
+  b: StreamSource,
+  addonOrder: ReadonlyMap<string, number>,
+  target: PlaybackTarget = "external",
+) {
+  const addonOrderDifference = compareAddonIdsByOrder(
+    a.addonId ?? "",
+    b.addonId ?? "",
+    addonOrder,
+  );
+  if (addonOrderDifference !== 0) return addonOrderDifference;
+  return sourcePickerScore(b, target) - sourcePickerScore(a, target);
+}
+
 export function sourcePickerScore(
   stream: StreamSource,
   target: PlaybackTarget = "browser",

@@ -16,6 +16,7 @@ import {
   loadLocalAddons,
   normalizeAddons,
   saveLocalAddons,
+  withAddonEnabled,
 } from "./addons";
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
 import { accentProfileColor, normalizeAccentName } from "./accent";
@@ -1379,12 +1380,13 @@ export function AppProvider({
           // addons locally, the cloud is stale/partial — self-heal by pushing our
           // list back up instead of wiping.
           const cloudReturnedEmpty = cloud !== null && cloudAddons.length === 0;
-          const addonState = source.map((addon) => ({
-            ...addon,
-            enabled:
+          const addonState = source.map((addon) =>
+            withAddonEnabled(
+              addon,
               !effectiveSettings.disabledAddonIds.includes(addon.id) &&
-              addon.enabled !== false,
-          }));
+                addon.enabled !== false,
+            ),
+          );
           setAddons(addonState);
           setAddonsReady(true);
           // Only persist locally when we actually have addons — an empty list can't
