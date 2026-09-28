@@ -182,6 +182,136 @@ test("DC and Star Wars use their MystreamNet chronological manifests", async () 
   }
 });
 
+test("direct franchise IMDb entries use localized TMDB overviews and landscape artwork", async () => {
+  const { loadCatalog } = await import(
+    pathToFileURL(path.join(__dirname, "..", "lib", "tmdb.ts")).href
+  );
+  const previousWindow = global.window;
+  const previousFetch = global.fetch;
+  const requestedLanguages = [];
+  global.window = { location: { origin: "http://localhost" } };
+  global.fetch = async (url) => {
+    const request = new URL(url);
+    if (request.pathname === "/api/proxy") {
+      return Response.json({
+        metas: [
+          {
+            id: "tt0371746",
+            type: "movie",
+            name: "Iron Man",
+            poster: "portrait.jpg",
+            description: "No description available.",
+          },
+        ],
+      });
+    }
+    if (request.pathname === "/api/tmdb/find/tt0371746") {
+      return Response.json({ movie_results: [{ id: 1726 }] });
+    }
+    if (request.pathname === "/api/tmdb/movie/1726") {
+      const language = request.searchParams.get("language");
+      requestedLanguages.push(language);
+      return Response.json({
+        id: 1726,
+        title: "Iron Man",
+        overview:
+          language === "de-DE"
+            ? "Deutsche Beschreibung"
+            : "English description",
+        poster_path: "/portrait.jpg",
+        backdrop_path: "/wide.jpg",
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  const catalog = {
+    id: "collection_franchise_marvel",
+    name: "Marvel",
+    kind: "COLLECTION",
+    enabled: true,
+    collectionSources: [
+      {
+        kind: "ADDON_CATALOG",
+        addonManifestUrl: "https://marvel.example/manifest.json",
+        addonCatalogType: "movie",
+        addonCatalogId: "marvel-mcu",
+        mediaType: "movie",
+      },
+    ],
+  };
+  try {
+    const german = await loadCatalog(catalog, "de-DE");
+    const english = await loadCatalog(catalog, "en-US");
+    assert.equal(german.items[0].id, 1726);
+    assert.equal(german.items[0].overview, "Deutsche Beschreibung");
+    assert.match(german.items[0].backdrop, /wide\.jpg$/);
+    assert.equal(english.items[0].overview, "English description");
+    assert.deepEqual(requestedLanguages, ["de-DE", "en-US"]);
+  } finally {
+    global.fetch = previousFetch;
+    global.window = previousWindow;
+  }
+});
+
+test("unresolved direct franchise entries do not show English manifest copy in German", async () => {
+  const { loadCatalog } = await import(
+    pathToFileURL(path.join(__dirname, "..", "lib", "tmdb.ts")).href
+  );
+  const previousWindow = global.window;
+  const previousFetch = global.fetch;
+  global.window = { location: { origin: "http://localhost" } };
+  global.fetch = async (url) => {
+    const request = new URL(url);
+    if (request.pathname === "/api/proxy") {
+      return Response.json({
+        metas: [
+          {
+            id: "tt99999999",
+            type: "movie",
+            name: "Unknown Film",
+            poster: "portrait.jpg",
+            description: "English plot",
+          },
+        ],
+      });
+    }
+    if (request.pathname.startsWith("/api/tmdb/")) {
+      return Response.json(
+        request.pathname.includes("/find/")
+          ? { movie_results: [] }
+          : { results: [] },
+      );
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    const row = await loadCatalog(
+      {
+        id: "collection_franchise_dc",
+        name: "DC",
+        kind: "COLLECTION",
+        enabled: true,
+        collectionSources: [
+          {
+            kind: "ADDON_CATALOG",
+            addonManifestUrl: "https://dc.example/manifest.json",
+            addonCatalogType: "movie",
+            addonCatalogId: "dc-chronological",
+            mediaType: "movie",
+          },
+        ],
+      },
+      "de-DE",
+    );
+    assert.equal(row.items[0].overview, "");
+    assert.equal(row.items[0].backdrop, null);
+    assert.equal(row.items[0].image, "portrait.jpg");
+  } finally {
+    global.fetch = previousFetch;
+    global.window = previousWindow;
+  }
+});
+
 test("catalogs without a row override inherit the global card layout", async () => {
   const { mergeCatalogs, resolveRailPosterMode } = await import(moduleUrl);
   const catalog = mergeCatalogs([

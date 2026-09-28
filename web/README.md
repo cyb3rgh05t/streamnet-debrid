@@ -15,6 +15,24 @@ This folder contains the self-hosted StreamNet webplayer. It is deployed separat
 - `components/` - StreamNet user interface
 - `lib/` - CloudSync, providers, playback, and application state
 
+## Franchise metadata
+
+The Marvel, DC Universe, and Star Wars collections load their chronology from
+direct MystreamNet catalog manifests without installing separate addons. These
+catalogs return IMDb IDs (`tt...`), portrait posters, and sometimes English or
+placeholder descriptions; they do not provide TMDB IDs or wide backdrops for
+every entry. `lib/tmdb.ts` resolves those IMDb IDs through TMDB's external-ID
+lookup and fetches movie/show details in the selected app language. The TMDB
+backdrop is used on landscape cards and the overview in the Home hero. Curated,
+TMDB, and MDBList collection sources remain available as fallbacks.
+
+If TMDB fails, cards retain the manifest poster without cropping it to fill a
+landscape frame; German UI does not use English manifest copy as an overview.
+Basic TMDB details are cached per language. The catalog row cache key was
+advanced to v4 so previously cached poster-only rows are reloaded. To roll
+back Web `1.0.058`, deploy the previous Web image; no backend migration is
+needed.
+
 ## Deployment
 
 The production compose file pulls the image published by GitHub Actions and expects an existing external Docker network named `proxy`, shared with Traefik:

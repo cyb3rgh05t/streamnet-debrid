@@ -8,9 +8,8 @@ import { localizedCatalogName, resolveRailPosterMode } from "@/lib/catalogs";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
 import { MediaRail } from "./MediaRail";
 
-// v3: v2 entries were poisoned by collection rails colliding on a cache key
-// that omitted collectionSources (all service rows shared one entry).
-const CATALOG_ROW_CACHE_KEY = "arvio.web.catalogRows.v3";
+// v4: reload collection artwork and localized descriptions after IMDb hydration.
+const CATALOG_ROW_CACHE_KEY = "arvio.web.catalogRows.v4";
 const CATALOG_ROW_CACHE_TTL = 12 * 60 * 60 * 1000;
 type CatalogRowCache = Record<string, { at: number; category: Category }>;
 

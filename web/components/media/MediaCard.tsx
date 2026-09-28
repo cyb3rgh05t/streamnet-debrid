@@ -340,7 +340,7 @@ function MediaCardBase({
       }}
     >
       <div
-        className={`poster ${artwork && !imgLoaded && !imgFailed ? "is-loading" : ""}`}
+        className={`poster ${artwork && !imgLoaded && !imgFailed ? "is-loading" : ""} ${!effectivePosterMode && artwork === image && !backdrop ? "is-portrait-only" : ""}`}
       >
         {artwork && !imgFailed ? (
           <img

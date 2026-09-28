@@ -2,6 +2,12 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.058] - 2026-09-28
+
+- Marvel-, DC- und Star-Wars-Franchise-Kataloge lösen ihre IMDb-Manifest-IDs vor der Anzeige zu TMDB-IDs auf. TMDB liefert damit breite Backdrops und Beschreibungen in der eingestellten App-Sprache statt hochkantiger Addon-Poster oder englischer Platzhaltertexte.
+- Der TMDB-Detailcache trennt Sprachen; alte Collection-Rail-Caches werden einmalig invalidiert. Falls TMDB nicht erreichbar ist, wird ein vorhandenes Hochkantposter vollständig statt beschnitten angezeigt und keine englische Manifest-Beschreibung als deutsche ausgegeben.
+- Web-Version: `1.0.058`.
+
 ## [Web 1.0.057] - 2026-09-28
 
 - Manuelles Auswählen einer anderen Quelle übernimmt jetzt immer die gespeicherte Fortschrittsposition des Titels, auch wenn dieser bereits als „gesehen“ markiert ist. Vorher wurde die Position bei bereits gesehenen Titeln verworfen und die neue Quelle startete bei 0.

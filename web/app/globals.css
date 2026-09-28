@@ -672,6 +672,10 @@ p {
   animation: arvio-img-in 420ms ease both;
 }
 
+.media-card:not(.is-poster) .poster.is-portrait-only img.poster-art {
+  object-fit: contain;
+}
+
 @keyframes arvio-img-in {
   from {
     opacity: 0;

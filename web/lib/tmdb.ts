@@ -907,9 +907,16 @@ async function loadAddonCatalog(
   );
   const payload = await jsonRequest<{ metas?: StremioMeta[] }>(url);
   const metas = payload.metas ?? [];
+  const directCollection =
+    catalog.id.startsWith("collection-addon-") && Boolean(catalog.sourceUrl);
   const hydrated = await Promise.all(
     metas.map((meta) =>
-      hydrateAddonMeta(meta, catalog.mediaType, language).catch(() => null),
+      hydrateAddonMeta(
+        meta,
+        catalog.mediaType,
+        language,
+        directCollection,
+      ).catch(() => null),
     ),
   );
   return hydrated.filter((item): item is MediaItem => Boolean(item));
@@ -919,8 +926,12 @@ async function hydrateAddonMeta(
   meta: StremioMeta,
   preferred: CatalogConfig["mediaType"],
   language: string,
+  directCollection: boolean,
 ): Promise<MediaItem | null> {
-  const tmdbId = numberValue(meta.tmdb_id);
+  const rawId = String(meta.id ?? "").trim();
+  const tmdbId =
+    numberValue(meta.tmdb_id) ??
+    (/^tmdb:\d+$/.test(rawId) ? numberValue(rawId.slice(5)) : null);
   const mediaType: MediaType =
     String(meta.type ?? preferred ?? "")
       .toLowerCase()
@@ -931,17 +942,32 @@ async function hydrateAddonMeta(
     const detailed = await getBasicItem(mediaType, tmdbId, language);
     if (detailed) return detailed;
   }
+  const imdbId = /^tt\d+$/.test(rawId) ? rawId : null;
+  const resolvedId =
+    directCollection && imdbId
+      ? await resolveTmdbId({
+          mediaType,
+          imdbId,
+          title: meta.name ?? meta.title,
+          year: meta.year ?? meta.releaseInfo,
+        }).catch(() => null)
+      : null;
   const numericId = numberValue(meta.id);
-  if (numericId) {
-    const detailed = await getBasicItem(mediaType, numericId, language);
+  const detailId = resolvedId ?? numericId;
+  if (detailId) {
+    const detailed = await getBasicItem(mediaType, detailId, language);
     if (detailed) return detailed;
   }
   const title = meta.name ?? meta.title;
   if (!title) return null;
   return {
-    id: numericId ?? stableStringId(`${mediaType}:${title}`),
+    id: detailId ?? stableStringId(`${mediaType}:${title}`),
     title,
-    overview: meta.description ?? "",
+    overview:
+      (directCollection && !language.startsWith("en")) ||
+      meta.description === "No description available."
+        ? ""
+        : (meta.description ?? ""),
     year: String(meta.year ?? meta.releaseInfo ?? "").slice(0, 4),
     mediaType,
     image: meta.poster ?? "",
@@ -1881,7 +1907,7 @@ export async function getBasicItem(
   id: number,
   language = "en-US",
 ): Promise<MediaItem | null> {
-  const key = `${mediaType}:${id}`;
+  const key = `${language}:${mediaType}:${id}`;
   if (basicItemCache.has(key)) return basicItemCache.get(key) ?? null;
   try {
     const details = await tmdb<TmdbItem>(`${mediaType}/${id}`, { language });
@@ -1898,7 +1924,6 @@ export async function getBasicItem(
     basicItemCache.set(key, mapped);
     return mapped;
   } catch {
-    basicItemCache.set(key, null);
     return null;
   }
 }
