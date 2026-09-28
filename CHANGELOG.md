@@ -2,6 +2,11 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.057] - 2026-09-28
+
+- Manuelles Auswählen einer anderen Quelle übernimmt jetzt immer die gespeicherte Fortschrittsposition des Titels, auch wenn dieser bereits als „gesehen“ markiert ist. Vorher wurde die Position bei bereits gesehenen Titeln verworfen und die neue Quelle startete bei 0.
+- Web-Version: `1.0.057`.
+
 ## [2.5.046] - 2026-09-28
 
 - Collection-only Add-ons für Marvel, DC Universe und Star Wars werden jetzt direkt an der gemeinsamen Add-on-Lese- und Persistenzschicht ausgefiltert.

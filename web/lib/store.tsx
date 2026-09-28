@@ -2988,11 +2988,13 @@ export function AppProvider({
         selected?.mediaType === "movie" ||
         (selected?.seasonNumber === selectedEpisode?.season &&
           selected?.episodeNumber === selectedEpisode?.episode);
+      // Inherit the saved position regardless of the watched flag — manually
+      // picking a source (e.g. after a stuck/dead one) must not silently
+      // restart a title just because it crossed the watched threshold.
       if (
         stream.resumePositionSeconds === undefined &&
         selected &&
-        sameEpisode &&
-        !selected.isWatched
+        sameEpisode
       ) {
         stream = {
           ...stream,
