@@ -195,14 +195,14 @@
                 </div>
               </div>
               <form id="mutation-form" class="form-stack">
-                <label
+                <label id="mutation-profile-field"
                   >Profil<select id="mutation-profile" required></select
                 ></label>
                 <label
                   >Aktion
                   <select id="mutation-operation">
                     <option value="upsert_addon">
-                      Add-on hinzufügen / ersetzen
+                      Add-on hinzufügen / aktualisieren
                     </option>
                     <option value="delete_addon">Add-on entfernen</option>
                     <option value="upsert_playlist">
@@ -225,8 +225,8 @@
                       placeholder="stremio://.../manifest.json oder https://.../manifest.json"
                   /></label>
                   <label class="checkbox-field"
-                    ><input id="addon-enabled" type="checkbox" checked />
-                    Aktiviert</label
+                    ><input id="addon-enabled" type="checkbox" checked /> Beim
+                    Hinzufügen in allen Profilen aktivieren</label
                   >
                 </div>
 

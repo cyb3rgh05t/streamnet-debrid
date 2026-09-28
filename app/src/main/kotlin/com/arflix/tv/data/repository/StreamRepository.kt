@@ -418,6 +418,8 @@ class StreamRepository @Inject constructor(
     private fun addonsKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "installed_addons")
     private fun pendingAddonsKey() = profileManager.profileStringKey("pending_addons")
     private fun pendingAddonsKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "pending_addons")
+    private fun addonActivationKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "addon_activation_v1")
     private fun hiddenBuiltInAddonsKey() = profileManager.profileStringKey("hidden_builtin_addons_v1")
     private fun lastGoodPlaybackKey(
         mediaType: MediaType,
@@ -615,10 +617,35 @@ class StreamRepository @Inject constructor(
     // ========== Addon Management ==========
 
     val installedAddons: Flow<List<Addon>> =
-        context.streamDataStore.data.map { prefs ->
+        profileManager.activeProfileId.combine(context.streamDataStore.data) { profileId, prefs ->
             val addons = readSharedOrLegacyAddons(prefs) ?: getDefaultAddonList()
-            enforceOpenSubtitles(addons).map { sanitizeAddonDisplayName(it) }
+            applyProfileActivation(prefs, profileId, addons)
+                .map { sanitizeAddonDisplayName(it) }
         }
+
+    private fun profileActivation(prefs: Preferences, profileId: String): Map<String, Boolean> {
+        val raw = prefs[addonActivationKeyFor(profileId)].orEmpty()
+        if (raw.isBlank()) return emptyMap()
+        return runCatching {
+            val type = TypeToken.getParameterized(
+                Map::class.java,
+                String::class.java,
+                Boolean::class.javaObjectType
+            ).type
+            gson.fromJson<Map<String, Boolean>>(raw, type).orEmpty()
+        }.getOrDefault(emptyMap())
+    }
+
+    private fun applyProfileActivation(
+        prefs: Preferences,
+        profileId: String,
+        addons: List<Addon>
+    ): List<Addon> {
+        val activation = profileActivation(prefs, profileId)
+        return enforceOpenSubtitles(addons).map { addon ->
+            activation[addon.id]?.let { addon.copy(isEnabled = it) } ?: addon
+        }
+    }
 
     private fun readSharedOrLegacyAddons(prefs: Preferences): List<Addon>? {
         parseAddons(prefs[sharedAddonsKey])?.takeIf { it.isNotEmpty() }?.let { return it }
@@ -705,12 +732,16 @@ class StreamRepository @Inject constructor(
     }
 
     suspend fun toggleAddon(addonId: String) {
-        val addons = installedAddons.first().toMutableList()
-        val index = addons.indexOfFirst { it.id == addonId }
-        if (index >= 0) {
-            addons[index] = addons[index].copy(isEnabled = !addons[index].isEnabled)
-            saveAddons(addons)
+        val profileId = profileManager.getProfileId()
+        val current = installedAddons.first().firstOrNull { it.id == addonId } ?: return
+        context.streamDataStore.edit { prefs ->
+            val activation = profileActivation(prefs, profileId).toMutableMap()
+            activation[addonId] = !current.isEnabled
+            prefs[addonActivationKeyFor(profileId)] = gson.toJson(activation)
+            prefs[addonsUpdatedAtKey] = System.currentTimeMillis()
         }
+        synchronized(streamResultCache) { streamResultCache.clear() }
+        invalidationBus.markDirty(CloudSyncScope.ADDONS, profileId, "toggle addon")
     }
 
     suspend fun moveAddonUp(addonId: String): Boolean {
@@ -1086,7 +1117,14 @@ class StreamRepository @Inject constructor(
         val prefs = context.streamDataStore.data.first()
         val stored = readSharedOrLegacyAddons(prefs)
             ?: parseAddons(prefs[addonsKeyFor(profileId)])
-        return enforceOpenSubtitles(stored ?: getDefaultAddonList()).map { sanitizeAddonDisplayName(it) }
+        return applyProfileActivation(prefs, profileId, stored ?: getDefaultAddonList())
+            .map { sanitizeAddonDisplayName(it) }
+    }
+
+    suspend fun getSharedAddons(): List<Addon> {
+        val prefs = context.streamDataStore.data.first()
+        return enforceOpenSubtitles(readSharedOrLegacyAddons(prefs) ?: getDefaultAddonList())
+            .map { sanitizeAddonDisplayName(it) }
     }
 
     suspend fun replaceAddonsForProfile(profileId: String, addons: List<Addon>) {
@@ -1111,6 +1149,26 @@ class StreamRepository @Inject constructor(
         invalidationBus.markDirty(CloudSyncScope.ADDONS, profileManager.getProfileIdSync(), "replace shared addons")
     }
 
+    suspend fun replaceAccountAddonsFromCloud(
+        addons: List<Addon>,
+        addonsByProfile: Map<String, List<Addon>>
+    ) {
+        val resolved = enforceOpenSubtitles(addons).filterNot(::isIncompleteExternalAddon)
+        val installedIds = resolved.mapTo(HashSet()) { it.id }
+        context.streamDataStore.edit { prefs ->
+            prefs[sharedAddonsKey] = gson.toJson(resolved)
+            prefs.remove(sharedPendingAddonsKey)
+            addonsByProfile.forEach { (profileId, profileAddons) ->
+                val activation = profileAddons
+                    .filter { it.id in installedIds }
+                    .associate { it.id to it.isEnabled }
+                prefs[addonActivationKeyFor(profileId)] = gson.toJson(activation)
+            }
+        }
+        synchronized(streamResultCache) { streamResultCache.clear() }
+        invalidationBus.markDirty(CloudSyncScope.ADDONS, profileManager.getProfileIdSync(), "replace account addons")
+    }
+
     // Bumped whenever the local addon SET is changed by the USER (add/remove/reorder). Lets cloud
     // sync distinguish an intentional "removed everything" from a blank/partial pull, so an
     // intentional empty state can propagate (see reconcileAddonsWithCloud). Not bumped when applying
@@ -1124,11 +1182,16 @@ class StreamRepository @Inject constructor(
     }
 
     private suspend fun saveAddons(addons: List<Addon>, stampChange: Boolean = true) {
-        val json = gson.toJson(addons.map { sanitizeAddonDisplayName(it) })
-
         // Save locally to the shared account-level addon list. Mirror to the
         // active profile key so older builds/cloud payloads can still recover it.
         context.streamDataStore.edit { prefs ->
+            val existingById = readSharedOrLegacyAddons(prefs)
+                .orEmpty()
+                .associateBy { it.id }
+            val sharedAddons = addons.map { addon ->
+                addon.copy(isEnabled = existingById[addon.id]?.isEnabled ?: addon.isEnabled)
+            }.map { sanitizeAddonDisplayName(it) }
+            val json = gson.toJson(sharedAddons)
             prefs[sharedAddonsKey] = json
             prefs.remove(sharedPendingAddonsKey)
             prefs[addonsKey()] = json

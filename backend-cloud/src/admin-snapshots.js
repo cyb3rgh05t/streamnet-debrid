@@ -284,13 +284,52 @@ function mirrorEditedTopLevelAddonsToProfiles(current, edited) {
   ) {
     return;
   }
-  const sharedAddons = cloneJson(edited.addons, "Payload addons");
-  const ids = profileIds(edited);
-  edited.addonsByProfile = {};
-  for (const profileId of ids) {
-    edited.addonsByProfile[profileId] = cloneJson(
-      sharedAddons,
-      "Payload addons",
+  replaceAccountAddons(edited, edited.addons);
+}
+
+function sharedAddonsFromPayload(payload) {
+  const addonsById = new Map();
+  const scopedAddons = isPlainObject(payload.addonsByProfile)
+    ? Object.values(payload.addonsByProfile)
+    : [];
+  const sources = [payload.addons, ...scopedAddons];
+  for (const addons of sources) {
+    if (!Array.isArray(addons)) continue;
+    for (const addon of addons) {
+      const id = String(addon?.id || "").trim();
+      if (id && !addonsById.has(id)) addonsById.set(id, addon);
+    }
+  }
+  return [...addonsById.values()];
+}
+
+function addonWithProfileActivation(addon, previousAddon) {
+  const next = cloneJson(addon, "Payload addon");
+  if (!previousAddon) return next;
+  if (Object.hasOwn(previousAddon, "isEnabled")) {
+    next.isEnabled = previousAddon.isEnabled !== false;
+  }
+  if (Object.hasOwn(previousAddon, "enabled")) {
+    next.enabled = previousAddon.enabled !== false;
+  }
+  return next;
+}
+
+function replaceAccountAddons(payload, addons) {
+  payload.addons = cloneJson(addons, "Payload addons");
+  const previousByProfile = isPlainObject(payload.addonsByProfile)
+    ? payload.addonsByProfile
+    : {};
+  payload.addonsByProfile = {};
+  for (const profileId of profileIds(payload)) {
+    const previousById = new Map(
+      (Array.isArray(previousByProfile[profileId])
+        ? previousByProfile[profileId]
+        : []
+      ).map((addon) => [addon?.id, addon]),
+    );
+    payload.addonsByProfile[profileId] = addons.map((addon) =>
+      addonWithProfileActivation(addon, previousById.get(addon?.id)),
     );
   }
 }
@@ -443,20 +482,15 @@ export function applyAdminSnapshotMutation(
     return merged;
   }
 
-  const profileId = requireProfile(payload, request.profileId);
-
   if (operation === "upsert_addon") {
     const addon = normalizeAddon(data);
-    const ids = profileIds(payload);
-    if (!isPlainObject(payload.addonsByProfile)) payload.addonsByProfile = {};
-    for (const id of ids) {
-      payload.addonsByProfile[id] = upsertById(
-        payload.addonsByProfile[id],
-        addon,
-      );
-    }
+    replaceAccountAddons(
+      payload,
+      upsertById(sharedAddonsFromPayload(payload), addon),
+    );
     payload.addonsUpdatedAt = now;
   } else if (operation === "upsert_playlist") {
+    const profileId = requireProfile(payload, request.profileId);
     const playlist = normalizePlaylist(data);
     const iptv = objectAt(payload, "iptvByProfile", profileId);
     iptv.playlists = upsertById(iptv.playlists, playlist);
@@ -467,16 +501,13 @@ export function applyAdminSnapshotMutation(
     stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "epgUrl", now);
   } else if (operation === "delete_addon") {
     const addonId = cleanIdentifier(data?.id, "Addon id");
-    if (isPlainObject(payload.addonsByProfile)) {
-      for (const id of Object.keys(payload.addonsByProfile)) {
-        payload.addonsByProfile[id] = removeById(
-          payload.addonsByProfile[id],
-          addonId,
-        );
-      }
-    }
+    replaceAccountAddons(
+      payload,
+      removeById(sharedAddonsFromPayload(payload), addonId),
+    );
     payload.addonsUpdatedAt = now;
   } else if (operation === "delete_playlist") {
+    const profileId = requireProfile(payload, request.profileId);
     const playlistId = cleanIdentifier(data?.id, "Playlist id");
     const iptv = objectAt(payload, "iptvByProfile", profileId);
     const removed = Array.isArray(iptv.playlists)
@@ -492,6 +523,7 @@ export function applyAdminSnapshotMutation(
       stampFieldUpdatedAt(payload, "iptvByProfile", profileId, "epgUrl", now);
     }
   } else if (operation === "delete_profile") {
+    const profileId = requireProfile(payload, request.profileId);
     const profiles = Array.isArray(payload.profiles) ? payload.profiles : [];
     if (profiles.length <= 1) {
       throw new Error("Cannot delete the only profile");
@@ -503,6 +535,7 @@ export function applyAdminSnapshotMutation(
       if (isPlainObject(payload[rootKey])) delete payload[rootKey][profileId];
     }
   } else if (operation === "set_profile_field") {
+    const profileId = requireProfile(payload, request.profileId);
     const rootKey = cleanIdentifier(request.rootKey, "rootKey");
     const field = cleanIdentifier(request.field, "field");
     if (!allowedProfileRoots.has(rootKey) || field === "playlists") {

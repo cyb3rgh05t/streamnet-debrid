@@ -1387,12 +1387,11 @@ class CloudSyncRepository @Inject constructor(
             )
         )
 
-        // Addons are shared account state. Keep the per-profile payload shape
-        // for older clients, but each profile receives the same shared list.
-        val sharedAddons = streamRepository.installedAddons.first()
+        // Installation/configuration is account-wide; activation is profile-specific.
+        val sharedAddons = streamRepository.getSharedAddons()
         val addonsByProfile = buildMap<String, List<Addon>> {
             profiles.forEach { profile ->
-                put(profile.id, sharedAddons)
+                put(profile.id, streamRepository.getAddonsForProfile(profile.id))
             }
         }
         root.put("addonsByProfile", JSONObject(gson.toJson(addonsByProfile)))
@@ -2354,7 +2353,14 @@ class CloudSyncRepository @Inject constructor(
             root.optJSONObject("addonsByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, Addon::class.java).type).type
                 val map: Map<String, List<Addon>> = gson.fromJson(json, type) ?: emptyMap()
-                val sharedAddons = mergeAddonsForSharedRestore(map.values)
+                val sharedAddons = root.optJSONArray("addons")
+                    ?.toString()
+                    ?.let { addonsJson ->
+                        val addonType = TypeToken.getParameterized(List::class.java, Addon::class.java).type
+                        gson.fromJson<List<Addon>>(addonsJson, addonType)
+                    }
+                    .orEmpty()
+                    .ifEmpty { mergeAddonsForSharedRestore(map.values) }
                 val localAddons = streamRepository.installedAddons.first()
                 val (resolvedAddons, _) = reconcileAddonsWithCloud(
                     cloudAddons = sharedAddons,
@@ -2366,7 +2372,7 @@ class CloudSyncRepository @Inject constructor(
                 // Apply the reconciled list even when it is empty — an intentional "removed all"
                 // must propagate (reconcile only returns empty when the cloud set is genuinely newer;
                 // opensubtitles is re-enforced downstream so playback isn't left with nothing).
-                streamRepository.replaceSharedAddonsFromCloud(resolvedAddons)
+                streamRepository.replaceAccountAddonsFromCloud(resolvedAddons, map)
                 appliedCloudAddons = true
             }
             root.optJSONArray("addons")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->

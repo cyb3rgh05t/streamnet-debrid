@@ -2,6 +2,29 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.045] - 2026-09-28
+
+- Add-on-Installation, Konfiguration, Reihenfolge und Entfernung sind jetzt eindeutig accountweit; alle Profile verwenden dieselbe installierte Add-on-Bibliothek.
+- Der Aktivierungsstatus eines installierten Add-ons wird getrennt pro Profil gespeichert. Ein Umschalten in einem Profil verändert die anderen Profile nicht.
+- Android speichert Profilaktivierungen separat von der gemeinsamen Add-on-Konfiguration und exportiert beziehungsweise restauriert beide Ebenen über den Cloud-Snapshot.
+- Android-Version: `2.5.045` / Code `446`.
+- Technische Doku: `docs/superpowers/account-wide-addons-profile-activation-2026-09-28.md`.
+
+## [Web 1.0.056] - 2026-09-28
+
+- Im Web installierte Add-ons werden accountweit für alle bekannten Profile verfügbar; der Ein-/Aus-Schalter bleibt profilbezogen.
+- Add-on-Updates bewahren die Aktivierungswerte aller anderen Profile. Entfernen löscht das Add-on ausdrücklich aus der globalen Bibliothek und allen Profilbereichen.
+- Web-Version: `1.0.056`.
+- Technische Doku: `docs/superpowers/account-wide-addons-profile-activation-2026-09-28.md`.
+
+## [Backend 1.0.021] - 2026-09-28
+
+- Add-ons können im Adminpanel ohne Profilauswahl accountweit hinzugefügt, aktualisiert und entfernt werden; Playlists bleiben profilbezogen.
+- Admin-Mutationen aktualisieren den globalen Payload und alle Profilbereiche atomar, ohne unterschiedliche Profilaktivierungen bei einer Konfigurationsänderung zu überschreiben.
+- Snapshot-Zeitstempel und Revision werden bei jeder Add-on-Mutation aktualisiert; Regressionstests decken Hinzufügen, Aktualisieren, Entfernen und den JSON-Payload-Editor ab.
+- Backend-Version: `1.0.021`.
+- Technische Doku: `docs/superpowers/account-wide-addons-profile-activation-2026-09-28.md`.
+
 ## [2.5.044] - 2026-09-28
 
 - Marvel, DC Universe und Star Wars laden ihre chronologischen Kataloge direkt von den MystreamNet-Manifest-URLs; sie benötigen keine separaten Addon-Karten.

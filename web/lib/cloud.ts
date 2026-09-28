@@ -1227,6 +1227,24 @@ function unionAddons(
   return [...byKey.values()];
 }
 
+function addonKey(addon: InstalledAddon): string {
+  return addon.manifestUrl || addon.id;
+}
+
+function preserveAddonActivation(
+  addon: InstalledAddon,
+  activationSource: InstalledAddon | undefined,
+): InstalledAddon {
+  if (!activationSource) return addon;
+  const next = { ...addon } as InstalledAddon & { isEnabled?: boolean };
+  const source = activationSource as InstalledAddon & { isEnabled?: boolean };
+  if (Object.hasOwn(source, "enabled")) next.enabled = source.enabled !== false;
+  if (Object.hasOwn(source, "isEnabled")) {
+    next.isEnabled = source.isEnabled !== false;
+  }
+  return next;
+}
+
 export async function saveCloudAddons(
   auth: AuthClient,
   addons: InstalledAddon[],
@@ -1242,19 +1260,45 @@ export async function saveCloudAddons(
     // id from every scope; everything else is merged in.
     const applyRemovals = (list: InstalledAddon[]) =>
       list.filter((a) => !removed.has(a.id));
-    root.addons = applyRemovals(unionAddons(addons, root.addons));
-    if (profileId) {
-      const scoped = scopedValue<InstalledAddon[]>(
-        root,
-        "addonsByProfile",
-        profileId,
+    const previousAccountAddons = arrayValue<InstalledAddon>(root.addons);
+    const previousAccountByKey = new Map(
+      previousAccountAddons.map((addon) => [addonKey(addon), addon]),
+    );
+    const accountAddons = applyRemovals(
+      unionAddons(addons, previousAccountAddons),
+    ).map((addon) =>
+      preserveAddonActivation(addon, previousAccountByKey.get(addonKey(addon))),
+    );
+    root.addons = accountAddons;
+
+    const profileIds = new Set<string>();
+    for (const profile of arrayValue<Profile>(root.profiles)) {
+      if (profile?.id) profileIds.add(profile.id);
+    }
+    for (const id of Object.keys(objectRecord(root.addonsByProfile))) {
+      profileIds.add(id);
+    }
+    if (profileId) profileIds.add(profileId);
+
+    const incomingByKey = new Map(
+      addons.map((addon) => [addonKey(addon), addon]),
+    );
+    for (const id of profileIds) {
+      const scoped = arrayValue<InstalledAddon>(
+        scopedValue<InstalledAddon[]>(root, "addonsByProfile", id),
       );
-      setScopedValue(
-        root,
-        "addonsByProfile",
-        profileId,
-        applyRemovals(unionAddons(addons, scoped)),
+      const scopedByKey = new Map(
+        scoped.map((addon) => [addonKey(addon), addon]),
       );
+      const profileAddons = accountAddons.map((addon) => {
+        const activationSource =
+          id === profileId
+            ? (incomingByKey.get(addonKey(addon)) ??
+              scopedByKey.get(addonKey(addon)))
+            : scopedByKey.get(addonKey(addon));
+        return preserveAddonActivation(addon, activationSource);
+      });
+      setScopedValue(root, "addonsByProfile", id, profileAddons);
     }
     // Set-level timestamp: lets Android tell an intentional "removed everything" from a blank pull,
     // so removing the last add-on(s) from web actually propagates (reconcileAddonsWithCloud).

@@ -43,12 +43,11 @@ const snapshot = () => ({
   watchlistByProfile: { kids: [{ id: "1" }] },
 });
 
-test("upserts an account-wide addon and advances sync timestamps", () => {
+test("upserts an account-wide addon with an initial state for every profile", () => {
   const result = applyAdminSnapshotMutation(
     snapshot(),
     {
       operation: "upsert_addon",
-      profileId: "living-room",
       data: {
         id: "example",
         name: "Example",
@@ -74,6 +73,32 @@ test("upserts an account-wide addon and advances sync timestamps", () => {
     result.addonsByProfile.kids,
     result.addonsByProfile["living-room"],
   );
+  assert.deepEqual(result.addons, result.addonsByProfile["living-room"]);
+});
+
+test("updates account-wide addon config without changing profile activation", () => {
+  const value = snapshot();
+  const existing = {
+    id: "org.example.addon_c3dad99e9c79",
+    name: "Old name",
+    isEnabled: true,
+  };
+  value.addons = [existing];
+  value.addonsByProfile["living-room"] = [existing];
+  value.addonsByProfile.kids = [{ ...existing, isEnabled: false }];
+
+  const result = applyAdminSnapshotMutation(value, {
+    operation: "upsert_addon",
+    data: {
+      name: "Updated name",
+      url: "https://secret.example/manifest.json",
+      manifest: addonManifest(),
+    },
+  });
+
+  assert.equal(result.addons[0].name, "Updated name");
+  assert.equal(result.addonsByProfile["living-room"][0].isEnabled, true);
+  assert.equal(result.addonsByProfile.kids[0].isEnabled, false);
 });
 
 test("hydrates remote Stremio addon links like Android settings installs", async () => {
@@ -229,14 +254,15 @@ test("allows only bounded profile fields and rejects unknown profiles", () => {
 
 test("removes an addon from every profile it was shared with", () => {
   const value = snapshot();
+  value.addons = [{ id: "example", name: "Stale legacy example" }];
   value.addonsByProfile["living-room"] = [{ id: "example", name: "Example" }];
   value.addonsByProfile.kids = [{ id: "example", name: "Example" }];
   const result = applyAdminSnapshotMutation(value, {
     operation: "delete_addon",
-    profileId: "kids",
     data: { id: "example" },
   });
 
+  assert.deepEqual(result.addons, []);
   assert.deepEqual(result.addonsByProfile["living-room"], []);
   assert.deepEqual(result.addonsByProfile.kids, []);
 });
@@ -292,6 +318,10 @@ test("removes a profile and its scoped data, but keeps at least one profile", ()
 test("edits the whole payload while preserving redacted secret values", () => {
   const value = snapshot();
   value.addons = [{ id: "opensubtitles", isEnabled: false }];
+  value.addonsByProfile["living-room"] = [
+    { id: "opensubtitles", isEnabled: true },
+  ];
+  value.addonsByProfile.kids = [{ id: "opensubtitles", isEnabled: false }];
   value.iptvByProfile.kids.m3uUrl = "https://user:pass@example/list.m3u";
   value.profiles[1].name = "Kids";
 
@@ -311,7 +341,7 @@ test("edits the whole payload while preserving redacted secret values", () => {
   );
 
   assert.equal(result.addons[0].isEnabled, true);
-  assert.equal(result.addonsByProfile.kids[0].isEnabled, true);
+  assert.equal(result.addonsByProfile.kids[0].isEnabled, false);
   assert.equal(result.addonsByProfile["living-room"][0].isEnabled, true);
   assert.equal(result.addonsUpdatedAt, 5678);
   assert.equal(result.profiles[1].name, "Kids Room");

@@ -808,9 +808,7 @@ function populateAddonSelect() {
   for (const addon of addons) {
     const option = document.createElement("option");
     option.value = addon.id;
-    option.textContent = addon.isEnabled
-      ? addon.name
-      : `${addon.name} (deaktiviert)`;
+    option.textContent = addon.name;
     select.append(option);
   }
 }
@@ -844,6 +842,10 @@ function populatePlaylistSelect() {
 
 function updateOperationFields() {
   const operation = byId("mutation-operation").value;
+  const isProfileScoped =
+    operation === "upsert_playlist" || operation === "delete_playlist";
+  byId("mutation-profile-field").classList.toggle("hidden", !isProfileScoped);
+  byId("mutation-profile").required = isProfileScoped;
   for (const id of operationFields) {
     byId(`fields-${id}`).classList.toggle("hidden", id !== operation);
   }
@@ -893,10 +895,12 @@ async function submitMutation(event) {
     const operation = byId("mutation-operation").value;
     const request = {
       operation,
-      profileId: byId("mutation-profile").value,
       reason: byId("mutation-reason").value,
       expectedRevision: state.selectedAccount.snapshot.revision,
     };
+    if (operation === "upsert_playlist" || operation === "delete_playlist") {
+      request.profileId = byId("mutation-profile").value;
+    }
     if (operation === "upsert_addon") {
       normalizeAddonLinkField();
       request.data = {
