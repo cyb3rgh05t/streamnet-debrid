@@ -9,6 +9,23 @@ import org.junit.Test
 
 class VodStreamingAddonTest {
     @Test
+    fun `collection-only addons never enter addon settings`() {
+        val ids = listOf(
+            "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+            "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
+            "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+            "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+        )
+
+        ids.forEach { manifestId ->
+            assertThat(
+                isCollectionOnlyAddon(addon(id = "${manifestId}_abcdef", manifestId = manifestId))
+            ).isTrue()
+        }
+        assertThat(isCollectionOnlyAddon(addon())).isFalse()
+    }
+
+    @Test
     fun `enabled movie stream addon counts as VOD`() {
         assertThat(isEnabledVodStreamingAddon(addon())).isTrue()
     }
@@ -52,11 +69,13 @@ class VodStreamingAddonTest {
     }
 
     private fun addon(
+        id: String = "test-addon",
+        manifestId: String = id,
         type: AddonType = AddonType.CUSTOM,
         enabled: Boolean = true,
         resourceTypes: List<String> = listOf("movie", "series"),
     ) = Addon(
-        id = "test-addon",
+        id = id,
         name = "Test Addon",
         version = "1.0.0",
         description = "",
@@ -64,7 +83,7 @@ class VodStreamingAddonTest {
         isEnabled = enabled,
         type = type,
         manifest = AddonManifest(
-            id = "test-addon",
+            id = manifestId,
             name = "Test Addon",
             version = "1.0.0",
             resources = listOf(AddonResource("stream", resourceTypes)),

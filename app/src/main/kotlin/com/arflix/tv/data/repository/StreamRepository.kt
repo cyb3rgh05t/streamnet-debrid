@@ -209,6 +209,13 @@ internal fun isEnabledVodStreamingAddon(addon: Addon): Boolean {
     return manifest.types.any { it.lowercase(Locale.US) in vodTypes }
 }
 
+internal fun isCollectionOnlyAddon(addon: Addon): Boolean {
+    val manifestIds = CollectionTemplateManifest.collectionOnlyAddonManifestIdsForCleanup()
+    val manifestId = addon.manifest?.id
+    return addon.id in manifestIds || manifestId in manifestIds ||
+        manifestIds.any { id -> addon.id.startsWith("${id}_") }
+}
+
 internal fun usesSlowAggregatorTimeout(addon: Addon): Boolean {
     val haystack = listOf(
         addon.id,
@@ -642,7 +649,7 @@ class StreamRepository @Inject constructor(
         addons: List<Addon>
     ): List<Addon> {
         val activation = profileActivation(prefs, profileId)
-        return enforceOpenSubtitles(addons).map { addon ->
+        return enforceOpenSubtitles(addons.filterNot(::isCollectionOnlyAddon)).map { addon ->
             activation[addon.id]?.let { addon.copy(isEnabled = it) } ?: addon
         }
     }
@@ -1110,7 +1117,7 @@ class StreamRepository @Inject constructor(
     }
 
     suspend fun replaceAddonsFromCloud(addons: List<Addon>) {
-        saveAddons(enforceOpenSubtitles(addons).filterNot(::isIncompleteExternalAddon), stampChange = false)
+        saveAddons(resolvedPersistedAddons(addons), stampChange = false)
     }
 
     suspend fun getAddonsForProfile(profileId: String): List<Addon> {
@@ -1124,11 +1131,12 @@ class StreamRepository @Inject constructor(
     suspend fun getSharedAddons(): List<Addon> {
         val prefs = context.streamDataStore.data.first()
         return enforceOpenSubtitles(readSharedOrLegacyAddons(prefs) ?: getDefaultAddonList())
+            .filterNot(::isCollectionOnlyAddon)
             .map { sanitizeAddonDisplayName(it) }
     }
 
     suspend fun replaceAddonsForProfile(profileId: String, addons: List<Addon>) {
-        val resolved = enforceOpenSubtitles(addons).filterNot(::isIncompleteExternalAddon)
+        val resolved = resolvedPersistedAddons(addons)
         context.streamDataStore.edit { prefs ->
             prefs[sharedAddonsKey] = gson.toJson(resolved)
             prefs.remove(sharedPendingAddonsKey)
@@ -1140,7 +1148,7 @@ class StreamRepository @Inject constructor(
     }
 
     suspend fun replaceSharedAddonsFromCloud(addons: List<Addon>) {
-        val resolved = enforceOpenSubtitles(addons).filterNot(::isIncompleteExternalAddon)
+        val resolved = resolvedPersistedAddons(addons)
         context.streamDataStore.edit { prefs ->
             prefs[sharedAddonsKey] = gson.toJson(resolved)
             prefs.remove(sharedPendingAddonsKey)
@@ -1153,7 +1161,7 @@ class StreamRepository @Inject constructor(
         addons: List<Addon>,
         addonsByProfile: Map<String, List<Addon>>
     ) {
-        val resolved = enforceOpenSubtitles(addons).filterNot(::isIncompleteExternalAddon)
+        val resolved = resolvedPersistedAddons(addons)
         val installedIds = resolved.mapTo(HashSet()) { it.id }
         context.streamDataStore.edit { prefs ->
             prefs[sharedAddonsKey] = gson.toJson(resolved)
@@ -1182,13 +1190,14 @@ class StreamRepository @Inject constructor(
     }
 
     private suspend fun saveAddons(addons: List<Addon>, stampChange: Boolean = true) {
+        val resolved = addons.filterNot(::isCollectionOnlyAddon)
         // Save locally to the shared account-level addon list. Mirror to the
         // active profile key so older builds/cloud payloads can still recover it.
         context.streamDataStore.edit { prefs ->
             val existingById = readSharedOrLegacyAddons(prefs)
                 .orEmpty()
                 .associateBy { it.id }
-            val sharedAddons = addons.map { addon ->
+            val sharedAddons = resolved.map { addon ->
                 addon.copy(isEnabled = existingById[addon.id]?.isEnabled ?: addon.isEnabled)
             }.map { sanitizeAddonDisplayName(it) }
             val json = gson.toJson(sharedAddons)
@@ -1201,6 +1210,11 @@ class StreamRepository @Inject constructor(
         synchronized(streamResultCache) { streamResultCache.clear() }
         invalidationBus.markDirty(CloudSyncScope.ADDONS, profileManager.getProfileIdSync(), "save addons")
     }
+
+    private fun resolvedPersistedAddons(addons: List<Addon>): List<Addon> =
+        enforceOpenSubtitles(addons)
+            .filterNot(::isIncompleteExternalAddon)
+            .filterNot(::isCollectionOnlyAddon)
 
     private fun sanitizeAddonDisplayName(addon: Addon): Addon {
         val sanitizedName = sanitizeProviderLabel(addon.name)

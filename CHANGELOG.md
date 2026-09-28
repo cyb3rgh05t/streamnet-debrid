@@ -2,6 +2,13 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.046] - 2026-09-28
+
+- Collection-only Add-ons für Marvel, DC Universe und Star Wars werden jetzt direkt an der gemeinsamen Add-on-Lese- und Persistenzschicht ausgefiltert.
+- Alte Cloud-Snapshots können diese Add-ons dadurch nach dem Home-Startup-Cleanup nicht mehr erneut in die Add-on-Einstellungen eintragen.
+- Die direkten MystreamNet-Manifestquellen der Franchise-Collections bleiben davon unberührt und funktionieren weiterhin ohne installierte Add-on-Karten.
+- Android-Version: `2.5.046` / Code `447`.
+
 ## [2.5.045] - 2026-09-28
 
 - Add-on-Installation, Konfiguration, Reihenfolge und Entfernung sind jetzt eindeutig accountweit; alle Profile verwenden dieselbe installierte Add-on-Bibliothek.
