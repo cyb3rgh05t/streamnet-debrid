@@ -229,6 +229,10 @@ export function mapTmdbItem(
     image: tmdbImageUrl(config.imageBase, item.poster_path),
     backdrop: tmdbImageUrl(config.backdropBase, item.backdrop_path) || null,
     genreIds: item.genre_ids ?? [],
+    numberOfSeasons:
+      mediaType === "tv" ? (item.number_of_seasons ?? null) : null,
+    numberOfEpisodes:
+      mediaType === "tv" ? (item.number_of_episodes ?? null) : null,
   };
 }
 

@@ -3,6 +3,7 @@
 import type { Category, MediaItem } from "@/lib/types";
 import { useApp } from "@/lib/store";
 import { translateUiText } from "@/lib/i18n";
+import { shouldShowWatchedBadge } from "@/lib/continueWatching";
 import { MediaCard } from "./MediaCard";
 import { RailScroller } from "./RailScroller";
 
@@ -26,6 +27,7 @@ export function MediaRail({
     (category.layout
       ? category.layout === "poster"
       : settings.cardLayoutMode === "poster");
+  const showWatched = shouldShowWatchedBadge(category.id);
   if (!category.items.length) return null;
   return (
     <section className={`rail ${effectivePosterMode ? "is-poster" : ""}`}>
@@ -41,6 +43,7 @@ export function MediaRail({
             onFocus={onFocus}
             posterMode={effectivePosterMode}
             autoFocus={focusFirstItem && index === 0}
+            showWatched={showWatched}
           />
         ))}
       </RailScroller>

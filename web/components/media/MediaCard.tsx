@@ -88,12 +88,14 @@ function MediaCardBase({
   onFocus,
   posterMode,
   autoFocus = false,
+  showWatched = true,
 }: {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   posterMode?: boolean;
   autoFocus?: boolean;
+  showWatched?: boolean;
 }) {
   const { settings, isWatched, isPartiallyWatched, openContextMenu } = useApp();
   const effectivePosterMode =
@@ -109,8 +111,8 @@ function MediaCardBase({
     item.durationSeconds ?? 0,
     (item.progress ?? 0) / 100,
   );
-  const storedWatched = isWatched(item);
-  const partiallyWatched = isPartiallyWatched(item);
+  const storedWatched = showWatched && isWatched(item);
+  const partiallyWatched = showWatched && isPartiallyWatched(item);
   // "Up next" rows carry SERIES completion (how far through the show you are),
   // not progress into the episode on the card — a 40% bar under "Up next S2 E5"
   // reads as "you're 40% into that episode", which is wrong. Those rows get the
@@ -428,6 +430,7 @@ export const MediaCard = memo(
     prev.item === next.item &&
     prev.posterMode === next.posterMode &&
     prev.autoFocus === next.autoFocus &&
+    prev.showWatched === next.showWatched &&
     prev.onOpen === next.onOpen &&
     prev.onFocus === next.onFocus,
 );

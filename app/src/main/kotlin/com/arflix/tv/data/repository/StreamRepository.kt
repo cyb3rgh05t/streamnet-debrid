@@ -962,6 +962,22 @@ class StreamRepository @Inject constructor(
         true
     }
 
+    suspend fun removeCustomAddonsByManifestIds(manifestIds: Set<String>) = withContext(Dispatchers.IO) {
+        val normalizedIds = manifestIds.map { it.trim() }.filter { it.isNotBlank() }.toSet()
+        if (normalizedIds.isEmpty()) return@withContext false
+
+        val current = installedAddons.first()
+        val retained = current.filterNot { addon ->
+            val manifestId = addon.manifest?.id
+            addon.id in normalizedIds || manifestId in normalizedIds ||
+                normalizedIds.any { id -> addon.id.startsWith("${id}_") }
+        }
+        if (retained.size == current.size) return@withContext false
+
+        saveAddons(retained)
+        true
+    }
+
     suspend fun findInstalledAddonIdForCatalog(
         catalogType: String,
         catalogId: String,
@@ -1333,7 +1349,26 @@ class StreamRepository @Inject constructor(
             ?: throw IllegalArgumentException("Addon not found")
         val addonUrl = addon.url ?: throw IllegalArgumentException("Addon URL missing")
         val (baseUrl, queryParams) = getAddonBaseUrl(addonUrl)
+        fetchAddonCatalogPage(baseUrl, queryParams, catalogType, catalogId, skip)
+    }
 
+    suspend fun getAddonCatalogPageFromUrl(
+        manifestUrl: String,
+        catalogType: String,
+        catalogId: String,
+        skip: Int = 0
+    ): StremioCatalogResponse = withContext(Dispatchers.IO) {
+        val (baseUrl, queryParams) = getAddonBaseUrl(manifestUrl)
+        fetchAddonCatalogPage(baseUrl, queryParams, catalogType, catalogId, skip)
+    }
+
+    private suspend fun fetchAddonCatalogPage(
+        baseUrl: String,
+        queryParams: String?,
+        catalogType: String,
+        catalogId: String,
+        skip: Int
+    ): StremioCatalogResponse {
         val queryBase = queryParams?.takeIf { it.isNotBlank() }
         val typeCandidates = catalogTypeAliases(catalogType)
         var firstSuccessful: StremioCatalogResponse? = null
@@ -1353,12 +1388,12 @@ class StreamRepository @Inject constructor(
                 }
                 val hasItems = !response.metas.isNullOrEmpty() || !response.items.isNullOrEmpty()
                 if (hasItems) {
-                    return@withContext response
+                    return response
                 }
             }
         }
 
-        firstSuccessful ?: StremioCatalogResponse(metas = emptyList())
+        return firstSuccessful ?: StremioCatalogResponse(metas = emptyList())
     }
 
     suspend fun getAddonMeta(

@@ -563,10 +563,10 @@ const androidCollectionDefaults: CatalogConfig[] = [
     const sources = {
       Marvel: [
         addonSource(
-          "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
+          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
           "Marvel",
           "marvel-mcu",
-          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+          "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
         ),
         curatedSource(...marvelCuratedRefs),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 86311 },
@@ -574,22 +574,24 @@ const androidCollectionDefaults: CatalogConfig[] = [
         mdblistPublicSource("at0microuton/mcu-tv-shows"),
       ],
       "DC Universe": [
-        curatedSource(...dcCuratedRefs),
         addonSource(
-          "com.tapframe.dcaddon.custom.dc-chronological",
+          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
           "DC",
           "dc-chronological",
+          "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
         ),
+        curatedSource(...dcCuratedRefs),
         mdblistPublicSource("kingkearney/dc-universe"),
         mdblistPublicSource("kraftynic/dc-tv-shows1"),
       ],
       "Star Wars": [
-        curatedSource(...starWarsCuratedRefs),
         addonSource(
-          "com.starwars.addon.custom.sw-movies-series-chronological",
+          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
           "StarWars",
           "sw-movies-series-chronological",
+          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
         ),
+        curatedSource(...starWarsCuratedRefs),
         mdblistPublicSource("jxduffy/star-wars-chronological-order"),
       ],
       "James Bond": [

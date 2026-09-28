@@ -76,6 +76,8 @@ import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.GenreFanartRepository
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.TraktRepository
+import com.arflix.tv.ui.screens.home.resolveHomeWatchedBadgeState
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.rememberCatalogueRowLayoutMode
@@ -95,8 +97,11 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 
 enum class CollectionTab { MOVIES, SERIES }
@@ -133,6 +138,7 @@ data class CollectionDetailsUiState(
 class CollectionDetailsViewModel @Inject constructor(
     private val catalogRepository: CatalogRepository,
     private val mediaRepository: MediaRepository,
+    private val traktRepository: TraktRepository,
     private val genreFanartRepository: GenreFanartRepository,
     private val iptvRepository: IptvRepository,
 ) : ViewModel() {
@@ -256,11 +262,12 @@ class CollectionDetailsViewModel @Inject constructor(
             CollectionTab.MOVIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
             CollectionTab.SERIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.TV }
         }
+        val decoratedPageItems = decorateWatchedBadges(pageItems)
         val decoratedCatalog = catalog
         _uiState.value = when (tab) {
             CollectionTab.MOVIES -> _uiState.value.copy(
                 catalog = decoratedCatalog,
-                movieItems = pageItems,
+                movieItems = decoratedPageItems,
                 isLoadingMovies = false,
                 hasMoreMovies = page?.hasMore == true,
                 loadedMovieOffset = page?.nextOffset ?: 0,
@@ -268,14 +275,14 @@ class CollectionDetailsViewModel @Inject constructor(
             )
             CollectionTab.SERIES -> _uiState.value.copy(
                 catalog = decoratedCatalog,
-                seriesItems = pageItems,
+                seriesItems = decoratedPageItems,
                 isLoadingSeries = false,
                 hasMoreSeries = page?.hasMore == true,
                 loadedSeriesOffset = page?.nextOffset ?: 0,
                 error = _uiState.value.error ?: if (page == null) COLLECTION_LOAD_FAILED_ERROR else null
             )
         }
-        preloadLogos(pageItems.take(2))
+        preloadLogos(decoratedPageItems.take(2))
         val hasMore = when (tab) {
             CollectionTab.MOVIES -> _uiState.value.hasMoreMovies
             CollectionTab.SERIES -> _uiState.value.hasMoreSeries
@@ -311,11 +318,12 @@ class CollectionDetailsViewModel @Inject constructor(
                 CollectionTab.MOVIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
                 CollectionTab.SERIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.TV }
             }
+            val decoratedFreshItems = decorateWatchedBadges(freshItems)
             val existingIds = when (tab) {
                 CollectionTab.MOVIES -> state.movieItems.mapTo(HashSet()) { it.id to it.mediaType }
                 CollectionTab.SERIES -> state.seriesItems.mapTo(HashSet()) { it.id to it.mediaType }
             }
-            val uniqueNew = freshItems.filter { (it.id to it.mediaType) !in existingIds }
+            val uniqueNew = decoratedFreshItems.filter { (it.id to it.mediaType) !in existingIds }
             _uiState.value = when (tab) {
                 CollectionTab.MOVIES -> _uiState.value.copy(
                     movieItems = state.movieItems + uniqueNew,
@@ -331,6 +339,49 @@ class CollectionDetailsViewModel @Inject constructor(
                 )
             }
             preloadLogos(uniqueNew)
+        }
+    }
+
+    private suspend fun decorateWatchedBadges(items: List<MediaItem>): List<MediaItem> {
+        if (items.isEmpty()) return items
+        traktRepository.initializeWatchedCache()
+        val watchedMovies = traktRepository.getWatchedMoviesFromCache()
+        val watchedEpisodeCounts = traktRepository.getWatchedEpisodesFromCache()
+            .mapNotNull { key ->
+                key.removePrefix("show_tmdb:")
+                    .substringBefore(':')
+                    .toIntOrNull()
+            }
+            .groupingBy { it }
+            .eachCount()
+        val watchedSeries = items.filter {
+            it.mediaType == MediaType.TV && (watchedEpisodeCounts[it.id] ?: 0) > 0
+        }
+        val detailSemaphore = Semaphore(5)
+        val episodeTotals = coroutineScope {
+            watchedSeries.distinctBy { it.id }.map { item ->
+                async {
+                    val total = item.seriesEpisodeCount
+                        ?: mediaRepository.getCachedFullItem(MediaType.TV, item.id)?.seriesEpisodeCount
+                        ?: detailSemaphore.withPermit {
+                            runCatching { mediaRepository.getTvDetails(item.id).seriesEpisodeCount }.getOrNull()
+                        }
+                    item.id to total
+                }
+            }.awaitAll().mapNotNull { (id, total) -> total?.let { id to it } }.toMap()
+        }
+        return items.map { item ->
+            val badge = resolveHomeWatchedBadgeState(
+                item = item,
+                watchedMovies = watchedMovies,
+                watchedEpisodeCount = watchedEpisodeCounts[item.id] ?: 0,
+                seriesEpisodeCount = episodeTotals[item.id] ?: item.seriesEpisodeCount,
+            )
+            if (item.isWatched == badge.isWatched && item.isPartiallyWatched == badge.isPartiallyWatched) {
+                item
+            } else {
+                item.copy(isWatched = badge.isWatched, isPartiallyWatched = badge.isPartiallyWatched)
+            }
         }
     }
 

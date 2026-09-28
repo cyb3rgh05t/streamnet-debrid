@@ -377,6 +377,8 @@ class MediaRepository @Inject constructor(
                 append(':')
                 append(source.addonId.orEmpty())
                 append(':')
+                append(source.addonManifestUrl.orEmpty())
+                append(':')
                 append(source.addonCatalogType.orEmpty())
                 append(':')
                 append(source.addonCatalogId.orEmpty())
@@ -1833,6 +1835,7 @@ class MediaRepository @Inject constructor(
                         source.kind.name,
                         source.mediaType.orEmpty(),
                         source.addonId.orEmpty(),
+                        source.addonManifestUrl.orEmpty(),
                         source.addonCatalogType.orEmpty(),
                         source.addonCatalogId.orEmpty(),
                         source.tmdbGenreId?.toString().orEmpty(),
@@ -2729,18 +2732,24 @@ class MediaRepository @Inject constructor(
         val catalogType = source.addonCatalogType?.trim().orEmpty()
         val catalogId = source.addonCatalogId?.trim().orEmpty()
         if (catalogType.isBlank() || catalogId.isBlank()) return@coroutineScope emptyList()
-        val addonId = streamRepository.findInstalledAddonIdForCatalog(
-            catalogType = catalogType,
-            catalogId = catalogId,
-            preferredAddonId = source.addonId
-        ) ?: return@coroutineScope emptyList()
+        val manifestUrl = source.addonManifestUrl?.trim()?.takeIf { it.isNotBlank() }
+        val addonId = if (manifestUrl == null) {
+            streamRepository.findInstalledAddonIdForCatalog(
+                catalogType = catalogType,
+                catalogId = catalogId,
+                preferredAddonId = source.addonId
+            ) ?: return@coroutineScope emptyList()
+        } else {
+            null
+        }
 
         val response = runCatching {
             loadPagedAddonCollectionRefs(
                 descriptor = AddonCatalogDescriptor(
                     addonId = addonId,
                     catalogType = catalogType,
-                    catalogId = catalogId
+                    catalogId = catalogId,
+                    manifestUrl = manifestUrl
                 ),
                 offset = offset,
                 limit = limit
@@ -2851,12 +2860,7 @@ class MediaRepository @Inject constructor(
         val maxProbes = 12
         while (probes < maxProbes && accumulated.size < limit) {
             val response = runCatching {
-                streamRepository.getAddonCatalogPage(
-                    addonId = descriptor.addonId,
-                    catalogType = descriptor.catalogType,
-                    catalogId = descriptor.catalogId,
-                    skip = probeOffset
-                )
+                fetchAddonCatalogPage(descriptor, probeOffset)
             }.getOrNull() ?: break
             val metas = response.metas ?: response.items ?: emptyList()
             if (metas.isEmpty()) break
@@ -2870,9 +2874,27 @@ class MediaRepository @Inject constructor(
     }
 
     private data class AddonCatalogDescriptor(
-        val addonId: String,
+        val addonId: String?,
         val catalogType: String,
-        val catalogId: String
+        val catalogId: String,
+        val manifestUrl: String? = null
+    )
+
+    private suspend fun fetchAddonCatalogPage(
+        descriptor: AddonCatalogDescriptor,
+        skip: Int
+    ) = descriptor.manifestUrl?.let { manifestUrl ->
+        streamRepository.getAddonCatalogPageFromUrl(
+            manifestUrl = manifestUrl,
+            catalogType = descriptor.catalogType,
+            catalogId = descriptor.catalogId,
+            skip = skip
+        )
+    } ?: streamRepository.getAddonCatalogPage(
+        addonId = requireNotNull(descriptor.addonId),
+        catalogType = descriptor.catalogType,
+        catalogId = descriptor.catalogId,
+        skip = skip
     )
 
     private data class UnresolvedAddonMeta(
@@ -2901,12 +2923,7 @@ class MediaRepository @Inject constructor(
 
         while (probes < maxProbes && accumulated.size < limit) {
             val response = runCatching {
-                streamRepository.getAddonCatalogPage(
-                    addonId = descriptor.addonId,
-                    catalogType = descriptor.catalogType,
-                    catalogId = descriptor.catalogId,
-                    skip = probeOffset
-                )
+                fetchAddonCatalogPage(descriptor, probeOffset)
             }.getOrNull() ?: break
 
             val metas = response.metas ?: response.items ?: emptyList()
@@ -2980,16 +2997,20 @@ class MediaRepository @Inject constructor(
         }
 
         val metaSemaphore = Semaphore(2)
-        val resolvedFromMeta = unresolvedMetaCandidates.take(8).map { unresolved ->
-            async {
-                metaSemaphore.withPermit {
-                    resolveAddonMetaToTmdbRef(
-                        descriptor = descriptor,
-                        unresolved = unresolved
-                    )
+        val resolvedFromMeta = if (descriptor.addonId != null) {
+            unresolvedMetaCandidates.take(8).map { unresolved ->
+                async {
+                    metaSemaphore.withPermit {
+                        resolveAddonMetaToTmdbRef(
+                            descriptor = descriptor,
+                            unresolved = unresolved
+                        )
+                    }
                 }
-            }
-        }.mapNotNull { it.await() }
+            }.mapNotNull { it.await() }
+        } else {
+            emptyList()
+        }
 
         val imdbSemaphore = Semaphore(4)
         val resolvedImdbRefs = imdbCandidates.map { (imdbId, hint) ->
@@ -3016,6 +3037,7 @@ class MediaRepository @Inject constructor(
         descriptor: AddonCatalogDescriptor,
         unresolved: UnresolvedAddonMeta
     ): Pair<MediaType, Int>? {
+        val addonId = descriptor.addonId ?: return null
         val mediaType = unresolved.typeHint ?: addonCatalogTypeToMediaType(descriptor.catalogType) ?: return null
         val requestedType = when (mediaType) {
             MediaType.MOVIE -> "movie"
@@ -3023,7 +3045,7 @@ class MediaRepository @Inject constructor(
         }
         val meta = runCatching {
             streamRepository.getAddonMeta(
-                addonId = descriptor.addonId,
+                addonId = addonId,
                 mediaType = requestedType,
                 mediaId = unresolved.id
             )
@@ -3136,7 +3158,11 @@ class MediaRepository @Inject constructor(
         val catalogType = normalizeAddonCatalogType(catalog.addonCatalogType)
         val catalogId = catalog.addonCatalogId?.trim().takeUnless { it.isNullOrBlank() }
         if (addonId != null && catalogType != null && catalogId != null) {
-            return AddonCatalogDescriptor(addonId, catalogType, catalogId)
+            return AddonCatalogDescriptor(
+                addonId = addonId,
+                catalogType = catalogType,
+                catalogId = catalogId
+            )
         }
 
         val sourceRef = catalog.sourceRef?.trim().orEmpty()
@@ -3149,7 +3175,11 @@ class MediaRepository @Inject constructor(
         val parsedCatalogId = decodeCatalogRefPart(parts[2]).trim()
         if (parsedAddonId.isBlank() || parsedType == null || parsedCatalogId.isBlank()) return null
 
-        return AddonCatalogDescriptor(parsedAddonId, parsedType, parsedCatalogId)
+        return AddonCatalogDescriptor(
+            addonId = parsedAddonId,
+            catalogType = parsedType,
+            catalogId = parsedCatalogId
+        )
     }
 
     private fun decodeCatalogRefPart(value: String): String {

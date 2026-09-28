@@ -2947,7 +2947,7 @@ class HomeViewModel @Inject constructor(
         // Freshly rebuilt categories always start with isWatched=false; the 90s
         // debounce must not skip re-applying badges here or checkmarks stay
         // missing until the cooldown lapses on its own.
-        refreshWatchedBadges(immediate = false)
+        refreshWatchedBadges(immediate = true)
     }
 
     private var cwFetchJob: Job? = null
@@ -3264,18 +3264,13 @@ class HomeViewModel @Inject constructor(
                 val mergedCachedContinueWatching = mergeContinueWatchingResumeData(cachedContinueWatching)
                 val savedCatalogs = withContext(networkDispatcher) {
                     runCatching {
-                        val marvelAddonUrls = CollectionTemplateManifest.entries
-                            .firstOrNull { it.title.equals("Marvel", ignoreCase = true) }
-                            ?.let(CollectionTemplateManifest::requiredAddonUrlsFor)
-                            .orEmpty()
                         streamRepository.removeCustomAddonsByUrl(
-                            (
-                                CollectionTemplateManifest.autoInstalledAddonUrls() +
-                                    MediaRepository.STREAMING_COLLECTION_ADDON_URL +
-                                    "https://addon-marvel.onrender.com/catalog/marvel-mcu/manifest.json"
-                                ).filterNot { it in marvelAddonUrls }
+                            CollectionTemplateManifest.autoInstalledAddonUrls() +
+                                MediaRepository.STREAMING_COLLECTION_ADDON_URL
                         )
-                        streamRepository.ensureCustomAddons(marvelAddonUrls)
+                        streamRepository.removeCustomAddonsByManifestIds(
+                            CollectionTemplateManifest.collectionOnlyAddonManifestIdsForCleanup()
+                        )
                         val addons = streamRepository.installedAddons.first()
                         catalogRepository.syncAddonCatalogs(addons)
                         catalogRepository.syncHomeServerCatalogs(homeServerRepository.getCatalogCandidates())
@@ -3860,7 +3855,7 @@ class HomeViewModel @Inject constructor(
                 // categories was just replaced wholesale (isWatched resets to false);
                 // skipping this due to the 90s debounce is what leaves checkmarks
                 // missing after frequent loadHomeData reloads (catalog/IPTV/cloud sync).
-                refreshWatchedBadges(immediate = false)
+                refreshWatchedBadges(immediate = true)
                 scheduleStartupCatalogImageWarmup(categories)
                 scheduleRecentlyWatchedHydration()
 

@@ -1,5 +1,12 @@
 import type { MediaItem } from "./types";
 
+export function shouldShowWatchedBadge(categoryId: string): boolean {
+  return (
+    categoryId !== "recently_watched_movies" &&
+    categoryId !== "recently_watched_series"
+  );
+}
+
 export function mediaWatchKey(
   item: Pick<MediaItem, "id" | "mediaType" | "seasonNumber" | "episodeNumber">,
   seasonNumber?: number | null,
@@ -116,9 +123,8 @@ export function isWatchedShowEpisode(
     const seasons = (item.seasons ?? []).filter(
       (entry) => entry.seasonNumber > 0,
     );
-    return (
-      seasons.length > 0 &&
-      seasons.every(
+    if (seasons.length > 0) {
+      return seasons.every(
         (entry) =>
           (entry.episodeCount ?? 0) > 0 &&
           Array.from(
@@ -127,8 +133,25 @@ export function isWatchedShowEpisode(
           ).every((number) =>
             watchedKeys.has(`tv:${item.id}:${entry.seasonNumber}:${number}`),
           ),
-      )
+      );
+    }
+
+    const totalEpisodes = item.numberOfEpisodes ?? 0;
+    if (totalEpisodes <= 0) return false;
+    const watchedEpisodes = new Set(
+      [...watchedKeys]
+        .filter((key) => key.startsWith(`${showKey}:`))
+        .map((key) => {
+          const [, , rawSeason, rawEpisode] = key.split(":");
+          const parsedSeason = Number(rawSeason);
+          const parsedEpisode = Number(rawEpisode);
+          return parsedSeason > 0 && parsedEpisode > 0
+            ? `${parsedSeason}:${parsedEpisode}`
+            : null;
+        })
+        .filter((key): key is string => key !== null),
     );
+    return watchedEpisodes.size >= totalEpisodes;
   }
   if (season == null || episode == null) return false;
 

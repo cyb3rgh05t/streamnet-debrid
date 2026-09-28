@@ -157,7 +157,7 @@ class ContinueWatchingItemTest {
 
         val mediaItem = item.toMediaItem(germanContext)
 
-        assertEquals("S1E2 bei 22:30 fortsetzen", mediaItem.subtitle)
+        assertEquals("S01 E02 bei 22:30 fortsetzen", mediaItem.subtitle)
         assertEquals("Noch 22 Min.", mediaItem.timeRemainingLabel)
     }
 }

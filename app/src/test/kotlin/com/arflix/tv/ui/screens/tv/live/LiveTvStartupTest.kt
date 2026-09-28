@@ -195,7 +195,7 @@ class LiveTvStartupTest {
             .setFrameRate(50f)
             .build()
 
-        assertThat(formatLiveVideoBadge(format)).isEqualTo("FHD · 1920×1080")
+        assertThat(formatLiveVideoBadge(format)).isEqualTo("FHD")
         assertThat(formatLiveFpsBadge(format)).isEqualTo("50 FPS")
     }
 

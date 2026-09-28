@@ -42,9 +42,9 @@ internal object CollectionTemplateManifest {
     private const val GENRE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Genres/"
     private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/images/Franchises/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
-    private const val MARVEL_ADDON_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json"
-    private const val DC_ADDON_URL = "https://addon-dc-cq85.onrender.com/catalog/dc-chronological/manifest.json"
-    private const val STAR_WARS_ADDON_URL = "https://addon-star-wars-u9e3.onrender.com/catalog/sw-movies-series-chronological/manifest.json"
+    private const val MARVEL_MANIFEST_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
+    private const val DC_ADDON_URL = "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json"
+    private const val STAR_WARS_ADDON_URL = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json"
     private const val TEMPLATE_IMAGE_BASE = IMAGE_BASE
     private val UPLOADED_COVER_BASE = "https://" + "nu" + "vioapp.space/uploads/covers/"
 
@@ -704,10 +704,10 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series", type = "Marvel", catalogId = "marvel-mcu")
+                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "Marvel", catalogId = "marvel-mcu", manifestUrl = MARVEL_MANIFEST_URL)
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = null)
+                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
             )
         ),
         entry(
@@ -718,10 +718,10 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.tapframe.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological")
+                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL)
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "dc-chronological", sourceAddonId = "com.tapframe.dcaddon.custom.dc-chronological", sourceName = "DC Universe", sourceLabel = "ADDON", mediaType = "dc", itemCount = null, author = null, url = null)
+                metadata(sourceCatalogId = "dc-chronological", sourceAddonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", sourceName = "DC Universe", sourceLabel = "ADDON", mediaType = "dc", itemCount = null, author = null, url = DC_ADDON_URL)
             )
         ),
         entry(
@@ -732,10 +732,10 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.starwars.addon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological")
+                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL)
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "sw-movies-series-chronological", sourceAddonId = "com.starwars.addon.custom.sw-movies-series-chronological", sourceName = "Star Wars", sourceLabel = "ADDON", mediaType = "starwars", itemCount = null, author = null, url = null)
+                metadata(sourceCatalogId = "sw-movies-series-chronological", sourceAddonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", sourceName = "Star Wars", sourceLabel = "ADDON", mediaType = "starwars", itemCount = null, author = null, url = STAR_WARS_ADDON_URL)
             )
         ),
         entry(
@@ -1138,15 +1138,22 @@ internal object CollectionTemplateManifest {
         val addonIds = entry.sources.mapNotNull { it.addonId }.toSet()
         return buildList {
             if (addonIds.contains("pw.ers.netflix-catalog")) add(STREAMING_ADDON_URL)
-            if (addonIds.contains("com.joaogonp.marveladdon.custom.marvel-mcu.movies.series")) add(MARVEL_ADDON_URL)
-            if (addonIds.contains("com.btmv.addon.dcuniverse.custom.dc-chronological")) add(DC_ADDON_URL)
-            if (addonIds.contains("com.starwars.addon.custom.sw-movies-series-chronological")) add(STAR_WARS_ADDON_URL)
         }
     }
 
+    fun collectionOnlyAddonManifestIdsForCleanup(): Set<String> = setOf(
+        "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+        "com.joaogonp.marveladdon.custom.marvel-mcu",
+        "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
+        "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+        "com.tapframe.dcaddon.custom.dc-chronological",
+        "com.btmv.addon.dcuniverse.custom.dc-chronological",
+        "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+        "com.starwars.addon.custom.sw-movies-series-chronological"
+    )
+
     fun autoInstalledAddonUrls(): List<String> = listOf(
         STREAMING_ADDON_URL,
-        MARVEL_ADDON_URL,
         DC_ADDON_URL,
         STAR_WARS_ADDON_URL
     )
@@ -1206,9 +1213,10 @@ internal object CollectionTemplateManifest {
         url = url
     )
 
-    private fun source(addonId: String, type: String, catalogId: String) = CollectionSourceConfig(
+    private fun source(addonId: String?, type: String, catalogId: String, manifestUrl: String? = null) = CollectionSourceConfig(
         kind = CollectionSourceKind.ADDON_CATALOG,
         addonId = addonId,
+        addonManifestUrl = manifestUrl,
         addonCatalogType = type,
         addonCatalogId = catalogId
     )

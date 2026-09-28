@@ -126,7 +126,7 @@ test("Marvel addon chronology is the primary web source with fallbacks retained"
   assert.equal(sources[0]?.addonCatalogId, "marvel-mcu");
   assert.equal(
     sources[0]?.addonManifestUrl,
-    "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+    "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
   );
   assert.equal(
     sources.some((source) => source.kind === "CURATED_IDS"),
@@ -141,6 +141,45 @@ test("Marvel addon chronology is the primary web source with fallbacks retained"
     ),
     true,
   );
+});
+
+test("DC and Star Wars use their MystreamNet chronological manifests", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const cases = [
+    {
+      id: "collection_franchise_dc_universe",
+      manifestId: "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+      catalogId: "dc-chronological",
+      manifestUrl:
+        "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
+    },
+    {
+      id: "collection_franchise_star_wars",
+      manifestId:
+        "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+      catalogId: "sw-movies-series-chronological",
+      manifestUrl:
+        "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
+    },
+  ];
+
+  for (const expected of cases) {
+    const sources =
+      defaultCatalogs.find((catalog) => catalog.id === expected.id)
+        ?.collectionSources ?? [];
+    assert.equal(sources[0]?.kind, "ADDON_CATALOG");
+    assert.equal(sources[0]?.addonId, expected.manifestId);
+    assert.equal(sources[0]?.addonCatalogId, expected.catalogId);
+    assert.equal(sources[0]?.addonManifestUrl, expected.manifestUrl);
+    assert.equal(
+      sources.some((source) => source.kind === "CURATED_IDS"),
+      true,
+    );
+    assert.equal(
+      sources.some((source) => source.kind === "MDBLIST_PUBLIC"),
+      true,
+    );
+  }
 });
 
 test("catalogs without a row override inherit the global card layout", async () => {

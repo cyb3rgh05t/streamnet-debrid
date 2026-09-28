@@ -7,6 +7,16 @@ const moduleUrl = pathToFileURL(
   path.join(__dirname, "..", "lib", "continueWatching.ts"),
 ).href;
 
+test("watched badges are hidden only on recently watched rails", async () => {
+  const { shouldShowWatchedBadge } = await import(moduleUrl);
+
+  assert.equal(shouldShowWatchedBadge("recently_watched_movies"), false);
+  assert.equal(shouldShowWatchedBadge("recently_watched_series"), false);
+  assert.equal(shouldShowWatchedBadge("continue_watching"), true);
+  assert.equal(shouldShowWatchedBadge("trending_movies"), true);
+  assert.equal(shouldShowWatchedBadge("collection_franchise_marvel"), true);
+});
+
 test("recently watched uses the watch time, not the watchlist date", async () => {
   const { traktItemToMedia, traktWatchedToMedia } = await import(
     pathToFileURL(path.join(__dirname, "..", "lib", "mappers.ts")).href
@@ -197,6 +207,44 @@ test("a series is watched only when every known non-special episode is watched",
   assert.equal(isWatchedShowEpisode(show, keys), true);
   keys.delete("tv:123:1:1");
   assert.equal(isWatchedShowEpisode(show, keys), false);
+});
+
+test("home series cards use TMDB episode totals when season details are absent", async () => {
+  const { isWatchedShowEpisode } = await import(moduleUrl);
+  const show = {
+    id: 456,
+    mediaType: "tv",
+    numberOfEpisodes: 3,
+  };
+  const keys = new Set([
+    "tv:456:0:1",
+    "tv:456:1:1",
+    "tv:456:1:2",
+    "tv:456:2:1",
+  ]);
+
+  assert.equal(isWatchedShowEpisode(show, keys), true);
+  keys.delete("tv:456:2:1");
+  assert.equal(isWatchedShowEpisode(show, keys), false);
+});
+
+test("TMDB home mapping retains series episode totals for watched badges", async () => {
+  const { mapTmdbItem } = await import(
+    pathToFileURL(path.join(__dirname, "..", "lib", "tmdb.ts")).href
+  );
+  const item = mapTmdbItem(
+    {
+      id: 456,
+      name: "Series",
+      media_type: "tv",
+      number_of_seasons: 3,
+      number_of_episodes: 24,
+    },
+    "tv",
+  );
+
+  assert.equal(item.numberOfSeasons, 3);
+  assert.equal(item.numberOfEpisodes, 24);
 });
 
 test("Trakt progress contributes completed season episodes to detail badges", async () => {

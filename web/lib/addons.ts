@@ -16,6 +16,16 @@ import type {
 } from "./types";
 
 const ADDON_KEY = "arvio.web.installed.addons";
+const COLLECTION_ONLY_ADDON_MANIFEST_IDS = new Set([
+  "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+  "com.joaogonp.marveladdon.custom.marvel-mcu",
+  "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
+  "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+  "com.tapframe.dcaddon.custom.dc-chronological",
+  "com.btmv.addon.dcuniverse.custom.dc-chronological",
+  "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+  "com.starwars.addon.custom.sw-movies-series-chronological",
+]);
 const unauthorizedStreamAddonBases = new Set<string>();
 const unauthorizedSubtitleAddonBases = new Set<string>();
 
@@ -201,6 +211,17 @@ export function normalizeAddons(addons: unknown) {
   const seen = new Set<string>();
   return addons.map(normalizeAddon).filter((addon): addon is InstalledAddon => {
     if (!addon) return false;
+    const manifestId = (
+      addon as InstalledAddon & { manifest?: { id?: string } }
+    ).manifest?.id;
+    if (
+      COLLECTION_ONLY_ADDON_MANIFEST_IDS.has(addon.id) ||
+      (manifestId && COLLECTION_ONLY_ADDON_MANIFEST_IDS.has(manifestId)) ||
+      [...COLLECTION_ONLY_ADDON_MANIFEST_IDS].some((id) =>
+        addon.id.startsWith(`${id}_`),
+      )
+    )
+      return false;
     const key = addon.manifestUrl || addon.id;
     if (seen.has(key)) return false;
     seen.add(key);

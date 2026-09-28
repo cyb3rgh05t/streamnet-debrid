@@ -2,8 +2,28 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.044] - 2026-09-28
+
+- Marvel, DC Universe und Star Wars laden ihre chronologischen Kataloge direkt von den MystreamNet-Manifest-URLs; sie benötigen keine separaten Addon-Karten.
+- Alte und aktuelle Manifest-IDs dieser Collection-only Addons werden beim Home-Start aus der Addon-Verwaltung bereinigt. Kuratierte, TMDB- und MDBList-Fallbacks bleiben verfügbar.
+- Collection- und Franchise-Karten verwenden jetzt denselben profilbezogenen Watched-Cache wie die Android-Home-Rails. Filme zeigen den vollständigen Watched-Status; Serien werden anhand ihrer gesehenen Episoden und der bekannten TMDB-Episodenzahl als vollständig oder teilweise gesehen markiert.
+- Nach einem vollständigen Home-Neuaufbau werden Watched-Marker sofort erneut angewendet und nicht mehr durch den 90-Sekunden-Cooldown übersprungen.
+- Watched-/Partial-Watched-Marker bleiben auf normalen Home-Rails sichtbar. Die Rails „Zuletzt gesehene Filme“ und „Zuletzt gesehene Serien“ sowie Continue Watching zeigen bewusst keine zusätzlichen Watched-Marker.
+- Android-Version: `2.5.044` / Code `445`.
+- Technische Doku: `docs/superpowers/watched-state-and-franchise-catalogs-2026-09-28.md`.
+
+## [Web 1.0.055] - 2026-09-28
+
+- Marvel, DC Universe und Star Wars verwenden ihre direkten MystreamNet-Manifest-Quellen mit bestehenden kuratierten/TMDB/MDBList-Fallbacks.
+- Die drei Collection-only Addons werden in der separaten Addon-Verwaltung ausgeblendet; Legacy-Manifest-IDs werden ebenfalls erkannt.
+- Home-, Collection- und Franchise-Karten verwenden durchgehend den gemeinsamen profilbezogenen Watched-Key-Satz. Serien ohne geladene Staffelstruktur können über die TMDB-Gesamtzahl ihrer Episoden dennoch korrekt als vollständig oder teilweise gesehen erkannt werden.
+- Watched-/Partial-Watched-Marker bleiben auf normalen Rails sichtbar und werden ausschließlich in „Zuletzt gesehene Filme“ und „Zuletzt gesehene Serien“ unterdrückt; Continue Watching behält seine Fortschrittsdarstellung.
+- Web-Version: `1.0.055`.
+- Technische Doku: `docs/superpowers/watched-state-and-franchise-catalogs-2026-09-28.md`.
+
 ## [Web 1.0.054] - 2026-09-27
 
+- Marvel-, DC- und Star-Wars-Collections rufen ihre chronologischen MystreamNet-Manifeste direkt ab; diese Collection-only Add-ons werden aus der separaten Add-on-Liste ausgeblendet.
 - Add-on-Schalter bleiben beim Aus- und Wiedereinschalten sowie beim Cloud-Wiederherstellen zwischen Web- und Android-Kompatibilitätsfeldern synchron.
 - Quellenlisten im Detailsdialog und Playerpanel folgen der installierten Add-on-Reihenfolge; Xtream-IPTV-VOD steht bei vorhandenen Treffern immer zuerst. Die Qualitätsreihenfolge innerhalb eines Add-ons und der browserkompatible automatische Quellenwechsel bleiben erhalten.
 - Web-Version: `1.0.054`.
@@ -19,9 +39,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [2.5.043] - 2026-09-26
 
+- Marvel-, DC- und Star-Wars-Collections rufen ihre chronologischen MystreamNet-Manifeste direkt ab und behalten ihre Fallbacks; die zugehörigen Addon-Karten werden beim Home-Start bereinigt und nicht erneut installiert.
 - Skip Intro/Recap/Credits/Preview folgt der gewählten App-Sprache; der Skip-Button wird wieder korrekt als Compose-Komponente kompiliert.
 - „Zuletzt gesehene Filme/Serien“ nutzt vorhandene profilbezogene Watched-Änderungszeiten statt der nach ID sortierten Snapshot-Reihenfolge. Für ältere Einträge ohne Zeitstempel bleibt die bisherige Reihenfolge erhalten.
-- Die Marvel-Franchise installiert und verwendet jetzt das erreichbare, chronologische Addon auf `marvel.mystreamnet.club`; kuratierte MCU- und MDBList-Fallbacks bleiben erhalten.
+- Die Marvel-Collection verwendet jetzt die direkte Manifest-URL `https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json` mit der neuen Manifest-ID; kuratierte MCU- und MDBList-Fallbacks bleiben erhalten, ohne Marvel als Addon zu installieren.
 - Android-Version: `2.5.043` / Code `444`.
 
 ## [Web 1.0.052] - 2026-09-26

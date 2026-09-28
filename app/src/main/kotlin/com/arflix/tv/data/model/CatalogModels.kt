@@ -65,6 +65,7 @@ data class CollectionSourceConfig(
     val kind: CollectionSourceKind,
     val mediaType: String? = null,
     val addonId: String? = null,
+    val addonManifestUrl: String? = null,
     val addonCatalogType: String? = null,
     val addonCatalogId: String? = null,
     val tmdbGenreId: Int? = null,
