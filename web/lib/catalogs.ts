@@ -278,30 +278,30 @@ const starWarsCuratedRefs = [
 ];
 
 const androidAssetBase =
-  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/9cc3dde7f7960c9256f0d81a761aa3ccbad4b976/";
+  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/";
 const franchiseAssetBase =
-  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/d6d01a462a006203757ae0e6afa6c839b32c458e/images/Franchises/";
-const streamingImageBase = `${androidAssetBase}images/Landscape%20Streaming%20Services/`;
-const videoBase = `${androidAssetBase}networks%20videos/`;
+  "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/";
+const streamingImageBase = `${androidAssetBase}artworks/streaming%20services/streaming%20services%20landscape/`;
+const videoBase = `${androidAssetBase}videos/networks%20videos/`;
 
 const androidCollectionArtwork: Record<
   string,
   { cover: string; heroVideo?: string; hideTitle?: boolean }
 > = {
   "Latest Movies": {
-    cover: `${androidAssetBase}images/Latest-Movies.jpg`,
+    cover: `${androidAssetBase}artworks/new-latest-trending/latest/Latest-Movies.jpg`,
     hideTitle: true,
   },
   "Latest Shows": {
-    cover: `${androidAssetBase}images/Latest-Shows.jpg`,
+    cover: `${androidAssetBase}artworks/new-latest-trending/latest/Latest-Shows.jpg`,
     hideTitle: true,
   },
   "Trending Movies": {
-    cover: `${androidAssetBase}images/Trending-Movies.jpg`,
+    cover: `${androidAssetBase}artworks/new-latest-trending/trending/Trending-Movies.jpg`,
     hideTitle: true,
   },
   "Trending Shows": {
-    cover: `${androidAssetBase}images/Trending-Shows.jpg`,
+    cover: `${androidAssetBase}artworks/new-latest-trending/trending/Trending-Shows.jpg`,
     hideTitle: true,
   },
   Netflix: {
@@ -345,7 +345,7 @@ const androidCollectionArtwork: Record<
     hideTitle: true,
   },
   Starz: {
-    cover: `${androidAssetBase}images/Starz.jpg`,
+    cover: `${streamingImageBase}Starz.jpegli.jpg`,
     heroVideo: `${videoBase}starz.mp4`,
     hideTitle: true,
   },
@@ -371,31 +371,31 @@ const androidCollectionArtwork: Record<
     hideTitle: true,
   },
   "20's Movies": {
-    cover: `${androidAssetBase}images/20snew.jpg`,
+    cover: `${androidAssetBase}artworks/decades/20snew.jpg`,
     hideTitle: true,
   },
   "10's Movies": {
-    cover: `${androidAssetBase}images/10snew.jpg`,
+    cover: `${androidAssetBase}artworks/decades/10snew.jpg`,
     hideTitle: true,
   },
   "00's Movies": {
-    cover: `${androidAssetBase}images/00snew.jpg`,
+    cover: `${androidAssetBase}artworks/decades/00snew.jpg`,
     hideTitle: true,
   },
   "90's Movies": {
-    cover: `${androidAssetBase}images/90snew.jpg`,
+    cover: `${androidAssetBase}artworks/decades/90snew.jpg`,
     hideTitle: true,
   },
   "80's Movies": {
-    cover: `${androidAssetBase}images/80snew.jpg`,
+    cover: `${androidAssetBase}artworks/decades/80snew.jpg`,
     hideTitle: true,
   },
   "70's Movies": {
-    cover: `${androidAssetBase}images/70snew.png`,
+    cover: `${androidAssetBase}artworks/decades/70snew.png`,
     hideTitle: true,
   },
   "60's Movies": {
-    cover: `${androidAssetBase}images/60snew.png`,
+    cover: `${androidAssetBase}artworks/decades/60snew.png`,
     hideTitle: true,
   },
   Marvel: { cover: `${franchiseAssetBase}Marvel.jpg`, hideTitle: true },

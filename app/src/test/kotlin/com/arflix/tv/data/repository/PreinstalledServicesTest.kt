@@ -16,8 +16,8 @@ import org.junit.Test
  * catalogs.
  */
 class PreinstalledServicesTest {
-    private val introVideoCommit = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
-    private val franchiseImageCommit = "d6d01a462a006203757ae0e6afa6c839b32c458e"
+    private val introVideoCommit = "3b8094a6d97084a54dfbe7779f904886e801a3fb"
+    private val franchiseImageCommit = "afacc40e5ab7202219749aaec497c5a4bdf3e27b"
 
     @Test
     fun `all franchise tiles use pinned branded artwork without logo overlays`() {
@@ -27,7 +27,7 @@ class PreinstalledServicesTest {
         assertTrue(franchises.isNotEmpty())
         franchises.forEach { franchise ->
             val cover = franchise.collectionCoverImageUrl.orEmpty()
-            assertTrue(cover.contains("/$franchiseImageCommit/images/Franchises/"))
+            assertTrue(cover.contains("/$franchiseImageCommit/artworks/franchises/"))
             assertEquals(franchise.collectionCoverImageUrl, franchise.collectionFocusGifUrl)
             assertNull(franchise.collectionClearLogoUrl)
         }
@@ -81,19 +81,19 @@ class PreinstalledServicesTest {
     )
 
     private val serviceVideoFiles = mapOf(
-        "collection_service_netflix" to "networks%20videos/netflix.mp4",
-        "collection_service_disneyplus" to "networks%20videos/disneyplus.mp4",
-        "collection_service_apple_tvplus" to "networks%20videos/appletv.mp4",
-        "collection_service_prime_video" to "networks%20videos/amazonprime.mp4",
-        "collection_service_hbo_max" to "networks%20videos/hbomax.mp4",
-        "collection_service_hulu" to "networks%20videos/hulu.mp4",
-        "collection_service_paramountplus" to "networks%20videos/paramount.mp4",
-        "collection_service_peacock" to "networks%20videos/peacock.mp4",
-        "collection_service_starz" to "networks%20videos/starz.mp4",
-        "collection_service_shudder" to "networks%20videos/shudder.mp4",
-        "collection_service_mgmplus" to "networks%20videos/mgm.mp4",
-        "collection_service_discoveryplus" to "networks%20videos/discovery.mp4",
-        "collection_service_crunchyroll" to "networks%20videos/crunchyroll.mp4"
+        "collection_service_netflix" to "videos/networks%20videos/netflix.mp4",
+        "collection_service_disneyplus" to "videos/networks%20videos/disneyplus.mp4",
+        "collection_service_apple_tvplus" to "videos/networks%20videos/appletv.mp4",
+        "collection_service_prime_video" to "videos/networks%20videos/amazonprime.mp4",
+        "collection_service_hbo_max" to "videos/networks%20videos/hbomax.mp4",
+        "collection_service_hulu" to "videos/networks%20videos/hulu.mp4",
+        "collection_service_paramountplus" to "videos/networks%20videos/paramount.mp4",
+        "collection_service_peacock" to "videos/networks%20videos/peacock.mp4",
+        "collection_service_starz" to "videos/networks%20videos/starz.mp4",
+        "collection_service_shudder" to "videos/networks%20videos/shudder.mp4",
+        "collection_service_mgmplus" to "videos/networks%20videos/mgm.mp4",
+        "collection_service_discoveryplus" to "videos/networks%20videos/discovery.mp4",
+        "collection_service_crunchyroll" to "videos/networks%20videos/crunchyroll.mp4"
     )
 
     private fun loadServices() =

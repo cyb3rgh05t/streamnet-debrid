@@ -63,6 +63,7 @@ enum class CollectionSourceKind {
 
 data class CollectionSourceConfig(
     val kind: CollectionSourceKind,
+    val collectionTab: String? = null,
     val mediaType: String? = null,
     val addonId: String? = null,
     val addonManifestUrl: String? = null,

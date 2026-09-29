@@ -1047,7 +1047,7 @@ class MediaRepository @Inject constructor(
         // user has them installed; the TMDB watch-provider source is the
         // out-of-the-box fallback so the rail populates on a fresh profile.
         // ──────────────────────────────────────────────────────────────
-        val mrtxivBase = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3486fc9a3d0efe59d1929e75f66021dc4e15bcb7/"
+        val mrtxivBase = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/"
         val services = listOf(
             // ── Premium 7 (mrtxiv assets + motion hero) ──
             collection(
@@ -1055,10 +1055,10 @@ class MediaRepository @Inject constructor(
                 title = "Netflix",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Netflix.",
-                cover = "${mrtxivBase}networks%20collection/netflix.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/netflix.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/netflix.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/netflix.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "movie", "mdblist.88328"),
@@ -1077,10 +1077,10 @@ class MediaRepository @Inject constructor(
                 title = "Prime Video",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Prime Video.",
-                cover = "${mrtxivBase}networks%20collection/amazonprime.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/prime.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/amazonprime.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/amazonprime.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "movie", "mdblist.86755"),
@@ -1099,10 +1099,10 @@ class MediaRepository @Inject constructor(
                 title = "Apple TV+",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Apple TV+.",
-                cover = "${mrtxivBase}networks%20collection/appletvplus.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/apple.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/appletv.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/appletv.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "apple_movies"),
@@ -1116,10 +1116,10 @@ class MediaRepository @Inject constructor(
                 title = "Disney+",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Disney+.",
-                cover = "${mrtxivBase}networks%20collection/disneyplus.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/disney.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/disneyplus.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/disneyplus.mp4",
                 clearLogo = null,
                 sources = listOf(
                     mdblistSource("garycrawfordgc/disney-shows")
@@ -1130,10 +1130,10 @@ class MediaRepository @Inject constructor(
                 title = "HBO Max",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on HBO Max.",
-                cover = "${mrtxivBase}networks%20collection/hbomax.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/hbo.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/hbomax.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/hbomax.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "movie", "mdblist.89647"),
@@ -1150,10 +1150,10 @@ class MediaRepository @Inject constructor(
                 title = "Hulu",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Hulu.",
-                cover = "${mrtxivBase}networks%20collection/hulu.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/hulu.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/hulu.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/hulu.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "series", "mdblist.88327"),
@@ -1168,10 +1168,10 @@ class MediaRepository @Inject constructor(
                 title = "Paramount+",
                 group = CollectionGroupKind.SERVICE,
                 description = "Trending movies and series on Paramount+.",
-                cover = "${mrtxivBase}networks%20collection/paramount.png",
+                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/paramount.jpegli.jpg",
                 focusGif = null,
                 hero = null,
-                heroVideo = "${mrtxivBase}networks%20videos/paramount.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/paramount.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "movie", "mdblist.86762"),
@@ -1256,7 +1256,7 @@ class MediaRepository @Inject constructor(
                 description = "Anime on Crunchyroll.",
                 cover = "https://mir-s3-cdn-cf.behance.net/project_modules/fs_webp/380e75223389683.67f7c1dc0669a.png",
                 focusGif = null,
-                heroVideo = "${mrtxivBase}networks%20videos/crunchyroll.mp4",
+                heroVideo = "${mrtxivBase}videos/networks%20videos/crunchyroll.mp4",
                 clearLogo = null,
                 sources = listOf(
                     addonCollectionSource("aio-metadata", "movie", "streaming.cru_movie"),

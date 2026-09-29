@@ -104,7 +104,7 @@ import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 
-enum class CollectionTab { MOVIES, SERIES }
+enum class CollectionTab { TIMELINE, MOVIES, SERIES }
 
 /**
  * Sentinel stored in [CollectionDetailsUiState.error] when a collection page fails to load.
@@ -118,20 +118,27 @@ data class CollectionDetailsUiState(
     val catalog: CatalogConfig? = null,
     val movieItems: List<MediaItem> = emptyList(),
     val seriesItems: List<MediaItem> = emptyList(),
+    val timelineItems: List<MediaItem> = emptyList(),
     val supportsMovies: Boolean = false,
     val supportsSeries: Boolean = false,
+    val supportsTimeline: Boolean = false,
     val isLoadingMovies: Boolean = true,
     val isLoadingSeries: Boolean = true,
+    val isLoadingTimeline: Boolean = true,
     val isLoadingMoreMovies: Boolean = false,
     val isLoadingMoreSeries: Boolean = false,
+    val isLoadingMoreTimeline: Boolean = false,
     val hasMoreMovies: Boolean = false,
     val hasMoreSeries: Boolean = false,
+    val hasMoreTimeline: Boolean = false,
     val loadedMovieOffset: Int = 0,
     val loadedSeriesOffset: Int = 0,
+    val loadedTimelineOffset: Int = 0,
     val error: String? = null
 ) {
     val hasMovies: Boolean get() = movieItems.isNotEmpty()
     val hasSeries: Boolean get() = seriesItems.isNotEmpty()
+    val hasTimeline: Boolean get() = timelineItems.isNotEmpty()
 }
 
 @HiltViewModel
@@ -171,7 +178,7 @@ class CollectionDetailsViewModel @Inject constructor(
             val current = _uiState.value
             if (current.catalog?.id == normalizedCatalogId && !current.isLoadingMovies && !current.isLoadingSeries) return@launch
 
-            _uiState.value = CollectionDetailsUiState(isLoadingMovies = true, isLoadingSeries = true)
+            _uiState.value = CollectionDetailsUiState(isLoadingMovies = true, isLoadingSeries = true, isLoadingTimeline = true)
             iptvOnlyMode = iptvRepository.observeConfig().first().iptvOnlyMode
             iptvVodAvailability = if (iptvOnlyMode) {
                 runCatching { iptvRepository.getXtreamVodAvailability(allowNetwork = false) }.getOrNull()
@@ -196,11 +203,14 @@ class CollectionDetailsViewModel @Inject constructor(
                 catalog = catalog,
                 supportsMovies = supportsTab(catalog, CollectionTab.MOVIES),
                 supportsSeries = supportsTab(catalog, CollectionTab.SERIES),
+                supportsTimeline = supportsTab(catalog, CollectionTab.TIMELINE),
                 isLoadingMovies = true,
-                isLoadingSeries = true
+                isLoadingSeries = true,
+                isLoadingTimeline = true
             )
 
             val primaryTab = when {
+                _uiState.value.supportsTimeline -> CollectionTab.TIMELINE
                 _uiState.value.supportsMovies -> CollectionTab.MOVIES
                 _uiState.value.supportsSeries -> CollectionTab.SERIES
                 else -> CollectionTab.MOVIES
@@ -208,15 +218,10 @@ class CollectionDetailsViewModel @Inject constructor(
             loadInitialTab(catalog, primaryTab)
             launch {
                 delay(1200L)
-                val secondaryTab = if (primaryTab == CollectionTab.MOVIES) CollectionTab.SERIES else CollectionTab.MOVIES
-                if (supportsTab(catalog, secondaryTab)) {
-                    loadInitialTab(catalog, secondaryTab)
-                } else {
-                    _uiState.value = when (secondaryTab) {
-                        CollectionTab.MOVIES -> _uiState.value.copy(isLoadingMovies = false)
-                        CollectionTab.SERIES -> _uiState.value.copy(isLoadingSeries = false)
-                    }
-                }
+                listOf(CollectionTab.TIMELINE, CollectionTab.MOVIES, CollectionTab.SERIES)
+                    .filter { it != primaryTab }
+                    .filter { supportsTab(catalog, it) }
+                    .forEach { loadInitialTab(catalog, it) }
             }
         }
     }
@@ -261,8 +266,9 @@ class CollectionDetailsViewModel @Inject constructor(
         val pageItems = when (tab) {
             CollectionTab.MOVIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
             CollectionTab.SERIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.TV }
+            CollectionTab.TIMELINE -> page?.items.orEmpty()
         }
-        val decoratedPageItems = decorateWatchedBadges(pageItems)
+        val decoratedPageItems = sortCollectionItems(tab, decorateWatchedBadges(pageItems))
         val decoratedCatalog = catalog
         _uiState.value = when (tab) {
             CollectionTab.MOVIES -> _uiState.value.copy(
@@ -281,11 +287,20 @@ class CollectionDetailsViewModel @Inject constructor(
                 loadedSeriesOffset = page?.nextOffset ?: 0,
                 error = _uiState.value.error ?: if (page == null) COLLECTION_LOAD_FAILED_ERROR else null
             )
+            CollectionTab.TIMELINE -> _uiState.value.copy(
+                catalog = decoratedCatalog,
+                timelineItems = decoratedPageItems,
+                isLoadingTimeline = false,
+                hasMoreTimeline = page?.hasMore == true,
+                loadedTimelineOffset = page?.nextOffset ?: 0,
+                error = _uiState.value.error ?: if (page == null) COLLECTION_LOAD_FAILED_ERROR else null
+            )
         }
         preloadLogos(decoratedPageItems.take(2))
         val hasMore = when (tab) {
             CollectionTab.MOVIES -> _uiState.value.hasMoreMovies
             CollectionTab.SERIES -> _uiState.value.hasMoreSeries
+            CollectionTab.TIMELINE -> _uiState.value.hasMoreTimeline
         }
         if (hasMore) {
             viewModelScope.launch {
@@ -301,41 +316,52 @@ class CollectionDetailsViewModel @Inject constructor(
         val isBusy = when (tab) {
             CollectionTab.MOVIES -> state.isLoadingMovies || state.isLoadingMoreMovies || !state.hasMoreMovies
             CollectionTab.SERIES -> state.isLoadingSeries || state.isLoadingMoreSeries || !state.hasMoreSeries
+            CollectionTab.TIMELINE -> state.isLoadingTimeline || state.isLoadingMoreTimeline || !state.hasMoreTimeline
         }
         if (isBusy) return
         _uiState.value = when (tab) {
             CollectionTab.MOVIES -> state.copy(isLoadingMoreMovies = true)
             CollectionTab.SERIES -> state.copy(isLoadingMoreSeries = true)
+            CollectionTab.TIMELINE -> state.copy(isLoadingMoreTimeline = true)
         }
         viewModelScope.launch {
             val pageCatalog = catalogForTab(catalog, tab)
             val nextOffset = when (tab) {
                 CollectionTab.MOVIES -> state.loadedMovieOffset
                 CollectionTab.SERIES -> state.loadedSeriesOffset
+                CollectionTab.TIMELINE -> state.loadedTimelineOffset
             }
             val next = runCatching { loadCollectionPage(pageCatalog, tab, offset = nextOffset, limit = PAGE_STEP) }.getOrNull()
             val freshItems = when (tab) {
                 CollectionTab.MOVIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
                 CollectionTab.SERIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.TV }
+                CollectionTab.TIMELINE -> next?.items.orEmpty()
             }
-            val decoratedFreshItems = decorateWatchedBadges(freshItems)
+            val decoratedFreshItems = sortCollectionItems(tab, decorateWatchedBadges(freshItems))
             val existingIds = when (tab) {
                 CollectionTab.MOVIES -> state.movieItems.mapTo(HashSet()) { it.id to it.mediaType }
                 CollectionTab.SERIES -> state.seriesItems.mapTo(HashSet()) { it.id to it.mediaType }
+                CollectionTab.TIMELINE -> state.timelineItems.mapTo(HashSet()) { it.id to it.mediaType }
             }
             val uniqueNew = decoratedFreshItems.filter { (it.id to it.mediaType) !in existingIds }
             _uiState.value = when (tab) {
                 CollectionTab.MOVIES -> _uiState.value.copy(
-                    movieItems = state.movieItems + uniqueNew,
+                    movieItems = sortCollectionItems(tab, state.movieItems + uniqueNew),
                     isLoadingMoreMovies = false,
                     hasMoreMovies = next?.hasMore == true,
                     loadedMovieOffset = next?.nextOffset ?: state.loadedMovieOffset
                 )
                 CollectionTab.SERIES -> _uiState.value.copy(
-                    seriesItems = state.seriesItems + uniqueNew,
+                    seriesItems = sortCollectionItems(tab, state.seriesItems + uniqueNew),
                     isLoadingMoreSeries = false,
                     hasMoreSeries = next?.hasMore == true,
                     loadedSeriesOffset = next?.nextOffset ?: state.loadedSeriesOffset
+                )
+                CollectionTab.TIMELINE -> _uiState.value.copy(
+                    timelineItems = state.timelineItems + uniqueNew,
+                    isLoadingMoreTimeline = false,
+                    hasMoreTimeline = next?.hasMore == true,
+                    loadedTimelineOffset = next?.nextOffset ?: state.loadedTimelineOffset
                 )
             }
             preloadLogos(uniqueNew)
@@ -384,6 +410,13 @@ class CollectionDetailsViewModel @Inject constructor(
             }
         }
     }
+
+    private fun sortCollectionItems(tab: CollectionTab, items: List<MediaItem>): List<MediaItem> =
+        if (tab == CollectionTab.TIMELINE) items else items.sortedWith(
+            compareByDescending<MediaItem> { it.popularity }
+                .thenByDescending { it.tmdbRating.toFloatOrNull() ?: 0f }
+                .thenBy { it.title.lowercase() }
+        )
 
     fun preloadLogos(items: List<MediaItem>) {
         if (items.isEmpty()) return
@@ -489,6 +522,13 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun sourceMatchesTab(source: com.arflix.tv.data.model.CollectionSourceConfig, tab: CollectionTab): Boolean {
+        source.collectionTab?.trim()?.lowercase()?.let { configuredTab ->
+            return when (tab) {
+                CollectionTab.MOVIES -> configuredTab == "movie"
+                CollectionTab.SERIES -> configuredTab == "series"
+                CollectionTab.TIMELINE -> configuredTab == "timeline"
+            }
+        }
         val mediaType = source.mediaType?.trim()?.lowercase()
         if (mediaType != null) {
             if (mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed") {
@@ -497,12 +537,13 @@ class CollectionDetailsViewModel @Inject constructor(
             return when (tab) {
                 CollectionTab.MOVIES -> mediaType == "movie" || mediaType == "film"
                 CollectionTab.SERIES -> mediaType == "series" || mediaType == "tv" || mediaType == "show" || mediaType == "anime"
+                CollectionTab.TIMELINE -> mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed"
             }
         }
 
         return when (source.kind) {
             com.arflix.tv.data.model.CollectionSourceKind.TMDB_COLLECTION -> tab == CollectionTab.MOVIES
-            else -> true
+            else -> tab != CollectionTab.TIMELINE
         }
     }
 }
@@ -570,6 +611,7 @@ fun CollectionDetailsScreen(
     }
 
     val initialTab = when {
+        uiState.supportsTimeline -> CollectionTab.TIMELINE
         uiState.supportsMovies -> CollectionTab.MOVIES
         uiState.supportsSeries -> CollectionTab.SERIES
         else -> CollectionTab.MOVIES
@@ -579,6 +621,7 @@ fun CollectionDetailsScreen(
     val seriesGridState = rememberTvLazyGridState()
     val moviesTabFocusRequester = remember { FocusRequester() }
     val seriesTabFocusRequester = remember { FocusRequester() }
+    val timelineTabFocusRequester = remember { FocusRequester() }
     // True after the first focus has been delivered; subsequent ON_RESUME uses saved index.
     var hasReceivedInitialFocus by rememberSaveable { mutableStateOf(false) }
     // Index (within the items list) of the last card the user focused per tab.
@@ -589,8 +632,10 @@ fun CollectionDetailsScreen(
 
     LaunchedEffect(uiState.catalog?.id, uiState.supportsMovies, uiState.supportsSeries) {
         val resolvedTab = when {
+            selectedTab == CollectionTab.TIMELINE && uiState.supportsTimeline -> CollectionTab.TIMELINE
             selectedTab == CollectionTab.MOVIES && uiState.supportsMovies -> CollectionTab.MOVIES
             selectedTab == CollectionTab.SERIES && uiState.supportsSeries -> CollectionTab.SERIES
+            uiState.supportsTimeline -> CollectionTab.TIMELINE
             uiState.supportsMovies -> CollectionTab.MOVIES
             uiState.supportsSeries -> CollectionTab.SERIES
             else -> CollectionTab.MOVIES
@@ -605,6 +650,7 @@ fun CollectionDetailsScreen(
     val currentTab by rememberUpdatedState(selectedTab)
     val currentSupportsMovies by rememberUpdatedState(uiState.supportsMovies)
     val currentSupportsSeries by rememberUpdatedState(uiState.supportsSeries)
+    val currentSupportsTimeline by rememberUpdatedState(uiState.supportsTimeline)
 
     fun requestTabFocus() {
         coroutineScope.launch {
@@ -614,6 +660,7 @@ fun CollectionDetailsScreen(
                 // First entry: focus the tab chip so D-pad works from the start
                 runCatching {
                     when (currentTab) {
+                        CollectionTab.TIMELINE -> if (currentSupportsTimeline) timelineTabFocusRequester.requestFocus()
                         CollectionTab.MOVIES -> if (currentSupportsMovies) moviesTabFocusRequester.requestFocus()
                         CollectionTab.SERIES -> if (currentSupportsSeries) seriesTabFocusRequester.requestFocus()
                     }
@@ -625,11 +672,13 @@ fun CollectionDetailsScreen(
                 // focusRestorer() can't be used here because lazy grid recycles off-screen
                 // items, making saved focus nodes stale by the time we return.
                 val savedIndex = when (currentTab) {
+                    CollectionTab.TIMELINE -> lastFocusedMovieIndex
                     CollectionTab.MOVIES -> lastFocusedMovieIndex
                     CollectionTab.SERIES -> lastFocusedSeriesIndex
                 }
                 if (savedIndex >= 0) {
                     val currentGridState = when (currentTab) {
+                        CollectionTab.TIMELINE -> moviesGridState
                         CollectionTab.MOVIES -> moviesGridState
                         CollectionTab.SERIES -> seriesGridState
                     }
@@ -639,6 +688,7 @@ fun CollectionDetailsScreen(
                 } else {
                     runCatching {
                         when (currentTab) {
+                            CollectionTab.TIMELINE -> if (currentSupportsTimeline) timelineTabFocusRequester.requestFocus()
                             CollectionTab.MOVIES -> if (currentSupportsMovies) moviesTabFocusRequester.requestFocus()
                             CollectionTab.SERIES -> if (currentSupportsSeries) seriesTabFocusRequester.requestFocus()
                         }
@@ -683,25 +733,24 @@ fun CollectionDetailsScreen(
     ) {
         CollectionBackdrop(catalog = uiState.catalog)
         val activeTab = selectedTab
-        val items = if (activeTab == CollectionTab.MOVIES) {
-            uiState.movieItems
-        } else {
-            uiState.seriesItems
+        val items = when (activeTab) {
+            CollectionTab.TIMELINE -> uiState.timelineItems
+            CollectionTab.MOVIES -> uiState.movieItems
+            CollectionTab.SERIES -> uiState.seriesItems
         }
-        val isTabLoading = if (activeTab == CollectionTab.MOVIES) {
-            uiState.isLoadingMovies
-        } else {
-            uiState.isLoadingSeries
+        val isTabLoading = when (activeTab) {
+            CollectionTab.TIMELINE -> uiState.isLoadingTimeline
+            CollectionTab.MOVIES -> uiState.isLoadingMovies
+            CollectionTab.SERIES -> uiState.isLoadingSeries
         }
-        val isTabLoadingMore = if (activeTab == CollectionTab.MOVIES) {
-            uiState.isLoadingMoreMovies
-        } else {
-            uiState.isLoadingMoreSeries
+        val isTabLoadingMore = when (activeTab) {
+            CollectionTab.TIMELINE -> uiState.isLoadingMoreTimeline
+            CollectionTab.MOVIES -> uiState.isLoadingMoreMovies
+            CollectionTab.SERIES -> uiState.isLoadingMoreSeries
         }
-        val gridState = if (activeTab == CollectionTab.MOVIES) {
-            moviesGridState
-        } else {
-            seriesGridState
+        val gridState = when (activeTab) {
+            CollectionTab.TIMELINE, CollectionTab.MOVIES -> moviesGridState
+            CollectionTab.SERIES -> seriesGridState
         }
         CollectionItemsGrid(
             items = items,
@@ -713,10 +762,12 @@ fun CollectionDetailsScreen(
             onClearPendingFocus = { pendingFocusIndex = -1 },
             hasMovies = uiState.supportsMovies,
             hasSeries = uiState.supportsSeries,
+            hasTimeline = uiState.supportsTimeline,
             cardLogoUrls = cardLogoUrls,
             selectedTab = selectedTab,
             moviesTabFocusRequester = moviesTabFocusRequester,
             seriesTabFocusRequester = seriesTabFocusRequester,
+            timelineTabFocusRequester = timelineTabFocusRequester,
             onTabSelected = { selectedTab = it },
             onItemClick = { item ->
                 onNavigateToDetails(item.mediaType, item.id)
@@ -724,7 +775,7 @@ fun CollectionDetailsScreen(
             onItemFocused = { item, index ->
                 viewModel.preloadLogos(listOf(item))
                 when (activeTab) {
-                    CollectionTab.MOVIES -> lastFocusedMovieIndex = index
+                    CollectionTab.TIMELINE, CollectionTab.MOVIES -> lastFocusedMovieIndex = index
                     CollectionTab.SERIES -> lastFocusedSeriesIndex = index
                 }
             },
@@ -841,14 +892,17 @@ private fun collectionAccentColor(group: CollectionGroupKind?): Color = when (gr
 private fun CollectionTabBar(
     hasMovies: Boolean,
     hasSeries: Boolean,
+    hasTimeline: Boolean,
     selectedTab: CollectionTab,
     moviesTabFocusRequester: FocusRequester,
     seriesTabFocusRequester: FocusRequester,
+    timelineTabFocusRequester: FocusRequester,
     onTabSelected: (CollectionTab) -> Unit
 ) {
+    val showTimeline = hasTimeline
     val showMovies = hasMovies || !hasSeries
     val showSeries = hasSeries || !hasMovies
-    val onlyOne = showMovies xor showSeries
+    val onlyOne = showTimeline.not() && (showMovies xor showSeries)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -856,6 +910,17 @@ private fun CollectionTabBar(
             .padding(start = 42.dp, end = 42.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        if (showTimeline) {
+            CollectionTabChip(
+                label = when (selectedTab) {
+                    CollectionTab.TIMELINE -> "Timeline"
+                    else -> "Timeline"
+                },
+                isSelected = selectedTab == CollectionTab.TIMELINE,
+                focusRequester = timelineTabFocusRequester,
+                onClick = { onTabSelected(CollectionTab.TIMELINE) }
+            )
+        }
         if (showMovies) {
             CollectionTabChip(
                 label = stringResource(R.string.movies),
@@ -940,10 +1005,12 @@ private fun CollectionItemsGrid(
     onClearPendingFocus: () -> Unit,
     hasMovies: Boolean,
     hasSeries: Boolean,
+    hasTimeline: Boolean,
     cardLogoUrls: Map<String, String>,
     selectedTab: CollectionTab,
     moviesTabFocusRequester: FocusRequester,
     seriesTabFocusRequester: FocusRequester,
+    timelineTabFocusRequester: FocusRequester,
     onTabSelected: (CollectionTab) -> Unit,
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit,
@@ -1008,9 +1075,11 @@ private fun CollectionItemsGrid(
             CollectionTabBar(
                 hasMovies = hasMovies,
                 hasSeries = hasSeries,
+                hasTimeline = hasTimeline,
                 selectedTab = selectedTab,
                 moviesTabFocusRequester = moviesTabFocusRequester,
                 seriesTabFocusRequester = seriesTabFocusRequester,
+                timelineTabFocusRequester = timelineTabFocusRequester,
                 onTabSelected = onTabSelected
             )
         }

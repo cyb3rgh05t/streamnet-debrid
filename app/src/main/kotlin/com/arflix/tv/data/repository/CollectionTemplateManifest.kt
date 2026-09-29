@@ -32,18 +32,20 @@ internal data class CollectionTemplateEntry(
 )
 
 internal object CollectionTemplateManifest {
-    private const val ASSET_COMMIT = "9cc3dde7f7960c9256f0d81a761aa3ccbad4b976"
-    private const val FRANCHISE_ASSET_COMMIT = "d6d01a462a006203757ae0e6afa6c839b32c458e"
+    private const val ASSET_COMMIT = "3b8094a6d97084a54dfbe7779f904886e801a3fb"
+    private const val FRANCHISE_ASSET_COMMIT = "afacc40e5ab7202219749aaec497c5a4bdf3e27b"
     private const val ASSET_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$ASSET_COMMIT/"
-    private const val VIDEO_BASE = "${ASSET_BASE}networks%20videos/"
-    private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}studios%20videos/"
-    private const val IMAGE_BASE = "${ASSET_BASE}images/"
-    private const val STREAMING_SERVICE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Streaming%20Services/"
-    private const val GENRE_IMAGE_BASE = "${IMAGE_BASE}Landscape%20Genres/"
-    private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/images/Franchises/"
+    private const val VIDEO_BASE = "${ASSET_BASE}videos/networks%20videos/"
+    private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}videos/studios%20videos/"
+    private const val IMAGE_BASE = "${ASSET_BASE}artworks/"
+    private const val STREAMING_SERVICE_IMAGE_BASE = "${ASSET_BASE}artworks/streaming%20services/streaming%20services%20landscape/"
+    private const val GENRE_IMAGE_BASE = "${ASSET_BASE}artworks/genres/genres%20landscape/genres%20landscape%201/"
+    private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/artworks/franchises/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
     private const val MARVEL_MANIFEST_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
+    private const val MARVEL_COMBINED_MANIFEST_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json"
     private const val DC_ADDON_URL = "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json"
+    private const val DC_COMBINED_MANIFEST_URL = "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json"
     private const val STAR_WARS_ADDON_URL = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json"
     private const val TEMPLATE_IMAGE_BASE = IMAGE_BASE
     private val UPLOADED_COVER_BASE = "https://" + "nu" + "vioapp.space/uploads/covers/"
@@ -263,7 +265,7 @@ internal object CollectionTemplateManifest {
         entry(
             title = "Starz",
             group = CollectionGroupKind.SERVICE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Starz.jpg",
+            coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}Starz.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}starz.mp4",
@@ -704,7 +706,9 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "Marvel", catalogId = "marvel-mcu", manifestUrl = MARVEL_MANIFEST_URL)
+                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "movie", catalogId = "movies", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "movie"),
+                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "series", catalogId = "series", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "series"),
+                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "Marvel", catalogId = "marvel-mcu", manifestUrl = MARVEL_MANIFEST_URL, collectionTab = "timeline")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
@@ -718,7 +722,9 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL)
+                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "movie", catalogId = "dc-movies", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "movie"),
+                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "series", catalogId = "dc-series", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "series"),
+                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL, collectionTab = "timeline")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "dc-chronological", sourceAddonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", sourceName = "DC Universe", sourceLabel = "ADDON", mediaType = "dc", itemCount = null, author = null, url = DC_ADDON_URL)
@@ -732,7 +738,9 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL)
+                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "movie", catalogId = "movies", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "movie"),
+                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "series", catalogId = "series", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "series"),
+                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "timeline")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "sw-movies-series-chronological", sourceAddonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", sourceName = "Star Wars", sourceLabel = "ADDON", mediaType = "starwars", itemCount = null, author = null, url = STAR_WARS_ADDON_URL)
@@ -1213,8 +1221,9 @@ internal object CollectionTemplateManifest {
         url = url
     )
 
-    private fun source(addonId: String?, type: String, catalogId: String, manifestUrl: String? = null) = CollectionSourceConfig(
+    private fun source(addonId: String?, type: String, catalogId: String, manifestUrl: String? = null, collectionTab: String? = null) = CollectionSourceConfig(
         kind = CollectionSourceKind.ADDON_CATALOG,
+        collectionTab = collectionTab,
         addonId = addonId,
         addonManifestUrl = manifestUrl,
         addonCatalogType = type,

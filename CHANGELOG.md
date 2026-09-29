@@ -2,6 +2,20 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.048] - 2026-09-29
+
+- Android-Collections verwenden jetzt wie Web drei Tabs in der Reihenfolge Timeline, Filme und Serien.
+- Marvel-, DC- und Star-Wars-Timelines laden die direkten chronologischen MystreamNet-Manifeste und bewahren deren Reihenfolge.
+- Film- und Serien-Tabs verwenden getrennte Quellen aus kombinierten Manifest-Catalogs und werden nach TMDB-Popularität, Rating und Titel sortiert.
+- Collection-Artworks verwenden die neue Repository-Struktur; Franchise-Cover sind auf Asset-Commit `afacc40e5ab7202219749aaec497c5a4bdf3e27b` gepinnt und Service-/Genre-/Video-Assets auf `3b8094a6d97084a54dfbe7779f904886e801a3fb`.
+- Starz verwendet jetzt das vorhandene Landscape-Cover aus dem Streaming-Service-Asset-Verzeichnis.
+- Android-Version: `2.5.048` / Code `449`.
+
+## [Web 1.0.060] - 2026-09-29
+
+- Franchise-Cover verwenden den neuesten Asset-Commit `afacc40e5ab7202219749aaec497c5a4bdf3e27b`; allgemeine Collection-Artworks bleiben auf dem geprüften Asset-Commit `3b8094a6d97084a54dfbe7779f904886e801a3fb`.
+- Web-Version: `1.0.060`.
+
 ## [Web 1.0.059] - 2026-09-29
 
 - Marvel, DC Universe und Star Wars haben jetzt drei Collection-Tabs: Timeline, Filme und Serien. Timeline steht zuerst.
