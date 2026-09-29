@@ -16,6 +16,7 @@ export interface MediaItem {
   year?: string;
   releaseDate?: string | null;
   rating?: string;
+  popularity?: number;
   duration?: string;
   mediaType: MediaType;
   image?: string;
@@ -181,6 +182,7 @@ export interface CatalogConfig {
 
 export interface CollectionSourceConfig {
   kind: string;
+  collectionTab?: "movie" | "series" | "timeline";
   mediaType?: string | null;
   addonId?: string | null;
   addonManifestUrl?: string | null;

@@ -30,8 +30,18 @@ If TMDB fails, cards retain the manifest poster without cropping it to fill a
 landscape frame; German UI does not use English manifest copy as an overview.
 Basic TMDB details are cached per language. The catalog row cache key was
 advanced to v4 so previously cached poster-only rows are reloaded. To roll
-back Web `1.0.058`, deploy the previous Web image; no backend migration is
+back Web `1.0.059`, deploy the previous Web image; no backend migration is
 needed.
+
+Each franchise browser exposes three tabs in this order:
+
+- Timeline: direct chronological MystreamNet manifest, preserving manifest order.
+- Movies: separate movie catalog plus curated/TMDB/MDBList movie fallbacks,
+  sorted by TMDB popularity.
+- Series: separate series catalog plus curated/MDBList series fallbacks,
+  sorted by TMDB popularity.
+
+Runtime/minute labels are intentionally hidden in the Series and Timeline tabs.
 
 ## Deployment
 

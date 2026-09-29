@@ -12,6 +12,7 @@ import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
 import { localize, t, translateUiText } from "@/lib/i18n";
+import type { UiLanguage } from "@/lib/i18n";
 import { RailScroller } from "@/components/media/RailScroller";
 
 const collectionGroupTitles: Record<string, string> = {
@@ -58,7 +59,14 @@ function catalogForMediaType(
     id: `${catalog.id}:${mediaType}`,
     mediaType,
     collectionSources: catalog.collectionSources
-      ?.filter((source) => sourceSupportsMediaType(source, mediaType))
+      ?.filter(
+        (source) =>
+          source.collectionTab !== "timeline" &&
+          (source.collectionTab === undefined ||
+            source.collectionTab ===
+              (mediaType === "movie" ? "movie" : "series")) &&
+          sourceSupportsMediaType(source, mediaType),
+      )
       .map((source) => {
         const declared = String(source.mediaType ?? "")
           .trim()
@@ -68,6 +76,17 @@ function catalogForMediaType(
           : source;
       }),
   };
+}
+
+function timelineTitle(catalogId: string, language: UiLanguage) {
+  const normalized = catalogId.toLowerCase();
+  if (normalized.includes("marvel")) {
+    return localize(language, "MCU-Timeline", "MCU Timeline");
+  }
+  if (normalized.includes("dc")) {
+    return localize(language, "DCU-Timeline", "DCU Timeline");
+  }
+  return localize(language, "Saga-Timeline", "Saga Timeline");
 }
 
 function CollectionBrowser({
@@ -94,14 +113,33 @@ function CollectionBrowser({
   const supportsSeries =
     String(catalog.collectionGroup ?? "").toUpperCase() === "NETWORK" ||
     Boolean(seriesCatalog.collectionSources?.length);
-  const [mediaType, setMediaType] = useState<MediaItem["mediaType"]>(
-    supportsMovies ? "movie" : "tv",
+  const timelineCatalog = useMemo(
+    () => ({
+      ...catalog,
+      id: `${catalog.id}:timeline`,
+      collectionSources: catalog.collectionSources?.filter(
+        (source) => source.collectionTab === "timeline",
+      ),
+    }),
+    [catalog],
   );
-  const activeCatalog = mediaType === "movie" ? movieCatalog : seriesCatalog;
+  const supportsTimeline = Boolean(timelineCatalog.collectionSources?.length);
+  const [collectionTab, setCollectionTab] = useState<
+    MediaItem["mediaType"] | "timeline"
+  >(supportsTimeline ? "timeline" : supportsMovies ? "movie" : "tv");
+  const activeCatalog =
+    collectionTab === "timeline"
+      ? timelineCatalog
+      : collectionTab === "movie"
+        ? movieCatalog
+        : seriesCatalog;
 
   useEffect(() => {
+    setCollectionTab(
+      supportsTimeline ? "timeline" : supportsMovies ? "movie" : "tv",
+    );
     window.scrollTo({ top: 0, behavior: "auto" });
-  }, [catalog.id]);
+  }, [catalog.id, supportsMovies, supportsTimeline]);
 
   return (
     <section className="collection-browser">
@@ -111,17 +149,26 @@ function CollectionBrowser({
       </button>
       {supportsMovies && supportsSeries && (
         <div className="collection-tabs" role="tablist">
+          {supportsTimeline && (
+            <button
+              type="button"
+              className={collectionTab === "timeline" ? "is-active" : ""}
+              onClick={() => setCollectionTab("timeline")}
+            >
+              {timelineTitle(catalog.id, settings.uiLanguage)}
+            </button>
+          )}
           <button
             type="button"
-            className={mediaType === "movie" ? "is-active" : ""}
-            onClick={() => setMediaType("movie")}
+            className={collectionTab === "movie" ? "is-active" : ""}
+            onClick={() => setCollectionTab("movie")}
           >
             {localize(settings.uiLanguage, "Filme", "Movies")}
           </button>
           <button
             type="button"
-            className={mediaType === "tv" ? "is-active" : ""}
-            onClick={() => setMediaType("tv")}
+            className={collectionTab === "tv" ? "is-active" : ""}
+            onClick={() => setCollectionTab("tv")}
           >
             {localize(settings.uiLanguage, "Serien", "Series")}
           </button>
@@ -131,7 +178,10 @@ function CollectionBrowser({
         key={activeCatalog.id}
         catalog={activeCatalog}
         eager
-        mediaTypeFilter={mediaType}
+        mediaTypeFilter={
+          collectionTab === "timeline" ? undefined : collectionTab
+        }
+        hideRuntime={collectionTab === "tv" || collectionTab === "timeline"}
         focusFirstItem
         onOpen={onOpen}
         onFocus={onHero}

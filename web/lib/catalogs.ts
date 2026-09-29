@@ -106,9 +106,11 @@ function addonSource(
   addonCatalogType: string,
   addonCatalogId: string,
   addonManifestUrl?: string,
+  collectionTab?: "movie" | "series" | "timeline",
 ): NonNullable<CatalogConfig["collectionSources"]>[number] {
   return {
     kind: "ADDON_CATALOG",
+    collectionTab,
     addonId,
     addonCatalogType,
     addonCatalogId,
@@ -150,12 +152,18 @@ function mdblistAddonSource(
   return addonSource("aio-metadata", addonCatalogType, addonCatalogId);
 }
 
-function mdblistPublicSource(mdblistSlug: string) {
-  return { kind: "MDBLIST_PUBLIC", mdblistSlug };
+function mdblistPublicSource(
+  mdblistSlug: string,
+  collectionTab?: "movie" | "series" | "timeline",
+) {
+  return { kind: "MDBLIST_PUBLIC", mdblistSlug, collectionTab };
 }
 
-function curatedSource(...curatedRefs: string[]) {
-  return { kind: "CURATED_IDS", curatedRefs };
+function curatedSource(
+  curatedRefs: string[],
+  collectionTab?: "movie" | "series" | "timeline",
+) {
+  return { kind: "CURATED_IDS", curatedRefs, collectionTab };
 }
 
 const marvelCuratedRefs = [
@@ -564,35 +572,110 @@ const androidCollectionDefaults: CatalogConfig[] = [
       Marvel: [
         addonSource(
           "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-          "Marvel",
+          "movie",
+          "movies",
+          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+          "movie",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+          "series",
+          "series",
+          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+          "series",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+          "all",
           "marvel-mcu",
           "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
+          "timeline",
         ),
-        curatedSource(...marvelCuratedRefs),
-        { kind: "TMDB_COLLECTION", tmdbCollectionId: 86311 },
-        mdblistPublicSource("lt3dave/marvel-cinematic-universe-mcu-collection"),
-        mdblistPublicSource("at0microuton/mcu-tv-shows"),
+        curatedSource(
+          marvelCuratedRefs.filter((ref) => ref.startsWith("movie:")),
+          "movie",
+        ),
+        {
+          kind: "TMDB_COLLECTION",
+          tmdbCollectionId: 86311,
+          collectionTab: "movie" as const,
+        },
+        curatedSource(
+          marvelCuratedRefs.filter((ref) => ref.startsWith("tv:")),
+          "series",
+        ),
+        mdblistPublicSource(
+          "lt3dave/marvel-cinematic-universe-mcu-collection",
+          "movie",
+        ),
+        mdblistPublicSource("at0microuton/mcu-tv-shows", "series"),
       ],
       "DC Universe": [
         addonSource(
           "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-          "DC",
+          "movie",
+          "dc-movies",
+          "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
+          "movie",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+          "series",
+          "dc-series",
+          "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
+          "series",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+          "all",
           "dc-chronological",
           "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
+          "timeline",
         ),
-        curatedSource(...dcCuratedRefs),
-        mdblistPublicSource("kingkearney/dc-universe"),
-        mdblistPublicSource("kraftynic/dc-tv-shows1"),
+        curatedSource(
+          dcCuratedRefs.filter((ref) => ref.startsWith("movie:")),
+          "movie",
+        ),
+        curatedSource(
+          dcCuratedRefs.filter((ref) => ref.startsWith("tv:")),
+          "series",
+        ),
+        mdblistPublicSource("kraftynic/dc-tv-shows1", "series"),
       ],
       "Star Wars": [
         addonSource(
           "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-          "StarWars",
+          "movie",
+          "movies",
+          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
+          "movie",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+          "series",
+          "series",
+          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
+          "series",
+        ),
+        addonSource(
+          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+          "all",
           "sw-movies-series-chronological",
           "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
+          "timeline",
         ),
-        curatedSource(...starWarsCuratedRefs),
-        mdblistPublicSource("jxduffy/star-wars-chronological-order"),
+        curatedSource(
+          starWarsCuratedRefs.filter((ref) => ref.startsWith("movie:")),
+          "movie",
+        ),
+        curatedSource(
+          starWarsCuratedRefs.filter((ref) => ref.startsWith("tv:")),
+          "series",
+        ),
+        mdblistPublicSource(
+          "jxduffy/star-wars-chronological-order",
+          "timeline",
+        ),
       ],
       "James Bond": [
         mdblistAddonSource("movie", "mdblist.7947"),

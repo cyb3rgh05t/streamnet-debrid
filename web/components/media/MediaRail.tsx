@@ -13,12 +13,14 @@ export function MediaRail({
   onFocus,
   posterMode,
   focusFirstItem = false,
+  hideRuntime = false,
 }: {
   category: Category;
   onOpen: (item: MediaItem) => void;
   onFocus?: (item: MediaItem) => void;
   posterMode?: boolean;
   focusFirstItem?: boolean;
+  hideRuntime?: boolean;
 }) {
   const { settings } = useApp();
   const title = translateUiText(settings.uiLanguage, category.title);
@@ -44,6 +46,7 @@ export function MediaRail({
             posterMode={effectivePosterMode}
             autoFocus={focusFirstItem && index === 0}
             showWatched={showWatched}
+            hideRuntime={hideRuntime}
           />
         ))}
       </RailScroller>

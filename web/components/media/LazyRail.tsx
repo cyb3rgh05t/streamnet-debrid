@@ -23,6 +23,7 @@ export function LazyRail({
   onEmpty,
   mediaTypeFilter,
   focusFirstItem = false,
+  hideRuntime = false,
 }: {
   catalog: CatalogConfig;
   eager?: boolean;
@@ -33,6 +34,7 @@ export function LazyRail({
   onEmpty?: () => void;
   mediaTypeFilter?: MediaItem["mediaType"];
   focusFirstItem?: boolean;
+  hideRuntime?: boolean;
 }) {
   const { loadCatalogRow, settings } = useApp();
   const cacheKey = catalogCacheKey(catalog, settings.language);
@@ -123,6 +125,7 @@ export function LazyRail({
         onFocus={onFocus}
         posterMode={effectivePosterMode}
         focusFirstItem={focusFirstItem}
+        hideRuntime={hideRuntime}
       />
     );
   }

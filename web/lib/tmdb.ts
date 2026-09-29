@@ -47,6 +47,7 @@ type TmdbItem = {
   budget?: number;
   revenue?: number;
   original_language?: string;
+  popularity?: number;
   genres?: Array<{ id: number; name: string }>;
   networks?: Array<{ id: number; name?: string; logo_path?: string | null }>;
   production_companies?: Array<{
@@ -223,6 +224,7 @@ export function mapTmdbItem(
     year: yearFrom(date),
     releaseDate: date ?? null,
     rating: item.vote_average ? item.vote_average.toFixed(1) : "",
+    popularity: item.popularity ?? 0,
     duration: runtime ? `${runtime}m` : "",
     mediaType,
     isAnime: animeFlag,
@@ -548,14 +550,27 @@ async function loadCollectionCatalog(
   const hasCuratedSource = sources.some(
     (source) => String(source.kind ?? "").toUpperCase() === "CURATED_IDS",
   );
+  const hasTimelineSource = sources.some(
+    (source) => source.collectionTab === "timeline",
+  );
   if (
     String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE" &&
-    !hasCuratedSource
+    !hasCuratedSource &&
+    !hasTimelineSource
   ) {
     return items.sort((left, right) =>
       (left.releaseDate ?? "9999-99-99").localeCompare(
         right.releaseDate ?? "9999-99-99",
       ),
+    );
+  }
+  if (!hasTimelineSource) {
+    return items.sort(
+      (left, right) =>
+        (right.popularity ?? 0) - (left.popularity ?? 0) ||
+        (right.rating ? Number(right.rating) : 0) -
+          (left.rating ? Number(left.rating) : 0) ||
+        left.title.localeCompare(right.title),
     );
   }
   return items;
@@ -891,7 +906,10 @@ async function loadAddonCatalog(
       candidate.name === catalog.addonName ||
       candidate.manifestUrl === catalog.sourceUrl,
   );
-  const manifestUrl = addon?.manifestUrl || catalog.sourceUrl;
+  // Direct franchise collections are authoritative about their manifest URL.
+  // An older installed addon with the same id may point at a smaller/legacy
+  // catalog; using it here makes the collection shrink when the addon exists.
+  const manifestUrl = catalog.sourceUrl || addon?.manifestUrl;
   const catalogType =
     catalog.addonCatalogType ||
     (catalog.mediaType === "tv"
@@ -902,11 +920,20 @@ async function loadAddonCatalog(
   const catalogId = catalog.addonCatalogId || catalog.sourceRef || catalog.id;
   if (!manifestUrl || !catalogId) return [];
   const base = manifestUrl.replace(/\/manifest\.json$/, "").replace(/\/+$/, "");
-  const url = proxiedUrl(
-    `${base}/catalog/${encodeURIComponent(catalogType)}/${encodeURIComponent(catalogId)}.json`,
+  const catalogTypes =
+    catalog.addonCatalogType === "all"
+      ? ["movie"]
+      : [catalog.addonCatalogType || "movie"];
+  const payloads = await Promise.all(
+    catalogTypes.map((type) =>
+      jsonRequest<{ metas?: StremioMeta[] }>(
+        proxiedUrl(
+          `${base}/catalog/${encodeURIComponent(type)}/${encodeURIComponent(catalogId)}.json`,
+        ),
+      ),
+    ),
   );
-  const payload = await jsonRequest<{ metas?: StremioMeta[] }>(url);
-  const metas = payload.metas ?? [];
+  const metas = payloads.flatMap((payload) => payload.metas ?? []);
   const directCollection =
     catalog.id.startsWith("collection-addon-") && Boolean(catalog.sourceUrl);
   const hydrated = await Promise.all(

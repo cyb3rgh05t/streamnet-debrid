@@ -89,6 +89,7 @@ function MediaCardBase({
   posterMode,
   autoFocus = false,
   showWatched = true,
+  hideRuntime = false,
 }: {
   item: MediaItem;
   onOpen: (item: MediaItem) => void;
@@ -96,6 +97,7 @@ function MediaCardBase({
   posterMode?: boolean;
   autoFocus?: boolean;
   showWatched?: boolean;
+  hideRuntime?: boolean;
 }) {
   const { settings, isWatched, isPartiallyWatched, openContextMenu } = useApp();
   const effectivePosterMode =
@@ -412,7 +414,7 @@ function MediaCardBase({
         : !episode && (
             <div className="card-meta-row">
               <span className="card-date">{dateLabel}</span>
-              {runtimeLabel && (
+              {runtimeLabel && !hideRuntime && (
                 <span className="card-runtime">{runtimeLabel}</span>
               )}
             </div>
@@ -431,6 +433,7 @@ export const MediaCard = memo(
     prev.posterMode === next.posterMode &&
     prev.autoFocus === next.autoFocus &&
     prev.showWatched === next.showWatched &&
+    prev.hideRuntime === next.hideRuntime &&
     prev.onOpen === next.onOpen &&
     prev.onFocus === next.onFocus,
 );

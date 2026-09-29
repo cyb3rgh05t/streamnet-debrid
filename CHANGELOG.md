@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.059] - 2026-09-29
+
+- Marvel, DC Universe und Star Wars haben jetzt drei Collection-Tabs: Timeline, Filme und Serien. Timeline steht zuerst.
+- Timeline verwendet ausschließlich die direkten chronologischen MystreamNet-Manifeste und bewahrt deren Reihenfolge. Filme und Serien verwenden getrennte Release-Order-/TMDB-/MDBList-/kuratierte Quellen.
+- Film- und Serienkarten werden nach TMDB-Popularität sortiert; Timeline-Karten bleiben chronologisch. Laufzeit-/Minutenlabels werden in Serien- und Timeline-Tabs ausgeblendet.
+- Der direkte Manifest-URL bleibt auch bei einem alten installierten Addon maßgeblich, damit ein veralteter Addon-Katalog die Collection nicht verkleinert.
+- Web-Version: `1.0.059`.
+
 ## [Web 1.0.058] - 2026-09-28
 
 - Marvel-, DC- und Star-Wars-Franchise-Kataloge lösen ihre IMDb-Manifest-IDs vor der Anzeige zu TMDB-IDs auf. TMDB liefert damit breite Backdrops und Beschreibungen in der eingestellten App-Sprache statt hochkantiger Addon-Poster oder englischer Platzhaltertexte.

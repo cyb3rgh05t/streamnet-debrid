@@ -115,7 +115,7 @@ test("Web fallback catalogs follow the current Android order", async () => {
   );
 });
 
-test("Marvel addon chronology is the primary web source with fallbacks retained", async () => {
+test("Marvel release-order sources and chronology timeline retain fallbacks", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
   const rail = defaultCatalogs.find(
     (catalog) => catalog.id === "collection_franchise_marvel",
@@ -123,10 +123,30 @@ test("Marvel addon chronology is the primary web source with fallbacks retained"
   const sources = rail?.collectionSources ?? [];
 
   assert.equal(sources[0]?.kind, "ADDON_CATALOG");
-  assert.equal(sources[0]?.addonCatalogId, "marvel-mcu");
+  assert.equal(sources[0]?.addonCatalogId, "movies");
+  assert.equal(sources[0]?.collectionTab, "movie");
   assert.equal(
     sources[0]?.addonManifestUrl,
-    "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
+    "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+  );
+  assert.equal(
+    sources.some(
+      (source) =>
+        source.kind === "ADDON_CATALOG" &&
+        source.addonCatalogId === "series" &&
+        source.collectionTab === "series",
+    ),
+    true,
+  );
+  assert.equal(
+    sources.some(
+      (source) =>
+        source.kind === "ADDON_CATALOG" &&
+        source.addonCatalogId === "marvel-mcu" &&
+        source.addonCatalogType === "all" &&
+        source.collectionTab === "timeline",
+    ),
+    true,
   );
   assert.equal(
     sources.some((source) => source.kind === "CURATED_IDS"),
@@ -167,10 +187,22 @@ test("DC and Star Wars use their MystreamNet chronological manifests", async () 
     const sources =
       defaultCatalogs.find((catalog) => catalog.id === expected.id)
         ?.collectionSources ?? [];
-    assert.equal(sources[0]?.kind, "ADDON_CATALOG");
-    assert.equal(sources[0]?.addonId, expected.manifestId);
-    assert.equal(sources[0]?.addonCatalogId, expected.catalogId);
-    assert.equal(sources[0]?.addonManifestUrl, expected.manifestUrl);
+    const timeline = sources.find(
+      (source) => source.collectionTab === "timeline",
+    );
+    assert.equal(timeline?.kind, "ADDON_CATALOG");
+    assert.equal(timeline?.addonId, expected.manifestId);
+    assert.equal(timeline?.addonCatalogId, expected.catalogId);
+    assert.equal(timeline?.addonCatalogType, "all");
+    assert.equal(timeline?.addonManifestUrl, expected.manifestUrl);
+    assert.equal(
+      sources.some((source) => source.collectionTab === "movie"),
+      true,
+    );
+    assert.equal(
+      sources.some((source) => source.collectionTab === "series"),
+      true,
+    );
     assert.equal(
       sources.some((source) => source.kind === "CURATED_IDS"),
       true,
@@ -247,6 +279,87 @@ test("direct franchise IMDb entries use localized TMDB overviews and landscape a
     assert.match(german.items[0].backdrop, /wide\.jpg$/);
     assert.equal(english.items[0].overview, "English description");
     assert.deepEqual(requestedLanguages, ["de-DE", "en-US"]);
+  } finally {
+    global.fetch = previousFetch;
+    global.window = previousWindow;
+  }
+});
+
+test("direct franchise manifest remains authoritative over an installed legacy addon URL", async () => {
+  const { loadCatalog } = await import(
+    pathToFileURL(path.join(__dirname, "..", "lib", "tmdb.ts")).href
+  );
+  const previousWindow = global.window;
+  const previousFetch = global.fetch;
+  global.window = { location: { origin: "http://localhost" } };
+  const requestedUrls = [];
+  global.fetch = async (url) => {
+    requestedUrls.push(String(url));
+    const request = new URL(url);
+    if (request.pathname === "/api/proxy") {
+      return Response.json({
+        metas: [
+          {
+            id: "tt0371746",
+            type: "movie",
+            name: "Iron Man",
+            poster: "portrait.jpg",
+          },
+        ],
+      });
+    }
+    if (request.pathname === "/api/tmdb/find/tt0371746") {
+      return Response.json({ movie_results: [{ id: 1726 }] });
+    }
+    if (request.pathname === "/api/tmdb/movie/1726") {
+      return Response.json({
+        id: 1726,
+        title: "Iron Man",
+        overview: "Iron Man",
+        poster_path: "/portrait.jpg",
+        backdrop_path: "/wide.jpg",
+      });
+    }
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    await loadCatalog(
+      {
+        id: "collection_franchise_marvel",
+        name: "Marvel",
+        kind: "COLLECTION",
+        enabled: true,
+        collectionSources: [
+          {
+            kind: "ADDON_CATALOG",
+            addonId: "marvel",
+            addonManifestUrl:
+              "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
+            addonCatalogType: "movie",
+            addonCatalogId: "marvel-mcu",
+            mediaType: "movie",
+          },
+        ],
+      },
+      "de-DE",
+      [
+        {
+          id: "marvel",
+          name: "Marvel",
+          manifestUrl: "https://legacy.example/manifest.json",
+          enabled: true,
+          isEnabled: true,
+        },
+      ],
+    );
+    assert.equal(
+      requestedUrls.some((url) => url.includes("marvel.mystreamnet.club")),
+      true,
+    );
+    assert.equal(
+      requestedUrls.some((url) => url.includes("legacy.example")),
+      false,
+    );
   } finally {
     global.fetch = previousFetch;
     global.window = previousWindow;
