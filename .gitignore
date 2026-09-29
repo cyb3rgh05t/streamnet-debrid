@@ -31,6 +31,7 @@ proguard/
 # Log Files
 *.log
 /docs/superpowers/*.md
+/streamnzb/*.*
 
 # Android Studio Navigation editor temp files
 .navigation/
