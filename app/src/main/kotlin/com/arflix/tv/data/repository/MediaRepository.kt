@@ -283,6 +283,8 @@ class MediaRepository @Inject constructor(
         synchronized(similarCache) { similarCache.clear() }
         synchronized(logoCache) { logoCache.clear() }
         homeServerLogoRefCache.clear()
+        collectionRefsCache.clear()
+        franchisePopularityCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
         imdbRatingMisses.clear()
@@ -314,6 +316,19 @@ class MediaRepository @Inject constructor(
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val homeServerLogoRefCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val collectionRefsCache = ConcurrentHashMap<String, CacheEntry<List<Pair<MediaType, Int>>>>()
+    private data class FranchisePopularityScore(
+        val popularity: Float,
+        val voteAverage: Float,
+        val title: String
+    )
+    private data class RankedFranchiseRef(
+        val ref: Pair<MediaType, Int>,
+        val score: FranchisePopularityScore,
+        val sourceIndex: Int
+    )
+    private val franchisePopularityCache = ConcurrentHashMap<String, CacheEntry<FranchisePopularityScore>>()
+    private val franchisePopularitySemaphore = Semaphore(6)
+    private val FRANCHISE_POPULARITY_LOOKAHEAD = 32
 
     private fun <T> getFromCache(cache: Map<String, CacheEntry<T>>, key: String): T? {
         val entry = cache[key] ?: return null
@@ -372,6 +387,8 @@ class MediaRepository @Inject constructor(
             append('|')
             catalog.collectionSources.forEach { source ->
                 append(source.kind.name)
+                append(':')
+                append(source.collectionTab.orEmpty())
                 append(':')
                 append(source.mediaType.orEmpty())
                 append(':')
@@ -474,6 +491,21 @@ class MediaRepository @Inject constructor(
             // Drain any remaining so pagination beyond the first page still has items.
             movieQueue.forEach { refs.add(it) }
             tvQueue.forEach { refs.add(it) }
+        } else if (
+            catalog.collectionGroup == CollectionGroupKind.FRANCHISE &&
+            catalog.collectionSources.none { it.collectionTab == "timeline" }
+        ) {
+            val sourceQueues = perSourceRefs.map { ArrayDeque(it) }
+            var hasQueuedRefs = true
+            while (hasQueuedRefs) {
+                hasQueuedRefs = false
+                sourceQueues.forEach { queue ->
+                    if (queue.isNotEmpty()) {
+                        refs.add(queue.removeFirst())
+                        hasQueuedRefs = true
+                    }
+                }
+            }
         } else {
             perSourceRefs.forEach { sourceRefs ->
                 sourceRefs.forEach { refs.add(it) }
@@ -992,8 +1024,13 @@ class MediaRepository @Inject constructor(
             // after /lists/ — e.g. "jxduffy/star-wars-chronological-order". Used
             // as a completeness fill-in behind curated lists: curated entries win
             // the ordering; mdblist-only items get appended at the end.
-            fun mdblistSource(slug: String, mediaType: String? = null) = CollectionSourceConfig(
+            fun mdblistSource(
+                slug: String,
+                mediaType: String? = null,
+                collectionTab: String? = null
+            ) = CollectionSourceConfig(
                 kind = CollectionSourceKind.MDBLIST_PUBLIC,
+                collectionTab = collectionTab,
                 mediaType = mediaType,
                 mdblistSlug = slug
             )
@@ -1337,9 +1374,8 @@ class MediaRepository @Inject constructor(
                         "tv:105248",     // Peacemaker
                         "tv:116244"      // The Penguin
                     ),
-                    // DCEU film list + DC TV list (both community-curated).
-                    mdblistSource("kingkearney/dc-universe"),
-                    mdblistSource("kraftynic/dc-tv-shows1")
+                    // Community-curated DC TV list, matching the Web fallback.
+                    mdblistSource("kraftynic/dc-tv-shows1", mediaType = "series")
                 )
             ),
             collection(
@@ -1415,10 +1451,11 @@ class MediaRepository @Inject constructor(
                         "tv:114471",     // Ironheart
                         "movie:617126"   // The Fantastic Four: First Steps
                     ),
+                    tmdbCollectionSource(86311),
                     // Fill-in from mdblist — covers late-phase releases and
                     // the live-action MCU TV catalog (separate list so both
                     // flows populate from community-curated sources).
-                    mdblistSource("lt3dave/marvel-cinematic-universe-mcu-collection"),
+                    mdblistSource("lt3dave/marvel-cinematic-universe-mcu-collection", mediaType = "movie"),
                     mdblistSource("at0microuton/mcu-tv-shows", mediaType = "series")
                 )
             ),
@@ -1484,7 +1521,7 @@ class MediaRepository @Inject constructor(
                     // Fill-in from the community-maintained Star Wars list so
                     // upcoming titles (Mandalorian & Grogu, Starfighter etc.)
                     // show up without a code change each time one is added.
-                    mdblistSource("jxduffy/star-wars-chronological-order")
+                    mdblistSource("jxduffy/star-wars-chronological-order", collectionTab = "timeline")
                 )
             ),
             collection(
@@ -1833,6 +1870,7 @@ class MediaRepository @Inject constructor(
                 return (primary + fallback).distinctBy { source ->
                     listOf(
                         source.kind.name,
+                        source.collectionTab.orEmpty(),
                         source.mediaType.orEmpty(),
                         source.addonId.orEmpty(),
                         source.addonManifestUrl.orEmpty(),
@@ -1921,6 +1959,7 @@ class MediaRepository @Inject constructor(
                 topLevelCatalogs.find { it.id == "favorite_tv" },
                 railsByGroup[CollectionGroupKind.SERVICE],
                 railsByGroup[CollectionGroupKind.FRANCHISE],
+                railsByGroup[CollectionGroupKind.DECADE],
                 topLevelCatalogs.find { it.id == "trending_movies" },
                 topLevelCatalogs.find { it.id == "top10_movies_today" },
                 topLevelCatalogs.find { it.id == "top_movies_week" },
@@ -2406,11 +2445,19 @@ class MediaRepository @Inject constructor(
             return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
         }
 
-        val refs = resolveCollectionCatalogRefs(
+        val resolvedRefs = resolveCollectionCatalogRefs(
             catalog = catalog,
             requiredCount = (offset + limit).coerceAtLeast(limit)
         )
-        if (refs.isEmpty()) return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
+        if (resolvedRefs.isEmpty()) return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
+        val refs = if (
+            catalog.collectionGroup == CollectionGroupKind.FRANCHISE &&
+            catalog.collectionSources.none { it.collectionTab == "timeline" }
+        ) {
+            rankFranchiseRefsByPopularity(resolvedRefs)
+        } else {
+            resolvedRefs
+        }
 
         val pageRefs = refs.drop(offset).take(limit)
         val itemsByRef = LinkedHashMap<Pair<MediaType, Int>, MediaItem>()
@@ -2443,6 +2490,53 @@ class MediaRepository @Inject constructor(
         val items = pageRefs.mapNotNull { itemsByRef[it] }
         if (items.isNotEmpty()) cacheItems(items)
         CategoryPageResult(items = items, hasMore = offset + pageRefs.size < refs.size)
+    }
+
+    private suspend fun rankFranchiseRefsByPopularity(
+        refs: List<Pair<MediaType, Int>>
+    ): List<Pair<MediaType, Int>> = coroutineScope {
+        val candidateCount = minOf(FRANCHISE_POPULARITY_LOOKAHEAD, refs.size)
+        val candidates = refs.take(candidateCount)
+        val ranked = candidates.mapIndexed { sourceIndex, ref ->
+            async {
+                val cacheKey = detailsCacheKey(ref.first, ref.second)
+                val score = getFromCache(franchisePopularityCache, cacheKey)
+                    ?: getCachedItem(ref.first, ref.second)
+                        ?.takeIf { it.popularity > 0f }
+                        ?.let {
+                            FranchisePopularityScore(
+                                popularity = it.popularity,
+                                voteAverage = it.tmdbRating.toFloatOrNull() ?: 0f,
+                                title = it.title
+                            )
+                        }
+                    ?: franchisePopularitySemaphore.withPermit {
+                        runCatching {
+                            when (ref.first) {
+                                MediaType.MOVIE -> tmdbApi.getMovieDetails(
+                                    ref.second,
+                                    apiKey,
+                                    language = contentLanguage
+                                ).let { FranchisePopularityScore(it.popularity, it.voteAverage, it.title) }
+                                MediaType.TV -> tmdbApi.getTvDetails(
+                                    ref.second,
+                                    apiKey,
+                                    language = contentLanguage
+                                ).let { FranchisePopularityScore(it.popularity, it.voteAverage, it.name) }
+                            }
+                        }.getOrNull()?.also {
+                            franchisePopularityCache[cacheKey] = CacheEntry(it, System.currentTimeMillis())
+                        } ?: FranchisePopularityScore(0f, 0f, "")
+                    }
+                RankedFranchiseRef(ref, score, sourceIndex)
+            }
+        }.awaitAll().sortedWith(
+            compareByDescending<RankedFranchiseRef> { it.score.popularity }
+                .thenByDescending { it.score.voteAverage }
+                .thenBy { it.score.title.lowercase(Locale.US) }
+                .thenBy { it.sourceIndex }
+        )
+        ranked.map { it.ref } + refs.drop(candidateCount)
     }
 
     private suspend fun resolveCollectionSourceRefs(
@@ -2545,6 +2639,11 @@ class MediaRepository @Inject constructor(
         } ?: return emptyList()
         val array = try { org.json.JSONArray(body) } catch (e: org.json.JSONException) { null } ?: return emptyList()
         val refs = mutableListOf<Pair<MediaType, Int>>()
+        val requestedType = when (source.mediaType?.trim()?.lowercase(Locale.US)) {
+            "movie", "film" -> MediaType.MOVIE
+            "series", "tv", "show", "anime" -> MediaType.TV
+            else -> null
+        }
         for (i in 0 until array.length()) {
             val obj = array.optJSONObject(i) ?: continue
             val id = obj.optInt("id", -1).takeIf { it > 0 } ?: continue
@@ -2553,6 +2652,7 @@ class MediaRepository @Inject constructor(
                 "show", "series", "tv" -> MediaType.TV
                 else -> continue
             }
+            if (requestedType != null && type != requestedType) continue
             refs.add(type to id)
             if (refs.size >= limit) break
         }
@@ -4521,7 +4621,7 @@ private fun TmdbMediaItem.toMediaItem(defaultType: MediaType): MediaItem {
     )
 }
 
-private fun TmdbMovieDetails.toMediaItem(): MediaItem {
+internal fun TmdbMovieDetails.toMediaItem(): MediaItem {
     val year = releaseDate?.take(4) ?: ""
     val hours = (runtime ?: 0) / 60
     val minutes = (runtime ?: 0) % 60
@@ -4549,11 +4649,12 @@ private fun TmdbMovieDetails.toMediaItem(): MediaItem {
         originalLanguage = originalLanguage,
         certification = certification.takeIf { it.isNotEmpty() },
         budget = budget,
-        genreIds = genres.map { it.id }
+        genreIds = genres.map { it.id },
+        popularity = popularity
     )
 }
 
-private fun TmdbTvDetails.toMediaItem(): MediaItem {
+    internal fun TmdbTvDetails.toMediaItem(): MediaItem {
     val year = firstAirDate?.take(4) ?: ""
     val runtime = episodeRunTime.firstOrNull() ?: 45
     val duration = "${runtime}m"
@@ -4590,7 +4691,8 @@ private fun TmdbTvDetails.toMediaItem(): MediaItem {
         totalEpisodes = actualSeasonCount,
         seriesEpisodeCount = numberOfEpisodes.takeIf { it > 0 },
         status = status,
-        genreIds = genres.map { it.id }
+        genreIds = genres.map { it.id },
+        popularity = popularity
     )
 }
 

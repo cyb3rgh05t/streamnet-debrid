@@ -210,10 +210,12 @@ internal fun isEnabledVodStreamingAddon(addon: Addon): Boolean {
 }
 
 internal fun isCollectionOnlyAddon(addon: Addon): Boolean {
-    val manifestIds = CollectionTemplateManifest.collectionOnlyAddonManifestIdsForCleanup()
-    val manifestId = addon.manifest?.id
-    return addon.id in manifestIds || manifestId in manifestIds ||
-        manifestIds.any { id -> addon.id.startsWith("${id}_") }
+    return CollectionTemplateManifest.isCollectionOnlyAddonIdentifier(
+        addon.id,
+        addon.manifest?.id,
+        addon.url,
+        addon.transportUrl
+    )
 }
 
 internal fun usesSlowAggregatorTimeout(addon: Addon): Boolean {

@@ -94,6 +94,38 @@ function collectionRail(
   };
 }
 
+export type HomeCatalogEntry =
+  | { type: "catalog"; catalog: CatalogConfig }
+  | { type: "group"; group: string; catalogs: CatalogConfig[] };
+
+export function buildHomeCatalogEntries(
+  catalogs: CatalogConfig[],
+): HomeCatalogEntry[] {
+  const visibleCatalogs = catalogs.filter((catalog) => {
+    const group = String(catalog.collectionGroup ?? "").toUpperCase();
+    return catalog.enabled !== false && group !== "FEATURED";
+  });
+  const groups = new Map<string, CatalogConfig[]>();
+  for (const catalog of visibleCatalogs) {
+    if (String(catalog.kind ?? "").toUpperCase() !== "COLLECTION") continue;
+    const group = String(catalog.collectionGroup ?? "FEATURED").toUpperCase();
+    groups.set(group, [...(groups.get(group) ?? []), catalog]);
+  }
+
+  return visibleCatalogs.flatMap<HomeCatalogEntry>((catalog) => {
+    const kind = String(catalog.kind ?? "").toUpperCase();
+    if (kind === "COLLECTION") return [];
+    if (kind === "COLLECTION_RAIL") {
+      const group = String(catalog.collectionGroup ?? "FEATURED").toUpperCase();
+      const groupCatalogs = groups.get(group) ?? [];
+      return groupCatalogs.length
+        ? [{ type: "group", group, catalogs: groupCatalogs }]
+        : [];
+    }
+    return [{ type: "catalog", catalog }];
+  });
+}
+
 export function collectionRailIdForGroup(group: string | null | undefined) {
   const normalized = String(group ?? "")
     .trim()
@@ -155,8 +187,9 @@ function mdblistAddonSource(
 function mdblistPublicSource(
   mdblistSlug: string,
   collectionTab?: "movie" | "series" | "timeline",
+  mediaType?: "movie" | "series",
 ) {
-  return { kind: "MDBLIST_PUBLIC", mdblistSlug, collectionTab };
+  return { kind: "MDBLIST_PUBLIC", mdblistSlug, collectionTab, mediaType };
 }
 
 function curatedSource(
@@ -457,6 +490,7 @@ const androidCollectionArtwork: Record<
 
 const androidCollectionDefaults: CatalogConfig[] = [
   collectionRail("SERVICE", "Streaming Services"),
+  collectionRail("DECADE", "Decades"),
   collectionRail("MOVIE_GENRE", "Movie Genres"),
   collectionRail("TV_GENRE", "TV Genres"),
   collectionRail("FRANCHISE", "Franchises"),
@@ -531,17 +565,17 @@ const androidCollectionDefaults: CatalogConfig[] = [
     "70's Movies",
     "60's Movies",
   ].map((title) => {
-    const ids: Record<string, string> = {
-      "20's Movies": "mdblist.91304",
-      "10's Movies": "mdblist.91303",
-      "00's Movies": "mdblist.91302",
-      "90's Movies": "mdblist.91300",
-      "80's Movies": "mdblist.91301",
-      "70's Movies": "mdblist.127962",
-      "60's Movies": "mdblist.144321",
+    const slugs: Record<string, string> = {
+      "20's Movies": "snoak/top-2020s-movies",
+      "10's Movies": "snoak/top-2010s-movies",
+      "00's Movies": "snoak/top-2000s-movies",
+      "90's Movies": "snoak/top-1990s-movies",
+      "80's Movies": "snoak/top-1980s-movies",
+      "70's Movies": "snoak/popular-1970s-movies",
+      "60's Movies": "snoak/popular-1960s-movies",
     };
     return collectionDefault(title, "DECADE", [
-      mdblistAddonSource("movie", ids[title]),
+      mdblistPublicSource(slugs[title], undefined, "movie"),
     ]);
   }),
   ...[
@@ -915,6 +949,7 @@ const defaultCatalogOrder = [
   "favorite_tv",
   "collection_rail_service",
   "collection_rail_franchise",
+  "collection_rail_decade",
   "trending_movies",
   "top10_movies_today",
   "top_movies_week",

@@ -245,14 +245,94 @@ class CatalogRepository @Inject constructor(
         return resolved
     }
 
+    private suspend fun getCatalogsIncludingHiddenForActiveProfile(): MutableList<CatalogConfig> {
+        val profileId = activeProfileId()
+        val prefs = context.settingsDataStore.data.first()
+        return readCatalogsFromPrefs(profileId, prefs, includeHidden = true).toMutableList()
+    }
+
     suspend fun getCatalogs(): List<CatalogConfig> {
         return readCatalogsForActiveProfile()
+    }
+
+    suspend fun getCatalogsForSettings(
+        defaultPreinstalled: List<CatalogConfig>,
+        addons: List<Addon>
+    ): List<CatalogConfig> {
+        val profileId = activeProfileId()
+        val prefs = context.settingsDataStore.data.first()
+        val stored = readCatalogsFromPrefs(profileId, prefs, includeHidden = true)
+            .filterNot(::isCollectionOnlyAddonCatalog)
+        val configsById = LinkedHashMap<String, CatalogConfig>()
+        stored.forEach { configsById.putIfAbsent(it.id, it) }
+        defaultPreinstalled.forEach { configsById.putIfAbsent(it.id, it) }
+        addonCatalogConfigs(addons, includeDisabled = true).forEach { configsById.putIfAbsent(it.id, it) }
+
+        val hiddenIds = decodeHiddenPreinstalled(profileId, prefs) +
+            decodeHiddenAddon(profileId, prefs) +
+            decodeHiddenHomeServer(profileId, prefs) +
+            decodeHiddenCustom(profileId, prefs)
+        return sanitizeCollectionCatalogs(configsById.values.toList()).map { catalog ->
+            catalog.copy(enabled = catalog.id !in hiddenIds)
+        }
+    }
+
+    suspend fun setCatalogEnabled(catalog: CatalogConfig, enabled: Boolean) {
+        val profileId = activeProfileId()
+        val catalogId = catalog.id.trim()
+        if (catalogId.isBlank()) return
+
+        context.settingsDataStore.edit { prefs ->
+            val hiddenKey = when {
+                isPreinstalledCatalog(catalog) -> hiddenPreinstalledKey(profileId)
+                catalog.sourceType == CatalogSourceType.ADDON -> hiddenAddonKey(profileId)
+                catalog.sourceType == CatalogSourceType.HOME_SERVER -> hiddenHomeServerKey(profileId)
+                else -> hiddenCustomKey(profileId)
+            }
+            val hiddenIds = when {
+                isPreinstalledCatalog(catalog) -> decodeHiddenPreinstalled(profileId, prefs)
+                catalog.sourceType == CatalogSourceType.ADDON -> decodeHiddenAddon(profileId, prefs)
+                catalog.sourceType == CatalogSourceType.HOME_SERVER -> decodeHiddenHomeServer(profileId, prefs)
+                else -> decodeHiddenCustom(profileId, prefs)
+            }.toMutableSet()
+            if (enabled) hiddenIds.remove(catalogId) else hiddenIds.add(catalogId)
+            prefs[hiddenKey] = if (hiddenIds.isEmpty()) "" else gson.toJson(hiddenIds.toList())
+            val storedCatalogs = parseCatalogsJson(prefs[catalogsKey(profileId)])
+            if (storedCatalogs.any { it.id == catalogId }) {
+                prefs[catalogsKey(profileId)] = gson.toJson(
+                    storedCatalogs.map { if (it.id == catalogId) it.copy(enabled = enabled) else it }
+                )
+            }
+            markCatalogsUpdated(prefs, profileId)
+        }
+        invalidationBus.markDirty(CloudSyncScope.CATALOGS, profileId, "set catalog enabled")
     }
 
     suspend fun getCatalogsForProfile(profileId: String): List<CatalogConfig> {
         val safeProfileId = profileId.trim().ifBlank { "default" }
         val prefs = context.settingsDataStore.data.first()
         return sanitizeCollectionCatalogs(readCatalogsFromPrefs(safeProfileId, prefs))
+    }
+
+    suspend fun getCatalogsForCloudSync(profileId: String, addons: List<Addon>): List<CatalogConfig> {
+        val safeProfileId = profileId.trim().ifBlank { "default" }
+        val prefs = context.settingsDataStore.data.first()
+        val catalogs = LinkedHashMap<String, CatalogConfig>()
+        readCatalogsFromPrefs(safeProfileId, prefs, includeHidden = true)
+            .filterNot(::isCollectionOnlyAddonCatalog)
+            .forEach {
+            catalogs.putIfAbsent(it.id, it)
+        }
+        addonCatalogConfigs(addons, includeDisabled = true).forEach {
+            catalogs.putIfAbsent(it.id, it)
+        }
+        val hiddenIds = decodeHiddenPreinstalled(safeProfileId, prefs) +
+            decodeHiddenAddon(safeProfileId, prefs) +
+            decodeHiddenHomeServer(safeProfileId, prefs) +
+            decodeHiddenCustom(safeProfileId, prefs)
+        return sanitizeCollectionCatalogs(catalogs.values.toList()).map { catalog ->
+            catalog.copy(enabled = catalog.id !in hiddenIds)
+        }
     }
 
     private fun isBundledPreinstalledCatalogId(catalogId: String): Boolean {
@@ -398,18 +478,6 @@ class CatalogRepository @Inject constructor(
         invalidationBus.markDirty(CloudSyncScope.CATALOGS, safeProfileId, "set hidden custom catalogs")
     }
 
-    suspend fun restoreAllHiddenCatalogsForActiveProfile() {
-        val profileId = activeProfileId()
-        context.settingsDataStore.edit { prefs ->
-            prefs[hiddenPreinstalledKey(profileId)] = ""
-            prefs[hiddenAddonKey(profileId)] = ""
-            prefs[hiddenHomeServerKey(profileId)] = ""
-            prefs[hiddenCustomKey(profileId)] = ""
-            markCatalogsUpdated(prefs, profileId)
-        }
-        invalidationBus.markDirty(CloudSyncScope.CATALOGS, profileId, "restore hidden catalogs")
-    }
-
     private suspend fun saveCatalogs(
         catalogs: List<CatalogConfig>,
         markCloudDirty: Boolean = true,
@@ -475,6 +543,11 @@ class CatalogRepository @Inject constructor(
             defaultPreinstalled.filterNot { it.id in hidden }
         }
 
+        val allStoredCatalogs = readCatalogsFromPrefs(profileId, prefs, includeHidden = true)
+        val hiddenIds = decodeHiddenPreinstalled(profileId, prefs) +
+            decodeHiddenAddon(profileId, prefs) +
+            decodeHiddenHomeServer(profileId, prefs) +
+            decodeHiddenCustom(profileId, prefs)
         val defaultIds = defaultPreinstalled.map { it.id }.toSet()
         val existing = getCatalogs().mapNotNull { cfg ->
             if ((cfg.kind == CatalogKind.COLLECTION || cfg.kind == CatalogKind.COLLECTION_RAIL) &&
@@ -548,10 +621,15 @@ class CatalogRepository @Inject constructor(
             )
         }
 
-        if (existing != merged) {
+        val mergedIds = merged.mapTo(HashSet()) { it.id }
+        val preservedHidden = allStoredCatalogs.filter {
+            it.id in hiddenIds && it.id !in mergedIds
+        }
+        val mergedForStorage = merged + preservedHidden
+        if (allStoredCatalogs != mergedForStorage) {
             // Defaults and app-version migrations are local maintenance, not a user edit.
             // Stamping them would let a fresh install outrank an existing cloud setup.
-            saveCatalogs(merged, markCloudDirty = false)
+            saveCatalogs(mergedForStorage, markCloudDirty = false)
         }
         return merged
     }
@@ -566,24 +644,9 @@ class CatalogRepository @Inject constructor(
         if (fingerprint == lastSyncedAddonFingerprint) return false
         lastSyncedAddonFingerprint = fingerprint
 
-        val hiddenAddonIds = context.settingsDataStore.data
-            .first()
-            .let { prefs -> decodeHiddenAddon(profileId, prefs) }
-        val allSupportedCatalogs = addons
-            .asSequence()
-            .filter { addon ->
-                    addon.isInstalled &&
-                    addon.isEnabled &&
-                    addon.type != AddonType.SUBTITLE &&
-                    !addon.url.isNullOrBlank() &&
-                    !addon.manifest?.catalogs.isNullOrEmpty()
-            }
-            .flatMap { addon ->
-                addon.manifest?.catalogs.orEmpty().asSequence()
-                    .mapNotNull { catalog -> buildAddonCatalogConfig(addon, catalog) }
-            }
-            .distinctBy { it.id }
-            .toList()
+        val prefs = context.settingsDataStore.data.first()
+        val hiddenAddonIds = decodeHiddenAddon(profileId, prefs)
+        val allSupportedCatalogs = addonCatalogConfigs(addons)
         val sportsAddonIds = allSupportedCatalogs
             .filter { catalog ->
                 listOf(catalog.title, catalog.addonName, catalog.addonCatalogId, catalog.addonCatalogType)
@@ -597,9 +660,9 @@ class CatalogRepository @Inject constructor(
                 prefs[hiddenAddonKey(profileId)] = gson.toJson(effectiveHiddenAddonIds.toList())
             }
         }
-        val supportedCatalogs = allSupportedCatalogs.filterNot { it.id in effectiveHiddenAddonIds }
+        val supportedCatalogs = allSupportedCatalogs
 
-        val current = getCatalogs().toMutableList()
+        val current = readCatalogsFromPrefs(profileId, prefs, includeHidden = true).toMutableList()
         val desiredById = supportedCatalogs.associateBy { it.id }
         var changed = false
 
@@ -643,6 +706,34 @@ class CatalogRepository @Inject constructor(
         return changed
     }
 
+    private fun addonCatalogConfigs(
+        addons: List<Addon>,
+        includeDisabled: Boolean = false
+    ): List<CatalogConfig> = addons
+            .asSequence()
+            .filter { addon ->
+                    addon.isInstalled &&
+                    (includeDisabled || addon.isEnabled) &&
+                    !isCollectionOnlyAddon(addon) &&
+                    addon.type != AddonType.SUBTITLE &&
+                    !addon.url.isNullOrBlank() &&
+                    !addon.manifest?.catalogs.isNullOrEmpty()
+            }
+            .flatMap { addon ->
+                addon.manifest?.catalogs.orEmpty().asSequence()
+                    .mapNotNull { catalog -> buildAddonCatalogConfig(addon, catalog) }
+            }
+            .distinctBy { it.id }
+            .toList()
+
+    private fun isCollectionOnlyAddonCatalog(catalog: CatalogConfig): Boolean =
+        catalog.sourceType == CatalogSourceType.ADDON &&
+            CollectionTemplateManifest.isCollectionOnlyAddonIdentifier(
+                catalog.addonId,
+                catalog.sourceUrl,
+                catalog.sourceRef
+            )
+
     /**
      * Builds a fingerprint for [syncAddonCatalogs] debouncing that captures all fields
      * affecting the sync outcome. Unlike the previous ID-only fingerprint, this includes:
@@ -678,16 +769,13 @@ class CatalogRepository @Inject constructor(
 
     suspend fun syncHomeServerCatalogs(candidates: List<HomeServerCatalogCandidate>): Boolean {
         val profileId = activeProfileId()
-        val hiddenHomeServerIds = context.settingsDataStore.data
-            .first()
-            .let { prefs -> decodeHiddenHomeServer(profileId, prefs) }
+        val prefs = context.settingsDataStore.data.first()
         val desiredCatalogs = candidates
             .filter { it.sourceRef.isNotBlank() && it.title.isNotBlank() }
             .map { candidate ->
                 val stableId = "home_server_${sha256Short(candidate.sourceRef)}"
                 stableId to candidate
             }
-            .filterNot { (stableId, _) -> stableId in hiddenHomeServerIds }
             .distinctBy { (stableId, _) -> stableId }
             .map { (stableId, candidate) ->
                 candidate to CatalogConfig(
@@ -701,7 +789,7 @@ class CatalogRepository @Inject constructor(
         val desiredById = desiredCatalogs.associate { (candidate, config) -> config.id to config }
         val candidateById = desiredCatalogs.associate { (candidate, config) -> config.id to candidate }
 
-        val current = getCatalogs().toMutableList()
+        val current = readCatalogsFromPrefs(profileId, prefs, includeHidden = true).toMutableList()
         var changed = false
 
         current.indices.forEach { index ->
@@ -873,7 +961,11 @@ class CatalogRepository @Inject constructor(
         return Result.success(manifest)
     }
 
-    suspend fun addCatalogPack(packUrl: String, manifest: CatalogPackManifest? = null): Result<CatalogPackManifest> {
+    suspend fun addCatalogPack(
+        packUrl: String,
+        manifest: CatalogPackManifest? = null,
+        catalogsInSettings: List<CatalogConfig>? = null
+    ): Result<CatalogPackManifest> {
         val finalManifest = if (manifest != null) {
             manifest
         } else {
@@ -882,7 +974,7 @@ class CatalogRepository @Inject constructor(
             manifestResult.getOrThrow()
         }
 
-        val current = getCatalogs().toMutableList()
+        val current = (catalogsInSettings ?: getCatalogs()).toMutableList()
         val addedConfigs = mutableListOf<CatalogConfig>()
 
         val manifestId = finalManifest.id ?: return Result.failure(IllegalArgumentException("Manifest missing ID"))
@@ -934,7 +1026,7 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun removeCatalogPack(packId: String): Result<Unit> {
-        val current = getCatalogs().toMutableList()
+        val current = getCatalogsIncludingHiddenForActiveProfile()
         val targets = current.filter { it.packId == packId }
         if (targets.isEmpty()) {
             return Result.failure(IllegalArgumentException("No catalogs found for pack: $packId"))
@@ -965,7 +1057,7 @@ class CatalogRepository @Inject constructor(
             ?: fallbackMetadata(normalizedUrl, sourceType)
             ?: return Result.failure(IllegalArgumentException(context.getString(R.string.catalog_failed_read_metadata)))
 
-        val current = getCatalogs().toMutableList()
+        val current = getCatalogsIncludingHiddenForActiveProfile()
         if (current.any { it.sourceUrl.equals(normalizedUrl, ignoreCase = true) }) {
             return Result.failure(IllegalArgumentException(context.getString(R.string.catalog_already_added)))
         }
@@ -984,7 +1076,7 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun updateCustomCatalog(catalogId: String, rawUrl: String): Result<CatalogConfig> {
-        val current = getCatalogs().toMutableList()
+        val current = getCatalogsIncludingHiddenForActiveProfile()
         val index = current.indexOfFirst { it.id == catalogId }
         if (index < 0) return Result.failure(IllegalArgumentException(context.getString(R.string.catalog_not_found)))
         val existing = current[index]
@@ -1017,7 +1109,7 @@ class CatalogRepository @Inject constructor(
     }
 
     suspend fun removeCustomCatalog(catalogId: String): Result<Unit> {
-        val current = getCatalogs().toMutableList()
+        val current = getCatalogsIncludingHiddenForActiveProfile()
         val target = current.firstOrNull { it.id == catalogId }
             ?: return Result.failure(IllegalArgumentException(context.getString(R.string.catalog_not_found)))
         val profileId = activeProfileId()
@@ -1041,7 +1133,7 @@ class CatalogRepository @Inject constructor(
     suspend fun renameCatalog(catalogId: String, newTitle: String): Boolean {
         val trimmed = newTitle.trim()
         if (trimmed.isBlank()) return false
-        val current = getCatalogs().toMutableList()
+        val current = getCatalogsIncludingHiddenForActiveProfile()
         val index = current.indexOfFirst { it.id == catalogId }
         if (index < 0) return false
         current[index] = current[index].copy(title = trimmed)
@@ -1049,9 +1141,12 @@ class CatalogRepository @Inject constructor(
         return true
     }
 
-    suspend fun moveCatalogUp(catalogId: String): Boolean {
-        val current = getCatalogs().toMutableList()
-        val visible = current.filter { isVisibleCatalogInSettings(it) }
+    suspend fun moveCatalogUp(
+        catalogId: String,
+        catalogsInSettings: List<CatalogConfig>? = null
+    ): Boolean {
+        val current = (catalogsInSettings ?: getCatalogsIncludingHiddenForActiveProfile()).toMutableList()
+        val visible = current.filter { isVisibleCatalogInSettings(it) && it.enabled }
         val visibleIndex = visible.indexOfFirst { it.id == catalogId }
         if (visibleIndex <= 0) return false
         val currentIndex = current.indexOfFirst { it.id == catalogId }
@@ -1066,9 +1161,12 @@ class CatalogRepository @Inject constructor(
         return true
     }
 
-    suspend fun moveCatalogDown(catalogId: String): Boolean {
-        val current = getCatalogs().toMutableList()
-        val visible = current.filter { isVisibleCatalogInSettings(it) }
+    suspend fun moveCatalogDown(
+        catalogId: String,
+        catalogsInSettings: List<CatalogConfig>? = null
+    ): Boolean {
+        val current = (catalogsInSettings ?: getCatalogsIncludingHiddenForActiveProfile()).toMutableList()
+        val visible = current.filter { isVisibleCatalogInSettings(it) && it.enabled }
         val visibleIndex = visible.indexOfFirst { it.id == catalogId }
         if (visibleIndex < 0 || visibleIndex >= visible.lastIndex) return false
         val currentIndex = current.indexOfFirst { it.id == catalogId }
@@ -1513,7 +1611,11 @@ class CatalogRepository @Inject constructor(
         }
     }
 
-    private fun readCatalogsFromPrefs(profileId: String, prefs: Preferences): List<CatalogConfig> {
+    private fun readCatalogsFromPrefs(
+        profileId: String,
+        prefs: Preferences,
+        includeHidden: Boolean = false
+    ): List<CatalogConfig> {
         val hiddenPreinstalled = decodeHiddenPreinstalled(profileId, prefs)
         val hiddenAddon = decodeHiddenAddon(profileId, prefs)
         val hiddenHomeServer = decodeHiddenHomeServer(profileId, prefs)
@@ -1538,7 +1640,7 @@ class CatalogRepository @Inject constructor(
             val base = primary
                 .distinctBy { it.id }
                 .map { refreshBundledPreinstalledCatalog(it) }
-                .filterNot { it.isHidden() }
+                .filter { includeHidden || !it.isHidden() }
                 .toMutableList()
             val existingKeys = base.map { "${it.id}|${it.sourceUrl.orEmpty()}" }.toMutableSet()
 
@@ -1549,7 +1651,7 @@ class CatalogRepository @Inject constructor(
                     parseCatalogsJson(prefs[legacyGlobalKey])
                 )
                     .filterNot { it.isPreinstalled }
-                    .filterNot { it.isHidden() }
+                    .filter { includeHidden || !it.isHidden() }
                     .distinctBy { "${it.id}|${it.sourceUrl.orEmpty()}" }
 
                 legacyCustom.forEach { cfg ->
@@ -1569,7 +1671,7 @@ class CatalogRepository @Inject constructor(
             return legacyDefault
                 .distinctBy { it.id }
                 .map { refreshBundledPreinstalledCatalog(it) }
-                .filterNot { it.isHidden() }
+                .filter { includeHidden || !it.isHidden() }
         }
 
         val legacyGlobal = parseCatalogsJson(prefs[legacyGlobalKey])
@@ -1577,7 +1679,7 @@ class CatalogRepository @Inject constructor(
             return legacyGlobal
                 .distinctBy { it.id }
                 .map { refreshBundledPreinstalledCatalog(it) }
-                .filterNot { it.isHidden() }
+                .filter { includeHidden || !it.isHidden() }
         }
 
         return emptyList()

@@ -45,6 +45,7 @@ class PreinstalledServicesTest {
                 "favorite_tv",
                 "collection_rail_service",
                 "collection_rail_franchise",
+                "collection_rail_decade",
                 "trending_movies",
                 "top10_movies_today",
                 "top_movies_week",
@@ -61,6 +62,75 @@ class PreinstalledServicesTest {
                 "recently_watched_series"
             ),
             ids
+        )
+    }
+
+    @Test
+    fun `decades have a visible home rail and valid decade artwork URLs`() {
+        val catalogs = MediaRepository.buildPreinstalledDefaults()
+        val decadeRail = catalogs.firstOrNull {
+            it.kind == CatalogKind.COLLECTION_RAIL && it.collectionGroup == CollectionGroupKind.DECADE
+        }
+        val decades = catalogs.filter {
+            it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.DECADE
+        }
+
+        assertNotNull("Decades Home rail should be preinstalled", decadeRail)
+        assertTrue("Decades rail should be a valid collection config", CollectionTemplateManifest.isValidCollectionConfig(decadeRail!!))
+        assertEquals(7, decades.size)
+        val expectedLists = mapOf(
+            "20's Movies" to "snoak/top-2020s-movies",
+            "10's Movies" to "snoak/top-2010s-movies",
+            "00's Movies" to "snoak/top-2000s-movies",
+            "90's Movies" to "snoak/top-1990s-movies",
+            "80's Movies" to "snoak/top-1980s-movies",
+            "70's Movies" to "snoak/popular-1970s-movies",
+            "60's Movies" to "snoak/popular-1960s-movies"
+        )
+        decades.forEach { catalog ->
+            assertTrue(
+                "${catalog.title} cover should use the decades artwork directory",
+                catalog.collectionCoverImageUrl.orEmpty().contains("/artworks/decades/")
+            )
+            assertEquals(
+                "${catalog.title} should use its public MDBList source without requiring an addon",
+                expectedLists[catalog.title],
+                catalog.collectionSources.singleOrNull { it.kind == CollectionSourceKind.MDBLIST_PUBLIC }?.mdblistSlug
+            )
+            assertEquals("${catalog.title} should only expose movies", "movie", catalog.collectionSources.single().mediaType)
+        }
+    }
+
+    @Test
+    fun `franchise public-list fallbacks are assigned to the correct tabs`() {
+        val collections = MediaRepository.buildPreinstalledDefaults()
+            .filter { it.kind == CatalogKind.COLLECTION }
+            .associateBy { it.title }
+
+        fun source(title: String, slug: String) = requireNotNull(collections[title])
+            .collectionSources.first { it.mdblistSlug == slug }
+
+        assertEquals(
+            "movie",
+            source("Marvel", "lt3dave/marvel-cinematic-universe-mcu-collection").mediaType
+        )
+        assertEquals("series", source("Marvel", "at0microuton/mcu-tv-shows").mediaType)
+        assertEquals("series", source("DC Universe", "kraftynic/dc-tv-shows1").mediaType)
+        assertTrue(
+            "Marvel should use the same TMDB collection fallback as Web",
+            collections.getValue("Marvel").collectionSources.any {
+                it.kind == CollectionSourceKind.TMDB_COLLECTION && it.tmdbCollectionId == 86311
+            }
+        )
+        assertFalse(
+            "DC movie sources should match Web and not add a separate MDBList",
+            collections.getValue("DC Universe").collectionSources.any {
+                it.mdblistSlug == "kingkearney/dc-universe"
+            }
+        )
+        assertEquals(
+            "timeline",
+            source("Star Wars", "jxduffy/star-wars-chronological-order").collectionTab
         )
     }
 

@@ -2,10 +2,22 @@ package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.api.TmdbEpisode
 import com.arflix.tv.data.api.TmdbMovieDetails
+import com.arflix.tv.data.api.TmdbTvDetails
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class MediaLanguageFallbackTest {
+    @Test
+    fun `movie and TV detail mapping preserve TMDB popularity for collection sorting`() {
+        val movie = TmdbMovieDetails(id = 1, title = "Popular Movie", popularity = 123.4f)
+            .toMediaItem()
+        val series = TmdbTvDetails(id = 2, name = "Popular Series", popularity = 98.7f)
+            .toMediaItem()
+
+        assertEquals(123.4f, movie.popularity, 0f)
+        assertEquals(98.7f, series.popularity, 0f)
+    }
+
     @Test
     fun `english movie details only fill missing localized fields`() {
         val localized = TmdbMovieDetails(

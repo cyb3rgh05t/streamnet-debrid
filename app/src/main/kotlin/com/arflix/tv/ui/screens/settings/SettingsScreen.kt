@@ -564,7 +564,7 @@ fun SettingsScreen(
                 6 + uiState.iptvPlaylists.size // Add + rows + order + IPTV-only + VOD search + refresh + clear + special categories
             }
             "home_server" -> if (uiState.homeServerConnections.isEmpty()) 1 else homeServerSettingsEntries.size + 3
-            "catalogs" -> uiState.catalogs.size + 2 // Add + Import + restore hidden + catalogs
+            "catalogs" -> uiState.catalogs.size + 1 // Add + Import + catalogs
             "stremio" -> stremioAddons.size + 1 // rows + refresh + add button
             "offline_downloads" -> uiState.offlineDownloads.size.coerceAtLeast(1) - 1
             "plugins" -> pluginsMaxIndex
@@ -701,18 +701,6 @@ fun SettingsScreen(
         }
     }
 
-    // Auto-scroll content to keep focused item visible in all sections.
-    //
-    // Strategy: prefer the per-row [BringIntoViewRequester] registered via
-    // Modifier.settingsFocusSlot(...) — this is Compose's native mechanism
-    // for nested-scroll focus-follow and correctly handles variable-height
-    // rows and arbitrary nesting depth. Sections that haven't adopted the
-    // modifier fall back to the legacy ratio heuristic, which is imprecise
-    // but non-regressive.
-    //
-    // Triggers on focus/section change AND on the tracker map itself, so late
-    // layout registrations (which happen one frame after composition) still
-    // produce a correct scroll.
     LaunchedEffect(
         contentFocusIndex,
         sectionIndex,
@@ -722,16 +710,11 @@ fun SettingsScreen(
         focusTracker.requesters[contentFocusIndex]
     ) {
         if (activeZone != Zone.CONTENT) return@LaunchedEffect
-
         val requester = focusTracker.requesters[contentFocusIndex]
         if (requester != null) {
-            // Native branch — handles all geometry correctly.
             runCatching { requester.bringIntoView() }
             return@LaunchedEffect
         }
-
-        // Fallback: legacy ratio heuristic, only when positions are unknown
-        // and scrolling is actually possible.
         val maxScroll = scrollState.maxValue
         val currentScroll = scrollState.value
         if (maxScroll <= 0) return@LaunchedEffect
@@ -749,13 +732,7 @@ fun SettingsScreen(
         if (!showIptvInput) {
             editingIptvIndex = -1
             iptvEditName = ""
-            iptvEditUrl = ""
-            iptvEditEpg = ""
-            iptvEditEnabled = true
-            iptvEditImportLiveTv = true
-            iptvEditImportVod = true
             iptvEditImportSeries = true
-            iptvEditXtreamUser = ""
             iptvEditXtreamPass = ""
         } else {
             val playlist = uiState.iptvPlaylists.getOrNull(editingIptvIndex)
@@ -935,7 +912,7 @@ fun SettingsScreen(
                                             )
                                     ) {
                                         iptvActionIndex--
-                                    } else if (currentSection == "catalogs" && contentFocusIndex > 2 && catalogActionIndex > 0) {
+                                    } else if (currentSection == "catalogs" && contentFocusIndex > 1 && catalogActionIndex > 0) {
                                         catalogActionIndex--
                                     } else if (currentSection == "offline_downloads" && contentFocusIndex in uiState.offlineDownloads.indices && offlineDownloadActionIndex > 0) {
                                         offlineDownloadActionIndex--
@@ -982,8 +959,8 @@ fun SettingsScreen(
                                         iptvActionIndex++
                                     } else if (currentSection == "iptv" && !showIptvCategoriesSettings && contentFocusIndex in 1..uiState.iptvPlaylists.size && iptvActionIndex < focusedIptvPlaylistMaxAction) {
                                         iptvActionIndex++
-                                    } else if (currentSection == "catalogs" && contentFocusIndex > 2) {
-                                        val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 3)
+                                    } else if (currentSection == "catalogs" && contentFocusIndex > 1) {
+                                        val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 2)
                                         val maxAction = if (catalog?.let(::hasCatalogUnpackAction) == true) 5 else 4
                                         if (catalogActionIndex < maxAction) catalogActionIndex++
                                     } else if (currentSection == "offline_downloads" && contentFocusIndex in uiState.offlineDownloads.indices && offlineDownloadActionIndex < 1) {
@@ -1304,10 +1281,8 @@ fun SettingsScreen(
                                                 showCatalogInput = true
                                             } else if (contentFocusIndex == 1) {
                                                 showCatalogPackInput = true
-                                            } else if (contentFocusIndex == 2) {
-                                                viewModel.restoreHiddenCatalogs()
                                             } else {
-                                                val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 3)
+                                                val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 2)
                                                 if (catalog != null) {
                                                     when (catalogActionIndex) {
                                                         0 -> {
@@ -1322,26 +1297,12 @@ fun SettingsScreen(
                                                                 toggleCatalogueRowLayoutMode(context, catalogueLayoutRowKey(catalog))
                                                             }
                                                         }
-                                                        4 -> {
-                                                            if (catalog.packId != null && catalog.isBulkDeletablePack) {
-                                                                viewModel.unpackCatalog(catalog.id)
-                                                            } else if (catalog.isBulkDeletablePack) {
-                                                                deletePackId = catalog.effectivePackId
-                                                                deletePackName = catalog.effectivePackName
-                                                                showDeletePackConfirm = true
-                                                            } else {
-                                                                viewModel.removeCatalog(catalog.id)
-                                                            }
+                                                        4 -> if (hasCatalogUnpackAction(catalog)) {
+                                                            viewModel.unpackCatalog(catalog.id)
+                                                        } else {
+                                                            viewModel.setCatalogEnabled(catalog.id, !catalog.enabled)
                                                         }
-                                                        else -> {
-                                                            if (catalog.isBulkDeletablePack) {
-                                                                deletePackId = catalog.effectivePackId
-                                                                deletePackName = catalog.effectivePackName
-                                                                showDeletePackConfirm = true
-                                                            } else {
-                                                                viewModel.removeCatalog(catalog.id)
-                                                            }
-                                                        }
+                                                        else -> viewModel.setCatalogEnabled(catalog.id, !catalog.enabled)
                                                     }
                                                 }
                                             }
@@ -1519,10 +1480,9 @@ fun SettingsScreen(
                         deletePackName = catalog.effectivePackName
                         showDeletePackConfirm = true
                     } else {
-                        viewModel.removeCatalog(catalog.id)
+                        viewModel.setCatalogEnabled(catalog.id, false)
                     }
                 },
-                onRestoreHiddenCatalogs = viewModel::restoreHiddenCatalogs,
                 onConnectHomeServerClick = {
                     homeServerUrl = ""
                     homeServerDisplayName = ""
@@ -1990,16 +1950,16 @@ fun SettingsScreen(
                             },
                             onMoveCatalogUp = { catalog -> viewModel.moveCatalogUp(catalog.id) },
                             onMoveCatalogDown = { catalog -> viewModel.moveCatalogDown(catalog.id) },
+                            onSetCatalogEnabled = { catalog, enabled -> viewModel.setCatalogEnabled(catalog.id, enabled) },
                             onDeleteCatalog = { catalog ->
                                 if (catalog.isBulkDeletablePack) {
                                     deletePackId = catalog.effectivePackId
                                     deletePackName = catalog.effectivePackName
                                     showDeletePackConfirm = true
                                 } else {
-                                    viewModel.removeCatalog(catalog.id)
+                                    viewModel.setCatalogEnabled(catalog.id, false)
                                 }
                             },
-                            onRestoreHiddenCatalogs = viewModel::restoreHiddenCatalogs,
                             onUnpackCatalog = { catalog -> viewModel.unpackCatalog(catalog.id) }
                         )
                         "stremio" -> StremioAddonsSettings(
@@ -4728,7 +4688,6 @@ private fun MobileSettingsLayout(
     onImportCatalogPackClick: () -> Unit,
     onRenameCatalogClick: (CatalogConfig) -> Unit,
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
-    onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
     onEditHomeServerConnection: (HomeServerConnection) -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
@@ -4853,7 +4812,6 @@ private fun MobileSettingsLayout(
                     onImportCatalogPackClick = onImportCatalogPackClick,
                     onRenameCatalogClick = onRenameCatalogClick,
                     onDeleteCatalogClick = onDeleteCatalogClick,
-                    onRestoreHiddenCatalogs = onRestoreHiddenCatalogs,
                     onConnectHomeServerClick = onConnectHomeServerClick,
                     onEditHomeServerConnection = onEditHomeServerConnection,
                     onConnectPlexHomeServerClick = onConnectPlexHomeServerClick,
@@ -5102,7 +5060,6 @@ private fun MobileSettingsSubPage(
     onImportCatalogPackClick: () -> Unit,
     onRenameCatalogClick: (CatalogConfig) -> Unit,
     onDeleteCatalogClick: (CatalogConfig) -> Unit,
-    onRestoreHiddenCatalogs: () -> Unit,
     onConnectHomeServerClick: () -> Unit,
     onEditHomeServerConnection: (HomeServerConnection) -> Unit,
     onConnectPlexHomeServerClick: () -> Unit,
@@ -5500,8 +5457,8 @@ private fun MobileSettingsSubPage(
                     onRenameCatalog = onRenameCatalogClick,
                     onMoveCatalogUp = { viewModel.moveCatalogUp(it.id) },
                     onMoveCatalogDown = { viewModel.moveCatalogDown(it.id) },
+                    onSetCatalogEnabled = { catalog, enabled -> viewModel.setCatalogEnabled(catalog.id, enabled) },
                     onDeleteCatalog = onDeleteCatalogClick,
-                    onRestoreHiddenCatalogs = onRestoreHiddenCatalogs,
                     onUnpackCatalog = { viewModel.unpackCatalog(it.id) }
                 )
             }
@@ -9487,35 +9444,6 @@ private fun formatCatalogDiscoveryDate(raw: String): String {
         ?: raw.replace('T', ' ').substringBefore('.').take(16)
 }
 
-@Composable
-private fun RestoreHiddenCatalogsRow(
-    focusIndex: Int,
-    focusedIndex: Int,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .settingsFocusSlot(focusIndex)
-            .background(
-                if (focusedIndex == focusIndex) Pink.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.05f),
-                RoundedCornerShape(10.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(Icons.Default.Visibility, contentDescription = stringResource(R.string.catalogs_show_hidden), tint = Pink, modifier = Modifier.size(20.dp))
-        Spacer(modifier = Modifier.width(10.dp))
-        Text(
-            text = stringResource(R.string.catalogs_restore_hidden),
-            style = ArflixTypography.button,
-            color = if (focusedIndex == focusIndex) TextPrimary else Pink
-        )
-    }
-    Spacer(modifier = Modifier.height(12.dp))
-}
-
 @OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun CatalogsSettings(
@@ -9527,9 +9455,9 @@ private fun CatalogsSettings(
     onRenameCatalog: (CatalogConfig) -> Unit,
     onMoveCatalogUp: (CatalogConfig) -> Unit,
     onMoveCatalogDown: (CatalogConfig) -> Unit,
+    onSetCatalogEnabled: (CatalogConfig, Boolean) -> Unit,
     onDeleteCatalog: (CatalogConfig) -> Unit,
-    onUnpackCatalog: (CatalogConfig) -> Unit,
-    onRestoreHiddenCatalogs: () -> Unit
+    onUnpackCatalog: (CatalogConfig) -> Unit
 ) {
     val isMobile = LocalDeviceType.current.isTouchDevice()
     var selectionMode by remember { mutableStateOf(false) }
@@ -9556,11 +9484,6 @@ private fun CatalogsSettings(
                 MobileSettingsRow(icon = Icons.Default.Add, title = stringResource(R.string.add_catalog), subtitle = stringResource(R.string.add_catalog_desc), value = "", isFocused = false, showDivider = true, onClick = onAddCatalog)
                 MobileSettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = "", isFocused = false, showDivider = false, onClick = onImportCatalogPack)
             }
-            RestoreHiddenCatalogsRow(
-                focusIndex = 2,
-                focusedIndex = focusedIndex,
-                onClick = onRestoreHiddenCatalogs
-            )
             if (catalogs.isNotEmpty()) {
                 MobileSettingsCategory(title = stringResource(R.string.settings_section_home_catalog_settings)) {
                     catalogs.forEachIndexed { index, catalog ->
@@ -9639,14 +9562,21 @@ private fun CatalogsSettings(
                                     Spacer(modifier = Modifier.width(16.dp))
                                 }
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (catalog.enabled) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    Text("$subtitle • ${stringResource(if (catalog.enabled) R.string.settings_visible else R.string.settings_hidden)}", style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 }
                                 if (!selectionMode) {
                                     CatalogueRowLayoutToggleButton(
                                         rowKey = layoutRowKey,
-                                        enabled = layoutToggleEnabled,
+                                        enabled = layoutToggleEnabled && catalog.enabled,
                                         modeOverride = if (!layoutToggleEnabled) com.arflix.tv.ui.components.CardLayoutMode.LANDSCAPE else null,
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    CatalogActionChip(
+                                        icon = if (catalog.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                                        contentDescription = stringResource(if (catalog.enabled) R.string.catalogs_disable_catalog else R.string.catalogs_enable_catalog),
+                                        isFocused = false,
+                                        onClick = { onSetCatalogEnabled(catalog, !catalog.enabled) }
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     if (catalog.packId != null && catalog.isBulkDeletablePack) {
@@ -9698,11 +9628,6 @@ private fun CatalogsSettings(
             Spacer(modifier = Modifier.height(16.dp))
             SettingsRow(icon = Icons.Default.Widgets, title = stringResource(R.string.catalog_pack_import_row_title), subtitle = stringResource(R.string.catalog_pack_import_row_subtitle), value = stringResource(R.string.catalog_pack_import_action), isFocused = focusedIndex == 1, onClick = onImportCatalogPack, modifier = Modifier.settingsFocusSlot(1))
             Spacer(modifier = Modifier.height(16.dp))
-            RestoreHiddenCatalogsRow(
-                focusIndex = 2,
-                focusedIndex = focusedIndex,
-                onClick = onRestoreHiddenCatalogs
-            )
             Text(
                 text = stringResource(R.string.settings_section_home_catalog_settings),
                 style = ArflixTypography.caption,
@@ -9710,7 +9635,7 @@ private fun CatalogsSettings(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
             catalogs.forEachIndexed { index, catalog ->
-                val rowFocusIndex = index + 3; val isRowFocused = focusedIndex == rowFocusIndex
+                val rowFocusIndex = index + 2; val isRowFocused = focusedIndex == rowFocusIndex
                 val currentPackId = catalog.packId
                 val prevPackId = if (index > 0) catalogs[index - 1].packId else null
                 val showPackHeader = currentPackId != null && currentPackId != prevPackId && catalog.isBulkDeletablePack
@@ -9771,33 +9696,34 @@ private fun CatalogsSettings(
                     Icon(imageVector = Icons.Default.Widgets, contentDescription = null, tint = TextSecondary, modifier = Modifier.size(19.dp))
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (isRowFocused || isSelected) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(title, style = ArflixTypography.cardTitle.copy(fontSize = 16.sp), color = if (catalog.enabled && (isRowFocused || isSelected)) TextPrimary else TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Spacer(modifier = Modifier.height(4.dp))
-                        Text(subtitle, style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary.copy(alpha = 0.7f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text("$subtitle • ${stringResource(if (catalog.enabled) R.string.settings_visible else R.string.settings_hidden)}", style = ArflixTypography.caption.copy(fontSize = 13.sp, lineHeight = 17.sp), color = TextSecondary.copy(alpha = 0.7f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
-                    CatalogActionChip(icon = Icons.Default.Edit, isFocused = isRowFocused && focusedActionIndex == 0, onClick = { onRenameCatalog(catalog) })
+                    CatalogActionChip(icon = Icons.Default.Edit, isFocused = isRowFocused && focusedActionIndex == 0, enabled = catalog.enabled, onClick = { onRenameCatalog(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(icon = Icons.Default.ArrowUpward, isFocused = isRowFocused && focusedActionIndex == 1, onClick = { onMoveCatalogUp(catalog) })
+                    CatalogActionChip(icon = Icons.Default.ArrowUpward, isFocused = isRowFocused && focusedActionIndex == 1, enabled = catalog.enabled, onClick = { onMoveCatalogUp(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
-                    CatalogActionChip(icon = Icons.Default.ArrowDownward, isFocused = isRowFocused && focusedActionIndex == 2, onClick = { onMoveCatalogDown(catalog) })
+                    CatalogActionChip(icon = Icons.Default.ArrowDownward, isFocused = isRowFocused && focusedActionIndex == 2, enabled = catalog.enabled, onClick = { onMoveCatalogDown(catalog) })
                     Spacer(modifier = Modifier.width(6.dp))
                     CatalogueRowLayoutToggleButton(
                         rowKey = layoutRowKey,
-                        enabled = layoutToggleEnabled,
+                        enabled = layoutToggleEnabled && catalog.enabled,
                         forceFocused = isRowFocused && focusedActionIndex == 3,
                         modeOverride = if (!layoutToggleEnabled) com.arflix.tv.ui.components.CardLayoutMode.LANDSCAPE else null,
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     if (hasCatalogUnpackAction(catalog)) {
-                        CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, onClick = { onUnpackCatalog(catalog) })
+                        CatalogActionChip(icon = Icons.Default.Unarchive, isFocused = isRowFocused && focusedActionIndex == 4, enabled = catalog.enabled, onClick = { onUnpackCatalog(catalog) })
                         Spacer(modifier = Modifier.width(6.dp))
                     }
                     CatalogActionChip(
-                        icon = Icons.Default.Visibility,
+                        icon = if (catalog.enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = stringResource(if (catalog.enabled) R.string.catalogs_disable_catalog else R.string.catalogs_enable_catalog),
                         isFocused = isRowFocused && focusedActionIndex == if (hasCatalogUnpackAction(catalog)) 5 else 4,
                         isDestructive = false,
                         enabled = true,
-                        onClick = { onDeleteCatalog(catalog) }
+                        onClick = { onSetCatalogEnabled(catalog, !catalog.enabled) }
                     )
                 }
                 Spacer(modifier = Modifier.height(10.dp))
@@ -9826,6 +9752,7 @@ private fun catalogueLayoutRowKey(catalog: CatalogConfig): String {
 private fun CatalogActionChip(
     icon: ImageVector,
     label: String? = null,
+    contentDescription: String? = label,
     isFocused: Boolean,
     isDestructive: Boolean = false,
     enabled: Boolean = true,
@@ -9884,7 +9811,7 @@ private fun CatalogActionChip(
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = label,
+                contentDescription = contentDescription,
                 tint = fgColor,
                 modifier = Modifier.size(16.dp)
             )

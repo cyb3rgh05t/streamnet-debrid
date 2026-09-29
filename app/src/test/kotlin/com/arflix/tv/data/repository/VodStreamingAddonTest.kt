@@ -12,6 +12,7 @@ class VodStreamingAddonTest {
     fun `collection-only addons never enter addon settings`() {
         val ids = listOf(
             "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+            "com.cyb3rgh05t.marveladdon.custom.marvel-mcu.movies.series",
             "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
             "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
             "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
@@ -22,6 +23,15 @@ class VodStreamingAddonTest {
                 isCollectionOnlyAddon(addon(id = "${manifestId}_abcdef", manifestId = manifestId))
             ).isTrue()
         }
+        assertThat(
+            isCollectionOnlyAddon(
+                addon(
+                    id = "new-marvel-addon-id",
+                    manifestId = "new-marvel-addon-id",
+                    url = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
+                )
+            )
+        ).isTrue()
         assertThat(isCollectionOnlyAddon(addon())).isFalse()
     }
 
@@ -74,6 +84,7 @@ class VodStreamingAddonTest {
         type: AddonType = AddonType.CUSTOM,
         enabled: Boolean = true,
         resourceTypes: List<String> = listOf("movie", "series"),
+        url: String? = null,
     ) = Addon(
         id = id,
         name = "Test Addon",
@@ -82,6 +93,7 @@ class VodStreamingAddonTest {
         isInstalled = true,
         isEnabled = enabled,
         type = type,
+        url = url,
         manifest = AddonManifest(
             id = manifestId,
             name = "Test Addon",

@@ -218,10 +218,14 @@ class CollectionDetailsViewModel @Inject constructor(
             loadInitialTab(catalog, primaryTab)
             launch {
                 delay(1200L)
-                listOf(CollectionTab.TIMELINE, CollectionTab.MOVIES, CollectionTab.SERIES)
+                val secondaryTabs = listOf(CollectionTab.TIMELINE, CollectionTab.MOVIES, CollectionTab.SERIES)
                     .filter { it != primaryTab }
                     .filter { supportsTab(catalog, it) }
-                    .forEach { loadInitialTab(catalog, it) }
+                coroutineScope {
+                    secondaryTabs.map { tab ->
+                        async { loadInitialTab(catalog, tab) }
+                    }.awaitAll()
+                }
             }
         }
     }
@@ -262,7 +266,8 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private suspend fun loadInitialTab(catalog: CatalogConfig, tab: CollectionTab) {
-        val page = runCatching { loadCollectionPage(catalog, tab, offset = 0, limit = FIRST_PAGE) }.getOrNull()
+        val pageCatalog = catalogForTab(catalog, tab)
+        val page = runCatching { loadCollectionPage(pageCatalog, tab, offset = 0, limit = FIRST_PAGE) }.getOrNull()
         val pageItems = when (tab) {
             CollectionTab.MOVIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
             CollectionTab.SERIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.TV }
@@ -651,6 +656,11 @@ fun CollectionDetailsScreen(
     val currentSupportsMovies by rememberUpdatedState(uiState.supportsMovies)
     val currentSupportsSeries by rememberUpdatedState(uiState.supportsSeries)
     val currentSupportsTimeline by rememberUpdatedState(uiState.supportsTimeline)
+    val selectedTabFocusRequester = when (selectedTab) {
+        CollectionTab.TIMELINE -> timelineTabFocusRequester
+        CollectionTab.MOVIES -> moviesTabFocusRequester
+        CollectionTab.SERIES -> seriesTabFocusRequester
+    }
 
     fun requestTabFocus() {
         coroutineScope.launch {
@@ -768,6 +778,9 @@ fun CollectionDetailsScreen(
             moviesTabFocusRequester = moviesTabFocusRequester,
             seriesTabFocusRequester = seriesTabFocusRequester,
             timelineTabFocusRequester = timelineTabFocusRequester,
+            onFocusTabFromTopRow = {
+                runCatching { selectedTabFocusRequester.requestFocus() }
+            },
             onTabSelected = { selectedTab = it },
             onItemClick = { item ->
                 onNavigateToDetails(item.mediaType, item.id)
@@ -918,6 +931,10 @@ private fun CollectionTabBar(
                 },
                 isSelected = selectedTab == CollectionTab.TIMELINE,
                 focusRequester = timelineTabFocusRequester,
+                onMoveRight = {
+                    if (showMovies) moviesTabFocusRequester.requestFocus()
+                    else if (showSeries) seriesTabFocusRequester.requestFocus()
+                },
                 onClick = { onTabSelected(CollectionTab.TIMELINE) }
             )
         }
@@ -926,6 +943,8 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.movies),
                 isSelected = selectedTab == CollectionTab.MOVIES || onlyOne,
                 focusRequester = moviesTabFocusRequester,
+                onMoveLeft = { if (showTimeline) timelineTabFocusRequester.requestFocus() },
+                onMoveRight = { if (showSeries) seriesTabFocusRequester.requestFocus() },
                 onClick = { onTabSelected(CollectionTab.MOVIES) }
             )
         }
@@ -934,6 +953,10 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.series),
                 isSelected = selectedTab == CollectionTab.SERIES || onlyOne,
                 focusRequester = seriesTabFocusRequester,
+                onMoveLeft = {
+                    if (showMovies) moviesTabFocusRequester.requestFocus()
+                    else if (showTimeline) timelineTabFocusRequester.requestFocus()
+                },
                 onClick = { onTabSelected(CollectionTab.SERIES) }
             )
         }
@@ -945,6 +968,8 @@ private fun CollectionTabChip(
     label: String,
     isSelected: Boolean,
     focusRequester: FocusRequester,
+    onMoveLeft: () -> Unit = {},
+    onMoveRight: () -> Unit = {},
     onClick: () -> Unit
 ) {
     var isFocused by remember { mutableStateOf(false) }
@@ -976,7 +1001,19 @@ private fun CollectionTabChip(
             .focusRequester(focusRequester)
             .onFocusChanged { isFocused = it.isFocused }
             .onPreviewKeyEvent { event ->
-                event.type == KeyEventType.KeyDown && event.key == Key.DirectionUp
+                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                when (event.key) {
+                    Key.DirectionUp -> true
+                    Key.DirectionLeft -> {
+                        onMoveLeft()
+                        true
+                    }
+                    Key.DirectionRight -> {
+                        onMoveRight()
+                        true
+                    }
+                    else -> false
+                }
             }
             .focusable()
             .clickable(onClick = onClick)
@@ -1011,6 +1048,7 @@ private fun CollectionItemsGrid(
     moviesTabFocusRequester: FocusRequester,
     seriesTabFocusRequester: FocusRequester,
     timelineTabFocusRequester: FocusRequester,
+    onFocusTabFromTopRow: () -> Unit,
     onTabSelected: (CollectionTab) -> Unit,
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit,
@@ -1028,6 +1066,7 @@ private fun CollectionItemsGrid(
     val latestGridColumns by rememberUpdatedState(gridColumns)
     val latestOnVisibleItemsChanged by rememberUpdatedState(onVisibleItemsChanged)
     val latestOnNearEnd by rememberUpdatedState(onNearEnd)
+    var focusedMediaIndex by remember(selectedTab) { mutableStateOf(-1) }
     // Collect scroll position without restarting on page-load-size changes —
     // items.size used to live in the key, which relaunched the snapshotFlow on
     // every page append and caused a stutter frame during scroll.
@@ -1058,7 +1097,22 @@ private fun CollectionItemsGrid(
     TvLazyVerticalGrid(
         columns = TvGridCells.Fixed(gridColumns),
         state = gridState,
-        modifier = Modifier.fillMaxSize().arvioDpadFocusGroup().clipToBounds(),
+        modifier = Modifier
+            .fillMaxSize()
+            .arvioDpadFocusGroup()
+            .onPreviewKeyEvent { event ->
+                if (
+                    event.type == KeyEventType.KeyDown &&
+                    event.key == Key.DirectionUp &&
+                    focusedMediaIndex in 0 until gridColumns
+                ) {
+                    onFocusTabFromTopRow()
+                    true
+                } else {
+                    false
+                }
+            }
+            .clipToBounds(),
         contentPadding = PaddingValues(
             start = 42.dp,
             top = topContentPadding,
@@ -1151,6 +1205,7 @@ private fun CollectionItemsGrid(
                     showTitle = true,
                     titleMaxLines = if (usePosterCards) 2 else 1,
                     onFocused = {
+                        focusedMediaIndex = index
                         onItemFocused(item, index)
                         if (items.size > 10 && index >= items.size - 2) onNearEnd()
                     },

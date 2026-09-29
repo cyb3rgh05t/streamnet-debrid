@@ -2,6 +2,35 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.050] - 2026-09-29
+
+- Kataloge bleiben in Android Settings sichtbar und lassen sich pro Zeile ein-/ausschalten; versteckte Konfigurationen bleiben fuer Reaktivierung und profilbezogenen CloudSync erhalten.
+- Marvel-, DC- und Star-Wars-Collection-Addons werden auch beim Rekonstruieren der Settings-/Cloud-Katalogliste ausgefiltert; Sichtbarkeitstoggles zeigen nur das Auge.
+- Franchise-Film-/Serienquellen werden bereits beim initialen Laden nach Tab gefiltert. Ein quellenuebergreifender TMDB-Popularitaets-Lookahead stabilisiert die erste Seite; Film-/Serientabs laden parallel, Timeline bleibt chronologisch. D-pad-Up aus der ersten Kartenreihe fokussiert den aktiven Tab.
+- Android-Version: `2.5.050` / Code `451`.
+
+## [Web 1.0.062] - 2026-09-29
+
+- Decades-Rails werden nur ueber aktivierte Rail-Kataloge gerendert und koennen nicht durch Collection-Kacheln wieder erscheinen.
+- Web-Version: `1.0.062`.
+
+## [2.5.049] - 2026-09-29
+
+- Decade-Cover verwenden jetzt die korrekten Asset-Pfade unter `artworks/decades/`.
+- Die Decades-Home-Rail wird bei Neuinstallationen vorinstalliert und bei bestehenden Profilen automatisch ergänzt.
+- Decade-Collections laden Filme direkt über öffentliche MDBList-JSON-Listen und benötigen dafür kein installiertes `aio-metadata`-Addon.
+- Decades sind explizit als Filme typisiert; der nicht verfügbare Serien-Tab wird auf Android und Web ausgeblendet.
+- Franchise-Film-/Serienquellen werden vor dem ersten Page-Slice quellenweise gemischt und ein 32-Titel-Lookahead nach TMDB-Popularität, Rating und Titel sortiert; Timeline-Reihenfolge bleibt unangetastet.
+- Film- und Serientabs werden nach dem initialen Tab parallel nachgeladen. D-pad-Up aus der ersten Kartenreihe fokussiert wieder den ausgewählten Tab.
+- Die Android-Katalogeinstellungen zeigen ausgeblendete Kataloge weiterhin an und schalten jeden Katalog einzeln; Aktivstatus und vollständige Katalogdefinitionen werden profilbezogen über CloudSync übertragen.
+- Android-Version: `2.5.049` / Code `450`.
+
+## [Web 1.0.061] - 2026-09-29
+
+- Die Decades-Rail ist jetzt auch im Web vorinstalliert und steht hinter den Franchises.
+- Alle sieben Jahrzehnt-Collections laden ihre Filme direkt von öffentlichen MDBList-JSON-Listen und benötigen kein `aio-metadata`-Addon.
+- Web-Version: `1.0.061`.
+
 ## [2.5.048] - 2026-09-29
 
 - Android-Collections verwenden jetzt wie Web drei Tabs in der Reihenfolge Timeline, Filme und Serien.

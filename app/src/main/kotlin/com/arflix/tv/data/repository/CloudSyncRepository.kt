@@ -1402,7 +1402,13 @@ class CloudSyncRepository @Inject constructor(
         // Catalogs per profile
         val catalogsByProfile = buildMap<String, List<CatalogConfig>> {
             profiles.forEach { profile ->
-                put(profile.id, catalogRepository.getCatalogsForProfile(profile.id))
+                put(
+                    profile.id,
+                    catalogRepository.getCatalogsForCloudSync(
+                        profile.id,
+                        addonsByProfile[profile.id].orEmpty()
+                    )
+                )
             }
         }
         root.put("catalogsByProfile", JSONObject(gson.toJson(catalogsByProfile)))

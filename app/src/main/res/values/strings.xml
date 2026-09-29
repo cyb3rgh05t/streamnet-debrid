@@ -1645,8 +1645,8 @@
     <string name="catalog_pack_label">Pack: %1$s • %2$s</string>
     <string name="catalog_pack_remove_catalog">Remove catalog from pack</string>
     <string name="catalogs_delete_selected">Delete selected catalogs</string>
-    <string name="catalogs_restore_hidden">Restore hidden catalogs</string>
-    <string name="catalogs_show_hidden">Show hidden catalogs</string>
+    <string name="catalogs_disable_catalog">Disable catalog</string>
+    <string name="catalogs_enable_catalog">Enable catalog</string>
     <string name="next_episode_countdown">in %1$ds</string>
     <string name="catalog_pack_url">Pack URL</string>
     <string name="settings_connect_simkl">Connect Simkl</string>

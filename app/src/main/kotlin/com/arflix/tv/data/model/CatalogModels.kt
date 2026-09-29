@@ -93,6 +93,7 @@ data class CatalogConfig(
     val sourceUrl: String? = null,
     val sourceRef: String? = null,
     val isPreinstalled: Boolean = false,
+    val enabled: Boolean = true,
     val addonId: String? = null,
     val addonCatalogType: String? = null,
     val addonCatalogId: String? = null,

@@ -2,6 +2,7 @@ package com.arflix.tv.data.model
 
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -21,6 +22,22 @@ class CatalogConfigRoundtripTest {
         val json = gson.toJson(original)
         val restored = gson.fromJson(json, CatalogConfig::class.java)
         assertEquals("https://example.com/netflix.mp4", restored.collectionHeroVideoUrl)
+    }
+
+    @Test
+    fun `catalog visibility survives gson round-trip`() {
+        val original = CatalogConfig(
+            id = "collection_rail_decade",
+            title = "Decades",
+            sourceType = CatalogSourceType.PREINSTALLED,
+            kind = CatalogKind.COLLECTION_RAIL,
+            collectionGroup = CollectionGroupKind.DECADE,
+            enabled = false
+        )
+
+        val restored = Gson().fromJson(Gson().toJson(original), CatalogConfig::class.java)
+
+        assertFalse(restored.enabled)
     }
 
     @Test

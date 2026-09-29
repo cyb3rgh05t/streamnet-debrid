@@ -289,6 +289,7 @@ const germanUiPhrases: Record<string, string> = {
   "Favorite TV": "TV-Favoriten",
   Services: "Streamingdienste",
   Franchises: "Filmreihen",
+  Decades: "Jahrzehnte",
   Studios: "Filmstudios",
   Networks: "TV-Sender",
   "Movie Genres": "Filmgenres",

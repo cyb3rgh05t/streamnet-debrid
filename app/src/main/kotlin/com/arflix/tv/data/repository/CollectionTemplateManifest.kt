@@ -38,6 +38,7 @@ internal object CollectionTemplateManifest {
     private const val VIDEO_BASE = "${ASSET_BASE}videos/networks%20videos/"
     private const val STUDIO_VIDEO_BASE = "${ASSET_BASE}videos/studios%20videos/"
     private const val IMAGE_BASE = "${ASSET_BASE}artworks/"
+    private const val DECADE_IMAGE_BASE = "${ASSET_BASE}artworks/decades/"
     private const val STREAMING_SERVICE_IMAGE_BASE = "${ASSET_BASE}artworks/streaming%20services/streaming%20services%20landscape/"
     private const val GENRE_IMAGE_BASE = "${ASSET_BASE}artworks/genres/genres%20landscape/genres%20landscape%201/"
     private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/artworks/franchises/"
@@ -54,7 +55,8 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.SERVICE,
         CollectionGroupKind.MOVIE_GENRE,
         CollectionGroupKind.TV_GENRE,
-        CollectionGroupKind.FRANCHISE
+        CollectionGroupKind.FRANCHISE,
+        CollectionGroupKind.DECADE
     )
 
     private val legacyEntries: List<CollectionTemplateEntry> = listOf(
@@ -603,12 +605,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "20's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}20snew.jpg",
+            coverImageUrl = "${DECADE_IMAGE_BASE}20snew.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91304")
+                mdblistSource("snoak/top-2020s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.91304", sourceAddonId = "aio-metadata", sourceName = "Popular 2020s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 179, author = "snoak", url = "https://mdblist.com/lists/snoak/top-2020s-movies")
@@ -617,12 +619,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "10's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}10snew.jpg",
+            coverImageUrl = "${DECADE_IMAGE_BASE}10snew.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91303")
+                mdblistSource("snoak/top-2010s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.91303", sourceAddonId = "aio-metadata", sourceName = "Popular 2010s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 372, author = "snoak", url = "https://mdblist.com/lists/snoak/top-2010s-movies")
@@ -631,12 +633,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "00's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}00snew.jpg",
+            coverImageUrl = "${DECADE_IMAGE_BASE}00snew.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91302")
+                mdblistSource("snoak/top-2000s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.91302", sourceAddonId = "aio-metadata", sourceName = "Popular 2000s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 448, author = "snoak", url = "https://mdblist.com/lists/snoak/top-2000s-movies")
@@ -645,12 +647,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "90's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}90snew.jpg",
+            coverImageUrl = "${DECADE_IMAGE_BASE}90snew.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91300")
+                mdblistSource("snoak/top-1990s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.91300", sourceAddonId = "aio-metadata", sourceName = "Popular 1990s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 314, author = "snoak", url = "https://mdblist.com/lists/snoak/top-1990s-movies")
@@ -659,12 +661,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "80's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}80snew.jpg",
+            coverImageUrl = "${DECADE_IMAGE_BASE}80snew.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91301")
+                mdblistSource("snoak/top-1980s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.91301", sourceAddonId = "aio-metadata", sourceName = "Popular 1980s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 220, author = "snoak", url = "https://mdblist.com/lists/snoak/top-1980s-movies")
@@ -673,12 +675,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "70's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}70snew.png",
+            coverImageUrl = "${DECADE_IMAGE_BASE}70snew.png",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.127962")
+                mdblistSource("snoak/popular-1970s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.127962", sourceAddonId = "aio-metadata", sourceName = "Popular 1970s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 159, author = "snoak", url = "https://mdblist.com/lists/snoak/popular-1970s-movies")
@@ -687,12 +689,12 @@ internal object CollectionTemplateManifest {
         entry(
             title = "60's Movies",
             group = CollectionGroupKind.DECADE,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}60snew.png",
+            coverImageUrl = "${DECADE_IMAGE_BASE}60snew.png",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.144321")
+                mdblistSource("snoak/popular-1960s-movies", mediaType = "movie")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.144321", sourceAddonId = "aio-metadata", sourceName = "Popular 1960s Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 117, author = "snoak", url = "https://mdblist.com/lists/snoak/popular-1960s-movies")
@@ -1151,6 +1153,7 @@ internal object CollectionTemplateManifest {
 
     fun collectionOnlyAddonManifestIdsForCleanup(): Set<String> = setOf(
         "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+        "com.cyb3rgh05t.marveladdon.custom.marvel-mcu.movies.series",
         "com.joaogonp.marveladdon.custom.marvel-mcu",
         "com.joaogonp.marveladdon.custom.marvel-mcu.movies.series",
         "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
@@ -1159,6 +1162,23 @@ internal object CollectionTemplateManifest {
         "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
         "com.starwars.addon.custom.sw-movies-series-chronological"
     )
+
+    fun isCollectionOnlyAddonIdentifier(vararg identifiers: String?): Boolean {
+        val knownIds = collectionOnlyAddonManifestIdsForCleanup()
+        val collectionOnlyHosts = setOf(
+            "marvel.mystreamnet.club",
+            "dc.mystreamnet.club",
+            "starwars.mystreamnet.club"
+        )
+        return identifiers.filterNotNull().any { raw ->
+            val value = raw.trim().lowercase(Locale.US)
+            value.isNotBlank() && (
+                knownIds.any { id ->
+                    value == id || value.startsWith("${id}_") || value.startsWith("${id}.")
+                } || collectionOnlyHosts.any(value::contains)
+            )
+        }
+    }
 
     fun autoInstalledAddonUrls(): List<String> = listOf(
         STREAMING_ADDON_URL,
@@ -1230,8 +1250,9 @@ internal object CollectionTemplateManifest {
         addonCatalogId = catalogId
     )
 
-    private fun mdblistSource(slug: String) = CollectionSourceConfig(
+    private fun mdblistSource(slug: String, mediaType: String? = null) = CollectionSourceConfig(
         kind = CollectionSourceKind.MDBLIST_PUBLIC,
+        mediaType = mediaType,
         mdblistSlug = slug
     )
 

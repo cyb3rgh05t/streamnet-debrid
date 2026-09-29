@@ -332,6 +332,13 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    private suspend fun settingsCatalogs(): List<CatalogConfig> {
+        val defaults = mediaRepository.getDefaultCatalogConfigs()
+        catalogRepository.ensurePreinstalledDefaults(defaults)
+        val addons = streamRepository.installedAddons.first()
+        return visibleCatalogs(catalogRepository.getCatalogsForSettings(defaults, addons))
+    }
+
     private val _uiState = MutableStateFlow(SettingsUiState())
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
@@ -740,9 +747,7 @@ class SettingsViewModel @Inject constructor(
 
             val subtitleOptions = loadSubtitleOptions(defaultSub)
             val audioLanguageOptions = loadAudioLanguageOptions(defaultAudio)
-            val existingCatalogs = visibleCatalogs(
-                catalogRepository.ensurePreinstalledDefaults(mediaRepository.getDefaultCatalogConfigs())
-            )
+            val existingCatalogs = settingsCatalogs()
             val watchlistCount = try {
                 watchlistRepository.getLocalWatchlistItems().size
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -2347,8 +2352,7 @@ class SettingsViewModel @Inject constructor(
     private fun observeCatalogs() {
         viewModelScope.launch {
             catalogRepository.observeCatalogs().collect {
-                val effectiveCatalogs = catalogRepository.ensurePreinstalledDefaults(mediaRepository.getDefaultCatalogConfigs())
-                val visible = visibleCatalogs(effectiveCatalogs)
+                val visible = settingsCatalogs()
                 if (_uiState.value.catalogs != visible) {
                     _uiState.value = _uiState.value.copy(catalogs = visible)
                 }
@@ -2405,7 +2409,7 @@ class SettingsViewModel @Inject constructor(
                 isPackLoading = true,
                 packError = null
             )
-            val result = catalogRepository.addCatalogPack(url, manifest)
+            val result = catalogRepository.addCatalogPack(url, manifest, _uiState.value.catalogs)
             result.onSuccess { installedManifest ->
                 _uiState.value = _uiState.value.copy(
                     isPackLoading = false,
@@ -2552,8 +2556,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             val result = catalogRepository.removeCustomCatalog(catalogId)
             result.onSuccess {
-                // Refresh the catalog list in UI state after removal
-                val updatedCatalogs = visibleCatalogs(catalogRepository.getCatalogs())
+                val updatedCatalogs = settingsCatalogs()
                 _uiState.value = _uiState.value.copy(
                     catalogs = updatedCatalogs,
                     toastMessage = context.getString(R.string.toast_catalog_removed),
@@ -2569,20 +2572,16 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun restoreHiddenCatalogs() {
+    fun setCatalogEnabled(catalogId: String, enabled: Boolean) {
         viewModelScope.launch {
+            val catalog = _uiState.value.catalogs.firstOrNull { it.id == catalogId } ?: return@launch
             runCatching {
-                catalogRepository.restoreAllHiddenCatalogsForActiveProfile()
-                catalogRepository.ensurePreinstalledDefaults(mediaRepository.getDefaultCatalogConfigs())
-                catalogRepository.syncAddonCatalogs(streamRepository.installedAddons.first())
+                catalogRepository.setCatalogEnabled(catalog, enabled)
+                _uiState.value = _uiState.value.copy(catalogs = settingsCatalogs())
                 syncLocalStateToCloud(silent = true)
-                _uiState.value = _uiState.value.copy(
-                    toastMessage = context.getString(R.string.toast_hidden_catalogs_restored),
-                    toastType = ToastType.SUCCESS
-                )
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = error.message ?: "Failed to restore hidden catalogs",
+                    toastMessage = error.message ?: context.getString(R.string.catalog_failed_update),
                     toastType = ToastType.ERROR
                 )
             }
@@ -2591,7 +2590,7 @@ class SettingsViewModel @Inject constructor(
 
     fun unpackCatalog(catalogId: String) {
         viewModelScope.launch {
-            val current = catalogRepository.getCatalogs()
+            val current = settingsCatalogs()
             val index = current.indexOfFirst { it.id == catalogId }
             if (index != -1) {
                 val target = current[index]
@@ -2624,14 +2623,14 @@ class SettingsViewModel @Inject constructor(
 
     fun moveCatalogUp(catalogId: String) {
         viewModelScope.launch {
-            catalogRepository.moveCatalogUp(catalogId)
+            catalogRepository.moveCatalogUp(catalogId, _uiState.value.catalogs)
             syncLocalStateToCloud(silent = true)
         }
     }
 
     fun moveCatalogDown(catalogId: String) {
         viewModelScope.launch {
-            catalogRepository.moveCatalogDown(catalogId)
+            catalogRepository.moveCatalogDown(catalogId, _uiState.value.catalogs)
             syncLocalStateToCloud(silent = true)
         }
     }

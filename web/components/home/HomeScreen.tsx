@@ -8,6 +8,7 @@ import { getImdbRating } from "@/lib/imdbRatings";
 import { loadGenreFanart } from "@/lib/genreFanart";
 import { tmdbOriginalBackdropUrl } from "@/lib/mediaImages";
 import { useApp } from "@/lib/store";
+import { buildHomeCatalogEntries } from "@/lib/catalogs";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
@@ -18,6 +19,7 @@ import { RailScroller } from "@/components/media/RailScroller";
 const collectionGroupTitles: Record<string, string> = {
   SERVICE: "Services",
   FRANCHISE: "Franchises",
+  DECADE: "Decades",
   STUDIO: "Studios",
   NETWORK: "Networks",
   MOVIE_GENRE: "Movie Genres",
@@ -251,42 +253,11 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
     };
   }, [catalogConfigs, settings.language]);
   const homeCatalogEntries = useMemo(() => {
-    const visibleCatalogs = catalogConfigs.filter((catalog) => {
-      if (settingsOnlyCatalogIds.has(catalog.id)) return false;
-      const group = String(catalog.collectionGroup ?? "").toUpperCase();
-      return group !== "FEATURED" && group !== "DECADE";
-    });
-    const groups = new Map<string, CatalogConfig[]>();
-    visibleCatalogs.filter(isCollectionCatalog).forEach((catalog) => {
-      const group = String(catalog.collectionGroup ?? "FEATURED").toUpperCase();
-      groups.set(group, [...(groups.get(group) ?? []), catalog]);
-    });
-    const renderedGroups = new Set<string>();
-    const entries: Array<
-      | { type: "catalog"; catalog: CatalogConfig }
-      | { type: "group"; group: string; catalogs: CatalogConfig[] }
-    > = [];
-    visibleCatalogs.forEach((catalog) => {
-      const kind = String(catalog.kind ?? "").toUpperCase();
-      if (kind === "COLLECTION") return;
-      if (kind === "COLLECTION_RAIL") {
-        const group = String(
-          catalog.collectionGroup ?? "FEATURED",
-        ).toUpperCase();
-        const catalogs = groups.get(group) ?? [];
-        if (catalogs.length) {
-          entries.push({ type: "group", group, catalogs });
-          renderedGroups.add(group);
-        }
-        return;
-      }
-      entries.push({ type: "catalog", catalog });
-    });
-    groups.forEach((catalogs, group) => {
-      if (!renderedGroups.has(group))
-        entries.push({ type: "group", group, catalogs });
-    });
-    return entries;
+    return buildHomeCatalogEntries(
+      catalogConfigs.filter(
+        (catalog) => !settingsOnlyCatalogIds.has(catalog.id),
+      ),
+    );
   }, [catalogConfigs]);
 
   // The eager rails (trending/popular/provider lists) overlap heavily; keep each

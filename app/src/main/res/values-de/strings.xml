@@ -1571,8 +1571,8 @@
     <string name="catalog_pack_label">Paket: %1$s • %2$s</string>
     <string name="catalog_pack_remove_catalog">Katalog aus Paket entfernen</string>
     <string name="catalogs_delete_selected">Ausgewählte Kataloge löschen</string>
-    <string name="catalogs_restore_hidden">Ausgeblendete Kataloge wiederherstellen</string>
-    <string name="catalogs_show_hidden">Ausgeblendete Kataloge anzeigen</string>
+    <string name="catalogs_disable_catalog">Katalog deaktivieren</string>
+    <string name="catalogs_enable_catalog">Katalog aktivieren</string>
     <string name="next_episode_countdown">in %1$ds</string>
     <string name="catalog_pack_url">Paket-URL</string>
     <string name="settings_connect_simkl">Simkl verbinden</string>

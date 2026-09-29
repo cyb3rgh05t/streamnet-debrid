@@ -6,6 +6,9 @@ const path = require("node:path");
 const moduleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/catalogs.ts"),
 ).href;
+const i18nModuleUrl = pathToFileURL(
+  path.resolve(__dirname, "../lib/i18n.ts"),
+).href;
 
 test("catalog migration removes retired rows and adds current Android defaults", async () => {
   const { mergeCatalogs } = await import(moduleUrl);
@@ -78,17 +81,25 @@ test("catalog labels use the requested German upcoming names", async () => {
   );
 });
 
+test("Decades Home rail uses the same German label as Android", async () => {
+  const { translateUiText } = await import(i18nModuleUrl);
+
+  assert.equal(translateUiText("de", "Decades"), "Jahrzehnte");
+  assert.equal(translateUiText("en", "Decades"), "Decades");
+});
+
 test("Web fallback catalogs follow the current Android order", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
 
-  assert.equal(defaultCatalogs.length, 99);
+  assert.equal(defaultCatalogs.length, 100);
   assert.deepEqual(
-    defaultCatalogs.slice(0, 14).map((catalog) => catalog.id),
+    defaultCatalogs.slice(0, 15).map((catalog) => catalog.id),
     [
       "recent_tv",
       "favorite_tv",
       "collection_rail_service",
       "collection_rail_franchise",
+      "collection_rail_decade",
       "trending_movies",
       "top10_movies_today",
       "top_movies_week",
@@ -112,6 +123,61 @@ test("Web fallback catalogs follow the current Android order", async () => {
       (catalog) => catalog.id === "collection_movie_genre_science_fiction",
     ),
     true,
+  );
+});
+
+test("Decades rail and collections use public MDBList sources without addons", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const rail = defaultCatalogs.find(
+    (catalog) => catalog.id === "collection_rail_decade",
+  );
+  const expectedSlugs = [
+    "snoak/top-2020s-movies",
+    "snoak/top-2010s-movies",
+    "snoak/top-2000s-movies",
+    "snoak/top-1990s-movies",
+    "snoak/top-1980s-movies",
+    "snoak/popular-1970s-movies",
+    "snoak/popular-1960s-movies",
+  ];
+  const decades = defaultCatalogs.filter(
+    (catalog) =>
+      catalog.kind === "COLLECTION" && catalog.collectionGroup === "DECADE",
+  );
+
+  assert.equal(rail?.kind, "COLLECTION_RAIL");
+  assert.equal(decades.length, expectedSlugs.length);
+  decades.forEach((catalog, index) => {
+    assert.equal(catalog.collectionSources?.length, 1);
+    assert.equal(catalog.collectionSources?.[0]?.kind, "MDBLIST_PUBLIC");
+    assert.equal(
+      catalog.collectionSources?.[0]?.mdblistSlug,
+      expectedSlugs[index],
+    );
+    assert.equal(catalog.collectionSources?.[0]?.mediaType, "movie");
+  });
+});
+
+test("disabled Decades rail is not recreated from its enabled collection cards", async () => {
+  const { buildHomeCatalogEntries, defaultCatalogs, mergeCatalogs } =
+    await import(moduleUrl);
+  const enabledEntries = buildHomeCatalogEntries(defaultCatalogs);
+  const disabledCatalogs = mergeCatalogs(defaultCatalogs, [
+    "collection_rail_decade",
+  ]);
+  const disabledEntries = buildHomeCatalogEntries(disabledCatalogs);
+
+  assert.equal(
+    enabledEntries.some(
+      (entry) => entry.type === "group" && entry.group === "DECADE",
+    ),
+    true,
+  );
+  assert.equal(
+    disabledEntries.some(
+      (entry) => entry.type === "group" && entry.group === "DECADE",
+    ),
+    false,
   );
 });
 
