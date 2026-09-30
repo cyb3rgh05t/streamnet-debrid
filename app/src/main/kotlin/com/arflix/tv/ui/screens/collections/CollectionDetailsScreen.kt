@@ -932,8 +932,9 @@ private fun CollectionTabBar(
                 },
                 isSelected = selectedTab == CollectionTab.TIMELINE,
                 focusRequester = timelineTabFocusRequester,
-                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                modifier = Modifier.weight(1f),
                 horizontalPadding = if (isMobile) 8.dp else 22.dp,
+                fillLabelWidth = true,
                 onMoveRight = {
                     if (showMovies) moviesTabFocusRequester.requestFocus()
                     else if (showSeries) seriesTabFocusRequester.requestFocus()
@@ -946,8 +947,9 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.movies),
                 isSelected = selectedTab == CollectionTab.MOVIES || onlyOne,
                 focusRequester = moviesTabFocusRequester,
-                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                modifier = Modifier.weight(1f),
                 horizontalPadding = if (isMobile) 8.dp else 22.dp,
+                fillLabelWidth = true,
                 onMoveLeft = { if (showTimeline) timelineTabFocusRequester.requestFocus() },
                 onMoveRight = { if (showSeries) seriesTabFocusRequester.requestFocus() },
                 onClick = { onTabSelected(CollectionTab.MOVIES) }
@@ -958,8 +960,9 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.series),
                 isSelected = selectedTab == CollectionTab.SERIES || onlyOne,
                 focusRequester = seriesTabFocusRequester,
-                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                modifier = Modifier.weight(1f),
                 horizontalPadding = if (isMobile) 8.dp else 22.dp,
+                fillLabelWidth = true,
                 onMoveLeft = {
                     if (showMovies) moviesTabFocusRequester.requestFocus()
                     else if (showTimeline) timelineTabFocusRequester.requestFocus()
@@ -977,6 +980,7 @@ private fun CollectionTabChip(
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
     horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
+    fillLabelWidth: Boolean = false,
     onMoveLeft: () -> Unit = {},
     onMoveRight: () -> Unit = {},
     onClick: () -> Unit
@@ -1030,7 +1034,7 @@ private fun CollectionTabChip(
     ) {
         androidx.tv.material3.Text(
             text = label,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = if (fillLabelWidth) Modifier.fillMaxWidth() else Modifier,
             style = ArflixTypography.sectionTitle.copy(
                 fontSize = 14.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,

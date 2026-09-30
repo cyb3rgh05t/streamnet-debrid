@@ -2,6 +2,11 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.052] - 2026-09-30
+
+- Franchise-Tabs erhalten auf TV gleich große, zentrierte Schaltflächen; drei sichtbare Tabs teilen die Breite in Drittel, zwei Tabs in Hälften.
+- Android-Version: `2.5.052` / Code `453`.
+
 ## [2.5.051] - 2026-09-30
 
 - Das Quellenfenster zeigt während der Addon-Suche den Ladehinweis und einen Spinner; schnelle Antworten bleiben mindestens kurz sichtbar, bevor Treffer erscheinen.
