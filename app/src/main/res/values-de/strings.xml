@@ -1066,6 +1066,7 @@
     <string name="player_error_generic">Ein unbekannter Fehler ist aufgetreten</string>
     <string name="player_no_media_server_sources">Keine Quellen für diesen Inhalt gefunden. Die konfigurierten Mediaserver enthalten diesen Titel möglicherweise nicht.</string>
     <string name="player_no_vod_sources">Keine Quellen für diesen Inhalt gefunden. Versuche eine andere Quelle oder überprüfe deine konfigurierten Quellen.</string>
+    <string name="player_no_streaming_addons">Keine Streaming-Add-ons eingerichtet.\n\nFüge unter Einstellungen → Add-ons ein Streaming-Add-on hinzu und versuche es erneut.</string>
 
     <!-- UI-Komponenten und Quellenauswahl -->
     <string name="component_qr_code">QR-Code</string>

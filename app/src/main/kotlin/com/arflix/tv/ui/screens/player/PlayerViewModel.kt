@@ -575,7 +575,8 @@ class PlayerViewModel @Inject constructor(
         preferredBingeGroup: String?,
         startPositionMs: Long?,
         isLiveStreamPlayback: Boolean = false,
-        airDate: String? = null
+        airDate: String? = null,
+        forceSourceRefresh: Boolean = false
     ) {
         currentAirDate = airDate
         currentMediaType = mediaType
@@ -1053,7 +1054,8 @@ class PlayerViewModel @Inject constructor(
                     streamRepository.resolveMovieStreamsProgressive(
                         imdbId = effectiveStreamId,
                         title = currentItemTitle,
-                        year = null
+                        year = null,
+                        forceRefresh = forceSourceRefresh
                     )
                 } else {
                     streamRepository.resolveEpisodeStreamsProgressive(
@@ -1066,7 +1068,8 @@ class PlayerViewModel @Inject constructor(
                         originalLanguage = currentOriginalLanguage,
                         title = currentItemTitle,
                         animeQueryOverride = animeQueryOverride,
-                        airDate = currentAirDate
+                        airDate = currentAirDate,
+                        forceRefresh = forceSourceRefresh
                     )
                 }
 
@@ -1110,9 +1113,9 @@ class PlayerViewModel @Inject constructor(
                             !hasHomeServerConnections &&
                             !supplementalSourcesStillLoading -> {
                             if (streamingAddonCount == 0) {
-                                "No streaming addons configured.\n\nGo to Settings \u2192 Addons to add a streaming addon, then come back and try again."
+                                context.getString(R.string.player_no_streaming_addons)
                             } else {
-                                "No streams found for this content. The addons may not have sources for this title."
+                                context.getString(R.string.player_no_vod_sources)
                             }
                         }
                         else -> null

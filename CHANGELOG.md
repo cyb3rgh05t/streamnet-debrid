@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.051] - 2026-09-30
+
+- Das Quellenfenster zeigt während der Addon-Suche den Ladehinweis und einen Spinner; schnelle Antworten bleiben mindestens kurz sichtbar, bevor Treffer erscheinen.
+- Der Empty-State mit Aktualisieren- und Anfrage-Aktionen erscheint erst, wenn die Suche beendet und die Ergebnisliste weiterhin leer ist.
+- Quellen aktualisieren erzwingt einen neuen Addon-Abruf und verwendet nicht erneut ein frisches Stream-Cache-Ergebnis.
+- Franchise-Tabs passen sich auf Touch-Geräten an die verfügbare Breite an und zentrieren ihre Beschriftungen.
+- Wiedergabefehler bei fehlenden Quellen oder nicht eingerichteten Streaming-Add-ons sind auf Deutsch lokalisiert.
+- Android-Version: `2.5.051` / Code `452`.
+
 ## [2.5.050] - 2026-09-29
 
 - Kataloge bleiben in Android Settings sichtbar und lassen sich pro Zeile ein-/ausschalten; versteckte Konfigurationen bleiben fuer Reaktivierung und profilbezogenen CloudSync erhalten.

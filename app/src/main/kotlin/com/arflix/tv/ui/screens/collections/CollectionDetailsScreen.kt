@@ -912,6 +912,7 @@ private fun CollectionTabBar(
     timelineTabFocusRequester: FocusRequester,
     onTabSelected: (CollectionTab) -> Unit
 ) {
+    val isMobile = LocalDeviceType.current.isTouchDevice()
     val showTimeline = hasTimeline
     val showMovies = hasMovies || !hasSeries
     val showSeries = hasSeries || !hasMovies
@@ -920,8 +921,8 @@ private fun CollectionTabBar(
         modifier = Modifier
             .fillMaxWidth()
             .arvioDpadFocusGroup()
-            .padding(start = 42.dp, end = 42.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(horizontal = if (isMobile) 16.dp else 42.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (isMobile) 6.dp else 8.dp)
     ) {
         if (showTimeline) {
             CollectionTabChip(
@@ -931,6 +932,8 @@ private fun CollectionTabBar(
                 },
                 isSelected = selectedTab == CollectionTab.TIMELINE,
                 focusRequester = timelineTabFocusRequester,
+                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                horizontalPadding = if (isMobile) 8.dp else 22.dp,
                 onMoveRight = {
                     if (showMovies) moviesTabFocusRequester.requestFocus()
                     else if (showSeries) seriesTabFocusRequester.requestFocus()
@@ -943,6 +946,8 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.movies),
                 isSelected = selectedTab == CollectionTab.MOVIES || onlyOne,
                 focusRequester = moviesTabFocusRequester,
+                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                horizontalPadding = if (isMobile) 8.dp else 22.dp,
                 onMoveLeft = { if (showTimeline) timelineTabFocusRequester.requestFocus() },
                 onMoveRight = { if (showSeries) seriesTabFocusRequester.requestFocus() },
                 onClick = { onTabSelected(CollectionTab.MOVIES) }
@@ -953,6 +958,8 @@ private fun CollectionTabBar(
                 label = stringResource(R.string.series),
                 isSelected = selectedTab == CollectionTab.SERIES || onlyOne,
                 focusRequester = seriesTabFocusRequester,
+                modifier = if (isMobile) Modifier.weight(1f) else Modifier,
+                horizontalPadding = if (isMobile) 8.dp else 22.dp,
                 onMoveLeft = {
                     if (showMovies) moviesTabFocusRequester.requestFocus()
                     else if (showTimeline) timelineTabFocusRequester.requestFocus()
@@ -968,6 +975,8 @@ private fun CollectionTabChip(
     label: String,
     isSelected: Boolean,
     focusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+    horizontalPadding: androidx.compose.ui.unit.Dp = 22.dp,
     onMoveLeft: () -> Unit = {},
     onMoveRight: () -> Unit = {},
     onClick: () -> Unit
@@ -994,7 +1003,7 @@ private fun CollectionTabChip(
         else -> 0.dp
     }
     Box(
-        modifier = Modifier
+        modifier = modifier
             .clip(shape)
             .background(bg)
             .border(width = borderWidth, color = borderColor, shape = shape)
@@ -1017,16 +1026,20 @@ private fun CollectionTabChip(
             }
             .focusable()
             .clickable(onClick = onClick)
-            .padding(horizontal = 22.dp, vertical = 10.dp)
+            .padding(horizontal = horizontalPadding, vertical = 10.dp)
     ) {
         androidx.tv.material3.Text(
             text = label,
+            modifier = Modifier.fillMaxWidth(),
             style = ArflixTypography.sectionTitle.copy(
                 fontSize = 14.sp,
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
                 letterSpacing = 0.4.sp
             ),
-            color = fg
+            color = fg,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }

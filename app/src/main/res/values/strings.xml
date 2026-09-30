@@ -1094,6 +1094,7 @@
     <string name="player_error_generic">An unknown error occurred</string>
     <string name="player_no_media_server_sources">No streams found for this content. The configured media servers may not have this title.</string>
     <string name="player_no_vod_sources">No streams found for this content. Try another source or check your configured sources.</string>
+    <string name="player_no_streaming_addons">No streaming addons configured.\n\nGo to Settings → Addons to add a streaming addon, then try again.</string>
 
     <!-- Extracted from code: Live TV -->
     <string name="live_badge_live">LIVE</string>

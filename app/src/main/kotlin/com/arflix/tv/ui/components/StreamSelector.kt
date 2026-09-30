@@ -220,6 +220,7 @@ fun StreamSelector(
     streams: List<StreamSource>,
     selectedStream: StreamSource?,
     isLoading: Boolean = false,
+    sourceSearchActive: Boolean = false,
     title: String = "",
     subtitle: String = "",
     hasStreamingAddons: Boolean = true,
@@ -253,6 +254,42 @@ fun StreamSelector(
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val pluginPrefix = stringResource(R.string.plugin_prefix)
     val accentColor = resolveAccentColor(AccentYellow)
+    var searchFeedbackStarted by remember { mutableStateOf(false) }
+    var searchFeedbackUntilMs by remember { mutableStateOf(0L) }
+    var emptyStateReady by remember { mutableStateOf(false) }
+    val searching = isLoading || sourceSearchActive || pluginScrapersLoading ||
+        (totalAddons > 0 && completedAddons < totalAddons)
+    LaunchedEffect(isVisible, searching, streams.isEmpty()) {
+        if (!isVisible) {
+            searchFeedbackStarted = false
+            searchFeedbackUntilMs = 0L
+            emptyStateReady = false
+            return@LaunchedEffect
+        }
+        if (streams.isNotEmpty()) {
+            emptyStateReady = true
+        } else {
+            emptyStateReady = false
+        }
+        if (streams.isEmpty() && !searchFeedbackStarted) {
+            searchFeedbackStarted = true
+            searchFeedbackUntilMs = android.os.SystemClock.elapsedRealtime() + 700L
+        }
+        val holdUntil = searchFeedbackUntilMs
+        val remaining = holdUntil - android.os.SystemClock.elapsedRealtime()
+        if (remaining > 0L) kotlinx.coroutines.delay(remaining)
+        if (searchFeedbackUntilMs == holdUntil) searchFeedbackUntilMs = 0L
+        if (streams.isEmpty() && !searching) {
+            kotlinx.coroutines.delay(1_500L)
+            emptyStateReady = true
+        }
+        if (!searching && searchFeedbackUntilMs == 0L) searchFeedbackStarted = false
+    }
+    val holdSearchFeedback = isVisible &&
+        searchFeedbackUntilMs > android.os.SystemClock.elapsedRealtime()
+    val showSearchFeedback = searching || holdSearchFeedback ||
+        (isVisible && streams.isEmpty() && !emptyStateReady)
+    val displayStreams = if (holdSearchFeedback) emptyList() else streams
 
     var elapsedSeconds by remember { mutableIntStateOf(0) }
     LaunchedEffect(streamSearchStartTime) {
@@ -284,8 +321,8 @@ fun StreamSelector(
     val sourceFilters = remember { listOf(SourceFilter("All")) }
 
     // Build addon tabs using addonId so multiple instances of the same addon are shown separately.
-    val addonTabs = remember(streams, addonOrderedIds) {
-        buildSourceAddonTabs(streams, addonOrderedIds)
+    val addonTabs = remember(displayStreams, addonOrderedIds) {
+        buildSourceAddonTabs(displayStreams, addonOrderedIds)
     }
 
     // Tab labels: "All sources" + addon labels
@@ -297,7 +334,7 @@ fun StreamSelector(
         sourceAddonTabKeys(addonTabs)
     }
 
-    val presentations = remember(streams) { streams.map(::presentSource) }
+    val presentations = remember(displayStreams) { displayStreams.map(::presentSource) }
 
     // Source ordering follows user addon order first. Within each addon, show the
     // largest files first, then the highest resolution/release quality.
@@ -389,14 +426,14 @@ fun StreamSelector(
     }
 
     // Count stats
-    val count4K = remember(streams) {
-        streams.count {
+    val count4K = remember(displayStreams) {
+        displayStreams.count {
             it.quality.contains("4K", ignoreCase = true) ||
             it.quality.contains("2160p", ignoreCase = true)
         }
     }
-    val count1080 = remember(streams) {
-        streams.count { it.quality.contains("1080p", ignoreCase = true) }
+    val count1080 = remember(displayStreams) {
+        displayStreams.count { it.quality.contains("1080p", ignoreCase = true) }
     }
     AnimatedVisibility(
         visible = isVisible,
@@ -523,7 +560,7 @@ fun StreamSelector(
                 OledSourceSelectorTv(
                     title = title,
                     subtitle = subtitle,
-                    streams = streams,
+                    streams = displayStreams,
                     flatPresentations = flatPresentations,
                     selectedStream = selectedStream,
                     sourceFilters = sourceFilters.map { it.label },
@@ -543,7 +580,8 @@ fun StreamSelector(
                     streamsFocused = focusZone == "streams",
                     count4K = count4K,
                     count1080 = count1080,
-                    isLoading = isLoading,
+                    isLoading = isLoading || showSearchFeedback,
+                    sourceSearchActive = sourceSearchActive || showSearchFeedback,
                     hasStreamingAddons = hasStreamingAddons,
                     completedAddons = completedAddons,
                     totalAddons = totalAddons,
@@ -595,7 +633,7 @@ fun StreamSelector(
                                 overflow = TextOverflow.Ellipsis
                             )
                             Text(
-                                text = "${streams.size} ${stringResource(R.string.sources_available)}",
+                                text = "${displayStreams.size} ${stringResource(R.string.sources_available)}",
                                 style = ArflixTypography.caption.copy(fontSize = 12.sp),
                                 color = TextSecondary
                             )
@@ -660,8 +698,8 @@ fun StreamSelector(
                     }
 
                     // Stream list or loading/empty states
-                    if (streams.isEmpty()) {
-                        val stillSearching = isLoading || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
+                    if (displayStreams.isEmpty()) {
+                        val stillSearching = showSearchFeedback
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -788,6 +826,7 @@ private fun OledSourceSelectorTv(
     count4K: Int,
     count1080: Int,
     isLoading: Boolean,
+    sourceSearchActive: Boolean,
     hasStreamingAddons: Boolean,
     completedAddons: Int,
     totalAddons: Int,
@@ -835,8 +874,9 @@ private fun OledSourceSelectorTv(
                     )
                     Spacer(modifier = Modifier.height(5.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        val stillSearchingMore = streams.isNotEmpty() &&
-                            (isLoading || pluginScrapersLoading || (totalAddons > 0 && completedAddons < totalAddons))
+                        val stillSearchingMore =
+                            isLoading || sourceSearchActive || pluginScrapersLoading ||
+                                (totalAddons > 0 && completedAddons < totalAddons)
                         if (stillSearchingMore) {
                             LoadingIndicator(color = OledMutedText, size = 13.dp, strokeWidth = 2.dp)
                             Spacer(modifier = Modifier.width(6.dp))
@@ -847,6 +887,7 @@ private fun OledSourceSelectorTv(
                                 completedAddons = completedAddons,
                                 totalAddons = totalAddons,
                                 isLoading = isLoading,
+                                sourceSearchActive = sourceSearchActive,
                                 elapsedSeconds = elapsedSeconds,
                                 pluginScrapersLoading = pluginScrapersLoading
                             ),
@@ -912,6 +953,7 @@ private fun OledSourceSelectorTv(
             when {
                 streams.isEmpty() -> SourceEmptyState(
                     isLoading = isLoading,
+                    sourceSearchActive = sourceSearchActive,
                     completedAddons = completedAddons,
                     totalAddons = totalAddons,
                     hasStreamingAddons = hasStreamingAddons,
@@ -924,6 +966,7 @@ private fun OledSourceSelectorTv(
                 )
                 flatPresentations.isEmpty() -> SourceEmptyState(
                     isLoading = false,
+                    sourceSearchActive = sourceSearchActive,
                     completedAddons = completedAddons,
                     totalAddons = totalAddons,
                     hasStreamingAddons = hasStreamingAddons,
@@ -1235,24 +1278,26 @@ private fun sourceStatusText(
     completedAddons: Int,
     totalAddons: Int,
     isLoading: Boolean,
+    sourceSearchActive: Boolean,
     elapsedSeconds: Int = 0,
     pluginScrapersLoading: Boolean = false
 ): String {
     val remaining = (totalAddons - completedAddons).coerceAtLeast(0)
-    val elapsed = if (elapsedSeconds > 0 && (isLoading || pluginScrapersLoading)) {
+    val searching = isLoading || sourceSearchActive || pluginScrapersLoading
+    val elapsed = if (elapsedSeconds > 0 && searching) {
         stringResource(R.string.stream_elapsed_prefix, elapsedSeconds)
     } else {
         ""
     }
     return when {
-        isLoading && totalAddons > 0 && remaining > 0 ->
+        searching && totalAddons > 0 && remaining > 0 ->
             elapsed + stringResource(
                 R.string.stream_sources_still_checking,
                 sourceCount,
                 remaining,
                 stringResource(if (remaining == 1) R.string.stream_addon_singular else R.string.stream_addon_plural),
             )
-        isLoading -> elapsed + stringResource(R.string.stream_sources_searching, sourceCount)
+        searching -> elapsed + stringResource(R.string.stream_sources_searching, sourceCount)
         pluginScrapersLoading -> elapsed + stringResource(R.string.stream_sources_searching_more, sourceCount)
         totalAddons > 0 -> stringResource(R.string.stream_sources_checked, sourceCount, completedAddons, totalAddons)
         else -> stringResource(R.string.stream_sources_found, sourceCount)
@@ -1940,6 +1985,7 @@ private fun RailMetric(label: String, value: String) {
 @Composable
 private fun SourceEmptyState(
     isLoading: Boolean,
+    sourceSearchActive: Boolean = false,
     completedAddons: Int,
     totalAddons: Int,
     hasStreamingAddons: Boolean,
@@ -1963,7 +2009,7 @@ private fun SourceEmptyState(
                 .border(1.dp, OledMutedBorder, RoundedCornerShape(18.dp))
                 .padding(horizontal = 42.dp, vertical = 34.dp)
         ) {
-            val stillSearching = isLoading || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
+            val stillSearching = isLoading || sourceSearchActive || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
             if (stillSearching) {
                 LoadingIndicator(color = accentColor, size = 42.dp)
                 Spacer(modifier = Modifier.height(14.dp))

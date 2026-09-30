@@ -4284,7 +4284,9 @@ fun PlayerScreen(
             isVisible = showSourceMenu,
             streams = uiState.streams,
             selectedStream = uiState.selectedStream,
-            isLoading = uiState.isLoadingStreams,
+            isLoading = uiState.isLoadingStreams || uiState.isLoading,
+            sourceSearchActive = uiState.sourceSearchActive ||
+                uiState.streamProgress != null || !uiState.streamLoadPhase.isNullOrBlank(),
             hasStreamingAddons = !uiState.isSetupError,
             addonOrderedIds = uiState.addonOrderedIds,
             title = uiState.title,
@@ -4340,6 +4342,7 @@ fun PlayerScreen(
                     preferredBingeGroup = null,
                     startPositionMs = exoPlayer.currentPosition,
                     isLiveStreamPlayback = isLiveStream,
+                    forceSourceRefresh = true,
                 )
             }
         )
