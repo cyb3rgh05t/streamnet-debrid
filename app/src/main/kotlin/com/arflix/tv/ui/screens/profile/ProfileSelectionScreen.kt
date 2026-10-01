@@ -210,7 +210,7 @@ fun ProfileSelectionScreen(
 
             Text(
                 text = stringResource(R.string.whos_watching),
-                fontSize = if (isTouchDevice) 24.sp else 30.sp,
+                fontSize = if (isTouchDevice) 20.sp else 24.sp,
                 fontWeight = FontWeight.Normal,
                 color = Color.White.copy(alpha = 0.86f),
                 textAlign = TextAlign.Center,

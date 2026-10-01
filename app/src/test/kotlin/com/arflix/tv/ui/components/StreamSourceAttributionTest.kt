@@ -7,6 +7,23 @@ import org.junit.Test
 
 class StreamSourceAttributionTest {
     @Test
+    fun `indexer is displayed beside addon only when supplied`() {
+        val indexed = source(
+            rawLabel = "4K WEB-DL",
+            hints = StreamBehaviorHints(indexer = "altHUB")
+        )
+        val codeOnly = source(
+            rawLabel = "4K WEB-DL",
+            hints = StreamBehaviorHints(indexerCode = "AB")
+        )
+        val withoutIndexer = source(rawLabel = "4K WEB-DL")
+
+        assertEquals("StreamNet NZB · altHUB", sourceAddonWithIndexerLabel(indexed, "StreamNet NZB"))
+        assertEquals("StreamNet NZB · AB", sourceAddonWithIndexerLabel(codeOnly, "StreamNet NZB"))
+        assertEquals("StreamNet NZB", sourceAddonWithIndexerLabel(withoutIndexer, "StreamNet NZB"))
+    }
+
+    @Test
     fun `structured provider and indexer are shown without internal codes`() {
         val stream = source(
             rawLabel = "Usenet Vault 4K WEB-DL HEVC",

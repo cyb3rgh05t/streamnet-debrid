@@ -191,11 +191,15 @@ data class StremioStream(
     val fileIdx: Int? = null,
     val ytId: String? = null,              // YouTube video ID
     val externalUrl: String? = null,        // External URL to open
+    val meta: StremioStreamMeta? = null,
     @SerializedName("headers") val headers: Map<String, String>? = null,
     val behaviorHints: StreamBehaviorHints? = null,
     val sources: List<String>? = null,
     val subtitles: List<StremioSubtitle>? = null
 ) {
+    fun getIndexerName(): String? = behaviorHints?.indexer.asAddonMetadataText()
+        ?: meta?.indexer.asAddonMetadataText()
+
     // Parse quality from title or name
     fun getQuality(): String {
         // Check all text fields for quality indicators
@@ -337,6 +341,8 @@ data class StremioStream(
 /**
  * Stream behavior hints - enhanced to match full Stremio protocol
  */
+data class StremioStreamMeta(val indexer: JsonElement? = null)
+
 data class StreamBehaviorHints(
     val notWebReady: Boolean? = null,       // Stream needs transcoding
     val cached: Boolean? = null,             // Already cached in debrid

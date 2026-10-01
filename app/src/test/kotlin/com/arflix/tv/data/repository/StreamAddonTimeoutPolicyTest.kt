@@ -9,6 +9,17 @@ import org.junit.Test
 
 class StreamAddonTimeoutPolicyTest {
     @Test
+    fun `streamnet nzb configured instances get time to finish server side lookup`() {
+        val addon = addon(
+            id = "com.usenet.streamer_730eec13a38f",
+            name = "StreamNet NZB",
+            manifestId = "com.usenet.streamer"
+        )
+
+        assertTrue(usesSlowAggregatorTimeout(addon))
+    }
+
+    @Test
     fun `penguplay configured instances use the slow aggregator timeout`() {
         val addon = addon(
             id = "com.penguplay.configured",

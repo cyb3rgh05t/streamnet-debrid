@@ -1604,9 +1604,12 @@ private fun rowSubtitle(presentation: SourcePresentation): String {
     val addonPart = presentation.upstreamLabel
         ?.let { "${presentation.addonLabel} — $it" }
         ?: presentation.addonLabel
+    val labeledAddon = sourceAddonWithIndexerLabel(presentation.stream, addonPart)
+    val indexer = cleanSourceAttribution(presentation.stream.behaviorHints?.indexer)
+        ?: cleanSourceAttribution(presentation.stream.behaviorHints?.indexerCode)
     return buildList {
-        add(addonPart)
-        addAll(presentation.attributionLabels)
+        add(labeledAddon)
+        addAll(presentation.attributionLabels.filterNot { it.equals(indexer, ignoreCase = true) })
         presentation.editionLabel?.let(::add)
         presentation.bitrateLabel?.let(::add)
     }
@@ -1752,7 +1755,7 @@ private fun BestMatchStrip(
             }
             Spacer(modifier = Modifier.height(5.dp))
             Text(
-                text = "${presentation.addonLabel} - ${presentation.rawTitle}",
+                text = "${sourceAddonWithIndexerLabel(presentation.stream, presentation.addonLabel)} - ${presentation.rawTitle}",
                 style = ArflixTypography.body.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                 color = TextPrimary,
                 maxLines = 1,

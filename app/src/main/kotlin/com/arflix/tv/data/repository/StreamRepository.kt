@@ -229,6 +229,7 @@ internal fun usesSlowAggregatorTimeout(addon: Addon): Boolean {
     ).joinToString(" ").lowercase(Locale.US)
     return haystack.contains("aiostreams") ||
         haystack.contains("aio-streams") ||
+        haystack.contains("com.usenet.streamer") ||
         haystack.contains("comet") ||
         haystack.contains("mediafusion") ||
         haystack.contains("hdhub") ||
@@ -1773,7 +1774,7 @@ class StreamRepository @Inject constructor(
         addonRevision: String
     ): String {
         val providerPart = providerEpisodeId?.let { "|provider:$it" }.orEmpty()
-        return "$profileId|$type|$imdbId|${season ?: 0}|${episode ?: 0}$providerPart|addons:$addonRevision"
+        return "v3|$profileId|$type|$imdbId|${season ?: 0}|${episode ?: 0}$providerPart|addons:$addonRevision"
     }
 
     private fun cacheTtlMsFor(result: StreamResult): Long {
@@ -2366,7 +2367,7 @@ class StreamRepository @Inject constructor(
                 synchronized(streamResultCache) {
                     val cached = streamResultCache[cacheKey]
                     if (cached != null) {
-                        if (isStreamCacheFresh(cached)) {
+                        if (isStreamCacheFresh(cached) && cached.result.streams.isNotEmpty()) {
                             trySend(ProgressiveStreamResult(cached.result.streams, cached.result.subtitles, 1, 1, true))
                             close()
                             return@launch
@@ -2389,10 +2390,10 @@ class StreamRepository @Inject constructor(
                             subtitles = cached.result.subtitles,
                             completedAddons = 0,
                             totalAddons = 1,
-                            isFinal = isStreamCacheFresh(cached)
+                            isFinal = isStreamCacheFresh(cached) && cached.result.streams.isNotEmpty()
                         )
                     )
-                    if (isStreamCacheFresh(cached)) {
+                    if (isStreamCacheFresh(cached) && cached.result.streams.isNotEmpty()) {
                         close()
                         return@launch
                     }
@@ -2669,19 +2670,20 @@ class StreamRepository @Inject constructor(
                             provider = it.provider.asAddonMetadataText(),
                             providerCode = it.providerCode.asAddonMetadataText(),
                             sourceLabel = it.source.asAddonMetadataText(),
-                            indexer = it.indexer.asAddonMetadataText(),
+                            indexer = stream.getIndexerName(),
                             indexerCode = it.indexerCode.asAddonMetadataText(),
                             language = it.language.asAddonMetadataText()
                         )
-                    } ?: stream.headers?.let { rawHeaders ->
-                        val requestHeaders = sanitizeRequestHeaders(rawHeaders)
+                    } ?: if (stream.headers != null || stream.getIndexerName() != null) {
+                        val requestHeaders = sanitizeRequestHeaders(stream.headers)
                         ModelStreamBehaviorHints(
                             notWebReady = false,
+                            indexer = stream.getIndexerName(),
                             proxyHeaders = requestHeaders
                                 .takeIf { headers -> headers.isNotEmpty() }
                                 ?.let { headers -> ModelProxyHeaders(request = headers) }
                         )
-                    },
+                    } else null,
                     subtitles = embeddedSubs,
                     sources = stream.sources ?: emptyList(),
                     description = stream.description?.trim()?.takeIf { it.isNotBlank() },
@@ -2825,7 +2827,7 @@ class StreamRepository @Inject constructor(
                 synchronized(streamResultCache) {
                     val cached = streamResultCache[cacheKey]
                     if (cached != null) {
-                        if (isStreamCacheFresh(cached)) {
+                        if (isStreamCacheFresh(cached) && cached.result.streams.isNotEmpty()) {
                             trySend(ProgressiveStreamResult(cached.result.streams, cached.result.subtitles, 1, 1, true))
                             close()
                             return@launch

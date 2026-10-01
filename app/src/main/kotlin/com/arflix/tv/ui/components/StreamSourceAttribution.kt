@@ -41,6 +41,17 @@ internal fun sourceAttributionLabels(
     }.distinctBy(::normalizedAttribution)
 }
 
+internal fun sourceAddonWithIndexerLabel(stream: StreamSource, addonLabel: String): String {
+    val indexer = cleanSourceAttribution(stream.behaviorHints?.indexer)
+        ?: cleanSourceAttribution(stream.behaviorHints?.indexerCode)
+    return if (indexer != null && normalizedAttribution(indexer) != normalizedAttribution(addonLabel) &&
+        !normalizedAttribution(addonLabel).contains(normalizedAttribution(indexer))) {
+        "$addonLabel · $indexer"
+    } else {
+        addonLabel
+    }
+}
+
 internal fun cleanSourceAttribution(raw: String?): String? {
     if (raw.isNullOrBlank()) return null
     val cleaned = raw

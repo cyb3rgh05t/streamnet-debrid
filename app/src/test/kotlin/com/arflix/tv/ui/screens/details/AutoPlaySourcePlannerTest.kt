@@ -9,6 +9,16 @@ import org.junit.Test
 
 class AutoPlaySourcePlannerTest {
     @Test
+    fun `empty source list stays loading until every provider finishes`() {
+        assertTrue(emptySourceSearchStillLoading(false, false, true, true, true))
+        assertTrue(emptySourceSearchStillLoading(false, true, false, true, true))
+        assertTrue(emptySourceSearchStillLoading(false, true, true, false, true))
+        assertTrue(emptySourceSearchStillLoading(false, true, true, true, false))
+        assertFalse(emptySourceSearchStillLoading(false, true, true, true, true))
+        assertFalse(emptySourceSearchStillLoading(true, false, false, false, false))
+    }
+
+    @Test
     fun `best autoplay prefers 4k over small 720p even when sizeBytes hint is wrong`() {
         val small720 = stream(
             source = "Movie 720p WEB-DL",

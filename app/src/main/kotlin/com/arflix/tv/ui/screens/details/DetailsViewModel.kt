@@ -303,9 +303,26 @@ class DetailsViewModel @Inject constructor(
     private var vodAppendJob: kotlinx.coroutines.Job? = null
     private var vodCompletedRequestId: Long = -1L
     private var vodCompletionCountedRequestId: Long = -1L
+    private var addonSearchFinishedRequestId: Long = -1L
+    private var homeServerCompletedRequestId: Long = -1L
     private var homeServerAppendJob: kotlinx.coroutines.Job? = null
+    private var pluginScraperJob: kotlinx.coroutines.Job? = null
     private var loadStreamsJob: kotlinx.coroutines.Job? = null
     private var loadStreamsRequestId: Long = 0L
+
+    private fun updateEmptySourceLoading(requestId: Long) {
+        if (requestId != loadStreamsRequestId) return
+        val current = _uiState.value
+        _uiState.value = current.copy(
+            isLoadingStreams = emptySourceSearchStillLoading(
+                hasStreams = current.streams.isNotEmpty(),
+                addonsFinished = addonSearchFinishedRequestId == requestId,
+                homeServerFinished = homeServerCompletedRequestId == requestId,
+                vodFinished = vodAppendJob == null || vodCompletedRequestId == requestId,
+                pluginsFinished = pluginScraperJob?.isActive != true
+            )
+        )
+    }
     private var focusedStreamPrewarmJob: kotlinx.coroutines.Job? = null
     private var streamListPrewarmJob: kotlinx.coroutines.Job? = null
     private var lastStreamListPrewarmKey: String = ""
@@ -1803,6 +1820,7 @@ class DetailsViewModel @Inject constructor(
 
     fun loadStreams(imdbId: String?, identity: EpisodeIdentity? = null) {
         loadStreamsJob?.cancel()
+        pluginScraperJob?.cancel()
         focusedStreamPrewarmJob?.cancel()
         streamListPrewarmJob?.cancel()
         homeServerAppendJob?.cancel()
@@ -1819,6 +1837,9 @@ class DetailsViewModel @Inject constructor(
         )
         vodCompletedRequestId = -1L
         vodCompletionCountedRequestId = -1L
+        addonSearchFinishedRequestId = -1L
+        homeServerCompletedRequestId = -1L
+        pluginScraperJob = null
         val requestId = ++loadStreamsRequestId
         val requestMediaType = currentMediaType
         val requestMediaId = currentMediaId
@@ -1889,15 +1910,22 @@ class DetailsViewModel @Inject constructor(
                 }.getOrDefault(false)
                 // Start VOD append in background - runs parallel to addon stream fetch
                 homeServerAppendJob = viewModelScope.launch {
-                    appendHomeServerSourcesInBackground(
-                        imdbId = resolvedImdbId,
-                        season = canonicalSeason,
-                        episode = canonicalEpisode,
-                        timeoutMs = 5_000L,
-                        requestId = requestId,
-                        requestMediaType = requestMediaType,
-                        requestMediaId = requestMediaId
-                    )
+                    try {
+                        appendHomeServerSourcesInBackground(
+                            imdbId = resolvedImdbId,
+                            season = canonicalSeason,
+                            episode = canonicalEpisode,
+                            timeoutMs = 5_000L,
+                            requestId = requestId,
+                            requestMediaType = requestMediaType,
+                            requestMediaId = requestMediaId
+                        )
+                    } finally {
+                        if (requestId == loadStreamsRequestId) {
+                            homeServerCompletedRequestId = requestId
+                            updateEmptySourceLoading(requestId)
+                        }
+                    }
                 }
                 vodAppendJob?.cancel()
                 vodAppendJob = if (iptvVodAddonEnabled) {
@@ -1920,7 +1948,6 @@ class DetailsViewModel @Inject constructor(
                     null
                 }
 
-                var pluginScraperJob: kotlinx.coroutines.Job? = null
                 pluginScraperJob = viewModelScope.launch {
                     try {
                         _uiState.value = _uiState.value.copy(pluginScrapersLoading = true)
@@ -1966,17 +1993,14 @@ class DetailsViewModel @Inject constructor(
                     } catch (e: Exception) {
                         Log.w(TAG, "[PluginScrapers] streaming execution failed: ${e.message}")
                     } finally {
-                        val current = _uiState.value
-                        val stillLoading = loadStreamsJob?.isActive == true ||
-                                           vodAppendJob?.isActive == true ||
-                                           homeServerAppendJob?.isActive == true
-                        val newLoading = current.isLoadingStreams && current.streams.isEmpty() && stillLoading
-
-                        _uiState.value = current.copy(
-                            pluginScrapersLoading = false,
-                            loadingPluginNames = emptySet(),
-                            isLoadingStreams = newLoading
-                        )
+                        if (isCurrentRequest()) {
+                            _uiState.value = _uiState.value.copy(
+                                pluginScrapersLoading = false,
+                                loadingPluginNames = emptySet()
+                            )
+                            pluginScraperJob = null
+                            updateEmptySourceLoading(requestId)
+                        }
                     }
                 }
 
@@ -2034,11 +2058,15 @@ class DetailsViewModel @Inject constructor(
                         )
                         val addonCount = streamRepository.installedAddons.first()
                             .count { it.isVodStreamingAddon() }
-                        val supplementalSourcesStillLoading =
-                            homeServerAppendJob?.isActive == true || vodAppendJob?.isActive == true
+                        if (progressive.isFinal) addonSearchFinishedRequestId = requestId
                         _uiState.value = _uiState.value.copy(
-                            isLoadingStreams = mergedStreams.isEmpty() &&
-                                (!progressive.isFinal || hasHomeServerConnections || supplementalSourcesStillLoading || pluginScraperJob?.isActive == true),
+                            isLoadingStreams = emptySourceSearchStillLoading(
+                                hasStreams = mergedStreams.isNotEmpty(),
+                                addonsFinished = addonSearchFinishedRequestId == requestId,
+                                homeServerFinished = homeServerCompletedRequestId == requestId,
+                                vodFinished = vodAppendJob == null || vodCompletedRequestId == requestId,
+                                pluginsFinished = pluginScraperJob?.isActive != true
+                            ),
                             completedAddons = progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0,
                             totalAddons = maxOf(
                                 progressive.totalAddons + if (iptvVodAddonEnabled) 1 else 0,
@@ -2094,11 +2122,15 @@ class DetailsViewModel @Inject constructor(
                         )
                         val addonCount = streamRepository.installedAddons.first()
                             .count { it.isVodStreamingAddon() }
-                        val supplementalSourcesStillLoading =
-                            homeServerAppendJob?.isActive == true || vodAppendJob?.isActive == true
+                        if (progressive.isFinal) addonSearchFinishedRequestId = requestId
                         _uiState.value = _uiState.value.copy(
-                            isLoadingStreams = mergedStreams.isEmpty() &&
-                                (!progressive.isFinal || hasHomeServerConnections || supplementalSourcesStillLoading || pluginScraperJob?.isActive == true),
+                            isLoadingStreams = emptySourceSearchStillLoading(
+                                hasStreams = mergedStreams.isNotEmpty(),
+                                addonsFinished = addonSearchFinishedRequestId == requestId,
+                                homeServerFinished = homeServerCompletedRequestId == requestId,
+                                vodFinished = vodAppendJob == null || vodCompletedRequestId == requestId,
+                                pluginsFinished = pluginScraperJob?.isActive != true
+                            ),
                             completedAddons = progressive.completedAddons + if (vodCompletedRequestId == requestId) 1 else 0,
                             totalAddons = maxOf(
                                 progressive.totalAddons + if (iptvVodAddonEnabled) 1 else 0,
@@ -2121,7 +2153,8 @@ class DetailsViewModel @Inject constructor(
                         e
                     )
                 }
-                _uiState.value = _uiState.value.copy(isLoadingStreams = false)
+                addonSearchFinishedRequestId = requestId
+                updateEmptySourceLoading(requestId)
             }
         }
     }
@@ -3119,9 +3152,6 @@ class DetailsViewModel @Inject constructor(
         }
         val validSources = sources.filter { !it.url.isNullOrBlank() }
         if (validSources.isEmpty()) {
-            if (_uiState.value.streams.isEmpty() && vodAppendJob?.isActive != true) {
-                _uiState.value = _uiState.value.copy(isLoadingStreams = false)
-            }
             return
         }
         val latest = _uiState.value.streams
@@ -3188,13 +3218,11 @@ class DetailsViewModel @Inject constructor(
                         vodCompletionCountedRequestId = requestId
                         val current = _uiState.value
                         _uiState.value = current.copy(
-                            completedAddons = current.completedAddons + 1,
-                            isLoadingStreams = current.isLoadingStreams &&
-                                current.streams.isEmpty() &&
-                                current.completedAddons + 1 < current.totalAddons
+                            completedAddons = current.completedAddons + 1
                         )
                     }
                 }
+                updateEmptySourceLoading(requestId)
             }
         }
         val validVodSources = vodSources.filter { !it.url.isNullOrBlank() }
@@ -3219,6 +3247,14 @@ class DetailsViewModel @Inject constructor(
         prewarmVisibleStreams(mergedStreams)
     }
 }
+
+internal fun emptySourceSearchStillLoading(
+    hasStreams: Boolean,
+    addonsFinished: Boolean,
+    homeServerFinished: Boolean,
+    vodFinished: Boolean,
+    pluginsFinished: Boolean
+): Boolean = !hasStreams && !(addonsFinished && homeServerFinished && vodFinished && pluginsFinished)
 
 private object DetailsVMRegexes {
     val reviewWhitespaceRegex = Regex("\\s+")

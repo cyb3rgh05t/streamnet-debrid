@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.053] - 2026-10-01
+
+- Das Quellenfenster zeigt den Leerzustand erst, wenn Addon-, Home-Server-, IPTV-VOD- und Plugin-Suche für dieselbe Anfrage abgeschlossen sind; bereits gefundene Quellen erscheinen weiterhin sofort. Ein alter Plugin-Job wird beim erneuten Laden abgebrochen.
+- Leere Stream-Cache-Ergebnisse gelten nicht mehr als endgültiger Treffer für spätere Anfragen. Das StreamNet-NZB-Addon erhält für serverseitige Suchen die vorhandenen Aggregator-Timeouts (20 Sekunden für Filme, 25 Sekunden für Episoden), damit langsame Antworten nicht vorschnell als quellenlos gelten.
+- Android übernimmt Indexernamen aus `meta.indexer` der Addon-Antwort und zeigt sie direkt neben dem Addonnamen in der Quellenliste an. Der Stream-Cache-Schlüssel ist einmalig versioniert, damit alte Einträge ohne Indexer nicht angezeigt werden.
+- „Wer schaut gerade?“ ist im Profilselector auf Touch-Geräten und TV kleiner dargestellt.
+- Android-Version: `2.5.053` / Code `454`.
+
 ## [2.5.052] - 2026-09-30
 
 - Franchise-Tabs erhalten auf TV gleich große, zentrierte Schaltflächen; drei sichtbare Tabs teilen die Breite in Drittel, zwei Tabs in Hälften.

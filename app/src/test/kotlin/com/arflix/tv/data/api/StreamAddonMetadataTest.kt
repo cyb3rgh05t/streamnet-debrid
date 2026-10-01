@@ -7,6 +7,30 @@ import org.junit.Test
 
 class StreamAddonMetadataTest {
     @Test
+    fun `nzb stream reads indexer from meta when behavior hints omit it`() {
+        val stream = Gson().fromJson(
+            """{
+                "name": "StreamNet NZB",
+                "behaviorHints": {"filename": "Movie.1080p.mkv"},
+                "meta": {"indexer": "SceneNZBs / Treasure-Maps"}
+            }""".trimIndent(),
+            StremioStream::class.java
+        )
+
+        assertEquals("SceneNZBs / Treasure-Maps", stream.getIndexerName())
+    }
+
+    @Test
+    fun `structured indexer takes precedence over addon meta`() {
+        val stream = Gson().fromJson(
+            """{"behaviorHints":{"indexer":"Primary"},"meta":{"indexer":"Fallback"}}""",
+            StremioStream::class.java
+        )
+
+        assertEquals("Primary", stream.getIndexerName())
+    }
+
+    @Test
     fun `custom behavior hints preserve strings arrays and numbers`() {
         val hints = Gson().fromJson(
             """{
