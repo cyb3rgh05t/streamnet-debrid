@@ -52,6 +52,17 @@ class VodStreamingAddonTest {
     }
 
     @Test
+    fun `movie catalog without stream resource does not count as VOD`() {
+        val catalogAddon = addon(
+            resourceName = "catalog",
+            resourceTypes = listOf("movie"),
+            manifestTypes = listOf("movie"),
+        )
+
+        assertThat(isEnabledVodStreamingAddon(catalogAddon)).isFalse()
+    }
+
+    @Test
     fun `fresh profile starts IPTV only until first VOD addon appears`() {
         val fresh = reconcileIptvOnlyAddonState(null, hasSeenVodAddon = false, hasVodAddon = false)
         assertThat(fresh.enabled).isTrue()
@@ -78,12 +89,27 @@ class VodStreamingAddonTest {
         assertThat(reconciled.enabledChanged).isFalse()
     }
 
+    @Test
+    fun `removing the last VOD addon forces IPTV only back on`() {
+        val reconciled = reconcileIptvOnlyAddonState(
+            currentEnabled = false,
+            hasSeenVodAddon = true,
+            hasVodAddon = false,
+        )
+
+        assertThat(reconciled.enabled).isTrue()
+        assertThat(reconciled.hasSeenVodAddon).isFalse()
+        assertThat(reconciled.enabledChanged).isTrue()
+    }
+
     private fun addon(
         id: String = "test-addon",
         manifestId: String = id,
         type: AddonType = AddonType.CUSTOM,
         enabled: Boolean = true,
         resourceTypes: List<String> = listOf("movie", "series"),
+        resourceName: String = "stream",
+        manifestTypes: List<String> = emptyList(),
         url: String? = null,
     ) = Addon(
         id = id,
@@ -98,7 +124,8 @@ class VodStreamingAddonTest {
             id = manifestId,
             name = "Test Addon",
             version = "1.0.0",
-            resources = listOf(AddonResource("stream", resourceTypes)),
+            types = manifestTypes,
+            resources = listOf(AddonResource(resourceName, resourceTypes)),
         ),
     )
 }

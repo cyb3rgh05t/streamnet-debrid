@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.054] - 2026-10-02
+
+- IPTV-only bleibt aktiv und IPTV-VOD-Suche eingeschaltet, solange kein aktiviertes VOD-Streaming-Addon installiert ist. Der Schalter ist dann auf Touch-Geräten und TV deaktiviert; Subtitle-, Metadaten- und reine Katalog-Addons zählen nicht als Streaming-Addon.
+- Das erstmalige Installieren eines Addons mit einer VOD-fähigen `stream`-Ressource kann IPTV-only wie vorgesehen ausschalten. Wird das letzte VOD-Streaming-Addon entfernt, werden IPTV-only und IPTV-VOD-Suche wieder eingeschaltet.
+- Alte lokale und aus der Cloud wiederhergestellte IPTV-only-Werte werden mit den installierten Addon-Fähigkeiten abgeglichen und profilbezogen synchronisiert. Ein Cloud-Restore kann die Sperre ohne VOD-Streaming-Addon nicht mehr umgehen.
+- Feste englische Status- und Toastmeldungen für Addons, IPTV, Cloud-Sync, Trakt und Profil-PIN sind in deutsche und englische Android-Ressourcen ausgelagert. Offline-Download-Systemmeldungen verwenden die vorhandenen Media3-Übersetzungen.
+- Android-Version: `2.5.054` / Code `455`.
+
 ## [2.5.053] - 2026-10-01
 
 - Das Quellenfenster zeigt den Leerzustand erst, wenn Addon-, Home-Server-, IPTV-VOD- und Plugin-Suche für dieselbe Anfrage abgeschlossen sind; bereits gefundene Quellen erscheinen weiterhin sofort. Ein alter Plugin-Job wird beim erneuten Laden abgebrochen.

@@ -375,14 +375,16 @@ internal fun reconcileIptvOnlyAddonState(
     var enabled = currentEnabled ?: !hasVodAddon
     var seen = hasSeenVodAddon
     var changed = currentEnabled == null
-    if (hasVodAddon && !seen) {
+    if (!hasVodAddon) {
+        enabled = true
+        seen = false
+        changed = changed || currentEnabled != true
+    } else if (!seen) {
         if (enabled) {
             enabled = false
             changed = true
         }
         seen = true
-    } else if (!hasVodAddon && seen) {
-        seen = false
     }
     return IptvOnlyAddonReconciliation(enabled, seen, changed)
 }
@@ -1148,6 +1150,10 @@ class IptvRepository @Inject constructor(
             prefs[iptvOnlyModeKey()] = reconciliation.enabled
             prefs[seenKey] = reconciliation.hasSeenVodAddon
             changed = reconciliation.enabledChanged
+            if (!hasVodAddon && prefs[vodSearchEnabledKey()] != true) {
+                prefs[vodSearchEnabledKey()] = true
+                changed = true
+            }
         }
         if (changed) {
             invalidationBus.markDirty(
@@ -1162,13 +1168,17 @@ class IptvRepository @Inject constructor(
      * A first Home Server connection is external VOD content just like the
      * first VOD addon. Disable IPTV-only once, then preserve later user choices.
      */
-    suspend fun reconcileIptvOnlyModeWithHomeServer(hasHomeServer: Boolean) {
+    suspend fun reconcileIptvOnlyModeWithHomeServer(hasHomeServer: Boolean, hasVodAddon: Boolean) {
         var changed = false
         context.settingsDataStore.edit { prefs ->
             val seenKey = iptvOnlyHomeServerSeenKey()
             val seen = prefs[seenKey] ?: false
+            if (!hasVodAddon && prefs[iptvOnlyModeKey()] != true) {
+                prefs[iptvOnlyModeKey()] = true
+                changed = true
+            }
             if (hasHomeServer && !seen) {
-                if (prefs[iptvOnlyModeKey()] != false) {
+                if (hasVodAddon && prefs[iptvOnlyModeKey()] != false) {
                     prefs[iptvOnlyModeKey()] = false
                     changed = true
                 }
@@ -2198,7 +2208,10 @@ class IptvRepository @Inject constructor(
                 onProgress(IptvLoadProgress(context.getString(R.string.iptv_connecting_stalker), 10))
                 val stalker = com.arflix.tv.data.api.StalkerApi(config.stalkerPortalUrl, config.stalkerMacAddress)
                 if (!stalker.handshake()) {
-                    return@withContext IptvSnapshot(epgWarning = "Stalker handshake failed. Check Portal URL and MAC.", loadedAt = Instant.now())
+                    return@withContext IptvSnapshot(
+                        epgWarning = context.getString(R.string.settings_stalker_handshake_failed),
+                        loadedAt = Instant.now()
+                    )
                 }
                 onProgress(IptvLoadProgress(context.getString(R.string.iptv_progress_loading_channels), 30))
                 stalker.getProfile()
@@ -2603,13 +2616,8 @@ class IptvRepository @Inject constructor(
                 }
                 resolvedNowNext
             }
-            val epgFailure = epgFailureMessage
             val epgWarning = if (epgCandidates.isNotEmpty() && nowNext.isEmpty()) {
-                if (!epgFailure.isNullOrBlank()) {
-                    "EPG unavailable right now (${epgFailure.take(120)})."
-                } else {
-                    "EPG unavailable for this source right now."
-                }
+                context.getString(R.string.settings_iptv_epg_unavailable)
             } else null
 
             val favoriteGroups = observeFavoriteGroups().first()

@@ -110,7 +110,8 @@ fun SettingsRow(
     value: String?,
     isFocused: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focusRingColor = resolveAccentColor(fallback = Pink)
@@ -119,17 +120,19 @@ fun SettingsRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(
+                enabled = enabled,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
+            .alpha(if (enabled) 1f else 0.4f)
             .background(
-                if (isFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
+                if (enabled && isFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
                 RoundedCornerShape(12.dp)
             )
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) focusRingColor else Color.Transparent,
+                width = if (enabled && isFocused) 2.dp else 0.dp,
+                color = if (enabled && isFocused) focusRingColor else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),
@@ -195,7 +198,8 @@ fun SettingsToggleRow(
     isEnabled: Boolean,
     isFocused: Boolean,
     onToggle: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    rowEnabled: Boolean = true,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focusRingColor = resolveAccentColor(fallback = Pink)
@@ -203,17 +207,19 @@ fun SettingsToggleRow(
         modifier = modifier
             .fillMaxWidth()
             .clickable(
+                enabled = rowEnabled,
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = { onToggle(!isEnabled) }
             )
+            .alpha(if (rowEnabled) 1f else 0.4f)
             .background(
-                if (isFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
+                if (rowEnabled && isFocused) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
                 RoundedCornerShape(12.dp)
             )
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) focusRingColor else Color.Transparent,
+                width = if (rowEnabled && isFocused) 2.dp else 0.dp,
+                color = if (rowEnabled && isFocused) focusRingColor else Color.Transparent,
                 shape = RoundedCornerShape(12.dp)
             )
             .padding(horizontal = 16.dp, vertical = 14.dp),

@@ -537,7 +537,7 @@ class ProfileViewModel @Inject constructor(
             // PIN incorrect - show error message in dialog
             _uiState.value = _uiState.value.copy(pinError = "")
             _uiState.value = _uiState.value.copy(
-                pinError = "Incorrect PIN. Please try again."
+                pinError = this.context.getString(R.string.settings_pin_incorrect)
             )
         }
     }

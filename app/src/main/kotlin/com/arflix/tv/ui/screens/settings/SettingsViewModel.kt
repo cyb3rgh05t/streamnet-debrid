@@ -51,6 +51,7 @@ import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.ProfileRepository
 import com.arflix.tv.data.repository.StreamRepository
+import com.arflix.tv.data.repository.isEnabledVodStreamingAddon
 import com.arflix.tv.data.repository.TvDeviceAuthRepository
 import com.arflix.tv.data.repository.TvDeviceAuthSession
 import com.arflix.tv.data.repository.TvDeviceAuthStatusType
@@ -2161,9 +2162,9 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     addons = currentAddons,
                     toastMessage = if (importedCatalogs > 0) {
-                        "Added ${addon.name} ($importedCatalogs catalogs imported)"
+                        context.getString(R.string.settings_addon_added_with_catalogs, addon.name, importedCatalogs)
                     } else {
-                        "Added ${addon.name} (no catalogs exposed)"
+                        context.getString(R.string.settings_addon_added_no_catalogs, addon.name)
                     },
                     toastType = ToastType.SUCCESS
                 )
@@ -2201,7 +2202,7 @@ class SettingsViewModel @Inject constructor(
                 runCatching {
                     catalogRepository.syncAddonCatalogs(updatedAddons)
                 }
-                val toast = "${report.refreshed} addons refreshed, ${report.failed} failed"
+                val toast = context.getString(R.string.settings_addons_refresh_summary, report.refreshed, report.failed)
                 _uiState.value = _uiState.value.copy(
                     addons = updatedAddons,
                     isRefreshingAddons = false,
@@ -2386,7 +2387,7 @@ class SettingsViewModel @Inject constructor(
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
                     isPackLoading = false,
-                    packError = error.message ?: "Failed to load pack manifest",
+                    packError = error.message ?: context.getString(R.string.settings_pack_manifest_failed),
                     pendingPackUrl = null
                 )
             }
@@ -2422,7 +2423,7 @@ class SettingsViewModel @Inject constructor(
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
                     isPackLoading = false,
-                    packError = error.message ?: "Failed to install pack"
+                    packError = error.message ?: context.getString(R.string.settings_pack_install_failed)
                 )
             }
         }
@@ -2439,7 +2440,7 @@ class SettingsViewModel @Inject constructor(
                 syncLocalStateToCloud(silent = true)
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
-                    toastMessage = error.message ?: "Failed to remove pack",
+                    toastMessage = error.message ?: context.getString(R.string.settings_pack_remove_failed),
                     toastType = ToastType.ERROR
                 )
             }
@@ -2478,7 +2479,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 catalogSearchResults = emptyList(),
                 isCatalogSearching = false,
-                catalogSearchError = if (normalizedQuery.isBlank()) null else "Type at least 2 characters"
+                catalogSearchError = if (normalizedQuery.isBlank()) null else context.getString(R.string.settings_catalog_query_min_chars)
             )
             return
         }
@@ -2493,7 +2494,7 @@ class SettingsViewModel @Inject constructor(
                 _uiState.value = _uiState.value.copy(
                     catalogSearchResults = lists,
                     isCatalogSearching = false,
-                    catalogSearchError = if (lists.isEmpty()) "No public Trakt lists found" else null
+                    catalogSearchError = if (lists.isEmpty()) context.getString(R.string.settings_catalog_no_trakt_lists) else null
                 )
             }.onFailure { error ->
                 _uiState.value = _uiState.value.copy(
@@ -2829,13 +2830,13 @@ class SettingsViewModel @Inject constructor(
                 val epgMissing = (snapshot.channels.size - epgCovered).coerceAtLeast(0)
                 val epgStatus = when {
                     snapshot.channels.isEmpty() -> ""
-                    epgCovered > 0 -> " EPG: $epgCovered matched, $epgMissing missing."
-                    else -> " EPG: no guide data yet."
+                    epgCovered > 0 -> context.getString(R.string.settings_iptv_epg_coverage, epgCovered, epgMissing)
+                    else -> context.getString(R.string.settings_iptv_epg_no_guide)
                 }
                 val doneMsg = if (configured) {
-                    snapshot.epgWarning ?: "Connected. Loaded ${snapshot.channels.size} channels.$epgStatus"
+                    snapshot.epgWarning ?: context.getString(R.string.settings_iptv_connected_status, snapshot.channels.size, epgStatus)
                 } else {
-                    snapshot.epgWarning ?: "Refreshed ${snapshot.channels.size} channels.$epgStatus"
+                    snapshot.epgWarning ?: context.getString(R.string.settings_iptv_refreshed_status, snapshot.channels.size, epgStatus)
                 }
                 _uiState.value = _uiState.value.copy(
                     isIptvLoading = false,
@@ -2846,7 +2847,8 @@ class SettingsViewModel @Inject constructor(
                     iptvProgressText = context.getString(R.string.done),
                     iptvProgressPercent = 100,
                     toastMessage = if (showToast) {
-                        if (configured) "IPTV configured (${snapshot.channels.size} channels)" else "IPTV refreshed (${snapshot.channels.size} channels)"
+                        if (configured) context.getString(R.string.settings_iptv_configured_toast, snapshot.channels.size)
+                        else context.getString(R.string.settings_iptv_refreshed_toast, snapshot.channels.size)
                     } else _uiState.value.toastMessage,
                     toastType = if (showToast) ToastType.SUCCESS else _uiState.value.toastType
                 )
@@ -2858,7 +2860,9 @@ class SettingsViewModel @Inject constructor(
                 if (error is CancellationException) {
                     return@onFailure
                 }
-                val failMessage = if (configured) "Failed to load IPTV playlist" else "Failed to refresh IPTV"
+                val failMessage = context.getString(
+                    if (configured) R.string.settings_iptv_load_failed else R.string.settings_iptv_refresh_failed
+                )
                 _uiState.value = _uiState.value.copy(
                     isIptvLoading = false,
                     iptvError = error.message ?: failMessage,
@@ -2888,15 +2892,20 @@ class SettingsViewModel @Inject constructor(
 
     fun setIptvOnlyMode(enabled: Boolean) {
         launchSettingsTask("iptv_only_mode") {
-            iptvRepository.saveIptvOnlyMode(enabled)
+            val hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
+            val effectiveEnabled = enabled || !hasVodAddon
+            iptvRepository.saveIptvOnlyMode(effectiveEnabled)
+            _uiState.value = _uiState.value.copy(iptvOnlyMode = effectiveEnabled)
             syncLocalStateToCloud(silent = true)
         }
     }
 
     fun setIptvVodSearchEnabled(enabled: Boolean) {
         launchSettingsTask("iptv_vod_search") {
-            iptvRepository.saveVodSearchEnabled(enabled)
-            _uiState.value = _uiState.value.copy(iptvVodSearchEnabled = enabled)
+            val hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
+            val effectiveEnabled = enabled || !hasVodAddon
+            iptvRepository.saveVodSearchEnabled(effectiveEnabled)
+            _uiState.value = _uiState.value.copy(iptvVodSearchEnabled = effectiveEnabled)
             syncLocalStateToCloud(silent = true)
         }
     }
@@ -2918,7 +2927,7 @@ class SettingsViewModel @Inject constructor(
                 isIptvLoading = false,
                 iptvChannelCount = 0,
                 iptvError = null,
-                iptvStatusMessage = "IPTV playlist removed",
+                iptvStatusMessage = context.getString(R.string.toast_iptv_playlist_removed),
                 iptvStatusType = ToastType.SUCCESS,
                 iptvProgressText = null,
                 iptvProgressPercent = 0,
@@ -3394,7 +3403,10 @@ class SettingsViewModel @Inject constructor(
             )
             val result = homeServerRepository.connect(serverUrl, username, password, displayName)
             result.onSuccess { connection ->
-                iptvRepository.reconcileIptvOnlyModeWithHomeServer(hasHomeServer = true)
+                iptvRepository.reconcileIptvOnlyModeWithHomeServer(
+                    hasHomeServer = true,
+                    hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
+                )
                 if (connection.collections.isNotEmpty()) {
                     syncHomeServerCatalogsFromConnections()
                 }
@@ -3515,7 +3527,10 @@ class SettingsViewModel @Inject constructor(
                 )
                 runCatching {
                     syncHomeServerCatalogsFromConnections()
-                    iptvRepository.reconcileIptvOnlyModeWithHomeServer(hasHomeServer = true)
+                    iptvRepository.reconcileIptvOnlyModeWithHomeServer(
+                        hasHomeServer = true,
+                        hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
+                    )
                     val connections = homeServerRepository.currentConnections()
                     plexHomeServerUrl = null
                     plexHomeServerDisplayName = null
@@ -3555,8 +3570,8 @@ class SettingsViewModel @Inject constructor(
                 plexHomeServerAuth = null,
                 isPlexHomeServerPolling = false,
                 homeServerCodeAuthPhase = null,
-                homeServerError = lastFailure ?: "Activation code expired",
-                toastMessage = lastFailure ?: "Activation code expired",
+                homeServerError = lastFailure ?: context.getString(R.string.settings_activation_code_expired),
+                toastMessage = lastFailure ?: context.getString(R.string.settings_activation_code_expired),
                 toastType = ToastType.ERROR
             )
         }
@@ -3701,7 +3716,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
                 isForceCloudSyncing = true,
-                lastCloudSyncStatus = "Starting cloud upload...",
+                lastCloudSyncStatus = context.getString(R.string.settings_cloud_push_status_uploading),
                     toastMessage = context.getString(R.string.toast_forcing_cloud_sync),
                 toastType = ToastType.INFO
             )
@@ -3709,7 +3724,7 @@ class SettingsViewModel @Inject constructor(
             if (!ensureCloudSyncSession()) {
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Cloud session expired. Reconnect StreamNet Cloud, then sync again.",
+                    lastCloudSyncStatus = context.getString(R.string.settings_cloud_session_expired_status),
                     toastMessage = context.getString(R.string.toast_reconnect_cloud_sync),
                     toastType = ToastType.INFO
                 )
@@ -3725,7 +3740,7 @@ class SettingsViewModel @Inject constructor(
             if (pushResult == null) {
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Upload timed out before cloud confirmed it",
+                    lastCloudSyncStatus = context.getString(R.string.settings_cloud_upload_timed_out),
                     toastMessage = context.getString(R.string.toast_cloud_sync_timed_out),
                     toastType = ToastType.ERROR
                 )
@@ -3741,8 +3756,11 @@ class SettingsViewModel @Inject constructor(
                 val uploadError = pushResult?.exceptionOrNull()?.message ?: context.getString(R.string.cloud_sync_failed_upload)
                 _uiState.value = _uiState.value.copy(
                     isForceCloudSyncing = false,
-                    lastCloudSyncStatus = "Upload failed: ${uploadError.take(120)}",
-                    toastMessage = uploadError,
+                    lastCloudSyncStatus = context.getString(
+                        R.string.settings_cloud_push_failed_status,
+                        uploadError.take(120)
+                    ),
+                    toastMessage = context.getString(R.string.cloud_sync_failed_upload),
                     toastType = ToastType.ERROR
                 )
                 return@launch
@@ -3769,14 +3787,14 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isForceCloudSyncing = false,
                 lastCloudSyncStatus = when (restoreResult) {
-                    CloudRestoreResult.RESTORED -> "Cloud sync complete and verified"
-                    CloudRestoreResult.NO_BACKUP -> "Cloud upload complete; no remote restore was needed"
-                    CloudRestoreResult.FAILED -> "Upload complete, but restore failed"
+                    CloudRestoreResult.RESTORED -> context.getString(R.string.settings_cloud_sync_verified)
+                    CloudRestoreResult.NO_BACKUP -> context.getString(R.string.settings_cloud_sync_no_backup)
+                    CloudRestoreResult.FAILED -> context.getString(R.string.settings_cloud_sync_restore_failed)
                 },
                 toastMessage = when (restoreResult) {
-                    CloudRestoreResult.RESTORED -> "Cloud sync complete"
-                    CloudRestoreResult.NO_BACKUP -> "Cloud sync complete (no backup to restore)"
-                    CloudRestoreResult.FAILED -> "Upload complete, but restore failed"
+                    CloudRestoreResult.RESTORED -> context.getString(R.string.toast_cloud_sync_complete)
+                    CloudRestoreResult.NO_BACKUP -> context.getString(R.string.settings_cloud_sync_no_backup)
+                    CloudRestoreResult.FAILED -> context.getString(R.string.settings_cloud_sync_restore_failed)
                 },
                 toastType = if (restoreResult == CloudRestoreResult.FAILED) {
                     ToastType.ERROR
@@ -4168,8 +4186,8 @@ class SettingsViewModel @Inject constructor(
 
                 System.err.println("SettingsVM: failed to start Trakt auth: ${e.message}")
                 val message = when (e) {
-                    is retrofit2.HttpException -> "Trakt activation failed (${e.code()})"
-                    else -> e.message?.takeIf { it.isNotBlank() } ?: "Trakt activation failed"
+                    is retrofit2.HttpException -> context.getString(R.string.settings_trakt_activation_failed_http, e.code())
+                    else -> context.getString(R.string.settings_trakt_activation_failed)
                 }
                 _uiState.value = _uiState.value.copy(
                     traktCode = null,
@@ -4280,12 +4298,12 @@ class SettingsViewModel @Inject constructor(
                     }
 
                     lastFailure = when (httpError?.code()) {
-                        404 -> "Trakt activation code is invalid"
-                        409 -> "Trakt activation code was already used"
-                        410 -> "Trakt activation code expired"
-                        418 -> "Trakt authorization was denied"
-                        null -> e.message?.takeIf { it.isNotBlank() } ?: "Trakt authorization failed"
-                        else -> "Trakt authorization failed (${httpError.code()})"
+                        404 -> context.getString(R.string.settings_trakt_code_invalid)
+                        409 -> context.getString(R.string.settings_trakt_code_used)
+                        410 -> context.getString(R.string.settings_activation_code_expired)
+                        418 -> context.getString(R.string.settings_trakt_authorization_denied)
+                        null -> context.getString(R.string.settings_trakt_authorization_failed)
+                        else -> context.getString(R.string.settings_trakt_authorization_failed_http, httpError.code())
                     }
                     break
                 }
@@ -4297,7 +4315,7 @@ class SettingsViewModel @Inject constructor(
                 isTraktAuthStarting = false,
                 isTraktPolling = false,
                 traktUsername = null,
-                toastMessage = lastFailure ?: "Trakt activation code expired",
+                toastMessage = lastFailure ?: context.getString(R.string.settings_activation_code_expired),
                 toastType = ToastType.ERROR
             )
         }

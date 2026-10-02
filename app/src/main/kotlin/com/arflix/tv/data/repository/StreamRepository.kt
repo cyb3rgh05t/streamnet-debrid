@@ -195,18 +195,15 @@ internal fun isEnabledVodStreamingAddon(addon: Addon): Boolean {
     if (!addon.isInstalled || !addon.isEnabled) return false
     if (addon.type == AddonType.SUBTITLE || addon.type == AddonType.METADATA) return false
 
-    val manifest = addon.manifest ?: return true
+    val manifest = addon.manifest ?: return false
     val vodTypes = setOf("movie", "series", "anime")
     val streamResources = manifest.resources.filter { resource ->
         resource.name.equals("stream", ignoreCase = true) ||
             resource.name.equals("streams", ignoreCase = true)
     }
-    if (streamResources.isNotEmpty()) {
-        return streamResources.any { resource ->
-            resource.types.isEmpty() || resource.types.any { it.lowercase(Locale.US) in vodTypes }
-        }
+    return streamResources.any { resource ->
+        resource.types.isEmpty() || resource.types.any { it.lowercase(Locale.US) in vodTypes }
     }
-    return manifest.types.any { it.lowercase(Locale.US) in vodTypes }
 }
 
 internal fun isCollectionOnlyAddon(addon: Addon): Boolean {

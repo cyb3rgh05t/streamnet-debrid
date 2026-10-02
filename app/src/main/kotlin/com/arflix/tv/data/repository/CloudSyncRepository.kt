@@ -2561,6 +2561,9 @@ class CloudSyncRepository @Inject constructor(
                 runCatching {
                     iptvRepository.invalidateCache()
                 }
+                iptvRepository.reconcileIptvOnlyModeWithVodAddons(
+                    hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
+                )
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_iptv")) }
 

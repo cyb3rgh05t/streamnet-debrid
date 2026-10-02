@@ -234,6 +234,7 @@ import com.arflix.tv.ui.theme.TextSecondary
 import kotlin.math.abs
 import androidx.compose.ui.res.stringResource
 import com.arflix.tv.R
+import com.arflix.tv.data.repository.isEnabledVodStreamingAddon
 import com.arflix.tv.network.OkHttpProvider
 import java.text.DateFormat
 import java.util.Date
@@ -1848,6 +1849,7 @@ fun SettingsScreen(
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
                             iptvOnlyMode = uiState.iptvOnlyMode,
                             vodSearchEnabled = uiState.iptvVodSearchEnabled,
+                            hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
                             onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                             onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                             onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
@@ -1900,6 +1902,7 @@ fun SettingsScreen(
                             showSpecialCategories = uiState.iptvShowSpecialCategories,
                             iptvOnlyMode = uiState.iptvOnlyMode,
                             vodSearchEnabled = uiState.iptvVodSearchEnabled,
+                            hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
                             onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                             onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                             sortOrder = uiState.iptvSortOrder,
@@ -5512,6 +5515,7 @@ private fun MobileSettingsSubPage(
                     showSpecialCategories = uiState.iptvShowSpecialCategories,
                     iptvOnlyMode = uiState.iptvOnlyMode,
                     vodSearchEnabled = uiState.iptvVodSearchEnabled,
+                    hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
                     onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
                     onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
                     onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
@@ -8243,6 +8247,7 @@ private fun IptvSettings(
     showSpecialCategories: Boolean = true,
     iptvOnlyMode: Boolean = true,
     vodSearchEnabled: Boolean = true,
+    hasVodAddon: Boolean = true,
     sortOrder: String = "provider",
     onSortOrderChange: (String) -> Unit = {},
     onIptvOnlyModeChange: (Boolean) -> Unit = {},
@@ -8366,16 +8371,18 @@ private fun IptvSettings(
                 MobileSettingsRow(
                     icon = Icons.Default.LiveTv,
                     title = stringResource(R.string.settings_iptv_only_mode_title),
-                    subtitle = stringResource(R.string.settings_iptv_only_mode_subtitle),
-                    value = if (iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
+                    subtitle = if (hasVodAddon) stringResource(R.string.settings_iptv_only_mode_subtitle) else stringResource(R.string.settings_iptv_requires_vod_addon),
+                    value = if (!hasVodAddon || iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
+                    enabled = hasVodAddon,
                     isFocused = false,
                     onClick = { onIptvOnlyModeChange(!iptvOnlyMode) }
                 )
                 MobileSettingsRow(
                     icon = Icons.Default.Movie,
                     title = stringResource(R.string.settings_iptv_vod_search),
-                    subtitle = stringResource(R.string.settings_iptv_vod_search_desc),
-                    value = if (vodSearchEnabled) stringResource(R.string.on) else stringResource(R.string.off),
+                    subtitle = if (hasVodAddon) stringResource(R.string.settings_iptv_vod_search_desc) else stringResource(R.string.settings_iptv_requires_vod_addon),
+                    value = if (!hasVodAddon || vodSearchEnabled) stringResource(R.string.on) else stringResource(R.string.off),
+                    enabled = hasVodAddon,
                     isFocused = false,
                     onClick = { onVodSearchToggle(!vodSearchEnabled) }
                 )
@@ -8533,21 +8540,23 @@ private fun IptvSettings(
             SettingsRow(
                 icon = Icons.Default.LiveTv,
                 title = stringResource(R.string.settings_iptv_only_mode_title),
-                subtitle = stringResource(R.string.settings_iptv_only_mode_subtitle),
-                value = if (iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
+                subtitle = if (hasVodAddon) stringResource(R.string.settings_iptv_only_mode_subtitle) else stringResource(R.string.settings_iptv_requires_vod_addon),
+                value = if (!hasVodAddon || iptvOnlyMode) stringResource(R.string.on) else stringResource(R.string.off),
                 isFocused = focusedIndex == playlists.size + 2,
                 onClick = { onIptvOnlyModeChange(!iptvOnlyMode) },
-                modifier = Modifier.settingsFocusSlot(playlists.size + 2)
+                modifier = Modifier.settingsFocusSlot(playlists.size + 2),
+                enabled = hasVodAddon
             )
             Spacer(modifier = Modifier.height(16.dp))
             SettingsToggleRow(
                 icon = Icons.Default.Movie,
                 title = stringResource(R.string.settings_iptv_vod_search),
-                subtitle = stringResource(R.string.settings_iptv_vod_search_desc),
-                isEnabled = vodSearchEnabled,
+                subtitle = if (hasVodAddon) stringResource(R.string.settings_iptv_vod_search_desc) else stringResource(R.string.settings_iptv_requires_vod_addon),
+                isEnabled = !hasVodAddon || vodSearchEnabled,
                 isFocused = focusedIndex == playlists.size + 3,
                 onToggle = onVodSearchToggle,
-                modifier = Modifier.settingsFocusSlot(playlists.size + 3)
+                modifier = Modifier.settingsFocusSlot(playlists.size + 3),
+                rowEnabled = hasVodAddon
             )
             Spacer(modifier = Modifier.height(16.dp))
             val refreshSubtitle = when { isLoading -> stringResource(R.string.settings_refreshing_channels_epg); error != null -> error; playlists.none { it.epgUrl.isNotBlank() || it.epgUrls.orEmpty().isNotEmpty() } -> stringResource(R.string.settings_reload_playlists_now); else -> stringResource(R.string.settings_reload_playlist_epg_now) }

@@ -38,6 +38,7 @@ import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.SportsRepository
 import com.arflix.tv.data.repository.StreamRepository
 import com.arflix.tv.data.repository.IptvRepository
+import com.arflix.tv.data.repository.isEnabledVodStreamingAddon
 import com.arflix.tv.data.repository.needsRichCurrentEpg
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.CloudSyncStatus
@@ -2411,7 +2412,8 @@ class HomeViewModel @Inject constructor(
                 .distinctUntilChanged()
                 .collect { connections ->
                     iptvRepository.reconcileIptvOnlyModeWithHomeServer(
-                        hasHomeServer = connections.any { it.isUsable }
+                        hasHomeServer = connections.any { it.isUsable },
+                        hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
                     )
                 }
         }
