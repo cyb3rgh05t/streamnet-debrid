@@ -1,4 +1,7 @@
 package com.arflix.tv.ui.screens.player
+import com.arflix.tv.data.model.isStreamNetNzbSource
+import com.arflix.tv.data.model.compareNzbSourceOrder
+import com.arflix.tv.data.model.nzbAutoplayCandidates
 
 import android.content.Context
 import android.util.Log
@@ -1045,8 +1048,8 @@ class PlayerViewModel @Inject constructor(
                     savedPosition = resumeData.positionMs,
                     error = null,
                     isSetupError = false,
-                    streamProgress = 0f,
-                    streamLoadPhase = if (streamingAddonCount > 0) "Searching 0/$streamingAddonCount sources" else "Preparing sources"
+                    streamProgress = null,
+                    streamLoadPhase = "Preparing sources"
                 )
 
                 val preferredLanguage = _uiState.value.preferredAudioLanguage.ifBlank { resolvePreferredAudioLanguage() }
@@ -2104,7 +2107,15 @@ class PlayerViewModel @Inject constructor(
     }
 
     private fun autoplaySelectBest(streams: List<StreamSource>, preferredLanguage: String) {
-        val healthyStreams = sortStreamsByQualityAndSize(streams, preferredLanguage)
+        val healthyStreams = nzbAutoplayCandidates(sortStreamsByQualityAndSize(streams, preferredLanguage))
+        if (healthyStreams.isEmpty()) {
+            playbackDiag("autoplaySkipped no concrete release; select Smart Play manually")
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                error = context.getString(R.string.player_nzb_smart_play_manual)
+            )
+            return
+        }
         val hasExplicitPreferred =
             !currentPreferredBingeGroup.isNullOrBlank() ||
                 !currentPreferredAddonId.isNullOrBlank() ||
@@ -2175,7 +2186,7 @@ class PlayerViewModel @Inject constructor(
     ): StreamSource? {
         if (streams.isEmpty()) return null
 
-        return sortStreamsByQualityAndSize(streams, preferredLanguage).firstOrNull()
+        return nzbAutoplayCandidates(sortStreamsByQualityAndSize(streams, preferredLanguage)).firstOrNull()
     }
 
     private fun pickAutoplayTopStream(
@@ -2190,7 +2201,7 @@ class PlayerViewModel @Inject constructor(
         streams: List<StreamSource>,
         preferredLanguage: String
     ): List<StreamSource> {
-        return streams.sortedWith(
+        return nzbAutoplayCandidates(streams.sortedWith(
             compareByDescending<StreamSource> { if (it.isXtreamVodSource()) 1 else 0 }
                 .thenBy { streamRepository.getPlaybackHostHealthPenalty(it) }
                 .thenBy { if (it.behaviorHints?.notWebReady == true) 1 else 0 }
@@ -2200,7 +2211,7 @@ class PlayerViewModel @Inject constructor(
                 .thenByDescending { if (it.behaviorHints?.cached == true) 1 else 0 }
                 .thenByDescending { streamLanguageScore(it, preferredLanguage) }
                 .thenByDescending { streamRepository.getAddonHealthBias(it.addonId) }
-        )
+        ))
     }
 
     /** Aggregator addons (AIOStreams) sort results server-side per the user's own web config —
@@ -2228,7 +2239,10 @@ class PlayerViewModel @Inject constructor(
                     if (it.value.isXtreamVodSource()) 1 else 0
                 }.thenBy { addonOrderIndex(it.value) }
                     .then { a, b ->
-                        if (keepsOwnStreamOrder(a.value) && keepsOwnStreamOrder(b.value)) {
+                        if (a.value.isStreamNetNzbSource() && b.value.isStreamNetNzbSource()) {
+                            compareNzbSourceOrder(a.value, b.value).takeIf { it != 0 }
+                                ?: a.index.compareTo(b.index)
+                        } else if (keepsOwnStreamOrder(a.value) && keepsOwnStreamOrder(b.value)) {
                             a.index.compareTo(b.index)
                         } else {
                             qualityOrder.compare(a, b)

@@ -17,6 +17,68 @@
 export const NUDGE_AFTER_MS = 6_000;
 export const RELOAD_AFTER_MS = 14_000;
 export const ESCALATE_AFTER_MS = 24_000;
+export const MEDIA_RECOVERY_TIMEOUT_MS = 15_000;
+
+export function mpegTsBufferOptions(live: boolean, stabilize: boolean) {
+  return {
+    liveBufferLatencyChasing: live,
+    liveBufferLatencyChasingOnPaused: live && !stabilize,
+    liveBufferLatencyMaxLatency: stabilize ? 12 : 5,
+    liveBufferLatencyMinRemain: stabilize ? 3 : 1,
+    enableStashBuffer: !live || stabilize,
+    stashInitialSize: 128 * 1024,
+  };
+}
+
+export function createMediaRecovery(
+  recover: () => void,
+  onExhausted: () => void,
+) {
+  let attempts = 0;
+  let pending = false;
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const exhausted = () => {
+    stopped = true;
+    pending = false;
+    clearTimeout(timer);
+    onExhausted();
+  };
+  const request = (): boolean => {
+    if (stopped) return false;
+    // HLS and the media element can report the same failure in one event turn.
+    if (pending) return true;
+    if (attempts >= 2) {
+      exhausted();
+      return true;
+    }
+    attempts += 1;
+    pending = true;
+    timer = setTimeout(() => {
+      pending = false;
+      request();
+    }, MEDIA_RECOVERY_TIMEOUT_MS);
+    try {
+      recover();
+    } catch {
+      exhausted();
+    }
+    return true;
+  };
+  return {
+    request,
+    isPending: () => pending,
+    succeeded() {
+      pending = false;
+      clearTimeout(timer);
+    },
+    dispose() {
+      stopped = true;
+      pending = false;
+      clearTimeout(timer);
+    },
+  };
+}
 
 export type StallAction =
   /** Still inside the grace window — keep waiting. */
@@ -157,6 +219,8 @@ export function monitorVideoFrames(
 export function monitorSilentAudio(
   video: HTMLVideoElement,
   onSilent: () => void,
+  silentThresholdMs = 8_000,
+  enabled: () => boolean = () => true,
 ): () => void {
   const chromiumVideo = video as HTMLVideoElement & {
     webkitAudioDecodedByteCount?: number;
@@ -175,6 +239,7 @@ export function monitorSilentAudio(
     lastCheck = now;
     lastTime = video.currentTime;
     if (
+      !enabled() ||
       document.visibilityState === "hidden" ||
       video.paused ||
       video.muted ||
@@ -189,7 +254,7 @@ export function monitorSilentAudio(
       return;
     }
     silentPlayingMs += elapsed;
-    if (silentPlayingMs >= 8_000) {
+    if (silentPlayingMs >= silentThresholdMs) {
       clearInterval(timer);
       onSilent();
     }

@@ -8,6 +8,8 @@ const DEFAULT_ALLOWED_MEDIA_HOSTS = [
   "xui.streamnet.live",
   "193.200.221.81",
   "50.7.184.250",
+  "85.209.176.85",
+  "193.108.118.53",
 ];
 const FORWARDED_HEADERS =
   /^(accept|authorization|cookie|icy-metadata|origin|referer|user-agent)$/i;

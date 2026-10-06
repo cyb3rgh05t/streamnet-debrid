@@ -231,6 +231,7 @@ export interface SubtitleTrack {
 }
 
 export interface StreamSource {
+  addonSourceOrder?: number;
   transport?: "file" | "hls" | "dash" | "mpegts";
   media?: {
     container?: string;

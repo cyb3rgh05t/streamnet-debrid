@@ -95,6 +95,44 @@ for (const [name, env] of [
     assert.equal(await segmentResponse.text(), "abc");
     assert.equal(upstreamFetch.mock.callCount(), 2);
   });
+
+  test(`85.209.176.85 segments are relayed with ${name}`, async (t) => {
+    const { default: worker } = await import(workerUrl);
+    const segmentUrl = "http://85.209.176.85/hls/test-token";
+    const upstreamFetch = t.mock.method(globalThis, "fetch", async (url, init) => {
+      assert.equal(url.toString(), segmentUrl);
+      assert.equal(init.headers.get("user-agent"), proxyHeaders["User-Agent"]);
+      assert.equal(init.headers.get("icy-metadata"), "1");
+      return new Response("segment-data", {
+        headers: { "content-type": "video/mp2t" },
+      });
+    });
+    const response = await worker.fetch(mediaRequest(segmentUrl), env);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("content-type"), "video/mp2t");
+    assert.equal(response.headers.get("access-control-allow-origin"), origin);
+    assert.equal(await response.text(), "segment-data");
+    assert.equal(upstreamFetch.mock.callCount(), 1);
+  });
+
+  test(`All built-in app relay hosts support worker fallback with ${name}`, async (t) => {
+    const { default: worker } = await import(workerUrl);
+    const upstreamFetch = t.mock.method(globalThis, "fetch", async () =>
+      new Response("segment", { headers: { "content-type": "video/mp2t" } }),
+    );
+    for (const host of [
+      "xui.streamnet.live",
+      "193.200.221.81",
+      "50.7.184.250",
+      "85.209.176.85",
+      "193.108.118.53",
+    ]) {
+      const response = await worker.fetch(mediaRequest(`http://${host}/hls/test`), env);
+      assert.equal(response.status, 200, host);
+      assert.equal(await response.text(), "segment");
+    }
+    assert.equal(upstreamFetch.mock.callCount(), 5);
+  });
 }
 
 test("Unknown hosts and disallowed origins remain blocked before upstream fetch", async (t) => {

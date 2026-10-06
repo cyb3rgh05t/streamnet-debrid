@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="player_nzb_smart_play_manual">Kein einzelner NZB-Release verfügbar. Smart Play bitte im Quellenmenü manuell auswählen.</string>
     <string name="home">Start</string>
     <string name="search">Suche</string>
     <string name="watchlist">Merkliste</string>
@@ -84,8 +85,8 @@
     <string name="player_starting_playback">Wiedergabe wird gestartet…</string>
     <string name="player_preparing_stream">Stream wird vorbereitet</string>
     <string name="player_preparing_sources">Quellen werden vorbereitet</string>
-    <string name="player_searching_sources">%1$d/%2$d Quellen werden durchsucht</string>
-    <string name="player_found_sources">%1$d Quellen gefunden (%2$d/%3$d)</string>
+    <string name="player_searching_sources">Quellensuche – %1$d/%2$d Addons abgefragt</string>
+    <string name="player_found_sources">%1$d Quellen gefunden (%2$d/%3$d Addons abgefragt)</string>
     <string name="live">Live</string>
     <string name="now">Jetzt</string>
     <string name="later">Später</string>

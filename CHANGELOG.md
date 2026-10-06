@@ -2,6 +2,34 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.055] - 2026-10-06
+
+- Continue Watching ist zwischen Android und Web angeglichen: aktive Resume-Einträge werden vor abgeschlossenen Einträgen bevorzugt, Position und Fortschritt stammen aus demselben Datensatz. Anzeigegrenzen und Prozent-Rundung sind vereinheitlicht.
+- Cloud-Verlauf ohne `user_id` wird dem authentifizierten Konto zugeordnet, statt beim Einlesen die gesamte Liste zu verwerfen. Episoden bleiben bis zur Zusammenführung erhalten; vorhandener Wiedergabefortschritt wird nicht wegen eines zukünftigen Metadaten-Ausstrahlungsdatums ausgeblendet.
+- Einträge ohne Zeitstempel werden nur durch eine tatsächlich vorhandene spätere Entfernung ausgeblendet. Debug-Diagnosen für den Cloud-Verlauf enthalten nur Zähler und Fehlertypen.
+- Franchise-Timelines laden über bisherige Seitengrenzen hinaus. Die Pagination berücksichtigt verbrauchte Katalogreferenzen statt nur erfolgreich aufgelöster Karten; das Quellenbudget wächst bei Bedarf.
+- StreamNet-NZB-Quellen behalten die Addon-Reihenfolge. Smart Play steht in der manuellen Auswahl oben; automatisches Abspielen und dessen Vorladen verwenden konkrete Releases innerhalb der bisherigen Provider-Priorität. Ist nur Smart Play vorhanden, wird zur manuellen Auswahl aufgefordert.
+- NZB-Karten zeigen mitgelieferte formatierte Angaben zu Audio, Codec, Gruppe, Bitrate, Sprache, Indexer, Dateianzahl, Datum und Health als umbrechende Detailfelder. Fehlende Angaben werden nicht erfunden; Cache-Status wird nicht als bestandener Health-Check dargestellt.
+- TV-Quellenkarten zeigen links über den Badges den Katalogtitel und, sofern erkannt, das Erscheinungsjahr in Klammern. Rechts bleiben Release-Dateiname und Addon-Details erhalten.
+- Der Ladezähler benennt abgeschlossene Addon-Abfragen statt einzelner Streams. Vor Beginn der Suche erscheint ein Vorbereitungsstatus ohne vorzeitige Prozentanzeige.
+- Zurück und Escape schließen die im Player geöffnete Quellenauswahl, ohne die Wiedergabe zu verlassen; auch der übergeordnete Player-Keyhandler fängt diesen Fall ab. Das normale Zurück-Verhalten außerhalb der Auswahl bleibt unverändert.
+- Untersucht, nicht behoben: Ein möglicherweise erst beim zweiten Zurück-Druck reagierender Detailscreen. Das Diagnose-Log belegt zwei Android-Back-Ereignisse, aber nicht den jeweils zuständigen App-Handler oder Fokuszustand.
+- Android-Version: `2.5.055` / Code `456`.
+
+## [Web 1.0.064] - 2026-10-06
+
+- STREAMNET TV verwendet für Live TV, Catch-up und Xtream-VOD einen eingeschränkten App-Relay als primären Wiedergabepfad; der Resolver bleibt Fallback. Playlists, Segmente, Schlüssel und Redirects bleiben hostbeschränkt, mit begrenzter Playlist-Größe.
+- App und Resolver erlauben die benötigten zusätzlichen Provider-Mediahosts; Audio-Konvertierung verwendet dieselben Standardhosts. Beliebige Fremdhosts werden nicht freigeschaltet.
+- Live-Wiedergabe startet mit HLS. Bei geeigneten STREAMNET-Live-Mediafehlern wird MPEG-TS versucht; ein begrenzter Rückwechsel zu HLS verhindert endlose Decoder-Wechsel. Netzwerkfehler behalten die Resolver-Fallbacks.
+- HLS-Media-Recovery verarbeitet doppelte Fehlerbenachrichtigungen nicht mehrfach, wartet länger auf Wiederherstellung und verhindert konkurrierende Watchdog-Wechsel. Ein manueller MPEG-TS-Test und bereinigte Wiedergabediagnosen erleichtern die Fehlersuche.
+- Der Audio-Watchdog reagiert bei IPTV nach drei Sekunden tatsächlich fortschreitender Wiedergabe ohne neu dekodiertes Audio; andere Quellen behalten acht Sekunden. Audio-Initialisierungsfehler können die vorhandene AAC-Konvertierung auslösen.
+- Interne Live-Quellenwechsel und Audio-Konvertierung erhalten Kanal-, Dock- und Layoutzustand, statt den Player neu einzuhängen oder die Ansicht ungewollt zu vergrößern.
+- Cloud-Verlauf leitet `profile_id` unverändert an den Backend-Proxy weiter und verwirft fremde Profile auch im Client. Fortschritt erhält einen gültigen Zeitstempel; fehlende Entfernungsmarkierungen verwerfen keine alten Resume-Einträge.
+- Wiedergabefortschritt wird unabhängig von einem Tracking-Dienst synchronisiert. Fehlgeschlagene externe Fortschrittsbestätigung zeigt einen Fehler und bleibt für erneute Bestätigung verfügbar; der Browser kann den VLC-Wiedergabestand nicht automatisch auslesen.
+- Die manuelle NZB-Quellenauswahl erhält die Addon-Reihenfolge mit Smart Play oben. Browser-Kompatibilitätswarnungen und automatisches Fehler-Fallback behalten ihre bisherige Bewertung.
+- Regressionstests für Relay, Media-Recovery, Audio-Watchdog, Cloud/Profile und NZB-Reihenfolge ergänzen die bestehenden Prüfungen.
+- Web-Version: `1.0.064`.
+
 ## [2.5.054] - 2026-10-02
 
 - IPTV-only bleibt aktiv und IPTV-VOD-Suche eingeschaltet, solange kein aktiviertes VOD-Streaming-Addon installiert ist. Der Schalter ist dann auf Touch-Geräten und TV deaktiviert; Subtitle-, Metadaten- und reine Katalog-Addons zählen nicht als Streaming-Addon.

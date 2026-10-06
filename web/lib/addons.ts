@@ -6,7 +6,7 @@ import {
   isBrowserPlayableStream,
   isIosPlayableStream,
 } from "./streamCompatibility";
-import { isXtreamVodSource } from "./sourceRank";
+import { isXtreamVodSource, restoreNzbSourceOrder } from "./sourceRank";
 import type {
   AddonCatalog,
   InstalledAddon,
@@ -471,9 +471,10 @@ async function queryAddonStreams(
       const url = `${base}/stream/${requestType}/${encodeURIComponent(id)}.json${query ? `?${query}` : ""}`;
       try {
         const payload = await addonJsonRequest<{ streams?: RawStream[] }>(url);
-        const streams = (payload.streams ?? []).map((stream) =>
-          normalizeStream(stream, addon),
-        );
+        const streams = (payload.streams ?? []).map((stream, addonSourceOrder) => ({
+          ...normalizeStream(stream, addon),
+          addonSourceOrder,
+        }));
         if (streams.length > 0) return streams;
       } catch (error) {
         if (isAddonAuthorizationError(error)) {
@@ -775,7 +776,7 @@ function detectQuality(value: string) {
 }
 
 function sortStreams(streams: StreamSource[]) {
-  return streams.sort((a, b) => streamScore(b) - streamScore(a));
+  return restoreNzbSourceOrder(streams.sort((a, b) => streamScore(b) - streamScore(a)));
 }
 
 function streamScore(stream: StreamSource) {

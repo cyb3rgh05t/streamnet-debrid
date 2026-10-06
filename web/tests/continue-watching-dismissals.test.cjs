@@ -1,5 +1,17 @@
 const assert = require("node:assert/strict");
 const test = require("node:test");
+test("resume thresholds and percentage rounding match Android parity fixtures", async () => {
+  const { continueWatchingProgressPercent, isPausedContinueWatchingItem } = await import(
+    "../lib/continueWatching.ts"
+  );
+  assert.equal(isPausedContinueWatchingItem({ progress: 0, resumePositionSeconds: 9 }), false);
+  assert.equal(isPausedContinueWatchingItem({ progress: 0, resumePositionSeconds: 10 }), true);
+  assert.equal(isPausedContinueWatchingItem({ progress: 1, resumePositionSeconds: 0 }), true);
+  assert.equal(isPausedContinueWatchingItem({ progress: 90, resumePositionSeconds: 900 }), false);
+  assert.equal(continueWatchingProgressPercent(30, 6000, 0), 1);
+  assert.equal(continueWatchingProgressPercent(2849, 6642, 0.42), 43);
+  assert.equal(continueWatchingProgressPercent(0, 0, 0.2), 20);
+});
 const { pathToFileURL } = require("node:url");
 const path = require("node:path");
 

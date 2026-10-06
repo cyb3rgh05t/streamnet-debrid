@@ -250,7 +250,8 @@ class MediaRepository @Inject constructor(
 
     data class CategoryPageResult(
         val items: List<MediaItem>,
-        val hasMore: Boolean
+        val hasMore: Boolean,
+        val nextOffset: Int? = null
     )
 
     private val apiKey = Constants.TMDB_API_KEY
@@ -439,14 +440,15 @@ class MediaRepository @Inject constructor(
         val targetCount = requiredCount.coerceAtLeast(1)
         // SERVICE and GENRE rails page through TMDB/addon catalogs on demand,
         // so let the per-source budget grow with the user's scroll position
-        // instead of clamping at the default 72/96/120 ceiling. FRANCHISE and
-        // other fixed groups keep the small cap.
+        // instead of clamping at the default 72/96/120 ceiling. Timelines also
+        // grow on demand; other fixed groups keep the small cap.
         val unlimitedGroup = catalog.collectionGroup == CollectionGroupKind.SERVICE ||
             catalog.collectionGroup == CollectionGroupKind.GENRE ||
             catalog.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
             catalog.collectionGroup == CollectionGroupKind.TV_GENRE ||
             catalog.collectionGroup == CollectionGroupKind.STUDIO ||
-            catalog.collectionGroup == CollectionGroupKind.NETWORK
+            catalog.collectionGroup == CollectionGroupKind.NETWORK ||
+            catalog.collectionSources.any { it.collectionTab == "timeline" }
 
         // Resolve all sources in parallel so a slow/failed source never blocks the
         // others — this alone fixes "empty" genre collections where one source 404s.
@@ -2447,7 +2449,7 @@ class MediaRepository @Inject constructor(
 
         val resolvedRefs = resolveCollectionCatalogRefs(
             catalog = catalog,
-            requiredCount = (offset + limit).coerceAtLeast(limit)
+            requiredCount = collectionPageProbeCount(offset, limit)
         )
         if (resolvedRefs.isEmpty()) return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
         val refs = if (
@@ -2489,7 +2491,12 @@ class MediaRepository @Inject constructor(
         jobs.forEach { it.await() }
         val items = pageRefs.mapNotNull { itemsByRef[it] }
         if (items.isNotEmpty()) cacheItems(items)
-        CategoryPageResult(items = items, hasMore = offset + pageRefs.size < refs.size)
+        val nextOffset = collectionPageNextOffset(offset, pageRefs.size)
+        CategoryPageResult(
+            items = items,
+            hasMore = nextOffset < refs.size,
+            nextOffset = nextOffset
+        )
     }
 
     private suspend fun rankFranchiseRefsByPopularity(

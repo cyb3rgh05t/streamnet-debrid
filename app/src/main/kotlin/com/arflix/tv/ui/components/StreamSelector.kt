@@ -2,6 +2,8 @@ package com.arflix.tv.ui.components
 
 import com.arflix.tv.ui.motion.*
 import com.arflix.tv.data.model.isXtreamVodSource
+import com.arflix.tv.data.model.isStreamNetNzbSource
+import com.arflix.tv.data.model.compareNzbSourceOrder
 
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.ui.graphics.graphicsLayer
@@ -223,6 +225,7 @@ fun StreamSelector(
     sourceSearchActive: Boolean = false,
     title: String = "",
     subtitle: String = "",
+    releaseYear: String? = null,
     hasStreamingAddons: Boolean = true,
     addonOrderedIds: List<String> = emptyList(),
     completedAddons: Int = 0,
@@ -367,7 +370,10 @@ fun StreamSelector(
                 }.thenBy {
                     addonOrder[sourceTabId(it.value.stream)] ?: Int.MAX_VALUE
                 }.then { a, b ->
-                    if (keepsOwnStreamOrder(a.value.stream) && keepsOwnStreamOrder(b.value.stream)) {
+                    if (a.value.stream.isStreamNetNzbSource() && b.value.stream.isStreamNetNzbSource()) {
+                        compareNzbSourceOrder(a.value.stream, b.value.stream).takeIf { it != 0 }
+                            ?: a.index.compareTo(b.index)
+                    } else if (keepsOwnStreamOrder(a.value.stream) && keepsOwnStreamOrder(b.value.stream)) {
                         a.index.compareTo(b.index)
                     } else {
                         qualityOrder.compare(a, b)
@@ -473,7 +479,7 @@ fun StreamSelector(
                         } else actualKey
 
                         when (logicalKey) {
-                            Key.Escape -> {
+                            Key.Back, Key.Escape -> {
                                 onClose()
                                 true
                             }
@@ -560,6 +566,7 @@ fun StreamSelector(
                 OledSourceSelectorTv(
                     title = title,
                     subtitle = subtitle,
+                    itemHeading = sourceItemHeading(title, releaseYear),
                     streams = displayStreams,
                     flatPresentations = flatPresentations,
                     selectedStream = selectedStream,
@@ -805,6 +812,7 @@ fun StreamSelector(
 private fun OledSourceSelectorTv(
     title: String,
     subtitle: String,
+    itemHeading: String,
     streams: List<StreamSource>,
     flatPresentations: List<SourcePresentation>,
     selectedStream: StreamSource?,
@@ -988,6 +996,7 @@ private fun OledSourceSelectorTv(
                             item(key = sourceStreamRowKey(presentation.stream, index)) {
                                 OledSourceRow(
                                     presentation = presentation,
+                                    itemHeading = itemHeading,
                                     isFocused = streamsFocused && index == focusedIndex,
                                     isDownloadFocused = streamsFocused && index == focusedIndex && focusedActionIndex == 1,
                                     isSelected = isSelectedSource(presentation.stream, selectedStream),
@@ -1599,6 +1608,30 @@ private fun sourceBadges(presentation: SourcePresentation): List<SourceBadge> = 
 
 }.distinctBy { it.text }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun NzbSourceDetails(stream: StreamSource) {
+    val lines = remember(stream) { nzbSourceDetailLines(stream) }
+    if (lines.isEmpty()) return
+    Spacer(modifier = Modifier.height(8.dp))
+    FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(5.dp)
+    ) {
+        lines.forEach { line ->
+            Text(
+                text = line,
+                style = ArflixTypography.caption.copy(fontSize = 11.sp, lineHeight = 15.sp),
+                color = TextSecondary,
+                modifier = Modifier
+                    .background(Color.White.copy(alpha = 0.045f), RoundedCornerShape(5.dp))
+                    .padding(horizontal = 7.dp, vertical = 4.dp)
+            )
+        }
+    }
+}
+
 private fun rowSubtitle(presentation: SourcePresentation): String {
     // Keep add-on ownership first, followed by add-on supplied provider/indexer details.
     val addonPart = presentation.upstreamLabel
@@ -2129,6 +2162,7 @@ private fun SourceRequestButton(
 @Composable
 private fun OledSourceRow(
     presentation: SourcePresentation,
+    itemHeading: String,
     isFocused: Boolean,
     isDownloadFocused: Boolean,
     isSelected: Boolean,
@@ -2171,11 +2205,25 @@ private fun OledSourceRow(
         ) {
             // Badges take a bounded ~42% and WRAP into 2-3 rows instead of a single row that
             // eats the whole card on high-chip sources; the filename then always keeps ≥55%.
-            OledBadgeFlow(
-                presentation = presentation,
-                maxBadges = 8,
-                modifier = Modifier.weight(0.42f)
-            )
+            Column(modifier = Modifier.weight(0.42f)) {
+                if (itemHeading.isNotBlank()) {
+                    Text(
+                        text = itemHeading,
+                        style = ArflixTypography.body.copy(
+                            fontSize = 14.sp,
+                            lineHeight = 18.sp,
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        color = TextPrimary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                OledBadgeFlow(
+                    presentation = presentation,
+                    maxBadges = 8,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(0.58f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -2226,6 +2274,7 @@ private fun OledSourceRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                NzbSourceDetails(presentation.stream)
             }
         }
     }
@@ -2474,7 +2523,8 @@ private fun MobileStreamCard(
                 SourceLanguageBadge(language = presentation.languageLabel, compact = true)
                 SourceSizeBadge(size = presentation.stream.size, compact = true)
             }
-            if (!presentation.description.isNullOrBlank()) {
+            NzbSourceDetails(presentation.stream)
+            if (!presentation.stream.isStreamNetNzbSource() && !presentation.description.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = presentation.description,
@@ -2676,7 +2726,8 @@ private fun GlassyStreamCard(
 
                 Spacer(modifier = Modifier.height(8.dp))
                 SourceMetadataChips(presentation = presentation, compact = false)
-                if (!presentation.description.isNullOrBlank()) {
+                NzbSourceDetails(presentation.stream)
+                if (!presentation.stream.isStreamNetNzbSource() && !presentation.description.isNullOrBlank()) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = presentation.description,

@@ -62,7 +62,7 @@ async function proxy(
   if (body.length > 2 * 1024 * 1024)
     return NextResponse.json({ error: "Request too large" }, { status: 413 });
   try {
-    const response = await fetch(`${base}/${action}`, {
+    const response = await fetch(`${base}/${action}${request.nextUrl.search}`, {
       method: request.method,
       headers: {
         "content-type":

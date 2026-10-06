@@ -1124,6 +1124,9 @@ fun DetailsScreen(
             isVisible = showStreamSelector,
             streams = uiState.streams,
             selectedStream = null,
+            title = uiState.item?.title.orEmpty(),
+            releaseYear = uiState.item?.year?.takeIf { it.isNotBlank() }
+                ?: uiState.item?.releaseDate?.take(4),
             isLoading = uiState.isLoadingStreams,
             hasStreamingAddons = uiState.hasStreamingAddons,
             addonOrderedIds = uiState.addonOrderedIds,

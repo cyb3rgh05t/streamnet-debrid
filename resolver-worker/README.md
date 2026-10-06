@@ -11,13 +11,21 @@ Required GitHub Actions secrets:
 
 The deployment creates the `resolve.streamnet.live` Worker custom domain. Keep `ALLOWED_MEDIA_HOSTS` in `wrangler.toml` synchronized with provider redirect hosts.
 
-The Live TV relay allows `xui.streamnet.live`, `193.200.221.81`, and
-`50.7.184.250` (including extensionless `/hls/` URLs). An unlisted host returns
+The Live TV relay allows `xui.streamnet.live`, `193.200.221.81`,
+`50.7.184.250`, `85.209.176.85`, and `193.108.118.53` (including extensionless
+`/hls/` URLs). These match the app relay's built-in hosts. An unlisted host returns
 HTTP 400 with `Media host not allowed` before any upstream request. When adding
 a provider host, update both `wrangler.toml` and the defaults in `src/index.ts`.
 Redeploy the worker for host changes to take effect; a WebUI refresh alone is
 not sufficient. The publish workflow deploys only on a web version change or
 manual `workflow_dispatch`.
+
+STREAMNET IPTV uses the web app relay as its primary path. The worker is a
+fallback, not the default segment relay. A fallback playlist uses
+`/api/proxy?rewrite=resolver` to fetch manifests through the app while routing
+segments and keys to the worker without app-relay exceptions. Direct worker
+requests are tried afterwards. The worker cannot fix a provider's Cloudflare
+1003 direct-IP rejection; if both paths fail, playback reports an error.
 
 Local validation (Node.js 22.19+):
 

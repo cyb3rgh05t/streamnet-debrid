@@ -7,4 +7,4 @@ routes = [
 
 [vars]
 ALLOWED_ORIGINS = "https://web.streamnet.live,http://localhost:3000,http://localhost:3100"
-ALLOWED_MEDIA_HOSTS = "xui.streamnet.live,193.200.221.81,50.7.184.250"
+ALLOWED_MEDIA_HOSTS = "xui.streamnet.live,193.200.221.81,50.7.184.250,85.209.176.85,193.108.118.53"

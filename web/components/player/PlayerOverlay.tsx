@@ -47,6 +47,14 @@ import {
 } from "@/lib/externalPlayers";
 import { proxiedUrl } from "@/lib/http";
 import {
+  isStreamNetRelayTarget,
+  iptvStartupRecovery,
+  playbackDiagnostic,
+  streamNetPlaybackAttempts,
+  xtreamLiveTsVariant,
+  createLiveTransportFallback,
+} from "@/lib/iptvPlayback";
+import {
   attachPlayback,
   type PlaybackHandle,
   type PlaybackTracks,
@@ -204,8 +212,8 @@ function workerManifestUrl(url: string) {
   return target.toString();
 }
 
-function streamNetRelayUrl(url: string) {
-  const target = new URL(proxiedUrl(url, liveTvProxyHeaders()));
+function streamNetRelayUrl(url: string, headers?: Record<string, string>) {
+  const target = new URL(proxiedUrl(url, { ...liveTvProxyHeaders(), ...headers }));
   target.searchParams.set("rewrite", "streamnet");
   return target.toString();
 }
@@ -213,7 +221,7 @@ function streamNetRelayUrl(url: string) {
 function browserReadableStreamUrl(stream: StreamSource, url: string) {
   return stream.addonId === "iptv_xtream_vod" &&
     requiresSecureStreamNetRelay(url)
-    ? streamNetRelayUrl(url)
+    ? streamNetRelayUrl(url, stream.behaviorHints?.proxyHeaders?.request)
     : url;
 }
 
@@ -226,8 +234,7 @@ function audioTranscodeUrl(url: string) {
 function requiresSecureStreamNetRelay(url: string) {
   try {
     return (
-      Boolean(config.mediaResolverUrl) &&
-      new URL(url).origin === new URL(config.streamnetTvXtreamUrl).origin
+      isStreamNetRelayTarget(url, config.streamnetTvXtreamUrl)
     );
   } catch {
     return false;
@@ -388,8 +395,12 @@ export function PlayerOverlay() {
       updateSettings={updateSettings}
       activeProfileId={activeProfile?.id ?? null}
       liveTv={Boolean(activeChannel)}
+      liveChannelId={activeChannel?.id}
       canAdvance={canAdvance}
-      onSelectStream={playStream}
+      onSelectStream={(next, options) => playStream(next, {
+        ...options,
+        preserveLiveChannel: Boolean(activeChannel),
+      })}
       onAdvance={advanceEpisode}
       onToast={setToast}
       onClose={closePlayer}
@@ -409,6 +420,7 @@ function VideoPlayer({
   updateSettings,
   activeProfileId,
   liveTv,
+  liveChannelId,
   canAdvance,
   onSelectStream: selectStream,
   onAdvance: advance,
@@ -426,6 +438,7 @@ function VideoPlayer({
   updateSettings: (patch: Partial<AppSettings>) => void;
   activeProfileId: string | null;
   liveTv: boolean;
+  liveChannelId?: string;
   canAdvance: boolean;
   onSelectStream: (
     stream: StreamSource,
@@ -442,7 +455,7 @@ function VideoPlayer({
   const { markWatchedLocally } = useApp();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const dock = useLivePlayerDock(liveTv, stream.url ?? "", close);
+  const dock = useLivePlayerDock(liveTv, liveChannelId ?? stream.originalUrl ?? stream.url ?? "", close);
   const onClose = useCallback(() => {
     videoRef.current?.dispatchEvent(new Event("arvio-tracking-stop"));
     close();
@@ -480,6 +493,7 @@ function VideoPlayer({
     ],
   );
   const transportRef = useRef<PlaybackHandle | null>(null);
+  const relayFallbackRef = useRef<(() => boolean) | null>(null);
   const [transportTracks, setTransportTracks] = useState<PlaybackTracks>({
     audioTracks: [],
     qualities: [],
@@ -550,6 +564,7 @@ function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [error, setError] = useState(false);
   const [errorDetail, setErrorDetail] = useState("");
+  const [errorDiagnostic, setErrorDiagnostic] = useState("");
   const [activePanel, setActivePanel] = useState<PlayerPanel>(null);
   const [activeSubtitle, setActiveSubtitle] = useState(-1);
   const [skipOverlay, setSkipOverlay] = useState<number | null>(null);
@@ -747,6 +762,12 @@ function VideoPlayer({
         return;
       }
       if (tryNextSource()) return;
+      setErrorDiagnostic(playbackDiagnostic(
+        stream.url ?? "",
+        "missing-video-frames",
+        video.readyState,
+        video.error?.code,
+      ));
       setBuffering(false);
       setShowControls(true);
       setError(true);
@@ -768,9 +789,12 @@ function VideoPlayer({
     if (!booted || (liveTv && stream.transport === "mpegts")) return undefined;
     const video = videoRef.current;
     if (!video) return undefined;
+    const iptvAudio =
+      liveTv ||
+      stream.addonId === "iptv_xtream_vod" ||
+      stream.addonName === "Catch-up";
     return monitorSilentAudio(video, () => {
       video.pause();
-      const isIptvVod = stream.addonId === "iptv_xtream_vod";
       if (!stream.transcoded && canProviderTranscode(stream)) {
         onToast(
           localize(
@@ -782,7 +806,7 @@ function VideoPlayer({
         onSelectStream(stream, { forceTranscode: true, forceBrowser: true });
         return;
       }
-      if ((liveTv || isIptvVod) && !stream.transcoded && stream.url) {
+      if (iptvAudio && !stream.transcoded && stream.url) {
         onToast(
           localize(
             settings.uiLanguage,
@@ -824,7 +848,14 @@ function VideoPlayer({
           "This browser cannot decode the audio format. Open the stream in VLC.",
         ),
       );
-    });
+      setErrorDiagnostic(playbackDiagnostic(
+        stream.url ?? "",
+        "silent-audio",
+        video.readyState,
+        video.error?.code,
+      ));
+    }, iptvAudio ? 3_000 : 8_000,
+      () => !liveTv || transportRef.current?.transport !== "mpegts");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [booted, stream.url, remuxRestartKey, liveTv]);
 
@@ -961,6 +992,11 @@ function VideoPlayer({
 
     const tick = window.setInterval(() => {
       if (escalated) return;
+      if (transportRef.current?.isRecoveringMediaError()) {
+        lastProgressTime = video.currentTime;
+        resetStall();
+        return;
+      }
       const stalledNow = isStalled({
         paused: video.paused,
         seeking: video.seeking,
@@ -1008,6 +1044,11 @@ function VideoPlayer({
         return;
       }
       // escalate
+      if (relayFallbackRef.current?.()) {
+        lastProgressTime = video.currentTime;
+        resetStall();
+        return;
+      }
       escalated = true;
       const lighter = lighterSource();
       if (lighter && currentStreamRef.current.autoSelect) {
@@ -1026,6 +1067,12 @@ function VideoPlayer({
       }
       // Nothing lighter: surface the failure instead of buffering silently so
       // the source list (and the external-player options) are reachable.
+      setErrorDiagnostic(playbackDiagnostic(
+        currentStreamRef.current.url ?? "",
+        "persistent-stall",
+        video.readyState,
+        video.error?.code,
+      ));
       setBuffering(false);
       setError(true);
       setShowControls(true);
@@ -1191,6 +1238,7 @@ function VideoPlayer({
   useEffect(() => {
     const video = videoRef.current;
     if (!video || !stream.url) return undefined;
+    setErrorDiagnostic("");
 
     // In-browser remux path (Tier 3): repackage an MKV direct link and play the
     // browser-safe audio track. Takes over the element entirely for this source.
@@ -1215,6 +1263,12 @@ function VideoPlayer({
       lastSavedRef.current = 0;
       const remuxFailed = (message: string) => {
         if (cancelled || recovering) return;
+        setErrorDiagnostic(playbackDiagnostic(
+          stream.url!,
+          "remux-failed",
+          video.readyState,
+          video.error?.code,
+        ));
         recovering = true;
         window.clearInterval(remuxWatchdog);
         video.pause();
@@ -1364,8 +1418,15 @@ function VideoPlayer({
     });
     const attach = (url: string) => {
       const handle = attachPlayback(video, url, {
-        onError: handlePlaybackError,
+        onError: (fault) => {
+          if (transportRef.current === handle) handlePlaybackError(fault);
+        },
         live: liveTv,
+        recoverMediaErrors: !combinedLiveTransport,
+        stabilizeLiveTs: combinedLiveTransport || !!(
+          liveTv && stream.transport === "mpegts" && stream.originalUrl &&
+          requiresSecureStreamNetRelay(stream.originalUrl)
+        ),
         transport: url === stream.url ? stream.transport : undefined,
         requestHeaders: url === stream.url ? headers : undefined,
         onTracks: (tracks) => {
@@ -1375,40 +1436,33 @@ function VideoPlayer({
       transportRef.current = handle;
       return handle;
     };
-    // Set once this source has actually rendered frames. Everything below is
-    // STARTUP logic — "can this URL be opened at all?" — and must stand down
-    // afterwards. Without this, an error five seconds into a working stream ran
-    // the startup ladder and declared the source unplayable, which is why a
-    // source that was visibly playing would suddenly say it can't play in the
-    // browser and hop to the next one. Once playback has proven itself, a later
-    // fault is a stall/interruption and belongs to the recovery watchdog.
+    // After frames arrive, only StreamNet network failures may change relays.
+    // Other sources recover in place instead of restarting the startup ladder.
     let hasPlayed = false;
-    // Playback ladder: direct first (free for CORS-friendly providers), then the
-    // Cloudflare resolver media proxy for live TV (fixes CORS/ORB without Netlify
-    // bandwidth), then the legacy Netlify fallbacks.
-    // Catch-up and Xtream VOD come from the same IPTV panels as live channels,
-    // so they use the restricted relay while retaining seekable VOD controls.
+    // StreamNet IPTV uses the app relay first, then an independent worker path.
+    // Other providers retain their existing direct/worker playback order.
     const iptvRelay =
       liveTv ||
       stream.addonName === "Catch-up" ||
       stream.addonId === "iptv_xtream_vod";
-    const secureStreamNetRelay = requiresSecureStreamNetRelay(stream.url);
-    const attempts: string[] = secureStreamNetRelay ? [] : [stream.url];
+    const secureStreamNetRelay =
+      iptvRelay && requiresSecureStreamNetRelay(stream.url);
+    const combinedLiveTransport = !!(
+      liveTv && secureStreamNetRelay && !stream.transcoded &&
+      xtreamLiveTsVariant(stream.url)
+    );
+    const nextLiveTransport = createLiveTransportFallback();
+    const attempts: string[] = secureStreamNetRelay
+      ? streamNetPlaybackAttempts(stream.url, {
+          appOrigin: window.location.origin,
+          resolverUrl: config.mediaResolverUrl || config.resolverUrl,
+          headers: { ...liveTvProxyHeaders(), ...headers },
+          liveTransportFallback: combinedLiveTransport,
+        })
+      : [stream.url];
     if (iptvRelay) {
       const hlsTwin = xtreamHlsVariant(stream.url);
-      if (secureStreamNetRelay) {
-        // The IPTV panel rejects direct manifest fetches from the resolver's
-        // Cloudflare egress. Let the app proxy fetch the manifest, then rewrite
-        // its segments to the resolver worker.
-        const manifestAttempt = isLikelyHlsUrl(stream.url)
-          ? workerManifestUrl(stream.url)
-          : null;
-        attempts.push(manifestAttempt ?? streamNetRelayUrl(stream.url));
-        if (hlsTwin)
-          attempts.push(
-            workerManifestUrl(hlsTwin) ?? streamNetRelayUrl(hlsTwin),
-          );
-      } else {
+      if (!secureStreamNetRelay) {
         if (hlsTwin) attempts.push(hlsTwin);
         const workerUrl = resolverMediaUrl(stream.url, {
           ...liveTvProxyHeaders(),
@@ -1447,8 +1501,8 @@ function VideoPlayer({
       // data) need a shorter leash than VOD so the ladder keeps moving.
       stallTimer = window.setTimeout(
         () => {
-          if (cancelled) return;
-          if (video.readyState < 1) handlePlaybackError();
+          if (cancelled || transportRef.current?.isRecoveringMediaError()) return;
+          if (video.readyState < 1) handlePlaybackError(undefined, "metadata-timeout");
           // A cold debrid link has to be fetched and cached by the provider
           // before the first byte arrives, which regularly exceeds the VOD
           // budget — condemning sources that were about to work.
@@ -1463,8 +1517,8 @@ function VideoPlayer({
       // own frame deadline; the original attempt must not cancel a new relay.
       playableWatchdog = window.setTimeout(
         () => {
-          if (cancelled || hasPlayed || video.readyState >= 2) return;
-          handlePlaybackError();
+          if (cancelled || hasPlayed || video.readyState >= 2 || transportRef.current?.isRecoveringMediaError()) return;
+          handlePlaybackError(undefined, "frames-timeout");
         },
         liveTv
           ? 15000
@@ -1478,29 +1532,122 @@ function VideoPlayer({
       setError(false);
       setBuffering(true);
       const attempt = video.play();
+      const requestedHandle = transportRef.current;
       if (attempt && typeof attempt.catch === "function") {
         attempt.catch(() => {
-          if (cancelled) return;
+          if (cancelled || transportRef.current !== requestedHandle) return;
           setBuffering(false);
-          if (video.error) setError(true);
+          if (video.error) handlePlaybackError(undefined, "play-rejected");
           setShowControls(true);
         });
       }
     };
+    const switchAttempt = (nextIndex: number, transportSwitch = false) => {
+      if (cancelled || handlingError || !secureStreamNetRelay) return false;
+      const nextUrl = uniqueAttempts[nextIndex];
+      if (!nextUrl) return false;
+      handlingError = true;
+      if (!liveTv && video.currentTime > 0)
+        resumeAtRef.current = video.currentTime;
+      hasPlayed = false;
+      attemptIndex = nextIndex;
+      setError(false);
+      setErrorDetail("");
+      setErrorDiagnostic("");
+      setBuffering(true);
+      detach?.();
+      detach = attach(nextUrl);
+      video.addEventListener("loadedmetadata", onReadyToStart, { once: true });
+      video.addEventListener("canplay", onReadyToStart, { once: true });
+      video.addEventListener("playing", onFirstPlaying);
+      video.addEventListener("timeupdate", onFirstPlaying);
+      armStallTimer();
+      requestPlayback();
+      handlingError = false;
+      onToast(
+        localize(
+          settings.uiLanguage,
+          transportSwitch
+            ? `Wiedergabeproblem. ${nextIndex === 1 ? "MPEG-TS" : "HLS"} wird versucht ...`
+            : "IPTV-Verbindung unterbrochen. Alternativer Relay wird versucht ...",
+          transportSwitch
+            ? `Playback problem. Trying ${nextIndex === 1 ? "MPEG-TS" : "HLS"}...`
+            : "IPTV connection interrupted. Trying the next relay...",
+        ),
+      );
+      return true;
+    };
+    const advanceRelay = () => switchAttempt(attemptIndex + 1);
+    if (secureStreamNetRelay) relayFallbackRef.current = advanceRelay;
     let refreshedLink = false;
-    const handlePlaybackError = (fault?: PlaybackError) => {
+    const handlePlaybackError = (
+      fault?: PlaybackError,
+      reason = "media-element-error",
+    ) => {
       if (cancelled || handlingError) return;
+      const diagnostic = playbackDiagnostic(
+        uniqueAttempts[attemptIndex] ?? stream.url!,
+        fault?.code === undefined ? reason : String(fault.code),
+        video.readyState,
+        video.error?.code ?? fault?.mediaError?.code,
+        video.error?.message ?? fault?.mediaError?.message,
+      );
+      setErrorDiagnostic(`${diagnostic}; transport=${fault?.transport ?? transportRef.current?.transport ?? "unknown"}${fault?.engineDiagnostic ? `; mse=${fault.engineDiagnostic}` : ""}`);
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[StreamNet playback fallback]", JSON.stringify({
+          attemptIndex,
+          kind: fault?.kind,
+          code: fault?.code,
+          readyState: video.readyState,
+          mediaError: video.error?.code,
+          hasPlayed,
+          transcoded: !!stream.transcoded,
+          diagnostic,
+        }));
+      }
+      const decodeFailure = fault
+        ? fault.kind === "media" || fault.kind === "unsupported"
+        : classifyMediaError(video.error?.code) === "fatal";
+      if (combinedLiveTransport && decodeFailure) {
+        const transport = fault?.transport ?? transportRef.current?.transport;
+        if (transport === "hls" || transport === "mpegts") {
+          const nextIndex = nextLiveTransport(transport);
+          if (nextIndex !== null && switchAttempt(nextIndex, true)) return;
+        }
+      }
+      // The media element emits decode errors before HLS finishes recovery.
+      if (
+        iptvRelay &&
+        !fault &&
+        video.error?.code === 3 &&
+        transportRef.current?.recoverMediaError()
+      ) {
+        setError(false);
+        setBuffering(true);
+        armStallTimer();
+        return;
+      }
       if (fault) setErrorDetail(fault.message);
-      // A source that already played is not a startup failure. Walking the
-      // ladder here would re-attach a different URL (or hop to another source)
-      // mid-film; the stall watchdog recovers in place instead, keeping the
-      // user's position and the source they chose. A decode fault is the one
-      // exception — those bytes will never play here, so say so plainly rather
-      // than letting the watchdog retry something that cannot work.
+      // StreamNet network faults can switch relays without changing the source.
+      // Other sources recover in place; decode failures need a different codec.
       if (hasPlayed) {
         const decodeFailure = fault
           ? fault.kind === "media" || fault.kind === "unsupported"
           : classifyMediaError(video.error?.code) === "fatal";
+        if (!decodeFailure && advanceRelay()) return;
+        if (!decodeFailure && secureStreamNetRelay) {
+          setBuffering(false);
+          setError(true);
+          setShowControls(true);
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "App-Relay und Resolver konnten diesen Stream nicht fortsetzen.",
+              "The app relay and resolver could not continue this stream.",
+            ),
+          );
+          return;
+        }
         if (decodeFailure) {
           if (!liveTv && !stream.transcoded && canProviderTranscode(stream)) {
             cancelled = true;
@@ -1524,6 +1671,56 @@ function VideoPlayer({
         }
         return;
       }
+      const startupRecovery = iptvStartupRecovery(
+        fault?.kind,
+        video.error?.code ?? fault?.mediaError?.code,
+        video.error?.message ?? fault?.mediaError?.message ?? "",
+        !!stream.transcoded,
+      );
+      if (!hasPlayed && startupRecovery !== "relay" && iptvRelay) {
+        if (startupRecovery === "audio-transcode" && stream.url) {
+          cancelled = true;
+          onToast(
+            localize(
+              settings.uiLanguage,
+              "Die Audiospur konnte nicht initialisiert werden. IPTV-Audio wird in AAC umgewandelt.",
+              "The audio decoder could not initialize. Converting IPTV audio to AAC.",
+            ),
+          );
+          onSelectStream(
+            {
+              ...stream,
+              url: audioTranscodeUrl(stream.url),
+              originalUrl: stream.originalUrl ?? stream.url,
+              transport: "mpegts",
+              transcoded: true,
+            },
+            { forceBrowser: true },
+          );
+          detach?.();
+          return;
+        }
+        cancelled = true;
+        detach?.();
+        setErrorDetail(
+          localize(
+            settings.uiLanguage,
+            combinedLiveTransport
+              ? "HLS und MPEG-TS konnten diesen Stream nicht wiedergeben. Die Quelle oder ihr Medienformat kann im Browser Probleme verursachen."
+              : "Der Browser kann die Audio- oder Videospur nicht decodieren. Ein anderer Relay behebt diesen Codec-Fehler nicht.",
+            combinedLiveTransport
+              ? "Neither HLS nor MPEG-TS could play this stream. The source or its media format may cause browser playback problems."
+              : "The browser cannot decode the audio or video track. Switching relays cannot fix this codec error.",
+          ),
+        );
+        setBuffering(false);
+        setError(true);
+        setShowControls(true);
+        window.clearTimeout(stallTimer);
+        window.clearTimeout(playableWatchdog);
+        return;
+      }
+      if (!hasPlayed && secureStreamNetRelay && advanceRelay()) return;
       handlingError = true;
       // A debrid CDN link is presigned and short-lived. When one expires the
       // CDN rejects it (TorBox: "Invalid Presigned Token", HTTP 400) and every
@@ -1620,8 +1817,8 @@ function VideoPlayer({
       onToast(
         localize(
           settings.uiLanguage,
-          "Für StreamNet Live-TV ist ein HTTPS-Resolver erforderlich.",
-          "StreamNet Live TV requires an HTTPS resolver.",
+          "Für diesen Stream ist kein Wiedergabepfad verfügbar.",
+          "No playback path is available for this stream.",
         ),
       );
       return;
@@ -1635,10 +1832,16 @@ function VideoPlayer({
       // Restore the position carried over from a source hop / remux switch.
       // Guarded so it only fires once and never seeks past the end.
       const resumeAt = resumeAtRef.current;
-      if (resumeAt > 5 && video.currentTime < 1) {
+      if (
+        resumeAt > (secureStreamNetRelay ? 0 : 5) &&
+        video.currentTime < 1
+      ) {
         const target =
           video.duration > 0
-            ? Math.min(resumeAt, video.duration - 5)
+            ? Math.min(
+                resumeAt,
+                Math.max(0, video.duration - (secureStreamNetRelay ? 0.1 : 5)),
+              )
             : resumeAt;
         if (target > 0) {
           try {
@@ -1654,11 +1857,9 @@ function VideoPlayer({
     const startTimer = window.setTimeout(requestPlayback, 0);
     video.addEventListener("loadedmetadata", onReadyToStart, { once: true });
     video.addEventListener("canplay", onReadyToStart, { once: true });
-    const onErr = () => handlePlaybackError();
+    const onErr = () => { if (video.error) handlePlaybackError(); };
     video.addEventListener("error", onErr);
-    // The moment real frames arrive this source has proven it plays here, so
-    // retire the startup watchdogs and the ladder. Anything that goes wrong
-    // from now on is handled by the stall watchdog, which recovers in place.
+    // Retire startup timers once frames arrive. A relay switch re-arms them.
     const onFirstPlaying = () => {
       if (video.readyState < 3) return;
       hasPlayed = true;
@@ -1667,6 +1868,7 @@ function VideoPlayer({
       // no longer actionable and must be dismissed.
       setError(false);
       setErrorDetail("");
+      setErrorDiagnostic("");
       setBuffering(false);
       window.clearTimeout(stallTimer);
       window.clearTimeout(playableWatchdog);
@@ -1679,6 +1881,8 @@ function VideoPlayer({
     video.addEventListener("timeupdate", onFirstPlaying);
     return () => {
       cancelled = true;
+      if (relayFallbackRef.current === advanceRelay)
+        relayFallbackRef.current = null;
       window.clearTimeout(startTimer);
       window.clearTimeout(stallTimer);
       window.clearTimeout(playableWatchdog);
@@ -2049,6 +2253,12 @@ function VideoPlayer({
       const attempt = video.play();
       void attempt?.catch(() => {
         if (video.error) {
+          setErrorDiagnostic(playbackDiagnostic(
+            stream.url ?? "",
+            "manual-play-rejected",
+            video.readyState,
+            video.error.code,
+          ));
           setBuffering(false);
           setError(true);
           setShowControls(true);
@@ -2583,7 +2793,32 @@ function VideoPlayer({
                 "The source could not be opened. Its network access, browser permissions, or media format may be unsupported. Try another source or an external player.",
               )}
           </span>
+          {errorDiagnostic && <pre>{errorDiagnostic}</pre>}
           <div className="player-error-actions">
+            {liveTv && !stream.transcoded && stream.url &&
+              requiresSecureStreamNetRelay(stream.url) &&
+              xtreamLiveTsVariant(stream.url) && (
+                <button
+                  type="button"
+                  className="player-error-external"
+                  onClick={() => {
+                    const tsUrl = xtreamLiveTsVariant(stream.url!);
+                    if (!tsUrl) return;
+                    onSelectStream(
+                      {
+                        ...stream,
+                        url: streamNetRelayUrl(tsUrl, stream.behaviorHints?.proxyHeaders?.request),
+                        originalUrl: stream.originalUrl ?? stream.url,
+                        transport: "mpegts",
+                      },
+                      { forceBrowser: true },
+                    );
+                  }}
+                >
+                  <Play size={15} fill="currentColor" />{" "}
+                  {localize(settings.uiLanguage, "MPEG-TS testen", "Try MPEG-TS")}
+                </button>
+              )}
             <button
               type="button"
               className="player-error-external"
@@ -3058,11 +3293,11 @@ function VideoPlayer({
                           "Konvertierung auf dem Gerät",
                           "On-device conversion",
                         )
-                      : stream.transport === "hls"
+                      : (transportRef.current?.transport ?? stream.transport) === "hls"
                         ? "HLS"
-                        : stream.transport === "dash"
+                        : (transportRef.current?.transport ?? stream.transport) === "dash"
                           ? "DASH"
-                          : stream.transport === "mpegts"
+                          : (transportRef.current?.transport ?? stream.transport) === "mpegts"
                             ? "MPEG-TS"
                             : localize(settings.uiLanguage, "Direkt", "Direct")}
                 </span>

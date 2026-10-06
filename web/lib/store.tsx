@@ -801,6 +801,7 @@ export interface AppStore {
       forceTranscode?: boolean;
       forceRemux?: boolean;
       forceBrowser?: boolean;
+      preserveLiveChannel?: boolean;
     },
   ) => void;
   playTrailer: (item: MediaItem) => Promise<void>;
@@ -2979,11 +2980,15 @@ export function AppProvider({
         forceTranscode?: boolean;
         forceRemux?: boolean;
         forceBrowser?: boolean;
+        preserveLiveChannel?: boolean;
       } = {},
     ) => {
       playbackPreparation.current?.abort();
       stopOwnedPlayback();
-      setActiveStream(null);
+      const preserveLiveChannel = !!(
+        options.preserveLiveChannel && options.forceBrowser && activeChannel
+      );
+      if (!preserveLiveChannel) setActiveStream(null);
       const sameEpisode =
         selected?.mediaType === "movie" ||
         (selected?.seasonNumber === selectedEpisode?.season &&
@@ -2992,6 +2997,7 @@ export function AppProvider({
       // picking a source (e.g. after a stuck/dead one) must not silently
       // restart a title just because it crossed the watched threshold.
       if (
+        !preserveLiveChannel &&
         stream.resumePositionSeconds === undefined &&
         selected &&
         sameEpisode
@@ -3106,7 +3112,7 @@ export function AppProvider({
             ).catch(() => undefined);
             return;
           }
-          setActiveChannel(null);
+          if (!preserveLiveChannel) setActiveChannel(null);
           ownedPlayback.current = {
             stream: prepared,
             settings: settingsRef.current,
@@ -3127,7 +3133,7 @@ export function AppProvider({
         })
         .finally(() => window.clearTimeout(timeout));
     },
-    [selected, activeProfile, selectedEpisode],
+    [selected, activeProfile, selectedEpisode, activeChannel],
   );
 
   const advanceEpisode = useCallback(async (): Promise<boolean> => {

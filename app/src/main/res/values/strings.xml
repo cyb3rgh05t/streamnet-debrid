@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="player_nzb_smart_play_manual">No individual NZB release available. Select Smart Play manually in the sources menu.</string>
     <string name="app_name">StreamNet</string>
     <string name="now_playing">NOW PLAYING</string>
 
@@ -91,8 +92,8 @@
     <string name="player_starting_playback">Starting playback…</string>
     <string name="player_preparing_stream">Preparing stream</string>
     <string name="player_preparing_sources">Preparing sources</string>
-    <string name="player_searching_sources">Searching %1$d/%2$d sources</string>
-    <string name="player_found_sources">Found %1$d sources (%2$d/%3$d)</string>
+    <string name="player_searching_sources">Searching sources – %1$d/%2$d addons checked</string>
+    <string name="player_found_sources">Found %1$d sources (%2$d/%3$d addons checked)</string>
     <string name="live">Live</string>
     <string name="now">Now</string>
     <string name="later">Later</string>
@@ -1699,5 +1700,3 @@
     <string name="tracking_mode_automatic">Cloud</string>
 
 </resources>
-
-

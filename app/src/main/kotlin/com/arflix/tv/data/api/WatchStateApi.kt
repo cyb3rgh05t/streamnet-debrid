@@ -257,7 +257,7 @@ interface WatchStateApi {
 
 data class WatchHistoryRecord(
     val id: String? = null,
-    @SerializedName("user_id") val userId: String,
+    @SerializedName("user_id") val userId: String? = null,
     @SerializedName("profile_id") val profileId: String? = null,
     @SerializedName("media_type") val mediaType: String, // "movie" or "tv"
     @SerializedName("show_tmdb_id") val showTmdbId: Int? = null,

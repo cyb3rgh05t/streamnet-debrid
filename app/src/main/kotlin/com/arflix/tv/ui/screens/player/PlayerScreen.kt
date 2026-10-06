@@ -3136,6 +3136,16 @@ fun PlayerScreen(
                         return@onKeyEvent true
                     }
 
+                    if ((event.key == Key.Back || event.key == Key.Escape) && showSourceMenu) {
+                        showSourceMenu = false
+                        showControls = true
+                        coroutineScope.launch {
+                            delay(120)
+                            runCatching { sourceButtonFocusRequester.requestFocus() }
+                        }
+                        return@onKeyEvent true
+                    }
+
                     if ((event.key == Key.Back || event.key == Key.Escape) &&
                         !showSubtitleMenu && !showSourceMenu && !showQuickSettings && !showNextEpisodePrompt && !showSubtitleSettings && uiState.error == null
                     ) {
@@ -4290,6 +4300,7 @@ fun PlayerScreen(
             hasStreamingAddons = !uiState.isSetupError,
             addonOrderedIds = uiState.addonOrderedIds,
             title = uiState.title,
+            releaseYear = uiState.releaseYear,
             subtitle = if (seasonNumber != null && episodeNumber != null) {
                 "S$seasonNumber E$episodeNumber"
             } else {

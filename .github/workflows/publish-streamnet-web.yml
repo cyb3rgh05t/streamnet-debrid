@@ -134,6 +134,10 @@ jobs:
         working-directory: web
         run: npm ci
 
+      - name: Test IPTV relay and fallback
+        working-directory: web
+        run: node --experimental-strip-types --experimental-loader ./tests/ts-resolution-loader.mjs --test tests/iptv-relay.test.cjs tests/media-recovery.test.cjs tests/silent-audio.test.cjs
+
       - name: Build Next app
         working-directory: web
         env:

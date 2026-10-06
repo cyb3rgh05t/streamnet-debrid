@@ -49,6 +49,12 @@ Migration exports contain sensitive account records and must remain outside Git.
 
 ## Android Build
 
+Franchise timeline collections page through their configured addon catalogs.
+Pagination probes beyond the requested page before deciding the catalog is
+exhausted, and advances by consumed source references rather than only hydrated
+cards. Timeline source budgets grow on demand so longer chronologies are not
+limited by the fixed franchise lookup budget.
+
 Copy local secrets and fill real values:
 
 ```bash

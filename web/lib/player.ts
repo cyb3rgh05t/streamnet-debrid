@@ -1,5 +1,6 @@
 import { mediaSourceConstructor } from "./capabilities";
-import { classifyMediaError } from "./playerRecovery";
+import { classifyMediaError, createMediaRecovery, mpegTsBufferOptions } from "./playerRecovery";
+import { mseErrorDiagnostic } from "./iptvPlayback";
 import type { LoadPolicy } from "hls.js";
 
 export type PlaybackTransport = "file" | "hls" | "dash" | "mpegts";
@@ -12,6 +13,9 @@ export type PlaybackError = {
   retryable: boolean;
   message: string;
   code?: string | number;
+  /** Original decoder failure, retained when engine teardown clears video.error. */
+  mediaError?: { code: number; message: string };
+  engineDiagnostic?: string;
 };
 
 export type PlaybackAudioTrack = { id: string; label: string; language?: string };
@@ -26,9 +30,12 @@ export type PlaybackTracks = {
 
 /** Callable for compatibility with existing effect cleanup functions. */
 export type PlaybackHandle = (() => void) & {
+  transport: PlaybackTransport;
   destroy(): void;
   /** Reload this source, preserving VOD position by default. Does not force autoplay. */
   reload(resumeAt?: number): void;
+  recoverMediaError(): boolean;
+  isRecoveringMediaError(): boolean;
   selectAudioTrack(id: string): boolean;
   /** null selects Auto. Unsupported or unavailable selections return false. */
   selectQuality(id: string | null): boolean;
@@ -43,10 +50,11 @@ export type PlaybackOptions = {
   /** Browser-permitted headers for adaptive/TS requests; native src cannot set headers. */
   requestHeaders?: Record<string, string>;
   live?: boolean;
+  recoverMediaErrors?: boolean;
+  stabilizeLiveTs?: boolean;
 };
 
 const HLS_NETWORK_RECOVERIES = 2;
-const HLS_MEDIA_RECOVERIES = 2;
 const owners = new WeakMap<HTMLVideoElement, PlaybackHandle>();
 const emptyTracks = (): PlaybackTracks => ({ audioTracks: [], qualities: [], selectedAudioTrackId: null, selectedQualityId: null });
 type Controls = Pick<PlaybackHandle, "selectAudioTrack" | "selectQuality" | "goLive">;
@@ -104,9 +112,13 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
   let controls: Controls | null = null;
   let audioSelection: string | null = null;
   let qualitySelection: string | null = null;
+  let recoverMedia: (() => boolean) | null = null;
+  let recoveringMedia: (() => boolean) | null = null;
 
   const release = () => {
     controls = null;
+    recoverMedia = null;
+    recoveringMedia = null;
     const previous = cleanup;
     cleanup = [];
     for (const dispose of previous.reverse()) {
@@ -128,7 +140,10 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
     }
   };
   const handle: PlaybackHandle = Object.assign(destroy, {
+    transport,
     destroy,
+    recoverMediaError: () => !disposed && (recoverMedia?.() ?? false),
+    isRecoveringMediaError: () => !disposed && (recoveringMedia?.() ?? false),
     reload: (resumeAt?: number) => {
       if (!disposed) start(resumeAt ?? (live ? undefined : video.currentTime), !video.paused && !video.ended);
     },
@@ -156,14 +171,15 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
     release();
     resetVideo();
     let failed = false;
+    let originalMediaError: PlaybackError["mediaError"];
     const active = () => !disposed && !failed && session === generation;
-    const fail = (kind: PlaybackError["kind"], message: string, code?: string | number, retryable = kind === "network" || kind === "unknown") => {
+    const fail = (kind: PlaybackError["kind"], message: string, code?: string | number, retryable = kind === "network" || kind === "unknown", engineDiagnostic?: string) => {
       if (!active()) return;
       failed = true;
       release();
       // Return the handle before notifying initial failures, and cancel queued notifications too.
       void Promise.resolve().then(() => {
-        if (!disposed && session === generation) options.onError?.({ transport, kind, fatal: true, retryable, message, code });
+        if (!disposed && session === generation) options.onError?.({ transport, kind, fatal: true, retryable, message, code, mediaError: originalMediaError, engineDiagnostic });
       });
     };
     const publish = (tracks: PlaybackTracks) => { if (active()) options.onTracks?.(tracks); };
@@ -257,11 +273,57 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
         });
         cleanup.push(() => instance.destroy());
         let networkAttempts = 0;
-        let mediaAttempts = 0;
+        let resumeAfterRecovery = false;
+        const mediaRecovery = createMediaRecovery(
+          () => {
+            if (video.error) {
+              originalMediaError = { code: video.error.code, message: video.error.message };
+            }
+            if (process.env.NODE_ENV === "development")
+              console.warn("[StreamNet HLS recovery]", "Starting bounded media recovery");
+            instance.recoverMediaError();
+          },
+          () => fail(
+            "media",
+            "HLS media recovery exhausted after two attempts.",
+            "MEDIA_RECOVERY_EXHAUSTED",
+          ),
+        );
+        cleanup.push(() => mediaRecovery.dispose());
+        recoverMedia = () => {
+          if (!active()) return false;
+          if (options.recoverMediaErrors === false) return false;
+          if (!mediaRecovery.isPending())
+            resumeAfterRecovery = !video.paused || video.error !== null;
+          return mediaRecovery.request();
+        };
+        recoveringMedia = mediaRecovery.isPending;
+        // recoverMediaError detaches the source and aborts the previous play().
+        listen(video, "canplay", () => {
+          if (!mediaRecovery.isPending()) return;
+          if (!resumeAfterRecovery) { mediaRecovery.succeeded(); return; }
+          void video.play().catch(() => {
+            if (active() && process.env.NODE_ENV === "development")
+              console.warn("[StreamNet HLS recovery]", "Playback resume rejected");
+          });
+        });
+        listen(video, "playing", () => mediaRecovery.succeeded());
         let retryTimer: ReturnType<typeof setTimeout> | undefined;
         cleanup.push(() => clearTimeout(retryTimer));
         instance.on(Hls.Events.ERROR, (_event, data) => {
+          if (process.env.NODE_ENV === "development" && active()) {
+            console.warn("[StreamNet HLS]", JSON.stringify({
+              type: data.type,
+              details: data.details,
+              fatal: data.fatal,
+              status: data.response?.code,
+              readyState: video.readyState,
+              mediaError: video.error?.code,
+            }));
+          }
           if (!active() || !data.fatal) return;
+          if (video.error)
+            originalMediaError = { code: video.error.code, message: video.error.message };
           const network = data.type === Hls.ErrorTypes.NETWORK_ERROR;
           const media = data.type === Hls.ErrorTypes.MEDIA_ERROR;
           const status = data.response?.code;
@@ -279,12 +341,15 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
             }, 500 * networkAttempts);
             return;
           }
-          if (media && mediaAttempts < HLS_MEDIA_RECOVERIES) {
-            mediaAttempts += 1;
-            try { instance.recoverMediaError(); } catch { fail("media", "HLS media recovery failed.", data.details); }
+          if (media && recoverMedia?.()) {
             return;
           }
-          fail(network ? "network" : media ? "media" : "unknown", "HLS playback recovery exhausted.", data.details, network ? retryable : !media);
+          fail(
+            network ? "network" : media ? "media" : "unknown",
+            `HLS playback recovery exhausted (${data.details}${status ? `, HTTP ${status}` : ""}).`,
+            data.details,
+            network ? retryable : !media,
+          );
         });
         const snapshot = () => {
           if (!active()) return;
@@ -439,17 +504,21 @@ export function attachPlayback(video: HTMLVideoElement, url: string, options: Pl
       prepareMse();
       const instance = mpegts.createPlayer({ type: "mpegts", isLive: live, url }, {
         // Keep a rolling live buffer even when paused; VOD must never chase the live edge.
-        enableWorker: true, headers, liveBufferLatencyChasing: live, liveBufferLatencyChasingOnPaused: live,
-        liveBufferLatencyMaxLatency: 5, liveBufferLatencyMinRemain: 1,
-        enableStashBuffer: !live, stashInitialSize: 128 * 1024,
+        enableWorker: true, headers,
+        ...mpegTsBufferOptions(live, live && options.stabilizeLiveTs === true),
         lazyLoad: !live, lazyLoadMaxDuration: lowMemory ? 20 : 40, lazyLoadRecoverDuration: 5,
         autoCleanupSourceBuffer: true, autoCleanupMaxBackwardDuration: lowMemory ? 20 : 40,
         autoCleanupMinBackwardDuration: lowMemory ? 10 : 20
       });
       cleanup.push(() => instance.destroy());
-      const onError = (type: string, detail: string) => {
+      const onError = (type: string, detail: string, info: unknown) => {
         const kind = type === mpegts.ErrorTypes.NETWORK_ERROR ? "network" : type === mpegts.ErrorTypes.MEDIA_ERROR ? "media" : "unknown";
-        fail(kind, "MPEG-TS playback failed.", detail);
+        if (video.error)
+          originalMediaError = { code: video.error.code, message: video.error.message };
+        const diagnostic = detail === mpegts.ErrorDetails.MEDIA_MSE_ERROR ? mseErrorDiagnostic(info) : undefined;
+        if (process.env.NODE_ENV === "development")
+          console.warn("[StreamNet MPEG-TS]", JSON.stringify({ type, detail, diagnostic }));
+        fail(kind, "MPEG-TS playback failed.", detail, kind === "network", diagnostic);
       };
       instance.on(mpegts.Events.ERROR, onError);
       cleanup.push(() => instance.off(mpegts.Events.ERROR, onError));

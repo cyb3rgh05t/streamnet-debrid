@@ -166,6 +166,29 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `legacy web progress without timestamp survives when no dismissal exists`() {
+        val remote = """{"localContinueWatchingByProfile":{"main":[{"id":123,"title":"Web movie","mediaType":"MOVIE","progress":25,"updatedAtMs":0}]}}"""
+        val merged = JSONObject(mergeLocalHistoryByTimestamp("{}", remote))
+            .getJSONObject("localContinueWatchingByProfile")
+            .getJSONArray("main")
+
+        assertEquals(1, merged.length())
+        assertEquals(25, merged.getJSONObject(0).getInt("progress"))
+        assertEquals(0L, merged.getJSONObject(0).getLong("updatedAtMs"))
+    }
+
+    @Test
+    fun `legacy untimestamped progress still respects an actual dismissal`() {
+        val remote = """{"localContinueWatchingByProfile":{"main":[{"id":123,"mediaType":"MOVIE","progress":25,"updatedAtMs":0}]}}"""
+        val local = """{"dismissedContinueWatchingByProfile":{"main":"movie:123,200"}}"""
+        val merged = JSONObject(mergeLocalHistoryByTimestamp(local, remote))
+            .getJSONObject("localContinueWatchingByProfile")
+            .getJSONArray("main")
+
+        assertEquals(0, merged.length())
+    }
+
+    @Test
     fun `cloud continue watching import infers missing media types without changing valid types`() {
         val normalized = JSONObject(
             normalizeCloudContinueWatchingMediaTypes(

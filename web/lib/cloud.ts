@@ -917,7 +917,7 @@ function androidContinueWatchingItems(
       dismissed.get(exactKey) ?? 0,
     );
     const updatedAt = Number(item.updatedAtMs ?? 0);
-    if (dismissedAt >= updatedAt) continue;
+    if (dismissedAt > 0 && dismissedAt >= updatedAt) continue;
     const existing = newestByTitle.get(showKey);
     newestByTitle.set(showKey, preferActiveCloudResumeRecord(existing, item));
   }
@@ -2187,7 +2187,9 @@ export async function pullCloudWatchHistory(
     `watch-history${query}`,
     { method: "GET" },
   );
-  const result = Array.isArray(rows) ? rows : [];
+  const result = Array.isArray(rows)
+    ? rows.filter((entry) => !profileId || entry.profile_id === profileId)
+    : [];
   cloudWatchHistoryCache.set(cacheKey, { at: Date.now(), rows: result });
   return structuredClone(result);
 }
@@ -2218,7 +2220,16 @@ export async function saveProgress(
   addons: InstalledAddon[] = [],
 ) {
   if (!auth.session || isLiveStreamOrSportsItem(entry, addons)) return;
-  await saveBackendWatchHistory(auth, entry, profileId).catch(() => undefined);
+  const updatedAt = Date.parse(entry.updated_at ?? "");
+  entry = {
+    ...entry,
+    updated_at: new Date(
+      Number.isFinite(updatedAt) && updatedAt > 0 ? updatedAt : Date.now(),
+    ).toISOString(),
+  };
+  await saveBackendWatchHistory(auth, entry, profileId).catch(() => {
+    console.warn("[StreamNet watch progress] Watch-history write failed; saving progress through account sync.");
+  });
   cloudWatchHistoryCache.delete(
     `${auth.session.userId}:${entry.profile_id ?? profileId ?? ""}`,
   );
@@ -2240,7 +2251,7 @@ export async function saveProgress(
         String(candidate.mediaType ?? "").toLowerCase() ===
           String(nextItem.mediaType ?? "").toLowerCase();
       if (!sameTitle) return true;
-      if (nextItem.mediaType !== "tv") return false;
+      if (nextItem.mediaType !== "TV") return false;
       return (
         candidate.season !== nextItem.season ||
         candidate.episode !== nextItem.episode

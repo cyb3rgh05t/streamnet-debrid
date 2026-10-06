@@ -7,6 +7,24 @@ const moduleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/sourceRank.ts"),
 ).href;
 
+test("NZB manual pickers keep Smart Play first and original release order for both targets", async () => {
+  const { compareSourcePickerOrder, restoreNzbSourceOrder } = await import(moduleUrl);
+  const nzb = (order, source) => ({
+    addonId: "com.usenet.streamer", addonName: "StreamNet NZB", source,
+    addonSourceOrder: order, quality: "1080p", url: "https://example.test/release",
+  });
+  const smart = { ...nzb(0, "Smart Play"), quality: "HD", behaviorHints: { notWebReady: true } };
+  const preferred = nzb(1, "German HEVC WEBRip");
+  const larger = { ...nzb(2, "German AVC BluRay"), size: "23 GB" };
+  const other = { ...nzb(0, "Other"), addonId: "other", addonName: "Other" };
+  assert.deepEqual(restoreNzbSourceOrder([larger, other, smart, preferred]),
+    [smart, other, preferred, larger]);
+  for (const target of ["browser", "external"]) {
+    assert.deepEqual([larger, preferred, smart].sort((a, b) =>
+      compareSourcePickerOrder(a, b, new Map(), target)), [smart, preferred, larger]);
+  }
+});
+
 test("source picker prioritizes addon order over quality and IPTV VOD first", async () => {
   const { compareSourcePickerOrder } = await import(moduleUrl);
   const addonOrder = new Map([

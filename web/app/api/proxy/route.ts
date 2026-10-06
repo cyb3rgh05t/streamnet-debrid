@@ -1,17 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  appSegmentRelayUrl,
+  IptvPlaylistSizeError,
+  readIptvPlaylist,
+  rewriteIptvPlaylist,
+  STREAMNET_RELAY_HOSTS,
+} from "@/lib/server/iptvRelay";
+import { config } from "@/lib/config";
+import {
   allowsMediaProxy,
   safeProxyFetch,
   withinProxyBudget,
 } from "@/lib/server/safeProxy";
 
 const BLOCKED_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
-const STREAMNET_RELAY_HOSTS = new Set([
-  "xui.streamnet.live",
-  "85.209.176.85",
-  "193.200.221.81",
-  "193.108.118.53",
-]);
 const ALLOW_MEDIA_PROXY = allowsMediaProxy();
 
 export async function GET(request: NextRequest) {
@@ -46,9 +48,12 @@ export async function GET(request: NextRequest) {
   }
   const rewriteMode = input.searchParams.get("rewrite");
   const streamNetRelayRequest =
-    rewriteMode === "streamnet" &&
+    (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
     STREAMNET_RELAY_HOSTS.has(target.hostname.toLowerCase());
-  if (rewriteMode === "streamnet" && !streamNetRelayRequest) {
+  if (
+    (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
+    !streamNetRelayRequest
+  ) {
     return NextResponse.json(
       { error: "StreamNet relay target not allowed" },
       { status: 400 },
@@ -58,6 +63,7 @@ export async function GET(request: NextRequest) {
     (rewriteMode === "0" ||
       rewriteMode === "direct" ||
       rewriteMode === "worker" ||
+      rewriteMode === "resolver" ||
       rewriteMode === "streamnet") &&
     !request.headers.has("range") &&
     isLikelyPlaylistTarget(target);
@@ -96,8 +102,15 @@ export async function GET(request: NextRequest) {
   if (response.ok && shouldRewritePlaylist(target, contentType)) {
     let text: string;
     try {
-      text = await response.text();
+      text = streamNetRelayRequest
+        ? await readIptvPlaylist(response)
+        : await response.text();
     } catch (error) {
+      if (error instanceof IptvPlaylistSizeError)
+        return NextResponse.json(
+          { error: error.message },
+          { status: 502, headers: { "cache-control": "no-store" } },
+        );
       return proxyFailure(error);
     }
     const hls = /^#EXT-X-/m.test(text);
@@ -107,32 +120,39 @@ export async function GET(request: NextRequest) {
         { status: 502, headers: { "cache-control": "no-store" } },
       );
     }
-    const rewritten =
-      rewriteMode === "0"
-        ? text
-        : rewriteMode === "streamnet"
-          ? rewritePlaylistToStreamNetRelay(
-              text,
-              new URL(response.headers.get("x-arvio-final-url") ?? target),
-              input.searchParams.get("headers"),
-            )
-          : rewriteMode === "worker"
-            ? rewritePlaylistToWorker(
+    let rewritten: string;
+    try {
+      rewritten =
+        rewriteMode === "0"
+          ? text
+          : rewriteMode === "streamnet" || rewriteMode === "resolver"
+            ? rewriteIptvPlaylist(
                 text,
                 new URL(response.headers.get("x-arvio-final-url") ?? target),
                 input.searchParams.get("headers"),
+                rewriteMode,
+                config.mediaResolverUrl || config.resolverUrl,
               )
-            : rewriteMode === "direct" || !ALLOW_MEDIA_PROXY
-              ? rewritePlaylistToDirectOrWorker(
+            : rewriteMode === "worker"
+              ? rewritePlaylistToWorker(
                   text,
                   new URL(response.headers.get("x-arvio-final-url") ?? target),
                   input.searchParams.get("headers"),
                 )
-              : rewritePlaylist(
-                  text,
-                  new URL(response.headers.get("x-arvio-final-url") ?? target),
-                  request,
-                );
+              : rewriteMode === "direct" || !ALLOW_MEDIA_PROXY
+                ? rewritePlaylistToDirectOrWorker(
+                    text,
+                    new URL(response.headers.get("x-arvio-final-url") ?? target),
+                    input.searchParams.get("headers"),
+                  )
+                : rewritePlaylist(
+                    text,
+                    new URL(response.headers.get("x-arvio-final-url") ?? target),
+                    request,
+                  );
+    } catch (error) {
+      return proxyFailure(error);
+    }
     const headers = new Headers();
     headers.set(
       "content-type",
@@ -376,15 +396,9 @@ function rewritePlaylistToWorker(
       return raw;
     }
     if (!["http:", "https:"].includes(absolute.protocol)) return raw;
-    // The IPTV panel's rotating segment IP rejects Cloudflare resolver
-    // requests, while the self-hosted app relay can reach it.
-    if (absolute.hostname === "193.200.221.81") {
-      const params = new URLSearchParams();
-      params.set("url", absolute.toString());
-      if (headersParam) params.set("headers", headersParam);
-      params.set("rewrite", "streamnet");
-      return `/api/proxy?${params.toString()}`;
-    }
+    // These segment hosts reject Cloudflare Worker fetches (error 1003).
+    const appRelay = appSegmentRelayUrl(absolute, headersParam);
+    if (appRelay) return appRelay;
     if (/\.m3u8?(?:$|[?#])/i.test(absolute.pathname)) {
       // Child playlists may live on the same CF-blocked host as the master;
       // keep them on this route (root-relative resolves against the app origin).
@@ -414,42 +428,6 @@ function rewritePlaylistToWorker(
     .join("\n");
 }
 
-function rewritePlaylistToStreamNetRelay(
-  text: string,
-  baseUrl: URL,
-  headersParam: string | null,
-) {
-  const relayUrl = (raw: string) => {
-    const trimmed = raw.trim();
-    if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:"))
-      return raw;
-    try {
-      const absolute = new URL(trimmed, baseUrl);
-      if (!["http:", "https:"].includes(absolute.protocol)) return raw;
-      const params = new URLSearchParams();
-      params.set("url", absolute.toString());
-      if (headersParam) params.set("headers", headersParam);
-      params.set("rewrite", "streamnet");
-      return `/api/proxy?${params.toString()}`;
-    } catch {
-      return raw;
-    }
-  };
-
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) return line;
-      if (!trimmed.startsWith("#")) return relayUrl(line);
-      return line.replace(
-        /URI="([^"]+)"/g,
-        (_match, uri: string) => `URI="${relayUrl(uri)}"`,
-      );
-    })
-    .join("\n");
-}
-
 function rewritePlaylistToDirectOrWorker(
   text: string,
   baseUrl: URL,
@@ -467,6 +445,8 @@ function rewritePlaylistToDirectOrWorker(
     try {
       const absolute = new URL(trimmed, baseUrl);
       if (!["http:", "https:"].includes(absolute.protocol)) return raw;
+      const appRelay = appSegmentRelayUrl(absolute, headersParam);
+      if (appRelay) return appRelay;
       if (absolute.protocol === "https:" || !resolverUrl.startsWith("https://"))
         return absolute.toString();
       const proxied = new URL(`${resolverUrl}/media`);

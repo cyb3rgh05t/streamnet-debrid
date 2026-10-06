@@ -25,6 +25,40 @@ import type { StreamSource } from "./types";
  */
 export type PlaybackTarget = "browser" | "external";
 
+export function isStreamNetNzbSource(stream: StreamSource): boolean {
+  return stream.addonId?.toLowerCase() === "com.usenet.streamer" ||
+    stream.addonName?.trim().toLowerCase() === "streamnet nzb";
+}
+
+export function isNzbSmartPlay(stream: StreamSource): boolean {
+  return isStreamNetNzbSource(stream) && /\bsmart\s*play\b/i.test(stream.source);
+}
+
+export function compareNzbSourceOrder(a: StreamSource, b: StreamSource): number {
+  return Number(isNzbSmartPlay(b)) - Number(isNzbSmartPlay(a)) ||
+    (a.addonSourceOrder ?? Number.MAX_SAFE_INTEGER) -
+      (b.addonSourceOrder ?? Number.MAX_SAFE_INTEGER);
+}
+
+// Restore only NZB slots after generic ranking, leaving other addons untouched.
+export function restoreNzbSourceOrder(streams: StreamSource[]): StreamSource[] {
+  const groups = new Map<string, StreamSource[]>();
+  for (const stream of streams) {
+    if (!isStreamNetNzbSource(stream)) continue;
+    const key = stream.addonId ?? stream.addonName;
+    groups.set(key, [...(groups.get(key) ?? []), stream]);
+  }
+  for (const group of groups.values()) group.sort(compareNzbSourceOrder);
+  const offsets = new Map<string, number>();
+  return streams.map((stream) => {
+    if (!isStreamNetNzbSource(stream)) return stream;
+    const key = stream.addonId ?? stream.addonName;
+    const offset = offsets.get(key) ?? 0;
+    offsets.set(key, offset + 1);
+    return groups.get(key)![offset];
+  });
+}
+
 export function isXtreamVodSource(stream: StreamSource): boolean {
   return stream.addonId === "iptv_xtream_vod";
 }
@@ -55,6 +89,8 @@ export function compareSourcePickerOrder(
     addonOrder,
   );
   if (addonOrderDifference !== 0) return addonOrderDifference;
+  if (a.addonId === b.addonId && isStreamNetNzbSource(a) && isStreamNetNzbSource(b))
+    return compareNzbSourceOrder(a, b);
   return sourcePickerScore(b, target) - sourcePickerScore(a, target);
 }
 

@@ -278,11 +278,14 @@ class WatchHistoryRepository @Inject constructor(
             try {
                 val records = executeBackendCall("get watch history") { auth ->
                     watchHistoryApi.getWatchHistory(auth = auth, profileId = profileId)
-                }.map { it.toEntry() }
+                }.map { it.toEntry(userId) }
                 if (currentProfileId() != profileId) {
                     return@withLock cachedWatchHistoryByProfile[profileId].orEmpty()
                 }
                 val result = filterByProfile(records, profileId, profileName, isDefault)
+                if (com.arflix.tv.BuildConfig.DEBUG) {
+                    android.util.Log.i("WatchHistoryRepository", "History fetched=${records.size} profileMatched=${result.size}")
+                }
                 cachedWatchHistory = result
                 cachedWatchHistoryByProfile[profileId] = result
                 watchHistoryFetchedAtByProfile[profileId] = System.currentTimeMillis()
@@ -291,6 +294,9 @@ class WatchHistoryRepository @Inject constructor(
                 throw error
             } catch (error: Exception) {
                 AppLogger.e("WatchHistoryRepository", "Error getting watch history, returning cache", error)
+                if (com.arflix.tv.BuildConfig.DEBUG) {
+                    android.util.Log.w("WatchHistoryRepository", "History fetch failed type=${error.javaClass.simpleName}")
+                }
                 cachedWatchHistoryByProfile[profileId].orEmpty()
             }
         }
@@ -362,7 +368,7 @@ class WatchHistoryRepository @Inject constructor(
                     episode = episode
                 )
             }
-            filterByProfile(records.map { it.toEntry() }).firstOrNull()
+            filterByProfile(records.map { it.toEntry(userId) }).firstOrNull()
         } catch (e: Exception) {
             AppLogger.e("WatchHistoryRepository", "Error returning null fallback", e)
             null
@@ -388,7 +394,7 @@ class WatchHistoryRepository @Inject constructor(
                     mediaType = mediaTypeKey
                 )
             }
-            filterByProfile(records.map { it.toEntry() })
+            filterByProfile(records.map { it.toEntry(userId) })
                 .filter { isEntryInProgress(it) }
                 .maxByOrNull { entry ->
                     parseEpoch(entry.updated_at).coerceAtLeast(parseEpoch(entry.paused_at))
@@ -560,10 +566,11 @@ private fun WatchHistoryEntry.toRecord(): com.arflix.tv.data.api.WatchHistoryRec
     )
 }
 
-private fun com.arflix.tv.data.api.WatchHistoryRecord.toEntry(): WatchHistoryEntry {
+internal fun com.arflix.tv.data.api.WatchHistoryRecord.toEntry(authenticatedUserId: String): WatchHistoryEntry {
+    require(authenticatedUserId.isNotBlank()) { "Authenticated account required for watch history" }
     return WatchHistoryEntry(
         id = id,
-        user_id = userId,
+        user_id = authenticatedUserId,
         profile_id = profileId,
         media_type = mediaType,
         show_tmdb_id = showTmdbId ?: 0,

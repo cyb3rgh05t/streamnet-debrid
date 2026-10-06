@@ -46,12 +46,8 @@ internal fun mergeTraktAndRecentLocalContinueWatching(
             traktItem
         } else {
             mergeContinueWatchingVisuals(
-                preferred = traktItem.copy(
-                    resumePositionSeconds = maxOf(traktItem.resumePositionSeconds, local.resumePositionSeconds),
-                    durationSeconds = maxOf(traktItem.durationSeconds, local.durationSeconds),
-                    progress = maxOf(traktItem.progress, local.progress)
-                ),
-                fallback = local
+                preferred = maxOf(traktItem, local, continueWatchingRecencyComparator),
+                fallback = minOf(traktItem, local, continueWatchingRecencyComparator)
             )
         }
     }
@@ -70,6 +66,7 @@ internal fun mergeTraktAndRecentLocalContinueWatching(
 }
 
 private val continueWatchingRecencyComparator =
-    compareBy<ContinueWatchingItem> { it.updatedAtMs }
+    compareBy<ContinueWatchingItem> { isActiveContinueWatchingResume(it) }
+        .thenBy { it.updatedAtMs }
         .thenBy { it.resumePositionSeconds }
         .thenBy { it.progress }

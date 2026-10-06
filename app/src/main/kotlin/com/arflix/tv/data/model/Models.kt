@@ -228,7 +228,8 @@ data class StreamSource(
     val rawLabel: String? = null,
     // Original Stremio title. Some addons use it for source/indexer details
     // that are intentionally separate from behaviorHints.filename.
-    val addonTitle: String? = null
+    val addonTitle: String? = null,
+    val addonSourceOrder: Int? = null
 ) : Serializable
 internal fun StreamSource.isXtreamVodSource(): Boolean = addonId == "iptv_xtream_vod"
 

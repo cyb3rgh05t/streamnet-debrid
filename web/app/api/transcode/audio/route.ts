@@ -2,12 +2,13 @@ import { spawn } from "node:child_process";
 import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
 import { safeProxyFetch, withinProxyBudget } from "@/lib/server/safeProxy";
+import { STREAMNET_RELAY_HOSTS } from "@/lib/server/iptvRelay";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const DEFAULT_HOSTS =
-  "xui.streamnet.live,usenetstreamer.mystreamnet.club,85.209.176.85,193.200.221.81,193.108.118.53";
+  [...STREAMNET_RELAY_HOSTS, "usenetstreamer.mystreamnet.club"].join(",");
 const DEFAULT_MAX_TRANSCODES = 4;
 let activeStreams = 0;
 

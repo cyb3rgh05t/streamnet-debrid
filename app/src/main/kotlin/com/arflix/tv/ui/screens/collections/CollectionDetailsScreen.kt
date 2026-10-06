@@ -474,7 +474,7 @@ class CollectionDetailsViewModel @Inject constructor(
         val availability = iptvVodAvailability
         if (!iptvOnlyMode || availability == null) {
             val page = mediaRepository.loadCollectionCatalogPage(pageCatalog, offset, limit)
-            return CollectionPage(page.items, page.hasMore, offset + page.items.size)
+            return CollectionPage(page.items, page.hasMore, page.nextOffset ?: (offset + page.items.size))
         }
 
         val availableItems = mutableListOf<MediaItem>()
@@ -487,11 +487,12 @@ class CollectionDetailsViewModel @Inject constructor(
                 offset = sourceOffset,
                 limit = maxOf(limit, PAGE_STEP),
             )
-            if (page.items.isEmpty()) {
+            val nextOffset = page.nextOffset ?: (sourceOffset + page.items.size)
+            if (nextOffset <= sourceOffset) {
                 hasMore = false
                 break
             }
-            sourceOffset += page.items.size
+            sourceOffset = nextOffset
             availableItems += page.items.filter(availability::contains)
             hasMore = page.hasMore
             pagesScanned++

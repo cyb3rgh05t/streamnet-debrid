@@ -468,7 +468,7 @@ private fun mergeLocalContinueWatching(local: JSONObject, remote: JSONObject, gs
                 }
                 val showKey = if (item.mediaType == MediaType.MOVIE) "movie:${item.id}" else "tv:${item.id}"
                 val dismissedAt = max(dismissed[exactKey] ?: 0L, dismissed[showKey] ?: 0L)
-                if (dismissedAt >= item.updatedAtMs) return@forEach
+                if (dismissedAt > 0L && dismissedAt >= item.updatedAtMs) return@forEach
                 val key = "${item.mediaType}:${item.id}"
                 val existing = byItem[key]
                 if (existing == null || item.updatedAtMs > existing.updatedAtMs) {

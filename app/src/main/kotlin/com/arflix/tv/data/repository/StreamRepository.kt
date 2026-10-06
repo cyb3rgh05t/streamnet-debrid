@@ -2605,7 +2605,7 @@ class StreamRepository @Inject constructor(
         }
 
         return filtered
-            .map { stream ->
+            .mapIndexed { sourceOrder, stream ->
                 val rawStreamUrl = stream.getStreamUrl()
                 val streamUrl = when {
                     !rawStreamUrl.isNullOrBlank() -> rawStreamUrl
@@ -2636,6 +2636,7 @@ class StreamRepository @Inject constructor(
                     source = torrentName,
                     addonName = addon.name + " - " + stream.getSourceName(),
                     addonId = addon.id,
+                    addonSourceOrder = sourceOrder,
                     quality = if (qualityFromTorrent != "Unknown") qualityFromTorrent else stream.getQuality(),
                     size = stream.getSize(),
                     sizeBytes = parseSizeToBytes(stream.getSize()),

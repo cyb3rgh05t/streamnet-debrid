@@ -12,6 +12,7 @@ import { syncClient } from "@/lib/sync";
 import {
   clearPendingExternalPlayback,
   loadPendingExternalPlayback,
+  savePendingExternalPlayback,
   type PendingExternalPlayback,
 } from "@/lib/externalPlayback";
 import { localize, type UiLanguage } from "@/lib/i18n";
@@ -183,7 +184,7 @@ export function ExternalPlaybackPrompt() {
             },
             active.profileId,
             addons,
-          ).catch(() => undefined);
+          );
         }
       }
       setToast(
@@ -200,6 +201,20 @@ export function ExternalPlaybackPrompt() {
             ),
       );
       await refreshData(active.profileId);
+    } catch {
+      console.warn("[StreamNet external playback] Progress synchronization failed.");
+      if (!finished) {
+        savePendingExternalPlayback(active);
+        setPending(active);
+        setMode("progress");
+      }
+      setToast(
+        localize(
+          settings.uiLanguage,
+          "Fortschritt konnte nicht vollständig synchronisiert werden. Bitte erneut versuchen.",
+          "Progress could not be fully synced. Please retry.",
+        ),
+      );
     } finally {
       setSaving(false);
     }

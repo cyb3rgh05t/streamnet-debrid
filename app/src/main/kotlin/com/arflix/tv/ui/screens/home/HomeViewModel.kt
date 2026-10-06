@@ -936,7 +936,7 @@ class HomeViewModel @Inject constructor(
                 return@mapNotNull item // Keep — episode may not be on TMDB yet
             }
 
-            if (!isEpisodeAlreadyAired(matchedEpisode.airDate)) {
+            if (item.isUpNext && !isEpisodeAlreadyAired(matchedEpisode.airDate)) {
                 return@mapNotNull null
             }
 
@@ -4767,19 +4767,11 @@ class HomeViewModel @Inject constructor(
         return try {
             val entries = watchHistoryRepository.getContinueWatching()
             if (entries.isEmpty()) return emptyList()
-            val mapped = entries.distinctBy { entry ->
-                "${entry.media_type}:${entry.show_tmdb_id}"
-            }.mapNotNull { entry ->
+            val mapped = entries.map { entry ->
                 val mediaType = if (entry.media_type == "tv") MediaType.TV else MediaType.MOVIE
-                val storedPct = (entry.progress * 100f).toInt()
-                val hasResumePosition = entry.position_seconds > 0L
-                val derivedPct = when {
-                    storedPct > 0 -> storedPct
-                    entry.duration_seconds > 0 && hasResumePosition ->
-                        ((entry.position_seconds.toFloat() / entry.duration_seconds.toFloat()) * 100f).toInt()
-                    hasResumePosition -> 1
-                    else -> 0
-                }
+                val derivedPct = continueWatchingProgressPercent(
+                    entry.position_seconds, entry.duration_seconds, entry.progress
+                )
                 val resolvedTitle = entry.title
                     ?.trim()
                     ?.takeIf { it.isNotBlank() }
@@ -4814,7 +4806,8 @@ class HomeViewModel @Inject constructor(
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            AppLogger.e("HomeVM", "Continue Watching history resolution failed", error)
             emptyList()
         }
     }
@@ -4895,7 +4888,7 @@ class HomeViewModel @Inject constructor(
         val sanitizedItems = sanitizeContinueWatchingItems(items, allowNetwork = allowNetwork)
         val visibleItems = applyContinueWatchingDismissals(sanitizedItems)
         return visibleItems.filter { item ->
-                if (useRemoteSync) true else item.progress in 1..99 || item.resumePositionSeconds > 0L
+                item.isUpNext || isActiveContinueWatchingResume(item)
             }
             .take(Constants.MAX_CONTINUE_WATCHING)
     }
@@ -4934,7 +4927,7 @@ class HomeViewModel @Inject constructor(
             sanitizeContinueWatchingItems(items, allowNetwork = false)
         )
             .filter { item ->
-                item.progress in 0..99 || item.resumePositionSeconds > 0L
+                item.isUpNext || isActiveContinueWatchingResume(item)
             }
             .take(Constants.MAX_CONTINUE_WATCHING)
     }
