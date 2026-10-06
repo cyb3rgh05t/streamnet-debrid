@@ -94,6 +94,10 @@ jobs:
         working-directory: resolver-worker
         run: npm run typecheck
 
+      - name: Test media relay
+        working-directory: resolver-worker
+        run: npm test
+
       - name: Deploy worker
         working-directory: resolver-worker
         env:

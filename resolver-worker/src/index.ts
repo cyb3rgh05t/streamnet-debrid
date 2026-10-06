@@ -4,7 +4,11 @@ interface Env {
 }
 
 const DEFAULT_ALLOWED_ORIGINS = ["https://web.streamnet.live"];
-const DEFAULT_ALLOWED_MEDIA_HOSTS = ["xui.streamnet.live", "193.200.221.81"];
+const DEFAULT_ALLOWED_MEDIA_HOSTS = [
+  "xui.streamnet.live",
+  "193.200.221.81",
+  "50.7.184.250",
+];
 const FORWARDED_HEADERS =
   /^(accept|authorization|cookie|icy-metadata|origin|referer|user-agent)$/i;
 

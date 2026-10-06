@@ -11,9 +11,18 @@ Required GitHub Actions secrets:
 
 The deployment creates the `resolve.streamnet.live` Worker custom domain. Keep `ALLOWED_MEDIA_HOSTS` in `wrangler.toml` synchronized with provider redirect hosts.
 
-Local validation:
+The Live TV relay allows `xui.streamnet.live`, `193.200.221.81`, and
+`50.7.184.250` (including extensionless `/hls/` URLs). An unlisted host returns
+HTTP 400 with `Media host not allowed` before any upstream request. When adding
+a provider host, update both `wrangler.toml` and the defaults in `src/index.ts`.
+Redeploy the worker for host changes to take effect; a WebUI refresh alone is
+not sufficient. The publish workflow deploys only on a web version change or
+manual `workflow_dispatch`.
+
+Local validation (Node.js 22.19+):
 
 ```bash
 npm ci
+npm test
 npm run typecheck
 ```

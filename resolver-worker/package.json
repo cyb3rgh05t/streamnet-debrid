@@ -5,6 +5,7 @@
   "scripts": {
     "deploy": "wrangler deploy",
     "dev": "wrangler dev",
+    "test": "node --experimental-strip-types --test tests/*.test.cjs",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
