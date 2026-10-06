@@ -10,6 +10,39 @@ const playbackUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/iptvPlayback.ts"),
 ).href;
 
+test("Existing same-origin IPTV relay URLs resolve to provider before fallback", async () => {
+  const { iptvPlaybackSourceUrl, streamNetPlaybackAttempts } = await import(playbackUrl);
+  const origin = "https://web.streamnet.live";
+  const provider = "https://xui.streamnet.live/live/test-user/test-pass/123.ts";
+  const relay = new URL("/api/proxy", origin);
+  relay.searchParams.set("url", provider);
+  relay.searchParams.set("rewrite", "streamnet");
+  const nested = new URL("/api/proxy", origin);
+  nested.searchParams.set("url", relay.toString());
+  const source = iptvPlaybackSourceUrl(nested.toString(), origin);
+  assert.equal(source, provider);
+  assert.equal(iptvPlaybackSourceUrl(`${relay.pathname}${relay.search}`, origin), provider);
+  const attempts = streamNetPlaybackAttempts(source, {
+    appOrigin: origin, resolverUrl: "https://resolve.streamnet.live",
+    headers: {}, liveTransportFallback: true,
+  });
+  for (const attempt of attempts) {
+    assert.equal(new URL(new URL(attempt).searchParams.get("url")).hostname, "xui.streamnet.live");
+  }
+});
+
+test("IPTV source normalization leaves conversion and foreign endpoints untouched", async () => {
+  const { iptvPlaybackSourceUrl } = await import(playbackUrl);
+  const origin = "https://web.streamnet.live";
+  for (const source of [
+    `${origin}/api/transcode/audio?url=https%3A%2F%2Fxui.streamnet.live%2F123.ts`,
+    "https://other.example/api/proxy?url=https%3A%2F%2Fxui.streamnet.live%2F123.ts",
+    "https://xui.streamnet.live/live/test/123.ts",
+  ]) assert.equal(iptvPlaybackSourceUrl(source, origin), source);
+  assert.throws(() => iptvPlaybackSourceUrl(`${origin}/api/proxy`, origin), /no upstream/);
+  assert.throws(() => iptvPlaybackSourceUrl(`${origin}/api/proxy?url=file%3A%2F%2F%2Fprivate`, origin), /protocol/);
+});
+
 test("Configured IPTV segment hosts use the restricted app relay", async () => {
   const { appSegmentRelayUrl, STREAMNET_RELAY_HOSTS } = await import(moduleUrl);
   const headers = btoa(JSON.stringify({

@@ -22,6 +22,25 @@ export function isStreamNetRelayTarget(url: string, providerUrl: string) {
   );
 }
 
+export function iptvPlaybackSourceUrl(url: string, appOrigin: string): string {
+  let source = url;
+  const seen = new Set<string>();
+  for (let depth = 0; depth < 8; depth++) {
+    const target = new URL(source, appOrigin);
+    if (target.origin !== new URL(appOrigin).origin || target.pathname !== "/api/proxy")
+      return source;
+    if (seen.has(target.toString())) throw new Error("Cyclic IPTV relay URL");
+    seen.add(target.toString());
+    const upstream = target.searchParams.get("url");
+    if (!upstream) throw new Error("IPTV relay URL has no upstream source");
+    const parsed = new URL(upstream, appOrigin);
+    if (!["http:", "https:"].includes(parsed.protocol))
+      throw new Error("IPTV relay source protocol is not supported");
+    source = parsed.toString();
+  }
+  throw new Error("IPTV relay URL nesting exceeds the limit");
+}
+
 export function xtreamLiveHlsVariant(url: string): string | null {
   const target = new URL(url);
   if (!/^\/(?:live\/)?[^/]+\/[^/]+\/\d+\.ts$/i.test(target.pathname))

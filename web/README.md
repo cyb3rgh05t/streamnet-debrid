@@ -46,6 +46,10 @@ providers retain their ranking; IPTV VOD precedence is unchanged.
 Smart Play remains explicitly selectable. If it is the only Android result,
 automatic selection displays a message requesting manual source selection.
 The Web browser recovery ranking and compatibility warnings remain unchanged.
+IPTV fallback normalizes existing same-origin `/api/proxy` URLs back to their
+upstream source before constructing relay attempts or audio conversion URLs.
+Converted audio endpoints are played directly rather than sent through the
+provider relay ladder. The explicit MPEG-TS test remains TS-only.
 
 Android NZB source cards additionally display the addon's formatted title and
 description as wrapping detail labels below the existing badges/filename.

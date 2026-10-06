@@ -51,6 +51,7 @@ import {
   iptvStartupRecovery,
   playbackDiagnostic,
   streamNetPlaybackAttempts,
+  iptvPlaybackSourceUrl,
   xtreamLiveTsVariant,
   createLiveTransportFallback,
 } from "@/lib/iptvPlayback";
@@ -227,7 +228,7 @@ function browserReadableStreamUrl(stream: StreamSource, url: string) {
 
 function audioTranscodeUrl(url: string) {
   const target = new URL("/api/transcode/audio", window.location.origin);
-  target.searchParams.set("url", url);
+  target.searchParams.set("url", iptvPlaybackSourceUrl(url, window.location.origin));
   return target.toString();
 }
 
@@ -1445,26 +1446,40 @@ function VideoPlayer({
       liveTv ||
       stream.addonName === "Catch-up" ||
       stream.addonId === "iptv_xtream_vod";
+    let iptvSourceUrl = stream.url;
+    if (iptvRelay && !stream.transcoded) {
+      try {
+        iptvSourceUrl = iptvPlaybackSourceUrl(stream.url, window.location.origin);
+      } catch (error) {
+        setError(true);
+        setBuffering(false);
+        setErrorDetail(error instanceof Error ? error.message : "Invalid IPTV relay URL");
+        return;
+      }
+    }
     const secureStreamNetRelay =
-      iptvRelay && requiresSecureStreamNetRelay(stream.url);
+      iptvRelay && !stream.transcoded && requiresSecureStreamNetRelay(iptvSourceUrl);
     const combinedLiveTransport = !!(
       liveTv && secureStreamNetRelay && !stream.transcoded &&
-      xtreamLiveTsVariant(stream.url)
+      stream.transport !== "mpegts" &&
+      xtreamLiveTsVariant(iptvSourceUrl)
     );
     const nextLiveTransport = createLiveTransportFallback();
     const attempts: string[] = secureStreamNetRelay
-      ? streamNetPlaybackAttempts(stream.url, {
+      ? streamNetPlaybackAttempts(iptvSourceUrl, {
           appOrigin: window.location.origin,
           resolverUrl: config.mediaResolverUrl || config.resolverUrl,
           headers: { ...liveTvProxyHeaders(), ...headers },
+          liveTsOnly: liveTv && stream.transport === "mpegts",
           liveTransportFallback: combinedLiveTransport,
         })
       : [stream.url];
-    if (iptvRelay) {
-      const hlsTwin = xtreamHlsVariant(stream.url);
+    if (iptvRelay && !stream.transcoded) {
+      const hlsTwin = xtreamHlsVariant(iptvSourceUrl);
       if (!secureStreamNetRelay) {
+        attempts[0] = iptvSourceUrl;
         if (hlsTwin) attempts.push(hlsTwin);
-        const workerUrl = resolverMediaUrl(stream.url, {
+        const workerUrl = resolverMediaUrl(iptvSourceUrl, {
           ...liveTvProxyHeaders(),
           ...headers,
         });
@@ -1478,10 +1493,10 @@ function VideoPlayer({
           const workerManifest = workerManifestUrl(hlsTwin);
           if (workerManifest) attempts.push(workerManifest);
         }
-        if (isLikelyHlsUrl(stream.url)) {
-          const workerManifest = workerManifestUrl(stream.url);
+        if (isLikelyHlsUrl(iptvSourceUrl)) {
+          const workerManifest = workerManifestUrl(iptvSourceUrl);
           if (workerUrl && workerManifest) attempts.push(workerManifest);
-          attempts.push(directManifestUrl(stream.url));
+          attempts.push(directManifestUrl(iptvSourceUrl));
         }
       }
     }
@@ -1690,7 +1705,7 @@ function VideoPlayer({
           onSelectStream(
             {
               ...stream,
-              url: audioTranscodeUrl(stream.url),
+              url: audioTranscodeUrl(iptvSourceUrl),
               originalUrl: stream.originalUrl ?? stream.url,
               transport: "mpegts",
               transcoded: true,

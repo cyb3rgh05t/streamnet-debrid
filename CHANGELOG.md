@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.065] - 2026-10-06
+
+- IPTV-Fallback löst bereits vorhandene App-Relay-URLs derselben Origin vor dem Aufbau neuer Wiedergabeversuche zur ursprünglichen Provider-URL auf. Dadurch werden App-Proxy-Links nicht erneut als Media-Ziel an Proxy oder Resolver geschickt.
+- Audio-Konvertierung erhält die Provider-URL statt eines verschachtelten App-Relay-Links. Bereits konvertierte Streams werden direkt abgespielt und nicht erneut durch die IPTV-Provider-Fallback-Kette geschickt.
+- Der explizite MPEG-TS-Test bleibt TS-only; normaler STREAMNET-Live-Start behält HLS mit begrenztem TS-Fallback.
+- Ungültige oder zu tief verschachtelte Relay-URLs melden einen Fehler; fremde Proxy-Origins werden nicht entpackt. Bestehende serverseitige Hostbeschränkungen bleiben unverändert.
+- Regressionstests prüfen bestehende und verschachtelte App-Relay-Links, unveränderte Konvertierungs-/Fremd-URLs sowie ungültige Relay-Ziele. Die gekürzten Produktionsrequests allein belegen nicht die Ursache aller gemeldeten HTTP-502-Antworten.
+- Web-Version: `1.0.065`. Android bleibt bei `2.5.055` / Code `456`.
+
 ## [2.5.055] - 2026-10-06
 
 - Continue Watching ist zwischen Android und Web angeglichen: aktive Resume-Einträge werden vor abgeschlossenen Einträgen bevorzugt, Position und Fortschritt stammen aus demselben Datensatz. Anzeigegrenzen und Prozent-Rundung sind vereinheitlicht.
