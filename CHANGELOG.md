@@ -2,6 +2,11 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.056] - 2026-10-07
+
+- Im Profilselector steht „StreamNet Cloud“ jetzt als gleich große Kachel direkt neben „Profil hinzufügen“. Die Cloud-Kachel behält ihre goldenen StreamNet-Akzente und bleibt nach erfolgreicher Verbindung ausgeblendet.
+- Android-Version: `2.5.056` / Code `457`.
+
 ## [Web 1.0.065] - 2026-10-06
 
 - IPTV-Fallback löst bereits vorhandene App-Relay-URLs derselben Origin vor dem Aufbau neuer Wiedergabeversuche zur ursprünglichen Provider-URL auf. Dadurch werden App-Proxy-Links nicht erneut als Media-Ziel an Proxy oder Resolver geschickt.

@@ -88,8 +88,8 @@ fun ProfileSelectionScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // Create focus requesters for each profile slot (max 5 profiles + 1 add button)
-    val focusRequesters = remember { List(6) { FocusRequester() } }
+    // Create focus requesters for each profile slot, the add button, and the cloud button.
+    val focusRequesters = remember { List(7) { FocusRequester() } }
 
     // Track if profile was selected in this session to trigger navigation
     var navigateTriggered by remember { mutableStateOf(false) }
@@ -275,6 +275,22 @@ fun ProfileSelectionScreen(
                             )
                         }
                     }
+
+                    if (!isCloudConnected) {
+                        item {
+                            CloudProfileButton(
+                                avatarSize = avatarSize,
+                                modifier = Modifier.focusRequester(
+                                    focusRequesters[uiState.profiles.size + if (uiState.profiles.size < 5) 1 else 0]
+                                ),
+                                onClick = {
+                                    if (!uiState.isSwitchingProfile) {
+                                        onConnectCloud()
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
                 } else {
                 // TV: original Row layout with fixed spacing
@@ -316,6 +332,21 @@ fun ProfileSelectionScreen(
                             onClick = { if (!uiState.isSwitchingProfile) viewModel.showAddDialog() }
                         )
                     }
+
+                    if (!isCloudConnected) {
+                        Spacer(modifier = Modifier.width(avatarSpacing))
+                        CloudProfileButton(
+                            avatarSize = avatarSize,
+                            modifier = Modifier.focusRequester(
+                                focusRequesters[uiState.profiles.size + if (uiState.profiles.size < 5) 1 else 0]
+                            ),
+                            onClick = {
+                                if (!uiState.isSwitchingProfile) {
+                                    onConnectCloud()
+                                }
+                            }
+                        )
+                    }
                 }
                 }
             }
@@ -331,18 +362,6 @@ fun ProfileSelectionScreen(
                     }
                 }
             )
-
-            if (!isCloudConnected) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                CloudConnectButton(
-                    onClick = {
-                        if (!uiState.isSwitchingProfile) {
-                            onConnectCloud()
-                        }
-                    }
-                )
-            }
 
             if (uiState.isSwitchingProfile) {
                 Spacer(modifier = Modifier.height(18.dp))
@@ -681,69 +700,90 @@ private fun ManageProfilesButton(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun CloudConnectButton(
+private fun CloudProfileButton(
+    avatarSize: Dp,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     var isFocused by remember { mutableIntStateOf(0) }
     val accentColor = Color(0xFFE5A209)
-    val accentFocused = Color(0xFFF0A809)
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused > 0) {
+            if (isTouchDevice) 1.1f else 1.04f
+        } else 1f,
+        animationSpec = tween(150),
+        label = "cloud_profile_scale"
+    )
 
-    Surface(
-        onClick = if (isTouchDevice) ({}) else onClick,
-        modifier = Modifier
-            .widthIn(max = 220.dp)
-            .then(if (isTouchDevice) Modifier.clickable { onClick() } else Modifier)
-            .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
-        shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(6.dp)),
-        colors = ClickableSurfaceDefaults.colors(
-            containerColor = Color.Black.copy(alpha = 0.38f),
-            focusedContainerColor = accentFocused
-        ),
-        scale = ClickableSurfaceDefaults.scale(
-            focusedScale = 1.04f,
-            pressedScale = 0.98f
-        ),
-        border = ClickableSurfaceDefaults.border(
-            border = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.72f)),
-                shape = RoundedCornerShape(6.dp)
-            ),
-            focusedBorder = androidx.tv.material3.Border(
-                border = androidx.compose.foundation.BorderStroke(2.dp, accentFocused),
-                shape = RoundedCornerShape(6.dp)
-            )
-        )
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Row(
-            modifier = Modifier
-                .background(
-                    Brush.horizontalGradient(
-                        if (isFocused > 0) {
-                            listOf(Color.Transparent, Color.White.copy(alpha = 0.12f), Color.Transparent)
-                        } else {
-                            listOf(accentColor.copy(alpha = 0.08f), Color.Transparent, accentColor.copy(alpha = 0.04f))
-                        }
+        val cloudContent: @Composable () -> Unit = {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.Cloud,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(42.dp)
+                )
+            }
+        }
+        if (isTouchDevice) {
+            Box(
+                modifier = modifier
+                    .size(avatarSize)
+                    .scale(scale)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (isFocused > 0) accentColor.copy(alpha = 0.14f)
+                        else Color.White.copy(alpha = 0.1f)
+                    )
+                    .border(
+                        width = if (isFocused > 0) 3.dp else 2.dp,
+                        color = if (isFocused > 0) accentColor else accentColor.copy(alpha = 0.55f),
+                        shape = RoundedCornerShape(8.dp)
+                    )
+                    .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 }
+                    .clickable { onClick() }
+            ) { cloudContent() }
+        } else {
+            Surface(
+                onClick = onClick,
+                modifier = modifier
+                    .size(avatarSize)
+                    .scale(scale)
+                    .onFocusChanged { isFocused = if (it.isFocused) 1 else 0 },
+                shape = ClickableSurfaceDefaults.shape(shape = RoundedCornerShape(8.dp)),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = accentColor.copy(alpha = 0.08f),
+                    focusedContainerColor = accentColor.copy(alpha = 0.18f)
+                ),
+                scale = ClickableSurfaceDefaults.scale(
+                    focusedScale = 1f,
+                    pressedScale = 1f
+                ),
+                border = ClickableSurfaceDefaults.border(
+                    border = androidx.tv.material3.Border(
+                        border = androidx.compose.foundation.BorderStroke(2.dp, accentColor.copy(alpha = 0.55f)),
+                        shape = RoundedCornerShape(8.dp)
+                    ),
+                    focusedBorder = androidx.tv.material3.Border(
+                        border = androidx.compose.foundation.BorderStroke(3.dp, accentColor),
+                        shape = RoundedCornerShape(8.dp)
                     )
                 )
-                .padding(horizontal = 16.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Cloud,
-                contentDescription = null,
-                tint = if (isFocused > 0) Color(0xFF18120A) else accentColor,
-                modifier = Modifier.size(18.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = stringResource(R.string.profile_cloud_button),
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (isFocused > 0) Color(0xFF18120A) else accentColor
-            )
+            ) { cloudContent() }
         }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Text(
+            text = stringResource(R.string.profile_cloud_button),
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Medium,
+            color = accentColor,
+            textAlign = TextAlign.Center
+        )
     }
 }
-
