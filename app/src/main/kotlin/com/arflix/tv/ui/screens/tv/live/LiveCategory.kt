@@ -207,6 +207,9 @@ private val CATEGORY_ARTWORK_RULES = listOf(
     Regex("\\b(fussball|fußball)\\b") to "fussball.webp",
 )
 
+internal fun liveChannelFallbackArtwork(channel: IptvChannel): LiveChannelFallbackArtwork? =
+    liveChannelFallbackArtwork(channel.group, channel.traits().country)
+
 internal fun liveChannelFallbackArtwork(
     groupName: String?,
     countryCode: String?,

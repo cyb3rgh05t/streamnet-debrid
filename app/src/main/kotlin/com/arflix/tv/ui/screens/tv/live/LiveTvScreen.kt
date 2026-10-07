@@ -3312,22 +3312,18 @@ fun LiveTvScreen(
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
                     lookupBackdrop = { program ->
-                        runCatching {
-                            viewModel.lookupProgramBackdrop(
-                                program.title,
-                                program.startUtcMillis,
-                                program.endUtcMillis,
-                            )
-                        }.getOrNull()
+                        viewModel.lookupProgramBackdrop(
+                            program.title,
+                            program.startUtcMillis,
+                            program.endUtcMillis,
+                        )
                     },
                     lookupLogo = { program ->
-                        runCatching {
-                            viewModel.lookupProgramLogo(
-                                program.title,
-                                program.startUtcMillis,
-                                program.endUtcMillis,
-                            )
-                        }.getOrNull()
+                        viewModel.lookupProgramLogo(
+                            program.title,
+                            program.startUtcMillis,
+                            program.endUtcMillis,
+                        )
                     },
                     titleTextSize = liveTvNetflixTitleSize,
                     descriptionTextSize = liveTvNetflixDescriptionSize,

@@ -3517,12 +3517,26 @@ class MediaRepository @Inject constructor(
             .map { it.toMediaItem(MediaType.MOVIE) }
     }
 
+    private val iptvBackdropCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
+    private val iptvLogoCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
+
+    fun clearIptvArtworkMisses() {
+        iptvBackdropCache.clearMisses()
+        iptvLogoCache.clearMisses()
+    }
+
     /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
     suspend fun lookupIptvProgramBackdrop(rawTitle: String, durationMs: Long? = null): String? {
         val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
+        return iptvBackdropCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
+            resolveIptvProgramBackdrop(cleanedTitle, durationMs)
+        }
+    }
+
+    private suspend fun resolveIptvProgramBackdrop(cleanedTitle: String, durationMs: Long?): String? {
         val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
         val bestCandidate = candidates.firstOrNull()
 
@@ -3539,6 +3553,12 @@ class MediaRepository @Inject constructor(
         if (cleanedTitle.length < 3) return null
         if (cleanedTitle.isArtworkPlaceholderTitle()) return null
 
+        return iptvLogoCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
+            resolveIptvProgramLogo(cleanedTitle, durationMs)
+        }
+    }
+
+    private suspend fun resolveIptvProgramLogo(cleanedTitle: String, durationMs: Long?): String? {
         val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
             .sortedByDescending { item ->
                 iptvArtworkCandidateScore(cleanedTitle, item.title, item.mediaType, durationMs, item.popularity)

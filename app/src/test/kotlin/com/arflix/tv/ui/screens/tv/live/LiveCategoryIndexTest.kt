@@ -11,6 +11,19 @@ import org.junit.Test
 class LiveCategoryIndexTest {
 
     @Test
+    fun homeAndNetflixUseTheSameSenderArtworkAndCountryInference() {
+        val sports = IptvChannel("sports", "Sport", "https://example.com/live", "DE | Sports")
+        assertThat(liveChannelFallbackArtwork(sports)?.assetPath).endsWith("sports.webp")
+        assertThat(liveChannelFallbackArtwork(sports))
+            .isEqualTo(liveChannelFallbackArtwork(sports.enrich(1).source))
+        val general = sports.copy(id = "general", name = "General", group = "DE | General")
+        assertThat(liveChannelFallbackArtwork(general))
+            .isEqualTo(liveChannelFallbackArtwork(general.group, general.enrich(1).country))
+        assertThat(liveChannelFallbackArtwork(general)?.isCountryFlag).isTrue()
+        assertThat(liveChannelFallbackArtwork(sports.copy(group = "STREAMNET RELAX"))).isNull()
+    }
+
+    @Test
     fun streamnetRelaxAlwaysUsesTheChannelLogoFallback() {
         assertThat(liveChannelFallbackArtwork("STREAMNET RELAX", "DE")).isNull()
         assertThat(

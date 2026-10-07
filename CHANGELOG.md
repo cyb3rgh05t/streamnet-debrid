@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.057] - 2026-10-07
+
+- Android: Home („Favorite TV“ und „Recently Watched TV“) und das Netflix-Live-TV-Layout teilen den Cache für Sendungsfanarts und -logos. Gleichzeitige Anfragen für dieselbe Sendung werden zusammengefasst; Sprache und die Filmbewertung anhand der Laufzeit bleiben getrennt.
+- Netflix-Live-TV verwendet dieselben senderbezogenen Ersatzbilder wie Home. Kategorie- und Länderfilter ändern die Senderauswahl, nicht mehr das Ersatzbild; Länderkennung aus Sendergruppe und -name wird auf beiden Screens gleich ausgewertet.
+- Fehlende Artwork-Treffer werden gemeinsam zehn Minuten gespeichert und bei Daten-/Playlist-Refresh freigegeben. Fehlgeschlagene oder abgebrochene Anfragen werden nicht als erfolgreiche Cache-Ergebnisse gespeichert.
+- Der gemeinsame Cache ist auf jeweils 256 Fanarts und Logos begrenzt. Bereits gefundene Bild-URLs werden beim Wechsel zwischen Home und Live TV wiederverwendet; eine Beschleunigung des gesamten Home-Starts wurde nicht gemessen. Unterschiedliche EPG-Aktualisierungsstände bei Sendungswechseln bleiben möglich.
+- 46 Regressionstests prüfen unter anderem gemeinsame Treffer, parallele Anfragen, Sprache/Laufzeit, Ablauf fehlender Treffer, Refresh, Fehler/Abbruch, Cache-Begrenzung und senderbezogene Ersatzbilder.
+- Android-Version: `2.5.057` / Code `458`.
+
 ## [2.5.056] - 2026-10-07
 
 - Im Profilselector steht „StreamNet Cloud“ jetzt als gleich große Kachel direkt neben „Profil hinzufügen“. Die Cloud-Kachel behält ihre goldenen StreamNet-Akzente und bleibt nach erfolgreicher Verbindung ausgeblendet.

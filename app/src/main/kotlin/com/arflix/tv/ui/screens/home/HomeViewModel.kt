@@ -383,10 +383,6 @@ class HomeViewModel @Inject constructor(
 
     // IPTV favorite channels — maps MediaItem.id (Int hash) to channel data
     private val iptvChannelMap = ConcurrentHashMap<Int, com.arflix.tv.data.model.IptvChannel>()
-    private val programBackdropCache = ConcurrentHashMap<String, String>()
-    private val programBackdropMisses = ConcurrentHashMap<String, Long>()
-    private val programLogoCache = ConcurrentHashMap<String, String>()
-    private val programLogoMisses = ConcurrentHashMap<String, Long>()
     private val _sportsHomeRows = MutableStateFlow(sportsRepository.defaultHomeRows())
     val sportsHomeRows: StateFlow<List<Category>> = combine(
         _sportsHomeRows,
@@ -958,27 +954,14 @@ class HomeViewModel @Inject constructor(
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
     ): String? {
-        val query = parseIptvProgramQuery(rawTitle) ?: return null
         val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
-        val key = "${query.cacheKey}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
-        programBackdropCache[key]?.let { return it }
-        if (hasActiveMiss(programBackdropMisses, key)) return null
-
-        return runCatching {
-            // Keep Home and Live TV on the same tolerant resolver. EPG titles often
-            // contain episode subtitles (e.g. "Blue Bloods - Crime Scene New York")
-            // while TMDB only returns the parent series title ("Blue Bloods").
+        return try {
             mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
-                ?.also { backdrop ->
-                    programBackdropCache[key] = backdrop
-                    programBackdropMisses.remove(key)
-                }
-                ?: run {
-                    registerMiss(programBackdropMisses, key)
-                    null
-                }
-        }.getOrElse {
-            registerMiss(programBackdropMisses, key)
+        } catch (e: java.io.IOException) {
+            AppLogger.e("HomeVM", "IPTV backdrop lookup failed", e)
+            null
+        } catch (e: retrofit2.HttpException) {
+            AppLogger.e("HomeVM", "IPTV backdrop lookup failed", e)
             null
         }
     }
@@ -988,24 +971,14 @@ class HomeViewModel @Inject constructor(
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
     ): String? {
-        val query = parseIptvProgramQuery(rawTitle) ?: return null
         val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
-        val key = "${query.cacheKey}:${if (durationMs != null && durationMs >= 75 * 60_000L) "movie" else "mixed"}"
-        programLogoCache[key]?.let { return it }
-        if (hasActiveMiss(programLogoMisses, key)) return null
-
-        return runCatching {
+        return try {
             mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs)
-                ?.also { logoUrl ->
-                    programLogoCache[key] = logoUrl
-                    programLogoMisses.remove(key)
-                }
-                ?: run {
-                    registerMiss(programLogoMisses, key)
-                    null
-                }
-        }.getOrElse {
-            registerMiss(programLogoMisses, key)
+        } catch (e: java.io.IOException) {
+            AppLogger.e("HomeVM", "IPTV logo lookup failed", e)
+            null
+        } catch (e: retrofit2.HttpException) {
+            AppLogger.e("HomeVM", "IPTV logo lookup failed", e)
             null
         }
     }
@@ -1174,20 +1147,6 @@ class HomeViewModel @Inject constructor(
             .take(IPTV_SEARCH_CANDIDATE_LIMIT)
     }
 
-    private fun hasActiveMiss(missCache: ConcurrentHashMap<String, Long>, key: String): Boolean {
-        val expiresAt = missCache[key] ?: return false
-        val now = SystemClock.elapsedRealtime()
-        if (expiresAt <= now) {
-            missCache.remove(key, expiresAt)
-            return false
-        }
-        return true
-    }
-
-    private fun registerMiss(missCache: ConcurrentHashMap<String, Long>, key: String) {
-        missCache[key] = SystemClock.elapsedRealtime() + IPTV_PROGRAM_MISS_TTL_MS
-    }
-
     private fun iptvChannelToMediaItem(
         channel: com.arflix.tv.data.model.IptvChannel,
         epg: com.arflix.tv.data.model.IptvNowNext?
@@ -1223,10 +1182,7 @@ class HomeViewModel @Inject constructor(
             overview = overviewParts.joinToString("\n").ifBlank { "Live TV" },
             mediaType = MediaType.TV,
             image = channel.logo ?: "",
-            backdrop = liveChannelFallbackArtwork(
-                groupName = channel.group,
-                countryCode = channel.country,
-            )?.assetPath ?: channel.logo,
+            backdrop = liveChannelFallbackArtwork(channel)?.assetPath ?: channel.logo,
             badge = "LIVE",
             status = "$IPTV_STATUS_PREFIX${channel.id}",
             isOngoing = true,
@@ -1899,7 +1855,6 @@ class HomeViewModel @Inject constructor(
     private var homeDataLoadAttempted = false
     private var lastWatchedBadgesRefreshMs: Long = 0L
     private val HOME_PLACEHOLDER_ITEM_COUNT = 8
-    private val IPTV_PROGRAM_MISS_TTL_MS = 10 * 60_000L
     private val IPTV_SEARCH_CANDIDATE_LIMIT = 12
     private val IPTV_LOGO_CANDIDATE_LIMIT = 5
     private val IPTV_MIN_SCORE_WITH_YEAR = 180
@@ -2364,8 +2319,7 @@ class HomeViewModel @Inject constructor(
     init {
         viewModelScope.launch {
             iptvRepository.dataRefreshEvents.collect {
-                programBackdropMisses.clear()
-                programLogoMisses.clear()
+                mediaRepository.clearIptvArtworkMisses()
                 refreshIptvHomeCatalogs()
                 if (iptvRepository.observeConfig().first().iptvOnlyMode) {
                     refreshIptvVodAvailability(allowNetwork = true)

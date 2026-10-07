@@ -152,25 +152,11 @@ internal fun LiveTvNetflixLayout(
         selectedCategoryId == "fav" -> stringResource(R.string.live_empty_no_favorites)
         else -> stringResource(R.string.live_empty_no_channels_category)
     }
-    val selectedCountryCode = remember(tree, selectedCategoryId) {
-        tree.countryCodeForCategory(selectedCategoryId)
-    }
-    val selectedCategoryName = remember(tree, selectedCategoryId) {
-        tree.byId(selectedCategoryId)?.label
-    }
     val previewFallbackArtwork = remember(
-        previewChannel?.source?.group,
-        previewChannel?.country,
-        selectedCountryCode,
-        selectedCategoryName,
+        previewChannel?.source,
     ) {
         previewChannel?.let { channel ->
-            liveChannelFallbackArtwork(
-                channel.source.group,
-                channel.country,
-                selectedCountryCode,
-                selectedCategoryName,
-            )
+            liveChannelFallbackArtwork(channel.source)
         }
     }
     val previewBackdropUrl by produceState<String?>(
@@ -183,7 +169,7 @@ internal fun LiveTvNetflixLayout(
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
-        value = runCatching { lookupBackdrop(program) }.getOrNull()
+        value = lookupBackdrop(program)
     }
     val previewProgramLogoUrl by produceState<String?>(
         initialValue = null,
@@ -195,7 +181,7 @@ internal fun LiveTvNetflixLayout(
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
-        value = runCatching { lookupLogo(program) }.getOrNull()
+        value = lookupLogo(program)
     }
     Column(modifier = modifier.fillMaxSize()) {
         Row(
@@ -257,8 +243,6 @@ internal fun LiveTvNetflixLayout(
 
         NetflixChannelRail(
             channels = channels,
-            selectedCountryCode = selectedCountryCode,
-            selectedCategoryName = selectedCategoryName,
             playingChannelId = playingChannelId,
             focusedChannelId = focusedChannelId,
             nowNextMap = nowNextMap,
@@ -802,8 +786,6 @@ private fun rememberNetflixCategoryItems(
 @Composable
 private fun NetflixChannelRail(
     channels: List<EnrichedChannel>,
-    selectedCountryCode: String?,
-    selectedCategoryName: String?,
     playingChannelId: String?,
     focusedChannelId: String?,
     nowNextMap: Map<String, IptvNowNext>,
@@ -881,8 +863,6 @@ private fun NetflixChannelRail(
             }
             NetflixChannelCard(
                 channel = ch,
-                selectedCountryCode = selectedCountryCode,
-                selectedCategoryName = selectedCategoryName,
                 nowNext = nowNextMap[ch.id],
                 clockTickMillis = clockTickMillis,
                 isPlaying = ch.id == playingChannelId,
@@ -902,8 +882,6 @@ private fun NetflixChannelRail(
 @Composable
 private fun NetflixChannelCard(
     channel: EnrichedChannel,
-    selectedCountryCode: String?,
-    selectedCategoryName: String?,
     nowNext: IptvNowNext?,
     clockTickMillis: Long,
     isPlaying: Boolean,
@@ -924,16 +902,11 @@ private fun NetflixChannelCard(
     } ?: 0f
     val minsLeft = now?.let { ((it.endUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L) }
     val backgroundLogoUrl = remember(channel.logo) { safeChannelLogoUrl(channel.logo) }
-    val fallbackArtwork = remember(channel.source.group, channel.country, selectedCountryCode, selectedCategoryName) {
-        liveChannelFallbackArtwork(
-            channel.source.group,
-            channel.country,
-            selectedCountryCode,
-            selectedCategoryName,
-        )
+    val fallbackArtwork = remember(channel.source) {
+        liveChannelFallbackArtwork(channel.source)
     }
 
-    // Async TMDB backdrop for the current program; cached by TvViewModel.
+    // Async artwork for the current program; shared with Home through MediaRepository.
     val cardBackdropUrl by produceState<String?>(
         initialValue = null,
         channel.id,
@@ -944,7 +917,7 @@ private fun NetflixChannelCard(
         value = null
         val program = now?.takeIf { it.title.isNotBlank() } ?: return@produceState
         delay(200L)
-        value = runCatching { lookupBackdrop(program) }.getOrNull()
+        value = lookupBackdrop(program)
     }
 
     val shape = RoundedCornerShape(8.dp)
