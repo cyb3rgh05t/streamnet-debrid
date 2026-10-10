@@ -2,6 +2,12 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.059] - 2026-10-10
+
+- Android TV: Der Quellendialog markiert fokussierte Quellen, Filter, Addon-Tabs und Aktualisieren-/Anfragen-/Download-Aktionen nur mit dem Akzentrahmen statt mit einer farbigen Fokusfüllung. Neutrale Grundflächen und Auswahlmarkierungen bleiben erhalten; Texte und Icons bleiben auf dunklem Hintergrund lesbar. Mobile Darstellung und Quellenbedienung bleiben unverändert.
+- Android TV: Das Download-Symbol und sein Rahmen sind im Quellendialog ohne Fokus neutral grau; erst beim Fokus wird die Akzentfarbe verwendet. Die fokusabhängige Hintergrundfüllung bleibt entfernt.
+- Android-Version `2.5.059` / Code `460`.
+
 ## [2.5.058] - 2026-10-10
 
 - Android: Der Home-Hero zeigt beim Nachladen einer fehlenden Beschreibung keinen englischen Ersatztext mehr. Der Beschreibungsbereich bleibt stabil reserviert; vorhandene Beschreibungen werden auch bei leerem Hero-Override verwendet. Ersatztexte außerhalb des Heros verwenden die vorhandene Übersetzung.

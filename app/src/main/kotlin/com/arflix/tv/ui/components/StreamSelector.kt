@@ -1813,7 +1813,6 @@ private fun SourceFilterChip(
             .clip(RoundedCornerShape(999.dp))
             .background(
                 when {
-                    isFocused -> accentColor
                     isSelected -> Color.White.copy(alpha = 0.12f)
                     else -> OledPanel
                 }
@@ -1836,7 +1835,7 @@ private fun SourceFilterChip(
                 fontSize = 11.sp,
                 fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.SemiBold
             ),
-            color = if (isFocused) Color.Black else TextPrimary.copy(alpha = if (isSelected) 0.96f else 0.82f),
+            color = TextPrimary.copy(alpha = if (isSelected || isFocused) 0.96f else 0.82f),
             maxLines = 1
         )
     }
@@ -1965,7 +1964,6 @@ private fun AddonRailItem(
             .clip(RoundedCornerShape(11.dp))
             .background(
                 when {
-                    isFocused -> accentColor
                     isSelected -> OledPanelStrong
                     else -> Color.Transparent
                 },
@@ -1989,7 +1987,7 @@ private fun AddonRailItem(
                 fontSize = 12.sp,
                 fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium
             ),
-            color = if (isFocused) Color.Black else TextPrimary.copy(alpha = if (isSelected) 1f else 0.66f),
+            color = TextPrimary.copy(alpha = if (isSelected || isFocused) 1f else 0.66f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
@@ -2103,7 +2101,7 @@ private fun SourceRefreshButton(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isFocused) accentColor.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f))
+            .background(Color.White.copy(alpha = 0.08f))
             .border(
                 if (isFocused) 2.dp else 1.dp,
                 if (isFocused) accentColor else Color.White.copy(alpha = 0.16f),
@@ -2137,7 +2135,7 @@ private fun SourceRequestButton(
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(if (isFocused) accentColor.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f))
+            .background(Color.White.copy(alpha = 0.08f))
             .border(if (isFocused) 2.dp else 1.dp, if (isFocused) accentColor else Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
             .clickable(onClick = onRequest)
             .padding(horizontal = 14.dp, vertical = 8.dp),
@@ -2181,7 +2179,6 @@ private fun OledSourceRow(
             .clip(RoundedCornerShape(15.dp))
             .background(
                 when {
-                    isFocused -> accentColor.copy(alpha = 0.16f)
                     isSelected -> Color.White.copy(alpha = 0.07f)
                     else -> Color.White.copy(alpha = 0.028f)
                 },
@@ -2260,7 +2257,8 @@ private fun OledSourceRow(
                     SourceDownloadButton(
                         onClick = onDownload,
                         accentColor = accentColor,
-                        isFocused = isDownloadFocused
+                        isFocused = isDownloadFocused,
+                        borderOnlyFocus = true,
                     )
                 }
                 Spacer(modifier = Modifier.height(5.dp))
@@ -2564,21 +2562,34 @@ private fun MobileStreamCard(
 private fun SourceDownloadButton(
     onClick: () -> Unit,
     accentColor: Color,
-    isFocused: Boolean = false
+    isFocused: Boolean = false,
+    borderOnlyFocus: Boolean = false,
 ) {
     Box(
         modifier = Modifier
             .size(if (isFocused) 38.dp else 34.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (isFocused) accentColor else accentColor.copy(alpha = 0.16f))
-            .border(1.dp, accentColor.copy(alpha = if (isFocused) 0.95f else 0.55f), RoundedCornerShape(10.dp))
+            .background(
+                if (borderOnlyFocus) Color.Transparent
+                else if (isFocused) accentColor else accentColor.copy(alpha = 0.16f)
+            )
+            .border(
+                1.dp,
+                if (borderOnlyFocus && !isFocused) OledBorder
+                else accentColor.copy(alpha = if (isFocused) 0.95f else 0.55f),
+                RoundedCornerShape(10.dp),
+            )
             .clickable { onClick() },
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = Icons.Default.Download,
             contentDescription = stringResource(R.string.offline_download_action),
-            tint = if (isFocused) Color.Black else accentColor,
+            tint = when {
+                borderOnlyFocus && !isFocused -> TextSecondary
+                isFocused && !borderOnlyFocus -> Color.Black
+                else -> accentColor
+            },
             modifier = Modifier.size(18.dp)
         )
     }
