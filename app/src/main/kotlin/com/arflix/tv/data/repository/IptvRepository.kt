@@ -361,6 +361,37 @@ internal object IptvTitleNormalizer {
     }
 }
 
+private val iptvVodTitleIgnoredTokens = setOf("the", "a", "an", "and", "of", "to", "in", "on")
+
+internal fun iptvVodTitlesMatchExactly(providerName: String, queryTitle: String): Boolean {
+    val provider = IptvTitleNormalizer.normalize(providerName)
+    val query = IptvTitleNormalizer.normalize(queryTitle)
+    if (provider.isBlank() || query.isBlank()) return false
+
+    fun meaningfulTokens(value: String): Set<String> = value
+        .split(' ')
+        .filter { token ->
+            token.isNotBlank() &&
+                token !in iptvVodTitleIgnoredTokens &&
+                (token.toIntOrNull()?.let { it !in 1900..2099 } ?: true)
+        }
+        .toSet()
+
+    val providerVariants = listOf(provider, IptvTitleNormalizer.foldUmlautTranscription(provider))
+    val queryVariants = listOf(query, IptvTitleNormalizer.foldUmlautTranscription(query))
+    return providerVariants.any { providerVariant ->
+        val variantTokens = meaningfulTokens(providerVariant)
+        queryVariants.any { queryVariant ->
+            val expectedTokens = meaningfulTokens(queryVariant)
+            expectedTokens.isNotEmpty() &&
+                variantTokens == expectedTokens
+        }
+    }
+}
+
+internal fun iptvVodYearsCompatible(queryYear: Int?, providerYear: Int?): Boolean =
+    queryYear == null || providerYear == null || kotlin.math.abs(providerYear - queryYear) <= 1
+
 internal data class IptvOnlyAddonReconciliation(
     val enabled: Boolean,
     val hasSeenVodAddon: Boolean,
@@ -4657,15 +4688,10 @@ class IptvRepository @Inject constructor(
                         }
                     }
                     candidatePool.values.forEach { entry ->
+                        if (!iptvVodTitlesMatchExactly(entry.name, normalizedShow)) return@forEach
                         val overlap = entry.titleTokens.intersect(queryTokens).size
                         if (overlap <= 0) return@forEach
                         val coverage = overlap.toFloat() / queryTokens.size.toFloat()
-                        val accepted = if (queryTokens.size == 1) {
-                            coverage >= 1f
-                        } else {
-                            overlap >= 2 || coverage >= 0.6f
-                        }
-                        if (!accepted) return@forEach
                         val yearDelta = when {
                             inputYear == null || entry.year == null -> 0
                             else -> kotlin.math.abs(inputYear - entry.year)
@@ -5215,6 +5241,11 @@ class IptvRepository @Inject constructor(
 
                 val imdbScore = if (!normalizedImdb.isNullOrBlank() && normalizeImdbId(item.imdb) == normalizedImdb) 10_000 else 0
                 val tmdbScore = if (!normalizedTmdb.isNullOrBlank() && normalizeTmdbId(item.tmdb) == normalizedTmdb) 9_500 else 0
+                if (imdbScore == 0 && tmdbScore == 0 &&
+                    !iptvVodTitlesMatchExactly(name, normalizedTitle)
+                ) {
+                    return@mapNotNull null
+                }
                 val titleScore = if (normalizedTitle.isNotBlank()) {
                     maxOf(scoreNameMatch(name, normalizedTitle), looseSeriesTitleScore(name, normalizedTitle))
                 } else {
@@ -9451,9 +9482,11 @@ class IptvRepository @Inject constructor(
             .mapNotNull { item ->
                 val name = item.name?.trim().orEmpty()
                 if (name.isBlank()) return@mapNotNull null
+                if (!iptvVodTitlesMatchExactly(name, normalizedTitle)) return@mapNotNull null
                 val score = scoreNameMatch(name, normalizedTitle)
                 if (score <= 0) return@mapNotNull null
-                val providerYear = parseYear(item.year ?: name)
+                val providerYear = parseYear(item.year?.takeIf { it.isNotBlank() } ?: name)
+                if (!iptvVodYearsCompatible(inputYear, providerYear)) return@mapNotNull null
                 val yearDelta = if (inputYear != null && providerYear != null) {
                     kotlin.math.abs(providerYear - inputYear)
                 } else null

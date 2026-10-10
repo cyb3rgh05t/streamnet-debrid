@@ -108,6 +108,9 @@
     <string name="close">Close</string>
     <string name="back">Back</string>
     <string name="cancel">Cancel</string>
+    <string name="exit_app_title">Close app?</string>
+    <string name="exit_app_message">Do you want to close StreamNet?</string>
+    <string name="exit_app_confirm">Close app</string>
     <string name="confirm">Confirm</string>
     <string name="retry">Retry</string>
     <string name="delete">Delete</string>

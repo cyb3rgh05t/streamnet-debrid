@@ -26,6 +26,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,28 +66,77 @@ val AppTopBarHorizontalPadding = 28.dp
 // Settings is NOT in this list — it's rendered as a standalone gear icon on the right.
 private val NAV_ITEMS = SidebarItem.entries.filter { it != SidebarItem.SETTINGS }
 
-fun topBarMaxIndex(hasProfile: Boolean): Int {
+val LocalHasOfflineDownloads = staticCompositionLocalOf { false }
+
+private fun navItems(showOfflineDownloads: Boolean): List<SidebarItem> =
+    if (showOfflineDownloads) NAV_ITEMS else NAV_ITEMS.filter { it != SidebarItem.OFFLINE }
+
+fun topBarMaxIndex(hasProfile: Boolean, showOfflineDownloads: Boolean = true): Int {
     // Profile (0 if shown) + nav items + settings gear (last index)
-    val navCount = NAV_ITEMS.size
+    val navCount = navItems(showOfflineDownloads).size
     return if (hasProfile) navCount + 1 else navCount // +1 for settings gear at the end
 }
 
-fun topBarSelectedIndex(selectedItem: SidebarItem, hasProfile: Boolean): Int {
+fun topBarSelectedIndex(
+    selectedItem: SidebarItem,
+    hasProfile: Boolean,
+    showOfflineDownloads: Boolean = true
+): Int {
     if (selectedItem == SidebarItem.SETTINGS) {
         // Settings is the last focusable item
-        return topBarMaxIndex(hasProfile)
+        return topBarMaxIndex(hasProfile, showOfflineDownloads)
     }
-    val base = NAV_ITEMS.indexOf(selectedItem)
+    val base = navItems(showOfflineDownloads).indexOf(selectedItem)
     if (base < 0) return -1
     return if (hasProfile) base + 1 else base
 }
 
-fun topBarFocusedItem(focusedIndex: Int, hasProfile: Boolean): SidebarItem? {
+fun topBarFocusedItem(
+    focusedIndex: Int,
+    hasProfile: Boolean,
+    showOfflineDownloads: Boolean = true
+): SidebarItem? {
     if (hasProfile && focusedIndex == 0) return null // profile avatar focused
     val itemIndex = if (hasProfile) focusedIndex - 1 else focusedIndex
+    val visibleItems = navItems(showOfflineDownloads)
     // If it's the settings gear (last index after nav items)
-    if (itemIndex == NAV_ITEMS.size) return SidebarItem.SETTINGS
-    return NAV_ITEMS.getOrNull(itemIndex)
+    if (itemIndex == visibleItems.size) return SidebarItem.SETTINGS
+    return visibleItems.getOrNull(itemIndex)
+}
+
+internal fun remapTopBarFocusIndex(
+    focusedIndex: Int,
+    hadProfile: Boolean,
+    hadOfflineDownloads: Boolean,
+    hasProfile: Boolean,
+    hasOfflineDownloads: Boolean
+): Int {
+    if (hadProfile && focusedIndex == 0 && hasProfile) return 0
+    val previousItem = topBarFocusedItem(focusedIndex, hadProfile, hadOfflineDownloads)
+    val selectedIndex = previousItem?.let {
+        topBarSelectedIndex(it, hasProfile, hasOfflineDownloads)
+    } ?: -1
+    return if (selectedIndex >= 0) selectedIndex else
+        focusedIndex.coerceIn(0, topBarMaxIndex(hasProfile, hasOfflineDownloads))
+}
+
+@Composable
+fun PreserveTopBarFocus(
+    focusedIndex: Int,
+    hasProfile: Boolean,
+    hasOfflineDownloads: Boolean,
+    onFocusIndexChanged: (Int) -> Unit
+) {
+    var previousLayout by remember { mutableStateOf(hasProfile to hasOfflineDownloads) }
+    LaunchedEffect(hasProfile, hasOfflineDownloads) {
+        val (hadProfile, hadOfflineDownloads) = previousLayout
+        onFocusIndexChanged(
+            remapTopBarFocusIndex(
+                focusedIndex, hadProfile, hadOfflineDownloads, hasProfile, hasOfflineDownloads
+            )
+        )
+        previousLayout = hasProfile to hasOfflineDownloads
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -100,6 +150,7 @@ fun AppTopBar(
     clockFormat: String = "24h",
     syncStatus: com.arflix.tv.data.repository.CloudSyncStatus = com.arflix.tv.data.repository.CloudSyncStatus.NOT_SIGNED_IN,
     hasUpdateBadge: Boolean = false,
+    showOfflineDownloads: Boolean = LocalHasOfflineDownloads.current,
     modifier: Modifier = Modifier
 ) {
     // Always show the profile avatar when a profile exists — it's clickable
@@ -108,9 +159,11 @@ fun AppTopBar(
     val showProfile = profile != null
     val hasProfile = showProfile
     val currentTime = rememberTopBarTime(clockFormat, profile?.id)
-    val selectedIndex = remember(selectedItem, hasProfile) { topBarSelectedIndex(selectedItem, hasProfile) }
+    val selectedIndex = remember(selectedItem, hasProfile, showOfflineDownloads) {
+        topBarSelectedIndex(selectedItem, hasProfile, showOfflineDownloads)
+    }
     // Settings gear is always the last focusable index
-    val settingsIndex = topBarMaxIndex(hasProfile)
+    val settingsIndex = topBarMaxIndex(hasProfile, showOfflineDownloads)
     val settingsFocused = isFocused && focusedIndex == settingsIndex
     val settingsSelected = selectedItem == SidebarItem.SETTINGS
 
@@ -154,7 +207,7 @@ fun AppTopBar(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    NAV_ITEMS.forEachIndexed { index, item ->
+                    navItems(showOfflineDownloads).forEachIndexed { index, item ->
                         val itemFocusIndex = if (hasProfile) index + 1 else index
                         TopBarNavChip(
                             item = item,

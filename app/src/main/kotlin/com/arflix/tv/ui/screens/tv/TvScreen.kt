@@ -278,13 +278,19 @@ fun TvScreen(
     onBack: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
     val context = LocalContext.current
     val isMobile = LocalDeviceType.current.isTouchDevice()
 
     var focusZone by rememberSaveable { mutableStateOf(if (uiState.isConfigured) TvFocusZone.GROUPS else TvFocusZone.SIDEBAR) }
     val hasProfile = currentProfile != null
-    val maxSidebarIndex = topBarMaxIndex(hasProfile)
-    var sidebarFocusIndex by rememberSaveable { mutableIntStateOf(if (hasProfile) 4 else 3) }
+    val maxSidebarIndex = topBarMaxIndex(hasProfile, hasOfflineDownloads)
+    var sidebarFocusIndex by rememberSaveable {
+        mutableIntStateOf(com.arflix.tv.ui.components.topBarSelectedIndex(SidebarItem.TV, hasProfile, hasOfflineDownloads))
+    }
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        sidebarFocusIndex, hasProfile, hasOfflineDownloads
+    ) { sidebarFocusIndex = it }
     var groupIndex by rememberSaveable { mutableIntStateOf(0) }
     var channelIndex by rememberSaveable { mutableIntStateOf(0) }
     var selectedChannelId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -918,7 +924,7 @@ fun TvScreen(
                             if (hasProfile && sidebarFocusIndex == 0) {
                                 onSwitchProfile()
                             } else {
-                                when (topBarFocusedItem(sidebarFocusIndex, hasProfile)) {
+                                when (topBarFocusedItem(sidebarFocusIndex, hasProfile, hasOfflineDownloads)) {
                                     SidebarItem.SEARCH -> onNavigateToSearch()
                                     SidebarItem.HOME -> onNavigateToHome()
                                     SidebarItem.WATCHLIST -> onNavigateToWatchlist()
@@ -1048,7 +1054,8 @@ fun TvScreen(
                 selectedItem = SidebarItem.TV,
                 isFocused = focusZone == TvFocusZone.SIDEBAR,
                 focusedIndex = sidebarFocusIndex,
-                profile = currentProfile
+                profile = currentProfile,
+                showOfflineDownloads = hasOfflineDownloads
             )
         }
 

@@ -49,6 +49,9 @@
     <string name="close">Schließen</string>
     <string name="back">Zurück</string>
     <string name="cancel">Abbrechen</string>
+    <string name="exit_app_title">App schließen?</string>
+    <string name="exit_app_message">Möchtest du StreamNet wirklich schließen?</string>
+    <string name="exit_app_confirm">App schließen</string>
     <string name="confirm">Bestätigen</string>
     <string name="retry">Erneut versuchen</string>
     <string name="loading">Laden…</string>

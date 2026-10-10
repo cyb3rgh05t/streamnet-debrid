@@ -210,8 +210,12 @@ fun WatchlistScreen(
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val rootFocusRequester = remember { FocusRequester() }
     val hasProfile = currentProfile != null
-    val maxSidebarIndex = topBarMaxIndex(hasProfile)
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
+    val maxSidebarIndex = topBarMaxIndex(hasProfile, hasOfflineDownloads)
     var sidebarFocusIndex by remember { mutableIntStateOf(if (hasProfile) 3 else 2) }
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        sidebarFocusIndex, hasProfile, hasOfflineDownloads
+    ) { sidebarFocusIndex = it }
     var focusZone by remember { mutableStateOf(WatchlistFocusZone.CONTENT) }
     var providerFocusIndex by remember { mutableIntStateOf(0) }
     var libraryFocusIndex by remember { mutableIntStateOf(0) }
@@ -580,7 +584,7 @@ fun WatchlistScreen(
                                     if (hasProfile && sidebarFocusIndex == 0) {
                                         onSwitchProfile()
                                     } else {
-                                        when (topBarFocusedItem(sidebarFocusIndex, hasProfile)) {
+                                        when (topBarFocusedItem(sidebarFocusIndex, hasProfile, hasOfflineDownloads)) {
                                             SidebarItem.SEARCH -> onNavigateToSearch()
                                             SidebarItem.HOME -> onNavigateToHome()
                                             SidebarItem.WATCHLIST -> Unit

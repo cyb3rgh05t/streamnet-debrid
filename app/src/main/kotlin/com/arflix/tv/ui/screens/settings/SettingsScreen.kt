@@ -454,8 +454,12 @@ fun SettingsScreen(
 
     var isSidebarFocused by remember { mutableStateOf(false) }
     val hasProfile = currentProfile != null
-    val maxSidebarIndex = topBarMaxIndex(hasProfile)
-    var sidebarFocusIndex by remember { mutableIntStateOf(if (hasProfile) 5 else 4) } // SETTINGS
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
+    val maxSidebarIndex = topBarMaxIndex(hasProfile, hasOfflineDownloads)
+    var sidebarFocusIndex by remember { mutableIntStateOf(maxSidebarIndex) } // SETTINGS
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        sidebarFocusIndex, hasProfile, hasOfflineDownloads
+    ) { sidebarFocusIndex = it }
     var sectionIndex by remember { mutableIntStateOf(initialSectionIdx ?: 0) }
     var mobilePage by remember {
         mutableStateOf(
@@ -1038,7 +1042,7 @@ fun SettingsScreen(
                                     if (hasProfile && sidebarFocusIndex == 0) {
                                         onSwitchProfile()
                                     } else {
-                                        when (topBarFocusedItem(sidebarFocusIndex, hasProfile)) {
+                                        when (topBarFocusedItem(sidebarFocusIndex, hasProfile, hasOfflineDownloads)) {
                                             SidebarItem.SEARCH -> onNavigateToSearch()
                                             SidebarItem.HOME -> onNavigateToHome()
                                             SidebarItem.TV -> onNavigateToTv()

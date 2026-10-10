@@ -174,4 +174,27 @@ class IptvArtworkCacheTest {
         }
         assertEquals(true, invalid)
     }
+
+    @Test
+    fun `malformed JSON response is retryable and cannot be cached as an artwork miss`() = runBlocking {
+        val cache = IptvLookupCache<String?>({ 0L }, { it == null })
+        val requests = IptvArtworkRequests()
+        var failure: IOException? = null
+        try {
+            cache.getOrLoad(key) {
+                requests.load<String> {
+                    throw com.google.gson.JsonSyntaxException(
+                        IllegalStateException("Expected BEGIN_ARRAY but was BEGIN_OBJECT")
+                    )
+                }
+                requests.throwIfFailed()
+                null
+            }
+        } catch (e: IOException) {
+            failure = e
+        }
+        assertEquals(true, failure?.message?.contains("Invalid JSON response") == true)
+        assertEquals(true, failure?.cause is com.google.gson.JsonParseException)
+        assertEquals("recovered", cache.getOrLoad(key) { "recovered" })
+    }
 }

@@ -20,6 +20,10 @@ internal class IptvArtworkRequests {
     } catch (e: retrofit2.HttpException) {
         failure.compareAndSet(null, e)
         null
+    } catch (e: com.google.gson.JsonParseException) {
+        val invalidResponse = java.io.IOException("Invalid JSON response during IPTV artwork lookup", e)
+        failure.compareAndSet(null, invalidResponse)
+        null
     }
 
     fun throwIfFailed() {

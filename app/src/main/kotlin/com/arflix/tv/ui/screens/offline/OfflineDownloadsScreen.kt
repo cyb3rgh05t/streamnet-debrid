@@ -98,10 +98,14 @@ fun OfflineDownloadsScreen(
     onBack: () -> Unit = {}
 ) {
     val downloads by viewModel.downloads.collectAsStateWithLifecycle()
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
     val isTouch = LocalDeviceType.current.isTouchDevice()
     val focusRequester = remember { FocusRequester() }
     var focusZone by remember { mutableStateOf(OfflineFocusZone.CONTENT) }
     var topBarFocused by remember { mutableIntStateOf(0) }
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        topBarFocused, currentProfile != null, hasOfflineDownloads
+    ) { topBarFocused = it }
     var contentFocused by remember { mutableIntStateOf(0) }
     var contentActionFocused by remember { mutableIntStateOf(0) }
     val accent = resolveAccentColor(fallback = Pink)
@@ -130,7 +134,7 @@ fun OfflineDownloadsScreen(
     }
 
     fun activateTopBar() {
-        when (topBarFocusedItem(topBarFocused, currentProfile != null)) {
+        when (topBarFocusedItem(topBarFocused, currentProfile != null, hasOfflineDownloads)) {
             SidebarItem.SEARCH -> onNavigateToSearch()
             SidebarItem.HOME -> onNavigateToHome()
             SidebarItem.WATCHLIST -> onNavigateToWatchlist()
@@ -182,7 +186,7 @@ fun OfflineDownloadsScreen(
                     }
                     Key.DirectionRight -> {
                         when (focusZone) {
-                            OfflineFocusZone.TOP_BAR -> topBarFocused = (topBarFocused + 1).coerceAtMost(topBarMaxIndex(currentProfile != null))
+                            OfflineFocusZone.TOP_BAR -> topBarFocused = (topBarFocused + 1).coerceAtMost(topBarMaxIndex(currentProfile != null, hasOfflineDownloads))
                             OfflineFocusZone.CONTENT -> {
                                 if (contentActionFocused == 1) {
                                     contentActionFocused = 0

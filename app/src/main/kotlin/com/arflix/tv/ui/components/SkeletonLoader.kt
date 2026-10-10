@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,15 +36,14 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.sp
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LocalDeviceType
+import com.arflix.tv.ui.skin.ArvioSkin
+import com.arflix.tv.ui.skin.resolveAccentColor
 import androidx.tv.foundation.lazy.list.TvLazyRow
 
 /**
- * Shared shimmer animation state - only one animation for all skeleton loaders
- * This prevents multiple infinite animations from running simultaneously
+ * Shimmer brush used by skeleton loaders.
  */
 object ShimmerState {
-    private var cachedTranslation: Float = 0f
-
     @Composable
     fun getShimmerBrush(): Brush {
         val transition = rememberInfiniteTransition(label = "globalShimmer")
@@ -56,12 +56,14 @@ object ShimmerState {
             ),
             label = "shimmerTranslate"
         )
+        val colors = ArvioSkin.colors
+        val accent = resolveAccentColor(colors.accent)
 
         return Brush.linearGradient(
             colors = listOf(
-                Color(0xFF151520),
-                Color(0xFF1F1F2A),
-                Color(0xFF151520)
+                colors.surface,
+                accent.copy(alpha = 0.06f).compositeOver(colors.surfaceRaised),
+                colors.surface
             ),
             start = Offset(translateAnim - 500f, 0f),
             end = Offset(translateAnim, 0f)

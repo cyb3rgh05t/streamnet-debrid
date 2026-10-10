@@ -80,6 +80,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -690,6 +691,9 @@ fun ArflixApp(
 ) {
     val context = LocalContext.current
     val authState by authRepository.authState.collectAsStateWithLifecycle()
+    val hasOfflineDownloads by remember(offlineDownloadRepository) {
+        offlineDownloadRepository.downloads.map { it.isNotEmpty() }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = false)
     val cloudUserProfile by authRepository.userProfile.collectAsStateWithLifecycle()
     val isCloudConnected = com.arflix.tv.data.repository.resolveCloudConnectionState(
         authState = authState,
@@ -716,6 +720,7 @@ fun ArflixApp(
     }
 
     val navController = rememberNavController()
+    var showExitConfirmation by remember { mutableStateOf(false) }
     val appCoroutineScope = androidx.compose.runtime.rememberCoroutineScope()
     var lastAddonsSyncKey by remember { mutableStateOf<String?>(null) }
 
@@ -766,7 +771,8 @@ fun ArflixApp(
         !currentRoute.contains("login")
 
     CompositionLocalProvider(
-        com.arflix.tv.ui.components.LocalAppBottomBarVisible provides showBottomBar
+        com.arflix.tv.ui.components.LocalAppBottomBarVisible provides showBottomBar,
+        com.arflix.tv.ui.components.LocalHasOfflineDownloads provides hasOfflineDownloads
     ) {
         Column(
             modifier = Modifier
@@ -816,8 +822,17 @@ fun ArflixApp(
                 onTvFullscreenChanged = { fullscreen ->
                     iptvFullscreen = fullscreen
                 },
-                onExitApp = onExitApp
+                onExitApp = { showExitConfirmation = true }
                 )
+                if (showExitConfirmation) {
+                    com.arflix.tv.ui.components.ExitAppDialog(
+                        onDismiss = { showExitConfirmation = false },
+                        onConfirm = {
+                            showExitConfirmation = false
+                            onExitApp()
+                        }
+                    )
+                }
             }
             if (showBottomBar) {
                 AppBottomBar(

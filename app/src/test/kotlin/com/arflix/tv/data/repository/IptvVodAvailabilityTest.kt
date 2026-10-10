@@ -99,4 +99,23 @@ class IptvVodAvailabilityTest {
 
         assertEquals(true, availability.contains(MediaItem(123, "The Example", year = "2025")))
     }
+
+    @Test
+    fun `VOD title fallback rejects candidates that only share a title word`() {
+        assertEquals(false, iptvVodTitlesMatchExactly("The Example Documentary", "The Example"))
+        assertEquals(false, iptvVodTitlesMatchExactly("Example of Something", "The Example"))
+    }
+
+    @Test
+    fun `VOD title fallback accepts exact titles with formatting and year noise`() {
+        assertEquals(true, iptvVodTitlesMatchExactly("The Example (2025) [4K]", "The Example"))
+        assertEquals(true, iptvVodTitlesMatchExactly("Example, The", "The Example"))
+    }
+
+    @Test
+    fun `VOD fallback rejects known year mismatch but tolerates adjacent release year`() {
+        assertEquals(false, iptvVodYearsCompatible(2025, 1999))
+        assertEquals(true, iptvVodYearsCompatible(2025, 2024))
+        assertEquals(true, iptvVodYearsCompatible(2025, null))
+    }
 }

@@ -3142,12 +3142,16 @@ private fun HomeInputLayer(
     // Profile avatar is always shown when a profile exists (clickable, opens
     // profile switcher). Focus navigation includes it as the first focusable item.
     val hasProfile = currentProfile != null
-    val maxSidebarIndex = topBarMaxIndex(hasProfile)
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
+    val maxSidebarIndex = topBarMaxIndex(hasProfile, hasOfflineDownloads)
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        focusState.sidebarFocusIndex, hasProfile, hasOfflineDownloads
+    ) { focusState.sidebarFocusIndex = it }
 
     LaunchedEffect(Unit) {
         if (!isMobile && !focusState.userHasNavigated) {
             focusState.isSidebarFocused = true
-            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile)
+            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile, hasOfflineDownloads)
         }
         focusRequester.requestFocus()
     }
@@ -3160,7 +3164,7 @@ private fun HomeInputLayer(
     }
     LaunchedEffect(hasProfile) {
         if (!focusState.userHasNavigated && focusState.isSidebarFocused) {
-            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile)
+            focusState.sidebarFocusIndex = topBarSelectedIndex(SidebarItem.HOME, hasProfile, hasOfflineDownloads)
         }
     }
 
@@ -3325,7 +3329,7 @@ private fun HomeInputLayer(
                             if (hasProfile && focusState.sidebarFocusIndex == 0) {
                                 onSwitchProfile()
                             } else {
-                                when (topBarFocusedItem(focusState.sidebarFocusIndex, hasProfile)) {
+                                when (topBarFocusedItem(focusState.sidebarFocusIndex, hasProfile, hasOfflineDownloads)) {
                                     SidebarItem.SEARCH -> onNavigateToSearch()
                                     SidebarItem.HOME -> Unit
                                     SidebarItem.WATCHLIST -> onNavigateToWatchlist()

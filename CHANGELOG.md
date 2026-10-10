@@ -2,6 +2,16 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.060] - 2026-10-10
+
+- Android TV: Beim Verlassen von Home erscheint eine Bestätigung zum Schließen der App. Das Popup verwendet Theme-Oberflächen, ein dezentes Schließen-Symbol und kompakte, gleich große abgerundete Buttons mit zentrierter Beschriftung und Akzentrahmen statt farbiger Fokusfüllung oder Zoom. „Abbrechen“ ist vorfokussiert und Zurück verwirft die Bestätigung.
+- Android TV: In der gesamten TVUI-Navigation (auch Home, Mediathek, Suche, Details und Einstellungen) wird „Downloads“ nur angezeigt, solange die Download-Liste mindestens einen Eintrag enthält. Die Navigation aktualisiert sich live beim Hinzufügen oder Entfernen von Downloads; der fokussierte Navigationseintrag bleibt beim Ein-/Ausblenden erhalten. Die mobile Navigation bleibt unverändert.
+- Android TV: IPTV-VOD-Titelsuche gibt bei Fallbacks keine Ergebnisse mehr nur wegen einzelner gemeinsamer Titelwörter aus. Titel müssen nach Normalisierung exakt übereinstimmen; bekannte Erscheinungsjahre dürfen höchstens ein Jahr abweichen. ID-Treffer bleiben bevorzugt, und derselbe strengere Titelabgleich gilt auch für Episoden-/Serien-Fallbacks.
+- Android TV: Home-Skeletons verwenden jetzt die Oberflächenfarben des aktiven Themes statt einer fest codierten bläulich-violetten Palette. Der aktive Akzentton wird nur dezent zur Shimmer-Mitte gemischt; Poster- und Querformat-Rails behalten passende Kartenkonturen.
+- Android TV: Beim Trakt-Abgleich der Merkliste wird der Repository-Cache nicht mehr vorübergehend geleert. Die synchronisierte Liste ersetzt den Cache direkt, damit die Merkliste beim Zurückkehren aus einer Detailansicht nicht kurzzeitig als leer erscheint.
+- Android TV: Beim Öffnen des Netflix-TV-Layouts kann die Programmbild-Suche den TVDB-Such-/Artwork-Fallback aufrufen. Ungültiges JSON aus diesen IPTV-Artwork-Anfragen (unter anderem ein Objekt, wo `data` als Array erwartet wird) wird als wiederholbarer Antwortfehler behandelt statt als gültiger leerer Treffer oder ungefangene Gson-Ausnahme.
+- Android-Version `2.5.060` / Code `461`.
+
 ## [2.5.059] - 2026-10-10
 
 - Android TV: Der Quellendialog markiert fokussierte Quellen, Filter, Addon-Tabs und Aktualisieren-/Anfragen-/Download-Aktionen nur mit dem Akzentrahmen statt mit einer farbigen Fokusfüllung. Neutrale Grundflächen und Auswahlmarkierungen bleiben erhalten; Texte und Icons bleiben auf dunklem Hintergrund lesbar. Mobile Darstellung und Quellenbedienung bleiben unverändert.

@@ -1261,7 +1261,6 @@ class WatchlistViewModel @Inject constructor(
                 val traktItems = syncResult.items.orEmpty()
                 val rawCount = syncResult.rawCount
                 if (traktItems.isNotEmpty()) {
-                    watchlistRepository.clearWatchlistCache()
                     val orderedTraktItems = traktItems.watchlistDisplayOrder()
                     watchlistRepository.syncFromTraktOrder(orderedTraktItems)
                     val mergedItems = watchlistRepository.getLocalWatchlistItems().watchlistDisplayOrder().enrichWithPlaybackProgress()

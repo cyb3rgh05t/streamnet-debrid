@@ -257,8 +257,12 @@ fun DetailsScreen(
     // Sidebar state
     var isSidebarFocused by remember { mutableStateOf(false) }
     val hasProfile = currentProfile != null
-    val maxSidebarIndex = topBarMaxIndex(hasProfile)
+    val hasOfflineDownloads = com.arflix.tv.ui.components.LocalHasOfflineDownloads.current
+    val maxSidebarIndex = topBarMaxIndex(hasProfile, hasOfflineDownloads)
     var sidebarFocusIndex by remember { mutableIntStateOf(if (hasProfile) 2 else 1) }
+    com.arflix.tv.ui.components.PreserveTopBarFocus(
+        sidebarFocusIndex, hasProfile, hasOfflineDownloads
+    ) { sidebarFocusIndex = it }
 
     // Stream Selector state
     var showStreamSelector by remember { mutableStateOf(false) }
@@ -828,7 +832,7 @@ fun DetailsScreen(
                                 if (hasProfile && sidebarFocusIndex == 0) {
                                     onSwitchProfile()
                                 } else {
-                                    when (topBarFocusedItem(sidebarFocusIndex, hasProfile)) {
+                                    when (topBarFocusedItem(sidebarFocusIndex, hasProfile, hasOfflineDownloads)) {
                                         SidebarItem.SEARCH -> onNavigateToSearch()
                                         SidebarItem.HOME -> onNavigateToHome()
                                         SidebarItem.WATCHLIST -> onNavigateToWatchlist()
