@@ -46,6 +46,11 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -83,6 +88,27 @@ data class PersonMediaSearchResult(
     val name: String,
     val items: List<MediaItem>
 )
+
+internal suspend fun loadHomeCategoryProgressively(
+    id: String,
+    title: String,
+    fetchPage: suspend (Int) -> MediaRepository.CategoryPageResult,
+    onReady: suspend (Category) -> Unit,
+): Category {
+    val first = fetchPage(1)
+    var category = Category(id, title, first.items.take(40))
+    if (category.items.isNotEmpty()) onReady(category)
+    if (first.hasMore && category.items.size < 40) {
+        val second = fetchPage(2)
+        val items = (category.items + second.items)
+            .distinctBy { "${it.mediaType}:${it.id}" }.take(40)
+        if (items != category.items) {
+            category = category.copy(items = items)
+            onReady(category)
+        }
+    }
+    return category
+}
 
 internal fun mergeEnrichedItemIntoFullDetails(
     fullDetails: MediaItem,
@@ -1988,24 +2014,26 @@ class MediaRepository @Inject constructor(
      * - Anime: Uses "anime" keyword (210024) for accurate anime content
      * - Provider categories: wider recency window to keep full rows populated
      */
-    suspend fun getHomeCategories(): List<Category> = coroutineScope {
+    suspend fun getHomeCategories(
+        onCategoryReady: suspend (Category) -> Unit = {},
+    ): List<Category> = coroutineScope {
         // Return cached categories if still fresh
         val now = System.currentTimeMillis()
         if (cachedHomeCategories.isNotEmpty() && now - homeCategoriesFetchedAt < HOME_CATEGORIES_CACHE_MS) {
+            cachedHomeCategories.forEach { onCategoryReady(it) }
             return@coroutineScope cachedHomeCategories
         }
         // First-launch resilience: on cold start the DNS resolver and TLS stack
         // may not be warm yet when HomeViewModel.init{} fires getHomeCategories().
-        // If the first attempt returns nothing (all TMDB calls failed silently in
-        // safeItems()), retry once after a short backoff so the home screen
+        // If the first attempt returns nothing, retry after a short backoff so Home
         // actually populates on first launch instead of requiring a second app open.
-        var result = getHomeCategoriesInternal()
+        var result = getHomeCategoriesInternal(onCategoryReady)
         if (result.isEmpty()) {
             kotlinx.coroutines.delay(1_500L)
-            result = getHomeCategoriesInternal()
+            result = getHomeCategoriesInternal(onCategoryReady)
             if (result.isEmpty()) {
                 kotlinx.coroutines.delay(3_000L)
-                result = getHomeCategoriesInternal()
+                result = getHomeCategoriesInternal(onCategoryReady)
             }
         }
         // Only cache non-empty results. Caching an empty list would cause
@@ -2017,78 +2045,65 @@ class MediaRepository @Inject constructor(
         result
     }
 
-    private suspend fun getHomeCategoriesInternal(): List<Category> = coroutineScope {
-        suspend fun fetchUpTo40(fetchPage: suspend (Int) -> TmdbListResponse): List<TmdbMediaItem> {
-            val first = runCatching { fetchPage(1) }.getOrNull() ?: return emptyList()
-            val firstItems = first.results
-            if (firstItems.size >= 40 || first.totalPages < 2) return firstItems.take(40)
-            val secondItems = runCatching { fetchPage(2) }.getOrNull()?.results.orEmpty()
-            return (firstItems + secondItems).distinctBy { it.id }.take(40)
-        }
-
+    private suspend fun getHomeCategoriesInternal(
+        onCategoryReady: suspend (Category) -> Unit,
+    ): List<Category> = coroutineScope {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
         val calendar = Calendar.getInstance()
-        // Wider windows keep rows filled up to 40 items consistently.
-        calendar.add(Calendar.MONTH, -12)
-        val twelveMonthsAgo = dateFormat.format(calendar.time)
         // Anime needs a wider horizon for slower seasonal cycles.
-        calendar.time = Calendar.getInstance().time
         calendar.add(Calendar.MONTH, -18)
         val eighteenMonthsAgo = dateFormat.format(calendar.time)
 
-        // Main trending - TMDB's daily trending for fresh content
-        val trendingMovies = async { fetchUpTo40 { page -> tmdbApi.getTrendingMovies(apiKey, language = contentLanguage, page = page) } }
-        val trendingTv = async { fetchUpTo40 { page -> tmdbApi.getTrendingTv(apiKey, language = contentLanguage, page = page) } }
+        suspend fun loadCategory(
+            id: String,
+            title: String,
+            mediaType: MediaType,
+            fetch: suspend (Int) -> TmdbListResponse,
+        ): Category = loadHomeCategoryProgressively(
+            id = id,
+            title = title,
+            fetchPage = { page ->
+                val response = try {
+                    fetch(page)
+                } catch (e: java.io.IOException) {
+                    Log.w("MediaRepository", "Home category $id page $page failed", e)
+                    null
+                } catch (e: retrofit2.HttpException) {
+                    Log.w("MediaRepository", "Home category $id page $page failed", e)
+                    null
+                }
+                CategoryPageResult(
+                    items = response?.results.orEmpty().map { it.toMediaItem(mediaType) },
+                    hasMore = response != null && response.page < response.totalPages,
+                )
+            },
+            onReady = { category ->
+                cacheItems(category.items)
+                onCategoryReady(category)
+            },
+        )
 
-        // Anime: popularity.desc tracks current buzz, air_date filter for currently airing
+        val trendingMovies = async {
+            loadCategory("trending_movies", context.getString(R.string.trending_movies), MediaType.MOVIE) {
+                tmdbApi.getTrendingMovies(apiKey, language = contentLanguage, page = it)
+            }
+        }
+        val trendingTv = async {
+            loadCategory("trending_tv", context.getString(R.string.trending_series), MediaType.TV) {
+                tmdbApi.getTrendingTv(apiKey, language = contentLanguage, page = it)
+            }
+        }
         val trendingAnime = async {
-            fetchUpTo40 { page ->
+            loadCategory("trending_anime", context.getString(R.string.trending_anime), MediaType.TV) { page ->
                 tmdbApi.discoverTv(
-                    apiKey, language = contentLanguage,
-                    genres = "16",
-                    keywords = "210024",  // "anime" keyword ID
-                    sortBy = "popularity.desc",
-                    minVoteCount = 10,
-                    airDateGte = eighteenMonthsAgo,
-                    page = page
+                    apiKey, language = contentLanguage, genres = "16", keywords = "210024",
+                    sortBy = "popularity.desc", minVoteCount = 10,
+                    airDateGte = eighteenMonthsAgo, page = page,
                 )
             }
         }
-
-        // Provider-based per-service discover rows intentionally removed —
-        // the Services collection-tile row already surfaces Netflix, Disney+,
-        // Prime, Max, Apple TV+, Paramount+, Hulu etc. with curated art and
-        // feeds from addon catalogs. Having duplicate rows below the tiles
-        // was noise per user feedback.
-
-        val maxItemsPerCategory = 40
-        suspend fun safeItems(fetch: suspend () -> List<TmdbMediaItem>, mediaType: MediaType): List<MediaItem> {
-            return runCatching { fetch() }
-                .getOrElse { emptyList() }
-                .take(maxItemsPerCategory)
-                .map { it.toMediaItem(mediaType) }
-        }
-
-        val categories = listOf(
-            Category(
-                id = "trending_movies",
-                title = context.getString(R.string.trending_movies),
-                items = safeItems({ trendingMovies.await() }, MediaType.MOVIE)
-            ),
-            Category(
-                id = "trending_tv",
-                title = context.getString(R.string.trending_series),
-                items = safeItems({ trendingTv.await() }, MediaType.TV)
-            ),
-            Category(
-                id = "trending_anime",
-                title = context.getString(R.string.trending_anime),
-                items = safeItems({ trendingAnime.await() }, MediaType.TV)
-            )
-        )
-        val nonEmpty = categories.filter { it.items.isNotEmpty() }
-        nonEmpty.forEach { cacheItems(it.items) }
-        nonEmpty
+        listOf(trendingMovies, trendingTv, trendingAnime).awaitAll()
+            .filter { it.items.isNotEmpty() }
     }
 
     suspend fun loadHomeCategoryPage(
@@ -3519,10 +3534,43 @@ class MediaRepository @Inject constructor(
 
     private val iptvBackdropCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
     private val iptvLogoCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
+    private val iptvCandidateCache = IptvLookupCache<List<MediaItem>>(
+        { android.os.SystemClock.elapsedRealtime() },
+        { it.isEmpty() },
+    )
 
     fun clearIptvArtworkMisses() {
         iptvBackdropCache.clearMisses()
         iptvLogoCache.clearMisses()
+        iptvCandidateCache.clearMisses()
+    }
+
+    fun observeIptvProgramArtwork(
+        rawTitle: String,
+        durationMs: Long?,
+        preferLogo: Boolean,
+    ): Flow<String?> {
+        val title = cleanIptvArtworkTitle(rawTitle)
+        if (title.length < 3 || title.isArtworkPlaceholderTitle()) return flowOf(null)
+        val cache = if (preferLogo) iptvLogoCache else iptvBackdropCache
+        val key = iptvArtworkKey(rawTitle, contentLanguage, durationMs)
+        return channelFlow {
+            launch { cache.observe(key).collect { send(it) } }
+            while (true) {
+                try {
+                    if (preferLogo) {
+                        lookupIptvProgramLogo(rawTitle, durationMs)
+                    } else {
+                        lookupIptvProgramBackdrop(rawTitle, durationMs)
+                    }
+                } catch (e: java.io.IOException) {
+                    Log.w("IptvArtwork", "Artwork lookup failed; retrying while visible", e)
+                } catch (e: retrofit2.HttpException) {
+                    Log.w("IptvArtwork", "Artwork HTTP ${e.code()}; retrying while visible")
+                }
+                delay(60_000L)
+            }
+        }
     }
 
     /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
@@ -3537,7 +3585,7 @@ class MediaRepository @Inject constructor(
     }
 
     private suspend fun resolveIptvProgramBackdrop(cleanedTitle: String, durationMs: Long?): String? {
-        val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
+        val candidates = cachedIptvArtworkCandidates(cleanedTitle, durationMs)
         val bestCandidate = candidates.firstOrNull()
 
         return bestCandidate?.backdrop
@@ -3559,13 +3607,13 @@ class MediaRepository @Inject constructor(
     }
 
     private suspend fun resolveIptvProgramLogo(cleanedTitle: String, durationMs: Long?): String? {
-        val candidates = searchIptvArtworkCandidates(cleanedTitle, durationMs)
+        val candidates = cachedIptvArtworkCandidates(cleanedTitle, durationMs)
             .sortedByDescending { item ->
                 iptvArtworkCandidateScore(cleanedTitle, item.title, item.mediaType, durationMs, item.popularity)
             }
 
         for (candidate in candidates.take(8)) {
-            getLogoUrl(candidate.mediaType, candidate.id)?.takeIf { it.isNotBlank() }?.let {
+            getLogoUrl(candidate.mediaType, candidate.id, propagateNetworkFailure = true)?.takeIf { it.isNotBlank() }?.let {
                 android.util.Log.d("IptvArtwork", "TMDB logo hit title=$cleanedTitle candidate=${candidate.id}")
                 return it
             }
@@ -3574,7 +3622,13 @@ class MediaRepository @Inject constructor(
             ?.also { android.util.Log.d("IptvArtwork", "Fallback logo hit title=$cleanedTitle") }
     }
 
+    private suspend fun cachedIptvArtworkCandidates(title: String, durationMs: Long?): List<MediaItem> =
+        iptvCandidateCache.getOrLoad(iptvArtworkKey(title, contentLanguage, durationMs)) {
+            searchIptvArtworkCandidates(title, durationMs)
+        }
+
     private suspend fun searchIptvArtworkCandidates(title: String, durationMs: Long?): List<MediaItem> {
+        val requests = IptvArtworkRequests()
         val languages = buildList<String?> {
             add(contentLanguage)
             if (!contentLanguage.startsWith("en", ignoreCase = true)) add("en-US")
@@ -3582,21 +3636,21 @@ class MediaRepository @Inject constructor(
         val searchResults = mutableListOf<MediaItem>()
         for (query in iptvArtworkSearchQueries(title)) {
             searchResults += languages.flatMap { language ->
-                val movies = runCatching {
+                val movies = requests.load {
                     tmdbApi.searchMovies(apiKey, query, language = language).results.map {
                         it.toMediaItem(MediaType.MOVIE)
                     }
-                }.getOrDefault(emptyList())
-                val shows = runCatching {
+                }.orEmpty()
+                val shows = requests.load {
                     tmdbApi.searchTv(apiKey, query, language = language).results.map {
                         it.toMediaItem(MediaType.TV)
                     }
-                }.getOrDefault(emptyList())
+                }.orEmpty()
                 movies + shows
             }
             if (searchResults.any { iptvArtworkTitleScore(title, it.title) >= 35.0 }) break
         }
-        return searchResults.groupBy { "${it.mediaType}:${it.id}" }
+        val candidates = searchResults.groupBy { "${it.mediaType}:${it.id}" }
             .values
             .map { localizedFirst ->
                 localizedFirst.drop(1).fold(localizedFirst.first()) { preferred, fallback ->
@@ -3611,6 +3665,9 @@ class MediaRepository @Inject constructor(
             .sortedByDescending { item ->
                 iptvArtworkCandidateScore(title, item.title, item.mediaType, durationMs, item.popularity)
             }
+        // A partial search must not be cached as a complete result or a valid miss.
+        requests.throwIfFailed()
+        return candidates
     }
 
     private suspend fun lookupFanartArtwork(
@@ -3618,19 +3675,22 @@ class MediaRepository @Inject constructor(
         tmdbCandidates: List<MediaItem>,
         preferLogo: Boolean,
     ): String? {
+        val requests = IptvArtworkRequests()
         if (tmdbCandidates.firstOrNull()?.mediaType == MediaType.MOVIE) return null
         val tvdbAuthenticated = Constants.TVDB_API_KEY.isNotBlank() && ensureTvdbToken() != null
         val tvCandidates = tmdbCandidates.filter { it.mediaType == MediaType.TV }.take(6)
         val ids = tvCandidates.mapNotNull { candidate ->
-            runCatching { tmdbApi.getTvExternalIds(candidate.id, apiKey).tvdbId }.getOrNull()
+            requests.load { tmdbApi.getTvExternalIds(candidate.id, apiKey).tvdbId }
         }.distinct().toMutableList()
         if (ids.isEmpty()) {
-            if (!tvdbAuthenticated) return null
+            if (!tvdbAuthenticated) {
+                requests.throwIfFailed()
+                return null
+            }
             val searchResults = buildList {
                 for (query in iptvArtworkSearchQueries(title)) {
                     addAll(
-                        runCatching { tvdbApi.search(query, type = "series").data }
-                            .getOrDefault(emptyList())
+                        requests.load { tvdbApi.search(query, type = "series").data }.orEmpty()
                     )
                     if (any { iptvArtworkTitleScore(title, it.name.orEmpty()) >= 35.0 }) break
                 }
@@ -3643,7 +3703,7 @@ class MediaRepository @Inject constructor(
         }
         for (tvdbId in ids.distinct()) {
             if (Constants.FANART_API_KEY.isNotBlank()) {
-                val artwork = runCatching { fanartApi.getTvArtwork(tvdbId) }.getOrNull()
+                val artwork = requests.load { fanartApi.getTvArtwork(tvdbId) }
                 val images = if (preferLogo) {
                     artwork?.clearLogos.orEmpty() + artwork?.hdTvLogos.orEmpty()
                 } else {
@@ -3666,7 +3726,7 @@ class MediaRepository @Inject constructor(
                     }
             }
             val tvdbArtwork = if (tvdbAuthenticated) {
-                runCatching { tvdbApi.getSeriesArtworks(tvdbId) }.getOrNull()
+                requests.load { tvdbApi.getSeriesArtworks(tvdbId) }
             } else {
                 null
             }
@@ -3686,7 +3746,8 @@ class MediaRepository @Inject constructor(
                     return it
                 }
         }
-            android.util.Log.d("IptvArtwork", "No artwork source hit title=$title logo=$preferLogo")
+        requests.throwIfFailed()
+        android.util.Log.d("IptvArtwork", "No artwork source hit title=$title logo=$preferLogo")
         return null
     }
 
@@ -3868,7 +3929,11 @@ class MediaRepository @Inject constructor(
     /**
      * Get logo URL for a media item (cached)
      */
-    suspend fun getLogoUrl(mediaType: MediaType, mediaId: Int): String? {
+    suspend fun getLogoUrl(
+        mediaType: MediaType,
+        mediaId: Int,
+        propagateNetworkFailure: Boolean = false,
+    ): String? {
         val cacheKey = "${mediaType}_logo_$mediaId"
         logoCache[cacheKey]?.let { cached ->
             if (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS) {
@@ -3909,7 +3974,7 @@ class MediaRepository @Inject constructor(
                 url
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-
+                if (propagateNetworkFailure) throw e
                 null
             }
         }

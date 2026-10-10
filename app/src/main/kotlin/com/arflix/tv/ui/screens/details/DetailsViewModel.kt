@@ -143,6 +143,19 @@ private data class ResumeInfo(
     val positionMs: Long
 )
 
+internal fun episodePlayLabelResource(
+    season: Int,
+    episode: Int,
+    hasWatchedEpisodes: Boolean,
+    resumePositionMs: Long? = null
+): Int = if (
+    season == 1 && episode == 1 && !hasWatchedEpisodes && (resumePositionMs ?: 0L) <= 0L
+) {
+    R.string.play_start_s1e1
+} else {
+    R.string.continue_season_episode
+}
+
 // TMDB Genre mappings
 private val movieGenres = mapOf(
     28 to "Action", 12 to "Adventure", 16 to "Animation", 35 to "Comedy",
@@ -680,10 +693,11 @@ class DetailsViewModel @Inject constructor(
                                 playTmdbSeason = canonicalTargetSeason,
                                 playTmdbEpisode = canonicalTargetEpisode,
                                 playLabel = displayTarget?.let {
-                                    context.getString(
-                                        R.string.continue_season_episode,
+                                    remapEpisodePlayLabel(
                                         it.displaySeason,
-                                        it.displayEpisode
+                                        it.displayEpisode,
+                                        state.playLabel,
+                                        state.playPositionMs
                                     )
                                 } ?: state.playLabel
                             )
@@ -910,7 +924,16 @@ class DetailsViewModel @Inject constructor(
                                 } else state.playEpisode,
                                 playLabel = if (shouldUseEpisodeTarget) {
                                     if (nextUnwatchedEpisode != null) {
-                                        context.getString(R.string.continue_season_episode, nextUnwatchedEpisode.seasonNumber, nextUnwatchedEpisode.episodeNumber)
+                                        context.getString(
+                                            episodePlayLabelResource(
+                                                nextUnwatchedEpisode.seasonNumber,
+                                                nextUnwatchedEpisode.episodeNumber,
+                                                hasWatchedEpisodes || state.seasonProgress.values.any { it.first > 0 },
+                                                state.playPositionMs
+                                            ),
+                                            nextUnwatchedEpisode.seasonNumber,
+                                            nextUnwatchedEpisode.episodeNumber
+                                        )
                                     } else if (hasWatchedEpisodes) {
                                         context.getString(R.string.play_start_s1e1)
                                     } else {
@@ -1023,7 +1046,12 @@ class DetailsViewModel @Inject constructor(
                                 playTmdbSeason = playTarget?.season,
                                 playTmdbEpisode = playTarget?.episode,
                                 playLabel = displayTarget?.let {
-                                    context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
+                                    remapEpisodePlayLabel(
+                                        it.displaySeason,
+                                        it.displayEpisode,
+                                        playTarget.label,
+                                        playTarget.positionMs
+                                    )
                                 } ?: playTarget?.label,
                                 playPositionMs = playTarget?.positionMs
                             )
@@ -1043,7 +1071,12 @@ class DetailsViewModel @Inject constructor(
                                 playTmdbSeason = playTarget?.season,
                                 playTmdbEpisode = playTarget?.episode,
                                 playLabel = displayTarget?.let {
-                                    context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
+                                    remapEpisodePlayLabel(
+                                        it.displaySeason,
+                                        it.displayEpisode,
+                                        playTarget.label,
+                                        playTarget.positionMs
+                                    )
                                 } ?: playTarget?.label,
                                 playPositionMs = playTarget?.positionMs
                             )
@@ -1626,7 +1659,12 @@ class DetailsViewModel @Inject constructor(
                 playTmdbSeason = playTarget?.season ?: latestState.playTmdbSeason,
                 playTmdbEpisode = playTarget?.episode ?: latestState.playTmdbEpisode,
                 playLabel = displayPlayTarget?.let {
-                    context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
+                    remapEpisodePlayLabel(
+                        it.displaySeason,
+                        it.displayEpisode,
+                        playTarget.label,
+                        playTarget.positionMs
+                    )
                 } ?: playTarget?.label ?: latestState.playLabel,
                 playPositionMs = playTarget?.positionMs ?: 0L
             )
@@ -1651,7 +1689,15 @@ class DetailsViewModel @Inject constructor(
                     return PlayTarget(
                         season = seasonNum,
                         episode = firstUnwatched.episodeNumber,
-                        label = context.getString(R.string.continue_season_episode, seasonNum, firstUnwatched.episodeNumber)
+                        label = context.getString(
+                            episodePlayLabelResource(
+                                seasonNum,
+                                firstUnwatched.episodeNumber,
+                                watchedKeys.any { it.startsWith("show_tmdb:$tmdbId:") }
+                            ),
+                            seasonNum,
+                            firstUnwatched.episodeNumber
+                        )
                     )
                 }
             }
@@ -2391,7 +2437,12 @@ class DetailsViewModel @Inject constructor(
                     playTmdbSeason = playTarget?.season ?: _uiState.value.playTmdbSeason,
                     playTmdbEpisode = playTarget?.episode ?: _uiState.value.playTmdbEpisode,
                     playLabel = displayPlayTarget?.let {
-                        context.getString(R.string.continue_season_episode, it.displaySeason, it.displayEpisode)
+                        remapEpisodePlayLabel(
+                            it.displaySeason,
+                            it.displayEpisode,
+                            playTarget.label,
+                            playTarget.positionMs
+                        )
                     } ?: playTarget?.label ?: _uiState.value.playLabel,
                     playPositionMs = playTarget?.positionMs ?: _uiState.value.playPositionMs,
                     toastMessage = context.getString(R.string.details_season_marked_watched, season),
@@ -2933,6 +2984,22 @@ class DetailsViewModel @Inject constructor(
             "%d:%02d".format(minutes, secs)
         }
     }
+
+    private fun remapEpisodePlayLabel(
+        season: Int,
+        episode: Int,
+        originalLabel: String?,
+        positionMs: Long?
+    ): String = context.getString(
+        episodePlayLabelResource(
+            season,
+            episode,
+            originalLabel != context.getString(R.string.play_start_s1e1),
+            positionMs
+        ),
+        season,
+        episode
+    )
 
     private fun buildPlayTarget(
         mediaType: MediaType,

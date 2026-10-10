@@ -5,6 +5,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CoroutineStart
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
@@ -110,5 +113,65 @@ class IptvArtworkCacheTest {
             cache.getOrLoad(iptvArtworkKey("Program $index", "de-DE", null)) { "art $index" }
         }
         assertEquals("new", cache.getOrLoad(key) { "new" })
+    }
+
+    @Test
+    fun `visible observer receives later warmup without another lookup`() = runBlocking {
+        val cache = IptvArtworkCache { 0L }
+        assertNull(cache.getOrLoad(key) { null })
+        val visible = async(start = CoroutineStart.UNDISPATCHED) {
+            cache.observe(key).filterNotNull().first()
+        }
+        cache.clearMisses()
+        cache.getOrLoad(key) { "late artwork" }
+        assertEquals("late artwork", visible.await())
+    }
+
+    @Test
+    fun `candidate cache shares movie and series search between logo and backdrop`() = runBlocking {
+        val cache = IptvLookupCache<List<String>>({ 0L }, { it.isEmpty() })
+        var searches = 0
+        assertEquals(listOf("series"), cache.getOrLoad(key) { searches++; listOf("series") })
+        assertEquals(listOf("series"), cache.getOrLoad(key) { searches++; emptyList() })
+        assertEquals(1, searches)
+    }
+
+    @Test
+    fun `partial request failure cannot become a cached miss`() = runBlocking {
+        val cache = IptvLookupCache<List<String>>({ 0L }, { it.isEmpty() })
+        var failure: IOException? = null
+        val expected = IOException("offline")
+        try {
+            cache.getOrLoad(key) {
+                val requests = IptvArtworkRequests()
+                requests.load<List<String>> { throw expected }
+                requests.load { emptyList<String>() }
+                requests.throwIfFailed()
+                emptyList()
+            }
+        } catch (e: IOException) {
+            failure = e
+        }
+        assertEquals(expected, failure)
+        assertEquals(listOf("retry"), cache.getOrLoad(key) { listOf("retry") })
+    }
+
+    @Test
+    fun `request cancellation and programming errors are not turned into misses`() = runBlocking {
+        val requests = IptvArtworkRequests()
+        var cancelled = false
+        try {
+            requests.load<String> { throw CancellationException("closed") }
+        } catch (e: CancellationException) {
+            cancelled = true
+        }
+        assertEquals(true, cancelled)
+        var invalid = false
+        try {
+            requests.load<String> { throw IllegalStateException("invalid") }
+        } catch (e: IllegalStateException) {
+            invalid = true
+        }
+        assertEquals(true, invalid)
     }
 }

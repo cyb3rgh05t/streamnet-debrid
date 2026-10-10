@@ -215,6 +215,8 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import dagger.hilt.android.EntryPointAccessors
@@ -237,14 +239,13 @@ private object HomeRegexes {
     val WHITESPACE = Regex("\\s+")
 }
 
-private fun cleanOverviewText(value: String): String {
+internal fun cleanOverviewText(value: String): String {
     return value
         .replace(HomeRegexes.HTML_TAG, " ")
         .replace(HomeRegexes.NON_BREAKING_SPACE, " ")
         .replace(HomeRegexes.UNICODE_SPACE, " ")
         .replace(HomeRegexes.WHITESPACE, " ")
         .trim()
-        .ifBlank { "No description available." }
 }
 
 private fun Context.genreNames(mediaType: MediaType, genreIds: List<Int>): List<String> =
@@ -1252,11 +1253,11 @@ fun HomeScreen(
                 ?.liveProgramTitle
                 ?.takeIf { it.isNotBlank() }
                 ?: return@produceState
-            value = viewModel.lookupIptvProgramBackdrop(
+            viewModel.observeIptvProgramBackdrop(
                 title,
                 displayHeroItem.liveProgramStartMs,
                 displayHeroItem.liveProgramEndMs,
-            )
+            ).collect { value = it }
         }
         val iptvHeroCategoryBackdrop = remember(displayHeroItem?.subtitle) {
             iptvHomeCategoryBackdrop(displayHeroItem?.subtitle)
@@ -1275,11 +1276,11 @@ fun HomeScreen(
                 ?.liveProgramTitle
                 ?.takeIf { it.isNotBlank() }
                 ?: return@produceState
-            value = viewModel.lookupIptvProgramLogo(
+            viewModel.observeIptvProgramLogo(
                 title,
                 displayHeroItem.liveProgramStartMs,
                 displayHeroItem.liveProgramEndMs,
-            )
+            ).collect { value = it }
         }
         val currentBackdrop = displayHeroItem?.let { item ->
             when {
@@ -1500,7 +1501,7 @@ fun HomeScreen(
             onNavigateToOffline = onNavigateToOffline,
             onNavigateToTv = onNavigateToTv,
             getIptvStreamUrl = { itemId -> viewModel.getIptvStreamUrl(itemId) },
-            lookupIptvProgramBackdrop = viewModel::lookupIptvProgramBackdrop,
+            lookupIptvProgramBackdrop = viewModel::observeIptvProgramBackdrop,
             isSportsHomeItem = { item -> viewModel.isSportsHomeItem(item) },
             onSportsHomeItemClick = openSportsHomeItem,
             onNavigateToSettings = onNavigateToSettings,
@@ -1637,8 +1638,8 @@ fun HomeScreen(
         programDetailsItem?.let { item ->
             IptvProgramDetailsDialog(
                 item = item,
-                lookupBackdrop = viewModel::lookupIptvProgramBackdrop,
-                lookupLogo = viewModel::lookupIptvProgramLogo,
+                lookupBackdrop = { viewModel.observeIptvProgramBackdrop(it, item.liveProgramStartMs, item.liveProgramEndMs) },
+                lookupLogo = { viewModel.observeIptvProgramLogo(it, item.liveProgramStartMs, item.liveProgramEndMs) },
                 onPlay = {
                     programDetailsItem = null
                     onNavigateToTv(viewModel.getIptvChannelId(item), viewModel.getIptvStreamUrl(item.id))
@@ -1687,8 +1688,8 @@ fun HomeScreen(
 @Composable
 private fun IptvProgramDetailsDialog(
     item: MediaItem,
-    lookupBackdrop: suspend (String) -> String?,
-    lookupLogo: suspend (String) -> String?,
+    lookupBackdrop: (String) -> Flow<String?>,
+    lookupLogo: (String) -> Flow<String?>,
     onPlay: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -1699,10 +1700,10 @@ private fun IptvProgramDetailsDialog(
     var interactionsArmed by remember(item.id) { mutableStateOf(isMobile) }
     val programTitle = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title
     val programBackdrop by produceState<String?>(null, programTitle) {
-        value = lookupBackdrop(programTitle)
+        lookupBackdrop(programTitle).collect { value = it }
     }
     val programLogo by produceState<String?>(null, programTitle) {
-        value = lookupLogo(programTitle)
+        lookupLogo(programTitle).collect { value = it }
     }
     val fallbackBackdrop = remember(item.subtitle) {
         iptvHomeCategoryBackdrop(item.subtitle)
@@ -2081,7 +2082,9 @@ private fun IptvHeroSection(
 
         item.liveProgramDescription?.takeIf { it.isNotBlank() }?.let { description ->
             Text(
-                text = cleanOverviewText(description),
+                text = cleanOverviewText(description).ifBlank {
+                    stringResource(R.string.no_description_available)
+                },
                 style = ArflixTypography.body.copy(
                     fontSize = 12.sp,
                     lineHeight = 17.sp,
@@ -2504,11 +2507,15 @@ private fun HeroSection(
 
                 // Overview text (EPG data for IPTV, synopsis for movies/shows)
                 val displayOverview = remember(overviewOverride, currentItem.overview) {
-                    cleanOverviewText(overviewOverride ?: currentItem.overview)
+                    cleanOverviewText(overviewOverride.orEmpty()).ifBlank {
+                        cleanOverviewText(currentItem.overview)
+                    }
                 }
 
                 val overviewMaxHeight = 72.dp
-                AutoScrollingSynopsis(
+                if (displayOverview.isBlank()) {
+                    Spacer(modifier = Modifier.width(360.dp).height(overviewMaxHeight))
+                } else AutoScrollingSynopsis(
                     text = displayOverview,
                     style = ArflixTypography.body.copy(
                         fontSize = 12.sp,
@@ -2697,7 +2704,9 @@ private fun MobileHeroOverlay(
     val hasMetadata = genreText.isNotEmpty() || year.isNotEmpty() || ratingValue > 0f
 
     val displayOverview = remember(overviewOverride, item.overview) {
-        cleanOverviewText(overviewOverride ?: item.overview)
+        cleanOverviewText(overviewOverride.orEmpty()).ifBlank {
+            cleanOverviewText(item.overview)
+        }
     }
 
     Box(
@@ -2793,7 +2802,9 @@ private fun MobileHeroOverlay(
             }
 
             Spacer(modifier = Modifier.height(6.dp))
-            AutoScrollingSynopsis(
+            if (displayOverview.isBlank()) {
+                Spacer(modifier = Modifier.fillMaxWidth().height(32.dp))
+            } else AutoScrollingSynopsis(
                 text = displayOverview,
                 style = ArflixTypography.body.copy(
                     fontSize = 11.sp,
@@ -3106,7 +3117,7 @@ private fun HomeInputLayer(
     onNavigateToOffline: () -> Unit,
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit,
     getIptvStreamUrl: (itemId: Int) -> String?,
-    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
+    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     isSportsHomeItem: (MediaItem) -> Boolean = { false },
     onSportsHomeItemClick: (MediaItem) -> Unit = {},
     onNavigateToSettings: () -> Unit,
@@ -3605,7 +3616,7 @@ private fun HomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
+    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null
 ) {
@@ -3669,7 +3680,7 @@ private fun MobileHomeRowsLayer(
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
     onLoadMoreCategory: (String) -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
-    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
+    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null,
     onCategoryVisiblePosition: (String, Int) -> Unit = { _, _ -> }
@@ -3906,7 +3917,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
+    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit
 ) {
     // ── Focus-row stabilizer ──
@@ -4330,7 +4341,7 @@ private fun ContentRow(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: suspend (String, Long?, Long?) -> String? = { _, _, _ -> null },
+    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit
 ) {
@@ -4747,7 +4758,7 @@ private fun IptvHomeCard(
     width: Dp,
     matchLandscapeFootprint: Boolean = false,
     isFocused: Boolean,
-    lookupBackdrop: suspend (String, Long?, Long?) -> String?,
+    lookupBackdrop: (String, Long?, Long?) -> Flow<String?>,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -4773,7 +4784,7 @@ private fun IptvHomeCard(
     ) {
         value = null
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
-        value = lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+        lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs).collect { value = it }
     }
     val categoryBackdropUrl = remember(item.subtitle, item.backdrop, item.image) {
         item.backdrop

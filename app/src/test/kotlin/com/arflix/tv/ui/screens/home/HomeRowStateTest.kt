@@ -10,6 +10,98 @@ import org.junit.Test
 class HomeRowStateTest {
 
     @Test
+    fun `missing Home overview stays empty instead of injecting English fallback`() {
+        assertThat(cleanOverviewText("")).isEmpty()
+        assertThat(cleanOverviewText("  \n\t ")).isEmpty()
+        assertThat(cleanOverviewText("<p>\u00A0</p>")).isEmpty()
+    }
+
+    @Test
+    fun `Home overview removes markup and normalizes spaces without changing language`() {
+        assertThat(cleanOverviewText("<p>Eine</p>\u00A0Beschreibung.\n Weitere Details."))
+            .isEqualTo("Eine Beschreibung. Weitere Details.")
+    }
+
+    @Test
+    fun `reload burst queues only one follow up without cancelling current work`() {
+        val gate = HomeReloadGate()
+        assertThat(gate.request()).isTrue()
+        repeat(20) { assertThat(gate.request()).isFalse() }
+        assertThat(gate.finish()).isTrue()
+        assertThat(gate.request()).isTrue()
+        assertThat(gate.finish()).isFalse()
+    }
+
+    @Test
+    fun `profile or language reset discards queued reloads`() {
+        val gate = HomeReloadGate()
+        gate.request()
+        gate.request()
+        gate.reset()
+        assertThat(gate.request()).isTrue()
+        assertThat(gate.finish()).isFalse()
+    }
+
+    @Test
+    fun `ready row preserves other rows and follows configured order`() {
+        val tv = Category("favorite_tv", "TV", listOf(MediaItem(1, "Channel")))
+        val movie = Category("trending_movies", "Movies", listOf(MediaItem(2, "Movie")))
+        val custom = Category("custom_list", "List", listOf(MediaItem(3, "Title")))
+        assertThat(mergeReadyHomeCategory(
+            listOf(tv, movie), custom, listOf("favorite_tv", "custom_list", "trending_movies"),
+        )).containsExactly(tv, custom, movie).inOrder()
+    }
+
+    @Test
+    fun `empty or unconfigured ready row cannot erase usable content`() {
+        val movie = Category("trending_movies", "Movies", listOf(MediaItem(2, "Movie")))
+        assertThat(mergeReadyHomeCategory(
+            listOf(movie), movie.copy(items = emptyList()), listOf(movie.id),
+        )).containsExactly(movie)
+        assertThat(mergeReadyHomeCategory(emptyList(), movie, emptyList())).isEmpty()
+    }
+
+    @Test
+    fun `late initial row does not truncate pages already loaded while scrolling`() {
+        val items = (1..60).map { MediaItem(it, "Item $it") }
+        val current = Category("trending_movies", "Movies", items)
+        assertThat(mergeReadyHomeCategory(
+            listOf(current), current.copy(items = items.take(40)), listOf(current.id),
+        ).single().items).containsExactlyElementsIn(items).inOrder()
+    }
+
+    @Test
+    fun `changed catalog contents replace previous row instead of appending stale pages`() {
+        val old = Category("custom", "List", listOf(MediaItem(1, "Old"), MediaItem(2, "Older")))
+        val ready = old.copy(items = listOf(MediaItem(3, "New")))
+        assertThat(mergeReadyHomeCategory(listOf(old), ready, listOf(old.id))).containsExactly(ready)
+    }
+
+    @Test
+    fun `late catalog result preserves newer TV guide and continue watching`() {
+        val freshTv = Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Fresh guide")))
+        val freshResume = Category("continue_watching", "Continue Watching", listOf(MediaItem(11, "Resume")))
+        val staleTv = freshTv.copy(items = listOf(MediaItem(10, "Old guide")))
+        val movie = Category("trending_movies", "Movies", listOf(MediaItem(12, "Movie")))
+        assertThat(preserveLiveHomeRows(
+            current = listOf(freshTv, freshResume),
+            incoming = listOf(movie, staleTv),
+            catalogOrder = listOf("favorite_tv", "trending_movies"),
+        )).containsExactly(freshResume, freshTv, movie).inOrder()
+    }
+
+    @Test
+    fun `late catalog result does not restore removed favorites or resume`() {
+        val staleTv = Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Old")))
+        val movie = Category("trending_movies", "Movies", listOf(MediaItem(12, "Movie")))
+        assertThat(preserveLiveHomeRows(
+            current = emptyList(),
+            incoming = listOf(staleTv, movie),
+            catalogOrder = listOf("favorite_tv", "trending_movies"),
+        )).containsExactly(movie)
+    }
+
+    @Test
     fun `recently watched titles use watched change time before fallback order`() {
         assertThat(recentlyWatchedFirst(listOf(12, 80, 35), mapOf(12 to 300L, 35 to 200L)))
             .containsExactly(12, 35, 80).inOrder()
