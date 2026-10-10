@@ -14,6 +14,7 @@ import com.arflix.tv.data.api.FanartApi
 import com.arflix.tv.data.api.WatchHistoryApi
 import com.arflix.tv.data.api.VodRequestApi
 import com.arflix.tv.network.OkHttpProvider
+import com.arflix.tv.network.TvdbJsonConverterFactory
 import com.arflix.tv.util.Constants
 import dagger.Module
 import dagger.Provides
@@ -84,7 +85,7 @@ object AppModule {
         val api = Retrofit.Builder()
             .baseUrl("https://api4.thetvdb.com/v4/")
             .client(tvdbClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(TvdbJsonConverterFactory())
             .build()
             .create(TvdbApi::class.java)
         return object : TvdbApi {

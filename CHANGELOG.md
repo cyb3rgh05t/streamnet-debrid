@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.062] - 2026-10-10
+
+- Android: Ungültige JSON-Antworten der TVDB-API werden bereits im Retrofit-Response-Converter in behandelbare IO-Anfragefehler umgewandelt, insbesondere ein Objekt statt einer Liste bei `data`. Die bestehende IPTV-Artwork-Fehlerbehandlung protokolliert den Fehler und kann erneut laden, statt die App zu beenden. Gültige Such-/Artwork-Listen und Login-Antworten bleiben unverändert.
+
+- !!!! ES KANN SEIN DASS BEIM UPDATE EIN PARSING FEHLER PASSIERT. EINFACH NEU INSTALLIEREN UND CLOUD VERBINDEN !!!!!
+
+- Android-Version `2.5.062` / Code `463`.
+
 ## [2.5.061] - 2026-10-10
 
 - Android: Marvel-Timeline-Unterrubriken verwenden die aktive Akzentfarbe. Fehlgeschlagene HTTP-/Netzwerk-Metadatenabfragen einzelner Einträge blockieren nicht mehr die ganze Seite: Die Karte bleibt mit exaktem Label, echtem Detail-Ziel und lokalisiertem Fehlerhinweis erhalten; spätere Phasen können weiter geladen werden. Fehlgeschlagene Metadaten werden nicht als erfolgreich geladen gecacht.
