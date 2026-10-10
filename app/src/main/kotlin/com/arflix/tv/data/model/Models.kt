@@ -52,6 +52,9 @@ data class MediaItem(
     val addedAt: Long = 0L,
     // Explicit source order when a remote list already gives the correct order.
     val sourceOrder: Int = Int.MAX_VALUE,
+    val timelineEntryId: String? = null,
+    val timelineSection: String? = null,
+    val timelineMetadataUnavailable: Boolean = false,
     // Placeholder card - shows skeleton loading animation
     val isPlaceholder: Boolean = false,
     // Continue Watching: formatted time remaining (e.g., "23min left", "1hr 15min left")
@@ -74,6 +77,9 @@ data class MediaItem(
     val homeServerProvider: String? = null,
     val homeServerImdbId: String? = null,
 ) : Serializable
+
+internal val MediaItem.collectionCardKey: String
+    get() = timelineEntryId ?: "${mediaType}-${id}"
 
 enum class MediaType {
     MOVIE, TV

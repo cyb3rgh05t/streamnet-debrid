@@ -44,6 +44,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -72,10 +75,12 @@ import com.arflix.tv.data.model.CollectionSourceKind
 import com.arflix.tv.data.model.CollectionTileShape
 import com.arflix.tv.data.model.MediaItem
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.model.collectionCardKey
 import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.GenreFanartRepository
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.MediaRepository
+import com.arflix.tv.data.repository.MarvelWatchlistTimeline
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.ui.screens.home.resolveHomeWatchedBadgeState
 import com.arflix.tv.ui.components.CardLayoutMode
@@ -344,11 +349,11 @@ class CollectionDetailsViewModel @Inject constructor(
             }
             val decoratedFreshItems = sortCollectionItems(tab, decorateWatchedBadges(freshItems))
             val existingIds = when (tab) {
-                CollectionTab.MOVIES -> state.movieItems.mapTo(HashSet()) { it.id to it.mediaType }
-                CollectionTab.SERIES -> state.seriesItems.mapTo(HashSet()) { it.id to it.mediaType }
-                CollectionTab.TIMELINE -> state.timelineItems.mapTo(HashSet()) { it.id to it.mediaType }
+                CollectionTab.MOVIES -> state.movieItems.mapTo(HashSet()) { it.collectionCardKey }
+                CollectionTab.SERIES -> state.seriesItems.mapTo(HashSet()) { it.collectionCardKey }
+                CollectionTab.TIMELINE -> state.timelineItems.mapTo(HashSet()) { it.collectionCardKey }
             }
-            val uniqueNew = decoratedFreshItems.filter { (it.id to it.mediaType) !in existingIds }
+            val uniqueNew = decoratedFreshItems.filter { it.collectionCardKey !in existingIds }
             _uiState.value = when (tab) {
                 CollectionTab.MOVIES -> _uiState.value.copy(
                     movieItems = sortCollectionItems(tab, state.movieItems + uniqueNew),
@@ -366,7 +371,8 @@ class CollectionDetailsViewModel @Inject constructor(
                     timelineItems = state.timelineItems + uniqueNew,
                     isLoadingMoreTimeline = false,
                     hasMoreTimeline = next?.hasMore == true,
-                    loadedTimelineOffset = next?.nextOffset ?: state.loadedTimelineOffset
+                    loadedTimelineOffset = next?.nextOffset ?: state.loadedTimelineOffset,
+                    error = _uiState.value.error ?: if (next == null) COLLECTION_LOAD_FAILED_ERROR else null
                 )
             }
             preloadLogos(uniqueNew)
@@ -417,7 +423,9 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun sortCollectionItems(tab: CollectionTab, items: List<MediaItem>): List<MediaItem> =
-        if (tab == CollectionTab.TIMELINE) items else items.sortedWith(
+        if (tab == CollectionTab.TIMELINE ||
+            _uiState.value.catalog?.collectionGroup == CollectionGroupKind.FRANCHISE
+        ) items else items.sortedWith(
             compareByDescending<MediaItem> { it.popularity }
                 .thenByDescending { it.tmdbRating.toFloatOrNull() ?: 0f }
                 .thenBy { it.title.lowercase() }
@@ -472,7 +480,9 @@ class CollectionDetailsViewModel @Inject constructor(
     ): CollectionPage {
         val pageCatalog = catalogForTab(catalog, tab)
         val availability = iptvVodAvailability
-        if (!iptvOnlyMode || availability == null) {
+        if (!iptvOnlyMode || availability == null ||
+            pageCatalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }
+        ) {
             val page = mediaRepository.loadCollectionCatalogPage(pageCatalog, offset, limit)
             return CollectionPage(page.items, page.hasMore, page.nextOffset ?: (offset + page.items.size))
         }
@@ -501,6 +511,9 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {
+        if (tab == CollectionTab.TIMELINE) {
+            MarvelWatchlistTimeline.catalogForTimeline(catalog)?.let { return it }
+        }
         val filteredSources = catalog.collectionSources.flatMap { source ->
             if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank()) {
                 val refs = source.curatedRefs.orEmpty().filter { ref ->
@@ -693,8 +706,12 @@ fun CollectionDetailsScreen(
                         CollectionTab.MOVIES -> moviesGridState
                         CollectionTab.SERIES -> seriesGridState
                     }
-                    // Grid has 2 header items (tab bar + spacer) before the media cards
-                    runCatching { currentGridState.scrollToItem(savedIndex + 2) }
+                    val currentItems = when (currentTab) {
+                        CollectionTab.TIMELINE -> viewModel.uiState.value.timelineItems
+                        CollectionTab.MOVIES -> viewModel.uiState.value.movieItems
+                        CollectionTab.SERIES -> viewModel.uiState.value.seriesItems
+                    }
+                    runCatching { currentGridState.scrollToItem(collectionCardGridIndex(currentItems, savedIndex)) }
                     pendingFocusIndex = savedIndex
                 } else {
                     runCatching {
@@ -1079,8 +1096,13 @@ private fun CollectionItemsGrid(
     topContentPadding: androidx.compose.ui.unit.Dp
 ) {
     val cardContentType = if (usePosterCards) "poster_card" else "landscape_card"
+    val timelineSections = stringArrayResource(R.array.marvel_timeline_sections).toList()
+    val timelineMovieLabel = stringResource(R.string.marvel_timeline_movie_label)
+    val timelineEpisodesLabel = stringResource(R.string.marvel_timeline_episodes_label)
     val focusBleedPadding = if (usePosterCards) 10.dp else 6.dp
     val latestItems by rememberUpdatedState(items)
+    val gridEntries = remember(items) { collectionGridEntries(items) }
+    val latestGridEntries by rememberUpdatedState(gridEntries)
     val latestGridColumns by rememberUpdatedState(gridColumns)
     val latestOnVisibleItemsChanged by rememberUpdatedState(onVisibleItemsChanged)
     val latestOnNearEnd by rememberUpdatedState(onNearEnd)
@@ -1094,8 +1116,9 @@ private fun CollectionItemsGrid(
             val last = layout.visibleItemsInfo.lastOrNull()?.index ?: 0
             val mediaIndexes = layout.visibleItemsInfo
                 .asSequence()
-                .map { it.index - 2 }
-                .filter { it >= 0 }
+                .mapNotNull {
+                    (latestGridEntries.getOrNull(it.index - 2) as? CollectionGridEntry.Card)?.mediaIndex
+                }
                 .toList()
             Triple(last, layout.totalItemsCount, mediaIndexes)
         }.distinctUntilChanged().collect { (last, total, mediaIndexes) ->
@@ -1122,7 +1145,7 @@ private fun CollectionItemsGrid(
                 if (
                     event.type == KeyEventType.KeyDown &&
                     event.key == Key.DirectionUp &&
-                    focusedMediaIndex in 0 until gridColumns
+                    focusedMediaIndex in 0 until collectionFirstRowCount(items, gridColumns)
                 ) {
                     onFocusTabFromTopRow()
                     true
@@ -1198,38 +1221,59 @@ private fun CollectionItemsGrid(
             }
         } else {
             itemsIndexed(
-                items,
-                key = { _, item -> "${item.mediaType}-${item.id}" },
-                contentType = { _, _ -> cardContentType }
-            ) { index, item ->
-                val cardLogoUrl = cardLogoUrls["${item.mediaType}_${item.id}"]
-                val itemFocusRequester = remember { FocusRequester() }
+                gridEntries,
+                key = { _, entry -> entry.key },
+                span = { _, entry ->
+                    androidx.tv.foundation.lazy.grid.TvGridItemSpan(
+                        if (entry is CollectionGridEntry.Heading) maxLineSpan else 1
+                    )
+                },
+                contentType = { _, entry -> if (entry is CollectionGridEntry.Heading) "section_heading" else cardContentType }
+            ) { _, entry ->
+                if (entry is CollectionGridEntry.Heading) {
+                    androidx.compose.material3.Text(
+                        text = localizedTimelineSection(entry.title, timelineSections),
+                        style = com.arflix.tv.ui.skin.ArvioSkin.typography.cardTitle.copy(fontSize = 20.sp),
+                        color = loadingAccent,
+                        modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 6.dp)
+                            .semantics { heading() }
+                    )
+                } else if (entry is CollectionGridEntry.Card) {
+                    val index = entry.mediaIndex
+                    val item = entry.item
+                    val cardLogoUrl = cardLogoUrls["${item.mediaType}_${item.id}"]
+                    val itemFocusRequester = remember { FocusRequester() }
 
-                // Fires when scrollToItem brings this card into composition on back-navigation.
-                // pendingFocusIndex is set by requestTabFocus() after scrolling to this item.
-                LaunchedEffect(pendingFocusIndex) {
-                    if (pendingFocusIndex == index) {
-                        delay(50)
-                        runCatching { itemFocusRequester.requestFocus() }
-                        onClearPendingFocus()
+                    // Lazy cards must request restored focus after scrolling into composition.
+                    LaunchedEffect(pendingFocusIndex) {
+                        if (pendingFocusIndex == index) {
+                            delay(50)
+                            runCatching { itemFocusRequester.requestFocus() }
+                            onClearPendingFocus()
+                        }
                     }
-                }
 
-                MediaCard(
-                    item = item,
-                    width = cardWidth,
-                    isLandscape = !usePosterCards,
-                    logoImageUrl = cardLogoUrl,
-                    showTitle = true,
-                    titleMaxLines = if (usePosterCards) 2 else 1,
-                    onFocused = {
-                        focusedMediaIndex = index
-                        onItemFocused(item, index)
-                        if (items.size > 10 && index >= items.size - 2) onNearEnd()
-                    },
-                    onClick = { onItemClick(item) },
-                    modifier = Modifier.focusRequester(itemFocusRequester)
-                )
+                    MediaCard(
+                        item = if (item.timelineEntryId != null) item.copy(
+                            title = localizedTimelineLabel(item.title, timelineMovieLabel, timelineEpisodesLabel),
+                            subtitle = if (item.timelineMetadataUnavailable) {
+                                stringResource(R.string.marvel_timeline_metadata_unavailable)
+                            } else item.subtitle
+                        ) else item,
+                        width = cardWidth,
+                        isLandscape = !usePosterCards,
+                        logoImageUrl = cardLogoUrl,
+                        showTitle = true,
+                        titleMaxLines = if (item.timelineEntryId != null) 3 else if (usePosterCards) 2 else 1,
+                        onFocused = {
+                            focusedMediaIndex = index
+                            onItemFocused(item, index)
+                            if (items.size > 10 && index >= items.size - 2) onNearEnd()
+                        },
+                        onClick = { onItemClick(item) },
+                        modifier = Modifier.focusRequester(itemFocusRequester)
+                    )
+                }
             }
         }
 

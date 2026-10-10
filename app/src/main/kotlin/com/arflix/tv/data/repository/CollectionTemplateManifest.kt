@@ -710,10 +710,14 @@ internal object CollectionTemplateManifest {
             sources = listOf(
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "movie", catalogId = "movies", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "movie"),
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "series", catalogId = "series", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "Marvel", catalogId = "marvel-mcu", manifestUrl = MARVEL_MANIFEST_URL, collectionTab = "timeline")
+                CollectionSourceConfig(
+                    kind = CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE,
+                    collectionTab = "timeline"
+                )
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
+                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL),
+                metadata(sourceCatalogId = "marvel-watchlist-2026-10-10", sourceAddonId = null, sourceName = "Marvel Story-Timeline", sourceLabel = "MARVELWATCHLIST", mediaType = "mixed", itemCount = 168, author = null, url = "https://marvelwatchlist.com/de/")
             )
         ),
         entry(
@@ -784,10 +788,15 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.102972")
+                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.102972"),
+                CollectionSourceConfig(
+                    kind = CollectionSourceKind.CURATED_IDS,
+                    curatedRefs = listOf("tv:224377")
+                )
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "mdblist.102972", sourceAddonId = "aio-metadata", sourceName = "Harry Potter Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 11, author = "thebirdod", url = "https://mdblist.com/lists/thebirdod/harry-potter-collection")
+                metadata(sourceCatalogId = "mdblist.102972", sourceAddonId = "aio-metadata", sourceName = "Harry Potter Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 11, author = "thebirdod", url = "https://mdblist.com/lists/thebirdod/harry-potter-collection"),
+                metadata(sourceCatalogId = "tv:224377", sourceAddonId = null, sourceName = "Harry Potter (TV)", sourceLabel = "TMDB", mediaType = "tv", itemCount = 1, author = null, url = "https://www.themoviedb.org/tv/224377-harry-potter")
             )
         ),
         entry(

@@ -311,7 +311,7 @@ class MediaRepository @Inject constructor(
         synchronized(logoCache) { logoCache.clear() }
         homeServerLogoRefCache.clear()
         collectionRefsCache.clear()
-        franchisePopularityCache.clear()
+        franchiseReleaseCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
         imdbRatingMisses.clear()
@@ -343,19 +343,11 @@ class MediaRepository @Inject constructor(
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val homeServerLogoRefCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val collectionRefsCache = ConcurrentHashMap<String, CacheEntry<List<Pair<MediaType, Int>>>>()
-    private data class FranchisePopularityScore(
-        val popularity: Float,
-        val voteAverage: Float,
-        val title: String
+    private data class FranchiseReleaseDate(
+        val date: java.time.LocalDate?
     )
-    private data class RankedFranchiseRef(
-        val ref: Pair<MediaType, Int>,
-        val score: FranchisePopularityScore,
-        val sourceIndex: Int
-    )
-    private val franchisePopularityCache = ConcurrentHashMap<String, CacheEntry<FranchisePopularityScore>>()
-    private val franchisePopularitySemaphore = Semaphore(6)
-    private val FRANCHISE_POPULARITY_LOOKAHEAD = 32
+    private val franchiseReleaseCache = ConcurrentHashMap<String, CacheEntry<FranchiseReleaseDate>>()
+    private val franchiseReleaseSemaphore = Semaphore(6)
 
     private fun <T> getFromCache(cache: Map<String, CacheEntry<T>>, key: String): T? {
         val entry = cache[key] ?: return null
@@ -479,7 +471,14 @@ class MediaRepository @Inject constructor(
         // Resolve all sources in parallel so a slow/failed source never blocks the
         // others — this alone fixes "empty" genre collections where one source 404s.
         val sourceBudgets = catalog.collectionSources.map { source ->
-            if (unlimitedGroup) {
+            if (usesFranchiseReleaseOrder(catalog)) {
+                // Resolve the fixed franchise budget before sorting to keep page offsets stable.
+                when (source.kind) {
+                    CollectionSourceKind.ADDON_CATALOG -> 120
+                    CollectionSourceKind.MDBLIST_PUBLIC -> 96
+                    else -> 72
+                }
+            } else if (unlimitedGroup) {
                 (targetCount + 20).coerceAtLeast(40)
             } else when (source.kind) {
                 CollectionSourceKind.ADDON_CATALOG -> (targetCount + 12).coerceAtLeast(24).coerceAtMost(120)
@@ -2461,17 +2460,17 @@ class MediaRepository @Inject constructor(
         if (catalog.collectionSources.isEmpty() || limit <= 0 || offset < 0) {
             return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
         }
+        if (catalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }) {
+            return@coroutineScope loadMarvelWatchlistTimelinePage(offset, limit)
+        }
 
         val resolvedRefs = resolveCollectionCatalogRefs(
             catalog = catalog,
             requiredCount = collectionPageProbeCount(offset, limit)
         )
         if (resolvedRefs.isEmpty()) return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
-        val refs = if (
-            catalog.collectionGroup == CollectionGroupKind.FRANCHISE &&
-            catalog.collectionSources.none { it.collectionTab == "timeline" }
-        ) {
-            rankFranchiseRefsByPopularity(resolvedRefs)
+        val refs = if (usesFranchiseReleaseOrder(catalog)) {
+            rankFranchiseRefsByReleaseDate(resolvedRefs)
         } else {
             resolvedRefs
         }
@@ -2514,51 +2513,80 @@ class MediaRepository @Inject constructor(
         )
     }
 
-    private suspend fun rankFranchiseRefsByPopularity(
+    private suspend fun loadMarvelWatchlistTimelinePage(offset: Int, limit: Int): CategoryPageResult =
+        coroutineScope {
+            val pageEntries = MarvelWatchlistTimeline.page(offset, limit)
+            val semaphore = Semaphore(2)
+            val metadata = pageEntries.map { it.value.mediaType to it.value.tmdbId }.distinct().map { ref ->
+                async {
+                    val item = getCachedItem(ref.first, ref.second)
+                        ?: getCachedItemFromDisk(ref.first, ref.second)
+                        ?: semaphore.withPermit {
+                            try {
+                                when (ref.first) {
+                                    MediaType.MOVIE -> getMovieDetails(ref.second)
+                                    MediaType.TV -> getTvDetails(ref.second)
+                                }
+                            } catch (e: java.io.IOException) {
+                                Log.w("MediaRepository", "Marvel timeline metadata failed for $ref", e)
+                                null
+                            } catch (e: retrofit2.HttpException) {
+                                Log.w("MediaRepository", "Marvel timeline metadata failed for $ref", e)
+                                null
+                            }
+                        }
+                    ref to item
+                }
+            }.awaitAll().toMap()
+            cacheItems(metadata.values.filterNotNull())
+            val items = pageEntries.map { (position, entry) ->
+                MarvelWatchlistTimeline.card(metadata[entry.mediaType to entry.tmdbId], position)
+            }
+            val nextOffset = collectionPageNextOffset(offset, pageEntries.size)
+            CategoryPageResult(
+                items = items,
+                hasMore = nextOffset < MarvelWatchlistTimeline.entries.size,
+                nextOffset = nextOffset
+            )
+        }
+
+    private suspend fun rankFranchiseRefsByReleaseDate(
         refs: List<Pair<MediaType, Int>>
     ): List<Pair<MediaType, Int>> = coroutineScope {
-        val candidateCount = minOf(FRANCHISE_POPULARITY_LOOKAHEAD, refs.size)
-        val candidates = refs.take(candidateCount)
-        val ranked = candidates.mapIndexed { sourceIndex, ref ->
+        val dates = refs.map { ref ->
             async {
                 val cacheKey = detailsCacheKey(ref.first, ref.second)
-                val score = getFromCache(franchisePopularityCache, cacheKey)
+                val release = getFromCache(franchiseReleaseCache, cacheKey)
                     ?: getCachedItem(ref.first, ref.second)
-                        ?.takeIf { it.popularity > 0f }
+                        ?.takeIf { collectionReleaseDate(it.releaseDate, it.year) != null }
                         ?.let {
-                            FranchisePopularityScore(
-                                popularity = it.popularity,
-                                voteAverage = it.tmdbRating.toFloatOrNull() ?: 0f,
-                                title = it.title
-                            )
+                            FranchiseReleaseDate(collectionReleaseDate(it.releaseDate, it.year))
                         }
-                    ?: franchisePopularitySemaphore.withPermit {
+                    ?: franchiseReleaseSemaphore.withPermit {
                         runCatching {
                             when (ref.first) {
                                 MediaType.MOVIE -> tmdbApi.getMovieDetails(
                                     ref.second,
                                     apiKey,
                                     language = contentLanguage
-                                ).let { FranchisePopularityScore(it.popularity, it.voteAverage, it.title) }
+                                ).let { FranchiseReleaseDate(collectionReleaseDate(it.releaseDate)) }
                                 MediaType.TV -> tmdbApi.getTvDetails(
                                     ref.second,
                                     apiKey,
                                     language = contentLanguage
-                                ).let { FranchisePopularityScore(it.popularity, it.voteAverage, it.name) }
+                                ).let { FranchiseReleaseDate(collectionReleaseDate(it.firstAirDate)) }
                             }
+                        }.onFailure {
+                            if (it is kotlinx.coroutines.CancellationException) throw it
+                            Log.w("MediaRepository", "Franchise release date lookup failed for $ref", it)
                         }.getOrNull()?.also {
-                            franchisePopularityCache[cacheKey] = CacheEntry(it, System.currentTimeMillis())
-                        } ?: FranchisePopularityScore(0f, 0f, "")
+                            franchiseReleaseCache[cacheKey] = CacheEntry(it, System.currentTimeMillis())
+                        } ?: FranchiseReleaseDate(null)
                     }
-                RankedFranchiseRef(ref, score, sourceIndex)
+                ref to release.date
             }
-        }.awaitAll().sortedWith(
-            compareByDescending<RankedFranchiseRef> { it.score.popularity }
-                .thenByDescending { it.score.voteAverage }
-                .thenBy { it.score.title.lowercase(Locale.US) }
-                .thenBy { it.sourceIndex }
-        )
-        ranked.map { it.ref } + refs.drop(candidateCount)
+        }.awaitAll().toMap()
+        sortFranchiseReleaseRefs(refs, dates)
     }
 
     private suspend fun resolveCollectionSourceRefs(
@@ -2581,6 +2609,8 @@ class MediaRepository @Inject constructor(
                 CollectionSourceKind.TMDB_KEYWORD -> loadCollectionKeywordRefs(source, limit)
                 CollectionSourceKind.TMDB_WATCH_PROVIDER -> loadCollectionWatchProviderRefs(source, limit)
                 CollectionSourceKind.CURATED_IDS -> loadCollectionCuratedRefs(source, limit)
+                CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE -> MarvelWatchlistTimeline.entries
+                    .map { it.mediaType to it.tmdbId }.distinct().take(limit)
                 CollectionSourceKind.MDBLIST_PUBLIC -> loadCollectionMdblistPublicRefs(source, limit)
                 CollectionSourceKind.VODWISHARR_STUDIO,
                 CollectionSourceKind.VODWISHARR_NETWORK -> loadVodwisharrCompanyRefs(source, limit)

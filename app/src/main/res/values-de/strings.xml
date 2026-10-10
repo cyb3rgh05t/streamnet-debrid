@@ -1627,4 +1627,24 @@
     <string name="tracking_update_simkl_connect">Verbinde Simkl, um dies zu aktivieren.</string>
     <string name="tracking_data_routing">DATENQUELLEN</string>
     <string name="tracking_mode_automatic">Cloud</string>
+    <string name="marvel_timeline_metadata_unavailable">Metadaten nicht verfügbar · Details zum erneuten Laden öffnen</string>
+    <string name="marvel_timeline_movie_label">Film</string>
+    <string name="marvel_timeline_episodes_label">Folgen</string>
+    <string-array name="marvel_timeline_sections">
+        <item>Vermächtnis: WKII &amp; die 1940er</item>
+        <item>Vermächtnis: Die Fox-X-Men-Saga</item>
+        <item>Vermächtnis: 1990er</item>
+        <item>Vermächtnis: 2000er</item>
+        <item>Vermächtnis: Alternative Universen</item>
+        <item>Phase 1 — Die Avengers-Initiative (2008–2012)</item>
+        <item>Phase 2 — HYDRA &amp; die Infinity-Steine (2012–2015)</item>
+        <item>Phase 3A — Street-Level-Helden (2015–2016)</item>
+        <item>Phase 3B — Civil War &amp; Fallout (2016–2018)</item>
+        <item>Phase 3C — Ragnarök &amp; der Infinity War (2018)</item>
+        <item>Vermächtnis: Zukunft (2029)</item>
+        <item>Phase 4 — Der Blip &amp; Neuanfänge (2023)</item>
+        <item>Phase 4 — Das Multiversum öffnet sich (2024–2025)</item>
+        <item>Phase 5 — Der Multiversum-Krieg (2025–2026)</item>
+        <item>Phase 6 — Doomsday (2026)</item>
+    </string-array>
 </resources>

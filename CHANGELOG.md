@@ -2,7 +2,25 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.061] - 2026-10-10
+
+- Android: Marvel-Timeline-Unterrubriken verwenden die aktive Akzentfarbe. Fehlgeschlagene HTTP-/Netzwerk-Metadatenabfragen einzelner Einträge blockieren nicht mehr die ganze Seite: Die Karte bleibt mit exaktem Label, echtem Detail-Ziel und lokalisiertem Fehlerhinweis erhalten; spätere Phasen können weiter geladen werden. Fehlgeschlagene Metadaten werden nicht als erfolgreich geladen gecacht.
+
+- Android: Marvel-Timeline-Unterrubriken verwenden deutsche bzw. englische Originaltexte der Website entsprechend der App-Sprache. Auch die Kartenbegriffe Film/Movie und Folgen/Episodes sind lokalisiert; Titel, Reihenfolge und Navigationsziele bleiben erhalten.
+
+- Android: Die Marvel-Timeline zeigt zusätzlich alle 15 deutschen Unterrubriken der Website als thematisierte, vollbreite Abschnittsüberschriften. Die 168 Karten bleiben in derselben Reihenfolge; Pagination, sichtbare Karten und Fokuswiederherstellung berücksichtigen die zusätzlichen Überschriften. Andere Sammlungen bleiben unverändert.
+
+- Android: Die Marvel-Timeline verwendet den geprüften Abruf der Story-Reihenfolge von marvelwatchlist.com/de/ vom 10.10.2026 mit 168 getrennten Karten und den Labels der Prüfliste, einschließlich Typ, Staffeln und Episodenblöcken. Abspannszenen führen zu den zugehörigen Film-/Seriendetails, nicht zu erfundenen eigenständigen Quellen. Diese Timeline wird auch im IPTV-only-Modus vollständig angezeigt; Quellenverfügbarkeit wird erst in den Details geprüft. Filme/Serien-Reiter und andere Timelines bleiben unverändert. Der Stand ist ein gebündelter Snapshot, kein Live-Scraping.
+
+- Android: Nur die Franchise-Reiter Filme und Serien werden nach Veröffentlichungsdatum aufsteigend sortiert (älteste zuerst), bei Serien nach Erstausstrahlung. Die Sortierung erfolgt vor der Seiteneinteilung; fehlende Datumsangaben stehen am Ende. Timeline und andere Sammlungen behalten ihre bisherige Reihenfolge.
+- Android: Die Harry-Potter-Franchise enthält zusätzlich die neue Serie über die feste TMDB-Referenz `tv:224377`. Die bisherigen Filmquellen bleiben erhalten; die Serienkarte verwendet reguläre TMDB-Metadaten und setzt keine verfügbaren Abspielquellen voraus.
+- Android-Version `2.5.061` / Code `462`.
+
 ## [2.5.060] - 2026-10-10
+
+- Android: Nur die Franchise-Reiter Filme und Serien werden nach Veröffentlichungsdatum aufsteigend sortiert (älteste zuerst), bei Serien nach Erstausstrahlung. Die Sortierung erfolgt vor der Seiteneinteilung; fehlende Datumsangaben stehen am Ende. Timeline und andere Sammlungen behalten ihre bisherige Reihenfolge.
+
+- Android: Die Harry-Potter-Franchise enthält zusätzlich die neue Serie über die feste TMDB-Referenz `tv:224377`. Die bisherigen Filmquellen bleiben erhalten; die Serienkarte verwendet reguläre TMDB-Metadaten und setzt keine verfügbaren Abspielquellen voraus.
 
 - Android TV: Beim Verlassen von Home erscheint eine Bestätigung zum Schließen der App. Das Popup verwendet Theme-Oberflächen, ein dezentes Schließen-Symbol und kompakte, gleich große abgerundete Buttons mit zentrierter Beschriftung und Akzentrahmen statt farbiger Fokusfüllung oder Zoom. „Abbrechen“ ist vorfokussiert und Zurück verwirft die Bestätigung.
 - Android TV: In der gesamten TVUI-Navigation (auch Home, Mediathek, Suche, Details und Einstellungen) wird „Downloads“ nur angezeigt, solange die Download-Liste mindestens einen Eintrag enthält. Die Navigation aktualisiert sich live beim Hinzufügen oder Entfernen von Downloads; der fokussierte Navigationseintrag bleibt beim Ein-/Ausblenden erhalten. Die mobile Navigation bleibt unverändert.

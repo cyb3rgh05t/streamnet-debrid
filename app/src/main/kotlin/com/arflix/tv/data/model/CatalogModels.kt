@@ -52,6 +52,8 @@ enum class CollectionSourceKind {
     // captures the correct ordering — e.g. Star Wars (timeline order spans
     // movies and TV shows) or MCU release order blending Disney+ series.
     CURATED_IDS,
+    // Snapshot with separate cards for seasons, episode blocks and credits.
+    MARVEL_WATCHLIST_TIMELINE,
     // Public mdblist list JSON (`mdblist.com/lists/{user}/{slug}/json`). Used
     // to complete curated franchise rows with community-maintained extras
     // (upcoming titles, spin-offs) without requiring the user to have any

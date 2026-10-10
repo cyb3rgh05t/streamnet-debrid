@@ -1702,4 +1702,24 @@
     <string name="tracking_data_routing">Data routing</string>
     <string name="tracking_mode_automatic">Cloud</string>
 
+    <string name="marvel_timeline_metadata_unavailable">Metadata unavailable · Open details to retry</string>
+    <string name="marvel_timeline_movie_label">Movie</string>
+    <string name="marvel_timeline_episodes_label">Episodes</string>
+    <string-array name="marvel_timeline_sections">
+        <item>Legacy: WWII &amp; The 1940s</item>
+        <item>Legacy: The Fox X-Men Saga</item>
+        <item>Legacy: 1990s</item>
+        <item>Legacy: 2000s</item>
+        <item>Legacy: Alternate Universes</item>
+        <item>Phase 1 — The Avengers Initiative (2008–2012)</item>
+        <item>Phase 2 — HYDRA &amp; The Infinity Stones (2012–2015)</item>
+        <item>Phase 3A — Street Level Heroes (2015–2016)</item>
+        <item>Phase 3B — Civil War &amp; Fallout (2016–2018)</item>
+        <item>Phase 3C — Ragnarok &amp; The Infinity War (2018)</item>
+        <item>Legacy: Future (2029)</item>
+        <item>Phase 4 — The Blip &amp; New Beginnings (2023)</item>
+        <item>Phase 4 — Multiverse Opens (2024–2025)</item>
+        <item>Phase 5 — The Multiverse War (2025–2026)</item>
+        <item>Phase 6 — Doomsday (2026)</item>
+    </string-array>
 </resources>
