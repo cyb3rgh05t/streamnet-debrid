@@ -109,6 +109,10 @@
     <string name="back">Back</string>
     <string name="cancel">Cancel</string>
     <string name="exit_app_title">Close app?</string>
+    <string name="home_overview_mode">Home hero description</string>
+    <string name="home_overview_mode_desc">TV hero: slowly scroll vertically or show a four-line preview. Full text is available in details.</string>
+    <string name="home_overview_auto">Auto Scroll</string>
+    <string name="home_overview_ellipsis">Ellipsis</string>
     <string name="exit_app_message">Do you want to close StreamNet?</string>
     <string name="exit_app_confirm">Close app</string>
     <string name="confirm">Confirm</string>
@@ -401,8 +405,10 @@
     <string name="settings_label_title">Title</string>
     <string name="settings_add_quality_filter">Add Quality Filter</string>
     <string name="settings_edit_quality_filter">Edit Quality Filter</string>
-    <string name="settings_plex_auth_touch_instruction">Open the auth page, sign in, then return to StreamNet. This screen will finish automatically.</string>
-    <string name="settings_plex_auth_tv_instruction">Scan the QR code or open the auth page and confirm this code</string>
+    <string name="settings_plex_auth_touch_instruction">Open the auth page and sign in. The code is prefilled; confirm it. If you open plex.tv/link manually, enter the displayed code. Then return to StreamNet.</string>
+    <string name="settings_plex_auth_tv_instruction">Scan the QR code, sign in and confirm the prefilled code. Alternatively, open plex.tv/link and enter the displayed code. StreamNet then connects to your server.</string>
+    <string name="settings_home_server_code_help">Plex\nLeave the server URL empty to discover a server from your Plex account. Confirm the short code at plex.tv/link. If discovery fails, enter a Plex server URL reachable from this device. Account approval alone does not make a local server reachable; use the same network, a suitable VPN or configured remote access.\n\nJellyfin\nEnter your Jellyfin server URL. Quick Connect must be enabled on the server. Approve the displayed code in an already signed-in Jellyfin client under Quick Connect.\n\nEmby\nThis code dialog does not support Emby. Use “Add server” with your server URL and username/password or API token instead.\n\nThe server name is optional and only labels your sources.</string>
+    <string name="homeserver_plex_unreachable_after_auth">Plex account authorized, but the server could not be reached. Check the network/VPN or remote access. Alternatively, enter a server URL reachable from this device in the code dialog.</string>
     <string name="settings_jellyfin_auth_instruction">Open your Jellyfin app or web UI, go to Quick Connect, enter this code, then return to StreamNet.</string>
     <string name="settings_quality_filters_subtitle">Device-local filters. Matching streams are excluded.</string>
     <string name="settings_no_filters_yet">No filters configured yet.</string>

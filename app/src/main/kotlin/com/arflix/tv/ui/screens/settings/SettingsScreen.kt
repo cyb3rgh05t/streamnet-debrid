@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +76,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Subtitles
+import androidx.compose.material.icons.filled.Subject
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.VolumeUp
@@ -160,6 +162,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
+import com.arflix.tv.ui.skin.ArvioSkin
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.Key
@@ -170,6 +173,8 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
@@ -271,13 +276,26 @@ private val tvGeneralSectionIds = setOf(
     "network"
 )
 
+internal fun settingsSectionOrder(includePlugins: Boolean): List<String> = buildList {
+    addAll(listOf(
+        "appearance", "profiles", "cloud_sync", "accounts", "playback", "language",
+        "subtitles", "ai_subtitles", "iptv", "stremio", "offline_downloads",
+        "catalogs", "home_server"
+    ))
+    if (includePlugins) add("plugins")
+    addAll(listOf("network", "info_updates"))
+}
+
+internal fun settingsAddonIndex(rowIndex: Int, addonCount: Int): Int? =
+    (rowIndex - 2).takeIf { it in 0 until addonCount }
+
 private fun tvGeneralRowsForSection(section: String): List<Int> {
     return when (section) {
         "language" -> listOf(0, 3, 1, 2)
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(18, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 24, 41, 36)
+        "appearance" -> listOf(18, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -401,26 +419,7 @@ fun SettingsScreen(
     }
 
     val sections = remember {
-        buildList {
-            add("profiles")
-            add("cloud_sync")
-            add("accounts")
-            add("playback")
-            add("language")
-            add("subtitles")
-            add("ai_subtitles")
-            add("iptv")
-            add("stremio")
-            add("offline_downloads")
-            add("catalogs")
-            add("home_server")
-            add("appearance")
-            if (BuildConfig.FEATURE_PLUGINS_ENABLED) {
-                add("plugins")
-            }
-            add("network")
-            add("info_updates")
-        }
+        settingsSectionOrder(BuildConfig.FEATURE_PLUGINS_ENABLED)
     }
 
     val initialSectionIdx = remember(initialSection, sections) {
@@ -856,7 +855,8 @@ fun SettingsScreen(
 
                 if (event.type == KeyEventType.KeyDown) {
                     val currentSection = sections.getOrNull(sectionIndex).orEmpty()
-                    val focusedStremioAddon = stremioAddons.getOrNull(contentFocusIndex)
+                    val focusedAddonIndex = settingsAddonIndex(contentFocusIndex, stremioAddons.size)
+                    val focusedStremioAddon = focusedAddonIndex?.let { stremioAddons[it] }
                     val focusedStremioAddonCanDelete = focusedStremioAddon?.let { addon ->
                         !(addon.id == "opensubtitles" && addon.type == com.arflix.tv.data.model.AddonType.SUBTITLE)
                     } ?: false
@@ -907,7 +907,7 @@ fun SettingsScreen(
                         Key.DirectionLeft -> {
                             when (activeZone) {
                                 Zone.CONTENT -> {
-                                    if (currentSection == "stremio" && contentFocusIndex < stremioAddons.size && addonActionIndex > 0) {
+                                    if (currentSection == "stremio" && focusedAddonIndex != null && addonActionIndex > 0) {
                                         addonActionIndex--
                                     } else if (currentSection == "iptv" &&
                                         iptvActionIndex > 0 &&
@@ -956,7 +956,7 @@ fun SettingsScreen(
                                 }
                                 Zone.CONTENT -> {
                                     if (currentSection == "stremio" &&
-                                        contentFocusIndex in 0 until stremioAddons.size &&
+                                        focusedAddonIndex != null &&
                                         addonActionIndex < focusedStremioAddonMaxAction
                                     ) {
                                         addonActionIndex++
@@ -1096,6 +1096,7 @@ fun SettingsScreen(
                                                 22 -> viewModel.cycleClockFormat()
                                                 23 -> viewModel.setShowBudget(!uiState.showBudget)
                                                 46 -> viewModel.setShowCertification(!uiState.showCertification)
+                                                52 -> viewModel.setAutoScrollHomeOverview(!uiState.autoScrollHomeOverview)
                                                 41 -> viewModel.setShowEpisodeRatings(!uiState.showEpisodeRatings)
                                                  36 -> viewModel.setSmoothScrolling(!uiState.smoothScrolling)
                                                 24 -> viewModel.setSpoilerBlurEnabled(!uiState.spoilerBlurEnabled)
@@ -1314,8 +1315,8 @@ fun SettingsScreen(
                                         }
                                         "stremio" -> {
                                             when {
-                                                contentFocusIndex in 0 until stremioAddons.size -> {
-                                                    val addon = stremioAddons[contentFocusIndex]
+                                                focusedAddonIndex != null -> {
+                                                    val addon = stremioAddons[focusedAddonIndex]
                                                     val canDelete = !(addon.id == "opensubtitles" && addon.type == com.arflix.tv.data.model.AddonType.SUBTITLE)
                                                     when (addonActionIndex) {
                                                         0 -> viewModel.toggleAddon(addon.id)
@@ -1324,14 +1325,14 @@ fun SettingsScreen(
                                                         3 -> if (canDelete) {
                                                             viewModel.removeAddon(addon.id)
                                                             addonActionIndex = 0
-                                                            if (contentFocusIndex >= stremioAddons.size && contentFocusIndex > 0) {
+                                                            if (contentFocusIndex >= stremioAddons.size + 2 && contentFocusIndex > 1) {
                                                                 contentFocusIndex--
                                                             }
                                                         }
                                                         else -> viewModel.toggleAddon(addon.id)
                                                     }
                                                 }
-                                                contentFocusIndex == stremioAddons.size -> {
+                                                contentFocusIndex == 0 -> {
                                                     viewModel.refreshAddons()
                                                 }
                                                 else -> {
@@ -1673,6 +1674,7 @@ fun SettingsScreen(
                             clockFormat = uiState.clockFormat,
                             showBudget = uiState.showBudget,
                             showCertification = uiState.showCertification,
+                            autoScrollHomeOverview = uiState.autoScrollHomeOverview,
                             volumeBoostDb = uiState.volumeBoostDb,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
                             onSubtitleClick = openSubtitlePicker,
@@ -1712,6 +1714,7 @@ fun SettingsScreen(
                             onClockFormatClick = { viewModel.cycleClockFormat() },
                             onShowBudgetToggle = { viewModel.setShowBudget(it) },
                             onShowCertificationToggle = { viewModel.setShowCertification(it) },
+                            onHomeOverviewModeClick = { viewModel.setAutoScrollHomeOverview(!uiState.autoScrollHomeOverview) },
                             showEpisodeRatings = uiState.showEpisodeRatings,
                             onShowEpisodeRatingsToggle = { viewModel.setShowEpisodeRatings(it) },
                             smoothScrolling = uiState.smoothScrolling,
@@ -2149,6 +2152,7 @@ fun SettingsScreen(
             InputModal(
                 title = stringResource(R.string.settings_connect_with_code),
                 supportingText = stringResource(R.string.settings_home_server_https_note),
+                helpText = stringResource(R.string.settings_home_server_code_help),
                 fields = listOf(
                     InputField(
                         label = stringResource(R.string.settings_label_server_name),
@@ -2678,6 +2682,7 @@ fun SettingsScreen(
             TraktActivationModal(
                 verificationUrl = traktCode.verificationUrl,
                 userCode = traktCode.userCode,
+                showProgress = uiState.isTraktPolling,
                 onDismiss = { viewModel.cancelTraktAuth() }
             )
         }
@@ -2689,6 +2694,7 @@ fun SettingsScreen(
                 instruction = stringResource(R.string.settings_simkl_auth_instruction, verificationUrl),
                 verificationUrl = verificationUrl,
                 userCode = simklCode,
+                showProgress = uiState.isSimklPolling,
                 onDismiss = { viewModel.disconnectSimkl() }
             )
         }
@@ -3918,9 +3924,10 @@ private fun TraktActivationModal(
     onOpenUrl: (() -> Unit)? = null
 ) {
     val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val dialogColors = ArvioSkin.colors
+    val dialogShape = RoundedCornerShape(ArvioSkin.radius.lg)
     val resolvedTitle = title ?: stringResource(R.string.settings_connect_trakt)
     val resolvedInstruction = instruction ?: stringResource(R.string.settings_trakt_instruction, verificationUrl)
-    val accentContentColor = contrastingContentColor(accentColor)
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val qrContainerSize = if (isMobile) 0.dp else 172.dp
@@ -3943,11 +3950,17 @@ private fun TraktActivationModal(
             Column(
                 modifier = Modifier
                     .then(
-                        if (isMobile) Modifier.fillMaxWidth(0.92f).widthIn(max = 520.dp)
-                        else Modifier.width(560.dp)
+                        if (isMobile) Modifier.widthIn(max = 520.dp).fillMaxWidth(0.92f)
+                        else Modifier.widthIn(max = 560.dp).fillMaxWidth(0.92f)
                     )
-                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
+                    .clip(dialogShape)
+                    .background(dialogColors.surfaceRaised)
+                    .background(Brush.linearGradient(listOf(
+                        accentColor.copy(alpha = 0.07f),
+                        dialogColors.surfaceRaised,
+                        dialogColors.surfaceRaised
+                    )))
+                    .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
                     .padding(if (isMobile) 20.dp else 28.dp)
                     .focusRequester(focusRequester)
                     .focusable()
@@ -3966,12 +3979,26 @@ private fun TraktActivationModal(
                         }
                     }
             ) {
-                Text(
-                    text = resolvedTitle,
-                    style = ArflixTypography.sectionTitle,
-                    color = TextPrimary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(52.dp)
+                            .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, tint = accentColor)
+                    }
+                    Text(
+                        text = resolvedTitle,
+                        style = ArflixTypography.sectionTitle,
+                        color = TextPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(18.dp))
                 Text(
                     text = resolvedInstruction,
                     style = ArflixTypography.body,
@@ -4002,15 +4029,21 @@ private fun TraktActivationModal(
                         }
                     }
 
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(14.dp)
+                    ) {
                         Text(
                             text = userCode,
-                            style = ArflixTypography.heroTitle.copy(fontSize = 34.sp),
+                            style = ArflixTypography.heroTitle.copy(fontSize = 32.sp, letterSpacing = 2.sp),
                             color = accentColor,
                             softWrap = true,
-                            textAlign = TextAlign.Center
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                                .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                                .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                .padding(horizontal = 12.dp, vertical = 14.dp)
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -4033,7 +4066,9 @@ private fun TraktActivationModal(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(accentColor, RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(accentColor.copy(alpha = 0.12f))
+                            .border(1.dp, accentColor.copy(alpha = 0.32f), RoundedCornerShape(10.dp))
                             .clickable { onOpenUrl() }
                             .padding(vertical = 13.dp, horizontal = 18.dp),
                         contentAlignment = Alignment.Center
@@ -4041,7 +4076,7 @@ private fun TraktActivationModal(
                         Text(
                             text = stringResource(R.string.settings_open_auth_page),
                             style = ArflixTypography.button,
-                            color = accentContentColor
+                            color = accentColor
                         )
                     }
 
@@ -4050,8 +4085,8 @@ private fun TraktActivationModal(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(10.dp))
-                            .border(1.dp, Color.White.copy(alpha = 0.14f), RoundedCornerShape(10.dp))
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(10.dp))
                             .clickable { clipboardManager.setText(androidx.compose.ui.text.AnnotatedString(userCode)) }
                             .padding(vertical = 12.dp, horizontal = 18.dp),
                         contentAlignment = Alignment.Center
@@ -4068,8 +4103,15 @@ private fun TraktActivationModal(
 
                 Box(
                     modifier = Modifier
+                        .align(Alignment.End)
+                        .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (isMobile && onOpenUrl != null) Color.White.copy(alpha = 0.08f) else accentColor,
+                            if (isMobile) Color.Transparent else Color.White.copy(alpha = 0.15f),
+                            RoundedCornerShape(10.dp)
+                        )
+                        .border(
+                            1.dp,
+                            Color.White.copy(alpha = if (isMobile) 0.15f else 0.6f),
                             RoundedCornerShape(10.dp)
                         )
                         .then(if (isMobile && onOpenUrl != null) Modifier.fillMaxWidth() else Modifier)
@@ -4080,7 +4122,7 @@ private fun TraktActivationModal(
                     Text(
                         text = stringResource(R.string.cancel),
                         style = ArflixTypography.button,
-                        color = if (isMobile && onOpenUrl != null) TextPrimary else accentContentColor
+                        color = TextPrimary
                     )
                 }
             }
@@ -5394,6 +5436,15 @@ private fun MobileSettingsSubPage(
                         onClick = { viewModel.setShowCertification(!uiState.showCertification) }
                     )
                     MobileSettingsRow(
+                        icon = Icons.Default.Subject,
+                        title = stringResource(R.string.home_overview_mode),
+                        subtitle = stringResource(R.string.home_overview_mode_desc),
+                        value = stringResource(if (uiState.autoScrollHomeOverview) R.string.home_overview_auto else R.string.home_overview_ellipsis),
+                        isFocused = false,
+                        showDivider = true,
+                        onClick = { viewModel.setAutoScrollHomeOverview(!uiState.autoScrollHomeOverview) }
+                    )
+                    MobileSettingsRow(
                         icon = Icons.Default.Star,
                         title = stringResource(R.string.show_episode_ratings),
                         value = if (uiState.showEpisodeRatings) "On" else "Off",
@@ -5929,7 +5980,7 @@ private fun UpdateActionButton(
 @Composable
 private fun tvSettingsSidebarGroup(section: String): String {
     return when (section) {
-        "accounts", "cloud_sync", "profiles" -> stringResource(R.string.settings_group_profile)
+        "appearance", "accounts", "cloud_sync", "profiles" -> stringResource(R.string.settings_group_profile)
         "playback", "language", "subtitles", "ai_subtitles" -> stringResource(R.string.playback)
         "iptv", "stremio", "offline_downloads", "catalogs", "home_server" -> stringResource(R.string.sources)
         else -> stringResource(R.string.settings_group_system)
@@ -6522,6 +6573,7 @@ private fun TvGeneralSettingsRows(
     clockFormat: String = "24h",
     showBudget: Boolean = true,
     showCertification: Boolean = true,
+    autoScrollHomeOverview: Boolean = true,
     showEpisodeRatings: Boolean = true,
     smoothScrolling: Boolean = true,
     spoilerBlurEnabled: Boolean = false,
@@ -6551,6 +6603,7 @@ private fun TvGeneralSettingsRows(
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
     onShowCertificationToggle: (Boolean) -> Unit = {},
+    onHomeOverviewModeClick: () -> Unit = {},
     onShowEpisodeRatingsToggle: (Boolean) -> Unit = {},
     onSmoothScrollingToggle: (Boolean) -> Unit = {},
     onSpoilerBlurToggle: (Boolean) -> Unit = {},
@@ -6702,6 +6755,7 @@ private fun TvGeneralSettingsRows(
                 22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
                 23 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
                 46 -> SettingsToggleRow(Icons.Default.Security, stringResource(R.string.show_certification), stringResource(R.string.show_certification_desc), showCertification, focusedIndex == localIndex, onShowCertificationToggle, Modifier.settingsFocusSlot(localIndex))
+                52 -> SettingsRow(Icons.Default.Subject, stringResource(R.string.home_overview_mode), stringResource(R.string.home_overview_mode_desc), stringResource(if (autoScrollHomeOverview) R.string.home_overview_auto else R.string.home_overview_ellipsis), focusedIndex == localIndex, onHomeOverviewModeClick, Modifier.settingsFocusSlot(localIndex))
                 41 -> SettingsToggleRow(Icons.Default.Star, stringResource(R.string.show_episode_ratings), stringResource(R.string.show_episode_ratings_desc), showEpisodeRatings, focusedIndex == localIndex, onShowEpisodeRatingsToggle, Modifier.settingsFocusSlot(localIndex))
                 36 -> SettingsToggleRow(Icons.Default.Widgets, stringResource(R.string.smooth_scrolling), stringResource(R.string.smooth_scrolling_desc), smoothScrolling, focusedIndex == localIndex, onSmoothScrollingToggle, Modifier.settingsFocusSlot(localIndex))
                 24 -> SettingsToggleRow(Icons.Default.VisibilityOff, stringResource(R.string.spoiler_blur), stringResource(R.string.spoiler_blur_desc), spoilerBlurEnabled, focusedIndex == localIndex, onSpoilerBlurToggle, Modifier.settingsFocusSlot(localIndex))
@@ -8611,6 +8665,8 @@ private fun CatalogDiscoveryModal(
     val focusManager = LocalFocusManager.current
     val view = LocalView.current
     val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val dialogColors = ArvioSkin.colors
+    val dialogShape = RoundedCornerShape(ArvioSkin.radius.lg)
     var editingInput by remember { mutableStateOf<CatalogDiscoveryInputTarget?>(null) }
     var optimisticAddedUrls by remember { mutableStateOf(emptySet<String>()) }
     val normalizedAddedCatalogUrls = remember(addedCatalogUrls) {
@@ -8652,18 +8708,42 @@ private fun CatalogDiscoveryModal(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-                    .padding(if (isCompact) 10.dp else 18.dp)
+                    .clip(dialogShape)
+                    .background(dialogColors.surfaceRaised)
+                    .background(Brush.linearGradient(listOf(
+                        accentColor.copy(alpha = 0.07f),
+                        dialogColors.surfaceRaised,
+                        dialogColors.surfaceRaised
+                    )))
+                    .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
+                    .padding(if (isCompact) 16.dp else 24.dp)
             ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier.padding(bottom = 18.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(44.dp)
+                            .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(14.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Search, contentDescription = null, tint = accentColor)
+                    }
+                    Text(
+                        text = stringResource(R.string.settings_search_lists),
+                        style = ArflixTypography.sectionTitle,
+                        color = TextPrimary
+                    )
+                }
                 if (isCompact) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(BackgroundElevated)
-                            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(dialogColors.surface.copy(alpha = 0.45f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                             .padding(10.dp)
                     ) {
                         CatalogDiscoveryInputButton(
@@ -8708,9 +8788,9 @@ private fun CatalogDiscoveryModal(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(BackgroundElevated)
-                            .border(1.dp, accentColor.copy(alpha = 0.28f), RoundedCornerShape(6.dp))
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(dialogColors.surface.copy(alpha = 0.45f))
+                            .border(1.dp, Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
                             .padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -8798,9 +8878,9 @@ private fun CatalogDiscoveryModal(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(BackgroundElevated)
-                        .border(1.dp, Color.White.copy(alpha = 0.10f), RoundedCornerShape(6.dp))
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(dialogColors.surface.copy(alpha = 0.35f))
+                        .border(1.dp, Color.White.copy(alpha = 0.06f), RoundedCornerShape(14.dp))
                         .padding(if (isCompact) 8.dp else 12.dp)
                 ) {
                     when {
@@ -8903,12 +8983,12 @@ private fun CatalogDiscoveryInputButton(
     val inputFocusColor = resolveAccentColor(fallback = AccentYellow)
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(if (isFocused) inputFocusColor.copy(alpha = 0.16f) else appBackgroundDark())
+            .clip(RoundedCornerShape(10.dp))
+            .background(ArvioSkin.colors.surface.copy(alpha = 0.65f))
             .border(
-                width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) inputFocusColor else Color.White.copy(alpha = 0.55f),
-                shape = RoundedCornerShape(6.dp)
+                width = if (isFocused) 1.5.dp else 1.dp,
+                color = if (isFocused) inputFocusColor else Color.White.copy(alpha = 0.16f),
+                shape = RoundedCornerShape(10.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(onClick = onClick)
@@ -9376,24 +9456,27 @@ private fun DiscoveryActionButton(
     Box(
         modifier = modifier
             .widthIn(min = if (label.length <= 5) 112.dp else 132.dp)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(
                 when {
                     !enabled -> Color.Black.copy(alpha = 0.18f)
-                    isFocused -> accentColor
-                    highlighted -> accentColor.copy(alpha = 0.16f)
-                    else -> appBackgroundDark()
+                    isFocused && highlighted -> accentColor
+                    isFocused -> Color.White.copy(alpha = 0.15f)
+                    highlighted -> accentColor.copy(alpha = 0.12f)
+                    else -> Color.Transparent
                 },
-                RoundedCornerShape(6.dp)
+                RoundedCornerShape(10.dp)
             )
             .border(
-                width = if (isFocused) 2.dp else 1.dp,
+                width = 1.dp,
                 color = when {
                     !enabled -> Color.White.copy(alpha = 0.18f)
-                    isFocused || highlighted -> accentColor
-                    else -> Color.White.copy(alpha = 0.22f)
+                    isFocused && highlighted -> accentColor
+                    highlighted -> accentColor.copy(alpha = 0.32f)
+                    isFocused -> Color.White.copy(alpha = 0.6f)
+                    else -> Color.White.copy(alpha = 0.15f)
                 },
-                shape = RoundedCornerShape(6.dp)
+                shape = RoundedCornerShape(10.dp)
             )
             .onFocusChanged { isFocused = it.isFocused }
             .clickable(enabled = enabled, onClick = onClick)
@@ -9402,7 +9485,8 @@ private fun DiscoveryActionButton(
     ) {
         val contentColor = when {
             !enabled -> TextSecondary.copy(alpha = 0.72f)
-            isFocused -> Color.Black
+            isFocused && highlighted -> contrastingContentColor(accentColor)
+            highlighted -> accentColor
             else -> TextPrimary
         }
         Row(
@@ -9957,34 +10041,13 @@ private fun StremioAddonsSettings(
     } else {
         // TV UI
         Column {
-            Text(stringResource(R.string.settings_section_stremio_addons), style = ArflixTypography.caption.copy(fontSize = 12.sp, letterSpacing = 1.sp), color = TextSecondary, modifier = Modifier.padding(bottom = 10.dp))
-            if (addons.isEmpty()) {
-                Text(stringResource(R.string.settings_no_addons_installed), style = ArflixTypography.body, color = TextSecondary)
-            } else {
-                addons.forEachIndexed { index, addon ->
-                    val canDelete = !(addon.id == "opensubtitles" && addon.type == com.arflix.tv.data.model.AddonType.SUBTITLE)
-                    AddonRow(
-                        addon = addon,
-                        isFocused = focusedIndex == index,
-                        focusedAction = if (focusedIndex == index) focusedActionIndex else -1,
-                        canDelete = canDelete,
-                        onToggle = { onToggleAddon(addon.id) },
-                        onMoveUp = { onMoveAddonUp(addon.id) },
-                        onMoveDown = { onMoveAddonDown(addon.id) },
-                        onDelete = { onDeleteAddon(addon.id) },
-                        modifier = Modifier.settingsFocusSlot(index)
-                    )
-                    if (index < addons.size - 1) { Spacer(modifier = Modifier.height(12.dp)) }
-                }
-            }
-            Spacer(modifier = Modifier.height(24.dp))
             Row(
                 modifier = Modifier
-                    .settingsFocusSlot(addons.size)
+                    .settingsFocusSlot(0)
                     .fillMaxWidth()
                     .clickable(enabled = !isRefreshingAddons, onClick = onRefreshAddons)
-                    .background(if (focusedIndex == addons.size) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                    .border(width = if (focusedIndex == addons.size) 2.dp else 0.dp, color = if (focusedIndex == addons.size) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
+                    .background(if (focusedIndex == 0) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .border(width = if (focusedIndex == 0) 2.dp else 0.dp, color = if (focusedIndex == 0) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
@@ -10006,11 +10069,11 @@ private fun StremioAddonsSettings(
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier
-                    .settingsFocusSlot(addons.size + 1)
+                    .settingsFocusSlot(1)
                     .fillMaxWidth()
                     .clickable(onClick = onAddCustomAddon)
-                    .background(if (focusedIndex == addons.size + 1) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
-                    .border(width = if (focusedIndex == addons.size + 1) 2.dp else 0.dp, color = if (focusedIndex == addons.size + 1) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
+                    .background(if (focusedIndex == 1) Color.White.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                    .border(width = if (focusedIndex == 1) 2.dp else 0.dp, color = if (focusedIndex == 1) accentColor else Color.Transparent, shape = RoundedCornerShape(12.dp))
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.Center
@@ -10018,6 +10081,27 @@ private fun StremioAddonsSettings(
                 Icon(Icons.Default.Widgets, contentDescription = null, tint = accentColor, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(stringResource(R.string.add_addon), style = ArflixTypography.button, color = accentColor)
+            }
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(stringResource(R.string.settings_section_stremio_addons), style = ArflixTypography.caption.copy(fontSize = 12.sp, letterSpacing = 1.sp), color = TextSecondary, modifier = Modifier.padding(bottom = 10.dp))
+            if (addons.isEmpty()) {
+                Text(stringResource(R.string.settings_no_addons_installed), style = ArflixTypography.body, color = TextSecondary)
+            } else {
+                addons.forEachIndexed { index, addon ->
+                    val canDelete = !(addon.id == "opensubtitles" && addon.type == com.arflix.tv.data.model.AddonType.SUBTITLE)
+                    AddonRow(
+                        addon = addon,
+                        isFocused = focusedIndex == index + 2,
+                        focusedAction = if (focusedIndex == index + 2) focusedActionIndex else -1,
+                        canDelete = canDelete,
+                        onToggle = { onToggleAddon(addon.id) },
+                        onMoveUp = { onMoveAddonUp(addon.id) },
+                        onMoveDown = { onMoveAddonDown(addon.id) },
+                        onDelete = { onDeleteAddon(addon.id) },
+                        modifier = Modifier.settingsFocusSlot(index + 2)
+                    )
+                    if (index < addons.size - 1) Spacer(modifier = Modifier.height(12.dp))
+                }
             }
         }
     }
@@ -10759,6 +10843,9 @@ private fun MdbListConnectDialog(
 ) {
     var apiKey by remember { mutableStateOf("") }
     val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val dialogColors = ArvioSkin.colors
+    val dialogShape = RoundedCornerShape(ArvioSkin.radius.lg)
+    val accentContentColor = contrastingContentColor(accentColor)
     var focusedButton by remember { mutableIntStateOf(1) } // 0 cancel, 1 connect
     var inputFocused by remember { mutableStateOf(false) }
     val dialogFocusRequester = remember { FocusRequester() }
@@ -10777,11 +10864,17 @@ private fun MdbListConnectDialog(
         ModalScrim(onDismiss = onDismiss) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth(if (LocalDeviceType.current.isTouchDevice()) 0.92f else 1f)
                     .widthIn(max = 560.dp)
-                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
-                    .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 24.dp)
+                    .fillMaxWidth(0.92f)
+                    .clip(dialogShape)
+                    .background(dialogColors.surfaceRaised)
+                    .background(Brush.linearGradient(listOf(
+                        accentColor.copy(alpha = 0.07f),
+                        dialogColors.surfaceRaised,
+                        dialogColors.surfaceRaised
+                    )))
+                    .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
+                    .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 28.dp)
                     .focusRequester(dialogFocusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -10820,11 +10913,24 @@ private fun MdbListConnectDialog(
                         }
                     }
             ) {
-                Text(
-                    text = stringResource(R.string.mdblist_connect_title),
-                    style = ArflixTypography.sectionTitle,
-                    color = TextPrimary
-                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    Box(
+                        modifier = Modifier.size(52.dp)
+                            .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Link, contentDescription = null, tint = accentColor)
+                    }
+                    Text(
+                        text = stringResource(R.string.mdblist_connect_title),
+                        style = ArflixTypography.sectionTitle,
+                        color = TextPrimary
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -10833,6 +10939,7 @@ private fun MdbListConnectDialog(
                     onValueChange = { apiKey = it },
                     singleLine = true,
                     enabled = !connecting,
+                    shape = RoundedCornerShape(10.dp),
                     label = {
                         Text(
                             text = stringResource(R.string.mdblist_key_hint),
@@ -10842,8 +10949,8 @@ private fun MdbListConnectDialog(
                     colors = androidx.compose.material3.TextFieldDefaults.colors(
                         focusedTextColor = TextPrimary,
                         unfocusedTextColor = TextPrimary,
-                        focusedContainerColor = accentColor.copy(alpha = 0.12f),
-                        unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
+                        focusedContainerColor = dialogColors.surface,
+                        unfocusedContainerColor = dialogColors.surface.copy(alpha = 0.65f),
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         focusedLabelColor = accentColor,
@@ -10855,7 +10962,7 @@ private fun MdbListConnectDialog(
                         .focusRequester(inputFocusRequester)
                         .onFocusChanged { inputFocused = it.isFocused }
                         .border(
-                            width = if (inputFocused) 2.dp else 1.dp,
+                            width = if (inputFocused) 1.5.dp else 1.dp,
                             color = if (inputFocused) accentColor else Color.White.copy(alpha = 0.16f),
                             shape = RoundedCornerShape(10.dp)
                         )
@@ -10879,10 +10986,10 @@ private fun MdbListConnectDialog(
                         modifier = Modifier
                             .weight(1f)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(if (focusedButton == 0) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.08f))
+                            .background(if (focusedButton == 0 && !inputFocused) Color.White.copy(alpha = 0.15f) else Color.Transparent)
                             .border(
-                                width = if (focusedButton == 0) 2.dp else 1.dp,
-                                color = if (focusedButton == 0) accentColor else Color.White.copy(alpha = 0.14f),
+                                width = 1.dp,
+                                color = if (focusedButton == 0 && !inputFocused) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .clickable { onDismiss() }
@@ -10903,14 +11010,14 @@ private fun MdbListConnectDialog(
                             .clip(RoundedCornerShape(10.dp))
                             .background(
                                 if (canConnect) {
-                                    if (focusedButton == 1) accentColor else accentColor.copy(alpha = 0.62f)
+                                    if (focusedButton == 1 && !inputFocused) accentColor else accentColor.copy(alpha = 0.12f)
                                 } else {
                                     Color.White.copy(alpha = 0.08f)
                                 }
                             )
                             .border(
-                                width = if (focusedButton == 1) 2.dp else 1.dp,
-                                color = if (focusedButton == 1) accentColor.copy(alpha = 0.78f) else Color.White.copy(alpha = 0.14f),
+                                width = 1.dp,
+                                color = if (canConnect) accentColor.copy(alpha = if (focusedButton == 1 && !inputFocused) 1f else 0.32f) else Color.White.copy(alpha = 0.15f),
                                 shape = RoundedCornerShape(10.dp)
                             )
                             .clickable(enabled = canConnect) { onConnect(apiKey) }
@@ -10920,7 +11027,11 @@ private fun MdbListConnectDialog(
                         Text(
                             text = if (connecting) stringResource(R.string.syncing) else stringResource(R.string.connect),
                             style = ArflixTypography.button,
-                            color = if (canConnect) Color.Black else TextSecondary
+                            color = when {
+                                !canConnect -> TextSecondary
+                                focusedButton == 1 && !inputFocused -> accentContentColor
+                                else -> accentColor
+                            }
                         )
                     }
                 }
@@ -12150,12 +12261,15 @@ private fun InputModalLegacy(
 private fun InputModal(
     title: String,
     supportingText: String? = null,
+    helpText: String? = null,
     fields: List<InputField>,
     toggleFields: List<ToggleField> = emptyList(),
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    var focusedIndex by remember(title, fields.size, toggleFields.size) { mutableIntStateOf(0) }
+    var focusedIndex by remember(title, fields.size, toggleFields.size, helpText) {
+        mutableIntStateOf(if (helpText == null) 0 else -1)
+    }
     var lastFocusedFieldIndex by remember(title, fields.size) { mutableStateOf<Int?>(null) }
     val pasteIndex = fields.size + toggleFields.size
     val totalItems = pasteIndex + 3 // inputs + toggles + paste + cancel + confirm
@@ -12163,12 +12277,18 @@ private fun InputModal(
     val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
     val maxDialogHeight = (screenHeightDp * 0.88f).coerceAtMost(if (isTouchDevice) 620.dp else 660.dp)
     val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val modalColors = ArvioSkin.colors
+    val modalShape = RoundedCornerShape(ArvioSkin.radius.lg)
+    val fieldShape = RoundedCornerShape(10.dp)
+    val accentContentColor = contrastingContentColor(accentColor)
 
     val clipboardManager = LocalClipboardManager.current
     val context = LocalContext.current
     val view = LocalView.current
     val modalFocusRequester = remember { FocusRequester() }
     val formScrollState = rememberScrollState()
+    val formScope = rememberCoroutineScope()
+    var helpHeightPx by remember(helpText) { mutableIntStateOf(0) }
 
     val editTextRefs = remember { MutableList<EditText?>(fields.size) { null } }
 
@@ -12229,11 +12349,15 @@ private fun InputModal(
     // Scroll so the focused field stays in view. Distribute proportionally across the actual
     // scroll range so the calculation works at any screen density and form height.
     LaunchedEffect(focusedIndex) {
-        if (focusedIndex in 0 until fields.size) {
+        if (focusedIndex == -1) {
+            formScrollState.animateScrollTo(0)
+        } else if (focusedIndex in 0 until fields.size) {
             lastFocusedFieldIndex = focusedIndex
             val maxScroll = formScrollState.maxValue
             if (maxScroll > 0 && fields.size > 1) {
-                val targetScroll = (focusedIndex.toFloat() / (fields.size - 1) * maxScroll).toInt()
+                val firstFieldScroll = helpHeightPx.coerceAtMost(maxScroll)
+                val targetScroll = firstFieldScroll +
+                    (focusedIndex.toFloat() / (fields.size - 1) * (maxScroll - firstFieldScroll)).toInt()
                 runCatching { formScrollState.animateScrollTo(targetScroll) }
             }
         } else if (focusedIndex >= fields.size) {
@@ -12267,14 +12391,22 @@ private fun InputModal(
                 modifier = Modifier
                     .then(
                         if (isTouchDevice) Modifier.fillMaxWidth(0.92f).widthIn(max = 640.dp)
-                        else Modifier.width(680.dp)
+                        else Modifier.widthIn(max = 580.dp).fillMaxWidth(0.88f)
                     )
                     .navigationBarsPadding()
                     .imePadding()
                     .heightIn(max = maxDialogHeight)
-                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = if (isTouchDevice) 16.dp else 24.dp, vertical = 20.dp)
+                    .clip(modalShape)
+                    .background(modalColors.surfaceRaised)
+                    .background(
+                        Brush.linearGradient(listOf(
+                            accentColor.copy(alpha = 0.07f),
+                            modalColors.surfaceRaised,
+                            modalColors.surfaceRaised
+                        ))
+                    )
+                    .border(1.dp, accentColor.copy(alpha = 0.22f), modalShape)
+                    .padding(horizontal = if (isTouchDevice) 20.dp else 28.dp, vertical = 24.dp)
                     .focusRequester(modalFocusRequester)
                     .focusable()
                     .onPreviewKeyEvent { event ->
@@ -12290,14 +12422,24 @@ private fun InputModal(
                                     true
                                 }
                                 Key.DirectionUp -> {
-                                    if (focusedIndex > 0) {
+                                    if (focusedIndex > if (helpText == null) 0 else -1) {
                                         if (focusedIndex < fields.size) hideKeyboardAll()
                                         focusedIndex--
                                     }
                                     true
                                 }
                                 Key.DirectionDown -> {
-                                    if (focusedIndex < totalItems - 1) {
+                                    if (focusedIndex == -1 &&
+                                        formScrollState.value < helpHeightPx.coerceAtMost(formScrollState.maxValue)
+                                    ) {
+                                        formScope.launch {
+                                            formScrollState.animateScrollTo(
+                                                (formScrollState.value + formScrollState.viewportSize / 2)
+                                                    .coerceAtMost(helpHeightPx)
+                                                    .coerceAtMost(formScrollState.maxValue)
+                                            )
+                                        }
+                                    } else if (focusedIndex < totalItems - 1) {
                                         if (focusedIndex < fields.size) hideKeyboardAll()
                                         focusedIndex++
                                     }
@@ -12313,6 +12455,10 @@ private fun InputModal(
                                 }
                                 Key.Enter, Key.DirectionCenter -> {
                                     when {
+                                        focusedIndex == -1 -> {
+                                            focusedIndex = 0
+                                            true
+                                        }
                                         focusedIndex in 0 until fields.size -> {
                                             showKeyboardFor(focusedIndex)
                                             true
@@ -12346,19 +12492,19 @@ private fun InputModal(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 18.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                    horizontalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
                     Box(
-                        modifier = Modifier.size(42.dp)
-                            .background(accentColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp))
-                            .border(1.dp, accentColor.copy(alpha = 0.45f), RoundedCornerShape(8.dp)),
+                        modifier = Modifier.size(52.dp)
+                            .background(accentColor.copy(alpha = 0.08f), RoundedCornerShape(16.dp))
+                            .border(1.dp, accentColor.copy(alpha = 0.2f), RoundedCornerShape(16.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(Icons.Default.Add, contentDescription = null, tint = accentColor, modifier = Modifier.size(22.dp))
                     }
-                    Column(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(text = title, style = ArflixTypography.sectionTitle, color = TextPrimary)
                         Text(
                             text = supportingText ?: stringResource(
@@ -12378,6 +12524,33 @@ private fun InputModal(
                         .weight(1f, fill = false)
                         .verticalScroll(formScrollState)
                 ) {
+                    if (helpText != null) {
+                        val styledHelp = remember(helpText, accentColor) {
+                            buildAnnotatedString {
+                                append(helpText)
+                                var sectionStart = 0
+                                helpText.split("\n\n").forEach { section ->
+                                    val headingLength = section.indexOf('\n')
+                                    if (headingLength > 0) {
+                                        addStyle(
+                                            SpanStyle(color = accentColor, fontWeight = FontWeight.SemiBold),
+                                            sectionStart,
+                                            sectionStart + headingLength
+                                        )
+                                    }
+                                    sectionStart += section.length + 2
+                                }
+                            }
+                        }
+                        Text(
+                            text = styledHelp,
+                            style = ArflixTypography.caption,
+                            color = if (focusedIndex == -1) TextPrimary else TextSecondary,
+                            modifier = Modifier.fillMaxWidth()
+                                .onSizeChanged { helpHeightPx = it.height }
+                                .padding(bottom = 20.dp)
+                        )
+                    }
                     fields.forEachIndexed { index, field ->
                         val isFocused = focusedIndex == index
                         val placeholder = field.placeholder.ifBlank {
@@ -12412,11 +12585,11 @@ private fun InputModal(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(BackgroundElevated, RoundedCornerShape(6.dp))
+                                    .background(modalColors.surface.copy(alpha = 0.65f), fieldShape)
                                     .border(
-                                        width = if (isFocused) 2.dp else 1.dp,
+                                        width = if (isFocused) 1.5.dp else 1.dp,
                                         color = if (isFocused) accentColor else Color.White.copy(alpha = 0.16f),
-                                        shape = RoundedCornerShape(6.dp)
+                                        shape = fieldShape
                                     )
                                     .padding(2.dp)
                             ) {
@@ -12545,12 +12718,12 @@ private fun InputModal(
                                 .fillMaxWidth()
                                 .background(
                                     if (isFocused) accentColor.copy(alpha = 0.14f) else BackgroundElevated,
-                                    RoundedCornerShape(6.dp)
+                                    fieldShape
                                 )
                                 .border(
                                     if (isFocused) 2.dp else 1.dp,
                                     if (isFocused) accentColor else Color.White.copy(alpha = 0.14f),
-                                    RoundedCornerShape(6.dp)
+                                    fieldShape
                                 )
                                 .clickable { field.onValueChange(!field.value) }
                                 .padding(horizontal = 14.dp, vertical = 11.dp),
@@ -12592,15 +12765,15 @@ private fun InputModal(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(6.dp))
+                        .clip(fieldShape)
                         .background(
-                            color = if (isPasteFocused) accentColor.copy(alpha = 0.18f) else BackgroundElevated,
-                            shape = RoundedCornerShape(6.dp)
+                            color = if (isPasteFocused) Color.White.copy(alpha = 0.15f) else Color.Transparent,
+                            shape = fieldShape
                         )
                         .border(
-                            width = if (isPasteFocused) 2.dp else 1.dp,
-                            color = if (isPasteFocused) accentColor else Color.White.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(6.dp)
+                            width = 1.dp,
+                            color = if (isPasteFocused) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
+                            shape = fieldShape
                         )
                         .clickable {
                             pasteClipboardIntoTarget()
@@ -12612,7 +12785,7 @@ private fun InputModal(
                     Icon(
                         imageVector = Icons.Default.ContentPaste,
                         contentDescription = stringResource(R.string.settings_cd_paste),
-                        tint = if (isPasteFocused) accentColor else TextSecondary,
+                        tint = if (isPasteFocused) TextPrimary else TextSecondary,
                         modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -12625,25 +12798,25 @@ private fun InputModal(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(if (isTouchDevice) 1f else 0.88f).align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     val isCancelFocused = focusedIndex == pasteIndex + 1
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(fieldShape)
                             .background(
-                                color = BackgroundElevated,
-                                shape = RoundedCornerShape(6.dp)
+                                color = if (isCancelFocused) Color.White.copy(alpha = 0.15f) else Color.Transparent,
+                                shape = fieldShape
                             )
                             .border(
-                                width = if (isCancelFocused) 2.dp else 1.dp,
-                                color = if (isCancelFocused) Color.White else Color.White.copy(alpha = 0.14f),
-                                shape = RoundedCornerShape(6.dp)
+                                width = 1.dp,
+                                color = if (isCancelFocused) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
+                                shape = fieldShape
                             )
                             .clickable {
                                 hideKeyboardAll()
@@ -12652,25 +12825,22 @@ private fun InputModal(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = null, tint = TextPrimary, modifier = Modifier.size(17.dp))
-                            Text(text = tr("Cancel"), style = ArflixTypography.button, color = TextPrimary)
-                        }
+                        Text(text = tr("Cancel"), style = ArflixTypography.button, color = if (isCancelFocused) TextPrimary else TextSecondary)
                     }
 
                     val isConfirmFocused = focusedIndex == pasteIndex + 2
                     Box(
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(6.dp))
+                            .clip(fieldShape)
                             .background(
-                                color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(6.dp)
+                                color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.12f),
+                                shape = fieldShape
                             )
                             .border(
-                                width = if (isConfirmFocused) 2.dp else 1.dp,
-                                color = accentColor,
-                                shape = RoundedCornerShape(6.dp)
+                                width = 1.dp,
+                                color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.32f),
+                                shape = fieldShape
                             )
                             .clickable {
                                 hideKeyboardAll()
@@ -12679,14 +12849,11 @@ private fun InputModal(
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Check, contentDescription = null, tint = if (isConfirmFocused) Color.Black else accentColor, modifier = Modifier.size(17.dp))
-                            Text(text = tr("Confirm"), style = ArflixTypography.button, color = if (isConfirmFocused) Color.Black else TextPrimary)
-                        }
+                        Text(text = tr("Confirm"), style = ArflixTypography.button, color = if (isConfirmFocused) accentContentColor else accentColor)
                     }
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = if (LocalDeviceType.current.isTouchDevice()) stringResource(R.string.settings_modal_footer_touch) else stringResource(R.string.settings_modal_footer_tv),
                     style = ArflixTypography.caption,

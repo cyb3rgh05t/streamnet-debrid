@@ -47,6 +47,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
 
+internal fun plexLinkUrl(code: String): String =
+    requireNotNull("https://plex.tv/link".toHttpUrlOrNull())
+        .newBuilder()
+        .addQueryParameter("token", code)
+        .build()
+        .toString()
+
 enum class HomeServerKind {
     UNKNOWN,
     JELLYFIN,
@@ -483,7 +490,7 @@ class HomeServerRepository @Inject constructor(
     private fun startPlexPinAuthInternal(): PlexPinAuthSession {
         val url = "https://plex.tv/api/v2/pins".toHttpUrlOrNull()
             ?.newBuilder()
-            ?.addQueryParameter("strong", "true")
+            ?.addQueryParameter("strong", "false")
             ?.addQueryParameter("X-Plex-Client-Identifier", deviceId())
             ?.addQueryParameter("X-Plex-Product", "StreamNet")
             ?.build()
@@ -506,7 +513,7 @@ class HomeServerRepository @Inject constructor(
             return PlexPinAuthSession(
                 id = id,
                 code = code,
-                verificationUrl = plexActivationUrl(code),
+                verificationUrl = plexLinkUrl(code),
                 expiresIn = json.int("expiresIn") ?: json.int("expires_in") ?: 600,
                 interval = (json.int("interval") ?: 5).coerceIn(2, 15),
                 serverKind = HomeServerKind.PLEX
@@ -1100,22 +1107,6 @@ class HomeServerRepository @Inject constructor(
         token?.takeIf { it.isNotBlank() }?.let { put("X-Plex-Token", it) }
     }
 
-    private fun plexActivationUrl(code: String): String {
-        val contextProductKey = "context[device][product]"
-        return "https://app.plex.tv/auth".toHttpUrlOrNull()
-            ?.newBuilder()
-            ?.fragment(
-                "!?" + listOf(
-                    "clientID=${deviceId()}",
-                    "code=$code",
-                    "$contextProductKey=StreamNet"
-                ).joinToString("&")
-            )
-            ?.build()
-            ?.toString()
-            ?: "https://app.plex.tv/auth"
-    }
-
     private fun requestBuilder(url: String, connection: HomeServerConnection? = null): Request.Builder {
         val builder = Request.Builder()
             .url(url)
@@ -1426,8 +1417,10 @@ class HomeServerRepository @Inject constructor(
             return shell
         }
 
-        val message = lastError?.message?.takeIf { it.isNotBlank() }
-        error(message ?: context.getString(R.string.homeserver_no_libraries))
+        throw IllegalStateException(
+            context.getString(R.string.homeserver_plex_unreachable_after_auth),
+            lastError
+        )
     }
 
     private fun refreshLibrariesInBackground(connection: HomeServerConnection) {

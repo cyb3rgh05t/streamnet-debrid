@@ -40,10 +40,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +74,7 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -192,6 +198,36 @@ fun SearchScreen(
     val textInputFocusRequester = remember { FocusRequester() }
     val filtersFocusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = LocalFocusManager.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isSearchResumed by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    val stopSearchEditing by rememberUpdatedState(newValue = {
+        isSearchEditing = false
+        isSearchInputFocused = false
+        keyboardController?.hide()
+        focusManager.clearFocus(force = true)
+    })
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> isSearchResumed = true
+                Lifecycle.Event.ON_PAUSE -> {
+                    isSearchResumed = false
+                    stopSearchEditing()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    fun openSearchResult(item: MediaItem) {
+        stopSearchEditing()
+        focusZone = FocusZone.RESULTS
+        onNavigateToDetails(item.mediaType, item.id)
+    }
     val actionGenre = remember { ALL_GENRES.firstOrNull { it.id == 28 } }
     val comedyGenre = remember { ALL_GENRES.firstOrNull { it.id == 35 } }
     val horrorGenre = remember { ALL_GENRES.firstOrNull { it.id == 27 } }
@@ -311,8 +347,8 @@ fun SearchScreen(
         if (!isTouchDevice) runCatching { searchFocusRequester.requestFocus() }
         suppressSelectUntilMs = SystemClock.elapsedRealtime() + 150L
     }
-    LaunchedEffect(isSearchEditing, searchEditRequestNonce) {
-        if (isSearchEditing) {
+    LaunchedEffect(isSearchEditing, searchEditRequestNonce, isSearchResumed) {
+        if (isSearchEditing && isSearchResumed) {
             runCatching { textInputFocusRequester.requestFocus() }
             keyboardController?.show()
         }
@@ -526,7 +562,7 @@ fun SearchScreen(
                                 // Use stable category lookup to avoid race condition with dynamic list updates
                                 val cats = activeCategories.filter { it.items.isNotEmpty() }
                                 val item = cats.getOrNull(currentRowIndex)?.items?.getOrNull(currentItemIndex)
-                                if (item != null) onNavigateToDetails(item.mediaType, item.id)
+                                if (item != null) openSearchResult(item)
                                 true
                             }
                         }
@@ -659,7 +695,7 @@ fun SearchScreen(
                         Icon(Icons.Default.AutoAwesome, null, tint = AccentGreen, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp))
                         Text(uiState.aiInterpretation ?: "", style = ArflixTypography.body.copy(fontSize = 14.sp, fontWeight = FontWeight.Medium), color = Color.White.copy(alpha = 0.85f))
                     }
-                    ContentGrid(items = uiState.aiResults, usePosterCards = aiUsePosterCards, isLoading = false, isTouchDevice = isTouchDevice, onItemClick = { onNavigateToDetails(it.mediaType, it.id) }, onLoadMore = {})
+                    ContentGrid(items = uiState.aiResults, usePosterCards = aiUsePosterCards, isLoading = false, isTouchDevice = isTouchDevice, onItemClick = { openSearchResult(it) }, onLoadMore = {})
                 }
 
                 uiState.query.isNotEmpty() && !uiState.isAiSearch && !hasSearchResults -> {
@@ -679,7 +715,7 @@ fun SearchScreen(
                         fastScrollThresholdMs = fastScrollThresholdMs,
                         isFocused = focusZone == FocusZone.RESULTS,
                         isTouchDevice = isTouchDevice,
-                        onItemClick = { onNavigateToDetails(it.mediaType, it.id) }
+                        onItemClick = { openSearchResult(it) }
                     )
                 }
             }

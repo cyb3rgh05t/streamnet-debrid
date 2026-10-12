@@ -10,6 +10,12 @@ import org.junit.Test
 
 class HomeServerMatcherTest {
     @Test
+    fun `plex link prepopulates the short code using the website token parameter`() {
+        assertEquals("https://plex.tv/link?token=ABCD", plexLinkUrl("ABCD"))
+        assertEquals("https://plex.tv/link?token=A%26B", plexLinkUrl("A&B"))
+    }
+
+    @Test
     fun `home server library types select the provider media filter`() {
         assertEquals(MediaType.MOVIE, homeServerCatalogMediaType("movie"))
         assertEquals(MediaType.MOVIE, homeServerCatalogMediaType("movies"))

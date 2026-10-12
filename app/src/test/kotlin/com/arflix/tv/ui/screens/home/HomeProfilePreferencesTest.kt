@@ -65,6 +65,7 @@ class HomeProfilePreferencesTest {
         assertThat(settings.trailerInCards).isTrue()
         assertThat(settings.showBudget).isTrue()
         assertThat(settings.showCertification).isTrue()
+        assertThat(settings.autoScrollHomeOverview).isTrue()
         assertThat(settings.clockFormat).isEqualTo("24h")
         assertThat(settings.smoothScrolling).isFalse()
         assertThat(settings.contentLanguage).isEqualTo("en-US")
@@ -80,6 +81,24 @@ class HomeProfilePreferencesTest {
         )
 
         assertThat(settings.contentLanguage).isEqualTo("ar-SA")
+    }
+
+    @Test
+    fun `description mode updates live and stays isolated per profile`() = runTest {
+        val profileId = MutableStateFlow("primary")
+        val preferences = MutableStateFlow<Preferences>(mutablePreferencesOf())
+        observeHomeProfilePreferences(profileId, preferences).test {
+            assertThat(awaitItem().autoScrollHomeOverview).isTrue()
+            preferences.value = mutablePreferencesOf(
+                booleanPreferencesKey("profile_primary_auto_scroll_home_overview") to false
+            )
+            assertThat(awaitItem().autoScrollHomeOverview).isFalse()
+            profileId.value = "secondary"
+            assertThat(awaitItem().autoScrollHomeOverview).isTrue()
+            profileId.value = "primary"
+            assertThat(awaitItem().autoScrollHomeOverview).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

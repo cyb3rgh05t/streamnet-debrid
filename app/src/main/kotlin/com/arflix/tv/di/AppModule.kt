@@ -14,7 +14,7 @@ import com.arflix.tv.data.api.FanartApi
 import com.arflix.tv.data.api.WatchHistoryApi
 import com.arflix.tv.data.api.VodRequestApi
 import com.arflix.tv.network.OkHttpProvider
-import com.arflix.tv.network.TvdbJsonConverterFactory
+import com.arflix.tv.network.RecoverableJsonConverterFactory
 import com.arflix.tv.util.Constants
 import dagger.Module
 import dagger.Provides
@@ -23,7 +23,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
 import javax.inject.Named
 import javax.inject.Singleton
 
@@ -65,7 +64,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.TMDB_BASE_URL)
             .client(tmdbClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(TmdbApi::class.java)
     }
@@ -85,7 +84,7 @@ object AppModule {
         val api = Retrofit.Builder()
             .baseUrl("https://api4.thetvdb.com/v4/")
             .client(tvdbClient)
-            .addConverterFactory(TvdbJsonConverterFactory())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(TvdbApi::class.java)
         return object : TvdbApi {
@@ -113,7 +112,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://webservice.fanart.tv/v3/")
             .client(fanartClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(FanartApi::class.java)
     }
@@ -125,7 +124,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.TRAKT_API_URL)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(TraktApi::class.java)
     }
@@ -137,7 +136,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.MDBLIST_API_URL)
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(com.arflix.tv.data.api.MdbListApi::class.java)
     }
@@ -195,7 +194,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.SIMKL_BASE_URL)
             .client(simklClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(com.arflix.tv.data.api.SimklApi::class.java)
     }
@@ -212,7 +211,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.CLOUD_BACKEND_URL + "/")
             .client(noCacheClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(WatchStateApi::class.java)
     }
@@ -224,7 +223,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.CLOUD_BACKEND_URL + "/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(WatchHistoryApi::class.java)
     }
@@ -236,7 +235,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl(Constants.VOD_REQUEST_BASE_URL.trimEnd('/') + "/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(VodRequestApi::class.java)
     }
@@ -249,7 +248,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://api.themoviedb.org/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
             .create(StreamApi::class.java)
     }
@@ -264,7 +263,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://api.theintrodb.org/v3/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
     }
 
@@ -283,7 +282,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://api.introdb.app/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
     }
 
@@ -302,7 +301,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://api.aniskip.com/v2/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
     }
 
@@ -321,7 +320,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://arm.haglund.dev/api/v2/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
     }
 
@@ -340,7 +339,7 @@ object AppModule {
         return Retrofit.Builder()
             .baseUrl("https://api.jikan.moe/v4/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(RecoverableJsonConverterFactory())
             .build()
     }
 

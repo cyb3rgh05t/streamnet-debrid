@@ -5,6 +5,7 @@ import com.arflix.tv.data.api.TvdbLoginRequest
 import com.arflix.tv.data.api.TvdbLoginResponse
 import com.arflix.tv.data.api.TvdbSearchResponse
 import com.arflix.tv.data.api.TvdbApi
+import com.arflix.tv.data.api.KitsuSearchResponse
 import com.google.gson.JsonParseException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.ResponseBody.Companion.toResponseBody
@@ -24,10 +25,10 @@ import org.robolectric.annotation.Config
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = android.app.Application::class, manifest = Config.NONE)
-class TvdbJsonConverterFactoryTest {
+class RecoverableJsonConverterFactoryTest {
     private val retrofit = Retrofit.Builder()
         .baseUrl("https://api4.thetvdb.com/v4/")
-        .addConverterFactory(TvdbJsonConverterFactory())
+        .addConverterFactory(RecoverableJsonConverterFactory())
         .build()
 
     private fun <T> parse(type: Class<T>, json: String): T =
@@ -43,6 +44,22 @@ class TvdbJsonConverterFactoryTest {
             assertTrue(failure.cause is JsonParseException)
             assertTrue(failure.cause!!.message!!.contains("$.data"))
         }
+    }
+
+    @Test
+    fun `Kitsu and root list responses receive the same protection as TVDB`() {
+        val kitsuFailure = assertThrows(IOException::class.java) {
+            parse(KitsuSearchResponse::class.java, """{"data":{}}""")
+        }
+        assertTrue(kitsuFailure.cause is JsonParseException)
+        assertTrue(kitsuFailure.message!!.contains("KitsuSearchResponse"))
+        val listType = object : com.google.gson.reflect.TypeToken<List<String>>() {}.type
+        val converter = retrofit.responseBodyConverter<List<String>>(listType, emptyArray())
+        assertThrows(IOException::class.java) {
+            converter.convert("""{"error":"unexpected response"}""".toResponseBody("application/json".toMediaType()))
+        }
+        assertEquals(listOf("valid"), converter.convert("""["valid"]""".toResponseBody("application/json".toMediaType())))
+        assertEquals("123", parse(KitsuSearchResponse::class.java, """{"data":[{"id":"123"}]}""").data!!.single().id)
     }
 
     @Test
@@ -80,7 +97,7 @@ class TvdbJsonConverterFactoryTest {
                 }
                 val api = Retrofit.Builder()
                     .baseUrl("http://127.0.0.1:${server.localPort}/")
-                    .addConverterFactory(TvdbJsonConverterFactory())
+                    .addConverterFactory(RecoverableJsonConverterFactory())
                     .build().create(TvdbApi::class.java)
                 val error = assertThrows(IOException::class.java) {
                     runBlocking { api.search("Series") }

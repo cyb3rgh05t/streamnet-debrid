@@ -6,11 +6,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 
@@ -24,14 +24,21 @@ fun AutoScrollingSynopsis(
     style: TextStyle,
     color: Color,
     modifier: Modifier = Modifier,
+    autoScroll: Boolean = true,
+    maxLines: Int = 4,
 ) {
+    if (!autoScroll) {
+        Text(
+            text = text,
+            style = style,
+            color = color,
+            modifier = modifier,
+            maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis
+        )
+        return
+    }
     val scrollState = rememberScrollState()
-    val scrollDownDurationMillis = remember(scrollState.maxValue) {
-        (scrollState.maxValue * 180).coerceIn(16_000, 40_000)
-    }
-    val scrollUpDurationMillis = remember(scrollState.maxValue) {
-        (scrollState.maxValue * 45).coerceIn(3_000, 9_000)
-    }
 
     LaunchedEffect(text) {
         scrollState.scrollTo(0)
@@ -42,6 +49,8 @@ fun AutoScrollingSynopsis(
                 delay(300)
                 continue
             }
+            val scrollDownDurationMillis = (maxScroll * 180).coerceIn(16_000, 40_000)
+            val scrollUpDurationMillis = (maxScroll * 45).coerceIn(3_000, 9_000)
             scrollState.animateScrollTo(
                 maxScroll,
                 tween(durationMillis = scrollDownDurationMillis, easing = LinearEasing)

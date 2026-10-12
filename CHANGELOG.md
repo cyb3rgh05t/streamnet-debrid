@@ -2,6 +2,32 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.063] - 2026-10-12
+
+- Android: Plex-, Jellyfin- und Emby-Überschriften in den Heimserver-Pairinghinweisen verwenden die aktive Akzentfarbe und eine stärkere Schrift.
+
+- Android: Heimserver-Code-Dialog erklärt Plex-Erkennung und Netzwerkerreichbarkeit, Jellyfin Quick Connect und den separaten Emby-Anmeldeweg. Hinweise stehen vollständig im scrollbaren Formular.
+- Android: Plex-Link-QR und Anmeldebutton belegen den kurzen Code über den von der Plex-Seite verwendeten token-Parameter vor; Bestätigung bleibt erforderlich. Scheitert nach der Kontofreigabe die Serververbindung, erscheint ein verständlicher Netzwerkhinweis mit erhaltener Fehlerursache.
+
+- Android: Plex-Pairing verwendet kurze Link-Codes statt langer Auth-Codes; QR-Code und mobile Anmeldung führen zu plex.tv/link. Deutsche und englische Hinweise erklären die Code-Eingabe. Jellyfin Quick Connect bleibt unverändert.
+- Android: Trakt und SIMKL zeigen während des laufenden Autorisierungs-Pollings denselben Ladeindikator wie Heimserver-Pairing.
+
+- Android: Auch Trakt- und SIMKL-Aktivierungsdialoge verwenden den Exit-Stil: abgerundete Karte mit Akzentverlauf, Icon-Kopfzeile, hervorgehobener Aktivierungscode und neutraler Abbrechen-Button. QR-Code, Autorisierungsstatus sowie mobile Aktionen zum Öffnen der Anmeldeseite und Kopieren des Codes bleiben erhalten.
+
+- Android: Oberfläche steht in der TV-Einstellungsnavigation an erster Stelle der Kategorie Profile. Addons aktualisieren und Addon hinzufügen stehen auf TV vor den installierten Addons; D-Pad-Fokus, Scrollziele und Aktionszuordnung folgen der neuen Reihenfolge.
+- Android: MDBList-Verbindung und Katalogsuche verwenden den neuen Dialogstil mit Akzentverlauf, abgerundeter Karte, klarer Kopfzeile und neutralen bzw. akzentfarbenen Buttons. Der MDBList-Dialog bleibt auch auf TV auf eine kompakte Breite begrenzt; die Katalogsuche behält Platz für Ergebnisse und beide Eingabewege.
+
+- Android: Gemeinsame Einstellungs-Eingabedialoge (unter anderem Addon, Heimserver, IPTV und Katalog) im neuen Exit-Dialog-Stil: kompaktere TV-Breite, weiche Ecken, dezenter Akzentverlauf, klarere Abstände und abgerundete Eingabefelder. Abbrechen und Einfügen verwenden neutrale Konturen, Bestätigen eine Akzentfüllung mit kontrastierender Fokusschrift. Tastatur-, Einfüge- und D-Pad-Verhalten bleiben unverändert.
+
+- Android: Neuer profilbezogener Beschreibungsmodus unter Darstellung: Der TV-Home-Hero scrollt wahlweise langsam automatisch (bisheriger Standard) oder zeigt vier Zeilen mit Ellipsis. Die Einstellung wird live übernommen und per Cloud synchronisiert; ältere Backups überschreiben sie nicht.
+- Android: Details zeigen den vollständigen Beschreibungstext direkt im Hero, auf TV mit breiterer Textfläche und ohne Ellipsis oder Text-Autoscrolling. Logo, Metadaten, Beschreibung und Aktionen bilden einen gemeinsamen Seitenabschnitt; bei sehr langen Texten bewegt das D-Pad die gesamte Seite. Der separate Beschreibungsblock entfällt, Home-Hero-Einstellungen bleiben unverändert.
+- Android: Überarbeiteter Beenden-Dialog mit Akzentverlauf und klarer Titelhierarchie. Buttons verwenden den Stil des Discord-Dialogs: Abbrechen mit neutraler Kontur und grauer Fokusfüllung; App schließen mit dezenter Akzentfüllung und Akzentkontur, im Fokus vollflächig in Akzentfarbe mit kontrastierender Schrift. Kein Zoom; Abbrechen bleibt vorausgewählt.
+- Android: Die vollständige Beschreibung im TV-Detail-Hero nutzt eine schmalere Textfläche (56 statt 68 Prozent), damit mehr vom Hintergrundmotiv sichtbar bleibt. Der volle Text und die Seitennavigation bleiben erhalten.
+
+- Android: Beim Öffnen eines Suchergebnisses (auch KI-Suche und D-Pad-Auswahl) und beim Verlassen des aktiven Suchbildschirms werden Suchbearbeitung, Eingabefokus und Bildschirmtastatur beendet. Die Suche darf die Tastatur nur im aktiven Bildschirm öffnen, damit kein alter Eingabefokus bis in Details oder Wiedergabe erhalten bleibt.
+
+- Android: Die JSON-Response-Absicherung gilt zentral für alle 15 Gson-basierten Retrofit-Konfigurationen, nicht nur TVDB (unter anderem TMDB, Kitsu/Stream-API, Trakt und Cloud-APIs). JSON-Parsingfehler werden mit ursprünglicher Ursache und Antwortmodell als IO-Anfragefehler weitergereicht; es werden keine leeren Erfolgsantworten erfunden. Gültige Antworten und Request-Serialisierung bleiben unverändert.
+
 ## [2.5.062] - 2026-10-10
 
 - Android: Ungültige JSON-Antworten der TVDB-API werden bereits im Retrofit-Response-Converter in behandelbare IO-Anfragefehler umgewandelt, insbesondere ein Objekt statt einer Liste bei `data`. Die bestehende IPTV-Artwork-Fehlerbehandlung protokolliert den Fehler und kann erneut laden, statt die App zu beenden. Gültige Such-/Artwork-Listen und Login-Antworten bleiben unverändert.
@@ -11,6 +37,8 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - Android-Version `2.5.062` / Code `463`.
 
 ## [2.5.061] - 2026-10-10
+
+- Android: Die JSON-Response-Absicherung gilt zentral für alle 15 Gson-basierten Retrofit-Konfigurationen, nicht nur TVDB (unter anderem TMDB, Kitsu/Stream-API, Trakt und Cloud-APIs). JSON-Parsingfehler werden mit ursprünglicher Ursache und Antwortmodell als IO-Anfragefehler weitergereicht; es werden keine leeren Erfolgsantworten erfunden. Gültige Antworten und Request-Serialisierung bleiben unverändert.
 
 - Android: Marvel-Timeline-Unterrubriken verwenden die aktive Akzentfarbe. Fehlgeschlagene HTTP-/Netzwerk-Metadatenabfragen einzelner Einträge blockieren nicht mehr die ganze Seite: Die Karte bleibt mit exaktem Label, echtem Detail-Ziel und lokalisiertem Fehlerhinweis erhalten; spätere Phasen können weiter geladen werden. Fehlgeschlagene Metadaten werden nicht als erfolgreich geladen gecacht.
 

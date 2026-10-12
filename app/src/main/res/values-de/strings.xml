@@ -50,6 +50,10 @@
     <string name="back">Zurück</string>
     <string name="cancel">Abbrechen</string>
     <string name="exit_app_title">App schließen?</string>
+    <string name="home_overview_mode">Home-Hero-Beschreibung</string>
+    <string name="home_overview_mode_desc">TV-Hero: langsam vertikal scrollen oder vier Zeilen als Vorschau anzeigen. Der volle Text steht in den Details.</string>
+    <string name="home_overview_auto">Auto Scroll</string>
+    <string name="home_overview_ellipsis">Ellipsis</string>
     <string name="exit_app_message">Möchtest du StreamNet wirklich schließen?</string>
     <string name="exit_app_confirm">App schließen</string>
     <string name="confirm">Bestätigen</string>
@@ -552,8 +556,10 @@
     <string name="settings_label_title">Titel</string>
     <string name="settings_add_quality_filter">Qualitätsfilter hinzufügen</string>
     <string name="settings_edit_quality_filter">Qualitätsfilter bearbeiten</string>
-    <string name="settings_plex_auth_touch_instruction">Authentifizierungsseite öffnen, anmelden und zu StreamNet zurückkehren. Dieser Bildschirm wird automatisch abgeschlossen.</string>
-    <string name="settings_plex_auth_tv_instruction">QR-Code scannen oder Authentifizierungsseite öffnen und diesen Code bestätigen</string>
+    <string name="settings_plex_auth_touch_instruction">Anmeldeseite öffnen und anmelden. Der Code ist vorbelegt; bitte bestätigen. Bei manuellem Aufruf von plex.tv/link den angezeigten Code eingeben. Danach zu StreamNet zurückkehren.</string>
+    <string name="settings_plex_auth_tv_instruction">QR-Code scannen, anmelden und den vorbelegten Code bestätigen. Alternativ plex.tv/link öffnen und den angezeigten Code eingeben. Danach verbindet StreamNet den Server.</string>
+    <string name="settings_home_server_code_help">Plex\nServer-URL leer lassen, um einen Server aus deinem Plex-Konto zu finden. Den kurzen Code auf plex.tv/link bestätigen. Falls die Erkennung scheitert, eine von diesem Gerät erreichbare Plex-Server-URL eingeben. Die Kontofreigabe allein macht einen lokalen Server nicht erreichbar; gleiches Netzwerk, passendes VPN oder eingerichteten Fernzugriff verwenden.\n\nJellyfin\nDie URL deines Jellyfin-Servers eingeben. Quick Connect muss auf dem Server aktiviert sein. Den angezeigten Code in einem bereits angemeldeten Jellyfin-Client unter Quick Connect freigeben.\n\nEmby\nDieser Code-Dialog unterstützt Emby nicht. Stattdessen „Server hinzufügen“ mit Server-URL und Benutzername/Passwort oder API-Token verwenden.\n\nDer Servername ist optional und dient nur als Bezeichnung in deinen Quellen.</string>
+    <string name="homeserver_plex_unreachable_after_auth">Plex-Konto freigegeben, aber der Server ist nicht erreichbar. Netzwerk/VPN oder Fernzugriff prüfen. Alternativ im Code-Dialog eine von diesem Gerät erreichbare Server-URL eingeben.</string>
     <string name="settings_jellyfin_auth_instruction">Jellyfin-App oder Weboberfläche öffnen, zu Quick Connect gehen, diesen Code eingeben und zu StreamNet zurückkehren.</string>
     <string name="settings_quality_filters_subtitle">Gerätespezifische Filter. Passende Streams werden ausgeschlossen.</string>
     <string name="settings_no_filters_yet">Noch keine Filter eingerichtet.</string>

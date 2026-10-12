@@ -81,6 +81,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -145,7 +146,6 @@ import com.arflix.tv.ui.components.resolveDetailsBackdropHeightDp
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.AppTopBar
 import com.arflix.tv.ui.components.AppTopBarContentTopInset
-import com.arflix.tv.ui.components.AutoScrollingSynopsis
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.PersonModal
@@ -242,8 +242,10 @@ fun DetailsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val isMobile = LocalDeviceType.current.isTouchDevice()
 
-    // Start on buttons for both TV and movies (buttons are now shown for both)
-    var focusedSection by remember { mutableStateOf(FocusSection.BUTTONS) }
+    var focusedSection by remember { mutableStateOf(FocusSection.DESCRIPTION) }
+    var descriptionScrollRequest by remember(mediaType, mediaId) { mutableIntStateOf(0) }
+    var descriptionAtTop by remember(mediaType, mediaId) { mutableStateOf(true) }
+    var descriptionAtBottom by remember(mediaType, mediaId) { mutableStateOf(true) }
     var buttonIndex by remember { mutableIntStateOf(0) }
     var episodeIndex by rememberSaveable { mutableIntStateOf(0) }
     var ratingsIndex by rememberSaveable { mutableIntStateOf(0) }
@@ -352,7 +354,7 @@ fun DetailsScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(mediaType, mediaId, initialSeason, initialEpisode) {
-        focusedSection = FocusSection.BUTTONS
+        focusedSection = FocusSection.DESCRIPTION
         buttonIndex = 0
         episodeIndex = 0
         ratingsIndex = 0
@@ -657,6 +659,7 @@ fun DetailsScreen(
                                     FocusSection.REVIEWS -> reviewIndex == 0
                                     FocusSection.SIMILAR -> similarIndex == 0
                                     FocusSection.COLLECTION -> collectionIndex == 0
+                                    FocusSection.DESCRIPTION -> true
                                 }
                                 if (atLeftmost) {
                                     true
@@ -677,6 +680,11 @@ fun DetailsScreen(
                                 }
                                 true
                             } else {
+                                if (focusedSection == FocusSection.DESCRIPTION) {
+                                    focusedSection = FocusSection.BUTTONS
+                                    buttonIndex = 1
+                                    return@onPreviewKeyEvent true
+                                }
                                 handleRight(
                                     focusedSection, buttonIndex, episodeIndex, ratingsIndex, seasonIndex, castIndex, reviewIndex, similarIndex, collectionIndex,
                                     uiState,
@@ -695,53 +703,13 @@ fun DetailsScreen(
                             if (isSidebarFocused) {
                                 true
                             } else {
-                                // Navigation: BUTTONS -> SEASONS -> EPISODES -> CAST -> REVIEWS -> SIMILAR -> COLLECTION
-                                val isTV = mediaType == MediaType.TV
-                                val hasEpisodes = uiState.episodes.isNotEmpty()
-                                val hasAnyValidRating = uiState.episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }
-                                val hasRatings = isTV && hasEpisodes && uiState.showEpisodeRatings && hasAnyValidRating
-                                val hasCast = uiState.cast.isNotEmpty()
-                                val hasReviews = uiState.reviews.isNotEmpty()
-                                val hasSimilar = uiState.similar.isNotEmpty()
-                                val hasCollection = uiState.collectionItems.isNotEmpty()
-                                focusedSection = when (focusedSection) {
-                                    FocusSection.BUTTONS -> {
-                                        isSidebarFocused = true
-                                        FocusSection.BUTTONS
-                                    }
-                                    FocusSection.SEASONS -> FocusSection.BUTTONS
-                                    FocusSection.EPISODES -> {
-                                        if (uiState.totalSeasons > 1) FocusSection.SEASONS else FocusSection.BUTTONS
-                                    }
-                                    FocusSection.CAST -> {
-                                        if (isTV) {
-                                            when {
-                                                hasRatings -> FocusSection.RATINGS
-                                                hasEpisodes -> FocusSection.EPISODES
-                                                uiState.totalSeasons > 1 -> FocusSection.SEASONS
-                                                else -> FocusSection.BUTTONS
-                                            }
-                                        } else FocusSection.BUTTONS
-                                    }
-                                    FocusSection.RATINGS -> {
-                                        when {
-                                            hasEpisodes -> FocusSection.EPISODES
-                                            uiState.totalSeasons > 1 -> FocusSection.SEASONS
-                                            else -> FocusSection.BUTTONS
-                                        }
-                                    }
-                                    FocusSection.REVIEWS -> if (hasCast) FocusSection.CAST else FocusSection.BUTTONS
-                                    FocusSection.SIMILAR -> {
-                                        if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCast) FocusSection.CAST
-                                        else FocusSection.BUTTONS
-                                    }
-                                    FocusSection.COLLECTION -> {
-                                        if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCast) FocusSection.CAST
-                                        else FocusSection.BUTTONS
-                                    }
+                                if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtTop) {
+                                    descriptionScrollRequest--
+                                } else if (focusedSection == FocusSection.DESCRIPTION) {
+                                    isSidebarFocused = true
+                                } else {
+                                    val sections = detailsFocusSections(uiState)
+                                    focusedSection = sections[(sections.indexOf(focusedSection) - 1).coerceAtLeast(0)]
                                 }
                                 true
                             }
@@ -751,66 +719,11 @@ fun DetailsScreen(
                                 isSidebarFocused = false
                                 true
                             } else {
-                                // Navigation: BUTTONS -> SEASONS -> EPISODES -> CAST -> REVIEWS -> SIMILAR -> COLLECTION
-                                val isTV = mediaType == MediaType.TV
-                                val hasEpisodes = uiState.episodes.isNotEmpty()
-                                val hasAnyValidRating = uiState.episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }
-                                val hasRatings = isTV && hasEpisodes && uiState.showEpisodeRatings && hasAnyValidRating
-                                val hasSeasons = uiState.totalSeasons > 1
-                                val hasCast = uiState.cast.isNotEmpty()
-                                val hasReviews = uiState.reviews.isNotEmpty()
-                                val hasSimilar = uiState.similar.isNotEmpty()
-                                val hasCollection = uiState.collectionItems.isNotEmpty()
-                                focusedSection = when (focusedSection) {
-                                    FocusSection.BUTTONS -> {
-                                        if (isTV && hasSeasons) FocusSection.SEASONS
-                                        else if (isTV && hasEpisodes) FocusSection.EPISODES
-                                        else if (hasRatings) FocusSection.RATINGS
-                                        else if (hasCast) FocusSection.CAST
-                                        else if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.BUTTONS
-                                    }
-                                    FocusSection.SEASONS -> {
-                                        if (hasEpisodes) FocusSection.EPISODES
-                                        else if (hasRatings) FocusSection.RATINGS
-                                        else if (hasCast) FocusSection.CAST
-                                        else if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.SEASONS
-                                    }
-                                    FocusSection.EPISODES -> {
-                                        if (hasRatings) FocusSection.RATINGS
-                                        else if (hasCast) FocusSection.CAST
-                                        else if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.EPISODES
-                                    }
-                                    FocusSection.RATINGS -> {
-                                        if (hasCast) FocusSection.CAST
-                                        else if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.RATINGS
-                                    }
-                                    FocusSection.CAST -> {
-                                        if (hasReviews) FocusSection.REVIEWS
-                                        else if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.CAST
-                                    }
-                                    FocusSection.REVIEWS -> {
-                                        if (hasCollection) FocusSection.COLLECTION
-                                        else if (hasSimilar) FocusSection.SIMILAR
-                                        else FocusSection.REVIEWS
-                                    }
-                                    FocusSection.COLLECTION -> {
-                                        if (hasSimilar) FocusSection.SIMILAR else FocusSection.COLLECTION
-                                    }
-                                    FocusSection.SIMILAR -> FocusSection.SIMILAR
+                                if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtBottom) {
+                                    descriptionScrollRequest++
+                                } else {
+                                    val sections = detailsFocusSections(uiState)
+                                    focusedSection = sections[(sections.indexOf(focusedSection) + 1).coerceAtMost(sections.lastIndex)]
                                 }
                                 true
                             }
@@ -929,6 +842,7 @@ fun DetailsScreen(
                                 FocusSection.REVIEWS -> {
                                     // Reviews don't have an action on Enter, just focus
                                 }
+                                FocusSection.DESCRIPTION -> onButtonClickRemembered(0)
                                 FocusSection.SIMILAR -> {
                                     val similar = uiState.similar.getOrNull(similarIndex)
                                     if (similar != null) {
@@ -1026,6 +940,11 @@ fun DetailsScreen(
                     hasCollectionAction = uiState.collectionId != null,
                     collectionIndex = collectionIndex,
                     focusedSection = focusedSection,
+                    descriptionScrollRequest = descriptionScrollRequest,
+                    onDescriptionPositionChange = { atTop, atBottom ->
+                        descriptionAtTop = atTop
+                        descriptionAtBottom = atBottom
+                    },
                     buttonIndex = buttonIndex,
                     episodeIndex = episodeIndex,
                     ratingsIndex = ratingsIndex,
@@ -1246,8 +1165,41 @@ fun DetailsScreen(
     }
 }
 
-private enum class FocusSection {
-    BUTTONS, EPISODES, SEASONS, RATINGS, CAST, REVIEWS, SIMILAR, COLLECTION
+internal enum class FocusSection {
+    BUTTONS, EPISODES, SEASONS, RATINGS, DESCRIPTION, CAST, REVIEWS, SIMILAR, COLLECTION
+}
+
+internal fun detailsFocusSections(state: DetailsUiState): List<FocusSection> = buildList {
+    add(FocusSection.DESCRIPTION)
+    add(FocusSection.BUTTONS)
+    if (state.item?.mediaType == MediaType.TV) {
+        if (state.episodes.isNotEmpty()) {
+            if (state.totalSeasons > 1) add(FocusSection.SEASONS)
+            add(FocusSection.EPISODES)
+            if (state.showEpisodeRatings && state.episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }) {
+                add(FocusSection.RATINGS)
+            }
+        }
+    }
+    if (state.cast.isNotEmpty()) add(FocusSection.CAST)
+    if (state.reviews.isNotEmpty()) add(FocusSection.REVIEWS)
+    if (state.collectionItems.isNotEmpty()) add(FocusSection.COLLECTION)
+    if (state.similar.isNotEmpty()) add(FocusSection.SIMILAR)
+}
+
+internal fun descriptionPageScrollDistance(
+    offset: Int,
+    size: Int,
+    viewportStart: Int,
+    viewportEnd: Int,
+    forward: Boolean
+): Float {
+    val pagePx = (viewportEnd - viewportStart) * 0.75f
+    return if (forward) {
+        minOf(pagePx, (offset + size - viewportEnd).coerceAtLeast(0).toFloat())
+    } else {
+        maxOf(-pagePx, (offset - viewportStart).coerceAtMost(0).toFloat())
+    }
 }
 
 private fun handleLeft(
@@ -1267,6 +1219,7 @@ private fun handleLeft(
         FocusSection.REVIEWS -> if (reviewIdx > 0) setReview(reviewIdx - 1)
         FocusSection.SIMILAR -> if (similarIdx > 0) setSimilar(similarIdx - 1)
         FocusSection.COLLECTION -> if (collectionIdx > 0) setCollection(collectionIdx - 1)
+        FocusSection.DESCRIPTION -> Unit
     }
     return true
 }
@@ -1301,6 +1254,7 @@ private fun handleRight(
         FocusSection.REVIEWS -> if (reviewIdx < uiState.reviews.size - 1) setReview(reviewIdx + 1)
         FocusSection.SIMILAR -> if (similarIdx < uiState.similar.size - 1) setSimilar(similarIdx + 1)
         FocusSection.COLLECTION -> if (collectionIdx < uiState.collectionItems.size - 1) setCollection(collectionIdx + 1)
+        FocusSection.DESCRIPTION -> Unit
     }
     return true
 }
@@ -1323,6 +1277,8 @@ private fun DetailsContent(
     hasCollectionAction: Boolean = collectionItems.isNotEmpty(),
     collectionIndex: Int = 0,
     focusedSection: FocusSection,
+    descriptionScrollRequest: Int,
+    onDescriptionPositionChange: (Boolean, Boolean) -> Unit,
     buttonIndex: Int,
     episodeIndex: Int,
     ratingsIndex: Int,
@@ -1667,8 +1623,7 @@ private fun DetailsContent(
                             fontWeight = FontWeight.Normal
                         ),
                         color = Color.White.copy(alpha = 0.88f),
-                        maxLines = 4,
-                        overflow = TextOverflow.Ellipsis
+                        modifier = Modifier.fillMaxWidth()
                     )
 
                     // --- TV Show: Season selector & Episodes ---
@@ -1978,349 +1933,316 @@ private fun DetailsContent(
 
         // Layer 4 removed for performance - radial gradients are expensive on TV
 
-        // Hero metadata positioned above the content rows
-        val heroStartPadding = 36.dp
-        val heroEndPadding = 400.dp
         val configuration = LocalConfiguration.current
-        val hasPosterDetailRails = usePosterCards && (collectionItems.isNotEmpty() || similar.isNotEmpty())
-        // Poster details rails need extra vertical room for two title lines,
-        // subtitle text, and focus bleed; otherwise the title block clips.
-        val minContentRowHeight = if (hasPosterDetailRails) 322.dp else 260.dp
-        val maxContentRowHeight = if (hasPosterDetailRails) 350.dp else 330.dp
-        val contentRowHeight = (configuration.screenHeightDp * 0.34f).dp.coerceIn(
-            minimumValue = minContentRowHeight,
-            maximumValue = maxContentRowHeight
-        )
-        val contentRowBottomPadding = 0.dp
-        val contentRowTopPadding = contentRowHeight + contentRowBottomPadding
-        val buttonsBottomPadding = contentRowTopPadding - 4.dp
-        val heroBottomPadding = buttonsBottomPadding + if (configuration.screenHeightDp < 720) 46.dp else 58.dp
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(
-                    bottom = heroBottomPadding,
-                    start = heroStartPadding,
-                    end = heroEndPadding
-                )
-        ) {
-            Column(verticalArrangement = Arrangement.Bottom) {
-                val showInCinema = remember(item.releaseDate, item.mediaType) {
-                    isInCinema(item)
-                }
-                val inCinemaColor = Color(0xFF8AD5FF)
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier.height(72.dp),
-                        contentAlignment = Alignment.CenterStart
-                    ) {
-                        if (logoUrl != null) {
-                            AsyncImage(
-                                model = logoUrl,
-                                contentDescription = item.title,
-                                contentScale = ContentScale.Fit,
-                                alignment = Alignment.CenterStart,
-                                modifier = Modifier
-                                    .height(72.dp)
-                                    .width(320.dp)
-                            )
-                        }
+        val heroContent: @Composable () -> Unit = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 36.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.Bottom) {
+                    val showInCinema = remember(item.releaseDate, item.mediaType) {
+                        isInCinema(item)
                     }
-
-                    if (showInCinema) {
-                        Box(
-                            modifier = Modifier
-                                .background(inCinemaColor, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = stringResource(R.string.in_cinema),
-                                style = ArflixTypography.caption.copy(
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold
-                                ),
-                                color = Color.Black
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                val tvSeriesLabel = stringResource(R.string.details_label_tv_series)
-                val movieLabel = stringResource(R.string.movie)
-                val genreText = genres.take(2).map(::formatGenreName).joinToString(" / ").ifEmpty {
-                    if (item.mediaType == MediaType.TV) tvSeriesLabel else movieLabel
-                }
-                val isCompactHeight = configuration.screenHeightDp < 720
-                val displayDate = item.releaseDate?.takeIf { it.isNotEmpty() } ?: item.year
-                val hasDuration = item.duration.isNotEmpty() && item.duration != "0m"
-                val rating = imdbRatingFor(item)
-                val ratingValue = parseRatingValue(rating)
-                val hasRatingMetadata = ratingValue > 0f
-                val primaryNetworkLogo = item.primaryNetworkLogo?.takeIf { it.isNotBlank() }
-                val budgetText = budget?.trim()?.takeIf { it.isNotEmpty() && item.mediaType == MediaType.MOVIE }
-                val hasBudgetMetadata = !budgetText.isNullOrBlank()
-                val certificationText = certification?.trim()?.takeIf { it.isNotEmpty() }
-                val hasCertificationMetadata = certificationText != null
-                val hasSecondaryMetadata = primaryNetworkLogo != null ||
-                    hasRatingMetadata ||
-                    hasCertificationMetadata ||
-                    hasBudgetMetadata
-                val overviewMaxHeight = if (isCompactHeight) 68.dp else 72.dp
-
-                val separatorStyle = ArflixTypography.caption.copy(
-                    fontSize = 13.sp,
-                    shadow = textShadow
-                )
-
-                Column(
-                    modifier = Modifier.width(360.dp),
-                    verticalArrangement = Arrangement.spacedBy(3.dp)
-                ) {
+                    val inCinemaColor = Color(0xFF8AD5FF)
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(3.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(
-                            text = genreText,
-                            style = ArflixTypography.caption.copy(
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                shadow = textShadow
-                            ),
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-
-                        if (displayDate.isNotEmpty()) {
-                            Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
-                            Text(
-                                text = displayDate,
-                                style = ArflixTypography.caption.copy(
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    shadow = textShadow
-                                ),
-                                color = Color.White,
-                                maxLines = 1
-                            )
+                        Box(
+                            modifier = Modifier.height(72.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            if (logoUrl != null) {
+                                AsyncImage(
+                                    model = logoUrl,
+                                    contentDescription = item.title,
+                                    contentScale = ContentScale.Fit,
+                                    alignment = Alignment.CenterStart,
+                                    modifier = Modifier
+                                        .height(72.dp)
+                                        .width(320.dp)
+                                )
+                            }
                         }
 
-                        if (hasDuration) {
-                            Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
-                            Text(
-                                text = item.duration,
-                                style = ArflixTypography.caption.copy(
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    shadow = textShadow
-                                ),
-                                color = Color.White,
-                                maxLines = 1
-                            )
+                        if (showInCinema) {
+                            Box(
+                                modifier = Modifier
+                                    .background(inCinemaColor, RoundedCornerShape(6.dp))
+                                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.in_cinema),
+                                    style = ArflixTypography.caption.copy(
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = Color.Black
+                                )
+                            }
                         }
                     }
 
-                    if (hasSecondaryMetadata) {
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    val tvSeriesLabel = stringResource(R.string.details_label_tv_series)
+                    val movieLabel = stringResource(R.string.movie)
+                    val genreText = genres.take(2).map(::formatGenreName).joinToString(" / ").ifEmpty {
+                        if (item.mediaType == MediaType.TV) tvSeriesLabel else movieLabel
+                    }
+                    val displayDate = item.releaseDate?.takeIf { it.isNotEmpty() } ?: item.year
+                    val hasDuration = item.duration.isNotEmpty() && item.duration != "0m"
+                    val rating = imdbRatingFor(item)
+                    val ratingValue = parseRatingValue(rating)
+                    val hasRatingMetadata = ratingValue > 0f
+                    val primaryNetworkLogo = item.primaryNetworkLogo?.takeIf { it.isNotBlank() }
+                    val budgetText = budget?.trim()?.takeIf { it.isNotEmpty() && item.mediaType == MediaType.MOVIE }
+                    val hasBudgetMetadata = !budgetText.isNullOrBlank()
+                    val certificationText = certification?.trim()?.takeIf { it.isNotEmpty() }
+                    val hasCertificationMetadata = certificationText != null
+                    val hasSecondaryMetadata = primaryNetworkLogo != null ||
+                        hasRatingMetadata ||
+                        hasCertificationMetadata ||
+                        hasBudgetMetadata
+
+                    val separatorStyle = ArflixTypography.caption.copy(
+                        fontSize = 13.sp,
+                        shadow = textShadow
+                    )
+
+                    Column(
+                        modifier = Modifier.width(360.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(3.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (primaryNetworkLogo != null) {
-                                val networkLogoRequest = remember(primaryNetworkLogo, context) {
-                                    ImageRequest.Builder(context)
-                                        .data(primaryNetworkLogo)
-                                        .bitmapConfig(Bitmap.Config.ARGB_8888)
-                                        .allowRgb565(false)
-                                        .build()
-                                }
-                                AsyncImage(
-                                    model = networkLogoRequest,
-                                    imageLoader = metadataLogoImageLoader,
-                                    contentDescription = stringResource(R.string.details_cd_primary_provider),
-                                    contentScale = ContentScale.Fit,
-                                    modifier = Modifier
-                                        .height(16.dp)
-                                        .width(52.dp)
-                                )
+                            Text(
+                                text = genreText,
+                                style = ArflixTypography.caption.copy(
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    shadow = textShadow
+                                ),
+                                color = Color.White,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f, fill = false)
+                            )
 
-                                if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
-                                    Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
-                                }
-                            }
-
-                            if (hasRatingMetadata) {
-                                DetailsImdbSvgRatingBadge(
-                                    rating = rating,
-                                    imageLoader = metadataLogoImageLoader,
-                                    ratingFontSize = 13,
-                                    logoWidth = 34.dp,
-                                    logoHeight = 14.dp,
-                                    textShadow = textShadow
-                                )
-
-                                if (hasCertificationMetadata || hasBudgetMetadata) {
-                                    Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
-                                }
-                            }
-
-                            if (hasCertificationMetadata) {
+                            if (displayDate.isNotEmpty()) {
+                                Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
                                 Text(
-                                    text = certificationText,
+                                    text = displayDate,
                                     style = ArflixTypography.caption.copy(
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
                                         shadow = textShadow
                                     ),
-                                    color = Color.White.copy(alpha = 0.74f),
+                                    color = Color.White,
                                     maxLines = 1
                                 )
-
-                                if (hasBudgetMetadata) {
-                                    Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
-                                }
                             }
 
-                            if (hasBudgetMetadata) {
+                            if (hasDuration) {
+                                Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
                                 Text(
-                                    text = "${stringResource(R.string.budget)} $budgetText",
+                                    text = item.duration,
                                     style = ArflixTypography.caption.copy(
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Medium,
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
                                         shadow = textShadow
                                     ),
-                                    color = Color.White.copy(alpha = 0.74f),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
+                                    color = Color.White,
+                                    maxLines = 1
                                 )
                             }
                         }
+
+                        if (hasSecondaryMetadata) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                if (primaryNetworkLogo != null) {
+                                    val networkLogoRequest = remember(primaryNetworkLogo, context) {
+                                        ImageRequest.Builder(context)
+                                            .data(primaryNetworkLogo)
+                                            .bitmapConfig(Bitmap.Config.ARGB_8888)
+                                            .allowRgb565(false)
+                                            .build()
+                                    }
+                                    AsyncImage(
+                                        model = networkLogoRequest,
+                                        imageLoader = metadataLogoImageLoader,
+                                        contentDescription = stringResource(R.string.details_cd_primary_provider),
+                                        contentScale = ContentScale.Fit,
+                                        modifier = Modifier
+                                            .height(16.dp)
+                                            .width(52.dp)
+                                    )
+
+                                    if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
+                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                    }
+                                }
+
+                                if (hasRatingMetadata) {
+                                    DetailsImdbSvgRatingBadge(
+                                        rating = rating,
+                                        imageLoader = metadataLogoImageLoader,
+                                        ratingFontSize = 13,
+                                        logoWidth = 34.dp,
+                                        logoHeight = 14.dp,
+                                        textShadow = textShadow
+                                    )
+
+                                    if (hasCertificationMetadata || hasBudgetMetadata) {
+                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                    }
+                                }
+
+                                if (hasCertificationMetadata) {
+                                    Text(
+                                        text = certificationText,
+                                        style = ArflixTypography.caption.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            shadow = textShadow
+                                        ),
+                                        color = Color.White.copy(alpha = 0.74f),
+                                        maxLines = 1
+                                    )
+
+                                    if (hasBudgetMetadata) {
+                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                    }
+                                }
+
+                                if (hasBudgetMetadata) {
+                                    Text(
+                                        text = "${stringResource(R.string.budget)} $budgetText",
+                                        style = ArflixTypography.caption.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            shadow = textShadow
+                                        ),
+                                        color = Color.White.copy(alpha = 0.74f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                }
+                            }
+                        }
                     }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    val displayOverview = item.overview.ifBlank {
+                        stringResource(R.string.no_description_available)
+                    }
+
+                    Text(
+                        text = displayOverview,
+                        style = ArflixTypography.body.copy(
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Normal,
+                            lineHeight = 19.sp,
+                            shadow = textShadow
+                        ),
+                        color = Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier
+                            .fillMaxWidth(0.56f)
+                    )
+
                 }
-
-                Spacer(modifier = Modifier.height(6.dp))
-
-                val displayOverview = item.overview.ifBlank {
-                    stringResource(R.string.no_description_available)
-                }
-
-                AutoScrollingSynopsis(
-                    text = displayOverview,
-                    style = ArflixTypography.body.copy(
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Normal,
-                        lineHeight = 16.sp,
-                        shadow = textShadow
-                    ),
-                    color = Color.White.copy(alpha = 0.9f),
-                    modifier = Modifier
-                        .width(360.dp)
-                        .height(overviewMaxHeight)
-                )
-
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(
-                    bottom = buttonsBottomPadding,
-                    start = heroStartPadding,
-                    end = heroEndPadding
-                )
-        ) {
-            val buttonWatched = if (item.mediaType == MediaType.TV) {
-                episodes.getOrNull(episodeIndex)?.isWatched ?: item.isWatched
-            } else {
-                item.isWatched
-            }
-
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                val playButtonLabel = if (!playLabel.isNullOrBlank()) {
-                    playLabel
+                val buttonWatched = if (item.mediaType == MediaType.TV) {
+                    episodes.getOrNull(episodeIndex)?.isWatched ?: item.isWatched
                 } else {
-                    stringResource(R.string.play)
+                    item.isWatched
                 }
-                Box(modifier = Modifier.clickable { onButtonClick(0) }) {
-                    PremiumActionButton(
-                        icon = Icons.Default.PlayArrow,
-                        text = playButtonLabel,
-                        isPrimary = true,
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 0
-                    )
-                }
-                if (showPlayFromBeginning) {
-                    Box(modifier = Modifier.clickable { onButtonClick(1) }) {
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val playButtonLabel = if (!playLabel.isNullOrBlank()) {
+                        playLabel
+                    } else {
+                        stringResource(R.string.play)
+                    }
+                    Box(modifier = Modifier.clickable { onButtonClick(0) }) {
                         PremiumActionButton(
-                            icon = Icons.Default.Replay,
-                            text = stringResource(R.string.play_from_beginning),
-                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1,
+                            icon = Icons.Default.PlayArrow,
+                            text = playButtonLabel,
+                            isPrimary = true,
+                            isFocused = focusSectionForUi == FocusSection.DESCRIPTION ||
+                                (focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 0)
+                        )
+                    }
+                    if (showPlayFromBeginning) {
+                        Box(modifier = Modifier.clickable { onButtonClick(1) }) {
+                            PremiumActionButton(
+                                icon = Icons.Default.Replay,
+                                text = stringResource(R.string.play_from_beginning),
+                                isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1,
+                                isIconOnly = true
+                            )
+                        }
+                    }
+                    val actionOffset = if (showPlayFromBeginning) 1 else 0
+                    Box(modifier = Modifier.clickable { onButtonClick(1 + actionOffset) }) {
+                        PremiumActionButton(
+                            icon = Icons.Default.List,
+                            text = stringResource(R.string.sources),
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1 + actionOffset,
                             isIconOnly = true
                         )
                     }
-                }
-                val actionOffset = if (showPlayFromBeginning) 1 else 0
-                Box(modifier = Modifier.clickable { onButtonClick(1 + actionOffset) }) {
-                    PremiumActionButton(
-                        icon = Icons.Default.List,
-                        text = stringResource(R.string.sources),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 1 + actionOffset,
-                        isIconOnly = true
-                    )
-                }
-                Box(modifier = Modifier
-                    .clickable(enabled = hasTrailer) { onButtonClick(2 + actionOffset) }
-                    .graphicsLayer { alpha = if (hasTrailer) 1f else 0.4f }
-                ) {
-                    PremiumActionButton(
-                        icon = Icons.Default.Theaters,
-                        text = stringResource(R.string.trailer),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 2 + actionOffset,
-                        isIconOnly = true
-                    )
-                }
-                Box(modifier = Modifier.clickable { onButtonClick(3 + actionOffset) }) {
-                    PremiumActionButton(
-                        icon = if (buttonWatched) Icons.Default.Check else Icons.Default.Visibility,
-                        text = if (buttonWatched) stringResource(R.string.watched) else stringResource(R.string.details_btn_mark_watched),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 3 + actionOffset,
-                        isActive = buttonWatched,
-                        isIconOnly = true
-                    )
-                }
-                Box(modifier = Modifier.clickable { onButtonClick(4 + actionOffset) }) {
-                    PremiumActionButton(
-                        icon = if (isInWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        text = stringResource(R.string.watchlist),
-                        isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 4 + actionOffset,
-                        isIconOnly = true,
-                        isActive = isInWatchlist
-                    )
-                }
-
-                // "View Collection" button — only shown when this movie belongs to a TMDB collection
-                if (hasCollectionAction) {
-                    Box(modifier = Modifier.clickable { onButtonClick(5 + actionOffset) }) {
+                    Box(modifier = Modifier
+                        .clickable(enabled = hasTrailer) { onButtonClick(2 + actionOffset) }
+                        .graphicsLayer { alpha = if (hasTrailer) 1f else 0.4f }
+                    ) {
                         PremiumActionButton(
-                            icon = Icons.Default.Star,
-                            text = stringResource(R.string.view_collection),
-                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 5 + actionOffset,
+                            icon = Icons.Default.Theaters,
+                            text = stringResource(R.string.trailer),
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 2 + actionOffset,
                             isIconOnly = true
                         )
+                    }
+                    Box(modifier = Modifier.clickable { onButtonClick(3 + actionOffset) }) {
+                        PremiumActionButton(
+                            icon = if (buttonWatched) Icons.Default.Check else Icons.Default.Visibility,
+                            text = if (buttonWatched) stringResource(R.string.watched) else stringResource(R.string.details_btn_mark_watched),
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 3 + actionOffset,
+                            isActive = buttonWatched,
+                            isIconOnly = true
+                        )
+                    }
+                    Box(modifier = Modifier.clickable { onButtonClick(4 + actionOffset) }) {
+                        PremiumActionButton(
+                            icon = if (isInWatchlist) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                            text = stringResource(R.string.watchlist),
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 4 + actionOffset,
+                            isIconOnly = true,
+                            isActive = isInWatchlist
+                        )
+                    }
+
+                    // "View Collection" button — only shown when this movie belongs to a TMDB collection
+                    if (hasCollectionAction) {
+                        Box(modifier = Modifier.clickable { onButtonClick(5 + actionOffset) }) {
+                            PremiumActionButton(
+                                icon = Icons.Default.Star,
+                                text = stringResource(R.string.view_collection),
+                                isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 5 + actionOffset,
+                                isIconOnly = true
+                            )
+                        }
                     }
                 }
             }
@@ -2328,6 +2250,7 @@ private fun DetailsContent(
 
         DetailsTvRows(
             modifier = Modifier.align(Alignment.BottomStart),
+            heroContent = heroContent,
             item = item,
             episodes = episodes,
             totalSeasons = totalSeasons,
@@ -2340,6 +2263,8 @@ private fun DetailsContent(
             collectionName = collectionName,
             collectionIndex = collectionIndex,
             focusedSection = focusedSection,
+            descriptionScrollRequest = descriptionScrollRequest,
+            onDescriptionPositionChange = onDescriptionPositionChange,
             focusSectionForUi = focusSectionForUi,
             episodeIndex = episodeIndex,
             ratingsIndex = ratingsIndex,
@@ -2351,8 +2276,8 @@ private fun DetailsContent(
             usePosterCards = usePosterCards,
             showEpisodeRatings = showEpisodeRatings,
             spoilerBlurEnabled = spoilerBlurEnabled,
-            contentRowHeight = contentRowHeight,
-            contentRowBottomPadding = contentRowBottomPadding,
+            contentRowHeight = configuration.screenHeightDp.dp - AppTopBarContentTopInset - 8.dp,
+            contentRowBottomPadding = 0.dp,
             configuration = configuration,
             contentHasFocus = contentHasFocus,
             onSeasonClick = onSeasonClick,
@@ -2367,6 +2292,7 @@ private fun DetailsContent(
 @Composable
 private fun DetailsTvRows(
     modifier: Modifier,
+    heroContent: @Composable () -> Unit,
     item: MediaItem,
     episodes: List<Episode>,
     totalSeasons: Int,
@@ -2379,6 +2305,8 @@ private fun DetailsTvRows(
     collectionName: String? = null,
     collectionIndex: Int = 0,
     focusedSection: FocusSection,
+    descriptionScrollRequest: Int,
+    onDescriptionPositionChange: (Boolean, Boolean) -> Unit,
     focusSectionForUi: FocusSection?,
     episodeIndex: Int,
     ratingsIndex: Int,
@@ -2409,13 +2337,14 @@ private fun DetailsTvRows(
         episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }
     }
     val hasRatings = hasEpisodes && showEpisodeRatings && hasAnyValidRating
-    val hasSeasons = isTV && totalSeasons > 1
+    val hasSeasons = hasEpisodes && totalSeasons > 1
     val hasCast = cast.isNotEmpty()
     val hasReviews = reviews.isNotEmpty()
     val hasSimilar = similar.isNotEmpty()
     val hasCollection = collectionItems.isNotEmpty()
 
-    var idx = 0
+    val descriptionIdx = 0
+    var idx = 1
     val seasonsIdx = if (hasSeasons) idx.also { idx++ } else -1
     val episodesIdx = if (hasEpisodes) idx.also { idx++ } else -1
     val ratingsIdx = if (hasRatings) idx.also { idx++ } else -1
@@ -2428,53 +2357,51 @@ private fun DetailsTvRows(
     if (hasSimilar) idx++
     val similarIdx = if (hasSimilar) idx.also { idx++ } else -1
 
-    LaunchedEffect(item.mediaType, item.id, currentSeason, hasEpisodes, hasSeasons) {
-        contentScrollState.scrollToItem(0, 0)
-    }
-
-    LaunchedEffect(focusedSection, contentHasFocus, hasCollection, hasSimilar) {
+    var lastDescriptionScrollRequest by remember(item.id) { mutableIntStateOf(descriptionScrollRequest) }
+    var lastFocusedSection by remember(item.id) { mutableStateOf<FocusSection?>(null) }
+    LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
         if (!contentHasFocus) return@LaunchedEffect
+        val delta = descriptionScrollRequest - lastDescriptionScrollRequest
+        val wasDescriptionFocused = lastFocusedSection == FocusSection.DESCRIPTION
+        lastDescriptionScrollRequest = descriptionScrollRequest
+        lastFocusedSection = focusedSection
+        if (focusedSection == FocusSection.DESCRIPTION && wasDescriptionFocused && delta != 0) {
+            val layout = contentScrollState.layoutInfo
+            val description = layout.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+                ?: return@LaunchedEffect
+            val distance = descriptionPageScrollDistance(
+                offset = description.offset,
+                size = description.size,
+                viewportStart = layout.viewportStartOffset,
+                viewportEnd = layout.viewportEndOffset,
+                forward = delta > 0
+            )
+            contentScrollState.scrollBy(distance)
+            return@LaunchedEffect
+        }
 
         val targetIndex = when (focusedSection) {
-            FocusSection.BUTTONS, FocusSection.EPISODES, FocusSection.SEASONS -> 0
+            FocusSection.BUTTONS -> descriptionIdx
+            FocusSection.EPISODES -> episodesIdx
+            FocusSection.SEASONS -> seasonsIdx
             FocusSection.RATINGS -> ratingsIdx
+            FocusSection.DESCRIPTION -> descriptionIdx
             FocusSection.CAST -> castIdx
             FocusSection.REVIEWS -> reviewsIdx
             FocusSection.COLLECTION -> collectionIdx
             FocusSection.SIMILAR -> similarIdx
         }
         if (targetIndex < 0) return@LaunchedEffect
-        val firstFocusableRailIndex = listOf(
-            seasonsIdx,
-            episodesIdx,
-            ratingsIdx,
-            castIdx,
-            reviewsIdx,
-            collectionIdx,
-            similarIdx
-        ).firstOrNull { it >= 0 } ?: -1
-        val targetScrollIndex = if (targetIndex == firstFocusableRailIndex && targetIndex > 0) {
-            0
-        } else {
-            targetIndex
-        }
+        val targetScrollIndex = targetIndex
 
         val firstVisible = contentScrollState.firstVisibleItemIndex
-        val topClusterMaxIndex = maxOf(episodesIdx, seasonsIdx, 0)
-        if (
-            focusSectionForUi == FocusSection.BUTTONS ||
-            focusSectionForUi == FocusSection.EPISODES ||
-            focusSectionForUi == FocusSection.SEASONS
-        ) {
-            if (firstVisible > topClusterMaxIndex || contentScrollState.firstVisibleItemScrollOffset != 0) {
-                val travelPx = with(density) { 96.dp.toPx() }
-                detailsStackOffsetPx.stop()
-                detailsStackOffsetPx.snapTo(-travelPx)
-                contentScrollState.scrollToItem(0, 0)
-                detailsStackOffsetPx.animateTo(
-                    targetValue = 0f,
-                    animationSpec = tween(durationMillis = 150, easing = FastOutSlowInEasing)
-                )
+        if (focusedSection == FocusSection.BUTTONS) {
+            val hero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+            if (hero == null) contentScrollState.scrollToItem(descriptionIdx, 0)
+            val measuredHero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+            if (measuredHero != null) {
+                val overflow = measuredHero.offset + measuredHero.size - contentScrollState.layoutInfo.viewportEndOffset
+                if (overflow > 0) contentScrollState.scrollBy(overflow.toFloat())
             }
             return@LaunchedEffect
         }
@@ -2498,6 +2425,20 @@ private fun DetailsTvRows(
         )
     }
 
+    val currentOnDescriptionPositionChange = rememberUpdatedState(onDescriptionPositionChange)
+    LaunchedEffect(contentScrollState, descriptionIdx) {
+        snapshotFlow {
+            val layout = contentScrollState.layoutInfo
+            val description = layout.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+            Pair(
+                description != null && description.offset >= layout.viewportStartOffset,
+                description != null && description.offset + description.size <= layout.viewportEndOffset
+            )
+        }.collect { (atTop, atBottom) ->
+            currentOnDescriptionPositionChange.value(atTop, atBottom)
+        }
+    }
+
     val contentStartPadding = 12.dp
     val contentOuterStartPadding = 24.dp
 
@@ -2514,6 +2455,7 @@ private fun DetailsTvRows(
         verticalArrangement = Arrangement.spacedBy(4.dp),
         contentPadding = PaddingValues(top = 6.dp)
     ) {
+        item(key = "details_hero") { heroContent() }
         if (item.mediaType == MediaType.TV && episodes.isNotEmpty()) {
             if (totalSeasons > 1) {
                 item {
@@ -2621,7 +2563,9 @@ private fun DetailsTvRows(
             }
         }
 
-        item { Spacer(modifier = Modifier.height(20.dp)) }
+        item {
+            Spacer(modifier = Modifier.height(contentRowHeight))
+        }
     }
 }
 

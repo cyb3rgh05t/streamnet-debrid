@@ -143,6 +143,7 @@ data class SettingsUiState(
     val trailerInCards: Boolean = true,
     val showBudget: Boolean = true,
     val showCertification: Boolean = true,
+    val autoScrollHomeOverview: Boolean = true,
     val showEpisodeRatings: Boolean = true,
     // Volume boost in decibels (0 = off, up to 15 dB). Applied via system LoudnessEnhancer
     // attached to the ExoPlayer audio session. Issue #88.
@@ -372,6 +373,7 @@ class SettingsViewModel @Inject constructor(
     private fun trailerInCardsKey() = profileManager.profileBooleanKey("trailer_in_cards")
     private fun showBudgetKey() = profileManager.profileBooleanKey("show_budget_on_home")
     private fun showCertificationKey() = profileManager.profileBooleanKey("show_certification")
+    private fun autoScrollHomeOverviewKey() = profileManager.profileBooleanKey("auto_scroll_home_overview")
     private fun showEpisodeRatingsKey() = profileManager.profileBooleanKey("show_episode_ratings")
     private fun clockFormatKey() = profileManager.profileStringKey("clock_format")
     private fun accentColorKey() = profileManager.profileStringKey("accent_color")
@@ -670,6 +672,7 @@ class SettingsViewModel @Inject constructor(
             val spoilerBlurEnabled = prefs[spoilerBlurKey()] ?: false
             val showBudget = prefs[showBudgetKey()] ?: true
             val showCertification = prefs[showCertificationKey()] ?: true
+            val autoScrollHomeOverview = prefs[autoScrollHomeOverviewKey()] ?: true
             val showEpisodeRatings = prefs[showEpisodeRatingsKey()] ?: true
             val clockFormat = prefs[clockFormatKey()] ?: "24h"
             // One-time migration: read old "focus_border_color" key if new "accent_color" is absent
@@ -786,6 +789,7 @@ class SettingsViewModel @Inject constructor(
                 trailerInCards = trailerInCards,
                 showBudget = showBudget,
                 showCertification = showCertification,
+                autoScrollHomeOverview = autoScrollHomeOverview,
                 showEpisodeRatings = showEpisodeRatings,
                 volumeBoostDb = volumeBoostDb,
                 showLoadingStats = showLoadingStats,
@@ -1689,6 +1693,14 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             context.settingsDataStore.edit { it[showCertificationKey()] = enabled }
             _uiState.value = _uiState.value.copy(showCertification = enabled)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun setAutoScrollHomeOverview(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { it[autoScrollHomeOverviewKey()] = enabled }
+            _uiState.value = _uiState.value.copy(autoScrollHomeOverview = enabled)
             syncLocalStateToCloud(silent = true)
         }
     }

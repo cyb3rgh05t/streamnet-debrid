@@ -281,6 +281,7 @@ data class HomeUiState(
     // Home hero metadata visibility toggles (issue #72)
     val showBudget: Boolean = true,
     val showCertification: Boolean = true,
+    val autoScrollHomeOverview: Boolean = true,
     val heroOverviewOverride: String? = null,
     val cardLogoUrls: Map<String, String> = emptyMap(),
     // Previous hero for crossfade (Phase 2.1)
@@ -2500,6 +2501,7 @@ class HomeViewModel @Inject constructor(
                         trailerInCards = preferences.trailerInCards,
                         showBudget = preferences.showBudget,
                         showCertification = preferences.showCertification,
+                        autoScrollHomeOverview = preferences.autoScrollHomeOverview,
                         clockFormat = preferences.clockFormat,
                         smoothScrolling = preferences.smoothScrolling
                     )

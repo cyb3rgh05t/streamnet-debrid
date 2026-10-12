@@ -24,9 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.tv.material3.Border
 import androidx.tv.material3.Button
@@ -38,6 +42,7 @@ import androidx.tv.material3.Text
 import com.arflix.tv.R
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.theme.contrastingContentColor
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
@@ -46,66 +51,98 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     val colors = ArvioSkin.colors
     val accent = resolveAccentColor(colors.accent)
     val shape = RoundedCornerShape(ArvioSkin.radius.lg)
-    val buttonShape = RoundedCornerShape(ArvioSkin.radius.sm)
+    val buttonShape = RoundedCornerShape(10.dp)
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             modifier = Modifier
+                .widthIn(max = 460.dp)
                 .fillMaxWidth()
-                .widthIn(max = 420.dp)
-                .border(1.dp, colors.textMuted.copy(alpha = 0.15f), shape),
+                .border(1.dp, accent.copy(alpha = 0.22f), shape),
             shape = shape,
             colors = SurfaceDefaults.colors(containerColor = colors.surfaceRaised)
         ) {
             Column(
-                modifier = Modifier.padding(32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                modifier = Modifier
+                    .background(Brush.linearGradient(listOf(
+                        accent.copy(alpha = 0.07f),
+                        colors.surfaceRaised,
+                        colors.surfaceRaised
+                    )))
+                    .padding(28.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .background(accent.copy(alpha = 0.08f), RoundedCornerShape(16.dp)),
-                    contentAlignment = Alignment.Center
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.PowerSettingsNew,
-                        contentDescription = null,
-                        tint = accent,
-                        modifier = Modifier.size(26.dp)
-                    )
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .background(accent.copy(alpha = 0.08f), RoundedCornerShape(18.dp))
+                            .border(1.dp, accent.copy(alpha = 0.2f), RoundedCornerShape(18.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.PowerSettingsNew,
+                            contentDescription = null,
+                            tint = accent,
+                            modifier = Modifier.size(30.dp)
+                        )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(
+                            text = "StreamNet",
+                            style = ArvioSkin.typography.body.copy(fontSize = 12.sp, fontWeight = FontWeight.Medium),
+                            color = accent
+                        )
+                        Text(
+                            text = stringResource(R.string.exit_app_title),
+                            style = ArvioSkin.typography.sectionTitle,
+                            color = colors.textPrimary
+                        )
+                    }
                 }
                 Spacer(Modifier.height(20.dp))
                 Text(
-                    text = stringResource(R.string.exit_app_title),
-                    style = ArvioSkin.typography.sectionTitle,
-                    color = colors.textPrimary,
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
                     text = stringResource(R.string.exit_app_message),
                     style = ArvioSkin.typography.body,
-                    color = colors.textMuted,
-                    textAlign = TextAlign.Center
+                    color = colors.textMuted
                 )
-                Spacer(Modifier.height(28.dp))
+                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(20.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(0.88f).align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val buttonColors = ButtonDefaults.colors(
-                        containerColor = colors.surface,
-                        contentColor = colors.textPrimary,
-                        focusedContainerColor = colors.surface,
+                    val cancelColors = ButtonDefaults.colors(
+                        containerColor = Color.Transparent,
+                        contentColor = colors.textMuted,
+                        focusedContainerColor = Color.White.copy(alpha = 0.15f),
                         focusedContentColor = colors.textPrimary
                     )
-                    val buttonBorder = ButtonDefaults.border(
+                    val cancelBorder = ButtonDefaults.border(
                         border = Border(
-                            border = BorderStroke(1.dp, colors.textMuted.copy(alpha = 0.15f)),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                             shape = buttonShape
                         ),
                         focusedBorder = Border(
-                            border = BorderStroke(2.dp, accent),
+                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                            shape = buttonShape
+                        )
+                    )
+                    val confirmColors = ButtonDefaults.colors(
+                        containerColor = accent.copy(alpha = 0.12f),
+                        contentColor = accent,
+                        focusedContainerColor = accent,
+                        focusedContentColor = contrastingContentColor(accent)
+                    )
+                    val confirmBorder = ButtonDefaults.border(
+                        border = Border(
+                            border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+                            shape = buttonShape
+                        ),
+                        focusedBorder = Border(
+                            border = BorderStroke(1.dp, accent),
                             shape = buttonShape
                         )
                     )
@@ -113,10 +150,10 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     val buttonScale = ButtonDefaults.scale(focusedScale = 1f)
                     Button(
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(44.dp).focusRequester(cancelFocusRequester),
-                        colors = buttonColors,
+                        modifier = Modifier.weight(1f).height(42.dp).focusRequester(cancelFocusRequester),
+                        colors = cancelColors,
                         shape = buttonShapes,
-                        border = buttonBorder,
+                        border = cancelBorder,
                         scale = buttonScale
                     ) {
                         Text(
@@ -129,10 +166,10 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     }
                     Button(
                         onClick = onConfirm,
-                        modifier = Modifier.weight(1f).height(44.dp),
-                        colors = buttonColors,
+                        modifier = Modifier.weight(1f).height(42.dp),
+                        colors = confirmColors,
                         shape = buttonShapes,
-                        border = buttonBorder,
+                        border = confirmBorder,
                         scale = buttonScale
                     ) {
                         Text(

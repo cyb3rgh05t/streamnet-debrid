@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.IOException
 import java.lang.reflect.Type
 
-internal class TvdbJsonConverterFactory : Converter.Factory() {
+internal class RecoverableJsonConverterFactory : Converter.Factory() {
     private val gson = GsonConverterFactory.create()
 
     override fun responseBodyConverter(
@@ -21,7 +21,10 @@ internal class TvdbJsonConverterFactory : Converter.Factory() {
             try {
                 converter.convert(body)
             } catch (e: JsonParseException) {
-                throw IOException("Invalid TVDB JSON response for ${type.typeName}", e)
+                throw IOException("Invalid JSON response for ${type.typeName}", e)
+            } catch (e: IllegalStateException) {
+                // Gson's root collection adapter can report token mismatches without wrapping them.
+                throw IOException("Invalid JSON response for ${type.typeName}", e)
             }
         }
     }
