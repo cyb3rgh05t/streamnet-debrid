@@ -992,7 +992,7 @@ class SettingsViewModel @Inject constructor(
                     homeServerConnection = connections.firstOrNull(),
                     homeServerConnections = connections
                 )
-                if (connections.any { it.collections.isNotEmpty() }) {
+                if (connections.isEmpty() || connections.any { it.collections.isNotEmpty() }) {
                     syncHomeServerCatalogsFromConnections()
                 }
             }
@@ -3646,7 +3646,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             cancelPlexHomeServerAuth(updateState = false)
             homeServerRepository.disconnect()
-            catalogRepository.syncHomeServerCatalogs(emptyList())
+            catalogRepository.syncHomeServerCatalogs(emptyList(), removeMissing = true)
             _uiState.value = _uiState.value.copy(
                 homeServerConnection = null,
                 homeServerConnections = emptyList(),
@@ -3663,7 +3663,11 @@ class SettingsViewModel @Inject constructor(
 
     private suspend fun syncHomeServerCatalogsFromConnections() {
         val candidates = homeServerRepository.getCatalogCandidates()
-        catalogRepository.syncHomeServerCatalogs(candidates)
+        val connections = homeServerRepository.currentConnections()
+        catalogRepository.syncHomeServerCatalogs(
+            candidates,
+            removeMissing = connections.isEmpty() || connections.any { it.collections.isNotEmpty() }
+        )
     }
 
     fun syncLocalStateToCloud(silent: Boolean = false, force: Boolean = false) {

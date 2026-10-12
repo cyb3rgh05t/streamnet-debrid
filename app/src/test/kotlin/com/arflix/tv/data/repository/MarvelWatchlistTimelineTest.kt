@@ -12,6 +12,22 @@ import java.security.MessageDigest
 
 class MarvelWatchlistTimelineTest {
     @Test
+    fun `Marvel persisted legacy lists are replaced with only the three official addon sources`() {
+        val marvel = MediaRepository.buildPreinstalledDefaults().single { it.title == "Marvel" }
+        val polluted = marvel.collectionSources + com.arflix.tv.data.model.CollectionSourceConfig(
+            kind = CollectionSourceKind.CURATED_IDS,
+            curatedRefs = listOf("tv:202412", "tv:92785")
+        )
+        val restored = CollectionTemplateManifest.normalizeCollectionSources(marvel.id, polluted)
+        assertEquals(3, restored.size)
+        assertTrue(restored.all { it.kind == CollectionSourceKind.ADDON_CATALOG })
+        assertEquals(listOf("movie", "series", "timeline"), restored.map { it.collectionTab })
+        assertEquals(restored, marvel.collectionSources)
+        assertTrue(restored.none { it.curatedRefs.orEmpty().contains("tv:202412") })
+        assertEquals(polluted, CollectionTemplateManifest.normalizeCollectionSources("custom-collection", polluted))
+    }
+
+    @Test
     fun `metadata failure in phase four does not block later phases or consume missing cards`() {
         val cards = MarvelWatchlistTimeline.entries.indices.map { position ->
             val entry = MarvelWatchlistTimeline.entries[position]
@@ -106,16 +122,37 @@ class MarvelWatchlistTimelineTest {
     }
 
     @Test
-    fun `Marvel replaces only timeline source and excludes legacy fallbacks from timeline tab`() {
+    fun `Marvel uses MyStreamNet addon for timeline without changing movie and series sources`() {
         val defaults = MediaRepository.buildPreinstalledDefaults()
         val marvel = defaults.single { it.title == "Marvel" }
-        val timeline = MarvelWatchlistTimeline.catalogForTimeline(marvel)!!
-        assertEquals(1, timeline.collectionSources.size)
-        assertEquals(CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE, timeline.collectionSources.single().kind)
+        val timeline = marvel.collectionSources.single { it.collectionTab == "timeline" }
+        assertEquals(CollectionSourceKind.ADDON_CATALOG, timeline.kind)
+        assertEquals("Marvel", timeline.addonCatalogType)
+        assertEquals("marvel-mcu", timeline.addonCatalogId)
+        assertEquals("https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json", timeline.addonManifestUrl)
+        assertTrue(!usesFranchiseReleaseOrder(marvel.copy(collectionSources = listOf(timeline))))
+        assertEquals(
+            listOf("ADDON"),
+            CollectionTemplateManifest.listMetadataFor(marvel.id).map { it.sourceLabel }
+        )
         assertTrue(marvel.collectionSources.any { it.collectionTab == "movie" && it.addonCatalogId == "movies" })
         assertTrue(marvel.collectionSources.any { it.collectionTab == "series" && it.addonCatalogId == "series" })
         for (title in listOf("DC Universe", "Star Wars", "Harry Potter")) {
             assertNull(MarvelWatchlistTimeline.catalogForTimeline(defaults.single { it.title == title }))
+        }
+
+    }
+
+    @Test
+    fun `legacy snapshot sources migrate to addon while other sources remain unchanged`() {
+        val legacy = com.arflix.tv.data.model.CollectionSourceConfig(
+            kind = CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE,
+            collectionTab = "timeline"
+        )
+        assertEquals(CollectionTemplateManifest.marvelTimelineSource(), CollectionTemplateManifest.migrateMarvelTimelineSource(legacy))
+        val sources = MediaRepository.buildPreinstalledDefaults().single { it.title == "Marvel" }.collectionSources
+        sources.forEach { source ->
+            assertEquals(source, CollectionTemplateManifest.migrateMarvelTimelineSource(source))
         }
     }
 }

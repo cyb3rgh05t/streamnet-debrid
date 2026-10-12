@@ -70,6 +70,16 @@
             </svg>
             Accounts
           </button>
+          <button class="nav-item" data-view="global">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 7h16M4 17h16" />
+              <circle cx="9" cy="7" r="3" />
+              <circle cx="15" cy="17" r="3" />
+            </svg>
+            Remote Config
+          </button>
           <button class="nav-item" data-view="audits">
             <svg
               width="16"
@@ -151,6 +161,99 @@
             Keine Accounts gefunden.
           </p>
           <div id="accounts-pagination" class="pagination-bar"></div>
+        </section>
+
+        <section id="global-view" class="hidden">
+          <section class="editor-panel" aria-labelledby="global-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">ALLE REGISTRIERTEN ACCOUNTS</p>
+                <h2 id="global-title">Remote Config</h2>
+              </div>
+              <button id="global-refresh" class="button secondary" type="button">Aktualisieren</button>
+            </div>
+            <p id="global-summary" class="filter-note" role="status"></p>
+            <div class="warning">
+              Unabhängig von Suche und Online-Filter. Hinzufügen gilt für alle bestehenden
+              Profile; Bearbeiten und Entfernen nur für vorhandene Einträge mit der
+              ausgewählten ID. Accounts ohne Cloud-Snapshot oder Profile werden
+              übersprungen. Keine Vorgaben für zukünftige Accounts.
+              Der leere StreamNet-TV-Systemeintrag in der App bleibt bestehen;
+              vorhandene App-Limits für Playlists gelten weiterhin.
+            </div>
+            <form id="global-form" class="form-stack">
+              <label>Aktion<select id="global-operation">
+                <option value="add_playlist">Playlist global hinzufügen / aktualisieren</option>
+                <option value="edit_playlist">Vorhandene Playlist global bearbeiten</option>
+                <option value="change_xtream_host">Xtream / StreamNet TV: nur Host ändern</option>
+                <option value="delete_playlist">Ausgewählte Playlist global entfernen</option>
+                <option value="clear_playlists">Alle Playlists global entfernen</option>
+                <option value="add_addon">Add-on global hinzufügen / aktualisieren</option>
+                <option value="edit_addon">Vorhandenes Add-on global bearbeiten</option>
+                <option value="delete_addon">Ausgewähltes Add-on global entfernen</option>
+                <option value="clear_addons">Alle Add-ons global entfernen</option>
+              </select></label>
+              <label id="global-target-field" class="hidden">Vorhandener Eintrag
+                <select id="global-target"></select>
+              </label>
+              <div id="global-playlist-fields" class="op-fields">
+                <div class="quick-panel">
+                  Beim Bearbeiten werden Name, M3U-/EPG-URL und die folgenden Optionen
+                  ersetzt. Die Playlist-ID und weitere Einstellungen bleiben erhalten.
+                  Gespeicherte URLs werden aus Sicherheitsgründen nicht angezeigt.
+                </div>
+                <label>Playlist-Typ<select id="global-playlist-type">
+                  <option value="m3u">M3U / get.php-Link</option>
+                  <option value="xtream">Xtream Codes</option>
+                  <option value="streamnet_tv">StreamNet TV (System-Playlist)</option>
+                </select></label>
+                <label>Name<input id="global-playlist-name" maxlength="200" /></label>
+                <div id="global-m3u-fields">
+                  <label>M3U-URL<input id="global-playlist-url" type="url" placeholder="https://.../get.php?username=...&amp;password=..." /></label>
+                  <label>EPG-URL (optional, leer entfernt die EPG-URL)<input id="global-playlist-epg" type="url" /></label>
+                </div>
+                <div id="global-xtream-fields" class="hidden">
+                  <div class="warning">
+                    Benutzername und Passwort werden für alle Zielaccounts gleich gesetzt.
+                    Für individuelle Zugangsdaten stattdessen „nur Host ändern“ wählen.
+                    StreamNet TV verwendet die feste ID streamnet_tv.
+                    Eigene StreamNet-TV-Hosts erfordern die aktualisierte App mit
+                    Remote-Host-Unterstützung.
+                  </div>
+                  <label>Server-URL<input id="global-xtream-host" type="url" placeholder="https://server.example:8080" /></label>
+                  <label>Benutzername<input id="global-xtream-user" autocomplete="off" maxlength="500" /></label>
+                  <label>Passwort<input id="global-xtream-password" type="password" autocomplete="new-password" maxlength="500" /></label>
+                </div>
+                <div class="checkbox-grid">
+                  <label class="checkbox-field"><input id="global-playlist-enabled" type="checkbox" checked /> Aktiviert</label>
+                  <label class="checkbox-field"><input id="global-playlist-live" type="checkbox" checked /> Live-TV importieren</label>
+                  <label class="checkbox-field"><input id="global-playlist-vod" type="checkbox" checked /> Filme importieren</label>
+                  <label class="checkbox-field"><input id="global-playlist-series" type="checkbox" checked /> Serien importieren</label>
+                </div>
+              </div>
+              <div id="global-host-fields" class="op-fields hidden">
+                <div class="quick-panel">
+                  Nur für die ausgewählte Playlist-ID: individuelle Zugangsdaten,
+                  Name, Aktivierung und Importoptionen bleiben erhalten.
+                  M3U- und EPG-Adressen werden auf den neuen Xtream-Server gesetzt.
+                  Ungültige oder fehlende Xtream-Zugangsdaten brechen die gesamte Aktion ab.
+                  Ein eigener StreamNet-TV-Host erfordert eine App-Version mit Remote-Host-Unterstützung.
+                </div>
+                <label>Neue Server-URL<input id="global-host-url" type="url" placeholder="https://server.example:8080" /></label>
+              </div>
+              <div id="global-addon-fields" class="op-fields hidden">
+                <div class="quick-panel">
+                  Das Manifest wird geladen. Beim Bearbeiten ersetzt der neue Link den
+                  ausgewählten Eintrag. Die Aktivierung bestehender Profile bleibt erhalten.
+                </div>
+                <label>Manifest- oder Stremio-Link<input id="global-addon-url" placeholder="stremio://.../manifest.json oder https://.../manifest.json" /></label>
+                <label class="checkbox-field"><input id="global-addon-enabled" type="checkbox" checked /> In neuen Profilzuordnungen aktivieren</label>
+              </div>
+              <label>Kommentar (optional)<input id="global-reason" maxlength="500" /></label>
+              <button class="button primary" type="submit">Vorschau und Bestätigung</button>
+              <p id="global-mutation-message" class="message" role="status"></p>
+            </form>
+          </section>
         </section>
 
         <section id="account-view" class="hidden">

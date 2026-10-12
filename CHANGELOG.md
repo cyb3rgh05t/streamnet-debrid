@@ -2,6 +2,64 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.064] - 2026-10-12
+
+- Android: MDBList verwendet echte TV-Material-Buttons wie der Exitdialog statt manuell gezeichneter Fokuszustände; eine Fokusgruppe hält die D-pad-Navigation innerhalb des Dialoginhalts.
+
+- Android: TV-Hero für Recently Watched TV und Favorite TV zeigt Sender-/Gruppentrenner in Theme-Akzent, einschließlich eingebetteter Texttrenner.
+- Android: Fokussierte Abbrechen-Buttons bei Trakt/SIMKL/Heimserver und Discord verwenden jetzt volle Akzentfüllung mit kontrastierender Schrift auch beim initialen Fokus. MDBList-Aktionen übernehmen Höhe und neutralen/primären Fokuslook des Exitdialogs.
+
+- Android: Marvel nutzt in Filme/Serien/Timeline ausschließlich die drei offiziellen Addon-Quellen. Alte beigemischte MCU-IDs werden auch in gespeicherten Profilkatalogen ersetzt; die falsche Agatha-ID `tv:202412` erzeugte den japanischen Fremdeintrag.
+- Android: Alle Collection-/Franchise-Karten zeigen Release-Jahre statt kompletter Release-Daten in Theme-Akzent, einschließlich der Marvel-Timeline. Metadaten-Trenner auf Home und Details verwenden ebenfalls Theme-Akzent.
+- Android: Discord-Pairing erhält den gemeinsamen Skin-/Gradient-/Button-Stil mit echtem Button-Fokus und Akzentrahmen.
+- Android: Heimserver-Trennung entfernt zugehörige Kataloge auch bei leerer Kandidatenliste. Start-/Settings-Abgleich bereinigt verwaiste Heimserver-Kataloge; eine noch nicht geladene Bibliotheksliste bleibt geschützt. Andere Katalogquellen und Profile bleiben erhalten.
+
+- Android: Ursache der veralteten Marvel-Timeline im Emulator nachgewiesen: HTTP-Cache enthielt eine Antwort vom 10. Oktober mit 69 statt aktuell 87 Einträgen; das Addon setzt 21 Tage Cache-Gültigkeit. Die Timeline revalidiert jetzt beim Öffnen per `Cache-Control: no-cache`, hält aber beim Nachladen denselben Snapshot. Regressionstest prüft den echten HTTP-Cache-Pfad von 69 auf 87 Einträge.
+- Android: Marvel-IMDb-Auflösung berücksichtigt Filme und Serien unabhängig vom fehlerhaften Addon-Typ (z. B. „The Punisher: One Last Kill“). Fehlende Landschaftsbilder werden zusätzlich über TMDB-Bilder gesucht; die Timeline verwendet keine Hochformat-Poster mehr als Landscape-Fallback.
+- Android Debug: Log-Tag `MarvelTimeline` zeigt revalidierten Snapshot, rohe Addon-Positionen, aufgelöste Identität, Landschaftsbildstatus, Seitenübergänge und tatsächlich fokussierte Karten.
+
+- Android: Marvel-Addon-Timeline erhält pro Eintrag einen eigenen Kartenschlüssel, damit mehrere Staffeln derselben Serie beim Nachladen nicht zusammenfallen. Ein nicht auflösbarer Eintrag bleibt als gekennzeichnete Karte sichtbar statt die Seite abzubrechen; Details öffnen nur mit echter aufgelöster Identität.
+- Android: Marvel-Landschaftsbilder werden separat aus Metadaten ergänzt, ohne Addon-Titel oder Reihenfolge zu ersetzen. Fehlende Landschaftsbilder zeigen das Hochformat-Poster eingepasst statt zugeschnitten. Der komplette Addon-Snapshot bleibt während des Nachladens stabil; ein Regressionstest verwendet die echte Antwort mit 87 Einträgen.
+- Android: Trakt-/SIMKL-/Heimserver-Abbrechen und MDBList-Buttons zeigen den Fokus mit Akzentrahmen. MDBList kann per D-Pad zwischen Eingabefeld und Aktionen wechseln; Eingabe-OK und Links/Rechts werden nicht mehr vom Dialog abgefangen.
+
+- Android: Marvel-Timeline rendert die echten Addon-Karten direkt aus dem vollständigen Katalog statt sie über TMDB-Details neu aufzubauen und bei Metadatenfehlern zu entfernen. Titel, Poster, Beschreibung und Position stammen vom Addon; echte aufgelöste TMDB-Identitäten bleiben für Navigation erhalten. Das camelCase-Feld tmdbId wird neben tmdb_id unterstützt.
+
+- Android: Quellen aktualisieren und Beim Host bestellen verwenden beide den ursprünglichen neutralen Aktualisieren-Stil: helle Schrift, Akzent-Icon, graue Fokusfüllung und Akzentrahmen statt voller Akzentfüllung.
+- Android: Addon-Kataloge behalten die ursprüngliche Reihenfolge auch bei gemischten direkten TMDB- und aufgelösten IMDb-IDs. Timeline-Erweiterungen hängen neu aufgelöste Einträge nicht mehr hinter alte Cache-Einträge. Die MyStreamNet-Marvel-Timeline wird im IPTV-only-Modus nicht auf bereits verfügbare Titel reduziert.
+
+- Android: StreamNet TV unterstützt ausdrücklich per Remote Config gesetzte Server über das Playlist-Feld `streamNetHostOverride`. Ein eigener Remote-Host wird nicht mehr automatisch auf den im APK eingebauten Xtream-Server zurückgesetzt.
+- Android: Der Remote-Host bleibt beim Cloud-Import, bei der Playlist-Normalisierung, beim lokalen JSON-Laden und beim erneuten Cloud-Export erhalten. Ohne Remote-Vorgabe bleibt die bisherige Host-Migration unverändert.
+- Android: StreamNet TV behält die feste Playlist-ID `streamnet_tv`. Das Entfernen der Konfiguration lässt weiterhin den leeren, deaktivierten Systemeintrag bestehen; vorhandene Playlist-Limits bleiben unverändert.
+- Rollout: Für eigene StreamNet-TV-Hosts muss die aktualisierte APK vor Nutzung dieser Remote-Konfiguration verteilt werden. Ältere Apps können den eingebauten Host beim nächsten Sync wiederherstellen.
+- Validierung: 9 gezielte Android-Playlist-Tests erfolgreich, einschließlich Remote-Host-Erhalt, JSON-Kompatibilität und unveränderter Host-Migration ohne Override.
+- Status: Noch nicht veröffentlicht; Versionsnummer und Versionscode wurden durch diese Änderungen nicht erhöht.
+
+## [Web 1.0.066] - 2026-10-12
+
+- WebUI: Playlist-Typen, Cloud-Einlesen und Laufzeit-Normalisierung erhalten das Feld `streamNetHostOverride`, damit eine per Remote Config gesetzte StreamNet-TV-Adresse beim Web-/Android-Sync nicht verloren geht.
+- WebUI: Xtream-Konfigurationen aus Remote Config verwenden reguläre M3U-/EPG-Adressen und bleiben mit der bestehenden Playlist-Verarbeitung kompatibel.
+- Validierung: 13 gezielte Web-/Cloud-Tests erfolgreich; TypeScript-Prüfung bestanden. Ein Regressionstest prüft den Erhalt der Remote-Host-Vorgabe.
+- Status: Noch nicht veröffentlicht; die Web-Versionsnummer wurde nicht erhöht. Der neue Admin-Bereich wird vom Backend ausgeliefert, nicht von der separaten WebUI.
+
+## [Backend 1.0.022] - 2026-10-12
+
+- Adminpanel: Neuer Navigationsbereich **Remote Config** mit Regler-Icon für globale Playlist- und Add-on-Verwaltung über alle registrierten Accounts, unabhängig von Suche, Seitenaufteilung und Online-Filter.
+- Remote Config: Playlists und Add-ons global hinzufügen bzw. anhand derselben ID aktualisieren, vorhandene Einträge bearbeiten, ausgewählte Einträge entfernen oder alle Playlists bzw. Add-ons leeren.
+- Geltungsbereich: Hinzufügen erreicht alle bestehenden Profile konfigurierbarer Accounts. Bearbeiten und ausgewähltes Entfernen treffen nur vorhandene Einträge mit der gewählten ID. Accounts ohne Cloud-Snapshot oder Profile werden ausdrücklich als übersprungen gezählt. Keine automatischen Vorgaben für zukünftige Accounts oder Profile.
+- Playlists: Bearbeiten erhält die Playlist-ID und zusätzliche profilbezogene Eigenschaften; Name, M3U-/EPG-Adressen sowie die angezeigten Aktivierungs-/Importoptionen werden ersetzt. Eine leere EPG-Adresse entfernt die EPG-Konfiguration. Entfernen bereinigt passende profilbezogene Legacy-URL-Felder; vollständiges Leeren entfernt auch die alten M3U-/EPG-Felder.
+- Xtream Codes: Separate Eingabefelder für Server, Benutzername und Passwort erzeugen korrekt kodierte `get.php`- und `xmltv.php`-Adressen. Gemeinsame Zugangsdaten werden für alle Zielaccounts identisch gesetzt; dies ist keine individuelle Benutzerbereitstellung.
+- StreamNet TV: Eigener Playlist-Typ konfiguriert die feste System-ID `streamnet_tv` statt einer zusätzlichen benutzerdefinierten Playlist und setzt eine ausdrückliche Remote-Host-Vorgabe.
+- Xtream / StreamNet TV: Die Aktion **nur Host ändern** erhält individuelle Zugangsdaten, Playlist-ID, Name, Aktivierung und Importoptionen bestehender Einträge. Xtream-URLs und ältere Host-/Benutzer-/Passwort-Triplets werden unterstützt; vorhandene `type`-/`output`-Parameter bleiben erhalten. M3U-/EPG-Adressen werden neu aufgebaut und zwischengespeicherte Ablaufprüfungen zurückgesetzt.
+- Validierung: Ungültige Serveradressen, fehlende Zugangsdaten oder ein unpassendes StreamNet-TV-Ziel werden ausdrücklich abgelehnt. Fehlende bzw. ungültige Xtream-Zugangsdaten eines betroffenen Eintrags brechen die gesamte Aktion ab, statt einzelne Fehler still zu überspringen.
+- Add-ons: Manifest- bzw. Stremio-Links werden über den bestehenden Manifest-Lader verarbeitet. Eine Link-Änderung ersetzt die alte Instanz-ID und erhält bestehende profilbezogene Aktivierungswerte. Die Aktivierungsoption gilt für neue Profilzuordnungen.
+- Absicherung: Eine schreibfreie Vorschau zeigt geänderte, unveränderte und übersprungene Accounts. Anwenden erfordert die genaue Bestätigung **ALLE ACCOUNTS**. Zwischenzeitliche Account-/Snapshot-Änderungen führen zu HTTP 409 und erfordern eine neue Vorschau; globale Aktionen werden nicht automatisch wiederholt.
+- Speicherung: Alle Änderungen und Audit-Einträge laufen gemeinsam in einer PostgreSQL-Transaktion. Jeder tatsächlich geänderte Account erhält eine neue Cloud-Revision, aktualisierte Sync-Zeitstempel, `source = 'admin'` und einen `global_`-Audit-Eintrag mit gemeinsamer Batch-ID. Unveränderte und übersprungene Accounts erhalten keine neue Revision. Audit-/Validierungsfehler verhindern eine teilweise erfolgreiche Aktion.
+- Sicherheit und Rückmeldung: Globale Endpunkte akzeptieren nur Admin-Tokens. Die Bestandsauswahl zeigt Namen, IDs und Account-Anzahlen ohne gespeicherte Playlist-URLs oder Zugangsdaten. Globale Requests erhalten eigene Log-Aktionsnamen; Formularstatus und Toast bleiben getrennt.
+- API: `GET /admin-api/global`, `POST /admin-api/global/preview` und `PATCH /admin-api/global/snapshot`; zusätzliche Operation `change_xtream_host` für Host-Wechsel mit individuellen Zugangsdaten.
+- Validierung: 46 gezielte Backend-/Admin-/Logging-Tests erfolgreich. Browserprüfung mit isolierten Testaccounts für Aktionswechsel, Xtream-/StreamNet-TV-Eingabe, Host-Wechsel, Vorschau, Bestätigung und Abbruch; keine echten Accounts verändert.
+- Rollout: Backend und Adminoberfläche neu deployen; für den Erhalt der Host-Vorgabe auch die aktualisierte WebUI ausrollen. Eigene StreamNet-TV-Hosts benötigen zusätzlich die aktualisierte APK. Keine neue Datenbankmigration erforderlich. Geräte übernehmen Änderungen beim nächsten Cloud-Pull.
+- Status: Noch nicht live deployed; die Backend-Versionsnummer wurde nicht erhöht. Bedienung und API sind zusätzlich im [Backend-Handbuch](backend-cloud/README.md#remote-config-global-playlists-and-add-ons) dokumentiert.
+
 ## [2.5.063] - 2026-10-12
 
 - Android: Plex-, Jellyfin- und Emby-Überschriften in den Heimserver-Pairinghinweisen verwenden die aktive Akzentfarbe und eine stärkere Schrift.

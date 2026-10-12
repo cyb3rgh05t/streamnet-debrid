@@ -553,6 +553,221 @@ export function applyAdminSnapshotMutation(
   return payload;
 }
 
+function normalizeXtreamHost(value) {
+  const raw = String(value || "").trim().replace(/\/+$/, "");
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    throw new Error("Xtream server URL is invalid");
+  }
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password ||
+      url.search || url.hash || /\s/.test(raw)) {
+    throw new Error("Xtream server URL is invalid");
+  }
+  url.pathname = url.pathname.replace(/\/(?:get|player_api|xmltv)\.php$/i, "").replace(/\/+$/, "");
+  return url.toString().replace(/\/+$/, "");
+}
+
+function xtreamUrls(host, username, password) {
+  const user = String(username || "").trim();
+  const pass = String(password || "").trim();
+  if (!user || !pass || user.length > 500 || pass.length > 500) {
+    throw new Error("Xtream username and password are required");
+  }
+  const credentials = new URLSearchParams({ username: user, password: pass });
+  return {
+    m3uUrl: `${host}/get.php?${credentials}&type=m3u_plus&output=ts`,
+    epgUrl: `${host}/xmltv.php?${credentials}`,
+  };
+}
+
+function existingXtreamCredentials(value) {
+  const raw = String(value || "").trim();
+  try {
+    const url = new URL(raw);
+    if (["http:", "https:"].includes(url.protocol) &&
+        /\/(?:get|player_api)\.php$/i.test(url.pathname)) {
+      const username = url.searchParams.get("username");
+      const password = url.searchParams.get("password");
+      if (username && password) return {
+        username, password,
+        type: url.searchParams.get("type"),
+        output: url.searchParams.get("output"),
+      };
+    }
+  } catch {
+    // Android also stores Xtream access as a host/user/password triplet.
+  }
+  const parts = raw.split(/\s+/);
+  if (parts.length === 3) {
+    const host = parts[0].replace(/^(?:xtream|xstream|xtreamcodes):\/\//i, "http://");
+    normalizeXtreamHost(/^https?:\/\//i.test(host) ? host : `http://${host}`);
+    return { username: parts[1], password: parts[2] };
+  }
+  throw new Error("Selected playlist has no valid Xtream credentials");
+}
+
+export function prepareAdminGlobalMutation(request) {
+  if (!isPlainObject(request)) throw new Error("Mutation request is invalid");
+  const operation = request.operation;
+  const allowed = new Set([
+    "add_addon", "edit_addon", "delete_addon", "clear_addons",
+    "add_playlist", "edit_playlist", "delete_playlist", "clear_playlists",
+    "change_xtream_host",
+  ]);
+  if (!allowed.has(operation)) throw new Error("Unsupported operation");
+  const targetId = /^(edit|delete)_/.test(operation) || operation === "change_xtream_host"
+    ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : "Playlist id")
+    : null;
+  let data = null;
+  if (/^(add|edit)_addon$/.test(operation)) data = normalizeAddon(request.data);
+  if (operation === "change_xtream_host") {
+    data = { host: normalizeXtreamHost(request.data?.host) };
+  }
+  if (/^(add|edit)_playlist$/.test(operation)) {
+    if (!isPlainObject(request.data)) {
+      throw new Error("Playlist data must be an object");
+    }
+    const input = { ...request.data };
+    const sourceType = input.sourceType || "m3u";
+    if (!["m3u", "xtream", "streamnet_tv"].includes(sourceType)) {
+      throw new Error("Playlist source type is invalid");
+    }
+    if (sourceType !== "m3u") {
+      const host = normalizeXtreamHost(input.host);
+      Object.assign(input, xtreamUrls(host, input.username, input.password));
+      input.expiresAtEpochSeconds = 0;
+      input.expirationCheckedAtMillis = 0;
+      if (sourceType === "streamnet_tv") {
+        if (operation === "edit_playlist" && targetId !== "streamnet_tv") {
+          throw new Error("Select StreamNet TV to edit its configuration");
+        }
+        input.id = "streamnet_tv";
+        input.name = "StreamNet TV";
+        input.streamNetHostOverride = host;
+      }
+    }
+    delete input.sourceType;
+    delete input.host;
+    delete input.username;
+    delete input.password;
+    data = normalizePlaylist({
+      ...input,
+      ...(operation === "edit_playlist" ? { id: targetId } : {}),
+    });
+  }
+  return { operation, targetId, data };
+}
+
+export function adminGlobalInventory(payload) {
+  if (!isPlainObject(payload)) throw new Error("Snapshot payload is invalid");
+  const playlists = new Map();
+  for (const id of profileIds(payload)) {
+    const iptv = payload.iptvByProfile?.[id];
+    for (const playlist of Array.isArray(iptv?.playlists) ? iptv.playlists : []) {
+      if (playlist?.id) playlists.set(String(playlist.id), { id: String(playlist.id), name: String(playlist.name || playlist.id) });
+    }
+  }
+  return {
+    profileCount: profileIds(payload).size,
+    addons: sharedAddonsFromPayload(payload).map((addon) => ({
+      id: String(addon.id), name: String(addon.name || addon.id),
+    })),
+    playlists: [...playlists.values()],
+  };
+}
+
+export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now()) {
+  if (!isPlainObject(payloadValue)) throw new Error("Snapshot payload is invalid");
+  const payload = cloneJson(payloadValue, "Snapshot payload", adminSnapshotMaxBytes);
+  for (const id of profileIds(payload)) cleanIdentifier(id, "profileId");
+  const { operation, targetId, data } = mutation;
+  if (operation.endsWith("addon") || operation === "clear_addons") {
+    const current = sharedAddonsFromPayload(payload);
+    if (/^(edit|delete)_addon$/.test(operation) && !current.some((addon) => addon.id === targetId)) {
+      return null;
+    }
+    let next;
+    if (operation === "clear_addons") next = [];
+    else if (operation === "delete_addon") next = removeById(current, targetId);
+    else if (operation === "add_addon") next = upsertById(current, data);
+    else if (operation === "edit_addon") {
+      next = upsertById(removeById(current, targetId), data);
+      // Keep each profile's activation even when a changed URL produces a new ID.
+      for (const items of Object.values(payload.addonsByProfile || {})) {
+        if (!Array.isArray(items)) continue;
+        for (const addon of items) {
+          if (addon?.id === targetId) addon.id = data.id;
+        }
+      }
+    } else throw new Error("Unsupported operation");
+    replaceAccountAddons(payload, next);
+    if (jsonEqual(payloadValue.addons, payload.addons) &&
+        jsonEqual(payloadValue.addonsByProfile, payload.addonsByProfile)) return null;
+    payload.addonsUpdatedAt = now;
+  } else {
+    let changed = false;
+    for (const profileId of profileIds(payload)) {
+      const previous = payload.iptvByProfile?.[profileId];
+      const items = Array.isArray(previous?.playlists) ? previous.playlists : [];
+      const selected = items.find((item) => item?.id === targetId);
+      if ((/^(edit|delete)_playlist$/.test(operation) || operation === "change_xtream_host") && !selected) continue;
+      const iptv = objectAt(payload, "iptvByProfile", profileId);
+      if (operation === "clear_playlists") {
+        iptv.playlists = [];
+        iptv.m3uUrl = "";
+        iptv.epgUrl = "";
+        if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = [];
+      } else if (operation === "delete_playlist") {
+        iptv.playlists = removeById(items, targetId);
+        if (iptv.m3uUrl === selected.m3uUrl) iptv.m3uUrl = "";
+        if (iptv.epgUrl === selected.epgUrl) {
+          iptv.epgUrl = "";
+          if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = [];
+        }
+      } else if (operation === "change_xtream_host") {
+        const credentials = existingXtreamCredentials(selected.m3uUrl);
+        const urls = xtreamUrls(data.host, credentials.username, credentials.password);
+        const m3u = new URL(urls.m3uUrl);
+        for (const field of ["type", "output"]) {
+          if (credentials[field]) m3u.searchParams.set(field, credentials[field]);
+        }
+        urls.m3uUrl = m3u.toString();
+        const replacement = {
+          ...selected, ...urls, epgUrls: [urls.epgUrl],
+          expiresAtEpochSeconds: 0, expirationCheckedAtMillis: 0,
+          ...(targetId === "streamnet_tv" ? { streamNetHostOverride: data.host } : {}),
+        };
+        iptv.playlists = upsertById(items, replacement);
+        if (iptv.m3uUrl === selected.m3uUrl) iptv.m3uUrl = urls.m3uUrl;
+        if (iptv.epgUrl === selected.epgUrl) {
+          iptv.epgUrl = urls.epgUrl;
+          if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = [urls.epgUrl];
+        }
+      } else if (operation === "add_playlist" || operation === "edit_playlist") {
+        iptv.playlists = upsertById(items, operation === "edit_playlist" ? { ...selected, ...data } : data);
+        if (!iptv.m3uUrl || (selected && iptv.m3uUrl === selected.m3uUrl)) iptv.m3uUrl = data.m3uUrl;
+        if (!iptv.epgUrl || (selected && iptv.epgUrl === selected.epgUrl)) {
+          iptv.epgUrl = data.epgUrl;
+          if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = data.epgUrls;
+        }
+      } else throw new Error("Unsupported operation");
+      const original = payloadValue.iptvByProfile?.[profileId] || {};
+      for (const field of ["playlists", "m3uUrl", "epgUrl", "epgUrls"]) {
+        if (!jsonEqual(original[field], iptv[field])) {
+          stampFieldUpdatedAt(payload, "iptvByProfile", profileId, field, now);
+          changed = true;
+        }
+      }
+    }
+    if (!changed) return null;
+  }
+  payload.updatedAt = now;
+  cloneJson(payload, "Payload data", adminSnapshotMaxBytes);
+  return payload;
+}
+
 export function redactAdminPayload(value, key = "") {
   if (sensitivePropertyPattern.test(key)) return "[REDACTED]";
   if (Array.isArray(value))

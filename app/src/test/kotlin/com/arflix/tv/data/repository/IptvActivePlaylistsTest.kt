@@ -5,6 +5,30 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IptvActivePlaylistsTest {
+    @Test
+    fun `remote StreamNet host survives preset migration and JSON decoding`() {
+        val playlist = decodePlaylistJsonCompat(
+            """[{"id":"streamnet_tv","name":"StreamNet TV","m3uUrl":"https://remote.example/get.php?username=user&password=pass","streamNetHostOverride":"https://remote.example","enabled":false,"importVod":false}]"""
+        ).single()
+
+        val result = ensureStreamNetTvPreset(listOf(playlist), "https://built-in.example").single()
+
+        assertEquals(playlist.m3uUrl, result.m3uUrl)
+        assertEquals("https://remote.example", result.streamNetHostOverride)
+        assertTrue(!result.enabled)
+        assertTrue(!result.importVod)
+    }
+
+    @Test
+    fun `StreamNet host without remote override still migrates to built-in host`() {
+        val playlist = configuredStreamNetTvPlaylist("https://old.example", "user", "pass")!!
+
+        val result = ensureStreamNetTvPreset(listOf(playlist), "https://built-in.example").single()
+
+        assertEquals("https://built-in.example user pass", result.m3uUrl)
+        assertEquals("", result.streamNetHostOverride)
+    }
+
     private fun newRepository(): IptvRepository = IptvRepository(
         context = io.mockk.mockk(relaxed = true),
         okHttpClient = io.mockk.mockk(relaxed = true),

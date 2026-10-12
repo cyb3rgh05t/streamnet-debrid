@@ -541,6 +541,9 @@ export function normalizeIptvPlaylist(
     epgUrl: epgUrls[0] ?? "",
     epgUrls,
     enabled: playlist.enabled !== false,
+    ...(playlist.streamNetHostOverride
+      ? { streamNetHostOverride: playlist.streamNetHostOverride }
+      : {}),
   };
 }
 

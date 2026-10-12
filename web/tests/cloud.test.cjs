@@ -7,6 +7,16 @@ const moduleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/cloud.ts"),
 ).href;
 
+test("playlist normalization preserves the Remote Config StreamNet host override", async () => {
+  const { normalizeIptvPlaylist } = await import(pathToFileURL(path.resolve(__dirname, "../lib/iptv.ts")).href);
+  const result = normalizeIptvPlaylist({
+    id: "streamnet_tv", name: "StreamNet TV",
+    m3uUrl: "https://remote.example/get.php?username=user&password=pass",
+    enabled: true, streamNetHostOverride: "https://remote.example",
+  });
+  assert.equal(result.streamNetHostOverride, "https://remote.example");
+});
+
 test("cloud history cannot leak another profile when a legacy backend returns all rows", async (t) => {
   const { pullCloudWatchHistory } = await import(moduleUrl);
   t.mock.method(globalThis, "fetch", async () => Response.json([

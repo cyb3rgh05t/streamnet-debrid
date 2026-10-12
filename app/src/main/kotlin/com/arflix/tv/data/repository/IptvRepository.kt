@@ -447,7 +447,8 @@ data class IptvPlaylistEntry(
     val importVod: Boolean = true,
     val importSeries: Boolean = true,
     val expiresAtEpochSeconds: Long = 0L,
-    val expirationCheckedAtMillis: Long = 0L
+    val expirationCheckedAtMillis: Long = 0L,
+    val streamNetHostOverride: String = ""
 )
 
 internal fun decodePlaylistJsonCompat(raw: String, gson: Gson = Gson()): List<IptvPlaylistEntry> =
@@ -470,6 +471,7 @@ internal fun decodePlaylistJsonCompat(raw: String, gson: Gson = Gson()): List<Ip
                     importSeries = json.booleanOrDefault("importSeries", true),
                     expiresAtEpochSeconds = json.longOrDefault("expiresAtEpochSeconds", 0L),
                     expirationCheckedAtMillis = json.longOrDefault("expirationCheckedAtMillis", 0L),
+                    streamNetHostOverride = json.stringOrDefault("streamNetHostOverride"),
                 )
             }
             .orEmpty()
@@ -528,7 +530,8 @@ private fun migrateStreamNetTvHost(
     playlist: IptvPlaylistEntry,
     streamNetHost: String,
 ): IptvPlaylistEntry {
-    if (streamNetHost.isBlank() || playlist.m3uUrl.isBlank() || isStreamNetTvSource(playlist, streamNetHost)) {
+    if (!playlist.streamNetHostOverride.isNullOrBlank() ||
+        streamNetHost.isBlank() || playlist.m3uUrl.isBlank() || isStreamNetTvSource(playlist, streamNetHost)) {
         return playlist
     }
     val (username, password) = streamNetCredentials(playlist.m3uUrl) ?: return playlist
@@ -1436,7 +1439,8 @@ class IptvRepository @Inject constructor(
             importVod = runCatching { playlist.importVod }.getOrDefault(true),
             importSeries = runCatching { playlist.importSeries }.getOrDefault(true),
             expiresAtEpochSeconds = runCatching { playlist.expiresAtEpochSeconds }.getOrDefault(0L).coerceAtLeast(0L),
-            expirationCheckedAtMillis = runCatching { playlist.expirationCheckedAtMillis }.getOrDefault(0L).coerceAtLeast(0L)
+            expirationCheckedAtMillis = runCatching { playlist.expirationCheckedAtMillis }.getOrDefault(0L).coerceAtLeast(0L),
+            streamNetHostOverride = playlist.streamNetHostOverride.orEmpty().trim()
         )
     }
 

@@ -35,6 +35,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -102,6 +103,7 @@ import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.TextSecondary
 import com.arflix.tv.ui.skin.resolveAccentColor
+import com.arflix.tv.ui.skin.ArvioSkin
 import androidx.compose.ui.res.stringResource
 import coil.compose.AsyncImage
 import com.arflix.tv.R
@@ -774,7 +776,9 @@ fun StreamSelector(
                                     Spacer(modifier = Modifier.height(16.dp))
                                     SourceRefreshButton(onRefresh = onRefresh, accentColor = accentColor)
                                     if (onRequest != null && hasStreamingAddons) {
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(22.dp))
+                                        SourceRequestExplanation()
+                                        Spacer(modifier = Modifier.height(12.dp))
                                         SourceRequestButton(onRequest = onRequest, accentColor = accentColor)
                                     }
                                 }
@@ -2032,6 +2036,7 @@ private fun SourceEmptyState(
     focusedActionIndex: Int = 0,
 ) {
     val accentColor = resolveAccentColor(AccentYellow)
+    val panelShape = RoundedCornerShape(ArvioSkin.radius.lg)
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -2039,9 +2044,13 @@ private fun SourceEmptyState(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
-                .background(OledPanel, RoundedCornerShape(18.dp))
-                .border(1.dp, OledMutedBorder, RoundedCornerShape(18.dp))
-                .padding(horizontal = 42.dp, vertical = 34.dp)
+                .widthIn(max = 460.dp)
+                .fillMaxWidth(0.92f)
+                .clip(panelShape)
+                .background(ArvioSkin.colors.surfaceRaised)
+                .background(Brush.linearGradient(listOf(accentColor.copy(alpha = 0.07f), Color.Transparent)))
+                .border(1.dp, accentColor.copy(alpha = 0.22f), panelShape)
+                .padding(horizontal = 28.dp, vertical = 28.dp)
         ) {
             val stillSearching = isLoading || sourceSearchActive || (completedAddons < totalAddons && totalAddons > 0) || pluginScrapersLoading
             if (stillSearching) {
@@ -2059,17 +2068,24 @@ private fun SourceEmptyState(
                     color = TextSecondary
                 )
             } else {
-                Icon(
-                    imageVector = if (!hasStreamingAddons) Icons.Default.Settings else Icons.Default.Cloud,
-                    contentDescription = null,
-                    tint = if (hasStreamingAddons) accentColor else OledMutedText,
-                    modifier = Modifier.size(36.dp)
-                )
-                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier.size(56.dp)
+                        .background(accentColor.copy(alpha = 0.1f), RoundedCornerShape(16.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (!hasStreamingAddons) Icons.Default.Settings else Icons.Default.Cloud,
+                        contentDescription = null,
+                        tint = if (hasStreamingAddons) accentColor else OledMutedText,
+                        modifier = Modifier.size(30.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = message ?: if (!hasStreamingAddons) stringResource(R.string.stream_no_streaming_addons) else stringResource(R.string.stream_no_sources_found),
-                    style = ArflixTypography.body.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium),
-                    color = TextSecondary
+                    style = ArflixTypography.body.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
+                    color = TextPrimary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
                 if (hasStreamingAddons) {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -2079,7 +2095,9 @@ private fun SourceEmptyState(
                         isFocused = focusedActionIndex == 0,
                     )
                     if (onRequest != null) {
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(22.dp))
+                        SourceRequestExplanation()
+                        Spacer(modifier = Modifier.height(12.dp))
                         SourceRequestButton(
                             onRequest = onRequest,
                             accentColor = accentColor,
@@ -2098,30 +2116,34 @@ private fun SourceRefreshButton(
     accentColor: Color,
     isFocused: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .border(
-                if (isFocused) 2.dp else 1.dp,
-                if (isFocused) accentColor else Color.White.copy(alpha = 0.16f),
-                RoundedCornerShape(8.dp),
-            )
-            .clickable(onClick = onRefresh)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    SourceEmptyActionButton(
+        onClick = onRefresh,
+        accentColor = accentColor,
+        isFocused = isFocused,
+        icon = Icons.Default.Refresh,
+        label = stringResource(R.string.stream_refresh_sources)
+    )
+}
+
+@Composable
+private fun SourceRequestExplanation() {
+    val accentColor = resolveAccentColor(AccentYellow)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        Icon(
-            imageVector = Icons.Default.Refresh,
-            contentDescription = stringResource(R.string.stream_refresh_sources),
-            tint = accentColor,
-            modifier = Modifier.size(17.dp),
+        Text(
+            text = stringResource(R.string.vod_request_heading),
+            style = ArflixTypography.body.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+            color = accentColor,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
         Text(
-            text = stringResource(R.string.stream_refresh_sources),
-            style = ArflixTypography.caption.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-            color = TextPrimary,
+            text = stringResource(R.string.vod_request_hint),
+            style = ArflixTypography.caption.copy(fontSize = 12.sp, lineHeight = 17.sp),
+            color = TextSecondary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
     }
 }
@@ -2132,24 +2154,42 @@ private fun SourceRequestButton(
     accentColor: Color,
     isFocused: Boolean = false,
 ) {
+    SourceEmptyActionButton(
+        onClick = onRequest,
+        accentColor = accentColor,
+        isFocused = isFocused,
+        icon = Icons.Default.Cloud,
+        label = stringResource(R.string.vod_request_action)
+    )
+}
+
+@Composable
+private fun SourceEmptyActionButton(
+    onClick: () -> Unit,
+    accentColor: Color,
+    isFocused: Boolean,
+    icon: ImageVector,
+    label: String,
+) {
     Row(
         modifier = Modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White.copy(alpha = 0.08f))
-            .border(if (isFocused) 2.dp else 1.dp, if (isFocused) accentColor else Color.White.copy(alpha = 0.16f), RoundedCornerShape(8.dp))
-            .clickable(onClick = onRequest)
-            .padding(horizontal = 14.dp, vertical = 8.dp),
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(Color.White.copy(alpha = if (isFocused) 0.15f else 0f))
+            .border(if (isFocused) 2.dp else 1.dp, if (isFocused) accentColor else Color.White.copy(alpha = 0.16f), RoundedCornerShape(10.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally),
     ) {
         Icon(
-            imageVector = Icons.Default.Cloud,
-            contentDescription = stringResource(R.string.vod_request_action),
+            imageVector = icon,
+            contentDescription = null,
             tint = accentColor,
             modifier = Modifier.size(17.dp),
         )
         Text(
-            text = stringResource(R.string.vod_request_action),
+            text = label,
             style = ArflixTypography.caption.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
             color = TextPrimary,
         )

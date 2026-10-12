@@ -767,7 +767,10 @@ class CatalogRepository @Inject constructor(
         }
     }
 
-    suspend fun syncHomeServerCatalogs(candidates: List<HomeServerCatalogCandidate>): Boolean {
+    suspend fun syncHomeServerCatalogs(
+        candidates: List<HomeServerCatalogCandidate>,
+        removeMissing: Boolean = candidates.isNotEmpty()
+    ): Boolean {
         val profileId = activeProfileId()
         val prefs = context.settingsDataStore.data.first()
         val desiredCatalogs = candidates
@@ -822,7 +825,7 @@ class CatalogRepository @Inject constructor(
         // Library visibility/removal is authoritative when discovery returned
         // candidates. Without this cleanup, a hidden or deleted server library
         // remained as a stale Home catalog forever.
-        if (candidates.isNotEmpty()) {
+        if (removeMissing) {
             val removed = current.removeAll { catalog ->
                 catalog.sourceType == CatalogSourceType.HOME_SERVER &&
                     catalog.id !in desiredById
@@ -1500,7 +1503,9 @@ class CatalogRepository @Inject constructor(
             if (e is kotlinx.coroutines.CancellationException) throw e
             CatalogKind.STANDARD
         }
-        val safeCollectionSources = config.collectionSources.orEmpty()
+        val safeCollectionSources = CollectionTemplateManifest.normalizeCollectionSources(
+            config.id, config.collectionSources.orEmpty()
+        )
         val safeRequiredAddonUrls = config.requiredAddonUrls.orEmpty()
         val normalizedCollectionTileShape = try {
             CollectionTileShape.valueOf(config.collectionTileShape.name)
@@ -1724,4 +1729,3 @@ private object CatalogRepoRegexes {
         RegexOption.IGNORE_CASE
     )
 }
-

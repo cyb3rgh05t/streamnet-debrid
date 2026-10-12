@@ -311,6 +311,7 @@ class MediaRepository @Inject constructor(
         synchronized(logoCache) { logoCache.clear() }
         homeServerLogoRefCache.clear()
         collectionRefsCache.clear()
+        marvelAddonCatalogCache.clear()
         franchiseReleaseCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
@@ -343,6 +344,7 @@ class MediaRepository @Inject constructor(
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val homeServerLogoRefCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val collectionRefsCache = ConcurrentHashMap<String, CacheEntry<List<Pair<MediaType, Int>>>>()
+    private val marvelAddonCatalogCache = ConcurrentHashMap<String, CacheEntry<List<StremioMetaPreview>>>()
     private data class FranchiseReleaseDate(
         val date: java.time.LocalDate?
     )
@@ -501,7 +503,9 @@ class MediaRepository @Inject constructor(
         }
 
         val refs = LinkedHashSet<Pair<MediaType, Int>>()
-        cached?.forEach { refs.add(it) }
+        if (catalog.collectionSources.none { it.collectionTab == "timeline" }) {
+            cached?.forEach { refs.add(it) }
+        }
 
         // For GENRE collections, interleave movie and series refs so the
         // first page always shows a mix rather than "all movies, then TV".
@@ -1972,9 +1976,12 @@ class MediaRepository @Inject constructor(
                         entry.tileShape
                     },
                     collectionHideTitle = entry.hideTitle,
-                    collectionSources = mergeCollectionSources(
-                        primary = entry.sources,
-                        fallback = legacy?.collectionSources.orEmpty()
+                    collectionSources = CollectionTemplateManifest.normalizeCollectionSources(
+                        entry.id,
+                        mergeCollectionSources(
+                            primary = entry.sources,
+                            fallback = legacy?.collectionSources.orEmpty()
+                        )
                     ),
                     requiredAddonUrls = emptyList()
                 )
@@ -2460,8 +2467,22 @@ class MediaRepository @Inject constructor(
         if (catalog.collectionSources.isEmpty() || limit <= 0 || offset < 0) {
             return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
         }
+        val marvelSource = catalog.collectionSources.singleOrNull()?.takeIf {
+            it.collectionTab == "timeline" &&
+                it.addonCatalogId == "marvel-mcu" &&
+                it.addonManifestUrl == CollectionTemplateManifest.marvelTimelineSource().addonManifestUrl
+        }
+        if (marvelSource != null) {
+            return@coroutineScope loadMarvelAddonTimelinePage(marvelSource, offset, limit)
+        }
         if (catalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }) {
-            return@coroutineScope loadMarvelWatchlistTimelinePage(offset, limit)
+            return@coroutineScope loadCollectionCatalogPage(
+                catalog.copy(collectionSources = catalog.collectionSources.map(
+                    CollectionTemplateManifest::migrateMarvelTimelineSource
+                )),
+                offset,
+                limit
+            )
         }
 
         val resolvedRefs = resolveCollectionCatalogRefs(
@@ -2511,6 +2532,111 @@ class MediaRepository @Inject constructor(
             hasMore = nextOffset < refs.size,
             nextOffset = nextOffset
         )
+    }
+
+    private suspend fun loadMarvelAddonTimelinePage(
+        source: CollectionSourceConfig,
+        offset: Int,
+        limit: Int
+    ): CategoryPageResult = coroutineScope {
+        val descriptor = AddonCatalogDescriptor(
+            addonId = null,
+            catalogType = requireNotNull(source.addonCatalogType),
+            catalogId = requireNotNull(source.addonCatalogId),
+            manifestUrl = requireNotNull(source.addonManifestUrl)
+        )
+        val snapshotKey = requireNotNull(source.addonManifestUrl)
+        val metas = (if (offset > 0) getFromCache(marvelAddonCatalogCache, snapshotKey) else null) ?: run {
+            // The addon advertises 21 days of freshness, even when the timeline changes.
+            val response = streamRepository.getAddonCatalogPageFromUrl(
+                manifestUrl = snapshotKey,
+                catalogType = descriptor.catalogType,
+                catalogId = descriptor.catalogId,
+                revalidate = true
+            )
+            (response.metas ?: response.items.orEmpty()).also {
+                if (it.isEmpty()) error("Marvel timeline returned an empty catalog")
+                marvelAddonCatalogCache[snapshotKey] = CacheEntry(it, System.currentTimeMillis())
+                if (com.arflix.tv.BuildConfig.DEBUG) {
+                    Log.d("MarvelTimeline", "SNAPSHOT revalidated count=${it.size} source=$snapshotKey")
+                    it.forEachIndexed { index, meta ->
+                        Log.d("MarvelTimeline", "RAW position=$index id=${meta.id} type=${meta.type} tmdb=${meta.tmdbId} title=${meta.name}")
+                    }
+                }
+            }
+        }
+        val semaphore = Semaphore(4)
+        val page = metas.withIndex().drop(offset).take(limit).map { (position, meta) ->
+            async {
+                semaphore.withPermit {
+                    val direct = parseTmdbRefFromAddonMeta(meta, null)
+                    val ref = direct ?: extractImdbId(meta)?.let { imdbId ->
+                        getAddonImdbLookupEntry(imdbId)?.data ?: try {
+                            marvelTimelineImdbRef(tmdbApi.findByExternalId(
+                                externalId = imdbId, apiKey = apiKey, externalSource = "imdb_id"
+                            )).also { resolved -> cacheAddonImdbLookup(imdbId, resolved) }
+                        } catch (e: java.io.IOException) {
+                            Log.w("MarvelTimeline", "IMDb lookup failed at $position id=$imdbId", e)
+                            null
+                        } catch (e: retrofit2.HttpException) {
+                            Log.w("MarvelTimeline", "IMDb lookup failed at $position id=$imdbId", e)
+                            null
+                        }
+                    }
+                    if (ref == null) {
+                        Log.w("MediaRepository", "Marvel timeline identity unresolved at $position: ${meta.id}")
+                    }
+                    val details = ref?.let {
+                        try {
+                            getFromCache(detailsCache, detailsCacheKey(it.first, it.second))
+                                ?.takeIf { cached -> !cached.backdrop.isNullOrBlank() }
+                                ?: when (it.first) {
+                                    MediaType.MOVIE -> tmdbApi.getMovieDetails(
+                                        it.second, apiKey, language = contentLanguage
+                                    ).toMediaItem()
+                                    MediaType.TV -> tmdbApi.getTvDetails(
+                                        it.second, apiKey, language = contentLanguage
+                                    ).toMediaItem()
+                                }.let { artwork ->
+                                    if (!artwork.backdrop.isNullOrBlank()) artwork else {
+                                        val images = tmdbApi.getImages(
+                                            mediaType = if (it.first == MediaType.TV) "tv" else "movie",
+                                            id = it.second,
+                                            apiKey = apiKey
+                                        )
+                                        val landscape = images.backdrops
+                                            .filter { image ->
+                                                !image.filePath.isNullOrBlank() &&
+                                                    image.height > 0 && image.width.toFloat() / image.height >= 1.4f
+                                            }
+                                            .maxWithOrNull(compareBy<TmdbImage> { image -> image.voteAverage }
+                                                .thenBy { image -> image.width })
+                                        artwork.copy(backdrop = landscape?.filePath?.let { path ->
+                                            "${Constants.BACKDROP_BASE}$path"
+                                        })
+                                    }
+                                }.also { artwork -> cacheItem(artwork) }
+                        } catch (e: java.io.IOException) {
+                            Log.w("MediaRepository", "Marvel artwork unavailable for $ref", e)
+                            null
+                        } catch (e: retrofit2.HttpException) {
+                            Log.w("MediaRepository", "Marvel artwork unavailable for $ref", e)
+                            null
+                        }
+                    }
+                    val card = marvelAddonTimelineCard(meta, ref, position, details)
+                    if (com.arflix.tv.BuildConfig.DEBUG) {
+                        Log.d("MarvelTimeline", "CARD position=$position id=${meta.id} resolved=$ref artwork=${if (card.backdrop.isNullOrBlank()) "missing-landscape" else "landscape"} title=${card.title}")
+                    }
+                    card
+                }
+            }
+        }.awaitAll()
+        val nextOffset = offset + page.size
+        if (com.arflix.tv.BuildConfig.DEBUG) {
+            Log.d("MarvelTimeline", "PAGE offset=$offset count=${page.size} next=$nextOffset total=${metas.size} positions=${page.map { it.sourceOrder }}")
+        }
+        CategoryPageResult(items = page, hasMore = nextOffset < metas.size, nextOffset = nextOffset)
     }
 
     private suspend fun loadMarvelWatchlistTimelinePage(offset: Int, limit: Int): CategoryPageResult =
@@ -2609,8 +2735,9 @@ class MediaRepository @Inject constructor(
                 CollectionSourceKind.TMDB_KEYWORD -> loadCollectionKeywordRefs(source, limit)
                 CollectionSourceKind.TMDB_WATCH_PROVIDER -> loadCollectionWatchProviderRefs(source, limit)
                 CollectionSourceKind.CURATED_IDS -> loadCollectionCuratedRefs(source, limit)
-                CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE -> MarvelWatchlistTimeline.entries
-                    .map { it.mediaType to it.tmdbId }.distinct().take(limit)
+                CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE -> loadCollectionAddonRefs(
+                    CollectionTemplateManifest.marvelTimelineSource(), offset, limit
+                )
                 CollectionSourceKind.MDBLIST_PUBLIC -> loadCollectionMdblistPublicRefs(source, limit)
                 CollectionSourceKind.VODWISHARR_STUDIO,
                 CollectionSourceKind.VODWISHARR_NETWORK -> loadVodwisharrCompanyRefs(source, limit)
@@ -3107,7 +3234,6 @@ class MediaRepository @Inject constructor(
         descriptor: AddonCatalogDescriptor
     ): List<Pair<MediaType, Int>> = coroutineScope {
         val typeHint = addonCatalogTypeToMediaType(descriptor.catalogType)
-        val directRefs = mutableListOf<Pair<MediaType, Int>>()
         val imdbCandidates = mutableListOf<Pair<String, MediaType?>>()
         val titleCandidates = mutableListOf<Pair<String, MediaType?>>()
         val unresolvedMetaCandidates = mutableListOf<UnresolvedAddonMeta>()
@@ -3118,7 +3244,6 @@ class MediaRepository @Inject constructor(
         metas.forEach { meta ->
             val direct = parseTmdbRefFromAddonMeta(meta, typeHint)
             if (direct != null) {
-                directRefs += direct
                 return@forEach
             }
             val inferredHint = typeHint ?: addonCatalogTypeToMediaType(meta.type)
@@ -3159,7 +3284,7 @@ class MediaRepository @Inject constructor(
                         )
                     }
                 }
-            }.mapNotNull { it.await() }
+            }.map { it.await() }
         } else {
             emptyList()
         }
@@ -3171,7 +3296,7 @@ class MediaRepository @Inject constructor(
                     resolveImdbToTmdbRef(imdbId, hint)
                 }
             }
-        }.mapNotNull { it.await() }
+        }.map { it.await() }
 
         val titleSemaphore = Semaphore(2)
         val resolvedTitleRefs = titleCandidates.take(12).map { (title, hint) ->
@@ -3180,9 +3305,22 @@ class MediaRepository @Inject constructor(
                     resolveTitleToTmdbRef(title, hint)
                 }
             }
-        }.mapNotNull { it.await() }
+        }.map { it.await() }
 
-        (directRefs + resolvedFromMeta + resolvedImdbRefs + resolvedTitleRefs).distinct()
+        val metaRefs = unresolvedMetaCandidates.take(8).zip(resolvedFromMeta)
+            .associate { (candidate, ref) -> candidate.id to ref }
+        val imdbRefs = imdbCandidates.zip(resolvedImdbRefs)
+            .associate { (candidate, ref) -> candidate to ref }
+        val titleRefs = titleCandidates.take(12).zip(resolvedTitleRefs)
+            .associate { (candidate, ref) -> candidate to ref }
+        val directInOrder = metas.map { parseTmdbRefFromAddonMeta(it, typeHint) }
+        val resolvedInOrder = metas.map { meta ->
+            val hint = typeHint ?: addonCatalogTypeToMediaType(meta.type)
+            extractImdbId(meta)?.let { imdbRefs[it to hint] }
+                ?: metaRefs[meta.id?.trim().orEmpty()]
+                ?: titleRefs[meta.name?.trim().orEmpty() to hint]
+        }
+        mergeAddonRefsInCatalogOrder(directInOrder, resolvedInOrder)
     }
 
     private suspend fun resolveAddonMetaToTmdbRef(
@@ -3362,11 +3500,7 @@ class MediaRepository @Inject constructor(
         typeHint: MediaType?
     ): Pair<MediaType, Int>? {
         val normalizedHint = typeHint ?: addonCatalogTypeToMediaType(meta.type)
-        // `moviedbId` would be a useful addon fallback field but it's added
-        // by a separate pending change to StremioMetaPreview — stick to the
-        // existing `tmdbId` alias until that lands to keep this branch
-        // self-contained.
-        val rawTmdb = meta.tmdbId?.trim().orEmpty()
+        val rawTmdb = (meta.tmdbId ?: meta.moviedbId)?.trim().orEmpty()
         val tmdbFromField = rawTmdb.toIntOrNull()
             ?: MediaRegexes.DIGITS_REGEX.find(rawTmdb)?.value?.toIntOrNull()
         if (tmdbFromField != null && normalizedHint != null) {

@@ -1516,7 +1516,9 @@ private fun DetailsContent(
                         if (genreText.isNotEmpty()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
-                                text = genreText,
+                                text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(
+                                    genreText, resolveAccentColor(AccentYellow)
+                                ),
                                 style = ArflixTypography.caption.copy(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -2020,7 +2022,9 @@ private fun DetailsContent(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = genreText,
+                                text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(
+                                    genreText, resolveAccentColor(AccentYellow)
+                                ),
                                 style = ArflixTypography.caption.copy(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
@@ -2033,7 +2037,7 @@ private fun DetailsContent(
                             )
 
                             if (displayDate.isNotEmpty()) {
-                                Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
+                                Text(text = "|", style = separatorStyle, color = resolveAccentColor(AccentYellow))
                                 Text(
                                     text = displayDate,
                                     style = ArflixTypography.caption.copy(
@@ -2047,7 +2051,7 @@ private fun DetailsContent(
                             }
 
                             if (hasDuration) {
-                                Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.7f))
+                                Text(text = "|", style = separatorStyle, color = resolveAccentColor(AccentYellow))
                                 Text(
                                     text = item.duration,
                                     style = ArflixTypography.caption.copy(
@@ -2086,7 +2090,7 @@ private fun DetailsContent(
                                     )
 
                                     if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
-                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                        Text(text = "|", style = separatorStyle, color = resolveAccentColor(AccentYellow))
                                     }
                                 }
 
@@ -2101,7 +2105,7 @@ private fun DetailsContent(
                                     )
 
                                     if (hasCertificationMetadata || hasBudgetMetadata) {
-                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                        Text(text = "|", style = separatorStyle, color = resolveAccentColor(AccentYellow))
                                     }
                                 }
 
@@ -2118,7 +2122,7 @@ private fun DetailsContent(
                                     )
 
                                     if (hasBudgetMetadata) {
-                                        Text(text = "|", style = separatorStyle, color = Color.White.copy(alpha = 0.58f))
+                                        Text(text = "|", style = separatorStyle, color = resolveAccentColor(AccentYellow))
                                     }
                                 }
 
@@ -3513,7 +3517,7 @@ private fun MobileMetadataSeparator() {
     Text(
         text = "•",
         style = ArflixTypography.caption.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-        color = Color.White.copy(alpha = 0.42f),
+        color = resolveAccentColor(AccentYellow),
         maxLines = 1
     )
 }

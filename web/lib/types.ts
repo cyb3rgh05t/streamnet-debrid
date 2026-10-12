@@ -372,6 +372,7 @@ export interface IptvPlaylistEntry {
   epgUrl?: string;
   epgUrls?: string[];
   enabled: boolean;
+  streamNetHostOverride?: string;
 }
 
 export interface IptvTvSession {

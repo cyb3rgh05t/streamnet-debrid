@@ -1,7 +1,7 @@
 {
   "name": "streamnet-backend-cloud",
   "private": true,
-  "version": "1.0.021",
+  "version": "1.0.022",
   "type": "module",
   "engines": {
     "node": ">=20"

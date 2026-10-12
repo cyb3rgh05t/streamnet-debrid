@@ -8,6 +8,7 @@ const state = {
   onlineOnly: false,
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
+  global: null,
 };
 
 const byId = (id) => document.getElementById(id);
@@ -185,6 +186,7 @@ function logout() {
   state.token = null;
   state.adminEmail = null;
   state.selectedAccount = null;
+  state.global = null;
   sessionStorage.removeItem("streamnet:admin-token");
   sessionStorage.removeItem("streamnet:admin-email");
   byId("dashboard-view").classList.add("hidden");
@@ -644,6 +646,7 @@ async function openAccount(accountId) {
   );
   state.selectedAccount = data;
   byId("accounts-view").classList.add("hidden");
+  byId("global-view").classList.add("hidden");
   byId("audits-view").classList.add("hidden");
   byId("account-view").classList.remove("hidden");
   byId("page-title").textContent = "Account-Details";
@@ -1029,16 +1032,152 @@ async function loadAudits() {
   });
 }
 
+async function loadGlobal() {
+  state.global = await api("/admin-api/global");
+  byId("global-summary").textContent =
+    `${state.global.total} registrierte Accounts · ${state.global.configurable} konfigurierbar · ` +
+    `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
+  updateGlobalFields();
+}
+
+function updateGlobalFields() {
+  const operation = byId("global-operation").value;
+  const needsTarget = /^(edit|delete)_/.test(operation) || operation === "change_xtream_host";
+  const editsData = /^(add|edit)_/.test(operation);
+  const isAddon = operation.endsWith("addon") || operation === "clear_addons";
+  byId("global-target-field").classList.toggle("hidden", !needsTarget);
+  byId("global-target").required = needsTarget;
+  byId("global-target").disabled = !needsTarget;
+  for (const [kind, active] of [["addon", editsData && isAddon], ["playlist", editsData && !isAddon]]) {
+    const fields = byId(`global-${kind}-fields`);
+    fields.classList.toggle("hidden", !active);
+    fields.querySelectorAll("input").forEach((input) => { input.disabled = !active; });
+  }
+  const hostOnly = operation === "change_xtream_host";
+  byId("global-host-fields").classList.toggle("hidden", !hostOnly);
+  byId("global-host-url").disabled = !hostOnly;
+  byId("global-host-url").required = hostOnly;
+  updateGlobalPlaylistFields();
+  byId("global-addon-url").required = editsData && isAddon;
+  const select = byId("global-target");
+  const previous = select.value;
+  select.replaceChildren();
+  const items = state.global?.[isAddon ? "addons" : "playlists"] || [];
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = items.length ? "Eintrag auswählen" : "Keine Einträge vorhanden";
+  select.append(placeholder);
+  for (const item of items) {
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = `${item.name} · ${item.accountCount} Account(s) · ${item.id}`;
+    select.append(option);
+  }
+  if (items.some((item) => item.id === previous)) select.value = previous;
+}
+
+function updateGlobalPlaylistFields() {
+  const active = /^(add|edit)_playlist$/.test(byId("global-operation").value);
+  const type = byId("global-playlist-type");
+  type.disabled = !active;
+  const xtream = type.value !== "m3u";
+  byId("global-m3u-fields").classList.toggle("hidden", xtream);
+  byId("global-xtream-fields").classList.toggle("hidden", !xtream);
+  for (const id of ["global-playlist-url", "global-playlist-epg"]) {
+    byId(id).disabled = !active || xtream;
+  }
+  byId("global-playlist-url").required = active && !xtream;
+  for (const id of ["global-xtream-host", "global-xtream-user", "global-xtream-password"]) {
+    byId(id).disabled = !active || !xtream;
+    byId(id).required = active && xtream;
+  }
+  byId("global-playlist-name").disabled = !active || type.value === "streamnet_tv";
+}
+
+async function submitGlobalMutation(event) {
+  event.preventDefault();
+  const button = event.target.querySelector('button[type="submit"]');
+  const message = byId("global-mutation-message");
+  setButtonBusy(button, true, "Vorschau wird geladen…");
+  try {
+    const operation = byId("global-operation").value;
+    const operationLabel = byId("global-operation").selectedOptions[0].textContent;
+    const request = {
+      operation,
+      targetId: byId("global-target").value,
+      reason: byId("global-reason").value,
+    };
+    if (/^(add|edit)_addon$/.test(operation)) {
+      request.data = { url: byId("global-addon-url").value.trim(), isEnabled: byId("global-addon-enabled").checked };
+    } else if (/^(add|edit)_playlist$/.test(operation)) {
+      request.data = {
+        name: byId("global-playlist-name").value.trim(),
+        m3uUrl: byId("global-playlist-url").value.trim(),
+        epgUrl: byId("global-playlist-epg").value.trim(),
+        enabled: byId("global-playlist-enabled").checked,
+        importLiveTv: byId("global-playlist-live").checked,
+        importVod: byId("global-playlist-vod").checked,
+        importSeries: byId("global-playlist-series").checked,
+        sourceType: byId("global-playlist-type").value,
+      };
+      if (request.data.sourceType !== "m3u") {
+        request.data.host = byId("global-xtream-host").value.trim();
+        request.data.username = byId("global-xtream-user").value.trim();
+        request.data.password = byId("global-xtream-password").value.trim();
+      }
+    } else if (operation === "change_xtream_host") {
+      request.data = { host: byId("global-host-url").value.trim() };
+    }
+    const preview = await api("/admin-api/global/preview", { method: "POST", body: JSON.stringify(request) });
+    const counts = (result) =>
+      `${result.changed} Account(s) geändert, ${result.unchanged} unverändert, ${result.skipped} ohne Snapshot/Profile übersprungen.`;
+    if (!preview.changed) {
+      setMessage(message, `Keine Änderungen erforderlich. ${counts(preview)}`, "info");
+      return;
+    }
+    const confirmed = await openAdminDialog({
+      title: "Globale Änderung bestätigen",
+      eyebrow: "ALLE ACCOUNTS",
+      message: `${operationLabel}. ` +
+        `${preview.changed} von ${preview.total} Accounts werden geändert; ` +
+        `${preview.unchanged} bleiben unverändert, ${preview.skipped} werden übersprungen. ` +
+        'Zum Anwenden bitte "ALLE ACCOUNTS" eingeben. Entfernen ist nicht rückgängig zu machen.',
+      inputLabel: "Bestätigung",
+      requiredText: "ALLE ACCOUNTS",
+      requiredTextError: 'Bitte exakt "ALLE ACCOUNTS" eingeben.',
+      confirmLabel: "Global anwenden",
+      danger: true,
+    });
+    if (confirmed !== "ALLE ACCOUNTS") {
+      setMessage(message, "Globale Änderung abgebrochen.", "info");
+      return;
+    }
+    const result = await api("/admin-api/global/snapshot", {
+      method: "PATCH",
+      body: JSON.stringify({ ...request, expectedState: preview.state, confirmation: confirmed }),
+    });
+    setMessage(message, `Gespeichert und pro Account protokolliert. ${counts(result)}`, "success");
+    showToast("Globale Änderung gespeichert.");
+    await loadGlobal();
+  } catch (error) {
+    setMessage(message, error.message, "error");
+    showToast(error.message, true);
+  } finally {
+    setButtonBusy(button, false);
+  }
+}
+
 function selectView(view) {
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === view);
   });
   byId("account-view").classList.add("hidden");
   byId("accounts-view").classList.toggle("hidden", view !== "accounts");
+  byId("global-view").classList.toggle("hidden", view !== "global");
   byId("audits-view").classList.toggle("hidden", view !== "audits");
   byId("page-title").textContent =
-    view === "accounts" ? "Accounts" : "Audit-Protokoll";
-  (view === "accounts" ? loadOverview() : loadAudits()).catch((error) =>
+    view === "accounts" ? "Accounts" : view === "global" ? "Remote Config" : "Audit-Protokoll";
+  (view === "accounts" ? loadOverview() : view === "global" ? loadGlobal() : loadAudits()).catch((error) =>
     showToast(error.message, true),
   );
 }
@@ -1071,6 +1210,18 @@ byId("login-form").addEventListener("submit", async (event) => {
 });
 
 byId("logout-button").addEventListener("click", logout);
+byId("global-operation").addEventListener("change", updateGlobalFields);
+byId("global-playlist-type").addEventListener("change", updateGlobalPlaylistFields);
+byId("global-target").addEventListener("change", () => {
+  if (byId("global-target").value === "streamnet_tv") {
+    byId("global-playlist-type").value = "streamnet_tv";
+    byId("global-playlist-type").dispatchEvent(new Event("change"));
+  }
+});
+byId("global-form").addEventListener("submit", submitGlobalMutation);
+byId("global-refresh").addEventListener("click", () => {
+  loadGlobal().catch((error) => showToast(error.message, true));
+});
 byId("refresh-button").addEventListener("click", (event) => {
   const button = event.currentTarget;
   setButtonBusy(button, true, "Aktualisieren…");

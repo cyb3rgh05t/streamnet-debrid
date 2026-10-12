@@ -710,14 +710,10 @@ internal object CollectionTemplateManifest {
             sources = listOf(
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "movie", catalogId = "movies", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "movie"),
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "series", catalogId = "series", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                CollectionSourceConfig(
-                    kind = CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE,
-                    collectionTab = "timeline"
-                )
+                marvelTimelineSource()
             ),
             listMetadata = listOf(
-                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL),
-                metadata(sourceCatalogId = "marvel-watchlist-2026-10-10", sourceAddonId = null, sourceName = "Marvel Story-Timeline", sourceLabel = "MARVELWATCHLIST", mediaType = "mixed", itemCount = 168, author = null, url = "https://marvelwatchlist.com/de/")
+                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
             )
         ),
         entry(
@@ -1121,6 +1117,22 @@ internal object CollectionTemplateManifest {
     private val entriesById: Map<String, CollectionTemplateEntry> = entries.associateBy { it.id }
     private val entryIds: Set<String> = entriesById.keys
     private val validRailGroups: Set<CollectionGroupKind> = railOrder.toSet()
+
+    fun marvelTimelineSource(): CollectionSourceConfig = source(
+        addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+        type = "Marvel",
+        catalogId = "marvel-mcu",
+        manifestUrl = MARVEL_MANIFEST_URL,
+        collectionTab = "timeline"
+    )
+
+    fun migrateMarvelTimelineSource(source: CollectionSourceConfig): CollectionSourceConfig =
+        if (source.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE) marvelTimelineSource() else source
+
+    fun normalizeCollectionSources(catalogId: String, sources: List<CollectionSourceConfig>): List<CollectionSourceConfig> {
+        val template = entryForCatalog(catalogId)
+        return if (template?.title == "Marvel") template.sources else sources.map(::migrateMarvelTimelineSource)
+    }
 
     fun entryForCatalog(catalogId: String?): CollectionTemplateEntry? = catalogId?.let(entriesById::get)
 

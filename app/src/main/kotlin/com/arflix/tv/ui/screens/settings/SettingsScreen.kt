@@ -32,6 +32,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.lazy.LazyColumn
@@ -3933,6 +3934,7 @@ private fun TraktActivationModal(
     val qrContainerSize = if (isMobile) 0.dp else 172.dp
     val qrBitmapSizePx = if (isMobile) 0 else 512
     val clipboardManager = LocalClipboardManager.current
+    var cancelFocused by remember { mutableStateOf(false) }
 
     LaunchedEffect(userCode) {
         focusRequester.requestFocus()
@@ -3962,8 +3964,6 @@ private fun TraktActivationModal(
                     )))
                     .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
                     .padding(if (isMobile) 20.dp else 28.dp)
-                    .focusRequester(focusRequester)
-                    .focusable()
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         when (event.key) {
@@ -3972,8 +3972,7 @@ private fun TraktActivationModal(
                                 true
                             }
                             Key.Enter, Key.DirectionCenter -> {
-                                onDismiss()
-                                true
+                                false
                             }
                             else -> false
                         }
@@ -4104,16 +4103,18 @@ private fun TraktActivationModal(
                 Box(
                     modifier = Modifier
                         .align(Alignment.End)
+                        .focusRequester(focusRequester)
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (isMobile) Color.Transparent else Color.White.copy(alpha = 0.15f),
+                            if (cancelFocused) accentColor else Color.Transparent,
                             RoundedCornerShape(10.dp)
                         )
                         .border(
-                            1.dp,
-                            Color.White.copy(alpha = if (isMobile) 0.15f else 0.6f),
+                            if (cancelFocused) 2.dp else 1.dp,
+                            if (cancelFocused) accentColor else Color.White.copy(alpha = 0.15f),
                             RoundedCornerShape(10.dp)
                         )
+                        .onFocusChanged { cancelFocused = it.isFocused }
                         .then(if (isMobile && onOpenUrl != null) Modifier.fillMaxWidth() else Modifier)
                         .clickable { onDismiss() }
                         .padding(vertical = 12.dp, horizontal = 18.dp),
@@ -4122,7 +4123,7 @@ private fun TraktActivationModal(
                     Text(
                         text = stringResource(R.string.cancel),
                         style = ArflixTypography.button,
-                        color = TextPrimary
+                        color = if (cancelFocused) contrastingContentColor(accentColor) else TextSecondary
                     )
                 }
             }
@@ -4480,12 +4481,15 @@ private fun DiscordActivationModal(
 ) {
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     val accentContentColor = contrastingContentColor(accentColor)
+    val dialogColors = ArvioSkin.colors
+    val dialogShape = RoundedCornerShape(ArvioSkin.radius.lg)
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
-    val qrContainerSize = if (isMobile) 0.dp else 190.dp
+    val qrContainerSize = if (isMobile) 0.dp else 172.dp
     val qrBitmapSizePx = if (isMobile) 0 else 512
     var showInAppWebView by remember { mutableStateOf(false) }
-    var focusedButton by remember { mutableIntStateOf(0) } // 0 = Log in directly on TV, 1 = Cancel
+    val loginFocusRequester = remember { FocusRequester() }
+    var focusedButton by remember { mutableIntStateOf(1) } // 0 = Log in directly on TV, 1 = Cancel
     val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
     val context = LocalContext.current
 
@@ -4498,8 +4502,8 @@ private fun DiscordActivationModal(
         }
     }
 
-    LaunchedEffect(Unit) {
-        runCatching { focusRequester.requestFocus() }
+    LaunchedEffect(showInAppWebView) {
+        if (!showInAppWebView) runCatching { focusRequester.requestFocus() }
     }
 
     if (showInAppWebView) {
@@ -4527,14 +4531,15 @@ private fun DiscordActivationModal(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .focusRequester(focusRequester)
-                    .focusable()
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         when (event.key) {
                             Key.Back, Key.Escape -> { onDismiss(); true }
-                            Key.DirectionLeft  -> { focusedButton = if (isRtl) 1 else 0; true }
-                            Key.DirectionRight -> { focusedButton = if (isRtl) 0 else 1; true }
+                            Key.DirectionLeft, Key.DirectionRight -> {
+                                val login = (event.key == Key.DirectionLeft) != isRtl
+                                if (login) loginFocusRequester.requestFocus() else focusRequester.requestFocus()
+                                true
+                            }
                             Key.Enter, Key.DirectionCenter -> {
                                 if (focusedButton == 0) {
                                     if (isMobile) openDiscordInBrowser() else showInAppWebView = true
@@ -4553,26 +4558,32 @@ private fun DiscordActivationModal(
                     modifier = Modifier
                         .then(
                             if (isMobile) Modifier.fillMaxWidth(0.92f).widthIn(max = 520.dp)
-                            else Modifier.width(580.dp)
+                            else Modifier.widthIn(max = 560.dp).fillMaxWidth(0.92f)
                         )
-                        .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                        .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
+                        .clip(dialogShape)
+                        .background(dialogColors.surfaceRaised)
+                        .background(Brush.linearGradient(listOf(
+                            accentColor.copy(alpha = 0.07f),
+                            dialogColors.surfaceRaised,
+                            dialogColors.surfaceRaised
+                        )))
+                        .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
                         .clickable(enabled = false) {}
                         .padding(if (isMobile) 20.dp else 28.dp)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
-                                .background(accentColor.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-                                .border(1.dp, accentColor.copy(alpha = 0.32f), RoundedCornerShape(8.dp)),
+                                .size(52.dp)
+                                .background(accentColor.copy(alpha = 0.12f), RoundedCornerShape(14.dp))
+                                .border(1.dp, accentColor.copy(alpha = 0.24f), RoundedCornerShape(14.dp)),
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Link,
                                 contentDescription = null,
                                 tint = accentColor,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(26.dp)
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
@@ -4661,19 +4672,21 @@ private fun DiscordActivationModal(
                         // "Log in directly on TV" button
                         Box(
                             modifier = Modifier
+                                .focusRequester(loginFocusRequester)
+                                .onFocusChanged { if (it.isFocused) focusedButton = 0 }
                                 .background(
                                     if (focusedButton == 0) accentColor else accentColor.copy(alpha = 0.12f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .border(
-                                    1.dp,
+                                    if (focusedButton == 0) 2.dp else 1.dp,
                                     if (focusedButton == 0) accentColor else accentColor.copy(alpha = 0.32f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .clickable {
                                     if (isMobile) openDiscordInBrowser() else showInAppWebView = true
                                 }
-                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
                         ) {
                             Text(
                                 text = stringResource(
@@ -4687,21 +4700,23 @@ private fun DiscordActivationModal(
                         // "Cancel" button
                         Box(
                             modifier = Modifier
+                                .focusRequester(focusRequester)
+                                .onFocusChanged { if (it.isFocused) focusedButton = 1 }
                                 .background(
-                                    if (focusedButton == 1) Color.White.copy(alpha = 0.15f) else Color.Transparent,
+                                    if (focusedButton == 1) accentColor else Color.Transparent,
                                     RoundedCornerShape(10.dp)
                                 )
                                 .border(
-                                    1.dp,
-                                    if (focusedButton == 1) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
+                                    if (focusedButton == 1) 2.dp else 1.dp,
+                                    if (focusedButton == 1) accentColor else Color.White.copy(alpha = 0.15f),
                                     RoundedCornerShape(10.dp)
                                 )
                                 .clickable { onDismiss() }
-                                .padding(horizontal = 18.dp, vertical = 10.dp)
+                                .padding(horizontal = 18.dp, vertical = 12.dp)
                         ) {
                             Text(
                                 text = stringResource(R.string.cancel),
-                                color = if (focusedButton == 1) TextPrimary else TextSecondary,
+                                color = if (focusedButton == 1) accentContentColor else TextSecondary,
                                 style = ArflixTypography.caption.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Medium)
                             )
                         }
@@ -10850,8 +10865,10 @@ private fun MdbListConnectDialog(
     var inputFocused by remember { mutableStateOf(false) }
     val dialogFocusRequester = remember { FocusRequester() }
     val inputFocusRequester = remember { FocusRequester() }
+    val connectFocusRequester = remember { FocusRequester() }
+    val keyboardController = androidx.compose.ui.platform.LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(Unit) { runCatching { inputFocusRequester.requestFocus() } }
+    LaunchedEffect(Unit) { inputFocusRequester.requestFocus() }
 
     androidx.compose.ui.window.Dialog(
         onDismissRequest = onDismiss,
@@ -10875,8 +10892,6 @@ private fun MdbListConnectDialog(
                     )))
                     .border(1.dp, accentColor.copy(alpha = 0.22f), dialogShape)
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 28.dp)
-                    .focusRequester(dialogFocusRequester)
-                    .focusable()
                     .onPreviewKeyEvent { event ->
                         if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         when (event.key) {
@@ -10885,33 +10900,35 @@ private fun MdbListConnectDialog(
                                 true
                             }
                             Key.DirectionLeft -> {
-                                focusedButton = 0
+                                if (inputFocused) return@onPreviewKeyEvent false
+                                dialogFocusRequester.requestFocus()
                                 true
                             }
                             Key.DirectionRight -> {
-                                focusedButton = 1
+                                if (inputFocused) return@onPreviewKeyEvent false
+                                if (!connecting && apiKey.isNotBlank()) connectFocusRequester.requestFocus()
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                if (inputFocused) keyboardController?.hide()
+                                if (focusedButton == 1 && !connecting && apiKey.isNotBlank()) {
+                                    connectFocusRequester.requestFocus()
+                                } else {
+                                    dialogFocusRequester.requestFocus()
+                                }
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                if (!connecting) inputFocusRequester.requestFocus()
                                 true
                             }
                             Key.Enter, Key.DirectionCenter -> {
-                                when (focusedButton) {
-                                    0 -> {
-                                        onDismiss()
-                                        true
-                                    }
-                                    1 -> {
-                                        if (!connecting && apiKey.isNotBlank()) {
-                                            onConnect(apiKey)
-                                            true
-                                        } else {
-                                            false
-                                        }
-                                    }
-                                    else -> false
-                                }
+                                false
                             }
                             else -> false
                         }
                     }
+                    .focusGroup()
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -10979,59 +10996,84 @@ private fun MdbListConnectDialog(
                 Spacer(modifier = Modifier.height(18.dp))
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth(0.88f).align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Box(
+                    androidx.tv.material3.Button(
+                        onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (focusedButton == 0 && !inputFocused) Color.White.copy(alpha = 0.15f) else Color.Transparent)
-                            .border(
-                                width = 1.dp,
-                                color = if (focusedButton == 0 && !inputFocused) Color.White.copy(alpha = 0.6f) else Color.White.copy(alpha = 0.15f),
+                            .height(42.dp)
+                            .focusRequester(dialogFocusRequester)
+                            .onFocusChanged { if (it.isFocused) focusedButton = 0 },
+                        colors = androidx.tv.material3.ButtonDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = dialogColors.textMuted,
+                            focusedContainerColor = Color.White.copy(alpha = 0.15f),
+                            focusedContentColor = dialogColors.textPrimary
+                        ),
+                        shape = androidx.tv.material3.ButtonDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        scale = androidx.tv.material3.ButtonDefaults.scale(focusedScale = 1f),
+                        border = androidx.tv.material3.ButtonDefaults.border(
+                            border = androidx.tv.material3.Border(
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                            focusedBorder = androidx.tv.material3.Border(
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
                                 shape = RoundedCornerShape(10.dp)
                             )
-                            .clickable { onDismiss() }
-                            .padding(vertical = 13.dp),
-                        contentAlignment = Alignment.Center
+                        )
                     ) {
                         Text(
                             text = stringResource(R.string.cancel),
-                            style = ArflixTypography.button,
-                            color = TextPrimary
+                            modifier = Modifier.fillMaxWidth(),
+                            style = ArvioSkin.typography.button,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
                         )
                     }
 
                     val canConnect = !connecting && apiKey.isNotBlank()
-                    Box(
+                    androidx.tv.material3.Button(
+                        onClick = { onConnect(apiKey) },
+                        enabled = canConnect,
                         modifier = Modifier
                             .weight(1f)
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(
-                                if (canConnect) {
-                                    if (focusedButton == 1 && !inputFocused) accentColor else accentColor.copy(alpha = 0.12f)
-                                } else {
-                                    Color.White.copy(alpha = 0.08f)
-                                }
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (canConnect) accentColor.copy(alpha = if (focusedButton == 1 && !inputFocused) 1f else 0.32f) else Color.White.copy(alpha = 0.15f),
+                            .height(42.dp)
+                            .focusRequester(connectFocusRequester)
+                            .onFocusChanged { if (it.isFocused) focusedButton = 1 },
+                        colors = androidx.tv.material3.ButtonDefaults.colors(
+                            containerColor = accentColor.copy(alpha = 0.12f),
+                            contentColor = accentColor,
+                            focusedContainerColor = accentColor,
+                            focusedContentColor = accentContentColor,
+                            disabledContainerColor = Color.White.copy(alpha = 0.08f),
+                            disabledContentColor = TextSecondary
+                        ),
+                        shape = androidx.tv.material3.ButtonDefaults.shape(shape = RoundedCornerShape(10.dp)),
+                        scale = androidx.tv.material3.ButtonDefaults.scale(focusedScale = 1f),
+                        border = androidx.tv.material3.ButtonDefaults.border(
+                            border = androidx.tv.material3.Border(
+                                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor.copy(alpha = 0.32f)),
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                            focusedBorder = androidx.tv.material3.Border(
+                                border = androidx.compose.foundation.BorderStroke(1.dp, accentColor),
+                                shape = RoundedCornerShape(10.dp)
+                            ),
+                            disabledBorder = androidx.tv.material3.Border(
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
                                 shape = RoundedCornerShape(10.dp)
                             )
-                            .clickable(enabled = canConnect) { onConnect(apiKey) }
-                            .padding(vertical = 13.dp),
-                        contentAlignment = Alignment.Center
+                        )
                     ) {
                         Text(
                             text = if (connecting) stringResource(R.string.syncing) else stringResource(R.string.connect),
-                            style = ArflixTypography.button,
-                            color = when {
-                                !canConnect -> TextSecondary
-                                focusedButton == 1 && !inputFocused -> accentContentColor
-                                else -> accentColor
-                            }
+                            modifier = Modifier.fillMaxWidth(),
+                            style = ArvioSkin.typography.button,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
                         )
                     }
                 }

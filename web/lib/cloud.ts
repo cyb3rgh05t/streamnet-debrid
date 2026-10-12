@@ -312,6 +312,7 @@ function normalizeIptvPlaylist(
       epgUrl,
       epgUrls: stringArray(raw.epgUrls ?? raw.epg_urls),
       enabled: raw.enabled !== false,
+      streamNetHostOverride: stringValue(raw.streamNetHostOverride) || undefined,
     },
     Number(fallbackId.match(/\d+$/)?.[0] ?? 1) - 1,
   );

@@ -80,7 +80,6 @@ import com.arflix.tv.data.repository.CatalogRepository
 import com.arflix.tv.data.repository.GenreFanartRepository
 import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.MediaRepository
-import com.arflix.tv.data.repository.MarvelWatchlistTimeline
 import com.arflix.tv.data.repository.TraktRepository
 import com.arflix.tv.ui.screens.home.resolveHomeWatchedBadgeState
 import com.arflix.tv.ui.components.CardLayoutMode
@@ -272,13 +271,20 @@ class CollectionDetailsViewModel @Inject constructor(
 
     private suspend fun loadInitialTab(catalog: CatalogConfig, tab: CollectionTab) {
         val pageCatalog = catalogForTab(catalog, tab)
-        val page = runCatching { loadCollectionPage(pageCatalog, tab, offset = 0, limit = FIRST_PAGE) }.getOrNull()
+        val page = runCatching { loadCollectionPage(pageCatalog, tab, offset = 0, limit = FIRST_PAGE) }
+            .onFailure {
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                android.util.Log.e("MarvelTimeline", "Initial collection page failed catalog=${catalog.id} tab=$tab", it)
+            }.getOrNull()
         val pageItems = when (tab) {
             CollectionTab.MOVIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
             CollectionTab.SERIES -> page?.items.orEmpty().filter { it.mediaType == MediaType.TV }
             CollectionTab.TIMELINE -> page?.items.orEmpty()
         }
         val decoratedPageItems = sortCollectionItems(tab, decorateWatchedBadges(pageItems))
+        if (com.arflix.tv.BuildConfig.DEBUG && tab == CollectionTab.TIMELINE) {
+            android.util.Log.d("MarvelTimeline", "UI initial catalog=${catalog.id} count=${decoratedPageItems.size} positions=${decoratedPageItems.map { it.sourceOrder }}")
+        }
         val decoratedCatalog = catalog
         _uiState.value = when (tab) {
             CollectionTab.MOVIES -> _uiState.value.copy(
@@ -341,7 +347,11 @@ class CollectionDetailsViewModel @Inject constructor(
                 CollectionTab.SERIES -> state.loadedSeriesOffset
                 CollectionTab.TIMELINE -> state.loadedTimelineOffset
             }
-            val next = runCatching { loadCollectionPage(pageCatalog, tab, offset = nextOffset, limit = PAGE_STEP) }.getOrNull()
+            val next = runCatching { loadCollectionPage(pageCatalog, tab, offset = nextOffset, limit = PAGE_STEP) }
+                .onFailure {
+                    if (it is kotlinx.coroutines.CancellationException) throw it
+                    android.util.Log.e("MarvelTimeline", "Collection page failed catalog=${catalog.id} tab=$tab offset=$nextOffset", it)
+                }.getOrNull()
             val freshItems = when (tab) {
                 CollectionTab.MOVIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.MOVIE }
                 CollectionTab.SERIES -> next?.items.orEmpty().filter { it.mediaType == MediaType.TV }
@@ -354,6 +364,9 @@ class CollectionDetailsViewModel @Inject constructor(
                 CollectionTab.TIMELINE -> state.timelineItems.mapTo(HashSet()) { it.collectionCardKey }
             }
             val uniqueNew = decoratedFreshItems.filter { it.collectionCardKey !in existingIds }
+            if (com.arflix.tv.BuildConfig.DEBUG && tab == CollectionTab.TIMELINE) {
+                android.util.Log.d("MarvelTimeline", "UI append offset=$nextOffset received=${freshItems.size} added=${uniqueNew.size} total=${state.timelineItems.size + uniqueNew.size} positions=${uniqueNew.map { it.sourceOrder }}")
+            }
             _uiState.value = when (tab) {
                 CollectionTab.MOVIES -> _uiState.value.copy(
                     movieItems = sortCollectionItems(tab, state.movieItems + uniqueNew),
@@ -432,10 +445,11 @@ class CollectionDetailsViewModel @Inject constructor(
         )
 
     fun preloadLogos(items: List<MediaItem>) {
+        val validItems = items.filter { it.id > 0 }
         if (items.isEmpty()) return
         viewModelScope.launch {
             val current = _cardLogoUrls.value.toMutableMap()
-            val missing = items
+            val missing = validItems
                 .filter { item ->
                     val key = "${item.mediaType}_${item.id}"
                     key !in current
@@ -481,7 +495,9 @@ class CollectionDetailsViewModel @Inject constructor(
         val pageCatalog = catalogForTab(catalog, tab)
         val availability = iptvVodAvailability
         if (!iptvOnlyMode || availability == null ||
-            pageCatalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }
+            pageCatalog.collectionSources.any {
+                it.collectionTab == "timeline" && it.addonCatalogId == "marvel-mcu"
+            }
         ) {
             val page = mediaRepository.loadCollectionCatalogPage(pageCatalog, offset, limit)
             return CollectionPage(page.items, page.hasMore, page.nextOffset ?: (offset + page.items.size))
@@ -511,9 +527,6 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {
-        if (tab == CollectionTab.TIMELINE) {
-            MarvelWatchlistTimeline.catalogForTimeline(catalog)?.let { return it }
-        }
         val filteredSources = catalog.collectionSources.flatMap { source ->
             if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank()) {
                 val refs = source.curatedRefs.orEmpty().filter { ref ->
@@ -801,9 +814,20 @@ fun CollectionDetailsScreen(
             },
             onTabSelected = { selectedTab = it },
             onItemClick = { item ->
-                onNavigateToDetails(item.mediaType, item.id)
+                if (item.id > 0) {
+                    onNavigateToDetails(item.mediaType, item.id)
+                } else {
+                    android.widget.Toast.makeText(
+                        context,
+                        context.getString(R.string.marvel_timeline_metadata_unavailable),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             },
             onItemFocused = { item, index ->
+                if (com.arflix.tv.BuildConfig.DEBUG && activeTab == CollectionTab.TIMELINE) {
+                    android.util.Log.d("MarvelTimeline", "FOCUS index=$index sourceOrder=${item.sourceOrder} key=${item.collectionCardKey} title=${item.title}")
+                }
                 viewModel.preloadLogos(listOf(item))
                 when (activeTab) {
                     CollectionTab.TIMELINE, CollectionTab.MOVIES -> lastFocusedMovieIndex = index
@@ -1264,6 +1288,7 @@ private fun CollectionItemsGrid(
                         isLandscape = !usePosterCards,
                         logoImageUrl = cardLogoUrl,
                         showTitle = true,
+                        showReleaseYear = true,
                         titleMaxLines = if (item.timelineEntryId != null) 3 else if (usePosterCards) 2 else 1,
                         onFocused = {
                             focusedMediaIndex = index

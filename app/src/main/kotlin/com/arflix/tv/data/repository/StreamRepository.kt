@@ -1433,10 +1433,11 @@ class StreamRepository @Inject constructor(
         manifestUrl: String,
         catalogType: String,
         catalogId: String,
-        skip: Int = 0
+        skip: Int = 0,
+        revalidate: Boolean = false
     ): StremioCatalogResponse = withContext(Dispatchers.IO) {
         val (baseUrl, queryParams) = getAddonBaseUrl(manifestUrl)
-        fetchAddonCatalogPage(baseUrl, queryParams, catalogType, catalogId, skip)
+        fetchAddonCatalogPage(baseUrl, queryParams, catalogType, catalogId, skip, revalidate)
     }
 
     private suspend fun fetchAddonCatalogPage(
@@ -1444,7 +1445,8 @@ class StreamRepository @Inject constructor(
         queryParams: String?,
         catalogType: String,
         catalogId: String,
-        skip: Int
+        skip: Int,
+        revalidate: Boolean = false
     ): StremioCatalogResponse {
         val queryBase = queryParams?.takeIf { it.isNotBlank() }
         val typeCandidates = catalogTypeAliases(catalogType)
@@ -1459,7 +1461,11 @@ class StreamRepository @Inject constructor(
                 queryBase = queryBase
             )
             for (url in urls) {
-                val response = runCatching { streamApi.getAddonCatalog(url) }.getOrNull() ?: continue
+                val response = if (revalidate) {
+                    streamApi.getAddonCatalog(url, cacheControl = "no-cache")
+                } else {
+                    runCatching { streamApi.getAddonCatalog(url) }.getOrNull() ?: continue
+                }
                 if (firstSuccessful == null) {
                     firstSuccessful = response
                 }

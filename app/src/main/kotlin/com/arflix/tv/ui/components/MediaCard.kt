@@ -74,6 +74,10 @@ private val missingArtworkBrush = Brush.linearGradient(
     )
 )
 
+internal fun formatCardReleaseYear(rawDate: String?, year: String): String? =
+    Regex("\\b\\d{4}\\b").find(year)?.value
+        ?: Regex("\\b\\d{4}\\b").find(rawDate.orEmpty())?.value
+
 private fun formatCardReleaseDate(rawDate: String?): String? {
     val value = rawDate?.trim().orEmpty()
     if (value.isBlank()) return null
@@ -101,6 +105,7 @@ fun MediaCard(
     showWatched: Boolean = true,
     showTitle: Boolean = true,
     showSubtitle: Boolean = true,
+    showReleaseYear: Boolean = false,
     titleMaxLines: Int = 1,
     subtitleMaxLines: Int = 1,
     isFocusedOverride: Boolean = false,
@@ -145,7 +150,11 @@ fun MediaCard(
     val baseImageUrl = if (isCollectionTile) {
         item.image.takeIf { it.isNotBlank() } ?: item.backdrop?.takeIf { it.isNotBlank() }
     } else if (isLandscape) {
-        (item.backdrop ?: item.image).takeIf { it.isNotBlank() }
+        if (item.timelineEntryId?.startsWith("marvel-addon:") == true) {
+            item.backdrop?.takeIf { it.isNotBlank() }
+        } else {
+            (item.backdrop ?: item.image).takeIf { it.isNotBlank() }
+        }
     } else {
         item.image.takeIf { it.isNotBlank() }
     }
@@ -543,12 +552,14 @@ fun MediaCard(
                 val tvSeriesLabel = stringResource(R.string.component_label_tv_series)
                 val movieLabel = stringResource(R.string.movie)
                 val mediaLabel = stringResource(R.string.component_label_media)
-                val subtitle = remember(showProgress, item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
+                val releaseYear = formatCardReleaseYear(item.releaseDate, item.year)
+                val subtitle = remember(showProgress, showReleaseYear, item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
                     if (showProgress && item.subtitle.isNotBlank()) {
                         item.subtitle
                     } else {
-                        val release = formatCardReleaseDate(item.releaseDate)
-                            ?: item.year.takeIf { it.isNotBlank() }
+                        val release = if (showReleaseYear) releaseYear else {
+                            formatCardReleaseDate(item.releaseDate) ?: item.year.takeIf { it.isNotBlank() }
+                        }
                         release ?: item.subtitle.ifBlank {
                             when (item.mediaType) {
                                 MediaType.TV -> tvSeriesLabel
@@ -567,7 +578,9 @@ fun MediaCard(
                             blurRadius = 4f
                         )
                     ),
-                    color = if (showProgress || formatCardReleaseDate(item.releaseDate) != null) {
+                    color = if (showProgress || (showReleaseYear && releaseYear != null) ||
+                        (!showReleaseYear && formatCardReleaseDate(item.releaseDate) != null)
+                    ) {
                         resolveAccentColor(ArvioSkin.colors.accent).copy(alpha = 0.95f)
                     } else {
                         ArvioSkin.colors.textMuted.copy(alpha = 0.85f)

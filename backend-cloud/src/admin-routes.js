@@ -8,6 +8,9 @@ import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
 import {
   applyAdminSnapshotMutation,
+  adminGlobalInventory,
+  applyAdminGlobalMutation,
+  prepareAdminGlobalMutation,
   hydrateAdminStremioAddon,
   summarizeAdminPayload,
 } from "./admin-snapshots.js";
@@ -39,6 +42,11 @@ const mutationFailureReasons = new Map([
   ["Playlist id is invalid", "invalid_playlist_id"],
   ["Playlist name is invalid", "invalid_playlist_name"],
   ["Playlist m3uUrl is required", "playlist_url_required"],
+  ["Xtream server URL is invalid", "invalid_xtream_host"],
+  ["Xtream username and password are required", "invalid_xtream_credentials"],
+  ["Selected playlist has no valid Xtream credentials", "missing_xtream_credentials"],
+  ["Playlist source type is invalid", "invalid_playlist_source_type"],
+  ["Select StreamNet TV to edit its configuration", "invalid_streamnet_tv_target"],
   ["rootKey is invalid", "invalid_profile_root"],
   ["field is invalid", "invalid_profile_field"],
   [
@@ -185,7 +193,136 @@ function setAdminSecurityHeaders(reply) {
     );
 }
 
+function globalState(rows) {
+  return crypto.createHash("sha256").update(JSON.stringify(
+    rows.map((row) => [row.account_id, row.revision, row.updated_at]),
+  )).digest("hex");
+}
+
+function globalSummary(rows) {
+  const addons = new Map();
+  const playlists = new Map();
+  let configurable = 0;
+  for (const row of rows) {
+    if (!row.payload) continue;
+    const inventory = adminGlobalInventory(row.payload);
+    if (!inventory.profileCount) continue;
+    configurable += 1;
+    for (const [map, items] of [[addons, inventory.addons], [playlists, inventory.playlists]]) {
+      for (const item of items) {
+        const entry = map.get(item.id) || { ...item, accountCount: 0 };
+        entry.accountCount += 1;
+        map.set(item.id, entry);
+      }
+    }
+  }
+  return {
+    total: rows.length,
+    configurable,
+    skipped: rows.length - configurable,
+    state: globalState(rows),
+    addons: [...addons.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    playlists: [...playlists.values()].sort((a, b) => a.name.localeCompare(b.name)),
+  };
+}
+
 export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
+  const globalAccountsQuery = `select a.id as account_id, s.payload, s.revision, s.updated_at
+    from accounts a left join account_sync_snapshots s on s.account_id = a.id
+    order by a.id`;
+
+  app.get("/admin-api/global", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    return globalSummary((await pool.query(globalAccountsQuery)).rows);
+  });
+
+  async function globalMutation(request, reply, preview) {
+    reply.header("Cache-Control", "no-store");
+    const admin = await authenticatedAdmin(request, pool, jwtKey);
+    if (!preview && (request.body?.confirmation !== "ALLE ACCOUNTS" ||
+        typeof request.body?.expectedState !== "string")) {
+      request.backendFailureReason = "invalid_global_confirmation";
+      return reply.code(400).send({ error: "Globale Bestätigung und Vorschau sind erforderlich." });
+    }
+    let mutation;
+    try {
+      const body = { ...request.body };
+      if (body.operation === "add_addon" || body.operation === "edit_addon") {
+        body.data = await hydrateAdminStremioAddon(body.data);
+      }
+      mutation = prepareAdminGlobalMutation(body);
+    } catch (error) {
+      request.backendFailureReason = mutationFailureReason(error);
+      return reply.code(400).send({ error: error.message });
+    }
+    const client = await pool.connect();
+    try {
+      await client.query("begin");
+      // Serialize with account deletion first, then with snapshot pushes.
+      if (!preview) {
+        await client.query("select id from accounts order by id for update");
+        await client.query("select account_id from account_sync_snapshots order by account_id for update");
+      }
+      const rows = (await client.query(globalAccountsQuery)).rows;
+      const summary = globalSummary(rows);
+      if (!preview && summary.state !== request.body.expectedState) {
+        await client.query("rollback");
+        request.backendFailureReason = "global_revision_conflict";
+        return reply.code(409).send({ error: "Accounts wurden zwischenzeitlich geändert. Bitte erneut eine Vorschau laden." });
+      }
+      let changed = 0;
+      const now = Date.now();
+      const batchId = crypto.randomUUID();
+      for (const row of rows) {
+        if (!row.payload || !adminGlobalInventory(row.payload).profileCount) continue;
+        let nextPayload;
+        try {
+          nextPayload = applyAdminGlobalMutation(row.payload, mutation, now);
+        } catch (error) {
+          await client.query("rollback");
+          request.backendFailureReason = mutationFailureReason(error);
+          return reply.code(400).send({ error: `Account ${row.account_id}: ${error.message}` });
+        }
+        if (!nextPayload) continue;
+        changed += 1;
+        if (preview) continue;
+        const revision = Number(row.revision);
+        await client.query(
+          `update account_sync_snapshots set payload = $2::jsonb, revision = $3,
+            payload_updated_at = to_timestamp($4::double precision / 1000.0),
+            source = 'admin', updated_at = now() where account_id = $1`,
+          [row.account_id, JSON.stringify(nextPayload), revision + 1, payloadUpdatedAtMillis(nextPayload)],
+        );
+        await client.query(
+          `insert into admin_audit_logs (
+            id, admin_id, account_id, operation, reason, details,
+            revision_before, revision_after, request_ip, user_agent
+          ) values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)`,
+          [crypto.randomUUID(), admin.id, row.account_id, `global_${mutation.operation}`,
+            optionalAuditReason(request.body.reason),
+            JSON.stringify({ batchId, targetId: mutation.targetId, itemId: mutation.data?.id || null }),
+            revision, revision + 1, request.ip || null,
+            String(request.headers["user-agent"] || "").slice(0, 500) || null],
+        );
+      }
+      await client.query("commit");
+      return {
+        preview, accepted: !preview, state: summary.state,
+        total: summary.total, configurable: summary.configurable,
+        changed, unchanged: summary.configurable - changed, skipped: summary.skipped,
+      };
+    } catch (error) {
+      await client.query("rollback");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  app.post("/admin-api/global/preview", (request, reply) => globalMutation(request, reply, true));
+  app.patch("/admin-api/global/snapshot", (request, reply) => globalMutation(request, reply, false));
+
   app.get("/admin", async (_request, reply) => {
     setAdminSecurityHeaders(reply);
     return reply

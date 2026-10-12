@@ -3,6 +3,7 @@ package com.arflix.tv.data.api
 import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Url
 
 /**
@@ -31,7 +32,8 @@ interface StreamApi {
 
     @GET
     suspend fun getAddonCatalog(
-        @Url url: String
+        @Url url: String,
+        @Header("Cache-Control") cacheControl: String? = null
     ): StremioCatalogResponse
 
     @GET
@@ -174,7 +176,7 @@ data class StremioMetaPreview(
     val releaseInfo: String? = null,
     val year: String? = null,
     @SerializedName("imdb_id") val imdbId: String? = null,
-    @SerializedName("tmdb_id") val tmdbId: String? = null,
+    @SerializedName(value = "tmdb_id", alternate = ["tmdbId"]) val tmdbId: String? = null,
     @SerializedName("moviedb_id") val moviedbId: String? = null
 )
 

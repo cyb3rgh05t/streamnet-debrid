@@ -114,7 +114,7 @@
     <string name="home_overview_auto">Auto Scroll</string>
     <string name="home_overview_ellipsis">Ellipsis</string>
     <string name="exit_app_message">Do you want to close StreamNet?</string>
-    <string name="exit_app_confirm">Close app</string>
+    <string name="exit_app_confirm">Exit</string>
     <string name="confirm">Confirm</string>
     <string name="retry">Retry</string>
     <string name="delete">Delete</string>
@@ -1271,7 +1271,9 @@
     <string name="stream_try_adding_addons">Try adding more addons</string>
     <string name="stream_searching_addons">Searching addons (%1$d/%2$d)...</string>
     <string name="stream_no_sources_match">No sources match this filter</string>
-    <string name="vod_request_action">Request from my server</string>
+    <string name="vod_request_action">Request title from host</string>
+    <string name="vod_request_heading">Missing your favorite title?</string>
+    <string name="vod_request_hint">Ask the host to add this movie or series. Your request is submitted for provision; the title will not be available immediately.</string>
     <string name="vod_request_created">Request submitted</string>
     <string name="vod_request_already_available">Already requested or available</string>
     <string name="vod_request_not_authenticated">Request service authentication required</string>

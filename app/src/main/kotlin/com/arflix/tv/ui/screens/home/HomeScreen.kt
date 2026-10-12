@@ -2025,10 +2025,10 @@ private fun IptvHeroSection(
                     modifier = Modifier
                         .width(1.dp)
                         .height(20.dp)
-                        .background(Color.White.copy(alpha = 0.42f))
+                        .background(accent)
                 )
                 Text(
-                    text = category,
+                    text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(category, accent),
                     style = ArflixTypography.caption.copy(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -2360,14 +2360,16 @@ private fun HeroSection(
                                             fontSize = 13.sp,
                                             shadow = textShadow
                                         ),
-                                        color = Color.White.copy(alpha = 0.7f)
+                                        color = resolveAccentColor(ArvioSkin.colors.accent)
                                     )
                                 }
                             }
 
                             if (hasGenre) {
                                 Text(
-                                    text = genreText,
+                                    text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(
+                                        genreText, resolveAccentColor(ArvioSkin.colors.accent)
+                                    ),
                                     style = ArflixTypography.caption.copy(
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
@@ -2388,7 +2390,7 @@ private fun HeroSection(
                                             fontSize = 13.sp,
                                             shadow = textShadow
                                         ),
-                                        color = Color.White.copy(alpha = 0.7f)
+                                        color = resolveAccentColor(ArvioSkin.colors.accent)
                                     )
                                 }
                                 Text(
@@ -2435,7 +2437,7 @@ private fun HeroSection(
                                                 fontSize = 12.sp,
                                                 shadow = textShadow
                                             ),
-                                            color = Color.White.copy(alpha = 0.58f)
+                                            color = resolveAccentColor(ArvioSkin.colors.accent)
                                         )
                                     }
                                 }
@@ -2457,7 +2459,7 @@ private fun HeroSection(
                                                 fontSize = 12.sp,
                                                 shadow = textShadow
                                             ),
-                                            color = Color.White.copy(alpha = 0.58f)
+                                            color = resolveAccentColor(ArvioSkin.colors.accent)
                                         )
                                     }
                                 }
@@ -2481,7 +2483,7 @@ private fun HeroSection(
                                                 fontSize = 12.sp,
                                                 shadow = textShadow
                                             ),
-                                            color = Color.White.copy(alpha = 0.58f)
+                                            color = resolveAccentColor(ArvioSkin.colors.accent)
                                         )
                                     }
                                 }
@@ -2757,7 +2759,9 @@ private fun MobileHeroOverlay(
                 ) {
                     if (genreText.isNotEmpty()) {
                         Text(
-                            text = genreText,
+                            text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(
+                                genreText, resolveAccentColor(ArvioSkin.colors.accent)
+                            ),
                             style = ArflixTypography.caption.copy(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
@@ -2773,7 +2777,7 @@ private fun MobileHeroOverlay(
                             Text(
                                 text = "|",
                                 style = ArflixTypography.caption.copy(fontSize = 12.sp, shadow = textShadow),
-                                color = Color.White.copy(alpha = 0.6f)
+                                color = resolveAccentColor(ArvioSkin.colors.accent)
                             )
                         }
                         Text(
@@ -2792,7 +2796,7 @@ private fun MobileHeroOverlay(
                             Text(
                                 text = "|",
                                 style = ArflixTypography.caption.copy(fontSize = 12.sp, shadow = textShadow),
-                                color = Color.White.copy(alpha = 0.6f)
+                                color = resolveAccentColor(ArvioSkin.colors.accent)
                             )
                         }
                         ImdbSvgRatingBadge(

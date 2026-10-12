@@ -73,6 +73,73 @@ Place an IP allowlist or an interactive access proxy in front of `/admin` and
 `/admin-api` when exposing the production host; do not apply that middleware to
 the Android API routes.
 
+### Remote Config: global playlists and add-ons
+
+The **Remote Config** navigation section adds, edits, removes selected entries, or
+clears all playlists/add-ons across registered accounts, regardless of search,
+pagination, or online filters.
+
+- Adding applies to every existing profile of every configurable account.
+  Entries with the same ID are updated rather than duplicated.
+- Editing/removing targets an existing ID only where it is present. Playlist
+  edits retain that ID and extra per-profile properties, but replace the name,
+  M3U/EPG URLs, and displayed activation/import options. Stored URLs are not
+  exposed; enter replacement URLs explicitly. An empty EPG URL clears the
+  entry's EPG configuration.
+- Add-on links are hydrated through the existing Stremio manifest loader.
+  Changing a link replaces the old instance ID while preserving existing
+  per-profile activation. The activation checkbox applies to new assignments.
+- Clearing playlists also clears profile-scoped legacy M3U/EPG fields.
+  Android may still display its empty, disabled StreamNet TV system entry;
+  this action does not remove the application's built-in preset.
+
+Accounts without a cloud snapshot or profiles are counted as skipped, not
+initialized with invented profiles. These actions do not establish defaults
+for future accounts or profiles. Existing application playlist limits remain
+unchanged.
+
+A preview reports changed, unchanged, and skipped accounts. Applying requires
+typing **ALLE ACCOUNTS**. Removal is irreversible. If account membership or any
+snapshot changes after preview, the server rejects the action with HTTP 409;
+load a new preview rather than automatically retrying a global change.
+
+Changes and per-account audits run in one PostgreSQL transaction. Each changed
+snapshot receives a new revision, sync timestamps, and `source = 'admin'`.
+Audit operations use the `global_` prefix and share a batch ID. Unchanged and
+skipped accounts receive no new revision. Devices apply changes on their next
+cloud pull. No additional database migration is required.
+
+Choose **Xtream Codes** to enter server URL, username and password separately.
+The backend generates encoded `get.php` and `xmltv.php` URLs. These credentials
+are identical for all targeted accounts; they are not per-user provisioning.
+Choose **StreamNet TV** to configure the protected `streamnet_tv` entry rather
+than creating a separate custom playlist.
+
+The **Xtream / StreamNet TV: only change host** action (`change_xtream_host`)
+instead retains each existing entry's credentials, ID, name, activation and
+import flags. Select its ID and enter `data.host`; M3U and EPG addresses are
+rebuilt for that server. Missing/invalid credentials fail the whole transaction,
+including preview, rather than silently skipping broken entries. Legacy
+host/user/password triplets and credential-bearing Xtream URLs are supported.
+This action also resets cached account expiry checks.
+
+StreamNet TV remote hosts set `streamNetHostOverride`. The updated Android app
+preserves that explicit configuration instead of migrating it back to the
+build-time server; without this field, existing migration behavior is unchanged.
+**Deploy the updated APK before relying on custom StreamNet TV hosts.** Older
+apps can restore the built-in server on their next sync. The WebUI preserves
+the override when normalizing and synchronizing playlists.
+
+The admin-only endpoints are `GET /admin-api/global` (redacted inventory),
+`POST /admin-api/global/preview`, and `PATCH /admin-api/global/snapshot`.
+Mutation operations are `add_playlist`, `edit_playlist`, `delete_playlist`,
+`clear_playlists`, `change_xtream_host`, `add_addon`, `edit_addon`, `delete_addon`, and `clear_addons`.
+Edit/delete requests supply `targetId`; add/edit requests supply `data`.
+Apply requests additionally supply the preview's `state` as `expectedState`
+and `confirmation: "ALLE ACCOUNTS"`, with an optional audit `reason`.
+Playlist data may include `sourceType: "xtream"` or `"streamnet_tv"` plus
+`host`, `username`, and `password` instead of manually supplied URLs.
+
 ## Upgrade Existing Production Server
 
 The account-deletion and StreamNet Club branding update requires both a new
