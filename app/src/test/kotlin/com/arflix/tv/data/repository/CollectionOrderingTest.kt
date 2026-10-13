@@ -99,6 +99,25 @@ class CollectionOrderingTest {
     }
 
     @Test
+    fun `marvelAddonTimelineCard prefers meta released but falls back to details releaseDate`() {
+        val metaWithoutReleased = com.arflix.tv.data.api.StremioMetaPreview(
+            id = "tt0458339", type = "movie", name = "Captain America: The First Avenger", releaseInfo = "2011"
+        )
+        val details = com.arflix.tv.data.model.MediaItem(
+            id = 1771, title = "Captain America: The First Avenger", mediaType = MediaType.MOVIE, releaseDate = "22 Jul 2011"
+        )
+        val card = marvelAddonTimelineCard(metaWithoutReleased, MediaType.MOVIE to 1771, 0, details)
+        assertEquals("22 Jul 2011", card.releaseDate)
+        assertEquals("2011", card.year)
+
+        val metaWithReleased = com.arflix.tv.data.api.StremioMetaPreview(
+            id = "tt0458339", type = "movie", name = "Captain America: The First Avenger", released = "2011-07-22T00:00:00.000Z"
+        )
+        val cardWithMeta = marvelAddonTimelineCard(metaWithReleased, MediaType.MOVIE to 1771, 0, details)
+        assertEquals("2011-07-22T00:00:00.000Z", cardWithMeta.releaseDate)
+    }
+
+    @Test
     fun `mixed direct and IMDb resolved Marvel entries keep the addon order`() {
         val wakanda = MediaType.TV to 283378
         val captainAmerica = MediaType.MOVIE to 1771

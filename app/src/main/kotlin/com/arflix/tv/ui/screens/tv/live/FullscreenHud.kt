@@ -513,6 +513,7 @@ fun FullscreenHud(
                         HudActionButton(
                             label = stringResource(R.string.live_btn_channels),
                             onClick = onChannelListClick,
+                            modifier = Modifier.align(Alignment.CenterStart),
                         )
                     }
 
@@ -885,13 +886,11 @@ private fun HudIconButton(
 
     val bgColor = when {
         isFocused -> accentColor
-        emphasis -> accentColor.copy(alpha = 0.82f)
         else -> Color.Black.copy(alpha = 0.55f)
     }
 
     val iconColor = when {
         isFocused -> LiveColors.Bg
-        emphasis -> LiveColors.Bg
         else -> Color.White
     }
 
@@ -977,11 +976,12 @@ private fun formatPlaybackDuration(ms: Long): String {
 private fun HudActionButton(
     label: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var isFocused by remember { mutableStateOf(false) }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .height(42.dp)
             .width(96.dp)
             .clip(RoundedCornerShape(999.dp))

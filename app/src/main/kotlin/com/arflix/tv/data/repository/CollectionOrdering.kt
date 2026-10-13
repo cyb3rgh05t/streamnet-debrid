@@ -45,8 +45,8 @@ internal fun marvelAddonTimelineCard(
     overview = meta.description.orEmpty(),
     image = meta.poster.orEmpty(),
     backdrop = meta.background?.takeIf { it.isNotBlank() } ?: details?.backdrop?.takeIf { it.isNotBlank() },
-    year = meta.year ?: meta.releaseInfo.orEmpty(),
-    releaseDate = meta.released,
+    year = (meta.year ?: meta.releaseInfo.orEmpty()).ifBlank { details?.year.orEmpty() },
+    releaseDate = meta.released?.takeIf { it.isNotBlank() } ?: details?.releaseDate?.takeIf { it.isNotBlank() },
     sourceOrder = position,
     timelineEntryId = "marvel-addon:$position:${meta.id}",
     timelineMetadataUnavailable = ref == null

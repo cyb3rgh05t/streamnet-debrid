@@ -57,6 +57,10 @@ import com.arflix.tv.util.LocalDeviceType
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.zIndex
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.time.format.DateTimeParseException
+import java.util.Locale
 
 /**
  * Media card component for rows/grids.
@@ -78,11 +82,19 @@ internal fun formatCardReleaseYear(rawDate: String?, year: String): String? =
     Regex("\\b\\d{4}\\b").find(year)?.value
         ?: Regex("\\b\\d{4}\\b").find(rawDate.orEmpty())?.value
 
-private fun formatCardReleaseDate(rawDate: String?): String? {
+internal fun formatCardReleaseDate(rawDate: String?): String? {
     val value = rawDate?.trim().orEmpty()
-    if (value.isBlank()) return null
-    val match = Regex("^(\\d{4})-(\\d{2})-(\\d{2})$").matchEntire(value)
-    return match?.let { "${it.groupValues[3]}.${it.groupValues[2]}.${it.groupValues[1]}" } ?: value
+    if (value.isBlank() || value.equals("N/A", ignoreCase = true)) return null
+    val match = Regex("^(\\d{4})-(\\d{2})-(\\d{2})(?:[T\\s].*)?$").matchEntire(value)
+    if (match != null) {
+        return "${match.groupValues[3]}.${match.groupValues[2]}.${match.groupValues[1]}"
+    }
+    return try {
+        val parsed = LocalDate.parse(value, DateTimeFormatter.ofPattern("d MMM uuuu", Locale.US))
+        parsed.format(DateTimeFormatter.ofPattern("dd.MM.yyyy", Locale.US))
+    } catch (_: DateTimeParseException) {
+        value
+    }
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -553,12 +565,14 @@ fun MediaCard(
                 val movieLabel = stringResource(R.string.movie)
                 val mediaLabel = stringResource(R.string.component_label_media)
                 val releaseYear = formatCardReleaseYear(item.releaseDate, item.year)
-                val subtitle = remember(showProgress, showReleaseYear, item.subtitle, item.releaseDate, item.year, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
+                val releaseDateText = remember(item.releaseDate) { formatCardReleaseDate(item.releaseDate) }
+                val hasValidYear = remember(item.year) { item.year.isNotBlank() && !item.year.equals("N/A", ignoreCase = true) }
+                val subtitle = remember(showProgress, showReleaseYear, item.subtitle, releaseDateText, item.year, hasValidYear, item.mediaType, tvSeriesLabel, movieLabel, mediaLabel) {
                     if (showProgress && item.subtitle.isNotBlank()) {
                         item.subtitle
                     } else {
                         val release = if (showReleaseYear) releaseYear else {
-                            formatCardReleaseDate(item.releaseDate) ?: item.year.takeIf { it.isNotBlank() }
+                            releaseDateText ?: item.year.takeIf { hasValidYear }
                         }
                         release ?: item.subtitle.ifBlank {
                             when (item.mediaType) {
@@ -579,7 +593,7 @@ fun MediaCard(
                         )
                     ),
                     color = if (showProgress || (showReleaseYear && releaseYear != null) ||
-                        (!showReleaseYear && formatCardReleaseDate(item.releaseDate) != null)
+                        (!showReleaseYear && (releaseDateText != null || hasValidYear))
                     ) {
                         resolveAccentColor(ArvioSkin.colors.accent).copy(alpha = 0.95f)
                     } else {

@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.066] - 2026-10-13
+
+- Franchises / Studios / Collections: Die Medienkarten in der Sammlungsübersicht zeigen wieder das vollständige Veröffentlichungsdatum (`releaseDate`, z. B. im Format `dd.MM.yyyy`) statt nur das Erscheinungsjahr (`releaseYear`). Fehlt ein genaues Datum, bleibt das Jahr als Fallback erhalten.
+- Live-TV-Playeroverlay: Der SENDER-Button wird in der unteren Steuerleiste vertikal zentriert und liegt jetzt auf derselben Mittellinie wie Play/Pause, PROGRAMM und die übrigen Aktionen. Zuvor war er ohne explizite Ausrichtung am oberen Rand der Leiste platziert. Größe, Fokusverhalten und Aktionen bleiben unverändert.
+- Live-TV-Playeroverlay: Play/Pause zeigt die orange Akzentfüllung nur bei tatsächlichem Fokus. Ohne Fokus verwendet der Button wie die übrigen Icons einen dunklen Hintergrund mit weißem Symbol, sodass der aktive D-pad-Fokus eindeutig erkennbar bleibt. Die größere Button-/Symbolgröße und die Fokusnavigation bleiben erhalten.
+- Android mobil: Sprachkontexte überschreiben nur noch die Sprache statt eine komplette Bildschirmkonfiguration festzuhalten. Der lokalisierte Compose-Kontext wird bei Konfigurationsänderungen aktualisiert, damit Home und Live-TV nach einer Drehung aktuelle Quer-/Hochformat-Abmessungen verwenden.
+- Live-TV mobil: Die Touch-Senderübersicht reicht den ermittelten Tablet-Querformatmodus an den Mini-Player weiter. Nach Vollbild → Zurück kann die laufende Übertragung wieder klein neben den Programminformationen stehen, während die Senderliste sichtbar bleibt; die bestehende Android-Ausrichtungsregel bleibt unverändert.
+- Home mobil: Hero-Karten berechnen ihre tatsächliche Höhe aus verfügbarer Breite, Seitenverhältnis und Höhenlimit. Die Begrenzung schneidet nicht mehr lediglich eine größere Karte ab; Titel, Metadaten und nachfolgende Katalogzeilen bleiben im Querformat erreichbar.
+
 ## [2.5.065] - 2026-10-13
 
 - Remote Config: Katalog-Konfigurationen erhalten `remoteManaged` und `remoteTitle`, damit global vergebene Namen und absichtlich ausgeblendete Kataloge beim Cloud-Sync erhalten bleiben.

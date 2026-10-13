@@ -209,7 +209,7 @@ class MainActivity : ComponentActivity() {
         if (!tag.isNullOrEmpty()) {
             val locale = java.util.Locale.forLanguageTag(tag)
             java.util.Locale.setDefault(locale)
-            val config = Configuration(newBase.resources.configuration)
+            val config = Configuration()
             config.setLocale(locale)
             super.attachBaseContext(newBase.createConfigurationContext(config))
         } else {
@@ -383,10 +383,10 @@ class MainActivity : ComponentActivity() {
             // Wrap the Activity as a ContextWrapper that only overrides getResources() with
             // localized resources. Hilt traverses ContextWrapper chains to find the Activity,
             // so hiltViewModel() still works correctly.
-            val localizedContext = remember(appLanguage) {
+            val localizedContext = remember(appLanguage, currentConfiguration) {
                 val locale = com.arflix.tv.util.appLocale(appLanguage)
                 java.util.Locale.setDefault(locale)
-                val config = Configuration(this@MainActivity.resources.configuration)
+                val config = Configuration()
                 config.setLocale(locale)
                 val localizedRes = this@MainActivity.createConfigurationContext(config).resources
                 object : android.content.ContextWrapper(this@MainActivity) {

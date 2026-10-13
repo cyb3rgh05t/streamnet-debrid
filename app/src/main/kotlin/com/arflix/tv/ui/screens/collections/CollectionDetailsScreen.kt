@@ -1288,7 +1288,6 @@ private fun CollectionItemsGrid(
                         isLandscape = !usePosterCards,
                         logoImageUrl = cardLogoUrl,
                         showTitle = true,
-                        showReleaseYear = true,
                         titleMaxLines = if (item.timelineEntryId != null) 3 else if (usePosterCards) 2 else 1,
                         onFocused = {
                             focusedMediaIndex = index

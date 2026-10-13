@@ -5,15 +5,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -79,88 +78,89 @@ fun MobileHeroBanner(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val maxHeightModifier = if (maxCardHeight != Dp.Unspecified) {
-        Modifier.heightIn(max = maxCardHeight)
-    } else {
-        Modifier
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .aspectRatio(cardAspectRatio)
-            .then(maxHeightModifier)
-            .shadow(elevation = 8.dp, shape = BannerShape, clip = false)
-            .clip(BannerShape)
-            .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
-            .border(width = 1.dp, color = CardBorder, shape = BannerShape)
-    ) {
-        // ── Layer 1: Full-bleed background image ────────────────────────────
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(imageUrl)
-                .precision(Precision.INEXACT)
-                .allowHardware(true)
-                .crossfade(400)
-                .build(),
-            contentDescription = title,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // ── Layer 2: Bottom scrim spanning the lower 65% of the card ────────
-        Spacer(
+    BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
+        val aspectHeight = maxWidth / cardAspectRatio
+        val cardHeight = if (maxCardHeight != Dp.Unspecified) {
+            aspectHeight.coerceAtMost(maxCardHeight)
+        } else {
+            aspectHeight
+        }
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.65f)
-                .align(Alignment.BottomCenter)
-                .background(BottomScrim)
-        )
-
-        // ── Layer 3: Content overlay — pinned to bottom-center ───────────────
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .height(cardHeight)
+                .shadow(elevation = 8.dp, shape = BannerShape, clip = false)
+                .clip(BannerShape)
+                .then(if (onClick != null) Modifier.clickable { onClick() } else Modifier)
+                .border(width = 1.dp, color = CardBorder, shape = BannerShape)
         ) {
-            // Element A — Logo image when available, otherwise large title text
-            if (logoUrl != null) {
-                AsyncImage(
-                    model = ImageRequest.Builder(context)
-                        .data(logoUrl)
-                        .precision(Precision.INEXACT)
-                        .allowHardware(true)
-                        .crossfade(300)
-                        .build(),
-                    contentDescription = title,
-                    contentScale = ContentScale.Fit,
-                    alignment = Alignment.Center,
-                    modifier = Modifier
-                        .height(56.dp)
-                        .fillMaxWidth()
-                )
-            } else {
-                Text(
-                    text = title,
-                    color = Color.White,
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold,
-                    lineHeight = 42.sp,
-                    textAlign = TextAlign.Center,
-                    maxLines = 3,
-                    overflow = TextOverflow.Ellipsis
-                )
+            // ── Layer 1: Full-bleed background image ────────────────────────────
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .precision(Precision.INEXACT)
+                    .allowHardware(true)
+                    .crossfade(400)
+                    .build(),
+                contentDescription = title,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+
+            // ── Layer 2: Bottom scrim spanning the lower 65% of the card ────────
+            Spacer(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.65f)
+                    .align(Alignment.BottomCenter)
+                    .background(BottomScrim)
+            )
+
+            // ── Layer 3: Content overlay — pinned to bottom-center ───────────────
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 28.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Element A — Logo image when available, otherwise large title text
+                if (logoUrl != null) {
+                    AsyncImage(
+                        model = ImageRequest.Builder(context)
+                            .data(logoUrl)
+                            .precision(Precision.INEXACT)
+                            .allowHardware(true)
+                            .crossfade(300)
+                            .build(),
+                        contentDescription = title,
+                        contentScale = ContentScale.Fit,
+                        alignment = Alignment.Center,
+                        modifier = Modifier
+                            .height(56.dp)
+                            .fillMaxWidth()
+                    )
+                } else {
+                    Text(
+                        text = title,
+                        color = Color.White,
+                        fontSize = 36.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 42.sp,
+                        textAlign = TextAlign.Center,
+                        maxLines = 3,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                // Element B — Genre tags with bullet separators
+                BannerGenres(genres = genres)
+
+                // Element C — Year and IMDb rating
+                BannerMeta(year = year, rating = rating)
             }
-
-            // Element B — Genre tags with bullet separators
-            BannerGenres(genres = genres)
-
-            // Element C — Year and IMDb rating
-            BannerMeta(year = year, rating = rating)
         }
     }
 }

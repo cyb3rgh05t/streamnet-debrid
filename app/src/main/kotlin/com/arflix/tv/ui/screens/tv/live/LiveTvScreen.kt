@@ -3146,6 +3146,7 @@ fun LiveTvScreen(
                         onOpenVariants = playingChannel?.let { channel -> { openVariantPicker(channel) } },
                         compact = compactTouchLayout,
                         landscapeCompact = landscapeCompactMiniPlayer,
+                        tabletLandscape = tabletLandscapeMiniPlayer,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(
