@@ -114,7 +114,9 @@ data class CatalogConfig(
     val collectionSources: List<CollectionSourceConfig> = emptyList(),
     val requiredAddonUrls: List<String> = emptyList(),
     val packId: String? = null,
-    val packName: String? = null
+    val packName: String? = null,
+    val remoteManaged: Boolean = false,
+    val remoteTitle: String? = null
 ) : Serializable
 
 val CatalogConfig.effectivePackId: String

@@ -52,3 +52,25 @@ test("unrelated web settings saves preserve newer cloud catalog state", async ()
   assert.deepEqual(root.catalogsByProfile.main, [{ id: "tv-order" }]);
   assert.equal(root.catalogsUpdatedAtByProfile.main, 900);
 });
+
+test("web re-enabling remote addon and custom catalogs clears Android hidden roots", async () => {
+  const { writeCatalogProfileState } = await import(moduleUrl);
+  const root = {
+    hiddenAddonByProfile: { main: ["addon", "unrelated-addon"] },
+    hiddenCustomByProfile: { main: ["custom", "deleted-list"] },
+  };
+  const current = {
+    ...settings([]),
+    catalogs: [
+      { id: "addon", sourceType: "addon", enabled: true },
+      { id: "custom", sourceType: "MDBLIST", enabled: true },
+    ],
+  };
+  writeCatalogProfileState(root, "main", current, settings([]), 1200);
+  assert.deepEqual(root.hiddenAddonByProfile.main, ["unrelated-addon"]);
+  assert.deepEqual(root.hiddenCustomByProfile.main, ["deleted-list"]);
+  current.catalogs.forEach((item) => { item.enabled = false; });
+  writeCatalogProfileState(root, "main", current, settings([]), 1300);
+  assert.deepEqual(root.hiddenAddonByProfile.main, ["unrelated-addon", "addon"]);
+  assert.deepEqual(root.hiddenCustomByProfile.main, ["deleted-list", "custom"]);
+});

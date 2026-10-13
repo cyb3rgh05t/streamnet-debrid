@@ -2857,7 +2857,10 @@ function CatalogsSection() {
               onChange={(e) =>
                 updateCatalogs(
                   catalogs.map((c) =>
-                    c.id === catalog.id ? { ...c, name: e.target.value } : c,
+                    c.id === catalog.id ? {
+                      ...c, name: e.target.value,
+                      ...(c.remoteTitle != null ? { title: e.target.value, remoteTitle: e.target.value } : {}),
+                    } : c,
                   ),
                 )
               }

@@ -1127,11 +1127,21 @@ export async function pullCloudPayload(
     "catalogsByProfile",
     profileId,
   );
-  const hiddenCatalogIds = scopedValue<string[]>(
+  const hiddenPreinstalledCatalogIds = scopedValue<string[]>(
     root,
     "hiddenPreinstalledByProfile",
     profileId,
   );
+  const hiddenAddonCatalogIds = scopedValue<string[]>(root, "hiddenAddonByProfile", profileId);
+  const hiddenCustomCatalogIds = scopedValue<string[]>(root, "hiddenCustomByProfile", profileId);
+  const hiddenCatalogIds = [hiddenPreinstalledCatalogIds, hiddenAddonCatalogIds, hiddenCustomCatalogIds]
+    .some((ids) => ids !== undefined)
+    ? [...new Set([
+      ...(hiddenPreinstalledCatalogIds || []),
+      ...(hiddenAddonCatalogIds || []),
+      ...(hiddenCustomCatalogIds || []),
+    ])]
+    : undefined;
   const hiddenHomeServerCatalogIds = scopedValue<string[]>(
     root,
     "hiddenHomeServerByProfile",
@@ -1194,7 +1204,7 @@ export async function pullCloudPayload(
       ...profileSettings,
       ...globalSettings,
       ...iptvSettings,
-      ...(arrayValue(profileCatalogs).length
+      ...(profileCatalogs !== undefined
         ? { catalogs: arrayValue(profileCatalogs) as AppSettings["catalogs"] }
         : legacyCatalogs.length
           ? { catalogs: legacyCatalogs }

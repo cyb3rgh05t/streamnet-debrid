@@ -1,5 +1,10 @@
 type CatalogProfileSettings = {
-  catalogs: unknown[];
+  catalogs: {
+    id: string;
+    sourceType?: string;
+    isPreinstalled?: boolean;
+    enabled?: boolean;
+  }[];
   hiddenCatalogIds: string[];
   hiddenHomeServerCatalogIds: string[];
 };
@@ -69,6 +74,20 @@ export function writeCatalogProfileState(
     profileId,
     settings.hiddenHomeServerCatalogIds,
   );
+  for (const [key, addon] of [
+    ["hiddenAddonByProfile", true],
+    ["hiddenCustomByProfile", false],
+  ] as const) {
+    const ids = new Set(recordValue<string[]>(root[key])[profileId] || []);
+    for (const catalog of settings.catalogs) {
+      const type = catalog.sourceType?.toUpperCase().replace(/-/g, "_");
+      if (catalog.isPreinstalled || type === "PREINSTALLED" || type === "HOME_SERVER") continue;
+      if ((type === "ADDON") !== addon) continue;
+      if (catalog.enabled === false || settings.hiddenCatalogIds.includes(catalog.id)) ids.add(catalog.id);
+      else ids.delete(catalog.id);
+    }
+    setProfileValue(root, key, profileId, [...ids]);
+  }
   const timestamps = recordValue<number>(root.catalogsUpdatedAtByProfile);
   timestamps[profileId] = changedAt;
   root.catalogsUpdatedAtByProfile = timestamps;

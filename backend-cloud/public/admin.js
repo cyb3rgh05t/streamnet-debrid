@@ -1042,13 +1042,14 @@ async function loadGlobal() {
 
 function updateGlobalFields() {
   const operation = byId("global-operation").value;
-  const needsTarget = /^(edit|delete)_/.test(operation) || operation === "change_xtream_host";
+  const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host";
   const editsData = /^(add|edit)_/.test(operation);
   const isAddon = operation.endsWith("addon") || operation === "clear_addons";
+  const isCatalog = operation.includes("catalog");
   byId("global-target-field").classList.toggle("hidden", !needsTarget);
   byId("global-target").required = needsTarget;
   byId("global-target").disabled = !needsTarget;
-  for (const [kind, active] of [["addon", editsData && isAddon], ["playlist", editsData && !isAddon]]) {
+  for (const [kind, active] of [["addon", editsData && isAddon], ["playlist", editsData && !isAddon && !isCatalog]]) {
     const fields = byId(`global-${kind}-fields`);
     fields.classList.toggle("hidden", !active);
     fields.querySelectorAll("input").forEach((input) => { input.disabled = !active; });
@@ -1058,11 +1059,12 @@ function updateGlobalFields() {
   byId("global-host-url").disabled = !hostOnly;
   byId("global-host-url").required = hostOnly;
   updateGlobalPlaylistFields();
+  updateGlobalCatalogFields();
   byId("global-addon-url").required = editsData && isAddon;
   const select = byId("global-target");
   const previous = select.value;
   select.replaceChildren();
-  const items = state.global?.[isAddon ? "addons" : "playlists"] || [];
+  const items = state.global?.[isCatalog ? "catalogs" : isAddon ? "addons" : "playlists"] || [];
   const placeholder = document.createElement("option");
   placeholder.value = "";
   placeholder.textContent = items.length ? "Eintrag auswählen" : "Keine Einträge vorhanden";
@@ -1074,6 +1076,41 @@ function updateGlobalFields() {
     select.append(option);
   }
   if (items.some((item) => item.id === previous)) select.value = previous;
+}
+
+function updateGlobalCatalogFields() {
+  const operation = byId("global-operation").value;
+  const adding = operation === "add_catalog";
+  const renaming = operation === "rename_catalog";
+  const settingEnabled = operation === "set_catalog_enabled";
+  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled);
+  const type = byId("global-catalog-type").value;
+  const template = type === "PREINSTALLED" || type === "ADDON";
+  for (const [id, visible] of [
+    ["type", adding], ["template", adding && template], ["url", adding && !template],
+    ["title", adding || renaming], ["enabled", adding || settingEnabled],
+  ]) {
+    byId(`global-catalog-${id}-field`).classList.toggle("hidden", !visible);
+    byId(`global-catalog-${id}`).disabled = !visible;
+  }
+  byId("global-catalog-title").required = renaming || (adding && !template);
+  byId("global-catalog-url").required = adding && !template;
+  byId("global-catalog-template").required = adding && template;
+  const select = byId("global-catalog-template");
+  const previous = select.value;
+  select.replaceChildren();
+  const empty = document.createElement("option");
+  empty.value = "";
+  empty.textContent = "Vorlage auswählen";
+  select.append(empty);
+  for (const item of state.global?.catalogs || []) {
+    if (item.sourceType !== type) continue;
+    const option = document.createElement("option");
+    option.value = item.id;
+    option.textContent = `${item.name} · ${item.id}`;
+    select.append(option);
+  }
+  if ([...select.options].some((option) => option.value === previous)) select.value = previous;
 }
 
 function updateGlobalPlaylistFields() {
@@ -1107,7 +1144,19 @@ async function submitGlobalMutation(event) {
       targetId: byId("global-target").value,
       reason: byId("global-reason").value,
     };
-    if (/^(add|edit)_addon$/.test(operation)) {
+    if (operation === "add_catalog") {
+      request.data = {
+        sourceType: byId("global-catalog-type").value,
+        templateId: byId("global-catalog-template").value,
+        sourceUrl: byId("global-catalog-url").value.trim(),
+        title: byId("global-catalog-title").value.trim(),
+        enabled: byId("global-catalog-enabled").checked,
+      };
+    } else if (operation === "rename_catalog") {
+      request.data = { title: byId("global-catalog-title").value.trim() };
+    } else if (operation === "set_catalog_enabled") {
+      request.data = { enabled: byId("global-catalog-enabled").checked };
+    } else if (/^(add|edit)_addon$/.test(operation)) {
       request.data = { url: byId("global-addon-url").value.trim(), isEnabled: byId("global-addon-enabled").checked };
     } else if (/^(add|edit)_playlist$/.test(operation)) {
       request.data = {
@@ -1212,6 +1261,7 @@ byId("login-form").addEventListener("submit", async (event) => {
 byId("logout-button").addEventListener("click", logout);
 byId("global-operation").addEventListener("change", updateGlobalFields);
 byId("global-playlist-type").addEventListener("change", updateGlobalPlaylistFields);
+byId("global-catalog-type").addEventListener("change", updateGlobalCatalogFields);
 byId("global-target").addEventListener("change", () => {
   if (byId("global-target").value === "streamnet_tv") {
     byId("global-playlist-type").value = "streamnet_tv";

@@ -615,12 +615,37 @@ export function prepareAdminGlobalMutation(request) {
     "add_addon", "edit_addon", "delete_addon", "clear_addons",
     "add_playlist", "edit_playlist", "delete_playlist", "clear_playlists",
     "change_xtream_host",
+    "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
   ]);
   if (!allowed.has(operation)) throw new Error("Unsupported operation");
-  const targetId = /^(edit|delete)_/.test(operation) || operation === "change_xtream_host"
-    ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : "Playlist id")
+  const targetId = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host"
+    ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : operation.includes("catalog") ? "Catalog id" : "Playlist id")
     : null;
   let data = null;
+  if (operation === "rename_catalog") {
+    data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
+  }
+  if (operation === "set_catalog_enabled") {
+    if (typeof request.data?.enabled !== "boolean") throw new Error("Catalog enabled must be a boolean");
+    data = { enabled: request.data.enabled };
+  }
+  if (operation === "add_catalog") {
+    if (!isPlainObject(request.data)) throw new Error("Catalog data must be an object");
+    if (request.data.enabled !== undefined && typeof request.data.enabled !== "boolean") {
+      throw new Error("Catalog enabled must be a boolean");
+    }
+    const sourceType = String(request.data.sourceType || "").toUpperCase();
+    if (["PREINSTALLED", "ADDON"].includes(sourceType)) {
+      data = {
+        sourceType, templateId: cleanIdentifier(request.data.templateId, "Catalog id"),
+        title: String(request.data.title || "").trim(),
+        enabled: request.data.enabled !== false,
+      };
+      if (data.title) data.title = cleanIdentifier(data.title, "Catalog title");
+    } else {
+      data = normalizeAdminListCatalog(request.data);
+    }
+  }
   if (/^(add|edit)_addon$/.test(operation)) data = normalizeAddon(request.data);
   if (operation === "change_xtream_host") {
     data = { host: normalizeXtreamHost(request.data?.host) };
@@ -660,13 +685,171 @@ export function prepareAdminGlobalMutation(request) {
   return { operation, targetId, data };
 }
 
+function normalizeAdminListCatalog(data) {
+  const sourceType = String(data.sourceType || "").toUpperCase();
+  if (!["TRAKT", "MDBLIST"].includes(sourceType)) throw new Error("Catalog source type is invalid");
+  let url;
+  try {
+    const raw = String(data.sourceUrl || "").trim();
+    url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+  } catch {
+    throw new Error("Catalog list URL is invalid");
+  }
+  const domain = sourceType === "TRAKT" ? "trakt.tv" : "mdblist.com";
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password ||
+      (url.hostname !== domain && !url.hostname.endsWith(`.${domain}`))) {
+    throw new Error("Catalog list URL is invalid");
+  }
+  const parts = url.pathname.split("/").filter(Boolean);
+  const valid = sourceType === "TRAKT"
+    ? (parts.length === 4 && parts[0] === "users" && parts[2] === "lists") ||
+      (parts.length === 2 && parts[0] === "lists" && /^\d+$/.test(parts[1]))
+    : parts.length === 3 && parts[0] === "lists";
+  if (!valid) throw new Error("Catalog list URL is invalid");
+  url.search = "";
+  url.hash = "";
+  url.pathname = `/${parts.join("/")}`;
+  const sourceUrl = url.toString();
+  const title = cleanIdentifier(data.title, "Catalog title");
+  return {
+    id: `custom_${crypto.createHash("sha256").update(`${sourceType}|${sourceUrl}`).digest("hex").slice(0, 16)}`,
+    title, name: title, sourceType, sourceUrl,
+    sourceRef: sourceType === "MDBLIST" ? `mdblist:${sourceUrl}` :
+      parts[0] === "users" ? `trakt_user:${parts[1]}:${parts[3]}` : `trakt_list:${parts[1]}`,
+    isPreinstalled: false, enabled: data.enabled !== false, kind: "STANDARD",
+    remoteManaged: true, remoteTitle: title,
+  };
+}
+
+function catalogType(catalog) {
+  return String(catalog?.sourceType || "").toUpperCase().replace(/-/g, "_");
+}
+
+function catalogsForProfile(payload, profileId) {
+  if (Object.hasOwn(payload.catalogsByProfile || {}, profileId)) {
+    return Array.isArray(payload.catalogsByProfile[profileId]) ? payload.catalogsByProfile[profileId] : [];
+  }
+  return Array.isArray(payload.catalogs) ? payload.catalogs : [];
+}
+
+function addonCatalogTemplates(payload) {
+  return sharedAddonsFromPayload(payload).flatMap((addon) =>
+    (Array.isArray(addon.manifest?.catalogs) ? addon.manifest.catalogs : [])
+      .filter(isPlainObject)
+      .map((catalog) => ({
+        ...catalog, type: String(catalog.type || "").trim().toLowerCase(),
+        id: String(catalog.id || "").trim(),
+      }))
+      .filter((catalog) => ["movie", "series", "tv", "show", "shows"].includes(catalog.type) && catalog.id &&
+        !(Array.isArray(catalog.extra) ? catalog.extra : []).some((extra) =>
+          extra?.isRequired && String(extra.name).toLowerCase() !== "skip"))
+      .map((catalog) => {
+        const hash = crypto.createHash("sha256").update(`${addon.id}|${catalog.type}|${catalog.id}`).digest("hex").slice(0, 16);
+        const encode = (value) => new URLSearchParams({ v: value }).toString().slice(2);
+        return {
+          id: `addon_${hash}`, title: String(catalog.name || catalog.id),
+          name: String(catalog.name || catalog.id), sourceType: "ADDON",
+          addonId: addon.id, addonName: addon.name, addonCatalogId: catalog.id,
+          addonCatalogType: catalog.type,
+          sourceRef: `addon_catalog|${encode(addon.id)}|${encode(catalog.type)}|${encode(catalog.id)}`,
+          isPreinstalled: false, enabled: true, kind: "STANDARD",
+        };
+      }),
+  );
+}
+
+export function resolveAdminCatalogTemplate(payload, id) {
+  for (const profileId of profileIds(payload)) {
+    const found = catalogsForProfile(payload, profileId).find((catalog) => catalog?.id === id);
+    if (found) return found;
+  }
+  return addonCatalogTemplates(payload).find((catalog) => catalog.id === id);
+}
+
+function catalogHiddenRoot(catalog) {
+  if (catalog.isPreinstalled || catalogType(catalog) === "PREINSTALLED") return "hiddenPreinstalledByProfile";
+  if (catalogType(catalog) === "ADDON") return "hiddenAddonByProfile";
+  if (catalogType(catalog) === "HOME_SERVER") return "hiddenHomeServerByProfile";
+  return "hiddenCustomByProfile";
+}
+
+function setCatalogHidden(payload, profileId, catalog, hidden) {
+  const root = catalogHiddenRoot(catalog);
+  const byProfile = isPlainObject(payload[root]) ? payload[root] : {};
+  const ids = new Set(Array.isArray(byProfile[profileId]) ? byProfile[profileId] : []);
+  if (hidden) ids.add(catalog.id);
+  else ids.delete(catalog.id);
+  payload[root] = { ...byProfile, [profileId]: [...ids] };
+}
+
+function applyGlobalCatalogMutation(payload, mutation, now) {
+  const { operation, targetId, data } = mutation;
+  let changed = false;
+  if (data?.id) cleanIdentifier(data.id, "Catalog id");
+  for (const profileId of profileIds(payload)) {
+    const current = catalogsForProfile(payload, profileId);
+    const target = current.find((catalog) => catalog?.id === targetId) ||
+      addonCatalogTemplates(payload).find((catalog) => catalog.id === targetId);
+    if (operation !== "add_catalog" && !target) continue;
+    if (operation === "add_catalog" && data.sourceType === "ADDON" &&
+        !sharedAddonsFromPayload(payload).some((addon) => addon.id === data.addonId)) continue;
+    const before = JSON.stringify([current, ...[
+      "hiddenPreinstalledByProfile", "hiddenAddonByProfile", "hiddenHomeServerByProfile", "hiddenCustomByProfile",
+    ].map((root) => payload[root]?.[profileId] || [])]);
+    let next;
+    if (operation === "add_catalog") {
+      if (!data.id) throw new Error("Catalog template is unavailable");
+      assertSafeKeys(data);
+      const existing = current.find((catalog) => catalog.id === data.id);
+      const catalog = { ...existing, ...data, remoteManaged: true };
+      next = upsertById(current, catalog);
+      setCatalogHidden(payload, profileId, catalog, !catalog.enabled);
+    } else if (operation === "rename_catalog") {
+      const hidden = payload[catalogHiddenRoot(target)]?.[profileId] || [];
+      const catalog = {
+        ...target, title: data.title, name: data.title, remoteTitle: data.title,
+        enabled: target.enabled !== false && !hidden.includes(target.id), remoteManaged: true,
+      };
+      next = upsertById(current, catalog);
+    } else if (operation === "set_catalog_enabled") {
+      const catalog = { ...target, enabled: data.enabled, remoteManaged: true };
+      next = upsertById(current, catalog);
+      setCatalogHidden(payload, profileId, catalog, !data.enabled);
+    } else if (operation === "delete_catalog") {
+      setCatalogHidden(payload, profileId, target, true);
+      // Defaults and manifest catalogs regenerate; keep a disabled record as a tombstone.
+      next = ["PREINSTALLED", "ADDON", "HOME_SERVER"].includes(catalogType(target)) || target.isPreinstalled
+        ? upsertById(current, { ...target, enabled: false, remoteManaged: true })
+        : removeById(current, targetId);
+    } else throw new Error("Unsupported operation");
+    const after = JSON.stringify([next, ...[
+      "hiddenPreinstalledByProfile", "hiddenAddonByProfile", "hiddenHomeServerByProfile", "hiddenCustomByProfile",
+    ].map((root) => payload[root]?.[profileId] || [])]);
+    if (before === after) continue;
+    payload.catalogsByProfile = { ...(payload.catalogsByProfile || {}), [profileId]: next };
+    payload.catalogsUpdatedAtByProfile = { ...(payload.catalogsUpdatedAtByProfile || {}), [profileId]: now };
+    changed = true;
+  }
+  return changed;
+}
+
 export function adminGlobalInventory(payload) {
   if (!isPlainObject(payload)) throw new Error("Snapshot payload is invalid");
   const playlists = new Map();
+  const catalogs = new Map();
   for (const id of profileIds(payload)) {
+    for (const catalog of catalogsForProfile(payload, id)) {
+      if (catalog?.id) catalogs.set(String(catalog.id), {
+        id: String(catalog.id), name: String(catalog.title || catalog.name || catalog.id),
+        sourceType: catalog.isPreinstalled ? "PREINSTALLED" : catalogType(catalog),
+      });
+    }
     const iptv = payload.iptvByProfile?.[id];
     for (const playlist of Array.isArray(iptv?.playlists) ? iptv.playlists : []) {
       if (playlist?.id) playlists.set(String(playlist.id), { id: String(playlist.id), name: String(playlist.name || playlist.id) });
+    }
+    for (const catalog of addonCatalogTemplates(payload)) {
+      if (!catalogs.has(catalog.id)) catalogs.set(catalog.id, { id: catalog.id, name: catalog.title, sourceType: "ADDON" });
     }
   }
   return {
@@ -675,6 +858,7 @@ export function adminGlobalInventory(payload) {
       id: String(addon.id), name: String(addon.name || addon.id),
     })),
     playlists: [...playlists.values()],
+    catalogs: [...catalogs.values()],
   };
 }
 
@@ -683,7 +867,9 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
   const payload = cloneJson(payloadValue, "Snapshot payload", adminSnapshotMaxBytes);
   for (const id of profileIds(payload)) cleanIdentifier(id, "profileId");
   const { operation, targetId, data } = mutation;
-  if (operation.endsWith("addon") || operation === "clear_addons") {
+  if (operation.includes("catalog")) {
+    if (!applyGlobalCatalogMutation(payload, mutation, now)) return null;
+  } else if (operation.endsWith("addon") || operation === "clear_addons") {
     const current = sharedAddonsFromPayload(payload);
     if (/^(edit|delete)_addon$/.test(operation) && !current.some((addon) => addon.id === targetId)) {
       return null;

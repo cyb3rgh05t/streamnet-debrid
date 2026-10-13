@@ -11,6 +11,7 @@ import {
   adminGlobalInventory,
   applyAdminGlobalMutation,
   prepareAdminGlobalMutation,
+  resolveAdminCatalogTemplate,
   hydrateAdminStremioAddon,
   summarizeAdminPayload,
 } from "./admin-snapshots.js";
@@ -42,6 +43,13 @@ const mutationFailureReasons = new Map([
   ["Playlist id is invalid", "invalid_playlist_id"],
   ["Playlist name is invalid", "invalid_playlist_name"],
   ["Playlist m3uUrl is required", "playlist_url_required"],
+  ["Catalog id is invalid", "invalid_catalog_id"],
+  ["Catalog title is invalid", "invalid_catalog_title"],
+  ["Catalog enabled must be a boolean", "invalid_catalog_enabled"],
+  ["Catalog data must be an object", "invalid_catalog_data"],
+  ["Catalog source type is invalid", "invalid_catalog_source_type"],
+  ["Catalog list URL is invalid", "invalid_catalog_list_url"],
+  ["Catalog template is unavailable", "catalog_template_unavailable"],
   ["Xtream server URL is invalid", "invalid_xtream_host"],
   ["Xtream username and password are required", "invalid_xtream_credentials"],
   ["Selected playlist has no valid Xtream credentials", "missing_xtream_credentials"],
@@ -202,13 +210,14 @@ function globalState(rows) {
 function globalSummary(rows) {
   const addons = new Map();
   const playlists = new Map();
+  const catalogs = new Map();
   let configurable = 0;
   for (const row of rows) {
     if (!row.payload) continue;
     const inventory = adminGlobalInventory(row.payload);
     if (!inventory.profileCount) continue;
     configurable += 1;
-    for (const [map, items] of [[addons, inventory.addons], [playlists, inventory.playlists]]) {
+    for (const [map, items] of [[addons, inventory.addons], [playlists, inventory.playlists], [catalogs, inventory.catalogs]]) {
       for (const item of items) {
         const entry = map.get(item.id) || { ...item, accountCount: 0 };
         entry.accountCount += 1;
@@ -223,6 +232,7 @@ function globalSummary(rows) {
     state: globalState(rows),
     addons: [...addons.values()].sort((a, b) => a.name.localeCompare(b.name)),
     playlists: [...playlists.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    catalogs: [...catalogs.values()].sort((a, b) => a.name.localeCompare(b.name)),
   };
 }
 
@@ -270,6 +280,24 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         await client.query("rollback");
         request.backendFailureReason = "global_revision_conflict";
         return reply.code(409).send({ error: "Accounts wurden zwischenzeitlich geändert. Bitte erneut eine Vorschau laden." });
+      }
+      if (mutation.operation === "add_catalog" && mutation.data.templateId) {
+        const input = mutation.data;
+        const template = rows.filter((row) => row.payload)
+          .map((row) => resolveAdminCatalogTemplate(row.payload, input.templateId))
+          .find((catalog) => catalog &&
+            (input.sourceType === "PREINSTALLED" ? catalog.isPreinstalled ||
+              String(catalog.sourceType).toUpperCase() === "PREINSTALLED" :
+              String(catalog.sourceType).toUpperCase() === input.sourceType));
+        if (!template) {
+          await client.query("rollback");
+          request.backendFailureReason = "catalog_template_unavailable";
+          return reply.code(400).send({ error: "Catalog template is unavailable" });
+        }
+        mutation.data = {
+          ...template, enabled: input.enabled, remoteManaged: true,
+          ...(input.title ? { title: input.title, name: input.title, remoteTitle: input.title } : {}),
+        };
       }
       let changed = 0;
       const now = Date.now();

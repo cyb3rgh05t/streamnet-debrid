@@ -73,11 +73,39 @@ Place an IP allowlist or an interactive access proxy in front of `/admin` and
 `/admin-api` when exposing the production host; do not apply that middleware to
 the Android API routes.
 
-### Remote Config: global playlists and add-ons
+### Remote Config: global playlists, add-ons and catalogs
 
 The **Remote Config** navigation section adds, edits, removes selected entries, or
 clears all playlists/add-ons across registered accounts, regardless of search,
 pagination, or online filters.
+
+Catalog operations are `add_catalog`, `rename_catalog`, `set_catalog_enabled`,
+and `delete_catalog`:
+
+- Add Trakt or MDBList lists with `data.sourceType` (`TRAKT` / `MDBLIST`),
+  `data.sourceUrl`, `data.title`, and an optional boolean `data.enabled`.
+  Supported URLs are Trakt user lists / numeric list URLs and MDBList user lists.
+  Reusing the normalized source URL updates its deterministic catalog ID.
+- Add existing built-in or add-on templates with `data.sourceType`
+  (`PREINSTALLED` / `ADDON`), `data.templateId`, an optional replacement
+  `data.title`, and `data.enabled`. Templates come from existing snapshots or
+  installed add-on manifests, not a new central catalog registry. Add-on
+  catalogs require the matching installed add-on instance on the target account;
+  this operation does not install add-ons.
+- Rename, toggle or remove the selected `targetId` wherever it exists. Rename
+  takes `data.title`; toggling takes a boolean `data.enabled`. These operations
+  preserve source URLs and collection metadata. Catalog URLs are not exposed
+  by the inventory.
+- Custom list removal deletes the profile entry. Built-in, add-on and home-server
+  removal keeps a disabled record and updates the corresponding hidden-ID list,
+  preventing automatic regeneration from making it visible again.
+  A profile's explicit empty catalog list overrides legacy root catalogs.
+- Changes stamp `catalogsUpdatedAtByProfile`, including visibility changes.
+  `remoteManaged` protects intentional hiding from automatic sports restoration;
+  `remoteTitle` preserves remote names during default/add-on refresh and Web
+  localization. Deploy the updated APK and Web client alongside the backend
+  before relying on these guarantees. Provider authentication/API keys remain
+  device/account prerequisites.
 
 - Adding applies to every existing profile of every configurable account.
   Entries with the same ID are updated rather than duplicated.

@@ -349,7 +349,13 @@ class CatalogRepository @Inject constructor(
             config.sourceType == CatalogSourceType.PREINSTALLED ||
             config.kind == CatalogKind.COLLECTION ||
             config.kind == CatalogKind.COLLECTION_RAIL
-        return if (shouldRefresh) bundled else config
+        return if (shouldRefresh) bundled.copy(
+            title = config.remoteTitle?.takeIf { it.isNotBlank() }
+                ?: if (config.remoteManaged) config.title else bundled.title,
+            remoteTitle = config.remoteTitle,
+            remoteManaged = config.remoteManaged,
+            enabled = if (config.remoteManaged) config.enabled else bundled.enabled
+        ) else config
     }
 
     private fun sanitizeCollectionCatalogs(catalogs: List<CatalogConfig>): List<CatalogConfig> {
@@ -521,22 +527,19 @@ class CatalogRepository @Inject constructor(
 
     suspend fun ensurePreinstalledDefaults(defaultPreinstalled: List<CatalogConfig>): List<CatalogConfig> {
         val profileId = activeProfileId()
-        val prefs = context.settingsDataStore.data.first()
+        var prefs = context.settingsDataStore.data.first()
         if (prefs[sportsCatalogRestoreKey(profileId)] != true) {
+            val remoteIds = readCatalogsFromPrefs(profileId, prefs, includeHidden = true)
+                .filter { it.remoteManaged }.map { it.id }.toSet()
             val restoredHidden = decodeHiddenPreinstalled(profileId, prefs)
-                .filterNot { it == "sports" || it == "top10_movies_today" }
+                .filterNot { (it == "sports" || it == "top10_movies_today") && it !in remoteIds }
             context.settingsDataStore.edit { updated ->
                 updated[hiddenPreinstalledKey(profileId)] = gson.toJson(restoredHidden.toList())
                 updated[sportsCatalogRestoreKey(profileId)] = true
             }
+            prefs = context.settingsDataStore.data.first()
         }
-        val hidden = if (prefs[sportsCatalogRestoreKey(profileId)] == true) {
-            decodeHiddenPreinstalled(profileId, prefs)
-        } else {
-            decodeHiddenPreinstalled(profileId, prefs)
-                .filterNot { it == "sports" || it == "top10_movies_today" }
-                .toSet()
-        }
+        val hidden = decodeHiddenPreinstalled(profileId, prefs)
         val effectiveDefaults = if (hidden.isEmpty()) {
             defaultPreinstalled
         } else {
@@ -584,11 +587,11 @@ class CatalogRepository @Inject constructor(
                     val defaultCfg = defaultMap[config.id] ?: return@mapNotNull null
                     // Preserve user-renamed titles: if the user changed the title
                     // from a previous default, keep their custom title.
-                    if (config.title != defaultCfg.title && config.title.isNotBlank()) {
-                        defaultCfg.copy(title = config.title)
-                    } else {
-                        defaultCfg
-                    }
+                    defaultCfg.copy(
+                        title = config.title.takeIf { it.isNotBlank() } ?: defaultCfg.title,
+                        remoteTitle = config.remoteTitle,
+                        remoteManaged = config.remoteManaged
+                    )
                 } else {
                     config
                 }
@@ -654,7 +657,9 @@ class CatalogRepository @Inject constructor(
             }
             .map { it.id }
             .toSet()
-        val effectiveHiddenAddonIds = hiddenAddonIds - sportsAddonIds
+        val remoteIds = readCatalogsFromPrefs(profileId, prefs, includeHidden = true)
+            .filter { it.remoteManaged }.map { it.id }.toSet()
+        val effectiveHiddenAddonIds = hiddenAddonIds - (sportsAddonIds - remoteIds)
         if (effectiveHiddenAddonIds != hiddenAddonIds) {
             context.settingsDataStore.edit { prefs ->
                 prefs[hiddenAddonKey(profileId)] = gson.toJson(effectiveHiddenAddonIds.toList())
@@ -678,7 +683,7 @@ class CatalogRepository @Inject constructor(
             val existing = current[index]
             val desired = desiredById[existing.id] ?: return@forEach
             val merged = existing.copy(
-                title = desired.title,
+                title = existing.remoteTitle?.takeIf { it.isNotBlank() } ?: desired.title,
                 sourceType = CatalogSourceType.ADDON,
                 sourceRef = desired.sourceRef,
                 isPreinstalled = false,
@@ -1139,7 +1144,10 @@ class CatalogRepository @Inject constructor(
         val current = getCatalogsIncludingHiddenForActiveProfile()
         val index = current.indexOfFirst { it.id == catalogId }
         if (index < 0) return false
-        current[index] = current[index].copy(title = trimmed)
+        current[index] = current[index].copy(
+            title = trimmed,
+            remoteTitle = if (current[index].remoteTitle != null) trimmed else null
+        )
         saveCatalogs(current)
         return true
     }
@@ -1478,7 +1486,9 @@ class CatalogRepository @Inject constructor(
                         collectionTileShape = collectionTileShape,
                         collectionHideTitle = collectionHideTitle,
                         collectionSources = collectionSources,
-                        requiredAddonUrls = requiredAddonUrls
+                        requiredAddonUrls = requiredAddonUrls,
+                        remoteManaged = (row["remoteManaged"] as? Boolean) ?: false,
+                        remoteTitle = asTrimmedString(row["remoteTitle"])
                     )
                 )
             }
@@ -1656,6 +1666,7 @@ class CatalogRepository @Inject constructor(
                     parseCatalogsJson(prefs[legacyGlobalKey])
                 )
                     .filterNot { it.isPreinstalled }
+                    .filterNot { it.id in hiddenCustom }
                     .filter { includeHidden || !it.isHidden() }
                     .distinctBy { "${it.id}|${it.sourceUrl.orEmpty()}" }
 
@@ -1669,6 +1680,7 @@ class CatalogRepository @Inject constructor(
             }
             return base
         }
+        if (prefs[catalogsKey(profileId)] != null) return emptyList()
 
         // Legacy fallback keys (pre profile-scoping).
         val legacyDefault = parseCatalogsJson(prefs[legacyDefaultKey])

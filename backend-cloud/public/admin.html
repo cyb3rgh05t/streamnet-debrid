@@ -192,6 +192,10 @@
                 <option value="edit_addon">Vorhandenes Add-on global bearbeiten</option>
                 <option value="delete_addon">Ausgewähltes Add-on global entfernen</option>
                 <option value="clear_addons">Alle Add-ons global entfernen</option>
+                <option value="add_catalog">Katalog global hinzufügen / aktualisieren</option>
+                <option value="rename_catalog">Katalog global umbenennen</option>
+                <option value="set_catalog_enabled">Katalog global aktivieren / deaktivieren</option>
+                <option value="delete_catalog">Katalog global entfernen / ausblenden</option>
               </select></label>
               <label id="global-target-field" class="hidden">Vorhandener Eintrag
                 <select id="global-target"></select>
@@ -241,6 +245,29 @@
                 </div>
                 <label>Neue Server-URL<input id="global-host-url" type="url" placeholder="https://server.example:8080" /></label>
               </div>
+                <div id="global-catalog-fields" class="op-fields hidden">
+                  <div class="quick-panel">
+                    Trakt und MDBList per Listen-Link. Eingebaute Kataloge und Add-on-Kataloge
+                    werden aus dem Cloud-Bestand bzw. installierten Manifesten ausgewählt.
+                    Add-on-Kataloge werden nur Accounts mit dem entsprechenden Add-on zugeordnet;
+                    das Add-on wird nicht automatisch installiert. Benötigte Anbieter-Verbindungen
+                    und API-Schlüssel bleiben Voraussetzung auf den Geräten.
+                    System-/Add-on-Kataloge werden beim Entfernen dauerhaft ausgeblendet,
+                    nicht aus der App oder dem Manifest gelöscht.
+                  </div>
+                  <label id="global-catalog-type-field">Quelle<select id="global-catalog-type">
+                    <option value="TRAKT">Trakt-Liste</option>
+                    <option value="MDBLIST">MDBList-Liste</option>
+                    <option value="PREINSTALLED">Eingebauter Katalog aus Bestand</option>
+                    <option value="ADDON">Katalog eines installierten Add-ons</option>
+                  </select></label>
+                  <label id="global-catalog-template-field" class="hidden">Katalogvorlage
+                    <select id="global-catalog-template"></select>
+                  </label>
+                  <label id="global-catalog-url-field">Listen-URL<input id="global-catalog-url" type="url" placeholder="https://trakt.tv/users/.../lists/... oder https://mdblist.com/lists/.../..." /></label>
+                  <label id="global-catalog-title-field">Name<input id="global-catalog-title" maxlength="200" /></label>
+                  <label id="global-catalog-enabled-field" class="checkbox-field"><input id="global-catalog-enabled" type="checkbox" checked /> Aktiviert</label>
+                </div>
               <div id="global-addon-fields" class="op-fields hidden">
                 <div class="quick-panel">
                   Das Manifest wird geladen. Beim Bearbeiten ersetzt der neue Link den

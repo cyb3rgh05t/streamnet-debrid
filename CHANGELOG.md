@@ -2,6 +2,36 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.065] - 2026-10-13
+
+- Remote Config: Katalog-Konfigurationen erhalten `remoteManaged` und `remoteTitle`, damit global vergebene Namen und absichtlich ausgeblendete Kataloge beim Cloud-Sync erhalten bleiben.
+- Standardkataloge übernehmen weiterhin aktuelle App-Vorgaben, behalten aber Remote-Namen und Verwaltungsmarker auch dann, wenn der Name dem bisherigen Standard entspricht.
+- Add-on-Aktualisierungen behalten globale Katalognamen statt sie durch Manifestnamen zu ersetzen. Die automatische Sport-Katalog-Wiederherstellung respektiert Remote-Ausblendungen.
+- Lokales Umbenennen aktualisiert einen vorhandenen Remote-Namen mit, damit spätere Synchronisierungen keine veraltete Bezeichnung wiederherstellen.
+- Eine ausdrücklich leere Profil-Katalogliste aktiviert keine Legacy-Kataloge erneut. Ausgeblendete benutzerdefinierte IDs werden nicht durch die Legacy-Wiederherstellung erneut in den Cloud-Export aufgenommen.
+- Kompatibilität: Ältere Kataloge ohne die neuen Felder behalten ihr bisheriges Verhalten.
+- Release: APK-Version `2.5.065`, Android-Versionscode `466`. Veröffentlichung über den bestehenden Android-Publish-Workflow nach Push auf `main`.
+
+## [Web 1.0.067] - 2026-10-13
+
+- Remote Config: Globale Katalognamen bleiben bei Standardkatalog-Abgleich und deutscher Lokalisierung erhalten; Verwaltungsmarker werden beim Normalisieren weitergereicht.
+- Cloud-Import: Eine ausdrücklich leere Profil-Katalogliste bleibt leer und reaktiviert keine alten benutzerdefinierten Kataloge aus dem Legacy-Bestand.
+- Lokales Umbenennen eines Remote-Katalogs hält Name, Android-Titel und vorhandenen Remote-Namen konsistent.
+- Katalog-Sichtbarkeit übernimmt auch Android-Ausblendelisten für Add-ons und benutzerdefinierte Quellen. Erneutes Aktivieren im Web bereinigt die passenden Cloud-Ausblendelisten, statt den Katalog auf Android weiterhin verborgen zu halten.
+- Release: Web-Version `1.0.067`; Paketmanifest und Lockfile einschließlich Root-Paketversion sind synchron. Veröffentlichung über den bestehenden Web-Publish-Workflow nach Push auf `main`.
+
+## [Backend 1.0.023] - 2026-10-13
+
+- Remote Config: Kataloge global hinzufügen/aktualisieren, umbenennen, aktivieren/deaktivieren und ausgewählt entfernen/ausblenden.
+- Quellen: Trakt- und MDBList-Listen per URL; eingebaute Kataloge aus vorhandenen Cloud-Konfigurationen und Add-on-Kataloge aus gespeicherten Konfigurationen bzw. installierten Manifesten.
+- Add-on-Kataloge werden nur Accounts mit derselben installierten Add-on-Instanz zugeordnet. Das Add-on wird nicht automatisch installiert; Anbieter-Verbindungen und API-Schlüssel bleiben Voraussetzung.
+- Entfernen löscht benutzerdefinierte Listen. System-, Add-on- und Heimserver-Kataloge erhalten eine deaktivierte Konfiguration samt passender Ausblendeliste, statt beim nächsten automatischen Abgleich erneut sichtbar zu werden.
+- Katalogänderungen setzen die profilbezogenen Katalog-Sync-Zeitstempel. Umbenennen erhält Quelladressen und Collection-Metadaten; die Bestandsübersicht zeigt keine Katalog-URLs.
+- Sicherheit und Geltungsbereich bleiben unverändert: Vorschau, Bestätigung mit `ALLE ACCOUNTS`, Konfliktprüfung, atomare Snapshot-/Audit-Updates, bestehende Profile und ausdrücklich übersprungene Accounts ohne Snapshot/Profile. Keine Vorgaben für zukünftige Accounts.
+- Rollout: Aktualisierte APK, WebUI und Backend gemeinsam verteilen, bevor Remote-Namen und dauerhaft ausgeblendete automatisch erzeugte Kataloge genutzt werden. Keine Datenbankmigration erforderlich.
+- Release: Backend-Version `1.0.023`; Paketmanifest und Lockfile sind synchron. Veröffentlichung über den bestehenden Backend-Publish-Workflow nach Push auf `main`; tatsächlicher Build-/Deployment-Erfolg wird separat durch die Workflows bestätigt.
+- Validierung: 54 gezielte Backend-Tests, 31 Web-/Cloud-/Katalog-Tests und TypeScript-Prüfung sowie 7 Android-Katalogtests erfolgreich. Lokaler Browser-Test prüft alle vier Quelltypen und Hinzufügen, Umbenennen, Deaktivieren und Entfernen samt Vorschau/Bestätigung; keine Produktionsaccounts verändert.
+
 ## [2.5.064] - 2026-10-12
 
 - Android: MDBList verwendet echte TV-Material-Buttons wie der Exitdialog statt manuell gezeichneter Fokuszustände; eine Fokusgruppe hält die D-pad-Navigation innerhalb des Dialoginhalts.

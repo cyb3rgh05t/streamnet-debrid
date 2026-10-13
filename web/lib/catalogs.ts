@@ -20,9 +20,10 @@ const germanCatalogNames: Record<string, string> = {
 };
 
 export function localizedCatalogName(
-  catalog: Pick<CatalogConfig, "id" | "name">,
+  catalog: Pick<CatalogConfig, "id" | "name" | "remoteTitle">,
   language: UiLanguage,
 ): string {
+  if (catalog.remoteTitle?.trim()) return catalog.remoteTitle.trim();
   return language === "de"
     ? (germanCatalogNames[catalog.id] ?? catalog.name)
     : catalog.name;
@@ -1083,6 +1084,10 @@ export function mergeCatalogs(
     return {
       ...catalog,
       ...(currentDefault && catalog.isPreinstalled ? currentDefault : {}),
+      ...(catalog.remoteManaged ? {
+        remoteManaged: true,
+        ...(catalog.remoteTitle ? { name: catalog.remoteTitle, title: catalog.remoteTitle, remoteTitle: catalog.remoteTitle } : {}),
+      } : {}),
       enabled: !hiddenIds.includes(catalog.id) && catalog.enabled !== false,
     };
   });

@@ -8,6 +8,7 @@ import {
   hydrateAdminStremioAddon,
   redactAdminPayload,
   summarizeAdminPayload,
+  resolveAdminCatalogTemplate,
 } from "../src/admin-snapshots.js";
 
 const addonManifest = () => ({
@@ -58,7 +59,124 @@ test("global inventory deduplicates playlists and includes top-level addons with
     profileCount: 2,
     addons: [{ id: "a", name: "A" }],
     playlists: [{ id: "tv", name: "TV" }],
+    catalogs: [{ id: "movies", name: "movies", sourceType: "" }],
   });
+});
+
+test("remote list catalogs add to every profile with Android and web names and timestamps", () => {
+  const value = snapshot();
+  for (const [sourceType, sourceUrl, sourceRef] of [
+    ["TRAKT", "https://trakt.tv/users/owner/lists/favorites", "trakt_user:owner:favorites"],
+    ["TRAKT", "https://trakt.tv/lists/123", "trakt_list:123"],
+    ["MDBLIST", "https://mdblist.com/lists/owner/favorites", "mdblist:https://mdblist.com/lists/owner/favorites"],
+  ]) {
+    const mutation = prepareAdminGlobalMutation({ operation: "add_catalog", data: { sourceType, sourceUrl, title: "Remote favorites", enabled: false } });
+    const result = applyAdminGlobalMutation(value, mutation, 7000);
+    for (const profile of value.profiles) {
+      const catalog = result.catalogsByProfile[profile.id].find((item) => item.id === mutation.data.id);
+      assert.equal(catalog.title, "Remote favorites");
+      assert.equal(catalog.name, catalog.title);
+      assert.equal(catalog.sourceRef, sourceRef);
+      assert.equal(catalog.enabled, false);
+      assert.equal(result.catalogsUpdatedAtByProfile[profile.id], 7000);
+      assert.ok(result.hiddenCustomByProfile[profile.id].includes(catalog.id));
+    }
+    assert.equal(applyAdminGlobalMutation(result, mutation), null);
+    assert.deepEqual(value, snapshot());
+  }
+});
+
+test("catalog rename affects matching IDs only and preserves source and collection data", () => {
+  const value = snapshot();
+  value.catalogsByProfile["living-room"] = [{
+    id: "movies", title: "Movies", sourceType: "PREINSTALLED",
+    collectionSources: [{ kind: "TMDB_GENRE", tmdbGenreId: 28 }], enabled: true,
+  }];
+  const result = applyAdminGlobalMutation(value, prepareAdminGlobalMutation({
+    operation: "rename_catalog", targetId: "movies", data: { title: "Cinema" },
+  }), 7100);
+  const item = result.catalogsByProfile["living-room"][0];
+  assert.equal(item.name, "Cinema");
+  assert.equal(item.title, "Cinema");
+  assert.equal(item.remoteTitle, "Cinema");
+  assert.deepEqual(item.collectionSources, value.catalogsByProfile["living-room"][0].collectionSources);
+  assert.equal(result.catalogsUpdatedAtByProfile["living-room"], 7100);
+  assert.equal(result.catalogsUpdatedAtByProfile.kids, undefined);
+  assert.equal(applyAdminGlobalMutation(result, prepareAdminGlobalMutation({
+    operation: "rename_catalog", targetId: "missing", data: { title: "Cinema" },
+  })), null);
+});
+
+test("removing and re-enabling a default catalog maintains a hidden tombstone", () => {
+  const value = snapshot();
+  value.catalogsByProfile["living-room"] = [{
+    id: "movies", title: "Movies", sourceType: "PREINSTALLED", isPreinstalled: true, enabled: true,
+  }];
+  const deleted = applyAdminGlobalMutation(value, prepareAdminGlobalMutation({
+    operation: "delete_catalog", targetId: "movies",
+  }), 7200);
+  assert.equal(deleted.catalogsByProfile["living-room"][0].enabled, false);
+  assert.ok(deleted.hiddenPreinstalledByProfile["living-room"].includes("movies"));
+  assert.equal(deleted.catalogsByProfile["living-room"][0].remoteManaged, true);
+  const enabled = applyAdminGlobalMutation(deleted, prepareAdminGlobalMutation({
+    operation: "set_catalog_enabled", targetId: "movies", data: { enabled: true },
+  }), 7300);
+  assert.equal(enabled.catalogsByProfile["living-room"][0].enabled, true);
+  assert.deepEqual(enabled.hiddenPreinstalledByProfile["living-room"], []);
+  assert.equal(enabled.catalogsUpdatedAtByProfile["living-room"], 7300);
+});
+
+test("custom catalog removal respects explicit empty profile arrays and does not leak legacy catalogs", () => {
+  const value = snapshot();
+  value.catalogs = [{ id: "legacy", title: "Legacy", sourceType: "TRAKT" }];
+  value.catalogsByProfile = {
+    "living-room": [{ id: "custom", title: "Custom", sourceType: "MDBLIST" }],
+    kids: [],
+  };
+  const deleted = applyAdminGlobalMutation(value, prepareAdminGlobalMutation({
+    operation: "delete_catalog", targetId: "custom",
+  }));
+  assert.deepEqual(deleted.catalogsByProfile["living-room"], []);
+  assert.deepEqual(deleted.catalogsByProfile.kids, []);
+  assert.deepEqual(adminGlobalInventory(deleted).catalogs, []);
+});
+
+test("addon catalog inventory derives Android instance IDs and supports hiding and renaming", () => {
+  const value = applyAdminSnapshotMutation(snapshot(), {
+    operation: "upsert_addon", data: { url: "https://addon.test", manifest: addonManifest() },
+  });
+  const catalog = adminGlobalInventory(value).catalogs.find((item) => item.sourceType === "ADDON");
+  const template = resolveAdminCatalogTemplate(value, catalog.id);
+  assert.match(template.id, /^addon_[a-f0-9]{16}$/);
+  assert.match(template.sourceRef, /^addon_catalog\|/);
+  const result = applyAdminGlobalMutation(value, {
+    operation: "add_catalog", data: { ...template, enabled: true },
+  }, 7500);
+  assert.ok(result.catalogsByProfile.kids.some((item) => item.id === catalog.id));
+  assert.equal(applyAdminGlobalMutation(snapshot(), { operation: "add_catalog", data: template }), null);
+  const deleted = applyAdminGlobalMutation(result, prepareAdminGlobalMutation({
+    operation: "delete_catalog", targetId: catalog.id,
+  }));
+  assert.ok(deleted.hiddenAddonByProfile.kids.includes(catalog.id));
+  assert.equal(deleted.catalogsByProfile.kids[0].enabled, false);
+  const renamed = applyAdminGlobalMutation(deleted, prepareAdminGlobalMutation({
+    operation: "rename_catalog", targetId: catalog.id, data: { title: "Hidden movies" },
+  }));
+  assert.equal(renamed.catalogsByProfile.kids[0].enabled, false);
+  assert.ok(renamed.hiddenAddonByProfile.kids.includes(catalog.id));
+});
+
+test("catalog validation rejects unsupported sources, URLs, unsafe IDs and invalid activation", () => {
+  for (const data of [
+    { sourceType: "OTHER", title: "Name" },
+    { sourceType: "TRAKT", sourceUrl: "https://trakt.tv.evil.test/lists/1", title: "Name" },
+    { sourceType: "TRAKT", sourceUrl: "https://trakt.tv/calendar", title: "Name" },
+    { sourceType: "TRAKT", sourceUrl: "https://trakt.tv/lists/invalid", title: "Name" },
+    { sourceType: "TRAKT", sourceUrl: "https://trakt.tv/lists/123", title: "Name", enabled: "false" },
+    { sourceType: "MDBLIST", sourceUrl: "https://mdblist.com/lists/u/l", title: "" },
+    { sourceType: "PREINSTALLED", templateId: "__proto__" },
+  ]) assert.throws(() => prepareAdminGlobalMutation({ operation: "add_catalog", data }));
+  assert.throws(() => prepareAdminGlobalMutation({ operation: "set_catalog_enabled", targetId: "movies", data: { enabled: "false" } }));
 });
 
 test("global playlist addition reaches every profile without changing unrelated data", () => {

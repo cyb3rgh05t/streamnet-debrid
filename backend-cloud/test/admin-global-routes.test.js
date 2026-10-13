@@ -198,6 +198,7 @@ test("Remote Config host migration retains individual credentials across account
   const applied = await send("PATCH", "/admin-api/global/snapshot", {
     ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
   });
+
   assert.equal(applied.statusCode, 200);
   const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
   assert.equal(updates.length, 2);
@@ -207,4 +208,49 @@ test("Remote Config host migration retains individual credentials across account
     assert.equal(new URL(item.m3uUrl).searchParams.get("password"), `pass${index}`);
     assert.equal(item.streamNetHostOverride, "https://new.test");
   }
+});
+
+test("catalog templates preview and apply account-wide with preserved metadata and audit", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  rows[0].payload.catalogsByProfile = { main: [{
+    id: "built-in", title: "Built-in", sourceType: "MDBLIST", isPreinstalled: true,
+    sourceUrl: "https://mdblist.com/lists/owner/list", enabled: true,
+  }] };
+  const request = {
+    operation: "add_catalog",
+    data: { sourceType: "PREINSTALLED", templateId: "built-in", title: "Cinema", enabled: false },
+  };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.json().changed, 2);
+  assert.equal(queries.some(({ sql }) => sql.includes("update account_sync_snapshots")), false);
+  const result = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(result.statusCode, 200);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 2);
+  for (const { values } of updates) {
+    const payload = JSON.parse(values[1]);
+    const catalog = payload.catalogsByProfile.main.find((item) => item.id === "built-in");
+    assert.equal(catalog.title, "Cinema");
+    assert.equal(catalog.sourceType, "MDBLIST");
+    assert.equal(catalog.sourceUrl, "https://mdblist.com/lists/owner/list");
+    assert.ok(payload.hiddenPreinstalledByProfile.main.includes("built-in"));
+    assert.ok(payload.catalogsUpdatedAtByProfile.main > 0);
+  }
+  const audits = queries.filter(({ sql }) => sql.includes("insert into admin_audit_logs"));
+  assert.equal(audits.length, 2);
+  assert.ok(audits.every(({ values }) => values[3] === "global_add_catalog"));
+});
+
+test("unavailable catalog templates are rejected without snapshot writes", async (t) => {
+  const { send, queries } = await fixture(t);
+  const result = await send("POST", "/admin-api/global/preview", {
+    operation: "add_catalog", data: { sourceType: "ADDON", templateId: "missing" },
+  });
+  assert.equal(result.statusCode, 400);
+  assert.equal(result.json().error, "Catalog template is unavailable");
+  assert.equal(queries.some(({ sql }) => sql.includes("update account_sync_snapshots")), false);
+  assert.equal(queries.at(-1).sql, "rollback");
 });

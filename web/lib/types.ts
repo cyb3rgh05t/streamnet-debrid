@@ -155,6 +155,8 @@ export interface CatalogConfig {
   isPreinstalled?: boolean;
   layout?: "landscape" | "poster";
   title?: string;
+  remoteManaged?: boolean;
+  remoteTitle?: string;
   kind?:
     | "STANDARD"
     | "COLLECTION"

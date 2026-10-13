@@ -7,6 +7,42 @@ const moduleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/cloud.ts"),
 ).href;
 
+test("an explicit empty profile catalog list does not revive legacy custom catalogs", async (t) => {
+  const { pullCloudPayload, invalidateRawPayloadCache } = await import(moduleUrl);
+  invalidateRawPayloadCache();
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    revision: 1, payload: {
+      catalogs: [{ id: "legacy-custom", name: "Old list", sourceType: "trakt" }],
+      catalogsByProfile: { main: [] },
+    },
+  }));
+  const auth = {
+    session: { userId: "catalog-empty", accessToken: "test-token" },
+    accessToken: async () => "test-token",
+  };
+  const result = await pullCloudPayload(auth, "main");
+  assert.deepEqual(result.settings.catalogs, []);
+});
+
+test("cloud imports Android addon and custom visibility alongside builtins", async (t) => {
+  const { pullCloudPayload, invalidateRawPayloadCache } = await import(moduleUrl);
+  invalidateRawPayloadCache();
+  t.mock.method(globalThis, "fetch", async () => Response.json({
+    revision: 1, payload: {
+      catalogsByProfile: { main: [] },
+      hiddenPreinstalledByProfile: { main: ["builtin"] },
+      hiddenAddonByProfile: { main: ["addon"] },
+      hiddenCustomByProfile: { main: ["custom"] },
+    },
+  }));
+  const auth = {
+    session: { userId: "catalog-hidden", accessToken: "test-token" },
+    accessToken: async () => "test-token",
+  };
+  const result = await pullCloudPayload(auth, "main");
+  assert.deepEqual(result.settings.hiddenCatalogIds, ["builtin", "addon", "custom"]);
+});
+
 test("playlist normalization preserves the Remote Config StreamNet host override", async () => {
   const { normalizeIptvPlaylist } = await import(pathToFileURL(path.resolve(__dirname, "../lib/iptv.ts")).href);
   const result = normalizeIptvPlaylist({

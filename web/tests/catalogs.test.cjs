@@ -10,6 +10,22 @@ const i18nModuleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/i18n.ts"),
 ).href;
 
+test("remote default names survive default overlays and German localization", async () => {
+  const { defaultCatalogs, mergeCatalogs, localizedCatalogName } = await import(moduleUrl);
+  const builtin = defaultCatalogs[0];
+  const stored = {
+    ...builtin, title: "Remote Cinema", name: "Remote Cinema",
+    remoteTitle: "Remote Cinema", remoteManaged: true, enabled: false,
+  };
+  const merged = mergeCatalogs([stored], [builtin.id]).find((item) => item.id === builtin.id);
+  assert.equal(merged.title, "Remote Cinema");
+  assert.equal(merged.name, "Remote Cinema");
+  assert.equal(merged.remoteManaged, true);
+  assert.equal(merged.enabled, false);
+  assert.equal(localizedCatalogName(merged, "de"), "Remote Cinema");
+  assert.equal(localizedCatalogName(merged, "en"), "Remote Cinema");
+});
+
 test("catalog migration removes retired rows and adds current Android defaults", async () => {
   const { mergeCatalogs } = await import(moduleUrl);
   const catalogs = mergeCatalogs([
