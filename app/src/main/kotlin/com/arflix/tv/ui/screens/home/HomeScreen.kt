@@ -162,6 +162,7 @@ import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.ui.components.MediaContextMenu
 import com.arflix.tv.ui.components.rememberCardLayoutMode
 import com.arflix.tv.ui.components.rememberCatalogueRowLayoutMode
+import com.arflix.tv.ui.components.rememberCatalogueRowLayouts
 import com.arflix.tv.ui.components.Toast
 import com.arflix.tv.ui.components.ToastType as ComponentToastType
 import com.arflix.tv.ui.components.SidebarItem
@@ -458,8 +459,22 @@ private data class HomeFocusedHeroSnapshot(
     val rowIndex: Int,
     val itemIndex: Int,
     val focusedItemKey: String,
-    val heroItemKey: String
+    val heroItemKey: String,
+    val sidebarFocused: Boolean
 )
+
+@Composable
+private inline fun TraceHomeComposition(name: String, content: @Composable () -> Unit) {
+    androidx.tracing.Trace.beginSection(name)
+    content()
+    androidx.tracing.Trace.endSection()
+}
+
+internal fun homeFocusedItemLoadKey(categories: List<Category>, rowIndex: Int, itemIndex: Int): String? {
+    val category = categories.getOrNull(rowIndex) ?: return null
+    val item = category.items.getOrNull(itemIndex)?.takeUnless { it.isPlaceholder } ?: return null
+    return "${category.id}:${homeRowItemKey(item)}"
+}
 
 internal fun preferredHomeStartRowIndex(categories: List<Category>): Int {
     val preferredCategoryIds = listOf(
@@ -820,7 +835,7 @@ fun HomeScreen(
     onNavigateToSettings: () -> Unit = {},
     onSwitchProfile: () -> Unit = {},
     onExitApp: () -> Unit = {}
-) {
+) = TraceHomeComposition("StreamNet.Home.compose") {
     val isMobile = LocalDeviceType.current.isTouchDevice()
 
     // Use preloaded data from StartupViewModel if available
@@ -995,10 +1010,16 @@ fun HomeScreen(
                 focusState.currentRowIndex,
                 focusState.currentItemIndex,
                 focusState.lastNavEventTime
-            )
+            ) to (focusState.isSidebarFocused to homeFocusedItemLoadKey(
+                latestDisplayCategories, focusState.currentRowIndex, focusState.currentItemIndex
+            ))
         }
             .distinctUntilChanged()
-            .collectLatest { (rowIndex, itemIndex, navEventTime) ->
+            .collectLatest { (position, target) ->
+                val (rowIndex, itemIndex, navEventTime) = position
+                val (sidebarFocused, itemKey) = target
+                viewModel.onFocusChanged(rowIndex, itemIndex, shouldPrefetch = false)
+                if (sidebarFocused || itemKey == null) return@collectLatest
                 val idleForMs = if (navEventTime > 0L) {
                     SystemClock.elapsedRealtime() - navEventTime
                 } else {
@@ -1009,6 +1030,7 @@ fun HomeScreen(
                 }
                 if (focusState.currentRowIndex != rowIndex) return@collectLatest
                 if (focusState.currentItemIndex != itemIndex) return@collectLatest
+                if (homeFocusedItemLoadKey(latestDisplayCategories, rowIndex, itemIndex) != itemKey) return@collectLatest
                 viewModel.onFocusChanged(rowIndex, itemIndex, shouldPrefetch = true)
                 viewModel.preloadLogosForCategory(rowIndex, prioritizeVisible = true)
                 viewModel.preloadLogosForCategory(rowIndex + 1, prioritizeVisible = false)
@@ -1034,7 +1056,8 @@ fun HomeScreen(
                 // Also include the current hero key. Background home/CW refreshes can
                 // republish the initial row-0 hero without changing focus indices; this
                 // forces the watcher to restore the actually focused card.
-                heroItemKey = latestDisplayHeroItem?.let { homeRowItemKey(it) }.orEmpty()
+                heroItemKey = latestDisplayHeroItem?.let { homeRowItemKey(it) }.orEmpty(),
+                sidebarFocused = focusState.isSidebarFocused
             )
         }
             .distinctUntilChanged()
@@ -1067,7 +1090,6 @@ fun HomeScreen(
                 if (homeRowItemKey(latestFocusedItem) != focusSnapshot.focusedItemKey) {
                     return@collectLatest
                 }
-                viewModel.onFocusChanged(focusSnapshot.rowIndex, focusSnapshot.itemIndex, shouldPrefetch = true)
                 viewModel.updateHeroItem(latestFocusedItem)
             }
     }
@@ -2178,6 +2200,7 @@ private fun HeroSection(
     // But the frosted pill provides additional protection
     val textShadow = textShadowPrimary
     val heroTextWidth = 360.dp
+    var loadedLogoUrl by remember(item.mediaType, item.id) { mutableStateOf<String?>(null) }
 
     Column(
         modifier = modifier,
@@ -2221,11 +2244,15 @@ private fun HeroSection(
                             contentDescription = currentItem.title,
                             contentScale = ContentScale.Fit,
                             alignment = Alignment.CenterStart,
+                            onSuccess = { loadedLogoUrl = currentLogoUrl },
+                            onError = { loadedLogoUrl = null },
                             modifier = Modifier
                                 .height(72.dp)
                                 .width(320.dp)
+                                .graphicsLayer { alpha = if (loadedLogoUrl == currentLogoUrl) 1f else 0f }
                         )
-                    } else {
+                    }
+                    if (currentLogoUrl == null || loadedLogoUrl != currentLogoUrl) {
                         // Fallback to title text with a single-line marquee for long names.
                         val fallbackTitle = currentItem.title.uppercase()
                         HomeHeroMarqueeTitle(
@@ -3933,7 +3960,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerVolume: Float = 0f,
     lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit
-) {
+) = TraceHomeComposition("StreamNet.Home.TVRows.compose") {
     // ── Focus-row stabilizer ──
     // Track the focused row by its category ID (stable) rather than integer
     // index. When new catalogs are inserted above the focused row (e.g.,
@@ -3981,10 +4008,11 @@ private fun TvHomeRowsLayer(
         .coerceIn(0, (renderedCategories.size - 1).coerceAtLeast(0))
 
     val density = LocalDensity.current
-    val rowLayoutModes = renderedCategories.map { category ->
+    val catalogueLayouts = rememberCatalogueRowLayouts()
+    val rowLayoutModes = remember(renderedCategories, catalogueLayouts) { renderedCategories.map { category ->
         !isFixedLandscapeHomeCategory(category.id) &&
-            rememberCatalogueRowLayoutMode("home:${category.id}") == CardLayoutMode.POSTER
-    }
+            catalogueLayouts.forRow("home:${category.id}") == CardLayoutMode.POSTER
+    } }
     val categoryHeightsPx = remember(renderedCategories, rowLayoutModes, density) {
         renderedCategories.mapIndexed { idx, _ ->
             val usePoster = rowLayoutModes.getOrNull(idx) ?: false
@@ -4065,7 +4093,7 @@ private fun TvHomeRowsLayer(
                         listState.scrollToItem(index = targetIndex, scrollOffset = 0)
                     }
                 } else {
-                    listState.animateScrollToItem(index = targetIndex, scrollOffset = 0)
+                    listState.scrollToItem(index = targetIndex, scrollOffset = 0)
                 }
             }
             lastAppliedTargetIndex = targetIndex
@@ -4102,9 +4130,7 @@ private fun TvHomeRowsLayer(
                 ) { index, category ->
                     val actualRowIndex = rowWindowStart + index
                     val rowIsFocused = !focusState.isSidebarFocused && actualRowIndex == focusState.currentRowIndex
-                    val rowKey = remember(category.id) { "home:${category.id}" }
-                    val rowUsePosterCards = !isFixedLandscapeHomeCategory(category.id) &&
-                        rememberCatalogueRowLayoutMode(rowKey) == CardLayoutMode.POSTER
+                    val rowUsePosterCards = rowLayoutModes.getOrElse(index) { false }
                     val rowHeight = if (rowUsePosterCards) 245.dp else 202.dp
                     val onRowLoadMore = remember(category.id) {
                         { onLoadMoreCategory(category.id) }
@@ -4358,7 +4384,7 @@ private fun ContentRow(
     lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit
-) {
+) = TraceHomeComposition("StreamNet.Home.ContentRow.compose") {
     val isCollectionRow = category.id.startsWith("collection_row_")
     val effectiveCategoryHasMore = canPaginateHomeCategory(category.id, categoryHasMore)
     val rowState = rememberLazyListState()
@@ -4776,7 +4802,7 @@ private fun IptvHomeCard(
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-) {
+) = TraceHomeComposition("StreamNet.Home.IPTVCard.compose") {
     val isMobile = LocalDeviceType.current.isTouchDevice()
     var logoGradient by remember(item.image, item.title) {
         mutableStateOf(iptvLogoFallbackGradient(item.title))

@@ -2,6 +2,24 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.067] - 2026-10-15
+
+- Android TV Home: Die Layout-Einstellungen aller Katalogzeilen werden gemeinsam als profilbezogener Snapshot gelesen statt mit separaten DataStore-Collectorn pro Zeile. Individuelle Poster-/Landscape-Overrides und globale Fallbacks bleiben erhalten.
+- Android Home: Fokus-Prefetching startet nur noch über den gemeinsamen Idle-Beobachter. Neue Navigation oder Sidebar-Fokus bricht den aktiven Fokus-Prefetch ab; Hero-Wechsel starten keinen zweiten Fokus-Prefetch mehr.
+- Android TV Home: Bei deaktiviertem Smooth Scrolling erfolgt der vertikale Zeilenwechsel ohne Scrollanimation.
+- Android Home: Das Ersetzen von Start-Platzhaltern und die Rückkehr aus der Sidebar lösen die Anreicherung der fokussierten Karte auch bei unverändertem Itemindex aus. Während der Startphase zurückgestellter Detail-Prefetch wird verzögert statt verworfen.
+- Android Home: Ein gemeinsamer Hintergrund-Loader cached bis zu 64 Trailer-Ergebnisse pro Sprach-/Medienidentität, übernimmt keine Ergebnisse für einen inzwischen anderen Hero und versucht leere Abrufe einmal verzögert erneut. Weitere leere Abrufe erhalten eine Retry-Pause statt einer dauerhaften Sperre bis zum Neustart.
+- Android Home: Die Bildvorladung markiert nur tatsächlich in den begrenzten Batch aufgenommene URLs als gestartet, damit weitere Bilder später noch geladen werden können.
+- Android: Der fokussierte Abbrechen-Button im App-schließen-Dialog erhält einen Rahmen im aktiven Theme-Akzent; seine neutrale Füllung bleibt erhalten.
+- Android Home: Inkrementelle Katalogergebnisse werden nach dem ersten echten Inhalt in 120-ms-Fenstern gemeinsam veröffentlicht. Pro Rail gilt das neueste Ergebnis; Load-Abbruch verwirft offene Updates, der finale Katalogzustand übernimmt sie vorher vollständig.
+- Android IPTV: Artwork-Beobachtung und direkte Logo-/Backdrop-Lookups führen die Suche und Kandidatenaufbereitung auf dem IO-Dispatcher statt im aufrufenden UI-Kontext aus. Cache-, Retry- und Abbruchverhalten bleiben erhalten.
+- Android Diagnose: Feste Perfetto-Marker kennzeichnen Home-/Rail-/IPTV-Karten-Komposition, gebündelte Rail-Veröffentlichung und Artwork-Kandidatenbewertung ohne Titel oder Zugangsdaten. Eine messbare Verbesserung wird erst anhand einer Vergleichsaufnahme bewertet.
+- Android TV Details: Interner Startfokus und sichtbare Play-Markierung liegen beide auf den Aktionen. Die Beschreibung ist kein eigener D-Pad-Fokus-Stopp mehr; oberhalb der Aktionen liegt die obere Navigation. D-Pad-Abwärts wechselt bei Filmen direkt zur nächsten vorhandenen Rail. Auf TV zeigen Serien auch bei nur einer Staffel den Staffelbutton und verwenden konsistent Aktionen, Staffelzeile und Episoden als Fokus-Stops; die mobile Staffelanzeige bleibt unverändert. Der Rückweg zu den Aktionen setzt eine unterbrochene Scrollanimation zurück und positioniert den Hero neu, auch wenn er vorher noch teilweise sichtbar war.
+- Android Home: Ein bereits sichtbarer Continue-Watching-Hero bleibt beim Eintreffen vorab geladener Katalogdaten erhalten, auch wenn sein Logo noch fehlt. Teilantworten für denselben Titel bewahren vorhandene Metadaten und übernehmen neue Fortschrittswerte ohne erneuten Titelwechsel. Die Hero-Hydration ergänzt jetzt auch Jahr und Artwork; der Titel bleibt sichtbar, bis das Clearlogo tatsächlich geladen ist.
+- Android TV Home: Passende gespeicherte Metadaten werden sofort in den sichtbaren CW-Hero übernommen. Nur das erste CW-Item erhält einen priorisierten Hintergrund-Metadatenabruf vor der Wartephase für den vollständigen Listenrefresh; dessen neue Daten aktualisieren denselben Hero ohne Titelwechsel.
+- Diagnose: Die gemeldete Absturzursache ist weiterhin nicht bestätigt. Einzelne Debug-/Emulator-Traces sind kein belastbarer Release-Performancebenchmark.
+- Android-Version: `2.5.067` / Code `468`.
+
 ## [2.5.066] - 2026-10-13
 
 - Franchises / Studios / Collections: Die Medienkarten in der Sammlungsübersicht zeigen wieder das vollständige Veröffentlichungsdatum (`releaseDate`, z. B. im Format `dd.MM.yyyy`) statt nur das Erscheinungsjahr (`releaseYear`). Fehlt ein genaues Datum, bleibt das Jahr als Fallback erhalten.

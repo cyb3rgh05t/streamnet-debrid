@@ -2,8 +2,27 @@ package com.arflix.tv.ui.components
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
 
 class CardLayoutModeTest {
+
+    @Test
+    fun `layout snapshot preserves profile overrides and legacy fallback`() {
+        val prefs = preferencesOf(
+            stringPreferencesKey("card_layout_mode") to "Poster",
+            stringPreferencesKey("profile_p1_card_layout_mode") to "Landscape",
+            profileCatalogueRowLayoutModeKey("p1", "home:trending_movies") to "Poster",
+            profileCatalogueRowLayoutModeKey("p2", "home:trending_movies") to "Landscape"
+        )
+        val first = catalogueRowLayoutsFromPreferences("p1", prefs)
+        assertThat(first.forRow(" Home:Trending Movies ")).isEqualTo(CardLayoutMode.POSTER)
+        assertThat(first.forRow("home:other")).isEqualTo(CardLayoutMode.LANDSCAPE)
+        val second = catalogueRowLayoutsFromPreferences("p2", prefs)
+        assertThat(second.forRow("home:trending_movies")).isEqualTo(CardLayoutMode.LANDSCAPE)
+        assertThat(second.forRow("home:other")).isEqualTo(CardLayoutMode.POSTER)
+        assertThat(first.overrides).hasSize(1)
+    }
 
     @Test
     fun `normalizes card layout values`() {

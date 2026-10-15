@@ -102,36 +102,62 @@ class PreinstalledServicesTest {
     }
 
     @Test
-    fun `franchise public-list fallbacks are assigned to the correct tabs`() {
+    fun `franchise addon sources and supported fallbacks are assigned to the correct tabs`() {
         val collections = MediaRepository.buildPreinstalledDefaults()
             .filter { it.kind == CatalogKind.COLLECTION }
             .associateBy { it.title }
 
-        fun source(title: String, slug: String) = requireNotNull(collections[title])
-            .collectionSources.first { it.mdblistSlug == slug }
+        fun assertAddonTabs(
+            title: String,
+            addonId: String,
+            manifestUrl: String,
+            catalogs: List<Pair<String, String>>,
+            timelineManifestUrl: String = manifestUrl
+        ) {
+            val sources = collections.getValue(title).collectionSources.filter {
+                it.kind == CollectionSourceKind.ADDON_CATALOG
+            }
+            assertEquals("$title should expose its three addon sources", 3, sources.size)
+            assertEquals(listOf("movie", "series", "timeline"), sources.map { it.collectionTab })
+            sources.forEachIndexed { index, source ->
+                assertEquals("$title tab ${source.collectionTab}", CollectionSourceKind.ADDON_CATALOG, source.kind)
+                assertEquals(addonId, source.addonId)
+                assertEquals(catalogs[index].first, source.addonCatalogType)
+                assertEquals(catalogs[index].second, source.addonCatalogId)
+                assertEquals(if (index == 2) timelineManifestUrl else manifestUrl, source.addonManifestUrl)
+                assertNull(source.mdblistSlug)
+                assertNull(source.tmdbCollectionId)
+            }
+        }
 
-        assertEquals(
-            "movie",
-            source("Marvel", "lt3dave/marvel-cinematic-universe-mcu-collection").mediaType
+        assertAddonTabs(
+            title = "Marvel",
+            addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
+            manifestUrl = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
+            catalogs = listOf("movie" to "movies", "series" to "series", "Marvel" to "marvel-mcu"),
+            timelineManifestUrl = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
         )
-        assertEquals("series", source("Marvel", "at0microuton/mcu-tv-shows").mediaType)
-        assertEquals("series", source("DC Universe", "kraftynic/dc-tv-shows1").mediaType)
-        assertTrue(
-            "Marvel should use the same TMDB collection fallback as Web",
-            collections.getValue("Marvel").collectionSources.any {
-                it.kind == CollectionSourceKind.TMDB_COLLECTION && it.tmdbCollectionId == 86311
-            }
+        assertAddonTabs(
+            title = "DC Universe",
+            addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
+            manifestUrl = "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
+            catalogs = listOf("movie" to "dc-movies", "series" to "dc-series", "DC" to "dc-chronological"),
+            timelineManifestUrl = "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json"
         )
-        assertFalse(
-            "DC movie sources should match Web and not add a separate MDBList",
-            collections.getValue("DC Universe").collectionSources.any {
-                it.mdblistSlug == "kingkearney/dc-universe"
-            }
+        assertAddonTabs(
+            title = "Star Wars",
+            addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
+            manifestUrl = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
+            catalogs = listOf("movie" to "movies", "series" to "series", "StarWars" to "sw-movies-series-chronological")
         )
-        assertEquals(
-            "timeline",
-            source("Star Wars", "jxduffy/star-wars-chronological-order").collectionTab
-        )
+        assertEquals("Marvel should not restore legacy fallback sources", 3,
+            collections.getValue("Marvel").collectionSources.size)
+        val dcSources = collections.getValue("DC Universe").collectionSources
+        assertEquals("series", dcSources.single { it.mdblistSlug == "kraftynic/dc-tv-shows1" }.mediaType)
+        assertFalse("DC should not add the removed movie MDBList",
+            dcSources.any { it.mdblistSlug == "kingkearney/dc-universe" })
+        assertEquals("timeline", collections.getValue("Star Wars").collectionSources
+            .single { it.mdblistSlug == "jxduffy/star-wars-chronological-order" }.collectionTab)
     }
 
     private val serviceOrder = listOf(

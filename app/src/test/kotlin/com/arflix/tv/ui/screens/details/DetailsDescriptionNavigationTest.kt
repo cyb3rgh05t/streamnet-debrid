@@ -13,19 +13,71 @@ class DetailsDescriptionNavigationTest {
     private val series = movie.copy(mediaType = MediaType.TV)
 
     @Test
-    fun `description is reachable even with no other rails or missing overview`() {
+    fun `movie actions move straight to cast and back with one key each`() {
+        val state = DetailsUiState(item = movie, cast = listOf(CastMember(1, "Actor")))
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.BUTTONS, down = true))
+            .isEqualTo(FocusSection.CAST)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.CAST, down = false))
+            .isEqualTo(FocusSection.BUTTONS)
+    }
+
+    @Test
+    fun `series keeps a visible season stop between actions and episodes in both directions`() {
+        val state = DetailsUiState(
+            item = series, totalSeasons = 3,
+            episodes = listOf(Episode(1, 1, 1, "Episode"))
+        )
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.BUTTONS, down = true))
+            .isEqualTo(FocusSection.SEASONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.SEASONS, down = true))
+            .isEqualTo(FocusSection.EPISODES)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.EPISODES, down = false))
+            .isEqualTo(FocusSection.SEASONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.SEASONS, down = false))
+            .isEqualTo(FocusSection.BUTTONS)
+    }
+
+    @Test
+    fun `single season series also keeps the visible season button in both directions`() {
+        val state = DetailsUiState(
+            item = series, totalSeasons = 1,
+            episodes = listOf(Episode(1, 1, 1, "Episode"))
+        )
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.BUTTONS, down = true))
+            .isEqualTo(FocusSection.SEASONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.SEASONS, down = true))
+            .isEqualTo(FocusSection.EPISODES)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.EPISODES, down = false))
+            .isEqualTo(FocusSection.SEASONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.SEASONS, down = false))
+            .isEqualTo(FocusSection.BUTTONS)
+    }
+
+    @Test
+    fun `description is not a focus stop and unloaded sections fall back to actions`() {
+        val state = DetailsUiState(item = series)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.BUTTONS, down = false))
+            .isEqualTo(FocusSection.BUTTONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.DESCRIPTION, down = true))
+            .isEqualTo(FocusSection.BUTTONS)
+        assertThat(moveDetailsVerticalFocus(state, FocusSection.SEASONS, down = true))
+            .isEqualTo(FocusSection.BUTTONS)
+    }
+
+    @Test
+    fun `only actions are focusable with no other rails or missing overview`() {
         assertThat(detailsFocusSections(DetailsUiState(item = movie)))
-            .containsExactly(FocusSection.DESCRIPTION, FocusSection.BUTTONS).inOrder()
+            .containsExactly(FocusSection.BUTTONS)
     }
 
     @Test
     fun `series without loaded episodes does not reserve an invisible season rail`() {
         assertThat(detailsFocusSections(DetailsUiState(item = series, totalSeasons = 3)))
-            .containsExactly(FocusSection.DESCRIPTION, FocusSection.BUTTONS).inOrder()
+            .containsExactly(FocusSection.BUTTONS)
     }
 
     @Test
-    fun `hero description precedes buttons and TV rails`() {
+    fun `actions precede TV rails without a description focus stop`() {
         val state = DetailsUiState(
             item = series,
             totalSeasons = 2,
@@ -36,7 +88,7 @@ class DetailsDescriptionNavigationTest {
             similar = listOf(movie)
         )
         assertThat(detailsFocusSections(state)).containsExactly(
-            FocusSection.DESCRIPTION, FocusSection.BUTTONS, FocusSection.SEASONS, FocusSection.EPISODES,
+            FocusSection.BUTTONS, FocusSection.SEASONS, FocusSection.EPISODES,
             FocusSection.RATINGS, FocusSection.CAST,
             FocusSection.REVIEWS, FocusSection.COLLECTION, FocusSection.SIMILAR
         ).inOrder()
@@ -50,7 +102,7 @@ class DetailsDescriptionNavigationTest {
             showEpisodeRatings = false
         )
         assertThat(detailsFocusSections(state)).containsExactly(
-            FocusSection.DESCRIPTION, FocusSection.BUTTONS, FocusSection.EPISODES
+            FocusSection.BUTTONS, FocusSection.SEASONS, FocusSection.EPISODES
         ).inOrder()
         assertThat(detailsFocusSections(state.copy(
             showEpisodeRatings = true,

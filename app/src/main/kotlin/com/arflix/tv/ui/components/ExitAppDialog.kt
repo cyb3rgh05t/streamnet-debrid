@@ -126,7 +126,7 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                             shape = buttonShape
                         ),
                         focusedBorder = Border(
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+                            border = BorderStroke(1.dp, accent),
                             shape = buttonShape
                         )
                     )

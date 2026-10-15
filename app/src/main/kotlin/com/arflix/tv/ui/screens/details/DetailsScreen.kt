@@ -242,7 +242,7 @@ fun DetailsScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val isMobile = LocalDeviceType.current.isTouchDevice()
 
-    var focusedSection by remember { mutableStateOf(FocusSection.DESCRIPTION) }
+    var focusedSection by remember { mutableStateOf(FocusSection.BUTTONS) }
     var descriptionScrollRequest by remember(mediaType, mediaId) { mutableIntStateOf(0) }
     var descriptionAtTop by remember(mediaType, mediaId) { mutableStateOf(true) }
     var descriptionAtBottom by remember(mediaType, mediaId) { mutableStateOf(true) }
@@ -354,7 +354,7 @@ fun DetailsScreen(
     val focusRequester = remember { FocusRequester() }
 
     LaunchedEffect(mediaType, mediaId, initialSeason, initialEpisode) {
-        focusedSection = FocusSection.DESCRIPTION
+        focusedSection = FocusSection.BUTTONS
         buttonIndex = 0
         episodeIndex = 0
         ratingsIndex = 0
@@ -703,13 +703,14 @@ fun DetailsScreen(
                             if (isSidebarFocused) {
                                 true
                             } else {
-                                if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtTop) {
+                                if (focusedSection == FocusSection.BUTTONS) {
+                                    isSidebarFocused = true
+                                } else if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtTop) {
                                     descriptionScrollRequest--
                                 } else if (focusedSection == FocusSection.DESCRIPTION) {
                                     isSidebarFocused = true
                                 } else {
-                                    val sections = detailsFocusSections(uiState)
-                                    focusedSection = sections[(sections.indexOf(focusedSection) - 1).coerceAtLeast(0)]
+                                    focusedSection = moveDetailsVerticalFocus(uiState, focusedSection, down = false)
                                 }
                                 true
                             }
@@ -722,8 +723,7 @@ fun DetailsScreen(
                                 if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtBottom) {
                                     descriptionScrollRequest++
                                 } else {
-                                    val sections = detailsFocusSections(uiState)
-                                    focusedSection = sections[(sections.indexOf(focusedSection) + 1).coerceAtMost(sections.lastIndex)]
+                                    focusedSection = moveDetailsVerticalFocus(uiState, focusedSection, down = true)
                                 }
                                 true
                             }
@@ -1170,11 +1170,10 @@ internal enum class FocusSection {
 }
 
 internal fun detailsFocusSections(state: DetailsUiState): List<FocusSection> = buildList {
-    add(FocusSection.DESCRIPTION)
     add(FocusSection.BUTTONS)
     if (state.item?.mediaType == MediaType.TV) {
         if (state.episodes.isNotEmpty()) {
-            if (state.totalSeasons > 1) add(FocusSection.SEASONS)
+            if (state.totalSeasons >= 1) add(FocusSection.SEASONS)
             add(FocusSection.EPISODES)
             if (state.showEpisodeRatings && state.episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }) {
                 add(FocusSection.RATINGS)
@@ -1185,6 +1184,17 @@ internal fun detailsFocusSections(state: DetailsUiState): List<FocusSection> = b
     if (state.reviews.isNotEmpty()) add(FocusSection.REVIEWS)
     if (state.collectionItems.isNotEmpty()) add(FocusSection.COLLECTION)
     if (state.similar.isNotEmpty()) add(FocusSection.SIMILAR)
+}
+
+internal fun moveDetailsVerticalFocus(
+    state: DetailsUiState,
+    current: FocusSection,
+    down: Boolean
+): FocusSection {
+    val sections = detailsFocusSections(state)
+    val index = sections.indexOf(current)
+    if (index < 0) return FocusSection.BUTTONS
+    return sections[(index + if (down) 1 else -1).coerceIn(0, sections.lastIndex)]
 }
 
 internal fun descriptionPageScrollDistance(
@@ -2184,8 +2194,7 @@ private fun DetailsContent(
                             icon = Icons.Default.PlayArrow,
                             text = playButtonLabel,
                             isPrimary = true,
-                            isFocused = focusSectionForUi == FocusSection.DESCRIPTION ||
-                                (focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 0)
+                            isFocused = focusSectionForUi == FocusSection.BUTTONS && buttonIndex == 0
                         )
                     }
                     if (showPlayFromBeginning) {
@@ -2341,7 +2350,7 @@ private fun DetailsTvRows(
         episodes.any { (it.imdbRating.toFloatOrNull() ?: 0f) > 0f }
     }
     val hasRatings = hasEpisodes && showEpisodeRatings && hasAnyValidRating
-    val hasSeasons = hasEpisodes && totalSeasons > 1
+    val hasSeasons = hasEpisodes && totalSeasons >= 1
     val hasCast = cast.isNotEmpty()
     val hasReviews = reviews.isNotEmpty()
     val hasSimilar = similar.isNotEmpty()
@@ -2400,8 +2409,9 @@ private fun DetailsTvRows(
 
         val firstVisible = contentScrollState.firstVisibleItemIndex
         if (focusedSection == FocusSection.BUTTONS) {
-            val hero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
-            if (hero == null) contentScrollState.scrollToItem(descriptionIdx, 0)
+            detailsStackOffsetPx.stop()
+            detailsStackOffsetPx.snapTo(0f)
+            contentScrollState.scrollToItem(descriptionIdx, 0)
             val measuredHero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
             if (measuredHero != null) {
                 val overflow = measuredHero.offset + measuredHero.size - contentScrollState.layoutInfo.viewportEndOffset
@@ -2461,7 +2471,7 @@ private fun DetailsTvRows(
     ) {
         item(key = "details_hero") { heroContent() }
         if (item.mediaType == MediaType.TV && episodes.isNotEmpty()) {
-            if (totalSeasons > 1) {
+            if (totalSeasons >= 1) {
                 item {
                     DetailsSeasonRail(
                         totalSeasons = totalSeasons,

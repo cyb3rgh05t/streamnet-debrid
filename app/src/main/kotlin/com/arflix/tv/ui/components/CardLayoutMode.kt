@@ -168,6 +168,42 @@ fun rememberCatalogueRowLayoutMode(rowKey: String): CardLayoutMode {
     return mode
 }
 
+data class CatalogueRowLayouts(
+    val fallback: CardLayoutMode = CardLayoutMode.LANDSCAPE,
+    val overrides: Map<String, CardLayoutMode> = emptyMap()
+) {
+    fun forRow(rowKey: String): CardLayoutMode =
+        overrides[normalizeCatalogueRowLayoutKey(rowKey)] ?: fallback
+}
+
+internal fun catalogueRowLayoutsFromPreferences(
+    profileId: String,
+    prefs: Preferences
+): CatalogueRowLayouts {
+    val fallback = parseCardLayoutMode(
+        prefs[profileCardLayoutModeKey(profileId)] ?: prefs[cardLayoutModeKey]
+    )
+    val overrides = prefs.asMap().mapNotNull { (key, value) ->
+        val rowKey = catalogueRowLayoutKeyFromPreferenceName(profileId, key.name)
+            ?: return@mapNotNull null
+        rowKey to parseCardLayoutMode(value as? String)
+    }.toMap()
+    return CatalogueRowLayouts(fallback, overrides)
+}
+
+@Composable
+fun rememberCatalogueRowLayouts(): CatalogueRowLayouts {
+    val context = LocalContext.current
+    val layoutsFlow = remember(context) {
+        combine(context.profilesDataStore.data, context.settingsDataStore.data) { profiles, settings ->
+            val profileId = profiles[activeProfileIdKey].orEmpty().ifBlank { "default" }
+            catalogueRowLayoutsFromPreferences(profileId, settings)
+        }.distinctUntilChanged()
+    }
+    val layouts by layoutsFlow.collectAsStateWithLifecycle(initialValue = CatalogueRowLayouts())
+    return layouts
+}
+
 @Composable
 fun CatalogueRowLayoutToggleButton(
     rowKey: String,

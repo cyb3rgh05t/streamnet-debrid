@@ -6,8 +6,114 @@ import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.repository.MediaRepository
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 
 class HomeRowStateTest {
+
+    @Test
+    fun `hero refresh preserves known metadata while accepting new playback progress`() {
+        val visible = MediaItem(
+            10, "Resume", image = "poster", backdrop = "backdrop", year = "2025",
+            overview = "Overview", duration = "120m", releaseDate = "2025-01-01",
+            imdbRating = "8.0", certification = "FSK 12", progress = 20
+        )
+        val incoming = MediaItem(10, "Resume", backdrop = "", releaseDate = "", progress = 40)
+        val merged = mergeHomeHeroMetadata(incoming, visible)
+        assertThat(merged.year).isEqualTo("2025")
+        assertThat(merged.image).isEqualTo("poster")
+        assertThat(merged.backdrop).isEqualTo("backdrop")
+        assertThat(merged.releaseDate).isEqualTo("2025-01-01")
+        assertThat(merged.certification).isEqualTo("FSK 12")
+        assertThat(merged.overview).isEqualTo("Overview")
+        assertThat(merged.progress).isEqualTo(40)
+        assertThat(mergeHomeHeroMetadata(incoming.copy(id = 11), visible).year).isEmpty()
+        assertThat(mergeHomeHeroMetadata(incoming.copy(mediaType = MediaType.TV), visible).year).isEmpty()
+    }
+
+    @Test
+    fun `startup preserves the visible continue watching hero even before its logo loads`() {
+        val resume = MediaItem(10, "Resume", year = "2025", overview = "Hydrated overview")
+        val state = HomeUiState(heroItem = resume)
+        val merged = preserveStartupHomeHero(state, MediaItem(11, "Trending"), "other-logo")
+        assertThat(merged.heroItem).isEqualTo(resume)
+        assertThat(merged.heroLogoUrl).isNull()
+        val same = preserveStartupHomeHero(state, resume.copy(year = "", overview = ""), "resume-logo")
+        assertThat(same.heroItem).isEqualTo(resume)
+        assertThat(same.heroLogoUrl).isEqualTo("resume-logo")
+        val differentType = preserveStartupHomeHero(state, resume.copy(mediaType = MediaType.TV), "tv-logo")
+        assertThat(differentType.heroLogoUrl).isNull()
+        assertThat(preserveStartupHomeHero(HomeUiState(), resume, "resume-logo").heroItem).isEqualTo(resume)
+        val rawResume = resume.copy(year = "", overview = "", progress = 40)
+        val enriched = preserveStartupHomeHero(HomeUiState(heroItem = rawResume), resume, "resume-logo")
+        assertThat(enriched.heroItem?.year).isEqualTo("2025")
+        assertThat(enriched.heroItem?.overview).isEqualTo("Hydrated overview")
+        assertThat(enriched.heroItem?.progress).isEqualTo(40)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `ready rows publish first content immediately and coalesce later updates`() = runTest {
+        val batches = mutableListOf<List<Category>>()
+        val publisher = HomeCategoryBatcher(this, publish = { batches.add(it) })
+        val first = Category("movies", "Movies", listOf(MediaItem(1, "First")))
+        val second = Category("series", "Series", listOf(MediaItem(2, "Second")))
+        publisher.offer(first, immediately = true)
+        assertThat(batches).containsExactly(listOf(first))
+        publisher.offer(second, immediately = false)
+        publisher.offer(first, immediately = false)
+        val newest = second.copy(title = "New series title")
+        publisher.offer(newest, immediately = false)
+        runCurrent()
+        advanceTimeBy(119L)
+        runCurrent()
+        assertThat(batches).hasSize(1)
+        advanceTimeBy(1L)
+        runCurrent()
+        assertThat(batches).containsExactly(listOf(first), listOf(newest, first)).inOrder()
+        publisher.offer(second, immediately = false)
+        publisher.cancel()
+        advanceTimeBy(200L)
+        runCurrent()
+        assertThat(batches).hasSize(2)
+        publisher.offer(second, immediately = false)
+        publisher.flush()
+        advanceTimeBy(200L)
+        runCurrent()
+        assertThat(batches).hasSize(3)
+        assertThat(batches.last()).containsExactly(second)
+    }
+
+    @Test
+    fun `trailer cache retains successful keys across focus changes and allows retry after misses`() {
+        val cache = HomeTrailerCache(maxEntries = 2)
+        cache.record("de:movie:1", "trailer-one", 0L)
+        cache.record("de:movie:2", null, 100L)
+        assertThat(cache.trailerKey("de:movie:1")).isEqualTo("trailer-one")
+        assertThat(cache.shouldLoad("de:movie:1", 100_000L)).isFalse()
+        assertThat(cache.shouldLoad("de:movie:2", 60_099L)).isFalse()
+        assertThat(cache.shouldLoad("de:movie:2", 60_100L)).isTrue()
+        assertThat(cache.shouldLoad("en:movie:1", 100L)).isTrue()
+        cache.record("de:movie:3", "trailer-three", 200L)
+        assertThat(cache.shouldLoad("de:movie:1", 200L)).isTrue()
+        cache.clear()
+        assertThat(cache.trailerKey("de:movie:3")).isNull()
+    }
+
+    @Test
+    fun `first item loading retriggers when placeholder becomes real without moving focus`() {
+        val placeholder = Category("trending_movies", "Movies", listOf(MediaItem(-1, "", isPlaceholder = true)))
+        val ready = placeholder.copy(items = listOf(MediaItem(10, "Movie")))
+        assertThat(homeFocusedItemLoadKey(listOf(placeholder), 0, 0)).isNull()
+        val readyKey = homeFocusedItemLoadKey(listOf(ready), 0, 0)
+        assertThat(readyKey).isNotNull()
+        assertThat(homeFocusedItemLoadKey(listOf(ready, placeholder), 0, 0)).isEqualTo(readyKey)
+        assertThat(homeFocusedItemLoadKey(listOf(ready.copy(id = "other_row")), 0, 0)).isNotEqualTo(readyKey)
+        assertThat(homeFocusedItemLoadKey(listOf(ready.copy(items = listOf(MediaItem(11, "Next")))), 0, 0))
+            .isNotEqualTo(readyKey)
+    }
 
     @Test
     fun `missing Home overview stays empty instead of injecting English fallback`() {

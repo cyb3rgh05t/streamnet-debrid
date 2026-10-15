@@ -42,6 +42,7 @@ import com.arflix.tv.util.CatalogUrlParser
 import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import androidx.tracing.trace
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -51,6 +52,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
@@ -3734,16 +3736,16 @@ class MediaRepository @Inject constructor(
                 }
                 delay(60_000L)
             }
-        }
+        }.flowOn(Dispatchers.IO)
     }
 
     /** Resolve IPTV program artwork consistently for Home and the Live TV screen. */
-    suspend fun lookupIptvProgramBackdrop(rawTitle: String, durationMs: Long? = null): String? {
+    suspend fun lookupIptvProgramBackdrop(rawTitle: String, durationMs: Long? = null): String? = withContext(Dispatchers.IO) {
         val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
-        if (cleanedTitle.length < 3) return null
-        if (cleanedTitle.isArtworkPlaceholderTitle()) return null
+        if (cleanedTitle.length < 3) return@withContext null
+        if (cleanedTitle.isArtworkPlaceholderTitle()) return@withContext null
 
-        return iptvBackdropCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
+        iptvBackdropCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
             resolveIptvProgramBackdrop(cleanedTitle, durationMs)
         }
     }
@@ -3760,12 +3762,12 @@ class MediaRepository @Inject constructor(
                 ?.also { android.util.Log.d("IptvArtwork", "Secondary TMDB backdrop hit title=$cleanedTitle") }
     }
 
-    suspend fun lookupIptvProgramLogo(rawTitle: String, durationMs: Long? = null): String? {
+    suspend fun lookupIptvProgramLogo(rawTitle: String, durationMs: Long? = null): String? = withContext(Dispatchers.IO) {
         val cleanedTitle = cleanIptvArtworkTitle(rawTitle)
-        if (cleanedTitle.length < 3) return null
-        if (cleanedTitle.isArtworkPlaceholderTitle()) return null
+        if (cleanedTitle.length < 3) return@withContext null
+        if (cleanedTitle.isArtworkPlaceholderTitle()) return@withContext null
 
-        return iptvLogoCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
+        iptvLogoCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
             resolveIptvProgramLogo(cleanedTitle, durationMs)
         }
     }
@@ -3814,7 +3816,8 @@ class MediaRepository @Inject constructor(
             }
             if (searchResults.any { iptvArtworkTitleScore(title, it.title) >= 35.0 }) break
         }
-        val candidates = searchResults.groupBy { "${it.mediaType}:${it.id}" }
+        val candidates = trace("StreamNet.IPTV.rankArtworkCandidates") {
+            searchResults.groupBy { "${it.mediaType}:${it.id}" }
             .values
             .map { localizedFirst ->
                 localizedFirst.drop(1).fold(localizedFirst.first()) { preferred, fallback ->
@@ -3829,6 +3832,7 @@ class MediaRepository @Inject constructor(
             .sortedByDescending { item ->
                 iptvArtworkCandidateScore(title, item.title, item.mediaType, durationMs, item.popularity)
             }
+        }
         // A partial search must not be cached as a complete result or a valid miss.
         requests.throwIfFailed()
         return candidates

@@ -58,6 +58,8 @@ import com.arflix.tv.util.detectDeviceType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import androidx.tracing.trace
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -97,6 +99,43 @@ internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
 internal fun <T> recentlyWatchedFirst(keys: List<T>, changedAt: Map<T, Long>): List<T> =
     keys.asReversed().sortedByDescending { changedAt[it] ?: 0L }
 
+internal fun preserveStartupHomeHero(
+    state: HomeUiState,
+    incomingHero: MediaItem?,
+    incomingLogo: String?
+): HomeUiState {
+    val current = state.heroItem?.takeUnless { it.isPlaceholder }
+    val incoming = incomingHero?.takeUnless { it.isPlaceholder }
+    val hero = current?.let { mergeHomeHeroMetadata(it, incoming) } ?: incoming
+    val sameIncoming = hero != null && incoming != null &&
+        hero.id == incoming.id && hero.mediaType == incoming.mediaType
+    return state.copy(
+        heroItem = hero,
+        heroLogoUrl = if (current != null) {
+            state.heroLogoUrl ?: incomingLogo.takeIf { sameIncoming }
+        } else {
+            incomingLogo.takeIf { incoming != null }
+        }
+    )
+}
+
+internal fun mergeHomeHeroMetadata(incoming: MediaItem, visible: MediaItem?): MediaItem {
+    if (visible == null || incoming.id != visible.id || incoming.mediaType != visible.mediaType) return incoming
+    return incoming.copy(
+        image = incoming.image.ifBlank { visible.image },
+        backdrop = incoming.backdrop?.takeIf { it.isNotBlank() } ?: visible.backdrop,
+        year = incoming.year.ifBlank { visible.year },
+        duration = incoming.duration.ifBlank { visible.duration },
+        releaseDate = incoming.releaseDate?.takeIf { it.isNotBlank() } ?: visible.releaseDate,
+        imdbRating = incoming.imdbRating.ifBlank { visible.imdbRating },
+        tmdbRating = incoming.tmdbRating.ifBlank { visible.tmdbRating },
+        certification = incoming.certification?.takeIf { it.isNotBlank() } ?: visible.certification,
+        budget = incoming.budget ?: visible.budget,
+        overview = incoming.overview.ifBlank { visible.overview },
+        primaryNetworkLogo = incoming.primaryNetworkLogo ?: visible.primaryNetworkLogo,
+    )
+}
+
 internal fun normalizeLogoCacheLanguage(language: String): String =
     language.ifBlank { "en-US" }
         .replace('_', '-')
@@ -106,6 +145,31 @@ internal fun normalizeLogoCacheLanguage(language: String): String =
 internal fun isLogoCacheLanguageCurrent(cachedLanguage: String?, contentLanguage: String): Boolean =
     cachedLanguage != null &&
         normalizeLogoCacheLanguage(cachedLanguage) == normalizeLogoCacheLanguage(contentLanguage)
+
+internal class HomeTrailerCache(private val maxEntries: Int = 64) {
+    private data class Entry(val trailerKey: String?, val retryAfterMs: Long)
+    private val entries = object : LinkedHashMap<String, Entry>(maxEntries, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Entry>): Boolean =
+            size > maxEntries
+    }
+
+    @Synchronized
+    fun trailerKey(identity: String): String? = entries[identity]?.trailerKey
+
+    @Synchronized
+    fun shouldLoad(identity: String, nowMs: Long): Boolean {
+        val entry = entries[identity] ?: return true
+        return entry.trailerKey == null && nowMs >= entry.retryAfterMs
+    }
+
+    @Synchronized
+    fun record(identity: String, trailerKey: String?, nowMs: Long) {
+        entries[identity] = Entry(trailerKey, nowMs + 60_000L)
+    }
+
+    @Synchronized
+    fun clear() = entries.clear()
+}
 
 internal data class HomeWatchedBadgeState(
     val isWatched: Boolean,
@@ -211,6 +275,42 @@ internal class HomeReloadGate {
     fun reset() {
         running = false
         pending = false
+    }
+}
+
+internal class HomeCategoryBatcher(
+    private val scope: CoroutineScope,
+    private val publish: (List<Category>) -> Unit,
+    private val windowMs: Long = 120L
+) {
+    private val pending = LinkedHashMap<String, Category>()
+    private var flushJob: Job? = null
+
+    fun offer(category: Category, immediately: Boolean) {
+        pending[category.id] = category
+        if (immediately) {
+            flush()
+        } else if (flushJob == null) {
+            flushJob = scope.launch {
+                delay(windowMs)
+                flush()
+            }
+        }
+    }
+
+    fun flush() {
+        flushJob?.cancel()
+        flushJob = null
+        if (pending.isEmpty()) return
+        val batch = pending.values.toList()
+        pending.clear()
+        publish(batch)
+    }
+
+    fun cancel() {
+        flushJob?.cancel()
+        flushJob = null
+        pending.clear()
     }
 }
 
@@ -437,7 +537,10 @@ class HomeViewModel @Inject constructor(
         val budget: Long?,
         val overview: String,
         val primaryNetworkLogo: String? = null,
-        val fullyLoaded: Boolean = false
+        val fullyLoaded: Boolean = false,
+        val year: String = "",
+        val image: String = "",
+        val backdrop: String? = null
     )
 
     private data class CategoryPaginationState(
@@ -829,11 +932,14 @@ class HomeViewModel @Inject constructor(
 
     private fun MediaItem.withHeroDetails(snapshot: HeroDetailsSnapshot): MediaItem {
         return copy(
+            year = snapshot.year.ifBlank { year },
+            image = snapshot.image.ifBlank { image },
+            backdrop = snapshot.backdrop?.takeIf { it.isNotBlank() } ?: backdrop,
             duration = snapshot.duration.ifEmpty { duration },
-            releaseDate = snapshot.releaseDate ?: releaseDate,
+            releaseDate = snapshot.releaseDate?.takeIf { it.isNotBlank() } ?: releaseDate,
             imdbRating = snapshot.imdbRating.ifEmpty { imdbRating },
             tmdbRating = snapshot.tmdbRating.ifEmpty { tmdbRating },
-            certification = snapshot.certification ?: certification,
+            certification = snapshot.certification?.takeIf { it.isNotBlank() } ?: certification,
             budget = snapshot.budget ?: budget,
             overview = snapshot.overview.ifBlank { overview },
             primaryNetworkLogo = snapshot.primaryNetworkLogo ?: primaryNetworkLogo
@@ -851,7 +957,10 @@ class HomeViewModel @Inject constructor(
             budget = cached.budget,
             overview = cached.overview,
             primaryNetworkLogo = cached.primaryNetworkLogo,
-            fullyLoaded = false
+            fullyLoaded = false,
+            year = cached.year,
+            image = cached.image,
+            backdrop = cached.backdrop
         )
     }
 
@@ -914,7 +1023,10 @@ class HomeViewModel @Inject constructor(
                 budget = details?.budget,
                 overview = resolvedOverview,
                 primaryNetworkLogo = primaryNetworkLogo,
-                fullyLoaded = true
+                fullyLoaded = details != null,
+                year = details?.year.orEmpty(),
+                image = details?.image.orEmpty(),
+                backdrop = details?.backdrop
             )
         }
     }
@@ -2069,8 +2181,9 @@ class HomeViewModel @Inject constructor(
     private val logoFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
     private val heroDetailsCache = ConcurrentHashMap<String, HeroDetailsSnapshot>()
     private val heroDetailsFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
-    private val heroTrailerFetchInFlight = Collections.synchronizedSet(mutableSetOf<String>())
-    private val heroTrailerResolved = Collections.synchronizedSet(mutableSetOf<String>())
+    private val heroTrailerCache = HomeTrailerCache()
+    private var heroTrailerJob: Job? = null
+    private var heroTrailerRequestKey: String? = null
     private val heroDetailsPrefetchSemaphore = Semaphore(if (isLowRamDevice) 1 else 2)
     private val savedCatalogById = ConcurrentHashMap<String, CatalogConfig>()
     private val categoryPaginationStates = ConcurrentHashMap<String, CategoryPaginationState>()
@@ -2379,8 +2492,9 @@ class HomeViewModel @Inject constructor(
         logoCacheDiskWriteJob?.cancel()
         heroDetailsCache.clear()
         heroDetailsFetchInFlight.clear()
-        heroTrailerFetchInFlight.clear()
-        heroTrailerResolved.clear()
+        heroTrailerJob?.cancel()
+        heroTrailerRequestKey = null
+        heroTrailerCache.clear()
         synchronized(logoCacheLock) {
             logoCacheLanguage = normalizeLogoCacheLanguage(contentLanguage)
             logoCache.clear()
@@ -2688,7 +2802,12 @@ class HomeViewModel @Inject constructor(
                                 orderedCachedCategories
                             }
                             val liveHero = _uiState.value.heroItem
-                            val finalHero = liveHero ?: cachedHero
+                            val cachedLiveHero = liveHero?.let { live ->
+                                orderedCachedCategories.asSequence()
+                                    .flatMap { it.items.asSequence() }
+                                    .firstOrNull { it.id == live.id && it.mediaType == live.mediaType }
+                            }
+                            val finalHero = liveHero?.let { mergeHomeHeroMetadata(it, cachedLiveHero) } ?: cachedHero
                             val finalLogo = if (liveHero != null) {
                                 _uiState.value.heroLogoUrl
                                     ?: getCachedLogo("${liveHero.mediaType}_${liveHero.id}")
@@ -2734,7 +2853,9 @@ class HomeViewModel @Inject constructor(
                     // Set hero item IMMEDIATELY from raw CW data (before the slow
                     // merge step) so the hero section, clear logo, and overview text
                     // appear on the very first frame after profile selection.
-                    val rawFirstItem = merged.firstOrNull()?.toMediaItem(context)
+                    val rawFirstItem = merged.firstOrNull()?.toMediaItem(context)?.let { raw ->
+                        getCachedHeroDetailsSnapshot(raw)?.let { raw.withHeroDetails(it) } ?: raw
+                    }
                     val heroKey = rawFirstItem?.let { "${it.mediaType}_${it.id}" }
                     val heroLogo = heroKey?.let { getCachedLogo(it) }
 
@@ -2905,7 +3026,9 @@ class HomeViewModel @Inject constructor(
                 }
             }
             val currentState = _uiState.value
-            if (heroLogoUrl != null && currentState.heroLogoUrl == null) {
+            if (heroLogoUrl != null && currentState.heroLogoUrl == null &&
+                currentState.heroItem?.id == heroItem?.id && currentState.heroItem?.mediaType == heroItem?.mediaType
+            ) {
                 _uiState.value = currentState.copy(heroLogoUrl = heroLogoUrl)
             }
             return
@@ -2946,43 +3069,16 @@ class HomeViewModel @Inject constructor(
             filteredCategories.add(0, placeholderContinueWatching)
         }
 
-        // Adjust hero item if it was from continue watching
-        val adjustedHeroItem = if (heroItem != null &&
-            categories.firstOrNull()?.id == "continue_watching" &&
-            categories.firstOrNull()?.items?.any { it.id == heroItem.id } == true) {
-            // Hero was from continue watching, use first item from filtered categories
-            filteredCategories.getOrNull(1)?.items?.firstOrNull() ?: heroItem
-        } else if (heroItem != null && !isCollectionItem(heroItem)) {
-            heroItem
-        } else {
-            chooseInitialHero(filteredCategories)
+        val startupHero = chooseInitialHero(filteredCategories) ?: heroItem
+        val startupLogo = heroLogoUrl.takeIf {
+            startupHero?.id == heroItem?.id && startupHero?.mediaType == heroItem?.mediaType
         }
-
-        // If CW preload already set a hero with a logo, preserve it — the preloaded
-        // hero from startup doesn't carry a logo URL and would cause a visible flash
-        // from logo → text → logo.
-        val currentHero = _uiState.value.heroItem
-        val currentLogo = _uiState.value.heroLogoUrl
-        val finalHero = if (currentHero != null && currentLogo != null) {
-            currentHero  // keep CW hero that already has a logo
-        } else {
-            adjustedHeroItem
-        }
-        val finalLogo = if (finalHero == currentHero && currentLogo != null) {
-            currentLogo  // keep the cached logo
-        } else if (adjustedHeroItem == heroItem) {
-            heroLogoUrl  // use whatever startup preloaded
-        } else {
-            null
-        }
-        _uiState.value = _uiState.value.copy(
+        _uiState.value = preserveStartupHomeHero(_uiState.value.copy(
             isLoading = false,
             isInitialLoad = false,
             categories = filteredCategories,
-            heroItem = finalHero,
-            heroLogoUrl = finalLogo,
             error = null
-        )
+        ), startupHero, startupLogo)
         replaceCardLogoState(snapshotLogoCache())
         // Freshly rebuilt categories always start with isWatched=false; the 90s
         // debounce must not skip re-applying badges here or checkmarks stay
@@ -3144,6 +3240,18 @@ class HomeViewModel @Inject constructor(
                 publishContinueWatching(instant)
             }
 
+            val firstHeroSource = instant.ifEmpty { cached }
+            if (firstHeroSource.isNotEmpty() && continueWatchingUpdates.revision == localUpdateRevision) {
+                val first = repairContinueWatchingMetadataIfNeeded(
+                    firstHeroSource.take(1), prioritizeFirstItem = true
+                ).firstOrNull()
+                if (first != null && first != firstHeroSource.first() &&
+                    continueWatchingUpdates.revision == localUpdateRevision
+                ) {
+                    publishContinueWatching(listOf(first) + firstHeroSource.drop(1))
+                }
+            }
+
             // SLOW PATH — do a freshness refresh in the background. If it
             // returns something different, republish. Swallows transient
             // Trakt 429s so the visible row doesn't blink back to empty.
@@ -3226,7 +3334,13 @@ class HomeViewModel @Inject constructor(
             } else {
                 current.add(0, continueWatchingCategory)
             }
-            _uiState.value = _uiState.value.copy(categories = current)
+            val state = _uiState.value
+            val refreshedHero = state.heroItem?.let { visible ->
+                continueWatchingCategory.items.firstOrNull {
+                    it.id == visible.id && it.mediaType == visible.mediaType
+                }?.let { mergeHomeHeroMetadata(it, visible) } ?: visible
+            }
+            _uiState.value = state.copy(categories = current, heroItem = refreshedHero)
         }
     }
 
@@ -3243,6 +3357,7 @@ class HomeViewModel @Inject constructor(
             fun logLoadStage(stage: String) {
                 Log.d("HomePerf", "load=$requestId stage=$stage elapsedMs=${SystemClock.elapsedRealtime() - loadStartedAt}")
             }
+            var readyRowsPublisher: HomeCategoryBatcher? = null
             logLoadStage("started")
             try {
                 initialCategoriesCacheReady.await()
@@ -3364,8 +3479,33 @@ class HomeViewModel @Inject constructor(
                 syncingHomeCatalogs = false
                 categoryPaginationStates.clear()
 
+                val catalogOrder = savedCatalogs.map { it.id }
+                val catalogById = savedCatalogs.associateBy { it.id }
+                val publisher = HomeCategoryBatcher(this, publish = { batch ->
+                    if (requestId == loadHomeRequestId) {
+                        trace("StreamNet.Home.publishRows") {
+                            val current = _uiState.value
+                            val rows = batch.fold(current.categories) { existing, ready ->
+                                mergeReadyHomeCategory(existing, ready, catalogOrder)
+                            }
+                            val hasReadyContent = rows.any(::hasRealItems)
+                            val updated = current.copy(
+                                categories = rows,
+                                heroItem = current.heroItem ?: chooseInitialHero(rows),
+                                isLoading = !hasReadyContent,
+                                isInitialLoad = false,
+                                categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
+                                error = null,
+                            )
+                            if (updated != current) _uiState.value = updated
+                            if (hasReadyContent) markHomeDataLoadSuccessful(requestId)
+                            logLoadStage("row_batch_published_${batch.size}")
+                        }
+                    }
+                })
+                readyRowsPublisher = publisher
                 suspend fun publishReadyCategory(category: Category) {
-                    val config = savedCatalogs.firstOrNull { it.id == category.id } ?: return
+                    val config = catalogById[category.id] ?: return
                     if (isCollectionRailConfig(config) || isCollectionTileConfig(config)) return
                     if (config.sourceType == CatalogSourceType.ADDON &&
                         category.title.trim().lowercase(Locale.US) in HOME_SERVICE_CATALOG_TITLES
@@ -3374,19 +3514,10 @@ class HomeViewModel @Inject constructor(
                         if (requestId != loadHomeRequestId) return@withContext
                         val ready = category.copy(title = config.title.ifBlank { category.title })
                             .withTop10CapIfNeeded()
-                        val current = _uiState.value
-                        val rows = mergeReadyHomeCategory(current.categories, ready, savedCatalogs.map { it.id })
-                        val hasReadyContent = rows.any(::hasRealItems)
-                        _uiState.value = current.copy(
-                            categories = rows,
-                            heroItem = current.heroItem ?: chooseInitialHero(rows),
-                            isLoading = !hasReadyContent,
-                            isInitialLoad = false,
-                            categoryHasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore },
-                            error = null,
+                        publisher.offer(
+                            ready,
+                            immediately = !_uiState.value.categories.any(::hasRealItems) && hasRealItems(ready),
                         )
-                        if (hasReadyContent) markHomeDataLoadSuccessful(requestId)
-                        logLoadStage("row_published_${category.id}")
                     }
                 }
 
@@ -3693,6 +3824,7 @@ class HomeViewModel @Inject constructor(
                     chooseInitialHero(categories)
                 }
 
+                publisher.flush()
                 // Keep the last rendered presentation while the background
                 // badge/artwork jobs catch up with a fresh catalog snapshot.
                 val previousItems = _uiState.value.categories
@@ -3932,6 +4064,7 @@ class HomeViewModel @Inject constructor(
                     error = if (_uiState.value.categories.isEmpty()) e.message ?: context.getString(R.string.home_failed_load_content) else null
                 )
             } finally {
+                readyRowsPublisher?.cancel()
                 if (requestId == loadHomeRequestId) {
                     syncingHomeCatalogs = false
                     loadHomeJob = null
@@ -4371,9 +4504,9 @@ class HomeViewModel @Inject constructor(
         // without preloaded images on cold start.
         val defaultLimit = if (isLowRamDevice) 4 else 8
         val limit = if (batchLimit > 0) batchLimit else defaultLimit
-        val uniqueUrls = urls.filter { url ->
+        val uniqueUrls = urls.asSequence().filter { url ->
             preloadedRequests.add("$url|${width}x${height}")
-        }.take(limit)
+        }.take(limit).toList()
         if (uniqueUrls.isEmpty()) return
 
         uniqueUrls.forEach { url ->
@@ -5265,28 +5398,17 @@ class HomeViewModel @Inject constructor(
         val currentHero = currentState.heroItem
         val cachedDetails = getCachedHeroDetailsSnapshot(item)
         val sameHero = currentHero?.id == item.id && currentHero.mediaType == item.mediaType
-        val presentationItem = if (sameHero) {
-            item.copy(
-                image = item.image.ifBlank { currentHero!!.image },
-                backdrop = item.backdrop ?: currentHero!!.backdrop,
-                duration = item.duration.ifBlank { currentHero!!.duration },
-                releaseDate = item.releaseDate ?: currentHero!!.releaseDate,
-                imdbRating = item.imdbRating.ifBlank { currentHero!!.imdbRating },
-                tmdbRating = item.tmdbRating.ifBlank { currentHero!!.tmdbRating },
-                certification = item.certification ?: currentHero!!.certification,
-                budget = item.budget ?: currentHero!!.budget,
-                overview = item.overview.ifBlank { currentHero!!.overview },
-                primaryNetworkLogo = item.primaryNetworkLogo ?: currentHero!!.primaryNetworkLogo,
-            )
-        } else {
-            item
-        }
+        val presentationItem = mergeHomeHeroMetadata(item, currentHero)
         val heroItem = cachedDetails?.let { presentationItem.withHeroDetails(it) } ?: presentationItem
+        val resolvedLogo = logoUrl ?: currentState.heroLogoUrl.takeIf { sameHero }
         if (currentHero?.id == item.id &&
             currentHero.mediaType == item.mediaType &&
-            currentState.heroLogoUrl == logoUrl &&
+            currentState.heroLogoUrl == resolvedLogo &&
             !currentState.isHeroTransitioning
         ) {
+            if (heroItem != currentHero) {
+                _uiState.value = currentState.copy(heroItem = heroItem)
+            }
             if (cachedDetails != null) {
                 applyHeroDetailsSnapshotIfCurrent(item, cachedDetails)
             }
@@ -5295,10 +5417,10 @@ class HomeViewModel @Inject constructor(
 
         // Save previous hero for crossfade animation, clear trailer for new hero
         _uiState.value = currentState.copy(
-            previousHeroItem = currentState.heroItem,
-            previousHeroLogoUrl = currentState.heroLogoUrl,
+            previousHeroItem = if (sameHero) currentState.previousHeroItem else currentState.heroItem,
+            previousHeroLogoUrl = if (sameHero) currentState.previousHeroLogoUrl else currentState.heroLogoUrl,
             heroItem = heroItem,
-            heroLogoUrl = logoUrl,
+            heroLogoUrl = resolvedLogo,
             heroOverviewOverride = cachedDetails?.overview?.ifBlank { heroItem.overview },
             heroTrailerKey = if (sameHero) currentState.heroTrailerKey else null,
             isHeroTransitioning = !sameHero
@@ -5310,32 +5432,7 @@ class HomeViewModel @Inject constructor(
             return
         }
 
-        // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
-        if (_uiState.value.trailerAutoPlay &&
-            !isIptvItem(item) &&
-            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null) &&
-            "${item.mediaType}:${item.id}" !in heroTrailerResolved &&
-            heroTrailerFetchInFlight.add("${item.mediaType}:${item.id}")
-        ) {
-            viewModelScope.launch(networkDispatcher) {
-                try {
-                    val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
-                    if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
-                        android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
-                        _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
-                        prefetchTrailerUrl(trailerKey)
-                    } else {
-                        android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
-                    }
-                        } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
-                            finally {
-                                heroTrailerFetchInFlight.remove("${item.mediaType}:${item.id}")
-                                heroTrailerResolved.add("${item.mediaType}:${item.id}")
-                            }
-            }
-        }
+        requestHeroTrailer(item)
 
         val normalizedOverview = item.overview.trim()
         val looksTruncated = normalizedOverview.endsWith("...") || normalizedOverview.length < 120
@@ -5358,28 +5455,6 @@ class HomeViewModel @Inject constructor(
                 applyHeroDetailsSnapshotIfCurrent(item, snapshot)
                 snapshot.primaryNetworkLogo?.let { preloadLogoImages(listOf(it)) }
 
-                // Fetch trailer key for hero (YouTube) only once per Home run.
-                val trailerRequestKey = "${item.mediaType}:${item.id}"
-                if (
-                    trailerRequestKey !in heroTrailerResolved &&
-                    heroTrailerFetchInFlight.add(trailerRequestKey)
-                ) {
-                    try {
-                        val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
-                        if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
-                            android.util.Log.d("TrailerDebug", "Home hero key set item=${item.mediaType}:${item.id} key=$trailerKey")
-                            _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
-                            prefetchTrailerUrl(trailerKey)
-                        } else {
-                            android.util.Log.d("TrailerDebug", "Home hero has no usable key item=${item.mediaType}:${item.id}")
-                        }
-                    } catch (e: Exception) {
-                        if (e is CancellationException) throw e
-                    } finally {
-                        heroTrailerFetchInFlight.remove(trailerRequestKey)
-                        heroTrailerResolved.add(trailerRequestKey)
-                    }
-                }
                     } catch (e: Exception) {
                 if (e is CancellationException) throw e
             }
@@ -5397,29 +5472,7 @@ class HomeViewModel @Inject constructor(
     private fun scheduleHeroDetailsFetch(item: MediaItem, fastScrolling: Boolean) {
         heroDetailsJob?.cancel()
 
-        // Fetch trailer for new hero item; skip if already loaded for this item (prevents restart mid-play)
-        if (_uiState.value.trailerAutoPlay &&
-            !isIptvItem(item) &&
-            !(_uiState.value.heroItem?.id == item.id && _uiState.value.heroTrailerKey != null) &&
-            "${item.mediaType}:${item.id}" !in heroTrailerResolved &&
-            heroTrailerFetchInFlight.add("${item.mediaType}:${item.id}")
-        ) {
-            viewModelScope.launch(networkDispatcher) {
-                try {
-                    val trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
-                    if (trailerKey != null && _uiState.value.heroItem?.id == item.id) {
-                        _uiState.value = _uiState.value.copy(heroTrailerKey = trailerKey)
-                        prefetchTrailerUrl(trailerKey)
-                    }
-                        } catch (e: Exception) {
-                if (e is CancellationException) throw e
-            }
-                            finally {
-                                heroTrailerFetchInFlight.remove("${item.mediaType}:${item.id}")
-                                heroTrailerResolved.add("${item.mediaType}:${item.id}")
-                            }
-            }
-        }
+        requestHeroTrailer(item)
 
         heroDetailsJob = viewModelScope.launch(networkDispatcher) {
             val detailsKey = heroDetailsKey(item)
@@ -5450,8 +5503,54 @@ class HomeViewModel @Inject constructor(
      * Phase 1.3: Ahead-of-focus preloading
      * Call this when focus changes to preload nearby items
      */
+    @Synchronized
+    private fun requestHeroTrailer(item: MediaItem) {
+        val state = _uiState.value
+        if (!state.trailerAutoPlay || !isActionableMediaItem(item) || isIptvItem(item) || isCollectionItem(item)) return
+        if (state.heroItem?.id != item.id || state.heroItem.mediaType != item.mediaType) return
+        if (state.heroTrailerKey != null) return
+        val language = mediaRepository.contentLanguage
+        val identity = "$language:${item.mediaType}:${item.id}"
+        val cachedKey = heroTrailerCache.trailerKey(identity)
+        if (cachedKey != null) {
+            _uiState.value = state.copy(heroTrailerKey = cachedKey)
+            return
+        }
+        if (heroTrailerRequestKey == identity && heroTrailerJob?.isActive == true) return
+        if (!heroTrailerCache.shouldLoad(identity, SystemClock.elapsedRealtime())) return
+        heroTrailerJob?.cancel()
+        heroTrailerRequestKey = identity
+        heroTrailerJob = viewModelScope.launch(networkDispatcher) {
+            try {
+                var trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
+                if (trailerKey == null) {
+                    delay(1_500L)
+                    val current = _uiState.value
+                    if (!current.trailerAutoPlay || current.heroItem?.id != item.id ||
+                        current.heroItem.mediaType != item.mediaType || mediaRepository.contentLanguage != language
+                    ) return@launch
+                    trailerKey = mediaRepository.getTrailerKey(item.mediaType, item.id)
+                }
+                if (mediaRepository.contentLanguage != language) return@launch
+                heroTrailerCache.record(identity, trailerKey, SystemClock.elapsedRealtime())
+                val resolvedKey = trailerKey ?: return@launch
+                withContext(Dispatchers.Main.immediate) {
+                    val current = _uiState.value
+                    if (current.trailerAutoPlay && current.heroItem?.id == item.id && current.heroItem.mediaType == item.mediaType) {
+                        _uiState.value = current.copy(heroTrailerKey = resolvedKey)
+                        prefetchTrailerUrl(resolvedKey)
+                    }
+                }
+            } catch (error: Exception) {
+                if (error is CancellationException) throw error
+                heroTrailerCache.record(identity, null, SystemClock.elapsedRealtime())
+                AppLogger.e("HomeVM", "Hero trailer fetch failed", error)
+            }
+        }
+    }
+
     private suspend fun prefetchHeroDetailsForFocusWindow(items: List<MediaItem>) {
-        if (isStartupSettling()) return
+        delayUntilStartupSettled()
         val itemsToLoad = items
             .asSequence()
             .filter { item -> !isIptvItem(item) && !isCollectionItem(item) }
