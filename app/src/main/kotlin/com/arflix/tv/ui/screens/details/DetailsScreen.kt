@@ -1946,14 +1946,10 @@ private fun DetailsContent(
         // Layer 4 removed for performance - radial gradients are expensive on TV
 
         val configuration = LocalConfiguration.current
-        val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
-            configuration.screenHeightDp, AppTopBarContentTopInset.value, configuration.fontScale
-        )
         val showHeroHeader = focusedSection == FocusSection.BUTTONS || focusedSection == FocusSection.DESCRIPTION
         val heroHeaderContent: @Composable () -> Unit = {
             Column(
-                modifier = Modifier.fillMaxWidth().height(heroLayout.headerHeightDp.dp)
-                    .padding(start = 36.dp, end = 36.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 36.dp, end = 36.dp),
                 verticalArrangement = Arrangement.Top
             ) {
                 Column(verticalArrangement = Arrangement.Top) {
@@ -2028,7 +2024,7 @@ private fun DetailsContent(
                     )
 
                     Column(
-                        modifier = Modifier.width(360.dp).height(heroLayout.metadataHeightDp.dp),
+                        modifier = Modifier.width(360.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
@@ -2269,53 +2265,62 @@ private fun DetailsContent(
             }
         }
 
-        if (showHeroHeader) {
-            Box(modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
-                .padding(top = heroLayout.logoTopDp.dp)) {
-                heroHeaderContent()
-            }
+        com.arflix.tv.ui.components.HomeMatchedDetailsHero(
+            screenHeightDp = configuration.screenHeightDp,
+            topBarInset = AppTopBarContentTopInset,
+            showHeader = showHeroHeader,
+            reference = {
+                Box(modifier = Modifier.padding(start = 36.dp, end = 400.dp)) {
+                    com.arflix.tv.ui.screens.home.HeroSection(
+                        item = item,
+                        logoUrl = logoUrl,
+                        showBudget = !budget.isNullOrBlank(),
+                        showCertification = !certification.isNullOrBlank(),
+                        measurementOnly = true
+                    )
+                }
+            },
+            header = heroHeaderContent,
+        ) { bodyHeight ->
+            DetailsTvRows(
+                modifier = Modifier,
+                heroContent = heroContent,
+                item = item,
+                episodes = episodes,
+                totalSeasons = totalSeasons,
+                currentSeason = currentSeason,
+                cast = cast,
+                reviews = reviews,
+                similar = similar,
+                similarLogoUrls = similarLogoUrls,
+                collectionItems = collectionItems,
+                collectionName = collectionName,
+                collectionIndex = collectionIndex,
+                focusedSection = focusedSection,
+                descriptionScrollRequest = descriptionScrollRequest,
+                onDescriptionPositionChange = onDescriptionPositionChange,
+                focusSectionForUi = focusSectionForUi,
+                episodeIndex = episodeIndex,
+                ratingsIndex = ratingsIndex,
+                seasonIndex = seasonIndex,
+                castIndex = castIndex,
+                reviewIndex = reviewIndex,
+                similarIndex = similarIndex,
+                seasonProgress = seasonProgress,
+                usePosterCards = usePosterCards,
+                showEpisodeRatings = showEpisodeRatings,
+                spoilerBlurEnabled = spoilerBlurEnabled,
+                contentRowHeight = bodyHeight,
+                contentRowBottomPadding = 0.dp,
+                configuration = configuration,
+                contentHasFocus = contentHasFocus,
+                onSeasonClick = onSeasonClick,
+                onEpisodeClick = onEpisodeClick,
+                onCastClick = onCastClick,
+                onSimilarClick = onSimilarClick,
+                onCollectionClick = onCollectionClick
+            )
         }
-
-        DetailsTvRows(
-            modifier = Modifier.align(Alignment.BottomStart),
-            heroContent = heroContent,
-            item = item,
-            episodes = episodes,
-            totalSeasons = totalSeasons,
-            currentSeason = currentSeason,
-            cast = cast,
-            reviews = reviews,
-            similar = similar,
-            similarLogoUrls = similarLogoUrls,
-            collectionItems = collectionItems,
-            collectionName = collectionName,
-            collectionIndex = collectionIndex,
-            focusedSection = focusedSection,
-            descriptionScrollRequest = descriptionScrollRequest,
-            onDescriptionPositionChange = onDescriptionPositionChange,
-            focusSectionForUi = focusSectionForUi,
-            episodeIndex = episodeIndex,
-            ratingsIndex = ratingsIndex,
-            seasonIndex = seasonIndex,
-            castIndex = castIndex,
-            reviewIndex = reviewIndex,
-            similarIndex = similarIndex,
-            seasonProgress = seasonProgress,
-            usePosterCards = usePosterCards,
-            showEpisodeRatings = showEpisodeRatings,
-            spoilerBlurEnabled = spoilerBlurEnabled,
-            contentRowHeight = if (showHeroHeader) {
-                (configuration.screenHeightDp - heroLayout.bodyTopDp).coerceAtLeast(1f).dp
-            } else configuration.screenHeightDp.dp - AppTopBarContentTopInset - 8.dp,
-            contentRowBottomPadding = 0.dp,
-            configuration = configuration,
-            contentHasFocus = contentHasFocus,
-            onSeasonClick = onSeasonClick,
-            onEpisodeClick = onEpisodeClick,
-            onCastClick = onCastClick,
-            onSimilarClick = onSimilarClick,
-            onCollectionClick = onCollectionClick
-        )
     }
 }
 

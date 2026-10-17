@@ -50,7 +50,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -2152,7 +2151,7 @@ private fun IptvHeroSection(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun HeroSection(
+internal fun HeroSection(
     item: MediaItem,
     logoUrl: String?,
     scrollIptvFallbackTitle: Boolean = false,
@@ -2164,7 +2163,8 @@ private fun HeroSection(
     showBudget: Boolean = true,
     showCertification: Boolean = true,
     autoScrollHomeOverview: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    measurementOnly: Boolean = false
 ) {
     if (item.status?.startsWith("iptv:") == true) {
         IptvHeroSection(
@@ -2201,10 +2201,6 @@ private fun HeroSection(
     // But the frosted pill provides additional protection
     val textShadow = textShadowPrimary
     val heroTextWidth = 360.dp
-    val heroConfiguration = LocalConfiguration.current
-    val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
-        heroConfiguration.screenHeightDp, AppTopBarContentTopInset.value, heroConfiguration.fontScale
-    )
     var loadedLogoUrl by remember(item.mediaType, item.id) { mutableStateOf<String?>(null) }
 
     Column(
@@ -2228,7 +2224,9 @@ private fun HeroSection(
                     modifier = Modifier.height(72.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
-                    if (currentLogoUrl != null) {
+                    if (measurementOnly) {
+                        Spacer(modifier = Modifier.height(72.dp).width(320.dp))
+                    } else if (currentLogoUrl != null) {
                         val (logoWidthPx, logoHeightPx) = logoSize
                         val request = remember(currentLogoUrl, logoWidthPx, logoHeightPx) {
                             val cacheKey = "$currentLogoUrl|${logoWidthPx}x$logoHeightPx"
@@ -2257,7 +2255,7 @@ private fun HeroSection(
                                 .graphicsLayer { alpha = if (loadedLogoUrl == currentLogoUrl) 1f else 0f }
                         )
                     }
-                    if (currentLogoUrl == null || loadedLogoUrl != currentLogoUrl) {
+                    if (!measurementOnly && (currentLogoUrl == null || loadedLogoUrl != currentLogoUrl)) {
                         // Fallback to title text with a single-line marquee for long names.
                         val fallbackTitle = currentItem.title.uppercase()
                         HomeHeroMarqueeTitle(
@@ -2365,7 +2363,7 @@ private fun HeroSection(
                         hasBudgetMetadata
 
                     Column(
-                        modifier = Modifier.width(heroTextWidth).heightIn(min = heroLayout.metadataHeightDp.dp),
+                        modifier = Modifier.width(heroTextWidth),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
@@ -2452,7 +2450,9 @@ private fun HeroSection(
                                             .allowRgb565(false)
                                             .build()
                                     }
-                                    AsyncImage(
+                                    if (measurementOnly) {
+                                        Spacer(modifier = Modifier.height(16.dp).width(58.dp))
+                                    } else AsyncImage(
                                         model = networkLogoRequest,
                                         imageLoader = metadataLogoImageLoader,
                                         contentDescription = stringResource(R.string.home_cd_primary_provider),
@@ -2549,7 +2549,7 @@ private fun HeroSection(
                 }
 
                 val overviewMaxHeight = 72.dp
-                if (displayOverview.isBlank()) {
+                if (measurementOnly || displayOverview.isBlank()) {
                     Spacer(modifier = Modifier.width(360.dp).height(overviewMaxHeight))
                 } else AutoScrollingSynopsis(
                     text = displayOverview,
@@ -2655,9 +2655,6 @@ private fun HomeHeroLayer(
         val contentRowTopPadding = contentRowHeight + contentRowBottomPadding
         val buttonsBottomPadding = contentRowTopPadding - 10.dp
         val heroBottomPadding = buttonsBottomPadding + if (configuration.screenHeightDp < 720) 34.dp else 34.dp
-        val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
-            configuration.screenHeightDp, AppTopBarContentTopInset.value, configuration.fontScale
-        )
 
         Box(
             modifier = Modifier
@@ -2670,16 +2667,13 @@ private fun HomeHeroLayer(
                 val isGenreCollection = item.collectionGroup == CollectionGroupKind.GENRE ||
                     item.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
                     item.collectionGroup == CollectionGroupKind.TV_GENRE
-                val fixedLogoAnchor = !isCollection && !isIptvItem(item)
                 val heroContentModifier = Modifier
-                    .align(if (fixedLogoAnchor) Alignment.TopStart else Alignment.BottomStart)
+                    .align(Alignment.BottomStart)
                     .padding(
                         start = contentStartPadding,
                         end = 400.dp
                     )
-                    .offset(y = if (fixedLogoAnchor) {
-                        heroLayout.logoTopDp.dp - AppTopBarContentTopInset
-                    } else -heroBottomPadding)
+                    .offset(y = -heroBottomPadding)
 
                 when {
                     !isCollection -> HeroSection(

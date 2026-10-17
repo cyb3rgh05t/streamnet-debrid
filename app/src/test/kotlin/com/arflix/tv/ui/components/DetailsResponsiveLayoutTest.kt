@@ -6,28 +6,27 @@ import org.junit.Test
 class DetailsResponsiveLayoutTest {
 
     @Test
-    fun tvHeroAnchorUsesTheCompactHomeGeometry() {
-        val layout = resolveTvHeroLayout(720, topBarInsetDp = 64f)
+    fun tvDetailsAnchorUsesMeasuredHomeHeightWithoutChangingHome() {
+        val layout = resolveTvHeroLayout(720, homeHeroHeightDp = 190f, detailsHeaderHeightDp = 112f)
         assertThat(layout.logoTopDp).isWithin(0.01f).of(249.2f)
-        assertThat(layout.headerHeightDp).isEqualTo(112f)
         assertThat(layout.bodyTopDp).isWithin(0.01f).of(367.2f)
     }
 
     @Test
-    fun tvHeroAnchorKeepsNavigationAndBodySpaceAtSmallerSizes() {
-        listOf(360, 540, 720, 1080).forEach { height ->
-            val layout = resolveTvHeroLayout(height, topBarInsetDp = 64f)
-            assertThat(layout.logoTopDp).isAtLeast(72f)
-            assertThat(height - layout.bodyTopDp).isAtLeast(114f)
-        }
+    fun tvDetailsDoesNotPushTheHomeAnchorDownToAnEstimatedNavigationLimit() {
+        val layout = resolveTvHeroLayout(540, homeHeroHeightDp = 205f, detailsHeaderHeightDp = 127f)
+        assertThat(layout.logoTopDp).isEqualTo(59f)
+        assertThat(layout.bodyTopDp).isEqualTo(192f)
     }
 
     @Test
-    fun tvHeroHeaderReservesMoreSpaceForLargerText() {
-        val normal = resolveTvHeroLayout(720, topBarInsetDp = 64f)
-        val large = resolveTvHeroLayout(720, topBarInsetDp = 64f, fontScale = 1.5f)
-        assertThat(large.metadataHeightDp).isEqualTo(54f)
+    fun tvDetailsUsesTheActualTextAndViewportSizes() {
+        val normal = resolveTvHeroLayout(720, homeHeroHeightDp = 190f, detailsHeaderHeightDp = 112f)
+        val large = resolveTvHeroLayout(720, homeHeroHeightDp = 208f, detailsHeaderHeightDp = 130f)
+        assertThat(large.logoTopDp).isWithin(0.01f).of(normal.logoTopDp - 18f)
         assertThat(large.bodyTopDp).isWithin(0.01f).of(normal.bodyTopDp)
+        val inset = resolveTvHeroLayout(720, 190f, 112f, viewportHeightDp = 700f)
+        assertThat(inset.logoTopDp).isWithin(0.01f).of(normal.logoTopDp - 20f)
     }
 
     @Test

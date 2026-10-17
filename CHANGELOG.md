@@ -2,6 +2,12 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.069] - 2026-10-17
+
+- Android TV Home: Die bewährte Bottom-Verankerung und natürliche Metadatenhöhe des Home-/Continue-Watching-Heros sind wiederhergestellt. Die mit 2.5.068 eingeführte feste Logo-Oberkante entfällt; Performance-, Metadaten- und Profilfoto-Sync-Fixes bleiben erhalten.
+- Android TV Details: Nur Details richtet seine Logo-Oberkante an einer tatsächlich gemessenen Home-Hero-Referenz aus, ohne zusätzliche Bildabrufe oder Synopsis-Animationen. Die Details-Metadaten erhalten ihre natürliche Höhe; lange Beschreibungen und Aktionen bleiben im separaten Scrollbereich. Mobile, Live-TV und die D-pad-Fokusreihenfolge bleiben unverändert.
+- Android-Version: `2.5.069` / Code `470`.
+
 ## [2.5.068] - 2026-10-17
 
 - Android IPTV: Backdrop- und Logo-Lookups teilen sich ein gemeinsames Limit von zwei gleichzeitigen Artwork-Ladevorgängen. Das Limit umfasst sichtbare Karten, Hero und vorsorgliche Vorladung; Cache-Treffer und die bestehende Request-Zusammenführung bleiben erhalten.
