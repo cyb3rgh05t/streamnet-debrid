@@ -11,12 +11,18 @@ import com.arflix.tv.util.Constants
 import com.arflix.tv.util.ProfileAvatarFiles
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.MediaType.Companion.toMediaType
 import org.json.JSONObject
+import org.json.JSONArray
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,12 +34,30 @@ data class ImportedProfileAvatar(
     val storagePath: String?
 )
 
+internal fun selectInlineProfileAvatar(
+    version: Long,
+    localImage: String?,
+    existingImage: String?,
+    existingVersion: Long?
+): String? = localImage?.takeIf { it.isNotBlank() }
+    ?: existingImage?.takeIf { it.isNotBlank() && existingVersion == version }
+
 @Singleton
 class ProfileAvatarImageManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val authRepository: AuthRepository
 ) {
     private val httpClient = OkHttpClient()
+    private val localAvatarRevisions = MutableStateFlow<Map<String, Long>>(emptyMap())
+
+    fun observeLocalAvatarRevision(profileId: String): Flow<Long> =
+        localAvatarRevisions.map { it[profileId] ?: 0L }.distinctUntilChanged()
+
+    private fun notifyAvatarChanged(profileId: String) {
+        localAvatarRevisions.update { revisions ->
+            revisions + (profileId to ((revisions[profileId] ?: 0L) + 1L))
+        }
+    }
 
     suspend fun importAvatar(profileId: String, uriString: String): ImportedProfileAvatar =
         withContext(Dispatchers.IO) {
@@ -47,6 +71,7 @@ class ProfileAvatarImageManager @Inject constructor(
             } ?: throw IllegalArgumentException(context.getString(R.string.avatar_decode_failed))
 
             ProfileAvatarFiles.cleanupProfile(context, profileId, keepVersion = version)
+            notifyAvatarChanged(profileId)
             ImportedProfileAvatar(
                 version = version,
                 storagePath = uploadAvatar(profileId, version, file).getOrNull()
@@ -68,13 +93,14 @@ class ProfileAvatarImageManager @Inject constructor(
 
             val resolvedInlineBase64 = inlineBase64
                 ?.takeIf { it.isNotBlank() }
-                ?: loadInlineAvatarFromCloud(profile.id)
+                ?: loadInlineAvatarFromCloud(profile)
 
             if (!resolvedInlineBase64.isNullOrBlank()) {
                 try {
                     val bytes = Base64.decode(resolvedInlineBase64, Base64.NO_WRAP)
                     file.writeBytes(bytes)
                     ProfileAvatarFiles.cleanupProfile(context, profile.id, keepVersion = profile.avatarImageVersion)
+                    notifyAvatarChanged(profile.id)
                     return@withContext
                 } catch (e: IllegalArgumentException) {
                     com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Base64 decode error: ${e.message}")
@@ -90,14 +116,22 @@ class ProfileAvatarImageManager @Inject constructor(
             if (storagePath.isBlank()) return@withContext
             downloadAvatar(storagePath, file).onSuccess {
                 ProfileAvatarFiles.cleanupProfile(context, profile.id, keepVersion = profile.avatarImageVersion)
+                notifyAvatarChanged(profile.id)
             }
         }
 
     fun buildInlineAvatarImagesJson(
         profiles: List<Profile>,
-        existingImagesById: JSONObject? = null
+        existingImagesById: JSONObject? = null,
+        existingProfiles: JSONArray? = null
     ): JSONObject {
         val result = JSONObject()
+        val existingVersions = (0 until (existingProfiles?.length() ?: 0)).mapNotNull { index ->
+            val profile = existingProfiles?.optJSONObject(index) ?: return@mapNotNull null
+            profile.optString("id").takeIf { it.isNotBlank() }?.let {
+                it to profile.optLong("avatarImageVersion", 0L)
+            }
+        }.toMap()
         profiles
             .filter { it.avatarImageVersion > 0L }
             .forEach { profile ->
@@ -105,7 +139,9 @@ class ProfileAvatarImageManager @Inject constructor(
                 val preservedImage = existingImagesById
                     ?.optString(profile.id)
                     ?.takeIf { it.isNotBlank() }
-                val image = localImage ?: preservedImage
+                val image = selectInlineProfileAvatar(
+                    profile.avatarImageVersion, localImage, preservedImage, existingVersions[profile.id]
+                )
                 if (!image.isNullOrBlank()) {
                     result.put(profile.id, image)
                 }
@@ -121,6 +157,7 @@ class ProfileAvatarImageManager @Inject constructor(
 
     fun clearLocalAvatar(profileId: String) {
         ProfileAvatarFiles.cleanupProfile(context, profileId)
+        notifyAvatarChanged(profileId)
     }
 
     private fun decodeSquareAvatar(uri: Uri): Bitmap? {
@@ -168,14 +205,19 @@ class ProfileAvatarImageManager @Inject constructor(
             Result.failure(IllegalStateException("Remote avatar storage is disabled; use inline account sync"))
         }
 
-    private suspend fun loadInlineAvatarFromCloud(profileId: String): String? {
+    private suspend fun loadInlineAvatarFromCloud(profile: Profile): String? {
         return authRepository.loadAccountSyncPayload().getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?.let { payload ->
                 try {
-                    JSONObject(payload)
-                        .optJSONObject("profileAvatarImagesById")
-                        ?.optString(profileId)
+                    val root = JSONObject(payload)
+                    val profiles = root.optJSONArray("profiles") ?: return@let null
+                    val matching = (0 until profiles.length()).asSequence()
+                        .mapNotNull { profiles.optJSONObject(it) }
+                        .firstOrNull { it.optString("id") == profile.id }
+                    if (matching?.optLong("avatarImageVersion", 0L) != profile.avatarImageVersion) return@let null
+                    root.optJSONObject("profileAvatarImagesById")
+                        ?.optString(profile.id)
                         ?.takeIf { it.isNotBlank() }
                 } catch (e: org.json.JSONException) {
                     com.arflix.tv.util.AppLogger.e("ProfileAvatar", "Error parsing inline avatar JSON: ${e.message}")

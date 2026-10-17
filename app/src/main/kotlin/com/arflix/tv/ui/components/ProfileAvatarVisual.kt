@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -46,13 +47,17 @@ fun ProfileAvatarVisual(
             ProfileAvatarVisualEntryPoint::class.java
         ).profileAvatarImageManager()
     }
-    var customFile by remember(profile.id, profile.avatarImageVersion, context) {
+    val avatarRevisionFlow = remember(avatarManager, profile.id) {
+        avatarManager.observeLocalAvatarRevision(profile.id)
+    }
+    val avatarFileRevision by avatarRevisionFlow.collectAsStateWithLifecycle(initialValue = 0L)
+    var customFile by remember(profile.id, profile.avatarImageVersion, context, avatarFileRevision) {
         mutableStateOf(
             ProfileAvatarFiles.localFile(context, profile)?.takeIf { it.exists() && it.length() > 0L }
         )
     }
 
-    LaunchedEffect(profile.id, profile.avatarImageVersion, profile.avatarImageStoragePath) {
+    LaunchedEffect(profile.id, profile.avatarImageVersion, profile.avatarImageStoragePath, avatarFileRevision) {
         if (profile.avatarImageVersion <= 0L) {
             customFile = null
             return@LaunchedEffect
@@ -78,8 +83,8 @@ fun ProfileAvatarVisual(
             AsyncImage(
                 model = ImageRequest.Builder(context)
                     .data(customFile)
-                    .memoryCacheKey("profile-avatar-${profile.id}-${profile.avatarImageVersion}")
-                    .diskCacheKey("profile-avatar-${profile.id}-${profile.avatarImageVersion}")
+                    .memoryCacheKey("profile-avatar-${profile.id}-${profile.avatarImageVersion}-$avatarFileRevision")
+                    .diskCacheKey("profile-avatar-${profile.id}-${profile.avatarImageVersion}-$avatarFileRevision")
                     .build(),
                 contentDescription = null,
                 contentScale = ContentScale.Crop,

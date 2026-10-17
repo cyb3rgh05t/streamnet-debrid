@@ -12,6 +12,7 @@ data class Profile(
     val avatarId: Int = 0, // 0 = legacy letter+color, 1-24 = Compose-drawn avatar
     val avatarImageVersion: Long = 0L, // 0 = no custom uploaded photo
     val avatarImageStoragePath: String? = null,
+    val avatarUpdatedAt: Long = 0L,
     val isKidsProfile: Boolean = false,
     val pin: String? = null, // 4-5 digit PIN, null if not set
     val isLocked: Boolean = false,
@@ -21,6 +22,19 @@ data class Profile(
     val createdAt: Long = System.currentTimeMillis(),
     val lastUsedAt: Long = System.currentTimeMillis()
 )
+
+fun Profile.avatarChangeTimestamp(): Long = maxOf(avatarUpdatedAt, avatarImageVersion)
+
+fun Profile.withLatestAvatarFrom(other: Profile?): Profile {
+    if (other == null || other.id != id || other.avatarChangeTimestamp() <= avatarChangeTimestamp()) return this
+    return copy(
+        avatarColor = other.avatarColor,
+        avatarId = other.avatarId,
+        avatarImageVersion = other.avatarImageVersion,
+        avatarImageStoragePath = other.avatarImageStoragePath,
+        avatarUpdatedAt = other.avatarUpdatedAt
+    )
+}
 
 fun Profile.hasSettingsPin(): Boolean = !settingsPin.isNullOrBlank()
 

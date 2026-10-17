@@ -1946,12 +1946,17 @@ private fun DetailsContent(
         // Layer 4 removed for performance - radial gradients are expensive on TV
 
         val configuration = LocalConfiguration.current
-        val heroContent: @Composable () -> Unit = {
+        val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
+            configuration.screenHeightDp, AppTopBarContentTopInset.value, configuration.fontScale
+        )
+        val showHeroHeader = focusedSection == FocusSection.BUTTONS || focusedSection == FocusSection.DESCRIPTION
+        val heroHeaderContent: @Composable () -> Unit = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 36.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp)
+                modifier = Modifier.fillMaxWidth().height(heroLayout.headerHeightDp.dp)
+                    .padding(start = 36.dp, end = 36.dp),
+                verticalArrangement = Arrangement.Top
             ) {
-                Column(verticalArrangement = Arrangement.Bottom) {
+                Column(verticalArrangement = Arrangement.Top) {
                     val showInCinema = remember(item.releaseDate, item.mediaType) {
                         isInCinema(item)
                     }
@@ -2023,7 +2028,7 @@ private fun DetailsContent(
                     )
 
                     Column(
-                        modifier = Modifier.width(360.dp),
+                        modifier = Modifier.width(360.dp).height(heroLayout.metadataHeightDp.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
@@ -2153,27 +2158,30 @@ private fun DetailsContent(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    val displayOverview = item.overview.ifBlank {
-                        stringResource(R.string.no_description_available)
-                    }
-
-                    Text(
-                        text = displayOverview,
-                        style = ArflixTypography.body.copy(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Normal,
-                            lineHeight = 19.sp,
-                            shadow = textShadow
-                        ),
-                        color = Color.White.copy(alpha = 0.9f),
-                        modifier = Modifier
-                            .fillMaxWidth(0.56f)
-                    )
-
                 }
+            }
+        }
+
+        val heroContent: @Composable () -> Unit = {
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(start = 12.dp, end = 36.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                val displayOverview = item.overview.ifBlank {
+                    stringResource(R.string.no_description_available)
+                }
+
+                Text(
+                    text = displayOverview,
+                    style = ArflixTypography.body.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal,
+                        lineHeight = 19.sp,
+                        shadow = textShadow
+                    ),
+                    color = Color.White.copy(alpha = 0.9f),
+                    modifier = Modifier.fillMaxWidth(0.56f)
+                )
                 val buttonWatched = if (item.mediaType == MediaType.TV) {
                     episodes.getOrNull(episodeIndex)?.isWatched ?: item.isWatched
                 } else {
@@ -2261,6 +2269,13 @@ private fun DetailsContent(
             }
         }
 
+        if (showHeroHeader) {
+            Box(modifier = Modifier.align(Alignment.TopStart).fillMaxWidth()
+                .padding(top = heroLayout.logoTopDp.dp)) {
+                heroHeaderContent()
+            }
+        }
+
         DetailsTvRows(
             modifier = Modifier.align(Alignment.BottomStart),
             heroContent = heroContent,
@@ -2289,7 +2304,9 @@ private fun DetailsContent(
             usePosterCards = usePosterCards,
             showEpisodeRatings = showEpisodeRatings,
             spoilerBlurEnabled = spoilerBlurEnabled,
-            contentRowHeight = configuration.screenHeightDp.dp - AppTopBarContentTopInset - 8.dp,
+            contentRowHeight = if (showHeroHeader) {
+                (configuration.screenHeightDp - heroLayout.bodyTopDp).coerceAtLeast(1f).dp
+            } else configuration.screenHeightDp.dp - AppTopBarContentTopInset - 8.dp,
             contentRowBottomPadding = 0.dp,
             configuration = configuration,
             contentHasFocus = contentHasFocus,
@@ -2372,7 +2389,7 @@ private fun DetailsTvRows(
 
     var lastDescriptionScrollRequest by remember(item.id) { mutableIntStateOf(descriptionScrollRequest) }
     var lastFocusedSection by remember(item.id) { mutableStateOf<FocusSection?>(null) }
-    LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
+    LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, contentRowHeight, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
         if (!contentHasFocus) return@LaunchedEffect
         val delta = descriptionScrollRequest - lastDescriptionScrollRequest
         val wasDescriptionFocused = lastFocusedSection == FocusSection.DESCRIPTION

@@ -99,6 +99,20 @@ internal fun newestFirstChannelIds(channelIds: List<String>): List<String> =
 internal fun <T> recentlyWatchedFirst(keys: List<T>, changedAt: Map<T, Long>): List<T> =
     keys.asReversed().sortedByDescending { changedAt[it] ?: 0L }
 
+internal suspend fun awaitHomeArtworkIdle(
+    lastNavigationMs: () -> Long,
+    nowMs: () -> Long,
+    quietPeriodMs: Long = 1_000L
+) {
+    while (true) {
+        val lastNavigation = lastNavigationMs()
+        if (lastNavigation <= 0L) return
+        val remaining = quietPeriodMs - (nowMs() - lastNavigation).coerceAtLeast(0L)
+        if (remaining <= 0L) return
+        delay(remaining)
+    }
+}
+
 internal fun preserveStartupHomeHero(
     state: HomeUiState,
     incomingHero: MediaItem?,
@@ -1884,11 +1898,16 @@ class HomeViewModel @Inject constructor(
 
         iptvHomeArtworkWarmupJob?.cancel()
         iptvHomeArtworkWarmupJob = viewModelScope.launch(networkDispatcher) {
+            delayUntilStartupSettled(extraDelayMs = 600L)
             val semaphore = Semaphore(2)
             firstItems.mapNotNull { item ->
                 val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
                 async {
                     semaphore.withPermit {
+                        awaitHomeArtworkIdle(
+                            lastNavigationMs = { lastArtworkNavigationAtMs },
+                            nowMs = { SystemClock.elapsedRealtime() }
+                        )
                         coroutineScope {
                             val backdrop = async {
                                 lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
@@ -2119,6 +2138,8 @@ class HomeViewModel @Inject constructor(
 
     // Phase 6.2-6.3: Fast scroll detection
     private var lastFocusChangeTime = 0L
+    @Volatile
+    private var lastArtworkNavigationAtMs = 0L
     private var consecutiveFastChanges = 0
     private val FAST_SCROLL_THRESHOLD_MS = 650L  // Under 650ms = fast scrolling
     private val FAST_SCROLL_DEBOUNCE_MS = 220L   // Keep hero responsive without updating every key repeat
@@ -5591,6 +5612,7 @@ class HomeViewModel @Inject constructor(
         currentRowIndex = rowIndex
         currentItemIndex = itemIndex
         lastFocusChangeTime = System.currentTimeMillis()
+        lastArtworkNavigationAtMs = SystemClock.elapsedRealtime()
         if (!shouldPrefetch) {
             prefetchJob?.cancel()
             return

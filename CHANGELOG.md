@@ -2,6 +2,17 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.068] - 2026-10-17
+
+- Android IPTV: Backdrop- und Logo-Lookups teilen sich ein gemeinsames Limit von zwei gleichzeitigen Artwork-Ladevorgängen. Das Limit umfasst sichtbare Karten, Hero und vorsorgliche Vorladung; Cache-Treffer und die bestehende Request-Zusammenführung bleiben erhalten.
+- Android TV Home: Vorsorgliche IPTV-Rail-Artwork-Vorladung beginnt erst nach der Start-Ruhephase und einer Sekunde ohne Fokusnavigation. Weitere Navigation verschiebt nachfolgende Warmup-Aufträge; sichtbare Karten und der fokussierte Hero behalten ihren direkten Ladepfad.
+- Android TV: Film-/Serien-Heros in Home und Details verwenden denselben Logo-Anker und eine reservierte Metadatenhöhe. Die lange Details-Beschreibung und Aktionen scrollen unterhalb des Headers, ohne dessen Logohöhe zu verschieben. Beim Fokuswechsel zu den Rails steht wieder der größere Scrollbereich zur Verfügung; mobile Darstellung sowie IPTV-/Collection-Heros bleiben unverändert.
+- Android Profile: Hochgeladene Fotos werden unabhängig vom Zeitpunkt der letzten Profilnutzung nach ihrem Avatar-Änderungsstand zusammengeführt. Inline-Bilddaten werden nur mit passender Bildversion übernommen; direkter Profil-Push und vollständiger Account-Sync verwenden dieselbe Merge-Regel.
+- Android Profile: Avataränderungen und bewusstes Entfernen erhalten einen eigenen Zeitstempel. Ältere Snapshots ohne Avatarfelder löschen kein neueres Foto; ein neuerer Entfernen-Stand wird nicht durch ein altes Foto wieder aufgehoben. Beim Restore werden neuere lokale Avatarstände vor dem Schreiben/Bereinigen von Bilddateien berücksichtigt.
+- Android Profile: Ein nachträglich aus der Cloud restauriertes Foto aktualisiert die betroffene Profilansicht und ihren Bildcache auch bei unveränderter Bildversion. Regressionstests decken stale-device Pushs, Entfernen, Legacy-Snapshots, Bildversionszuordnung und lokale Restore-Benachrichtigungen ab; keine Produktionsprofile im Test verändert.
+- Profilfoto-Sync: Für einen verlässlichen Handy-/TV-Abgleich beide Geräte auf den korrigierten Stand aktualisieren. Kein neues Backend-Schema erforderlich; ein echter Zwei-Geräte-Abgleich mit Produktionsprofilen wurde lokal nicht durchgeführt.
+- Android-Version: `2.5.068` / Code `469`.
+
 ## [2.5.067] - 2026-10-15
 
 - Android TV Home: Die Layout-Einstellungen aller Katalogzeilen werden gemeinsam als profilbezogener Snapshot gelesen statt mit separaten DataStore-Collectorn pro Zeile. Individuelle Poster-/Landscape-Overrides und globale Fallbacks bleiben erhalten.

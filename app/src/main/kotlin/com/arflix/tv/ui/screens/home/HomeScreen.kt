@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -2200,6 +2201,10 @@ private fun HeroSection(
     // But the frosted pill provides additional protection
     val textShadow = textShadowPrimary
     val heroTextWidth = 360.dp
+    val heroConfiguration = LocalConfiguration.current
+    val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
+        heroConfiguration.screenHeightDp, AppTopBarContentTopInset.value, heroConfiguration.fontScale
+    )
     var loadedLogoUrl by remember(item.mediaType, item.id) { mutableStateOf<String?>(null) }
 
     Column(
@@ -2360,7 +2365,7 @@ private fun HeroSection(
                         hasBudgetMetadata
 
                     Column(
-                        modifier = Modifier.width(heroTextWidth),
+                        modifier = Modifier.width(heroTextWidth).heightIn(min = heroLayout.metadataHeightDp.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
                         Row(
@@ -2650,6 +2655,9 @@ private fun HomeHeroLayer(
         val contentRowTopPadding = contentRowHeight + contentRowBottomPadding
         val buttonsBottomPadding = contentRowTopPadding - 10.dp
         val heroBottomPadding = buttonsBottomPadding + if (configuration.screenHeightDp < 720) 34.dp else 34.dp
+        val heroLayout = com.arflix.tv.ui.components.resolveTvHeroLayout(
+            configuration.screenHeightDp, AppTopBarContentTopInset.value, configuration.fontScale
+        )
 
         Box(
             modifier = Modifier
@@ -2662,13 +2670,16 @@ private fun HomeHeroLayer(
                 val isGenreCollection = item.collectionGroup == CollectionGroupKind.GENRE ||
                     item.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
                     item.collectionGroup == CollectionGroupKind.TV_GENRE
+                val fixedLogoAnchor = !isCollection && !isIptvItem(item)
                 val heroContentModifier = Modifier
-                    .align(Alignment.BottomStart)
+                    .align(if (fixedLogoAnchor) Alignment.TopStart else Alignment.BottomStart)
                     .padding(
                         start = contentStartPadding,
                         end = 400.dp
                     )
-                    .offset(y = -heroBottomPadding)
+                    .offset(y = if (fixedLogoAnchor) {
+                        heroLayout.logoTopDp.dp - AppTopBarContentTopInset
+                    } else -heroBottomPadding)
 
                 when {
                     !isCollection -> HeroSection(

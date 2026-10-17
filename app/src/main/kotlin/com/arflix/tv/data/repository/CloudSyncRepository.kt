@@ -10,6 +10,7 @@ import com.arflix.tv.data.model.AddonType
 import com.arflix.tv.data.model.CatalogConfig
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.Profile
+import com.arflix.tv.data.model.withLatestAvatarFrom
 import com.arflix.tv.data.repository.ContinueWatchingItem
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.ui.components.CARD_LAYOUT_MODE_LANDSCAPE
@@ -366,7 +367,11 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
                 } else {
                     remoteProfile
                 }
-                merged[localProfile.id] = baseProfile.copy(
+                val avatarProfile = baseProfile.withLatestAvatarFrom(
+                    if (baseProfile === localProfile) remoteProfile else localProfile
+                )
+                merged[localProfile.id] = avatarProfile.copy(
+                    avatarId = if (avatarProfile.avatarImageVersion > 0L) 0 else avatarProfile.avatarId,
                     settingsPin = settingsLockProfile.settingsPin,
                     settingsLocked = settingsLockProfile.settingsLocked,
                     settingsLockUpdatedAt = max(
@@ -383,6 +388,25 @@ internal fun mergeProfilesForPush(localPayload: String, remotePayload: String): 
             profile.createdAt > deletedAt
         }
         local.put("profiles", JSONArray(gson.toJson(survivingProfiles)))
+        if (local.has("profileAvatarImagesById") || remote.has("profileAvatarImagesById")) {
+            val localImages = local.optJSONObject("profileAvatarImagesById")
+            val remoteImages = remote.optJSONObject("profileAvatarImagesById")
+            val localById = localProfiles.associateBy { it.id }
+            val remoteById = remoteProfiles.associateBy { it.id }
+            val images = JSONObject()
+            survivingProfiles.forEach { profile ->
+                val localImage = localImages?.optString(profile.id)?.takeIf { it.isNotBlank() }
+                val remoteImage = remoteImages?.optString(profile.id)?.takeIf { it.isNotBlank() }
+                val image = if (profile.avatarImageVersion > 0L) {
+                    localImage?.takeIf { localById[profile.id]?.avatarImageVersion == profile.avatarImageVersion }
+                        ?: remoteImage?.takeIf { remoteById[profile.id]?.avatarImageVersion == profile.avatarImageVersion }
+                } else if (profile.avatarUpdatedAt <= 0L) {
+                    localImage ?: remoteImage
+                } else null
+                if (image != null) images.put(profile.id, image)
+            }
+            local.put("profileAvatarImagesById", images)
+        }
         preserveRemoteOnlyProfileState(
             local = local,
             remote = remote,
@@ -406,7 +430,6 @@ private fun preserveRemoteOnlyProfileState(
     if (remoteOnlyProfileIds.isEmpty()) return
 
     val profileScopedObjectKeys = listOf(
-        "profileAvatarImagesById",
         "profileSettingsById",
         "traktTokens",
         "mdbListSyncByProfile",
@@ -1320,17 +1343,21 @@ class CloudSyncRepository @Inject constructor(
 
         root.put("activeProfileId", profileRepository.getActiveProfileId() ?: JSONObject.NULL)
         root.put("profiles", JSONArray(gson.toJson(profiles)))
-        val existingAvatarImagesById = authRepository.loadAccountSyncPayload()
+        val existingAvatarPayload = authRepository.loadAccountSyncPayload()
             .getOrNull()
             ?.takeIf { it.isNotBlank() }
             ?.let { payload ->
                 runCatching {
-                    JSONObject(payload).optJSONObject("profileAvatarImagesById")
+                    JSONObject(payload)
                 }.getOrNull()
             }
         root.put(
             "profileAvatarImagesById",
-            profileAvatarImageManager.buildInlineAvatarImagesJson(profiles, existingAvatarImagesById)
+            profileAvatarImageManager.buildInlineAvatarImagesJson(
+                profiles,
+                existingAvatarPayload?.optJSONObject("profileAvatarImagesById"),
+                existingAvatarPayload?.optJSONArray("profiles")
+            )
         )
         root.put("profileSettingsById", JSONObject(gson.toJson(profileSettingsById)))
 
@@ -2071,15 +2098,9 @@ class CloudSyncRepository @Inject constructor(
                         ?.optString(profile.id)
                         ?.takeIf { it.isNotBlank() }
                     val localProfile = localProfilesById[profile.id]
+                    val reconciledAvatar = profile.withLatestAvatarFrom(localProfile)
                     val profileWithAvatarState = when {
-                        profile.avatarImageVersion > 0L -> profile
-                        localProfile != null && localProfile.avatarImageVersion > 0L -> {
-                            profile.copy(
-                                avatarId = 0,
-                                avatarImageVersion = localProfile.avatarImageVersion,
-                                avatarImageStoragePath = localProfile.avatarImageStoragePath
-                            )
-                        }
+                        reconciledAvatar.avatarUpdatedAt > 0L || reconciledAvatar.avatarImageVersion > 0L -> reconciledAvatar
                         !inlineAvatar.isNullOrBlank() -> {
                             profile.copy(
                                 avatarId = 0,
@@ -2087,9 +2108,15 @@ class CloudSyncRepository @Inject constructor(
                                 avatarImageStoragePath = null
                             )
                         }
-                        else -> profile
+                        else -> reconciledAvatar
                     }
-                    profileAvatarImageManager.restoreAvatarIfNeeded(profileWithAvatarState, inlineAvatar)
+                    val matchingInlineAvatar = inlineAvatar.takeIf {
+                        profileWithAvatarState.avatarImageVersion == profile.avatarImageVersion ||
+                            (profile.avatarImageVersion <= 0L && profile.avatarUpdatedAt <= 0L &&
+                                localProfile?.avatarImageVersion?.let { it <= 0L } != false &&
+                                localProfile?.avatarUpdatedAt?.let { it <= 0L } != false)
+                    }
+                    profileAvatarImageManager.restoreAvatarIfNeeded(profileWithAvatarState, matchingInlineAvatar)
                     profileWithAvatarState
                 }
                 // Preserve local active profile if it exists in cloud set

@@ -6,6 +6,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import com.arflix.tv.data.model.Profile
+import com.arflix.tv.data.model.withLatestAvatarFrom
 import com.arflix.tv.data.model.ProfileColors
 import com.arflix.tv.util.profilesDataStore
 import com.google.gson.Gson
@@ -106,7 +107,16 @@ class ProfileRepository @Inject constructor(
             val currentList = decodeProfiles(prefs[PROFILES_KEY]).toMutableList()
             val index = currentList.indexOfFirst { it.id == profile.id }
             if (index >= 0) {
-                currentList[index] = profile
+                val previous = currentList[index]
+                val avatarChanged = previous.avatarId != profile.avatarId ||
+                    previous.avatarColor != profile.avatarColor ||
+                    previous.avatarImageVersion != profile.avatarImageVersion ||
+                    previous.avatarImageStoragePath != profile.avatarImageStoragePath
+                currentList[index] = profile.copy(
+                    avatarUpdatedAt = if (avatarChanged) {
+                        maxOf(System.currentTimeMillis(), profile.avatarImageVersion, previous.avatarUpdatedAt + 1L)
+                    } else maxOf(previous.avatarUpdatedAt, profile.avatarUpdatedAt)
+                )
                 prefs[PROFILES_KEY] = encodeProfiles(currentList)
             }
         }
@@ -182,19 +192,7 @@ class ProfileRepository @Inject constructor(
             } else {
                 cloudProfile
             }
-            if (
-                localProfile != null &&
-                localProfile.avatarImageVersion > 0L &&
-                profileWithSettingsLock.avatarImageVersion <= 0L
-            ) {
-                profileWithSettingsLock.copy(
-                    avatarId = 0,
-                    avatarImageVersion = localProfile.avatarImageVersion,
-                    avatarImageStoragePath = localProfile.avatarImageStoragePath
-                )
-            } else {
-                profileWithSettingsLock
-            }
+            profileWithSettingsLock.withLatestAvatarFrom(localProfile)
         }
 
         context.profilesDataStore.edit { prefs ->
@@ -217,6 +215,12 @@ class ProfileRepository @Inject constructor(
         val profiles = getProfiles()
         val activeProfileId = getActiveProfileId()
         authRepository.mutateAccountSyncPayload { root ->
+            val existingPayload = root.toString()
+            val avatarImages = profileAvatarImageManager.buildInlineAvatarImagesJson(
+                profiles,
+                root.optJSONObject("profileAvatarImagesById"),
+                root.optJSONArray("profiles")
+            )
             if (!deletedProfileId.isNullOrBlank()) {
                 val deletedAtById = root.optJSONObject("profileDeletedAtById") ?: JSONObject()
                 deletedAtById.put(deletedProfileId, System.currentTimeMillis())
@@ -226,11 +230,11 @@ class ProfileRepository @Inject constructor(
             root.put("profiles", JSONArray(gson.toJson(profiles)))
             root.put(
                 "profileAvatarImagesById",
-                profileAvatarImageManager.buildInlineAvatarImagesJson(
-                    profiles,
-                    root.optJSONObject("profileAvatarImagesById")
-                )
+                avatarImages
             )
+            val merged = JSONObject(mergeProfilesForPush(root.toString(), existingPayload))
+            root.put("profiles", merged.optJSONArray("profiles") ?: JSONArray())
+            root.put("profileAvatarImagesById", merged.optJSONObject("profileAvatarImagesById") ?: JSONObject())
             root.put("userId", userId)
         }
     }

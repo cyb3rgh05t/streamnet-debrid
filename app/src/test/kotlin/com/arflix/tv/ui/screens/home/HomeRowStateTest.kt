@@ -10,8 +10,42 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.launch
 
 class HomeRowStateTest {
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test
+    fun `artwork warmup waits for navigation to settle and is cancellable`() = runTest {
+        var lastNavigation = 100L
+        var loaded = false
+        val job = launch {
+            awaitHomeArtworkIdle({ lastNavigation }, { testScheduler.currentTime + 100L })
+            loaded = true
+        }
+        runCurrent()
+        advanceTimeBy(800L)
+        lastNavigation = testScheduler.currentTime + 100L
+        advanceTimeBy(200L)
+        runCurrent()
+        assertThat(loaded).isFalse()
+        advanceTimeBy(800L)
+        runCurrent()
+        assertThat(loaded).isTrue()
+        job.join()
+
+        loaded = false
+        lastNavigation = testScheduler.currentTime + 100L
+        val cancelled = launch {
+            awaitHomeArtworkIdle({ lastNavigation }, { testScheduler.currentTime + 100L })
+            loaded = true
+        }
+        runCurrent()
+        cancelled.cancel()
+        advanceTimeBy(1_000L)
+        runCurrent()
+        assertThat(loaded).isFalse()
+    }
 
     @Test
     fun `hero refresh preserves known metadata while accepting new playback progress`() {

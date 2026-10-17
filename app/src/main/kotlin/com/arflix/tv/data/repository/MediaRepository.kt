@@ -3700,6 +3700,7 @@ class MediaRepository @Inject constructor(
 
     private val iptvBackdropCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
     private val iptvLogoCache = IptvArtworkCache { android.os.SystemClock.elapsedRealtime() }
+    private val iptvArtworkLoadSemaphore = Semaphore(2)
     private val iptvCandidateCache = IptvLookupCache<List<MediaItem>>(
         { android.os.SystemClock.elapsedRealtime() },
         { it.isEmpty() },
@@ -3746,7 +3747,9 @@ class MediaRepository @Inject constructor(
         if (cleanedTitle.isArtworkPlaceholderTitle()) return@withContext null
 
         iptvBackdropCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
-            resolveIptvProgramBackdrop(cleanedTitle, durationMs)
+            iptvArtworkLoadSemaphore.withPermit {
+                resolveIptvProgramBackdrop(cleanedTitle, durationMs)
+            }
         }
     }
 
@@ -3768,7 +3771,9 @@ class MediaRepository @Inject constructor(
         if (cleanedTitle.isArtworkPlaceholderTitle()) return@withContext null
 
         iptvLogoCache.getOrLoad(iptvArtworkKey(rawTitle, contentLanguage, durationMs)) {
-            resolveIptvProgramLogo(cleanedTitle, durationMs)
+            iptvArtworkLoadSemaphore.withPermit {
+                resolveIptvProgramLogo(cleanedTitle, durationMs)
+            }
         }
     }
 

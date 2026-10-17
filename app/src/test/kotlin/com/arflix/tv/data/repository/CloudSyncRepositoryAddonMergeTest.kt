@@ -12,6 +12,82 @@ import org.json.JSONObject
 
 class CloudSyncRepositoryAddonMergeTest {
     @Test
+    fun `remote only profiles do not restore image bytes after explicit avatar removal`() {
+        val local = """{"profiles":[{"id":"main","name":"Main"}]}"""
+        val remote = """{"profiles":[{"id":"main","name":"Main"},{"id":"other","name":"Other","avatarImageVersion":0,"avatarUpdatedAt":300}],"profileAvatarImagesById":{"other":"removed-photo"}}"""
+        val merged = JSONObject(mergeProfilesForPush(local, remote))
+        assertEquals(2, merged.getJSONArray("profiles").length())
+        assertFalse(merged.getJSONObject("profileAvatarImagesById").has("other"))
+    }
+
+    @Test
+    fun `newer explicit photo removal survives older uploaded photo in either direction`() {
+        val removed = """{"profiles":[{"id":"main","name":"Removed","lastUsedAt":100,"avatarId":7,"avatarImageVersion":0,"avatarUpdatedAt":300}]}"""
+        val oldPhoto = """{"profiles":[{"id":"main","name":"Old photo","lastUsedAt":400,"avatarImageVersion":200}],"profileAvatarImagesById":{"main":"old-photo"}}"""
+        listOf(mergeProfilesForPush(removed, oldPhoto), mergeProfilesForPush(oldPhoto, removed)).forEach {
+            val merged = JSONObject(it)
+            val profile = merged.getJSONArray("profiles").getJSONObject(0)
+            assertEquals(0L, profile.getLong("avatarImageVersion"))
+            assertEquals(7, profile.getInt("avatarId"))
+            assertEquals(300L, profile.getLong("avatarUpdatedAt"))
+            assertFalse(merged.getJSONObject("profileAvatarImagesById").has("main"))
+        }
+    }
+
+    @Test
+    fun `legacy profile without avatar state cannot erase an uploaded photo`() {
+        val legacy = """{"profiles":[{"id":"main","name":"Legacy","lastUsedAt":400}]}"""
+        val photo = """{"profiles":[{"id":"main","name":"Photo","lastUsedAt":100,"avatarImageVersion":200}],"profileAvatarImagesById":{"main":"photo"}}"""
+        val merged = JSONObject(mergeProfilesForPush(legacy, photo))
+        assertEquals(200L, merged.getJSONArray("profiles").getJSONObject(0).getLong("avatarImageVersion"))
+        assertEquals("photo", merged.getJSONObject("profileAvatarImagesById").getString("main"))
+    }
+
+    @Test
+    fun `inline avatar export never labels an older fallback photo as a newer version`() {
+        assertEquals("local-photo", selectInlineProfileAvatar(200, "local-photo", "old-photo", 100))
+        assertEquals("same-photo", selectInlineProfileAvatar(200, null, "same-photo", 200))
+        assertEquals(null, selectInlineProfileAvatar(200, null, "old-photo", 100))
+        assertEquals(null, selectInlineProfileAvatar(200, null, "unknown-photo", null))
+    }
+
+    @Test
+    fun `avatar image can be recovered from peer only for the same version`() {
+        val local = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":300,"avatarImageVersion":200}]}"""
+        val matching = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":200,"avatarImageVersion":200}],"profileAvatarImagesById":{"main":"matching-photo"}}"""
+        val older = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":200,"avatarImageVersion":100}],"profileAvatarImagesById":{"main":"old-photo"}}"""
+
+        assertEquals("matching-photo", JSONObject(mergeProfilesForPush(local, matching))
+            .getJSONObject("profileAvatarImagesById").getString("main"))
+        assertFalse(JSONObject(mergeProfilesForPush(local, older))
+            .getJSONObject("profileAvatarImagesById").has("main"))
+    }
+
+    @Test
+    fun `newer remote avatar survives newer local profile usage with matching image`() {
+        val local = """{"profiles":[{"id":"main","name":"Local","lastUsedAt":300,"avatarImageVersion":100}],"profileAvatarImagesById":{"main":"old-photo"}}"""
+        val remote = """{"profiles":[{"id":"main","name":"Remote","lastUsedAt":200,"avatarImageVersion":200}],"profileAvatarImagesById":{"main":"new-photo"}}"""
+
+        val merged = JSONObject(mergeProfilesForPush(local, remote))
+        val profile = merged.getJSONArray("profiles").getJSONObject(0)
+        assertEquals("Local", profile.getString("name"))
+        assertEquals(200L, profile.getLong("avatarImageVersion"))
+        assertEquals("new-photo", merged.getJSONObject("profileAvatarImagesById").getString("main"))
+    }
+
+    @Test
+    fun `newer local avatar survives newer remote profile usage with matching image`() {
+        val local = """{"profiles":[{"id":"main","name":"Local","lastUsedAt":200,"avatarImageVersion":200}],"profileAvatarImagesById":{"main":"new-photo"}}"""
+        val remote = """{"profiles":[{"id":"main","name":"Remote","lastUsedAt":300,"avatarImageVersion":100}],"profileAvatarImagesById":{"main":"old-photo"}}"""
+
+        val merged = JSONObject(mergeProfilesForPush(local, remote))
+        val profile = merged.getJSONArray("profiles").getJSONObject(0)
+        assertEquals("Remote", profile.getString("name"))
+        assertEquals(200L, profile.getLong("avatarImageVersion"))
+        assertEquals("new-photo", merged.getJSONObject("profileAvatarImagesById").getString("main"))
+    }
+
+    @Test
     fun `stale device push preserves profile created on another device`() {
         val local = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100}],"profileSettingsById":{"main":{"accentColor":"Orange"}},"iptvByProfile":{"main":{"playlists":[]}}}"""
         val remote = """{"profiles":[{"id":"main","name":"Main","lastUsedAt":100},{"id":"tv","name":"TV","lastUsedAt":200}],"profileSettingsById":{"main":{"accentColor":"Orange"},"tv":{"accentColor":"Gold"}},"iptvByProfile":{"main":{"playlists":[]},"tv":{"playlists":[{"id":"list_1","name":"TV","m3uUrl":"https://tv.example/list.m3u"}],"tvSession":{"lastChannelId":"channel-7"}}},"traktTokens":{"tv":{"accessToken":"remote-token"}},"mdbListSyncByProfile":{"tv":{"provider":"MDBLIST"}},"catalogsByProfile":{"tv":[{"id":"remote-catalog"}]},"catalogsUpdatedAtByProfile":{"tv":200},"watchlistByProfile":{"tv":[{"mediaType":"movie","tmdbId":7,"addedAt":200}]},"watchlistUpdatedAtByProfile":{"tv":200},"localContinueWatchingByProfile":{"tv":[{"id":7,"mediaType":"MOVIE","progress":50,"updatedAtMs":200}]}}"""

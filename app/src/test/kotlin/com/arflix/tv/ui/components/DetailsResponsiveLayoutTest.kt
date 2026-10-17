@@ -6,6 +6,31 @@ import org.junit.Test
 class DetailsResponsiveLayoutTest {
 
     @Test
+    fun tvHeroAnchorUsesTheCompactHomeGeometry() {
+        val layout = resolveTvHeroLayout(720, topBarInsetDp = 64f)
+        assertThat(layout.logoTopDp).isWithin(0.01f).of(249.2f)
+        assertThat(layout.headerHeightDp).isEqualTo(112f)
+        assertThat(layout.bodyTopDp).isWithin(0.01f).of(367.2f)
+    }
+
+    @Test
+    fun tvHeroAnchorKeepsNavigationAndBodySpaceAtSmallerSizes() {
+        listOf(360, 540, 720, 1080).forEach { height ->
+            val layout = resolveTvHeroLayout(height, topBarInsetDp = 64f)
+            assertThat(layout.logoTopDp).isAtLeast(72f)
+            assertThat(height - layout.bodyTopDp).isAtLeast(114f)
+        }
+    }
+
+    @Test
+    fun tvHeroHeaderReservesMoreSpaceForLargerText() {
+        val normal = resolveTvHeroLayout(720, topBarInsetDp = 64f)
+        val large = resolveTvHeroLayout(720, topBarInsetDp = 64f, fontScale = 1.5f)
+        assertThat(large.metadataHeightDp).isEqualTo(54f)
+        assertThat(large.bodyTopDp).isWithin(0.01f).of(normal.bodyTopDp)
+    }
+
+    @Test
     fun phoneLandscapeUsesCompactHeightThatStillFitsOverlay() {
         assertThat(
             resolveDetailsBackdropHeightDp(
