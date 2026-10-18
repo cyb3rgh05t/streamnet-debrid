@@ -290,13 +290,13 @@ internal fun settingsSectionOrder(includePlugins: Boolean): List<String> = build
 internal fun settingsAddonIndex(rowIndex: Int, addonCount: Int): Int? =
     (rowIndex - 2).takeIf { it in 0 until addonCount }
 
-private fun tvGeneralRowsForSection(section: String): List<Int> {
+internal fun tvGeneralRowsForSection(section: String): List<Int> {
     return when (section) {
         "language" -> listOf(0, 3, 1, 2)
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(18, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
+        "appearance" -> listOf(18, 53, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -1084,6 +1084,7 @@ fun SettingsScreen(
                                                 50 -> viewModel.cycleLiveTvClassicTitleSize()
                                                 51 -> viewModel.cycleLiveTvClassicDescriptionSize()
                                                 18 -> openUiModeWarningDialog()
+                                                53 -> viewModel.toggleTvUiScale()
                                                 19 -> viewModel.setSkipProfileSelection(!uiState.skipProfileSelection)
                                                 44 -> if (uiState.settingsLockEnabled) {
                                                     viewModel.setSettingsLockEnabled(false)
@@ -1720,6 +1721,8 @@ fun SettingsScreen(
                             onShowEpisodeRatingsToggle = { viewModel.setShowEpisodeRatings(it) },
                             smoothScrolling = uiState.smoothScrolling,
                             onSmoothScrollingToggle = { viewModel.setSmoothScrolling(it) },
+                            tvUiScalePercent = uiState.tvUiScalePercent,
+                            onTvUiScaleClick = { viewModel.toggleTvUiScale() },
                             spoilerBlurEnabled = uiState.spoilerBlurEnabled,
                             onSpoilerBlurToggle = { viewModel.setSpoilerBlurEnabled(it) },
                             accentColor = uiState.accentColor,
@@ -6590,7 +6593,8 @@ private fun TvGeneralSettingsRows(
     showCertification: Boolean = true,
     autoScrollHomeOverview: Boolean = true,
     showEpisodeRatings: Boolean = true,
-    smoothScrolling: Boolean = true,
+    smoothScrolling: Boolean = false,
+    tvUiScalePercent: Int = 100,
     spoilerBlurEnabled: Boolean = false,
     accentColor: String = "White",
     volumeBoostDb: Int = 0,
@@ -6621,6 +6625,7 @@ private fun TvGeneralSettingsRows(
     onHomeOverviewModeClick: () -> Unit = {},
     onShowEpisodeRatingsToggle: (Boolean) -> Unit = {},
     onSmoothScrollingToggle: (Boolean) -> Unit = {},
+    onTvUiScaleClick: () -> Unit = {},
     onSpoilerBlurToggle: (Boolean) -> Unit = {},
     onAccentColorClick: () -> Unit = {},
     showLoadingStats: Boolean = true,
@@ -6745,6 +6750,15 @@ private fun TvGeneralSettingsRows(
                     },
                     isFocused = focusedIndex == localIndex,
                     onClick = onDeviceModeClick,
+                    modifier = Modifier.settingsFocusSlot(localIndex)
+                )
+                53 -> SettingsRow(
+                    icon = Icons.Default.Widgets,
+                    title = stringResource(R.string.tv_ui_scale),
+                    subtitle = stringResource(R.string.tv_ui_scale_desc),
+                    value = "$tvUiScalePercent %",
+                    isFocused = focusedIndex == localIndex,
+                    onClick = onTvUiScaleClick,
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
                 19 -> SettingsToggleRow(Icons.Default.Person, stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))

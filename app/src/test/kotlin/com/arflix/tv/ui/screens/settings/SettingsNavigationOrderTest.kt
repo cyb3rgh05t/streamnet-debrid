@@ -5,6 +5,16 @@ import org.junit.Test
 
 class SettingsNavigationOrderTest {
     @Test
+    fun `tv scale follows device mode in appearance without duplicate focus slots`() {
+        val rows = tvGeneralRowsForSection("appearance")
+        assertThat(rows.take(2)).containsExactly(18, 53).inOrder()
+        assertThat(rows.distinct()).isEqualTo(rows)
+        listOf("language", "subtitles", "ai_subtitles", "playback", "profiles", "network").forEach {
+            assertThat(tvGeneralRowsForSection(it)).doesNotContain(53)
+        }
+    }
+
+    @Test
     fun `appearance starts the profile category and occurs only once`() {
         val sections = settingsSectionOrder(false)
         assertThat(sections.take(4)).containsExactly(

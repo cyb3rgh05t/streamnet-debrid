@@ -2650,18 +2650,19 @@ private fun HomeHeroLayer(
     } else {
         // TV hero: full-screen overlay with clearlogo
         val configuration = LocalConfiguration.current
-        val contentRowHeight = (configuration.screenHeightDp * 0.34f).dp.coerceIn(240.dp, 320.dp)
-        val contentRowBottomPadding = 12.dp
-        val contentRowTopPadding = contentRowHeight + contentRowBottomPadding
-        val buttonsBottomPadding = contentRowTopPadding - 10.dp
-        val heroBottomPadding = buttonsBottomPadding + if (configuration.screenHeightDp < 720) 34.dp else 34.dp
+        val uiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current
 
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(top = AppTopBarContentTopInset)
                 .zIndex(3f)
         ) {
+            val heroBottomPadding = com.arflix.tv.ui.components.resolveTvHomeHeroBottomPadding(
+                screenHeightDp = configuration.screenHeightDp,
+                viewportHeightDp = maxHeight.value + AppTopBarContentTopInset.value,
+                uiScale = uiScale,
+            ).dp
             heroItem?.let { item ->
                 val isCollection = item.status.orEmpty().startsWith("collection:")
                 val isGenreCollection = item.collectionGroup == CollectionGroupKind.GENRE ||
@@ -4048,7 +4049,10 @@ private fun TvHomeRowsLayer(
             .fillMaxSize()
             .padding(top = 24.dp)
     ) {
-        val rowsViewportHeight = (maxHeight * 0.31f).coerceIn(260.dp, 340.dp)
+        val rowsViewportHeight = com.arflix.tv.ui.components.resolveTvHomeRowsViewportHeight(
+            contentHeightDp = maxHeight.value,
+            uiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current,
+        ).dp
         val listState = rememberLazyListState()
         var lastAppliedTargetIndex by remember { mutableIntStateOf(-1) }
         val targetIndex = localCurrentRowIndex.coerceIn(0, (renderedCategories.size - 1).coerceAtLeast(0))
@@ -4561,7 +4565,7 @@ private fun ContentRow(
                     rowState.scrollToItem(index = scrollTargetIndex, scrollOffset = extraOffset)
                 }
             } else {
-                rowState.animateScrollToItem(index = scrollTargetIndex, scrollOffset = extraOffset)
+                rowState.scrollToItem(index = scrollTargetIndex, scrollOffset = extraOffset)
             }
         } else {
             rowState.scrollToItem(index = scrollTargetIndex, scrollOffset = extraOffset)

@@ -22,18 +22,33 @@ class IptvArtworkCacheTest {
         val cache = IptvArtworkCache { 0L }
         var loads = 0
         val homeKey = iptvArtworkKey("Tatort HD - S01 E02", "de-DE", 60 * 60_000L)
-        assertEquals(key, homeKey)
+        val tvKey = iptvArtworkKey("Tatort", "de-DE", 45 * 60_000L)
+        assertEquals(tvKey, homeKey)
         assertEquals("backdrop", cache.getOrLoad(homeKey) { loads++; "backdrop" })
-        assertEquals("backdrop", cache.getOrLoad(key) { loads++; "different" })
+        assertEquals("backdrop", cache.getOrLoad(tvKey) { loads++; "different" })
         assertEquals(1, loads)
     }
 
     @Test
-    fun `language and movie duration boundary keep results separate`() {
-        assertEquals(key, iptvArtworkKey("Tatort", "de-DE", 75 * 60_000L - 1))
+    fun `language and unknown series movie duration boundaries keep results separate`() {
+        val seriesKey = iptvArtworkKey("Tatort", "de-DE", 75 * 60_000L - 1)
+        assertNotEquals(key, seriesKey)
+        assertNotEquals(seriesKey, iptvArtworkKey("Tatort", "de-DE", 75 * 60_000L))
         assertNotEquals(key, iptvArtworkKey("Tatort", "de-DE", 75 * 60_000L))
+        assertEquals(key, iptvArtworkKey("Tatort", "de-DE", 0L))
+        assertEquals(key, iptvArtworkKey("Tatort", "de-DE", -1L))
         assertNotEquals(key, iptvArtworkKey("Tatort", "en-US", null))
         assertNotEquals(key, iptvArtworkKey("Tatort: Borowski", "de-DE", null))
+    }
+
+    @Test
+    fun `known episode duration cannot reuse a movie selected without guide duration`() = runBlocking {
+        val cache = IptvArtworkCache { 0L }
+        val unknownKey = iptvArtworkKey("The Equalizer", "de-DE", null)
+        val episodeKey = iptvArtworkKey("The Equalizer", "de-DE", 55 * 60_000L)
+        assertEquals("movie backdrop", cache.getOrLoad(unknownKey) { "movie backdrop" })
+        assertEquals("series backdrop", cache.getOrLoad(episodeKey) { "series backdrop" })
+        assertEquals("movie backdrop", cache.getOrLoad(unknownKey) { "unexpected reload" })
     }
 
     @Test

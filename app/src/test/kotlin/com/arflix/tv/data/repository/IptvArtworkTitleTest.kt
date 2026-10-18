@@ -76,6 +76,35 @@ class IptvArtworkTitleTest {
     }
 
     @Test
+    fun `equalizer episode prefers series over more popular same titled movie`() {
+        val durationMs = 55 * 60_000L
+        assertTrue(
+            iptvArtworkCandidateScore("The Equalizer", "The Equalizer", MediaType.TV, durationMs, 10f) >
+                iptvArtworkCandidateScore("The Equalizer", "The Equalizer", MediaType.MOVIE, durationMs, 250f)
+        )
+    }
+
+    @Test
+    fun `short duration does not promote a different series over an exact movie title`() {
+        val durationMs = 55 * 60_000L
+        assertTrue(
+            iptvArtworkCandidateScore("The Equalizer", "The Equalizer", MediaType.MOVIE, durationMs) >
+                iptvArtworkCandidateScore("The Equalizer", "The Equalizer 2", MediaType.TV, durationMs)
+        )
+    }
+
+    @Test
+    fun `unknown or invalid duration does not imply a series`() {
+        listOf(null, 0L, -1L).forEach { durationMs ->
+            assertEquals(
+                iptvArtworkCandidateScore("The Equalizer", "The Equalizer", MediaType.MOVIE, durationMs),
+                iptvArtworkCandidateScore("The Equalizer", "The Equalizer", MediaType.TV, durationMs),
+                0.0
+            )
+        }
+    }
+
+    @Test
     fun `long exact movie outranks same titled tv result`() {
         val durationMs = 99 * 60_000L
 

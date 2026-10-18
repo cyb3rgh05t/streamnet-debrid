@@ -184,6 +184,8 @@
     <string name="live_tv_text_size_large">Groß</string>
     <string name="live_tv_text_size_extra_large">Sehr groß</string>
     <string name="ui_mode">UI-Modus</string>
+    <string name="tv_ui_scale">TV-UI-Größe</string>
+    <string name="tv_ui_scale_desc">Lokale Darstellungsgröße dieses Geräts</string>
     <string name="skip_profile">Profilauswahl überspringen</string>
     <string name="oled_black_background">OLED Schwarzer Hintergrund</string>
     <string name="clock_format">Uhrzeitformat</string>

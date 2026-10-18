@@ -6,7 +6,7 @@ import retrofit2.http.GET
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/** TheIntroDB v3 timestamps API, using TMDB IDs as the primary identity. */
+/** TheIntroDB v4 timestamps API, requesting TMDB coordinates and reading segment lists. */
 interface TheIntroDbApi {
     @GET("media")
     suspend fun getMedia(

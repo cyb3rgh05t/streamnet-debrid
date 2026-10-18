@@ -7,6 +7,21 @@ import org.junit.Test
 
 class LiveTvMiniPlayerLayoutTest {
     @Test
+    fun `preview waits until fullscreen exit animation has completely finished`() {
+        listOf(1f, 0.8f, 0.5f, 0.001f).forEach { progress ->
+            assertEquals(false, liveTvPreviewOutputEnabled(isFullScreen = false, fullscreenProgress = progress))
+        }
+        assertEquals(true, liveTvPreviewOutputEnabled(isFullScreen = false, fullscreenProgress = 0f))
+    }
+
+    @Test
+    fun `entering fullscreen immediately blocks preview even before animation starts`() {
+        listOf(0f, 0.001f, 0.5f, 1f).forEach { progress ->
+            assertEquals(false, liveTvPreviewOutputEnabled(isFullScreen = true, fullscreenProgress = progress))
+        }
+    }
+
+    @Test
     fun `touch tablet landscape uses larger hero layout`() {
         assertEquals(
             LiveTvMiniPlayerLayout.TABLET_LANDSCAPE,

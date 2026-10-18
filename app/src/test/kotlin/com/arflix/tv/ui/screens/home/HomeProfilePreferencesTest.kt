@@ -5,12 +5,43 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.mutablePreferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import app.cash.turbine.test
+import com.arflix.tv.ui.screens.settings.SettingsUiState
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
 class HomeProfilePreferencesTest {
+
+    @Test
+    fun `settings and Home agree on disabled scrolling when no value is stored`() {
+        val preferences = readHomeProfilePreferences(mutablePreferencesOf(), "primary")
+        assertThat(preferences.smoothScrolling).isFalse()
+        assertThat(SettingsUiState().smoothScrolling).isEqualTo(preferences.smoothScrolling)
+        assertThat(HomeUiState().smoothScrolling).isEqualTo(preferences.smoothScrolling)
+    }
+
+    @Test
+    fun `saved scrolling choice stays isolated by profile and changes live`() = runTest {
+        val profileId = MutableStateFlow("primary")
+        val preferences = MutableStateFlow<Preferences>(mutablePreferencesOf(
+            booleanPreferencesKey("profile_primary_smooth_scrolling") to true,
+            booleanPreferencesKey("profile_secondary_smooth_scrolling") to false,
+        ))
+        observeHomeProfilePreferences(profileId, preferences).test {
+            assertThat(awaitItem().smoothScrolling).isTrue()
+            profileId.value = "secondary"
+            assertThat(awaitItem().smoothScrolling).isFalse()
+            profileId.value = "primary"
+            assertThat(awaitItem().smoothScrolling).isTrue()
+            preferences.value = mutablePreferencesOf(
+                booleanPreferencesKey("profile_primary_smooth_scrolling") to false,
+                booleanPreferencesKey("profile_secondary_smooth_scrolling") to false,
+            )
+            assertThat(awaitItem().smoothScrolling).isFalse()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
 
     @Test
     fun `delayed cloud restore enables trailer autoplay without recreating Home`() = runTest {

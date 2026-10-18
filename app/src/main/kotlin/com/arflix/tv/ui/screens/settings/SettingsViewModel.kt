@@ -1,5 +1,6 @@
 package com.arflix.tv.ui.screens.settings
 
+import com.arflix.tv.util.deviceDisplayDataStore
 import android.content.Context
 import android.graphics.Bitmap
 import coil.Coil
@@ -279,7 +280,8 @@ data class SettingsUiState(
     val subtitleAiModel: SubtitleAiModel = SubtitleAiModel.GROQ_LLAMA_70B,
     val subtitleRemoveHearingImpaired: Boolean = true,
     val aiKeyServerState: AiKeyServerState = AiKeyServerState(),
-    val smoothScrolling: Boolean = true
+    val smoothScrolling: Boolean = false,
+    val tvUiScalePercent: Int = 100
 )
 
 internal fun SettingsUiState.withIptvConnecting(message: String): SettingsUiState = copy(
@@ -499,6 +501,15 @@ class SettingsViewModel @Inject constructor(
             diagnosticsSharingEnabled = DiagnosticsManager.isReportingEnabled(context)
         )
         loadSettings()
+        viewModelScope.launch {
+            context.deviceDisplayDataStore.data.collect { preferences ->
+                _uiState.value = _uiState.value.copy(
+                    tvUiScalePercent = com.arflix.tv.util.normalizeTvUiScalePercent(
+                        preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] ?: 100
+                    )
+                )
+            }
+        }
         observeProfileChanges()
         observeProfileSecurity()
         observeAddons()
@@ -694,7 +705,7 @@ class SettingsViewModel @Inject constructor(
             }
             val volumeBoostDb = prefs[volumeBoostDbKey()]?.toIntOrNull()?.coerceIn(0, 15) ?: 0
             val showLoadingStats = prefs[showLoadingStatsKey()] ?: true
-            val smoothScrolling = prefs[smoothScrollingKey()] ?: true
+            val smoothScrolling = prefs[smoothScrollingKey()] ?: false
             val iptvVodSearchEnabled = iptvRepository.isVodSearchEnabled()
 
             val subtitleSize = prefs[subtitleSizeKey()] ?: "Medium"
@@ -1710,6 +1721,17 @@ class SettingsViewModel @Inject constructor(
             context.settingsDataStore.edit { it[showEpisodeRatingsKey()] = enabled }
             _uiState.value = _uiState.value.copy(showEpisodeRatings = enabled)
             syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun toggleTvUiScale() {
+        viewModelScope.launch {
+            context.deviceDisplayDataStore.edit { preferences ->
+                val current = com.arflix.tv.util.normalizeTvUiScalePercent(
+                    preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] ?: 100
+                )
+                preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] = com.arflix.tv.util.nextTvUiScalePercent(current)
+            }
         }
     }
 

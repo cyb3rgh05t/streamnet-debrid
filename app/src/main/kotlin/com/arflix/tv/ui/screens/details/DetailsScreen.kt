@@ -24,6 +24,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -43,6 +44,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed as standardItemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -173,6 +175,7 @@ import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.rememberArvioCardShape
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.contrastingContentColor
+import com.arflix.tv.ui.screens.tv.live.LiveColors
 import com.arflix.tv.ui.theme.AnimationConstants
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.AccentYellow
@@ -2503,7 +2506,6 @@ private fun DetailsTvRows(
                         focusSectionForUi = focusSectionForUi,
                         seasonIndex = seasonIndex,
                         contentStartPadding = contentStartPadding,
-                        contentOuterStartPadding = contentOuterStartPadding,
                         onSeasonClick = onSeasonClick
                     )
                 }
@@ -2614,19 +2616,28 @@ private fun DetailsSeasonRail(
     focusSectionForUi: FocusSection?,
     seasonIndex: Int,
     contentStartPadding: Dp,
-    contentOuterStartPadding: Dp,
     onSeasonClick: (Int) -> Unit
 ) {
-    val seasonRowState = rememberTvLazyListState()
+    val seasonRowState = rememberLazyListState()
     val seasonItems = remember(totalSeasons) { (1..totalSeasons).toList() }
-    HomeStyleRowAutoScroll(
-        rowState = seasonRowState,
-        isCurrentRow = focusSectionForUi == FocusSection.SEASONS,
-        focusedItemIndex = seasonIndex,
-        totalItems = totalSeasons,
-        itemWidth = 128.dp,
-        itemSpacing = 8.dp
-    )
+    LaunchedEffect(focusSectionForUi, seasonIndex, totalSeasons) {
+        if (focusSectionForUi != FocusSection.SEASONS || seasonIndex !in seasonItems.indices) {
+            return@LaunchedEffect
+        }
+        val layout = snapshotFlow { seasonRowState.layoutInfo }
+            .first { it.totalItemsCount == totalSeasons && it.visibleItemsInfo.isNotEmpty() }
+        val focusedItem = layout.visibleItemsInfo.firstOrNull { it.index == seasonIndex }
+        if (focusedItem == null) {
+            seasonRowState.animateScrollToItem(
+                seasonIndex,
+                scrollOffset = -(layout.viewportEndOffset - layout.viewportStartOffset) / 2
+            )
+        } else {
+            val visibleEnd = layout.viewportEndOffset - layout.afterContentPadding
+            val scrollDelta = detailsSeasonScrollDelta(focusedItem.offset, focusedItem.size, visibleEnd)
+            if (scrollDelta != 0) seasonRowState.animateScrollBy(scrollDelta.toFloat())
+        }
+    }
 
     val seasonFocusIndex by remember(focusSectionForUi, seasonIndex) {
         derivedStateOf {
@@ -2636,23 +2647,18 @@ private fun DetailsSeasonRail(
 
     val currentOnSeasonClick = rememberUpdatedState(onSeasonClick)
 
-    TvLazyRow(
+    LazyRow(
         state = seasonRowState,
         modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
         contentPadding = PaddingValues(
             start = contentStartPadding,
-            end = lockedDetailsRailEndPadding(
-                itemWidth = 128.dp,
-                startPadding = contentStartPadding,
-                outerStartPadding = contentOuterStartPadding,
-                minimum = 150.dp
-            ),
+            end = 24.dp,
             top = 6.dp,
             bottom = 6.dp,
         ),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        itemsIndexed(seasonItems, key = { _, s -> s }) { index, season ->
+        standardItemsIndexed(seasonItems, key = { _, s -> s }) { index, season ->
             val progress = seasonProgress[season]
             val currentSeasonProgress = if (season == currentSeason && episodes.isNotEmpty()) {
                 Pair(episodes.count { it.isWatched }, episodes.size)
@@ -2668,10 +2674,17 @@ private fun DetailsSeasonRail(
                 isFocused = focusSectionForUi == FocusSection.SEASONS && index == seasonFocusIndex,
                 watchedCount = currentSeasonProgress?.first ?: progress?.first ?: 0,
                 totalCount = currentSeasonProgress?.second ?: progress?.second ?: 0,
+                useTvCategoryStyle = true,
                 onClick = onClickForSeason
             )
         }
     }
+}
+
+internal fun detailsSeasonScrollDelta(itemOffset: Int, itemSize: Int, viewportEnd: Int): Int = when {
+    itemOffset < 0 -> itemOffset
+    itemOffset + itemSize > viewportEnd -> itemOffset + itemSize - viewportEnd
+    else -> 0
 }
 
 private fun getEpisodeRatingColor(rating: Float): Color {
@@ -4113,17 +4126,23 @@ private fun SeasonButton(
     isFocused: Boolean,
     watchedCount: Int = 0,
     totalCount: Int = 0,
+    useTvCategoryStyle: Boolean = false,
     onClick: () -> Unit = {},
     onLongClick: (() -> Unit)? = null
 ) {
     val shape = RoundedCornerShape(8.dp)
     val accentColor = resolveAccentColor(fallback = Color.White)
     val backgroundColor = when {
+        useTvCategoryStyle && isFocused -> LiveColors.PanelRaised
+        useTvCategoryStyle && isSelected -> accentColor.copy(alpha = 0.32f)
+        useTvCategoryStyle -> LiveColors.Panel
         isFocused -> accentColor
         isSelected -> Color.White.copy(alpha = 0.2f)
         else -> Color.Black.copy(alpha = 0.55f)
     }
     val textColor = when {
+        useTvCategoryStyle && (isFocused || isSelected) -> LiveColors.Fg
+        useTvCategoryStyle -> LiveColors.FgDim
         isFocused -> contrastingContentColor(accentColor)
         isSelected -> Color.White
         else -> Color.White.copy(alpha = 0.6f)
@@ -4148,13 +4167,14 @@ private fun SeasonButton(
 
     Row(
         modifier = clickModifier
+            .then(if (useTvCategoryStyle) Modifier.height(36.dp).clip(shape) else Modifier)
             .background(backgroundColor, shape)
             .border(
                 width = if (isFocused) 2.dp else 1.dp,
-                color = if (isFocused) accentColor else accentColor.copy(alpha = 0.5f),
+                color = if (isFocused) accentColor else accentColor.copy(alpha = if (useTvCategoryStyle) 0.42f else 0.5f),
                 shape = shape
             )
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = if (useTvCategoryStyle) 12.dp else 16.dp, vertical = if (useTvCategoryStyle) 4.dp else 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -4162,7 +4182,7 @@ private fun SeasonButton(
             text = "${stringResource(R.string.season_label)} $season",
             style = ArvioSkin.typography.button.copy(
                 fontSize = 13.sp,
-                fontWeight = if (isFocused || isSelected) FontWeight.Bold else FontWeight.Medium
+                fontWeight = if (!useTvCategoryStyle && (isFocused || isSelected)) FontWeight.Bold else FontWeight.Medium
             ),
             color = textColor
         )

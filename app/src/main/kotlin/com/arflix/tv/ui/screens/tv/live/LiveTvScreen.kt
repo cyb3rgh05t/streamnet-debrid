@@ -3100,6 +3100,12 @@ fun LiveTvScreen(
                     ),
             )
         }
+        val fsProgress by animateFloatAsState(
+            targetValue = if (isFullScreen) 1f else 0f,
+            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
+            label = "tv-fullscreen-progress",
+        )
+
         // Content area starts below the translucent top bar so it doesn't get
         // overwritten.
         if (isFullScreen) {
@@ -3316,6 +3322,7 @@ fun LiveTvScreen(
                     isBuffering = playerIsBuffering,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
+                    previewVideoEnabled = liveTvPreviewOutputEnabled(isFullScreen, fsProgress),
                     lookupBackdrop = { program ->
                         viewModel.lookupProgramBackdrop(
                             program.title,
@@ -3375,11 +3382,6 @@ fun LiveTvScreen(
         // anchored visually to where the user tapped instead of from screen
         // center. fsProgress stays mounted until it reaches 0, so the
         // reverse animation also plays on Back.
-        val fsProgress by animateFloatAsState(
-            targetValue = if (isFullScreen) 1f else 0f,
-            animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
-            label = "tv-fullscreen-progress",
-        )
         if (fsProgress > 0f && playingChannel != null) {
             val scale = 0.35f + 0.65f * fsProgress
             Box(
@@ -3505,7 +3507,7 @@ fun LiveTvScreen(
                     factory = { ctx ->
                         androidx.media3.ui.PlayerView(ctx).apply {
                             keepScreenOn = true
-                            player = exoPlayer
+                            player = if (isFullScreen) exoPlayer else null
                             useController = false
                             setShutterBackgroundColor(android.graphics.Color.BLACK)
                             setKeepContentOnPlayerReset(false)
@@ -3514,11 +3516,13 @@ fun LiveTvScreen(
                     },
                     update = { view ->
                         view.keepScreenOn = true
-                        if (view.player !== exoPlayer) {
-                            view.player = exoPlayer
+                        val targetPlayer = if (isFullScreen) exoPlayer else null
+                        if (view.player !== targetPlayer) {
+                            view.player = targetPlayer
                         }
                         view.resizeMode = liveTvResizeMode
                     },
+                    onRelease = { view -> view.player = null },
                     modifier = Modifier.fillMaxSize(),
                 )
                 if (isFullScreen && !fullscreenGuideOpen && !quickZapOpen) {

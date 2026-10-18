@@ -1,5 +1,6 @@
 package com.arflix.tv
 
+import com.arflix.tv.util.deviceDisplayDataStore
 import android.content.Context
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
@@ -303,6 +304,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
+            val tvUiScalePercent by remember {
+                this@MainActivity.deviceDisplayDataStore.data.map {
+                    com.arflix.tv.util.normalizeTvUiScalePercent(it[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] ?: 100)
+                }
+            }.collectAsStateWithLifecycle(initialValue = 100)
             // Observe device mode override changes live from DataStore
             val deviceModeOverride by remember {
                 this@MainActivity.settingsDataStore.data.map { it[DEVICE_MODE_OVERRIDE_KEY] }
@@ -380,13 +386,24 @@ class MainActivity : ComponentActivity() {
             // If no touchscreen, force TV mode regardless of override setting
             // (prevents tablet/phone UI on devices with only D-pad input)
             val effectiveDeviceType = if (!hasTouchScreen && deviceType != DeviceType.TV) DeviceType.TV else deviceType
+            val scale = com.arflix.tv.util.tvUiScaleFactor(tvUiScalePercent, effectiveDeviceType == DeviceType.TV)
+            val baseDensity = androidx.compose.ui.platform.LocalDensity.current
+            val uiDensity = remember(baseDensity, scale) {
+                if (scale == 1f) baseDensity else androidx.compose.ui.unit.Density(
+                    density = baseDensity.density * scale,
+                    fontScale = baseDensity.fontScale
+                )
+            }
+            val uiConfiguration = remember(currentConfiguration, scale) {
+                com.arflix.tv.util.scaledTvConfiguration(currentConfiguration, scale)
+            }
             // Wrap the Activity as a ContextWrapper that only overrides getResources() with
             // localized resources. Hilt traverses ContextWrapper chains to find the Activity,
             // so hiltViewModel() still works correctly.
-            val localizedContext = remember(appLanguage, currentConfiguration) {
+            val localizedContext = remember(appLanguage, uiConfiguration) {
                 val locale = com.arflix.tv.util.appLocale(appLanguage)
                 java.util.Locale.setDefault(locale)
-                val config = Configuration()
+                val config = Configuration(uiConfiguration)
                 config.setLocale(locale)
                 val localizedRes = this@MainActivity.createConfigurationContext(config).resources
                 object : android.content.ContextWrapper(this@MainActivity) {
@@ -399,6 +416,9 @@ class MainActivity : ComponentActivity() {
             }
             CompositionLocalProvider(
                 androidx.compose.ui.platform.LocalContext provides localizedContext,
+                androidx.compose.ui.platform.LocalDensity provides uiDensity,
+                LocalConfiguration provides uiConfiguration,
+                com.arflix.tv.util.LocalTvUiScaleFactor provides scale,
                 LocalAppLanguage provides appLanguage,
                 LocalDeviceType provides effectiveDeviceType,
                 LocalHasTouchScreen provides hasTouchScreen,

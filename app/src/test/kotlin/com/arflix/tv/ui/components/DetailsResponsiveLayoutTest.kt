@@ -6,6 +6,41 @@ import org.junit.Test
 class DetailsResponsiveLayoutTest {
 
     @Test
+    fun tvScalingPreservesTheMeasuredHeroAndFirstRowComposition() {
+        listOf(540, 576, 720, 1080).forEach { originalHeight ->
+            val viewportHeight = originalHeight - 20f
+            val original = resolveTvHeroLayout(originalHeight, 190f, 112f, viewportHeight)
+            val originalRowTop = viewportHeight - resolveTvHomeRowsViewportHeight(viewportHeight - 24f)
+            listOf(1f, 0.9f, 0.85f, 0.8f).forEach { scale ->
+                val scaledViewport = viewportHeight / scale
+                val scaled = resolveTvHeroLayout(
+                    screenHeightDp = (originalHeight / scale).toInt(),
+                    homeHeroHeightDp = 190f,
+                    detailsHeaderHeightDp = 112f,
+                    viewportHeightDp = scaledViewport,
+                    uiScale = scale,
+                )
+                val scaledRowTop = scaledViewport - resolveTvHomeRowsViewportHeight(scaledViewport - 24f, scale)
+                assertThat(scaled.logoTopDp).isWithin(0.35f).of(original.logoTopDp)
+                assertThat(scaled.bodyTopDp).isWithin(0.35f).of(original.bodyTopDp)
+                assertThat(scaledRowTop).isWithin(0.01f).of(originalRowTop)
+                assertThat(scaledRowTop - scaled.logoTopDp - 190f)
+                    .isWithin(0.35f).of(originalRowTop - original.logoTopDp - 190f)
+            }
+        }
+    }
+
+    @Test
+    fun defaultHomeGeometryRemainsUnchanged() {
+        listOf(360, 540, 576, 720, 1080).forEach { height ->
+            assertThat(resolveTvHomeHeroBottomPadding(height, height.toFloat()))
+                .isWithin(0.01f).of((height * 0.34f).coerceIn(240f, 320f) + 36f)
+            assertThat(resolveTvHomeRowsViewportHeight(height - 24f))
+                .isWithin(0.01f).of(((height - 24f) * 0.31f).coerceIn(260f, 340f))
+        }
+    }
+
+    @Test
     fun tvDetailsAnchorUsesMeasuredHomeHeightWithoutChangingHome() {
         val layout = resolveTvHeroLayout(720, homeHeroHeightDp = 190f, detailsHeaderHeightDp = 112f)
         assertThat(layout.logoTopDp).isWithin(0.01f).of(249.2f)

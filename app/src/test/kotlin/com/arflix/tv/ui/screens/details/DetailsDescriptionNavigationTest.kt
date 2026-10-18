@@ -13,6 +13,20 @@ class DetailsDescriptionNavigationTest {
     private val series = movie.copy(mediaType = MediaType.TV)
 
     @Test
+    fun `visible season buttons keep their position instead of locking to the leading edge`() {
+        assertThat(detailsSeasonScrollDelta(160, 90, 600)).isEqualTo(0)
+        assertThat(detailsSeasonScrollDelta(480, 120, 600)).isEqualTo(0)
+        assertThat(detailsSeasonScrollDelta(0, 90, 600)).isEqualTo(0)
+    }
+
+    @Test
+    fun `season scrolling reveals only the clipped part using actual button width`() {
+        assertThat(detailsSeasonScrollDelta(-24, 90, 600)).isEqualTo(-24)
+        assertThat(detailsSeasonScrollDelta(540, 90, 600)).isEqualTo(30)
+        assertThat(detailsSeasonScrollDelta(540, 120, 600)).isEqualTo(60)
+    }
+
+    @Test
     fun `movie actions move straight to cast and back with one key each`() {
         val state = DetailsUiState(item = movie, cast = listOf(CastMember(1, "Actor")))
         assertThat(moveDetailsVerticalFocus(state, FocusSection.BUTTONS, down = true))

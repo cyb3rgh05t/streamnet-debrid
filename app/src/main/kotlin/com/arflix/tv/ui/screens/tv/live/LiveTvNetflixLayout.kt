@@ -93,6 +93,9 @@ private const val HeroUpcomingMax = 2
 
 private data class NetflixCategoryItem(val id: String, val label: String, val count: Int)
 
+internal fun liveTvPreviewOutputEnabled(isFullScreen: Boolean, fullscreenProgress: Float): Boolean =
+    !isFullScreen && fullscreenProgress <= 0f
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 internal fun LiveTvNetflixLayout(
@@ -110,6 +113,7 @@ internal fun LiveTvNetflixLayout(
     guideClockMillis: Long,
     variantCountFor: (EnrichedChannel) -> Int,
     isFullScreen: Boolean,
+    previewVideoEnabled: Boolean = true,
     isBuffering: Boolean = false,
     lookupBackdrop: suspend (IptvProgram) -> String? = { null },
     lookupLogo: suspend (IptvProgram) -> String? = { null },
@@ -195,6 +199,7 @@ internal fun LiveTvNetflixLayout(
                 exoPlayer = exoPlayer,
                 channel = playingChannel,
                 isFullScreen = isFullScreen,
+                videoOutputEnabled = previewVideoEnabled,
                 isBuffering = isBuffering,
                 focusRequester = heroFocusRequester,
                 onClick = onOpenFullscreen,
@@ -277,6 +282,7 @@ private fun HeroVideoCard(
     exoPlayer: ExoPlayer,
     channel: EnrichedChannel?,
     isFullScreen: Boolean,
+    videoOutputEnabled: Boolean,
     isBuffering: Boolean,
     focusRequester: FocusRequester,
     onClick: () -> Unit,
@@ -285,25 +291,30 @@ private fun HeroVideoCard(
     modifier: Modifier = Modifier,
 ) {
     val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
-    val fullScreenState = rememberUpdatedState(isFullScreen)
+    var firstFrameRendered by remember(exoPlayer, videoOutputEnabled) { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
 
-    LaunchedEffect(isFullScreen) {
-        if (isFullScreen) {
-            textureViewRef.value?.let { tv ->
-                runCatching { exoPlayer.clearVideoTextureView(tv) }
+    DisposableEffect(exoPlayer, videoOutputEnabled, textureViewRef.value) {
+        val textureView = textureViewRef.value
+        firstFrameRendered = false
+        if (videoOutputEnabled && textureView != null) {
+            val listener = object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    if (textureView.isAvailable) firstFrameRendered = true
+                }
+
+                override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                    firstFrameRendered = false
+                }
+            }
+            exoPlayer.addListener(listener)
+            exoPlayer.setVideoTextureView(textureView)
+            onDispose {
+                exoPlayer.removeListener(listener)
+                runCatching { exoPlayer.clearVideoTextureView(textureView) }
             }
         } else {
-            delay(120L)
-            textureViewRef.value?.takeIf { it.isAvailable }?.let { tv ->
-                runCatching { exoPlayer.setVideoTextureView(tv) }
-            }
-        }
-    }
-
-    DisposableEffect(exoPlayer) {
-        onDispose {
-            textureViewRef.value?.let { tv -> runCatching { exoPlayer.clearVideoTextureView(tv) } }
+            onDispose { }
         }
     }
 
@@ -352,22 +363,11 @@ private fun HeroVideoCard(
             factory = { ctx ->
                 android.view.TextureView(ctx).also { tv ->
                     textureViewRef.value = tv
-                    tv.surfaceTextureListener = object : android.view.TextureView.SurfaceTextureListener {
-                        override fun onSurfaceTextureAvailable(s: android.graphics.SurfaceTexture, w: Int, h: Int) {
-                            if (!fullScreenState.value) {
-                                runCatching { exoPlayer.setVideoTextureView(tv) }
-                            }
-                        }
-                        override fun onSurfaceTextureSizeChanged(s: android.graphics.SurfaceTexture, w: Int, h: Int) {}
-                        override fun onSurfaceTextureDestroyed(s: android.graphics.SurfaceTexture): Boolean {
-                            runCatching { exoPlayer.clearVideoTextureView(tv) }
-                            return true
-                        }
-                        override fun onSurfaceTextureUpdated(s: android.graphics.SurfaceTexture) {}
-                    }
                 }
             },
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().graphicsLayer {
+                alpha = if (videoOutputEnabled && firstFrameRendered) 1f else 0f
+            },
         )
         if (isBuffering && !isFullScreen) {
             Box(

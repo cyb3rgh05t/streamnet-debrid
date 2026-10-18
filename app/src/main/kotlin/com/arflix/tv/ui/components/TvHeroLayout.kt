@@ -12,14 +12,35 @@ internal data class TvHeroLayout(
     val bodyTopDp: Float,
 )
 
+internal fun resolveTvHomeHeroBottomPadding(
+    screenHeightDp: Int,
+    viewportHeightDp: Float,
+    uiScale: Float = 1f,
+): Float {
+    val originalRowsHeight = (screenHeightDp * uiScale * 0.34f).coerceIn(240f, 320f)
+    return originalRowsHeight + 36f + viewportHeightDp * (1f - uiScale)
+}
+
+internal fun resolveTvHomeRowsViewportHeight(
+    contentHeightDp: Float,
+    uiScale: Float = 1f,
+    topPaddingDp: Float = 24f,
+): Float {
+    val viewportHeight = contentHeightDp + topPaddingDp
+    val originalContentHeight = viewportHeight * uiScale - topPaddingDp
+    val originalRowsHeight = (originalContentHeight * 0.31f).coerceIn(260f, 340f)
+    return originalRowsHeight + viewportHeight * (1f - uiScale)
+}
+
 internal fun resolveTvHeroLayout(
     screenHeightDp: Int,
     homeHeroHeightDp: Float,
     detailsHeaderHeightDp: Float,
     viewportHeightDp: Float = screenHeightDp.toFloat(),
+    uiScale: Float = 1f,
 ): TvHeroLayout {
-    val homeRowsHeight = (screenHeightDp * 0.34f).coerceIn(240f, 320f)
-    val top = (viewportHeightDp - homeRowsHeight - 36f - homeHeroHeightDp).coerceAtLeast(0f)
+    val bottomPadding = resolveTvHomeHeroBottomPadding(screenHeightDp, viewportHeightDp, uiScale)
+    val top = (viewportHeightDp - bottomPadding - homeHeroHeightDp).coerceAtLeast(0f)
     return TvHeroLayout(top, top + detailsHeaderHeightDp + 6f)
 }
 
@@ -34,6 +55,7 @@ internal fun HomeMatchedDetailsHero(
     header: @Composable () -> Unit,
     body: @Composable (Dp) -> Unit,
 ) {
+    val uiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current
     SubcomposeLayout(modifier = Modifier.fillMaxSize()) { constraints ->
         val looseConstraints = constraints.copy(minWidth = 0, minHeight = 0)
         val headerPlaceable = if (showHeader) {
@@ -46,6 +68,7 @@ internal fun HomeMatchedDetailsHero(
                 homeHeroHeightDp = homeHero.height.toDp().value,
                 detailsHeaderHeightDp = headerPlaceable.height.toDp().value,
                 viewportHeightDp = constraints.maxHeight.toDp().value,
+                uiScale = uiScale,
             )
         } else null
         val headerTop = heroLayout?.logoTopDp?.dp?.roundToPx() ?: 0

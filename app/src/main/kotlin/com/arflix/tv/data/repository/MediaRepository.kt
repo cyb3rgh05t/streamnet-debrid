@@ -187,10 +187,8 @@ internal fun iptvArtworkCandidateScore(
     popularity: Float = 0f,
 ): Double {
     val titleScore = iptvArtworkTitleScore(requestedTitle, candidateTitle)
-    val longProgramMovieBonus = if (
-        mediaType == MediaType.MOVIE && durationMs != null && durationMs >= 75 * 60_000L
-    ) 150.0 else 0.0
-    return titleScore + longProgramMovieBonus + (popularity / 100f)
+    val durationTypeBonus = if (mediaType == iptvArtworkPreferredMediaType(durationMs)) 150.0 else 0.0
+    return titleScore + durationTypeBonus + (popularity / 100f)
 }
 
 internal fun artworkLanguageRank(
@@ -3757,12 +3755,26 @@ class MediaRepository @Inject constructor(
         val candidates = cachedIptvArtworkCandidates(cleanedTitle, durationMs)
         val bestCandidate = candidates.firstOrNull()
 
-        return bestCandidate?.backdrop
-            ?.also { android.util.Log.d("IptvArtwork", "TMDB backdrop hit title=$cleanedTitle") }
+        return bestCandidate?.let { candidate ->
+            candidate.backdrop?.takeIf(String::isNotBlank)?.also {
+                android.util.Log.d(
+                    "IptvArtwork",
+                    "TMDB backdrop hit title=$cleanedTitle candidate=${candidate.id} type=${candidate.mediaType} " +
+                        "durationMs=$durationMs preferredType=${iptvArtworkPreferredMediaType(durationMs)}"
+                )
+            }
+        }
             ?: lookupFanartArtwork(cleanedTitle, candidates, preferLogo = false)
                 ?.also { android.util.Log.d("IptvArtwork", "Fallback backdrop hit title=$cleanedTitle") }
-            ?: candidates.firstNotNullOfOrNull { it.backdrop?.takeIf(String::isNotBlank) }
-                ?.also { android.util.Log.d("IptvArtwork", "Secondary TMDB backdrop hit title=$cleanedTitle") }
+            ?: candidates.firstNotNullOfOrNull { candidate ->
+                candidate.backdrop?.takeIf(String::isNotBlank)?.also {
+                    android.util.Log.d(
+                        "IptvArtwork",
+                        "Secondary TMDB backdrop hit title=$cleanedTitle candidate=${candidate.id} " +
+                            "type=${candidate.mediaType} durationMs=$durationMs"
+                    )
+                }
+            }
     }
 
     suspend fun lookupIptvProgramLogo(rawTitle: String, durationMs: Long? = null): String? = withContext(Dispatchers.IO) {
@@ -3785,7 +3797,11 @@ class MediaRepository @Inject constructor(
 
         for (candidate in candidates.take(8)) {
             getLogoUrl(candidate.mediaType, candidate.id, propagateNetworkFailure = true)?.takeIf { it.isNotBlank() }?.let {
-                android.util.Log.d("IptvArtwork", "TMDB logo hit title=$cleanedTitle candidate=${candidate.id}")
+                android.util.Log.d(
+                    "IptvArtwork",
+                    "TMDB logo hit title=$cleanedTitle candidate=${candidate.id} type=${candidate.mediaType} " +
+                        "durationMs=$durationMs preferredType=${iptvArtworkPreferredMediaType(durationMs)}"
+                )
                 return it
             }
         }

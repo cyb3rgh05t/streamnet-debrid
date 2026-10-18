@@ -261,7 +261,7 @@ object AppModule {
     @Named("theIntroDb")
     fun provideTheIntroDbRetrofit(okHttpClient: OkHttpClient): Retrofit {
         return Retrofit.Builder()
-            .baseUrl("https://api.theintrodb.org/v3/")
+            .baseUrl("https://api.theintrodb.org/v4/")
             .client(okHttpClient)
             .addConverterFactory(RecoverableJsonConverterFactory())
             .build()

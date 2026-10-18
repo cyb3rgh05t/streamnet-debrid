@@ -1,5 +1,6 @@
 package com.arflix.tv.data.repository
 
+import com.arflix.tv.data.model.MediaType
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.Flow
@@ -34,14 +35,20 @@ internal class IptvArtworkRequests {
 internal data class IptvArtworkKey(
     val title: String,
     val language: String,
-    val preferMovie: Boolean,
+    val preferredMediaType: MediaType?,
 )
+
+internal fun iptvArtworkPreferredMediaType(durationMs: Long?): MediaType? = when {
+    durationMs == null || durationMs <= 0L -> null
+    durationMs >= 75 * 60_000L -> MediaType.MOVIE
+    else -> MediaType.TV
+}
 
 internal fun iptvArtworkKey(rawTitle: String, language: String, durationMs: Long?): IptvArtworkKey =
     IptvArtworkKey(
         title = cleanIptvArtworkTitle(rawTitle).lowercase(Locale.US),
         language = language,
-        preferMovie = durationMs != null && durationMs >= 75 * 60_000L,
+        preferredMediaType = iptvArtworkPreferredMediaType(durationMs),
     )
 
 internal class IptvLookupCache<T>(
