@@ -86,6 +86,10 @@ and `delete_catalog`:
   `data.sourceUrl`, `data.title`, and an optional boolean `data.enabled`.
   Supported URLs are Trakt user lists / numeric list URLs and MDBList user lists.
   Reusing the normalized source URL updates its deterministic catalog ID.
+  Newly added catalogs are prepended to each profile's saved catalog order, so
+  Android and Web show them directly below Continue Watching (or first when it
+  is absent). Updating an existing catalog preserves its position and the
+  relative order of all other catalogs; previously added catalogs are not moved.
 - Add existing built-in or add-on templates with `data.sourceType`
   (`PREINSTALLED` / `ADDON`), `data.templateId`, an optional replacement
   `data.title`, and `data.enabled`. Templates come from existing snapshots or

@@ -2,6 +2,10 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Backend 1.0.024] - 2026-10-19
+
+- Backend Remote Config: Global neu hinzugefügte Kataloge werden pro Profil vorne in die gespeicherte Reihenfolge eingefügt und erscheinen nach dem Sync direkt unter „Weiterschauen“ (ohne CW ganz oben). Aktualisierungen bereits vorhandener Kataloge behalten deren Position; die Reihenfolge der übrigen Kataloge bleibt erhalten.
+
 ## [2.5.072] - 2026-10-19
 
 - Neue Katalog-Rails stehen direkt unter „Weiterschauen“ (CW), vor bestehenden TV-Rails. Neu entdeckte Add-on-/Server-Rails werden in Android und neue Server-Rails im Web ebenfalls vorne in die gespeicherte Katalogreihenfolge eingefügt; bestehende Rails behalten ihre relative Reihenfolge.

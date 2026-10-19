@@ -802,7 +802,7 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
       assertSafeKeys(data);
       const existing = current.find((catalog) => catalog.id === data.id);
       const catalog = { ...existing, ...data, remoteManaged: true };
-      next = upsertById(current, catalog);
+      next = existing ? upsertById(current, catalog) : [catalog, ...current];
       setCatalogHidden(payload, profileId, catalog, !catalog.enabled);
     } else if (operation === "rename_catalog") {
       const hidden = payload[catalogHiddenRoot(target)]?.[profileId] || [];

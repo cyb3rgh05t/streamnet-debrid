@@ -86,6 +86,76 @@ test("remote list catalogs add to every profile with Android and web names and t
   }
 });
 
+test("new remote catalogs prepend per profile while updates preserve existing order", () => {
+  for (const sourceType of ["TRAKT", "MDBLIST", "PREINSTALLED", "ADDON"]) {
+    const value = snapshot();
+    const mutation = ["TRAKT", "MDBLIST"].includes(sourceType)
+      ? prepareAdminGlobalMutation({
+        operation: "add_catalog",
+        data: {
+          sourceType,
+          sourceUrl: sourceType === "TRAKT"
+            ? "https://trakt.tv/users/owner/lists/favorites"
+            : "https://mdblist.com/lists/owner/favorites",
+          title: "Remote favorites",
+        },
+      })
+      : {
+        operation: "add_catalog",
+        data: {
+          id: `remote-${sourceType}`, sourceType, title: "Remote favorites",
+          enabled: true, ...(sourceType === "ADDON" ? { addonId: "installed-addon" } : {}),
+        },
+      };
+    if (sourceType === "ADDON") value.addons = [{ id: "installed-addon" }];
+    const existing = {
+      ...mutation.data, title: "Old title", enabled: false, tileShape: "LANDSCAPE",
+    };
+    value.catalogsByProfile = {
+      "living-room": [{ id: "tv_favorites" }, { id: "recent_tv" }, { id: "movies" }],
+      kids: [{ id: "kids-first" }, existing, { id: "kids-last" }],
+    };
+    value.hiddenCustomByProfile = { kids: [existing.id] };
+    const original = structuredClone(value);
+    const result = applyAdminGlobalMutation(value, mutation, 7600);
+    assert.deepEqual(
+      result.catalogsByProfile["living-room"].map((catalog) => catalog.id),
+      [mutation.data.id, "tv_favorites", "recent_tv", "movies"],
+    );
+    assert.deepEqual(
+      result.catalogsByProfile.kids.map((catalog) => catalog.id),
+      ["kids-first", mutation.data.id, "kids-last"],
+    );
+    assert.equal(result.catalogsByProfile.kids[1].title, "Remote favorites");
+    assert.equal(result.catalogsByProfile.kids[1].tileShape, "LANDSCAPE");
+    assert.equal(result.catalogsByProfile.kids[1].enabled, true);
+    assert.equal(result.catalogsUpdatedAtByProfile["living-room"], 7600);
+    assert.equal(result.catalogsUpdatedAtByProfile.kids, 7600);
+    assert.equal(applyAdminGlobalMutation(result, mutation, 7700), null);
+    assert.deepEqual(value, original);
+  }
+});
+
+test("new remote catalogs prepend legacy catalogs and respect explicitly empty profiles", () => {
+  const value = snapshot();
+  value.catalogs = [{ id: "legacy-first" }, { id: "legacy-last" }];
+  value.catalogsByProfile = { kids: [] };
+  const mutation = prepareAdminGlobalMutation({
+    operation: "add_catalog",
+    data: {
+      sourceType: "MDBLIST", sourceUrl: "https://mdblist.com/lists/owner/favorites",
+      title: "Remote favorites",
+    },
+  });
+  const result = applyAdminGlobalMutation(value, mutation, 7800);
+  assert.deepEqual(
+    result.catalogsByProfile["living-room"].map((catalog) => catalog.id),
+    [mutation.data.id, "legacy-first", "legacy-last"],
+  );
+  assert.deepEqual(result.catalogsByProfile.kids.map((catalog) => catalog.id), [mutation.data.id]);
+  assert.deepEqual(result.catalogs, value.catalogs);
+});
+
 test("catalog rename affects matching IDs only and preserves source and collection data", () => {
   const value = snapshot();
   value.catalogsByProfile["living-room"] = [{
