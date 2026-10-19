@@ -114,31 +114,15 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(0.88f).align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val cancelColors = ButtonDefaults.colors(
+                    val buttonColors = ButtonDefaults.colors(
                         containerColor = Color.Transparent,
                         contentColor = colors.textMuted,
-                        focusedContainerColor = Color.White.copy(alpha = 0.15f),
-                        focusedContentColor = colors.textPrimary
-                    )
-                    val cancelBorder = ButtonDefaults.border(
-                        border = Border(
-                            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.15f)),
-                            shape = buttonShape
-                        ),
-                        focusedBorder = Border(
-                            border = BorderStroke(1.dp, accent),
-                            shape = buttonShape
-                        )
-                    )
-                    val confirmColors = ButtonDefaults.colors(
-                        containerColor = accent.copy(alpha = 0.12f),
-                        contentColor = accent,
                         focusedContainerColor = accent,
                         focusedContentColor = contrastingContentColor(accent)
                     )
-                    val confirmBorder = ButtonDefaults.border(
+                    val buttonBorder = ButtonDefaults.border(
                         border = Border(
-                            border = BorderStroke(1.dp, accent.copy(alpha = 0.32f)),
+                            border = BorderStroke(1.dp, accent),
                             shape = buttonShape
                         ),
                         focusedBorder = Border(
@@ -151,9 +135,9 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     Button(
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f).height(42.dp).focusRequester(cancelFocusRequester),
-                        colors = cancelColors,
+                        colors = buttonColors,
                         shape = buttonShapes,
-                        border = cancelBorder,
+                        border = buttonBorder,
                         scale = buttonScale
                     ) {
                         Text(
@@ -167,9 +151,9 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                     Button(
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f).height(42.dp),
-                        colors = confirmColors,
+                        colors = buttonColors,
                         shape = buttonShapes,
-                        border = confirmBorder,
+                        border = buttonBorder,
                         scale = buttonScale
                     ) {
                         Text(

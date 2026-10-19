@@ -842,6 +842,10 @@
     <string name="cloud_login_restore_failed">StreamNet Cloud login successful, but cloud restore failed</string>
     <string name="settings_go_to">Go to: %1$s</string>
     <string name="settings_cd_paste">Paste</string>
+    <string name="settings_catalog_url_label">Catalog URL</string>
+    <string name="catalog_delete_title">Delete catalog</string>
+    <string name="home_loading_more">Loading more titles…</string>
+    <string name="catalog_delete_message">Delete the catalog "%1$s"? To use it again, you will need to add its URL again. Hiding it with the eye icon keeps it saved.</string>
     <string name="settings_paste_from_clipboard">Paste from Clipboard</string>
     <string name="settings_hint_enter_dpad">Press Enter to select • Navigate with D-pad</string>
     <string name="settings_modal_hint_touch">Tap a field to edit, then tap Confirm</string>

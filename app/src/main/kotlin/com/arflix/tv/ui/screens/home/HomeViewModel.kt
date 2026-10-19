@@ -416,6 +416,7 @@ data class HomeUiState(
     val showUnknownSourcesDialog: Boolean = false,
     val hasUpdateBadge: Boolean = false,
     val categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
+    val loadingCategoryIds: Set<String> = emptySet(),
     val smoothScrolling: Boolean = false
 )
 
@@ -4320,6 +4321,7 @@ class HomeViewModel @Inject constructor(
         if (!pagination.hasMore || pagination.isLoading) return
 
         pagination.isLoading = true
+        updatePaginationStatesInUiState()
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 val currentCategories = _uiState.value.categories
@@ -4426,7 +4428,7 @@ class HomeViewModel @Inject constructor(
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
 
-                // Keep UI stable; user can retry naturally by continuing to browse the row.
+                AppLogger.e("HomeVM", "Failed to load next page for $categoryId", e)
             } finally {
                 pagination.isLoading = false
                 updatePaginationStatesInUiState()
@@ -4436,7 +4438,10 @@ class HomeViewModel @Inject constructor(
 
     private fun updatePaginationStatesInUiState() {
         val hasMoreMap = categoryPaginationStates.mapValues { it.value.hasMore }
-        _uiState.value = _uiState.value.copy(categoryHasMoreMap = hasMoreMap)
+        _uiState.value = _uiState.value.copy(
+            categoryHasMoreMap = hasMoreMap,
+            loadingCategoryIds = categoryPaginationStates.filterValues { it.isLoading }.keys.toSet()
+        )
     }
 
     private fun createPlaceholderItems(count: Int = HOME_PLACEHOLDER_ITEM_COUNT): List<MediaItem> =

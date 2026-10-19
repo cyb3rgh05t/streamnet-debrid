@@ -613,7 +613,7 @@ fun MediaCard(
  */
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun PlaceholderCard(
+internal fun PlaceholderCard(
     width: Dp,
     isLandscape: Boolean,
     showTitle: Boolean = true,

@@ -475,7 +475,7 @@ fun SettingsScreen(
 
     // Sub-focus for addon rows: 0 = toggle, 1 = delete
     var addonActionIndex by remember { mutableIntStateOf(0) }
-    // Sub-focus for catalog rows: 0 = edit, 1 = up, 2 = down, 3 = layout, 4 = delete
+    // Catalog actions: edit, up, down, layout, optional unpack, visibility, optional delete.
     var catalogActionIndex by remember { mutableIntStateOf(0) }
     // Sub-focus for IPTV playlist rows: 0 = categories, 1 = enable, 2 = edit, 3 = up, 4 = down, 5 = delete
     // For IPTV category rows: 0 = visibility, 1 = up, 2 = down
@@ -488,6 +488,7 @@ fun SettingsScreen(
     var showCatalogRename by remember { mutableStateOf(false) }
     var renameCatalogId by remember { mutableStateOf("") }
     var renameCatalogTitle by remember { mutableStateOf("") }
+    var catalogsToDelete by remember { mutableStateOf(emptyList<CatalogConfig>()) }
 
     // Catalog Pack states
     var showCatalogPackInput by remember { mutableStateOf(false) }
@@ -495,6 +496,18 @@ fun SettingsScreen(
     var showDeletePackConfirm by remember { mutableStateOf(false) }
     var deletePackId by remember { mutableStateOf("") }
     var deletePackName by remember { mutableStateOf("") }
+    val requestCatalogDelete: (CatalogConfig) -> Unit = { catalog ->
+        when {
+            catalog.isBulkDeletablePack -> {
+                deletePackId = catalog.effectivePackId
+                deletePackName = catalog.effectivePackName
+                showDeletePackConfirm = true
+            }
+            canDeleteUrlCatalog(catalog) ->
+                catalogsToDelete = (catalogsToDelete + catalog).distinctBy { it.id }
+            else -> viewModel.setCatalogEnabled(catalog.id, false)
+        }
+    }
 
     LaunchedEffect(installPackUrl) {
         if (!installPackUrl.isNullOrBlank()) {
@@ -826,6 +839,7 @@ fun SettingsScreen(
         showMdbListDisconnectConfirm ||
         showCatalogPackInput ||
         showDeletePackConfirm ||
+        catalogsToDelete.isNotEmpty() ||
         uiState.isPackLoading ||
         uiState.packError != null ||
         uiState.pendingPackManifest != null ||
@@ -967,7 +981,8 @@ fun SettingsScreen(
                                         iptvActionIndex++
                                     } else if (currentSection == "catalogs" && contentFocusIndex > 1) {
                                         val catalog = uiState.catalogs.getOrNull(contentFocusIndex - 2)
-                                        val maxAction = if (catalog?.let(::hasCatalogUnpackAction) == true) 5 else 4
+                                        val visibilityAction = if (catalog?.let(::hasCatalogUnpackAction) == true) 5 else 4
+                                        val maxAction = visibilityAction + if (catalog?.let(::canDeleteUrlCatalog) == true) 1 else 0
                                         if (catalogActionIndex < maxAction) catalogActionIndex++
                                     } else if (currentSection == "offline_downloads" && contentFocusIndex in uiState.offlineDownloads.indices && offlineDownloadActionIndex < 1) {
                                         offlineDownloadActionIndex++
@@ -1305,12 +1320,17 @@ fun SettingsScreen(
                                                                 toggleCatalogueRowLayoutMode(context, catalogueLayoutRowKey(catalog))
                                                             }
                                                         }
-                                                        4 -> if (hasCatalogUnpackAction(catalog)) {
-                                                            viewModel.unpackCatalog(catalog.id)
-                                                        } else {
-                                                            viewModel.setCatalogEnabled(catalog.id, !catalog.enabled)
+                                                        else -> {
+                                                            val visibilityAction = if (hasCatalogUnpackAction(catalog)) 5 else 4
+                                                            when {
+                                                                catalogActionIndex == 4 && hasCatalogUnpackAction(catalog) ->
+                                                                    viewModel.unpackCatalog(catalog.id)
+                                                                catalogActionIndex == visibilityAction ->
+                                                                    viewModel.setCatalogEnabled(catalog.id, !catalog.enabled)
+                                                                catalogActionIndex == visibilityAction + 1 && canDeleteUrlCatalog(catalog) ->
+                                                                    requestCatalogDelete(catalog)
+                                                            }
                                                         }
-                                                        else -> viewModel.setCatalogEnabled(catalog.id, !catalog.enabled)
                                                     }
                                                 }
                                             }
@@ -1482,15 +1502,7 @@ fun SettingsScreen(
                     renameCatalogTitle = catalog.title
                     showCatalogRename = true
                 },
-                onDeleteCatalogClick = { catalog ->
-                    if (catalog.isBulkDeletablePack) {
-                        deletePackId = catalog.effectivePackId
-                        deletePackName = catalog.effectivePackName
-                        showDeletePackConfirm = true
-                    } else {
-                        viewModel.setCatalogEnabled(catalog.id, false)
-                    }
-                },
+                onDeleteCatalogClick = requestCatalogDelete,
                 onConnectHomeServerClick = {
                     homeServerUrl = ""
                     homeServerDisplayName = ""
@@ -1965,15 +1977,7 @@ fun SettingsScreen(
                             onMoveCatalogUp = { catalog -> viewModel.moveCatalogUp(catalog.id) },
                             onMoveCatalogDown = { catalog -> viewModel.moveCatalogDown(catalog.id) },
                             onSetCatalogEnabled = { catalog, enabled -> viewModel.setCatalogEnabled(catalog.id, enabled) },
-                            onDeleteCatalog = { catalog ->
-                                if (catalog.isBulkDeletablePack) {
-                                    deletePackId = catalog.effectivePackId
-                                    deletePackName = catalog.effectivePackName
-                                    showDeletePackConfirm = true
-                                } else {
-                                    viewModel.setCatalogEnabled(catalog.id, false)
-                                }
-                            },
+                            onDeleteCatalog = requestCatalogDelete,
                             onUnpackCatalog = { catalog -> viewModel.unpackCatalog(catalog.id) }
                         )
                         "stremio" -> StremioAddonsSettings(
@@ -2419,6 +2423,22 @@ fun SettingsScreen(
                     viewModel.clearPendingPack()
                 }
             )
+        }
+
+        catalogsToDelete.firstOrNull()?.let { catalog ->
+            key(catalog.id) {
+                AccountDisconnectConfirmDialog(
+                    title = stringResource(R.string.catalog_delete_title),
+                    description = stringResource(R.string.catalog_delete_message, catalog.title),
+                    confirmLabel = stringResource(R.string.delete),
+                    onConfirm = {
+                        viewModel.removeCatalog(catalog.id)
+                        catalogsToDelete = catalogsToDelete.drop(1)
+                        catalogActionIndex = 0
+                    },
+                    onDismiss = { catalogsToDelete = emptyList() }
+                )
+            }
         }
 
         if (showDeletePackConfirm) {
@@ -8809,6 +8829,7 @@ private fun CatalogDiscoveryModal(
                         DiscoveryActionButton(
                             label = stringResource(R.string.settings_add_url),
                             onClick = onManualAdd,
+                            highlighted = manualUrl.isNotBlank(),
                             enabled = manualUrl.isNotBlank(),
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -8849,6 +8870,7 @@ private fun CatalogDiscoveryModal(
                         DiscoveryActionButton(
                             label = stringResource(R.string.settings_add_url),
                             onClick = onManualAdd,
+                            highlighted = manualUrl.isNotBlank(),
                             enabled = manualUrl.isNotBlank()
                         )
                         Spacer(modifier = Modifier.width(10.dp))
@@ -8981,6 +9003,7 @@ private fun CatalogDiscoveryModal(
             initialValue = if (target == CatalogDiscoveryInputTarget.Search) query else manualUrl,
             placeholder = if (target == CatalogDiscoveryInputTarget.Search) stringResource(R.string.settings_search_lists) else "https://trakt.tv/users/...",
             confirmLabel = if (target == CatalogDiscoveryInputTarget.Search) stringResource(R.string.settings_use_search) else stringResource(R.string.settings_use_url),
+            fieldLabel = if (target == CatalogDiscoveryInputTarget.Search) stringResource(R.string.settings_search_lists) else stringResource(R.string.settings_catalog_url_label),
             onConfirm = { value ->
                 if (target == CatalogDiscoveryInputTarget.Search) {
                     onQueryChange(value)
@@ -9051,86 +9074,24 @@ private fun CatalogDiscoveryTextInputDialog(
     initialValue: String,
     placeholder: String,
     confirmLabel: String,
+    fieldLabel: String,
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
     var value by remember(initialValue) { mutableStateOf(initialValue) }
-    val accentColor = resolveAccentColor(fallback = AccentYellow)
-    androidx.compose.ui.window.Dialog(
-        onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false
-        )
-    ) {
-        BoxWithConstraints(
-            modifier = Modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            val isCompact = maxWidth < 720.dp
-            Column(
-                modifier = Modifier
-                    .widthIn(max = 680.dp)
-                    .fillMaxWidth(if (isCompact) 0.92f else 0.76f)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(appBackgroundDark(), RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(8.dp))
-                    .padding(if (isCompact) 16.dp else 20.dp)
-            ) {
-            Text(title, style = ArflixTypography.sectionTitle, color = TextPrimary)
-            Spacer(modifier = Modifier.height(14.dp))
-            androidx.compose.material3.TextField(
-                value = value,
-                onValueChange = { value = it },
-                placeholder = { androidx.compose.material3.Text(placeholder) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                colors = androidx.compose.material3.TextFieldDefaults.colors(
-                    focusedTextColor = TextPrimary,
-                    unfocusedTextColor = TextPrimary,
-                    focusedContainerColor = BackgroundElevated,
-                    unfocusedContainerColor = BackgroundElevated,
-                    focusedIndicatorColor = accentColor,
-                    unfocusedIndicatorColor = Color.White.copy(alpha = 0.18f),
-                    focusedPlaceholderColor = TextSecondary,
-                    unfocusedPlaceholderColor = TextSecondary
-                )
-            )
-            Spacer(modifier = Modifier.height(18.dp))
-            if (isCompact) {
-                Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DiscoveryActionButton(
-                        label = confirmLabel,
-                        onClick = { onConfirm(value.trim()) },
-                        highlighted = true,
-                        enabled = value.isNotBlank(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    DiscoveryActionButton(
-                        label = stringResource(R.string.cancel),
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            } else {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    DiscoveryActionButton(label = stringResource(R.string.cancel), onClick = onDismiss)
-                    Spacer(modifier = Modifier.width(10.dp))
-                    DiscoveryActionButton(
-                        label = confirmLabel,
-                        onClick = { onConfirm(value.trim()) },
-                        highlighted = true,
-                        enabled = value.isNotBlank()
-                    )
-                }
-            }
-            }
-        }
-    }
+    InputModal(
+        title = title,
+        fields = listOf(InputField(
+            label = fieldLabel,
+            value = value,
+            onValueChange = { value = it },
+            placeholder = placeholder,
+        )),
+        confirmLabel = confirmLabel,
+        confirmEnabled = value.isNotBlank(),
+        onConfirm = { onConfirm(value.trim()) },
+        onDismiss = onDismiss,
+    )
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
@@ -9256,6 +9217,7 @@ private fun CatalogDiscoveryResultRow(
             Spacer(modifier = Modifier.height(10.dp))
             CatalogDiscoveryAddPill(
                 isAdded = isAdded,
+                isFocused = isFocused,
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -9399,23 +9361,26 @@ private fun CatalogDiscoveryResultRow(
         }
 
         Spacer(modifier = Modifier.width(18.dp))
-        CatalogDiscoveryAddPill(isAdded = isAdded)
+        CatalogDiscoveryAddPill(isAdded = isAdded, isFocused = isFocused)
     }
 }
 
 @Composable
 private fun CatalogDiscoveryAddPill(
     isAdded: Boolean,
+    isFocused: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val accentColor = resolveAccentColor(fallback = AccentYellow)
+    val contentColor = if (isFocused) contrastingContentColor(accentColor) else TextPrimary
     Box(
         modifier = modifier
             .widthIn(min = 112.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(Color.Black.copy(alpha = 0.46f), RoundedCornerShape(10.dp))
+            .background(if (isFocused) accentColor else Color.Black.copy(alpha = 0.46f), RoundedCornerShape(10.dp))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.74f),
+                color = if (isFocused) accentColor else Color.White.copy(alpha = 0.74f),
                 shape = RoundedCornerShape(10.dp)
             )
             .padding(horizontal = 22.dp, vertical = 13.dp),
@@ -9429,7 +9394,7 @@ private fun CatalogDiscoveryAddPill(
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = TextPrimary,
+                    tint = contentColor,
                     modifier = Modifier.size(18.dp)
                 )
                 Spacer(modifier = Modifier.width(6.dp))
@@ -9437,7 +9402,7 @@ private fun CatalogDiscoveryAddPill(
             Text(
                 text = if (isAdded) stringResource(R.string.settings_added) else stringResource(R.string.add),
                 style = ArflixTypography.button,
-                color = TextPrimary,
+                color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
@@ -9704,6 +9669,17 @@ private fun CatalogsSettings(
                                         isFocused = false,
                                         onClick = { onSetCatalogEnabled(catalog, !catalog.enabled) }
                                     )
+                                    if (canDeleteUrlCatalog(catalog)) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        CatalogActionChip(
+                                            icon = Icons.Default.Delete,
+                                            contentDescription = stringResource(R.string.catalog_delete_title),
+                                            isFocused = false,
+                                            isDestructive = true,
+                                            enabled = true,
+                                            onClick = { onDeleteCatalog(catalog) }
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.width(8.dp))
                                     if (catalog.packId != null && catalog.isBulkDeletablePack) {
                                         Box(
@@ -9851,6 +9827,17 @@ private fun CatalogsSettings(
                         enabled = true,
                         onClick = { onSetCatalogEnabled(catalog, !catalog.enabled) }
                     )
+                    if (canDeleteUrlCatalog(catalog)) {
+                        Spacer(modifier = Modifier.width(6.dp))
+                        CatalogActionChip(
+                            icon = Icons.Default.Delete,
+                            contentDescription = stringResource(R.string.catalog_delete_title),
+                            isFocused = isRowFocused && focusedActionIndex == if (hasCatalogUnpackAction(catalog)) 6 else 5,
+                            isDestructive = true,
+                            enabled = true,
+                            onClick = { onDeleteCatalog(catalog) }
+                        )
+                    }
                 }
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -9860,6 +9847,12 @@ private fun CatalogsSettings(
 
 private fun hasCatalogUnpackAction(catalog: CatalogConfig): Boolean =
     catalog.packId != null && catalog.isBulkDeletablePack
+
+internal fun canDeleteUrlCatalog(catalog: CatalogConfig): Boolean =
+    !catalog.isPreinstalled &&
+        catalog.packId == null &&
+        !catalog.sourceUrl.isNullOrBlank() &&
+        catalog.sourceType in setOf(CatalogSourceType.TRAKT, CatalogSourceType.MDBLIST)
 
 private fun CatalogConfig.canToggleCatalogueLayout(): Boolean =
     kind != CatalogKind.COLLECTION_RAIL && !isFixedLandscapeHomeCategory(id)
@@ -12320,6 +12313,8 @@ private fun InputModal(
     helpText: String? = null,
     fields: List<InputField>,
     toggleFields: List<ToggleField> = emptyList(),
+    confirmLabel: String = tr("Confirm"),
+    confirmEnabled: Boolean = true,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -12534,8 +12529,10 @@ private fun InputModal(
                                             true
                                         }
                                         focusedIndex == pasteIndex + 2 -> {
-                                            hideKeyboardAll()
-                                            onConfirm()
+                                            if (confirmEnabled) {
+                                                hideKeyboardAll()
+                                                onConfirm()
+                                            }
                                             true
                                         }
                                         else -> false
@@ -12884,7 +12881,7 @@ private fun InputModal(
                         Text(text = tr("Cancel"), style = ArflixTypography.button, color = if (isCancelFocused) TextPrimary else TextSecondary)
                     }
 
-                    val isConfirmFocused = focusedIndex == pasteIndex + 2
+                    val isConfirmFocused = focusedIndex == pasteIndex + 2 && confirmEnabled
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -12898,14 +12895,18 @@ private fun InputModal(
                                 color = if (isConfirmFocused) accentColor else accentColor.copy(alpha = 0.32f),
                                 shape = fieldShape
                             )
-                            .clickable {
+                            .clickable(enabled = confirmEnabled) {
                                 hideKeyboardAll()
                                 onConfirm()
                             }
                             .padding(vertical = 12.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(text = tr("Confirm"), style = ArflixTypography.button, color = if (isConfirmFocused) accentContentColor else accentColor)
+                        Text(text = confirmLabel, style = ArflixTypography.button, color = when {
+                            !confirmEnabled -> TextSecondary.copy(alpha = 0.5f)
+                            isConfirmFocused -> accentContentColor
+                            else -> accentColor
+                        })
                     }
                 }
 

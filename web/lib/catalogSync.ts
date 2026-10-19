@@ -1,7 +1,14 @@
+import { catalogUrlSourceType } from "./catalogs.ts";
+
 type CatalogProfileSettings = {
   catalogs: {
     id: string;
+    name?: string;
+    title?: string;
     sourceType?: string;
+    sourceUrl?: string;
+    kind?: string;
+    collectionTileShape?: string;
     isPreinstalled?: boolean;
     enabled?: boolean;
   }[];
@@ -61,7 +68,26 @@ export function writeCatalogProfileState(
     );
   if (!changed) return false;
 
-  setProfileValue(root, "catalogsByProfile", profileId, settings.catalogs);
+  const catalogs = settings.catalogs.map((catalog) => {
+    const sourceType = (
+      (catalog.sourceUrl ? catalogUrlSourceType(catalog.sourceUrl) : null) ??
+      catalog.sourceType
+    )?.toUpperCase().replace(/-/g, "_");
+    return {
+      ...catalog,
+      ...(catalog.name || catalog.title
+        ? { title: catalog.name || catalog.title }
+        : {}),
+      ...(sourceType
+        ? { sourceType: ["TMDB", "TEMPLATE"].includes(sourceType) ? "PREINSTALLED" : sourceType }
+        : {}),
+      ...(catalog.kind ? { kind: catalog.kind.toUpperCase() } : {}),
+      ...(catalog.collectionTileShape
+        ? { collectionTileShape: catalog.collectionTileShape.toUpperCase() }
+        : {}),
+    };
+  });
+  setProfileValue(root, "catalogsByProfile", profileId, catalogs);
   setProfileValue(
     root,
     "hiddenPreinstalledByProfile",
@@ -79,7 +105,21 @@ export function writeCatalogProfileState(
     ["hiddenCustomByProfile", false],
   ] as const) {
     const ids = new Set(recordValue<string[]>(root[key])[profileId] || []);
-    for (const catalog of settings.catalogs) {
+    if (!addon) {
+      const currentIds = new Set(settings.catalogs.map((catalog) => catalog.id));
+      for (const catalog of baseline?.catalogs || []) {
+        const type = catalog.sourceType?.toUpperCase().replace(/-/g, "_");
+        if (
+          !currentIds.has(catalog.id) &&
+          !catalog.isPreinstalled &&
+          (type === "TRAKT" || type === "MDBLIST")
+        ) {
+          // Prevent Android's legacy catalog recovery from restoring deleted URLs.
+          ids.add(catalog.id);
+        }
+      }
+    }
+    for (const catalog of catalogs) {
       const type = catalog.sourceType?.toUpperCase().replace(/-/g, "_");
       if (catalog.isPreinstalled || type === "PREINSTALLED" || type === "HOME_SERVER") continue;
       if ((type === "ADDON") !== addon) continue;

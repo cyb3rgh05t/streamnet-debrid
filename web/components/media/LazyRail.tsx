@@ -49,20 +49,25 @@ export function LazyRail({
   );
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
 
   useEffect(() => {
     const cached = filterCategory(readCachedCatalog(cacheKey), mediaTypeFilter);
+    setCategory(cached);
     if (cached) {
-      setCategory(cached);
       onLoaded?.(cached);
     }
     startedRef.current = false;
+    setLoading(false);
     setDone(false);
+    setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey]);
+  }, [cacheKey, mediaTypeFilter, retry]);
 
   useEffect(() => {
     if (startedRef.current) return undefined;
+    let disposed = false;
 
     const load = () => {
       if (startedRef.current) return;
@@ -70,6 +75,7 @@ export function LazyRail({
       setLoading(true);
       void loadCatalogRow(catalog)
         .then((row) => {
+          if (disposed) return;
           setLoading(false);
           setDone(true);
           const filteredRow = filterCategory(row, mediaTypeFilter);
@@ -81,10 +87,11 @@ export function LazyRail({
             onEmpty?.();
           }
         })
-        .catch(() => {
+        .catch((cause: unknown) => {
+          if (disposed) return;
           setLoading(false);
           setDone(true);
-          onEmpty?.();
+          setError(cause instanceof Error ? cause.message : String(cause));
         });
     };
 
@@ -93,7 +100,11 @@ export function LazyRail({
     // still fires in backgrounded/embedded tabs.
     if (eager) {
       const timer = setTimeout(load, 0);
-      return () => clearTimeout(timer);
+      return () => {
+        disposed = true;
+        startedRef.current = false;
+        clearTimeout(timer);
+      };
     }
 
     const check = () => {
@@ -107,12 +118,14 @@ export function LazyRail({
     window.addEventListener("scroll", check, { passive: true });
     window.addEventListener("resize", check);
     return () => {
+      disposed = true;
+      startedRef.current = false;
       clearTimeout(timer);
       window.removeEventListener("scroll", check);
       window.removeEventListener("resize", check);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cacheKey, catalog.id, eager]);
+  }, [cacheKey, catalog.id, eager, mediaTypeFilter, retry]);
 
   if (category) {
     return (
@@ -146,17 +159,26 @@ export function LazyRail({
           >
             <Film size={34} strokeWidth={1.5} />
           </div>
-          <div className="rail-empty-copy">
+          <div className="rail-empty-copy" role={error ? "alert" : undefined}>
             <strong>
-              {settings.uiLanguage === "de"
+              {error
+                ? settings.uiLanguage === "de"
+                  ? "Katalog konnte nicht geladen werden"
+                  : "Could not load catalog"
+                : settings.uiLanguage === "de"
                 ? "Noch keine Inhalte"
                 : "No content yet"}
             </strong>
             <span>
-              {settings.uiLanguage === "de"
+              {error ?? (settings.uiLanguage === "de"
                 ? "Für diese Ansicht wurden keine passenden Titel gefunden."
-                : "No matching titles were found for this view."}
+                : "No matching titles were found for this view.")}
             </span>
+            {error && (
+              <button type="button" className="text-button" onClick={() => setRetry((value) => value + 1)}>
+                {settings.uiLanguage === "de" ? "Erneut versuchen" : "Try again"}
+              </button>
+            )}
           </div>
         </div>
       </section>

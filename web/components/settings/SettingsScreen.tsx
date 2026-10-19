@@ -41,7 +41,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { defaultCatalogs, mergeCatalogs } from "@/lib/catalogs";
+import { catalogUrlSourceType, defaultCatalogs, mergeCatalogs } from "@/lib/catalogs";
 import {
   config,
   hasCloudBackendConfig,
@@ -2713,9 +2713,9 @@ function CatalogsSection() {
           .filter((catalog): catalog is CatalogConfig => Boolean(catalog));
         const seen = new Set(ordered.map((catalog) => catalog.id));
         const canonical = [
+          ...next.filter((catalog) => !seen.has(catalog.id)),
           ...ordered,
           ...standardCatalogs.filter((catalog) => !seen.has(catalog.id)),
-          ...next.filter((catalog) => !seen.has(catalog.id)),
         ];
         const currentIds = safeArray(settings.catalogs).map(
           (catalog) => catalog.id,
@@ -2791,17 +2791,27 @@ function CatalogsSection() {
               );
               return;
             }
+            const sourceUrl = customCatalogUrl.trim();
+            const sourceType = catalogUrlSourceType(sourceUrl);
+            if (!sourceType) {
+              setToast(localize(
+                settings.uiLanguage,
+                "Bitte eine gültige Trakt- oder MDBList-URL eingeben.",
+                "Please enter a valid Trakt or MDBList URL.",
+              ));
+              return;
+            }
+            const title = sourceType === "trakt"
+              ? localize(settings.uiLanguage, "Benutzerdefinierte Trakt-Liste", "Custom Trakt list")
+              : localize(settings.uiLanguage, "Benutzerdefinierte MDBList", "Custom MDBList");
             updateCatalogs([
               {
                 id: `custom_${crypto.randomUUID()}`,
-                name: localize(
-                  settings.uiLanguage,
-                  "Benutzerdefinierte MDBList",
-                  "Custom MDBList",
-                ),
-                sourceType: "mdblist",
+                name: title,
+                title,
+                sourceType,
                 mediaType: "all",
-                sourceUrl: customCatalogUrl.trim(),
+                sourceUrl,
                 enabled: true,
               },
               ...catalogs,

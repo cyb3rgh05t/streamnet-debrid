@@ -10,6 +10,7 @@ import type {
 } from "./metadata/types";
 import { tmdbImageUrl } from "./mediaImages";
 import { loadStored, saveStored } from "./storage";
+import { TraktClient } from "./trakt";
 import type {
   CatalogConfig,
   Category,
@@ -450,10 +451,7 @@ export async function loadCatalog(
   }
 
   if (catalog.sourceType === "trakt" && catalog.sourceUrl) {
-    const refs = (await loadTraktPublicList(catalog.sourceUrl)) as Array<{
-      type: MediaType;
-      id: number;
-    }>;
+    const refs = await loadTraktPublicList(catalog.sourceUrl);
     const details = await hydrateRefs(refs, language);
     return {
       id: catalog.id,
@@ -1014,22 +1012,14 @@ function stableStringId(value: string) {
 
 async function loadTraktPublicList(sourceUrl: string) {
   const parsed = parseTraktUrl(sourceUrl);
-  if (!parsed) return [];
-  const path =
-    parsed.type === "user"
-      ? `users/${encodeURIComponent(parsed.user)}/lists/${encodeURIComponent(parsed.slug)}/items`
-      : `lists/${encodeURIComponent(parsed.slug)}/items`;
-  const url = new URL(`/api/trakt/${path}`, window.location.origin);
-  const payload = await jsonRequest<
-    Array<{
-      type?: string;
-      movie?: { ids?: { tmdb?: number } };
-      show?: { ids?: { tmdb?: number } };
-    }>
-  >(url.toString());
+  if (!parsed) throw new Error("Invalid Trakt list URL");
+  const payload = await new TraktClient().publicListItems(
+    parsed.slug,
+    parsed.type === "user" ? parsed.user : undefined,
+  );
   return payload
     .map((item) => {
-      const type: MediaType = item.type === "show" ? "tv" : "movie";
+      const type: MediaType = item.show ? "tv" : "movie";
       const id = type === "tv" ? item.show?.ids?.tmdb : item.movie?.ids?.tmdb;
       return id ? { type, id } : null;
     })

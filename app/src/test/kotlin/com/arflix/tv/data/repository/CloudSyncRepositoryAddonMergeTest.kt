@@ -482,6 +482,21 @@ class CloudSyncRepositoryAddonMergeTest {
     }
 
     @Test
+    fun `newer web visibility and deletion replace stale Android URL state together`() {
+        val local = """{"catalogsByProfile":{"main":[{"id":"custom","enabled":false}]},"hiddenCustomByProfile":{"main":["custom"]},"catalogsUpdatedAtByProfile":{"main":100}}"""
+        val enabled = """{"catalogsByProfile":{"main":[{"id":"custom","enabled":true}]},"hiddenCustomByProfile":{"main":[]},"catalogsUpdatedAtByProfile":{"main":200}}"""
+        val deleted = """{"catalogsByProfile":{"main":[]},"hiddenCustomByProfile":{"main":["custom"]},"catalogsUpdatedAtByProfile":{"main":300}}"""
+
+        val restored = JSONObject(mergeCatalogsByTimestamp(local, enabled))
+        assertTrue(restored.getJSONObject("catalogsByProfile").getJSONArray("main").getJSONObject(0).getBoolean("enabled"))
+        assertEquals(0, restored.getJSONObject("hiddenCustomByProfile").getJSONArray("main").length())
+
+        val removed = JSONObject(mergeCatalogsByTimestamp(restored.toString(), deleted))
+        assertEquals(0, removed.getJSONObject("catalogsByProfile").getJSONArray("main").length())
+        assertEquals("custom", removed.getJSONObject("hiddenCustomByProfile").getJSONArray("main").getString(0))
+    }
+
+    @Test
     fun `locally reordered catalogs win push despite newer remote device clock`() {
         val local = JSONObject()
             .put("catalogsByProfile", JSONObject().put("main", org.json.JSONArray()

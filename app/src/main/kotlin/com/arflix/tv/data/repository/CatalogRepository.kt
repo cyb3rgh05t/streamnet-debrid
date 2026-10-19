@@ -28,6 +28,7 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ParsedCatalogUrl
 import com.arflix.tv.util.settingsDataStore
 import com.google.gson.Gson
+import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -237,12 +238,14 @@ class CatalogRepository @Inject constructor(
         val primary = sanitizeCollectionCatalogs(
             parseCatalogsJson(prefs[catalogsKey(profileId)]).distinctBy { it.id }
         )
-        val resolved = sanitizeCollectionCatalogs(readCatalogsFromPrefs(profileId, prefs))
+        val allCatalogs = sanitizeCollectionCatalogs(
+            readCatalogsFromPrefs(profileId, prefs, includeHidden = true)
+        )
         // One-time migration/sync for old keys and merged legacy custom entries.
-        if (resolved.isNotEmpty() && resolved != primary) {
-            saveCatalogs(resolved, markCloudDirty = false)
+        if (allCatalogs.isNotEmpty() && allCatalogs != primary) {
+            saveCatalogs(allCatalogs, markCloudDirty = false)
         }
-        return resolved
+        return sanitizeCollectionCatalogs(readCatalogsFromPrefs(profileId, prefs))
     }
 
     private suspend fun getCatalogsIncludingHiddenForActiveProfile(): MutableList<CatalogConfig> {
@@ -552,7 +555,7 @@ class CatalogRepository @Inject constructor(
             decodeHiddenHomeServer(profileId, prefs) +
             decodeHiddenCustom(profileId, prefs)
         val defaultIds = defaultPreinstalled.map { it.id }.toSet()
-        val existing = getCatalogs().mapNotNull { cfg ->
+        val existing = allStoredCatalogs.mapNotNull { cfg ->
             if ((cfg.kind == CatalogKind.COLLECTION || cfg.kind == CatalogKind.COLLECTION_RAIL) &&
                 !defaultIds.contains(cfg.id)
             ) {
@@ -577,7 +580,7 @@ class CatalogRepository @Inject constructor(
                 cfg
             }
         }
-        val defaultMap = effectiveDefaults.associateBy { it.id }
+        val defaultMap = defaultPreinstalled.associateBy { it.id }
 
         val merged = if (existing.isEmpty()) {
             effectiveDefaults
@@ -634,7 +637,7 @@ class CatalogRepository @Inject constructor(
             // Stamping them would let a fresh install outrank an existing cloud setup.
             saveCatalogs(mergedForStorage, markCloudDirty = false)
         }
-        return merged
+        return merged.filterNot { it.id in hiddenIds }
     }
 
     suspend fun syncAddonCatalogs(addons: List<Addon>): Boolean {
@@ -701,7 +704,7 @@ class CatalogRepository @Inject constructor(
         val existingIds = current.map { it.id }.toHashSet()
         val missing = supportedCatalogs.filterNot { existingIds.contains(it.id) }
         if (missing.isNotEmpty()) {
-            current.addAll(missing)
+            current.addAll(0, missing)
             changed = true
         }
 
@@ -823,7 +826,7 @@ class CatalogRepository @Inject constructor(
         val existingIds = current.map { it.id }.toHashSet()
         val missing = desiredCatalogs.map { (_, config) -> config }.filterNot { it.id in existingIds }
         if (missing.isNotEmpty()) {
-            current.addAll(missing)
+            current.addAll(0, missing)
             changed = true
         }
 
@@ -1396,10 +1399,30 @@ class CatalogRepository @Inject constructor(
         }
     }
 
-    private fun parseCatalogsJson(json: String?): List<CatalogConfig> {
+    fun parseCatalogsJson(json: String?): List<CatalogConfig> {
         if (json.isNullOrBlank()) return emptyList()
+        val rows = JsonParser.parseString(json).asJsonArray
+        rows.forEach { element ->
+            val row = element.asJsonObject
+            fun text(key: String): String? = row.get(key)
+                ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+            if (text("title") == null) text("name")?.let { row.addProperty("title", it) }
+            require(text("id") != null && text("title") != null) {
+                "Catalog entry must contain an id and a title or name"
+            }
+            row.addProperty(
+                "sourceType",
+                parseSourceTypeCompat(text("sourceType").orEmpty(), text("sourceUrl"), text("sourceRef")).name
+            )
+            text("kind")?.let { row.addProperty("kind", it.uppercase()) }
+            text("collectionTileShape")?.let { row.addProperty("collectionTileShape", it.uppercase()) }
+        }
+        val normalizedJson = rows.toString()
         val strict = try {
-            gson.fromJson<List<CatalogConfig>>(json, listType) ?: emptyList()
+            gson.fromJson<List<CatalogConfig>>(normalizedJson, listType) ?: emptyList()
         } catch (e: Exception) { emptyList() }
             .mapNotNull { normalizeCatalogConfig(it) }
         if (strict.isNotEmpty()) return strict
@@ -1408,7 +1431,7 @@ class CatalogRepository @Inject constructor(
         // custom catalogs don't disappear after app updates.
         return try {
             val rawType = TypeToken.getParameterized(List::class.java, TypeToken.getParameterized(Map::class.java, String::class.java, Any::class.java).type).type
-            val rawList = gson.fromJson<List<Map<String, Any?>>>(json, rawType).orEmpty()
+            val rawList = gson.fromJson<List<Map<String, Any?>>>(normalizedJson, rawType).orEmpty()
             rawList.mapNotNull { row ->
                 val id = (row["id"] as? String)?.trim().orEmpty()
                 val title = (row["title"] as? String)?.trim().orEmpty()
@@ -1603,7 +1626,7 @@ class CatalogRepository @Inject constructor(
         sourceUrl: String?,
         sourceRef: String?
     ): CatalogSourceType {
-        val normalized = raw.trim().uppercase()
+        val normalized = raw.trim().uppercase().replace('-', '_')
         return when {
             // URL/ref evidence always wins over stale enum values from older builds.
             sourceRef?.startsWith(HomeServerRepository.CATALOG_SOURCE_REF_PREFIX, ignoreCase = true) == true -> CatalogSourceType.HOME_SERVER

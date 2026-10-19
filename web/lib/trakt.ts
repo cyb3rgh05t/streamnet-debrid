@@ -142,6 +142,17 @@ export class TraktClient {
     });
   }
 
+  async publicListItems(listId: string, username?: string) {
+    const listPath = username
+      ? `/users/${encodeURIComponent(username)}/lists/${encodeURIComponent(listId)}`
+      : `/lists/${encodeURIComponent(listId)}`;
+    return this.trakt<Array<{
+      type?: string;
+      movie?: { ids?: { tmdb?: number } };
+      show?: { ids?: { tmdb?: number } };
+    }>>(`${listPath}/items/movie,show?extended=full&page=1&limit=100`);
+  }
+
   // Items in a specific custom list (movies + shows).
   async listItems(listId: string | number) {
     const token = await this.refreshIfNeeded();
@@ -465,6 +476,12 @@ export class TraktClient {
     // exchange/refresh need the client secret (backend-only) — no direct fallback.
     if (normalized === "oauth/device/code") return true;
     if (normalized.startsWith("oauth/")) return false;
+    const method = (init.method ?? "GET").toUpperCase();
+    if (
+      method === "GET" &&
+      /^(?:users\/[^/]+\/)?lists\/[^/]+\/items(?:\/[^/?]+)?(?:\?|$)/.test(normalized) &&
+      !normalized.startsWith("users/me/")
+    ) return true;
     const headers = new Headers(init.headers ?? {});
     return Boolean(headers.get("x-user-token") || headers.get("Authorization"));
   }

@@ -1,9 +1,27 @@
 package com.arflix.tv.ui.screens.settings
 
 import com.google.common.truth.Truth.assertThat
+import com.arflix.tv.data.model.CatalogConfig
+import com.arflix.tv.data.model.CatalogSourceType
 import org.junit.Test
 
 class SettingsNavigationOrderTest {
+    @Test
+    fun `only standalone URL catalogs offer permanent deletion even when hidden`() {
+        val custom = CatalogConfig(
+            "custom", "Custom", CatalogSourceType.MDBLIST,
+            sourceUrl = "https://mdblist.com/lists/example/horror"
+        )
+        assertThat(canDeleteUrlCatalog(custom)).isTrue()
+        assertThat(canDeleteUrlCatalog(custom.copy(enabled = false))).isTrue()
+        assertThat(canDeleteUrlCatalog(custom.copy(sourceType = CatalogSourceType.TRAKT))).isTrue()
+        assertThat(canDeleteUrlCatalog(custom.copy(isPreinstalled = true))).isFalse()
+        assertThat(canDeleteUrlCatalog(custom.copy(packId = "pack"))).isFalse()
+        assertThat(canDeleteUrlCatalog(custom.copy(sourceType = CatalogSourceType.ADDON))).isFalse()
+        assertThat(canDeleteUrlCatalog(custom.copy(sourceType = CatalogSourceType.HOME_SERVER))).isFalse()
+        assertThat(canDeleteUrlCatalog(custom.copy(sourceUrl = null))).isFalse()
+    }
+
     @Test
     fun `tv scale follows device mode in appearance without duplicate focus slots`() {
         val rows = tvGeneralRowsForSection("appearance")

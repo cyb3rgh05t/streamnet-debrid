@@ -899,6 +899,10 @@
     <string name="settings_privacy_data_deletion_desc">Anleitung zum Löschen des StreamNet-Cloud-Kontos öffnen</string>
     <string name="settings_go_to">Aufrufen: %1$s</string>
     <string name="settings_cd_paste">Einfügen</string>
+    <string name="settings_catalog_url_label">Katalog-URL</string>
+    <string name="catalog_delete_title">Katalog löschen</string>
+    <string name="home_loading_more">Weitere Titel werden geladen…</string>
+    <string name="catalog_delete_message">Katalog "%1$s" löschen? Um ihn wieder zu nutzen, musst du seine URL erneut hinzufügen. Beim Ausblenden über das Augen-Symbol bleibt er gespeichert.</string>
     <string name="settings_paste_from_clipboard">Aus Zwischenablage einfügen</string>
     <string name="settings_hint_enter_dpad">Enter zum Auswählen drücken • Mit Steuerkreuz navigieren</string>
     <string name="settings_modal_hint_touch">Zum Bearbeiten auf ein Feld und danach auf Bestätigen tippen</string>

@@ -2440,12 +2440,12 @@ class CloudSyncRepository @Inject constructor(
         runCatching {
             val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
             root.optJSONObject("catalogsByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
-                val type = TypeToken.getParameterized(Map::class.java, String::class.java, TypeToken.getParameterized(List::class.java, CatalogConfig::class.java).type).type
-                val map: Map<String, List<CatalogConfig>> = gson.fromJson(json, type) ?: emptyMap()
-                map.forEach { (profileId, catalogs) ->
+                val catalogsByProfile = JSONObject(json)
+                catalogsByProfile.keys().forEach { profileId ->
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(profileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(profileId)
                     if (shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {
+                        val catalogs = catalogRepository.parseCatalogsJson(catalogsByProfile.getJSONArray(profileId).toString())
                         catalogRepository.replaceCatalogsForProfile(profileId, catalogs, stampChange = false)
                         catalogRepository.setCatalogsUpdatedAtForProfile(profileId, max(cloudUpdatedAt, localUpdatedAt))
                     }
@@ -2453,8 +2453,7 @@ class CloudSyncRepository @Inject constructor(
             }
             root.optJSONArray("catalogs")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 if (!root.has("catalogsByProfile")) {
-                    val type = TypeToken.getParameterized(List::class.java, CatalogConfig::class.java).type
-                    val catalogs: List<CatalogConfig> = gson.fromJson(json, type) ?: emptyList()
+                    val catalogs = catalogRepository.parseCatalogsJson(json)
                     val cloudUpdatedAt = catalogsUpdatedAt?.optLong(activeProfileId, 0L) ?: 0L
                     val localUpdatedAt = catalogRepository.getCatalogsUpdatedAtForProfile(activeProfileId)
                     if (catalogs.isNotEmpty() && shouldApplyCloudCatalogState(cloudUpdatedAt, localUpdatedAt, forceApplyRemote)) {

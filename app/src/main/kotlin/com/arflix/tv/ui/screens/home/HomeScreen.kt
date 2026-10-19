@@ -149,6 +149,7 @@ import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.data.model.isPortrait
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.ui.components.FeaturedMediaCard
+import com.arflix.tv.ui.components.PlaceholderCard
 import com.arflix.tv.ui.components.MediaCard as ArvioMediaCard
 import com.arflix.tv.ui.components.TrailerPlayer
 import com.arflix.tv.ui.components.CardLayoutMode
@@ -1510,6 +1511,7 @@ fun HomeScreen(
             syncStatus = uiState.syncStatus,
             hasUpdateBadge = uiState.hasUpdateBadge,
             categoryHasMoreMap = uiState.categoryHasMoreMap,
+            loadingCategoryIds = uiState.loadingCategoryIds,
             smoothScrolling = uiState.smoothScrolling,
             onLoadMoreCategory = { viewModel.loadNextPageForCategory(it) },
             onItemFocusedPrefetch = {},
@@ -3149,6 +3151,7 @@ private fun HomeInputLayer(
     syncStatus: com.arflix.tv.data.repository.CloudSyncStatus = com.arflix.tv.data.repository.CloudSyncStatus.NOT_SIGNED_IN,
     hasUpdateBadge: Boolean = false,
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
+    loadingCategoryIds: Set<String> = emptySet(),
     smoothScrolling: Boolean = true,
     onLoadMoreCategory: (String) -> Unit = {},
     onItemFocusedPrefetch: (MediaItem) -> Unit = {},
@@ -3590,6 +3593,7 @@ private fun HomeInputLayer(
             usePosterCards = usePosterCards,
             isMobile = isMobile,
             categoryHasMoreMap = categoryHasMoreMap,
+            loadingCategoryIds = loadingCategoryIds,
             smoothScrolling = smoothScrolling,
             onLoadMoreCategory = onLoadMoreCategory,
             onItemFocusedPrefetch = onItemFocusedPrefetch,
@@ -3648,6 +3652,7 @@ private fun HomeRowsLayer(
     usePosterCards: Boolean,
     isMobile: Boolean = false,
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
+    loadingCategoryIds: Set<String> = emptySet(),
     smoothScrolling: Boolean = true,
     onLoadMoreCategory: (String) -> Unit = {},
     onItemFocusedPrefetch: (MediaItem) -> Unit = {},
@@ -3677,6 +3682,7 @@ private fun HomeRowsLayer(
             onSwitchProfile = onSwitchProfile,
             usePosterCards = usePosterCards,
             categoryHasMoreMap = categoryHasMoreMap,
+            loadingCategoryIds = loadingCategoryIds,
             onLoadMoreCategory = onLoadMoreCategory,
             onNavigateToDetails = onNavigateToDetails,
             lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
@@ -3702,6 +3708,7 @@ private fun HomeRowsLayer(
             fastScrollThresholdMs = fastScrollThresholdMs,
             usePosterCards = usePosterCards,
             categoryHasMoreMap = categoryHasMoreMap,
+            loadingCategoryIds = loadingCategoryIds,
             smoothScrolling = smoothScrolling,
             onLoadMoreCategory = onLoadMoreCategory,
             onItemFocusedPrefetch = onItemFocusedPrefetch,
@@ -3725,6 +3732,7 @@ private fun MobileHomeRowsLayer(
     onNavigateToSearch: () -> Unit = {},
     onSwitchProfile: () -> Unit = {},
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
+    loadingCategoryIds: Set<String> = emptySet(),
     onLoadMoreCategory: (String) -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
     lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
@@ -3802,6 +3810,9 @@ private fun MobileHomeRowsLayer(
                         ),
                         color = Color.White
                     )
+                    if (category.id in loadingCategoryIds) {
+                        HomeRailLoadingIndicator()
+                    }
                 }
 
                 val rowHasMore = canPaginateHomeCategory(
@@ -3941,6 +3952,22 @@ private fun MobileHomeRowsLayer(
                             }
                         }
                     }
+                    if (category.id in loadingCategoryIds && rowHasMore &&
+                        itemsToRender.any { !it.isPlaceholder }
+                    ) {
+                        items(
+                            count = 3,
+                            key = { index -> "${category.id}:loading_more:$index" },
+                            contentType = { "pagination_skeleton" }
+                        ) {
+                            PlaceholderCard(
+                                width = rowMobileItemWidth,
+                                isLandscape = !isPortrait,
+                                showTitle = !isCollectionRow,
+                                showSubtitle = false
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -3958,6 +3985,7 @@ private fun TvHomeRowsLayer(
     fastScrollThresholdMs: Long,
     usePosterCards: Boolean,
     categoryHasMoreMap: Map<String, Boolean> = emptyMap(),
+    loadingCategoryIds: Set<String> = emptySet(),
     smoothScrolling: Boolean = true,
     onLoadMoreCategory: (String) -> Unit = {},
     onItemFocusedPrefetch: (MediaItem) -> Unit = {},
@@ -4167,6 +4195,7 @@ private fun TvHomeRowsLayer(
                             usePosterCards = rowUsePosterCards,
                             startPadding = contentStartPadding,
                             categoryHasMore = categoryHasMoreMap[category.id] == true,
+                            isLoadingMore = category.id in loadingCategoryIds,
                             smoothScrolling = smoothScrolling,
                             onLoadMore = onRowLoadMore,
                             focusedItemIndex = if (rowIsFocused) focusState.currentItemIndex else -1,
@@ -4373,6 +4402,25 @@ private fun ImdbBadge(rating: String) {
     }
 }
 
+@Composable
+private fun HomeRailLoadingIndicator() {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        androidx.compose.material3.CircularProgressIndicator(
+            modifier = Modifier.size(14.dp),
+            color = resolveAccentColor(ArvioSkin.colors.accent),
+            strokeWidth = 2.dp
+        )
+        Text(
+            text = stringResource(R.string.home_loading_more),
+            style = ArflixTypography.caption,
+            color = TextSecondary
+        )
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun ContentRow(
@@ -4383,6 +4431,7 @@ private fun ContentRow(
     usePosterCards: Boolean = false,
     startPadding: androidx.compose.ui.unit.Dp = 12.dp,
     categoryHasMore: Boolean = false,
+    isLoadingMore: Boolean = false,
     smoothScrolling: Boolean = true,
     onLoadMore: () -> Unit = {},
     focusedItemIndex: Int,
@@ -4595,6 +4644,9 @@ private fun ContentRow(
                 ),
                 color = Color.White
             )
+            if (isLoadingMore) {
+                HomeRailLoadingIndicator()
+            }
         }
 
         // Cards row - clipped to hide previous items when scrolling
@@ -4774,6 +4826,22 @@ private fun ContentRow(
                         )
                     }
                 }
+                }
+                if (isLoadingMore && effectiveCategoryHasMore &&
+                    itemsToRender.any { !it.isPlaceholder }
+                ) {
+                    items(
+                        count = 3,
+                        key = { index -> "${category.id}:loading_more:$index" },
+                        contentType = { "pagination_skeleton" }
+                    ) {
+                        PlaceholderCard(
+                            width = itemWidth,
+                            isLandscape = !effectivePosterMode,
+                            showTitle = false,
+                            showSubtitle = false
+                        )
+                    }
                 }
             }
             if (railFocusOverlayActive) {

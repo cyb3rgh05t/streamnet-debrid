@@ -1007,7 +1007,23 @@ function isValidCatalog(
   return true;
 }
 
-function normalizedSourceType(value: unknown): CatalogConfig["sourceType"] {
+export function catalogUrlSourceType(sourceUrl: string): "trakt" | "mdblist" | null {
+  let url: URL;
+  try {
+    url = new URL(sourceUrl);
+  } catch {
+    return null;
+  }
+  if (!["http:", "https:"].includes(url.protocol)) return null;
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  if (host === "trakt.tv") return "trakt";
+  if (host === "mdblist.com") return "mdblist";
+  return null;
+}
+
+function normalizedSourceType(value: unknown, sourceUrl?: string): CatalogConfig["sourceType"] {
+  const urlType = sourceUrl ? catalogUrlSourceType(sourceUrl) : null;
+  if (urlType) return urlType;
   const raw = String(value ?? "")
     .trim()
     .toLowerCase()
@@ -1037,7 +1053,7 @@ function normalizedCatalog(catalog: CatalogConfig): CatalogConfig {
     id: String(catalog.id).trim(),
     name: String(catalog.name ?? catalog.title).trim(),
     title: String(catalog.name ?? catalog.title).trim(),
-    sourceType: normalizedSourceType(catalog.sourceType),
+    sourceType: normalizedSourceType(catalog.sourceType, catalog.sourceUrl),
     layout: normalizedLayout(catalog),
     enabled: catalog.enabled !== false,
   };

@@ -74,3 +74,72 @@ test("web re-enabling remote addon and custom catalogs clears Android hidden roo
   assert.deepEqual(root.hiddenAddonByProfile.main, ["unrelated-addon", "addon"]);
   assert.deepEqual(root.hiddenCustomByProfile.main, ["deleted-list", "custom"]);
 });
+
+test("hidden URL catalogs remain in the web payload and can be re-enabled for Android", async () => {
+  const { writeCatalogProfileState } = await import(moduleUrl);
+  const catalog = { id: "custom_horror", sourceType: "mdblist", enabled: true };
+  const baseline = { ...settings([]), catalogs: [catalog] };
+  const hidden = {
+    ...settings([]),
+    catalogs: [{ ...catalog, enabled: false }],
+    hiddenCatalogIds: [catalog.id],
+  };
+  const root = { catalogsByProfile: { other: [{ id: "untouched" }] } };
+
+  writeCatalogProfileState(root, "main", hidden, baseline, 1400);
+  assert.deepEqual(root.catalogsByProfile.main, [{ ...hidden.catalogs[0], sourceType: "MDBLIST" }]);
+  assert.deepEqual(root.hiddenCustomByProfile.main, [catalog.id]);
+  assert.deepEqual(root.catalogsByProfile.other, [{ id: "untouched" }]);
+
+  writeCatalogProfileState(root, "main", baseline, hidden, 1500);
+  assert.deepEqual(root.hiddenCustomByProfile.main, []);
+  assert.deepEqual(root.hiddenPreinstalledByProfile.main, []);
+  assert.equal(root.catalogsByProfile.main[0].enabled, true);
+});
+
+test("web deletion of visible and hidden URLs prevents Android legacy recovery", async () => {
+  const { writeCatalogProfileState } = await import(moduleUrl);
+  const baseline = {
+    ...settings([]),
+    catalogs: [
+      { id: "visible", sourceType: "trakt", enabled: true },
+      { id: "hidden", sourceType: "MDBLIST", enabled: false },
+    ],
+    hiddenCatalogIds: ["hidden"],
+  };
+  const root = {
+    hiddenCustomByProfile: { main: ["hidden"], other: ["untouched"] },
+  };
+
+  writeCatalogProfileState(root, "main", settings([]), baseline, 1600);
+  assert.deepEqual(root.catalogsByProfile.main, []);
+  assert.deepEqual(new Set(root.hiddenCustomByProfile.main), new Set(["visible", "hidden"]));
+  assert.deepEqual(root.hiddenCustomByProfile.other, ["untouched"]);
+  assert.equal(root.catalogsUpdatedAtByProfile.main, 1600);
+});
+
+test("web exports Android-compatible catalog titles and enums without losing URL or enabled state", async () => {
+  const { writeCatalogProfileState } = await import(moduleUrl);
+  const root = {};
+  const current = {
+    ...settings([]),
+    catalogs: [{
+      id: "custom_web", name: "Horror", sourceType: "mdblist",
+      sourceUrl: "https://trakt.tv/users/movistapp/lists/horror",
+      enabled: false, kind: "standard", collectionTileShape: "poster",
+    }, {
+      id: "server", name: "Library", sourceType: "home-server", enabled: true,
+    }],
+    hiddenCatalogIds: ["custom_web"],
+  };
+  writeCatalogProfileState(root, "main", current, settings([]), 2000);
+  const [url, server] = root.catalogsByProfile.main;
+  assert.equal(url.title, "Horror");
+  assert.equal(url.sourceType, "TRAKT");
+  assert.equal(url.kind, "STANDARD");
+  assert.equal(url.collectionTileShape, "POSTER");
+  assert.equal(url.sourceUrl, current.catalogs[0].sourceUrl);
+  assert.equal(url.enabled, false);
+  assert.equal(server.sourceType, "HOME_SERVER");
+  assert.deepEqual(root.hiddenCustomByProfile.main, ["custom_web"]);
+});

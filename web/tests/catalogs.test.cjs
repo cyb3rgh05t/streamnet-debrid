@@ -10,6 +10,41 @@ const i18nModuleUrl = pathToFileURL(
   path.resolve(__dirname, "../lib/i18n.ts"),
 ).href;
 
+test("URL catalogs identify their provider and repair old mislabeled Trakt lists", async () => {
+  const { catalogUrlSourceType, mergeCatalogs } = await import(moduleUrl);
+  const url = "https://trakt.tv/users/movistapp/lists/horror";
+  assert.equal(catalogUrlSourceType(url), "trakt");
+  assert.equal(catalogUrlSourceType("https://www.mdblist.com/lists/user/horror"), "mdblist");
+  assert.equal(catalogUrlSourceType("https://trakt.tv.example.org/lists/test"), null);
+  assert.equal(catalogUrlSourceType("not a URL"), null);
+  const imported = mergeCatalogs([{
+    id: "custom_web", name: "Horror", sourceType: "mdblist",
+    sourceUrl: url, enabled: true,
+  }]).find((catalog) => catalog.id === "custom_web");
+  assert.equal(imported.sourceType, "trakt");
+  assert.equal(imported.title, "Horror");
+});
+
+test("new URL rails stay ahead of existing TV rails and survive a sync roundtrip", async () => {
+  const { defaultCatalogs, mergeCatalogs } = await import(moduleUrl);
+  const { writeCatalogProfileState } = await import(
+    pathToFileURL(path.resolve(__dirname, "../lib/catalogSync.ts")).href
+  );
+  const previous = mergeCatalogs(defaultCatalogs);
+  const added = {
+    id: "custom_new", name: "New list", sourceType: "trakt",
+    sourceUrl: "https://trakt.tv/users/movistapp/lists/horror", enabled: true,
+  };
+  const merged = mergeCatalogs([added, ...previous]);
+  assert.equal(merged[0].id, added.id);
+  assert.deepEqual(merged.slice(1).map((item) => item.id), previous.map((item) => item.id));
+  const root = {};
+  const settings = { catalogs: merged, hiddenCatalogIds: [], hiddenHomeServerCatalogIds: [] };
+  writeCatalogProfileState(root, "main", settings, null, 2000);
+  const restored = mergeCatalogs(root.catalogsByProfile.main);
+  assert.deepEqual(restored.map((item) => item.id), merged.map((item) => item.id));
+});
+
 test("remote default names survive default overlays and German localization", async () => {
   const { defaultCatalogs, mergeCatalogs, localizedCatalogName } = await import(moduleUrl);
   const builtin = defaultCatalogs[0];

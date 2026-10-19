@@ -13,6 +13,27 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.launch
 
 class HomeRowStateTest {
+    @Test
+    fun `new catalog rails follow continue watching before existing TV rails`() {
+        val cw = Category("continue_watching", "Continue watching", listOf(MediaItem(1, "Resume")))
+        val newRail = Category("custom_new", "New list", listOf(MediaItem(2, "New")))
+        val favorites = Category("favorite_tv", "TV favorites", listOf(MediaItem(3, "TV")))
+        val recent = Category("recent_tv", "Recent TV", listOf(MediaItem(4, "Recent")))
+        val existing = Category("custom_existing", "Existing", listOf(MediaItem(5, "Existing")))
+        val order = listOf(newRail.id, favorites.id, recent.id, existing.id)
+
+        val ordered = orderHomeCategories(listOf(existing, recent, cw, favorites, newRail), order)
+        assertThat(ordered.map { it.id }).containsExactly(
+            cw.id, newRail.id, favorites.id, recent.id, existing.id
+        ).inOrder()
+        val refreshed = mergeIptvHomeCategories(
+            ordered,
+            mapOf(favorites.id to favorites, recent.id to recent),
+            order
+        )
+        assertThat(refreshed).isEqualTo(ordered)
+        assertThat(orderHomeCategories(ordered.filterNot { it.id == cw.id }, order).first()).isEqualTo(newRail)
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test

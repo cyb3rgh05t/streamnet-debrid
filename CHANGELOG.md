@@ -2,6 +2,23 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.072] - 2026-10-19
+
+- Neue Katalog-Rails stehen direkt unter „Weiterschauen“ (CW), vor bestehenden TV-Rails. Neu entdeckte Add-on-/Server-Rails werden in Android und neue Server-Rails im Web ebenfalls vorne in die gespeicherte Katalogreihenfolge eingefügt; bestehende Rails behalten ihre relative Reihenfolge.
+- Android Home-Rails: Beim seitenweisen Nachladen erscheinen drei animierte, nicht fokussierbare Skeleton-Karten am Rail-Ende sowie ein Akzent-Ladeindikator mit „Weitere Titel werden geladen…“, im TV- und Touch-UI. Vorhandene Karten und der Fokus bleiben erhalten. „URL hinzufügen“ übernimmt bei ausgefülltem Feld denselben Akzentstil wie „Suche“.
+- Katalog-Sync Web → Android: Web exportiert Android-kompatible Titel und Quelltypen; Android importiert auch ältere Web-Einträge mit `name` und kleingeschriebenen Typen. Trakt- und MDBList-URLs werden im Web anhand ihrer Quelle erkannt, statt alle hinzugefügten Listen als MDBList zu speichern.
+- Web Trakt-URL-Kataloge: Öffentliche Listen nutzen wie die Trakt-Anbindung direkte Browser-Anfragen mit Server-Proxy-Fallback statt ausschließlich des Proxys; Filme und Serien werden mit explizitem 100er-API-Limit angefragt. Home-Rails unterscheiden Ladefehler mit Wiederholen-Aktion von tatsächlich leeren Listen.
+- Android TV Katalogverwaltung: Ausgeblendete URL-Kataloge bleiben samt URL und Reihenfolge gespeichert und können über das Augen-Symbol wieder aktiviert werden. Das Lesen der Startseiten-Kataloge entfernt keine ausgeblendeten Einträge mehr aus der Speicherung oder dem Cloud-Sync. Eigene einzelne URL-Kataloge erhalten einen separaten Löschbutton mit Bestätigung. Web-Sync überträgt Ausblenden, Wiedereinblenden und Löschen getrennt; im Web gelöschte URL-Kataloge werden nicht durch die Android-Legacy-Wiederherstellung zurückgeholt.
+- Android Schließen-Dialog: „Abbrechen“ und „Schließen“ verwenden denselben neutralen Button-Stil mit Akzentrahmen und erhalten bei Fokus eine solide Akzentfläche mit kontrastreicher Beschriftung.
+- Android Katalogsuche: Such- und URL-Eingabe verwenden den gemeinsamen App-Eingabedialog mit Theme-Oberfläche, Akzentrahmen und TV-/Touch-Bedienung. Die URL-Eingabe bietet „In Katalog-URL einfügen“ für die Zwischenablage; die bisherigen Bestätigungstexte und die Sperre leerer Eingaben bleiben erhalten. Bei fokussierten Suchtreffern erhält „Hinzufügen“ eine solide Akzentfläche mit kontrastreicher Beschriftung, sowohl im kompakten als auch im breiten Layout.
+
+## [Web 1.0.068] - 2026-10-19
+
+- Neue Katalog-Rails stehen direkt unter „Weiterschauen“ (CW), vor bestehenden TV-Rails. Neu entdeckte Add-on-/Server-Rails werden in Android und neue Server-Rails im Web ebenfalls vorne in die gespeicherte Katalogreihenfolge eingefügt; bestehende Rails behalten ihre relative Reihenfolge.
+- Android Home-Rails: Beim seitenweisen Nachladen erscheinen drei animierte, nicht fokussierbare Skeleton-Karten am Rail-Ende sowie ein Akzent-Ladeindikator mit „Weitere Titel werden geladen…“, im TV- und Touch-UI. Vorhandene Karten und der Fokus bleiben erhalten. „URL hinzufügen“ übernimmt bei ausgefülltem Feld denselben Akzentstil wie „Suche“.
+- Katalog-Sync Web → Android: Web exportiert Android-kompatible Titel und Quelltypen; Android importiert auch ältere Web-Einträge mit `name` und kleingeschriebenen Typen. Trakt- und MDBList-URLs werden im Web anhand ihrer Quelle erkannt, statt alle hinzugefügten Listen als MDBList zu speichern.
+- Web Trakt-URL-Kataloge: Öffentliche Listen nutzen wie die Trakt-Anbindung direkte Browser-Anfragen mit Server-Proxy-Fallback statt ausschließlich des Proxys; Filme und Serien werden mit explizitem 100er-API-Limit angefragt. Home-Rails unterscheiden Ladefehler mit Wiederholen-Aktion von tatsächlich leeren Listen.
+
 ## [2.5.071] - 2026-10-19
 
 - Android IPTV Artwork Nachkorrektur: Der Screenshot-Fall „The Blacklist“ wurde mit echten TMDB-Treffern und dem Bild der gleichnamigen arabischen Serie reproduziert. Originaltitel und Relevanz der Originaltitel-Familie haben jetzt Vorrang vor dem Jahr; „neueste Fassung“ gilt innerhalb derselben Familie. Bloße Wortüberschneidungen oder Teilwörter reichen nicht mehr für ein Sendungsbild. Diagnose-Logs enthalten ausgewählten Titel, Originaltitel, ID und Jahr.
