@@ -18,7 +18,7 @@ class IptvVodAvailabilityTest {
     @Test
     fun `provider title is normalized for Home availability matching`() {
         assertEquals(
-            IptvRepository.XtreamVodAvailabilityKey(MediaType.MOVIE, "example"),
+            IptvRepository.XtreamVodAvailabilityKey(MediaType.MOVIE, "example", year = 2025),
             repository.xtreamVodAvailabilityKey("The Example (2025) [4K]", MediaType.MOVIE),
         )
     }
@@ -117,5 +117,67 @@ class IptvVodAvailabilityTest {
         assertEquals(false, iptvVodYearsCompatible(2025, 1999))
         assertEquals(true, iptvVodYearsCompatible(2025, 2024))
         assertEquals(true, iptvVodYearsCompatible(2025, null))
+    }
+
+    @Test
+    fun `matching id accepts localized titles for movies and series`() {
+        MediaType.entries.forEach { type ->
+            val availability = IptvRepository.XtreamVodAvailability(
+                setOf(repository.xtreamVodAvailabilityKey("Provider Original Title", type, tmdbId = "123")!!),
+            )
+            assertEquals(true, availability.contains(MediaItem(123, "Lokaler Titel", mediaType = type)))
+            assertEquals(false, availability.contains(MediaItem(456, "Provider Original Title", mediaType = type)))
+        }
+    }
+
+    @Test
+    fun `search and playback share title normalization and year tolerance`() {
+        listOf("Example, The (2024) [4K]", "The Example (2024) 1080p WEB-DL").forEach { name ->
+            val availability = IptvRepository.XtreamVodAvailability(
+                setOf(repository.xtreamVodAvailabilityKey(name, MediaType.MOVIE)!!),
+            )
+            assertEquals(true, iptvVodTitlesMatchExactly(name, "The Example"))
+            assertEquals(true, availability.contains(MediaItem(123, "The Example", year = "2025")))
+            assertEquals(false, availability.contains(MediaItem(123, "The Example", year = "1999")))
+        }
+    }
+
+    @Test
+    fun `zero provider id is treated as unknown rather than conflicting`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(repository.xtreamVodAvailabilityKey("Example", MediaType.MOVIE, tmdbId = "0")!!),
+        )
+        assertEquals(true, availability.contains(MediaItem(123, "Example")))
+    }
+
+    @Test
+    fun `availability accepts umlaut transcription in either direction`() {
+        listOf("Für alle Fälle" to "Fuer alle Faelle", "Fuer alle Faelle" to "Für alle Fälle").forEach { (provider, query) ->
+            val availability = IptvRepository.XtreamVodAvailability(
+                setOf(repository.xtreamVodAvailabilityKey(provider, MediaType.TV)!!),
+            )
+            assertEquals(true, availability.contains(MediaItem(123, query, mediaType = MediaType.TV)))
+        }
+    }
+
+    @Test
+    fun `exact title matching preserves word order and meaningful short words`() {
+        assertEquals(false, iptvVodTitlesMatchExactly("Dog Bites Man", "Man Bites Dog"))
+        assertEquals(false, iptvVodTitlesMatchExactly("In Time", "Time"))
+        assertEquals(false, iptvVodTitlesMatchExactly("The Equalizer 2", "The Equalizer"))
+        assertEquals(true, iptvVodTitlesMatchExactly("1917", "1917"))
+    }
+
+    @Test
+    fun `series binding keys never mix ids with same title remakes`() {
+        val old = iptvSeriesBindingKeys("provider", "1", "tt0000001", "The Equalizer", 1985)
+        val current = iptvSeriesBindingKeys("provider", "2", "tt0000002", "The Equalizer", 2021)
+        assertEquals(listOf("provider|tmdb:1"), old)
+        assertEquals(listOf("provider|tmdb:2"), current)
+        assertEquals(
+            emptySet<String>(),
+            iptvSeriesBindingKeys("provider", null, null, "The Equalizer", 1985).toSet()
+                .intersect(iptvSeriesBindingKeys("provider", null, null, "The Equalizer", 2021).toSet()),
+        )
     }
 }

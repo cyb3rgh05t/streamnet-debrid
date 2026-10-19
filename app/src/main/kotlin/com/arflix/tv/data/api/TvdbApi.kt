@@ -27,6 +27,8 @@ data class TvdbSearchResult(
     val id: String? = null,
     val name: String? = null,
     val type: String? = null,
+    val year: String? = null,
+    @SerializedName("tvdb_id") val tvdbId: String? = null,
 )
 
 data class TvdbArtworkResponse(

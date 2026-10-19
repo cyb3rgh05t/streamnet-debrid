@@ -2,11 +2,115 @@ package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.api.TmdbTvDetails
 import com.arflix.tv.data.model.MediaType
+import com.arflix.tv.data.model.MediaItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class IptvArtworkTitleTest {
+    @Test
+    fun `real blacklist results prefer US original over newer translated namesake`() {
+        val original = MediaItem(46952, "The Blacklist", year = "2013", mediaType = MediaType.TV,
+            popularity = 182.36f, backdrop = "/2eIlCirgcvEwmCSYh2wDfz5Sxvz.jpg")
+        val namesake = MediaItem(216969, "The Blacklist", year = "2022", mediaType = MediaType.TV,
+            popularity = 0.50f, backdrop = "/A0tIv0kDDOURdl3nZtsUFY9YyRM.jpg")
+        val spinoff = MediaItem(68018, "The Blacklist: Redemption", year = "2017", mediaType = MediaType.TV,
+            popularity = 10.85f)
+        val originals = mapOf(
+            (MediaType.TV to original.id) to "The Blacklist",
+            (MediaType.TV to namesake.id) to "القائمة السوداء",
+            (MediaType.TV to spinoff.id) to "The Blacklist: Redemption",
+        )
+
+        listOf(null, 46 * 60_000L).forEach { duration ->
+            listOf(listOf(namesake, spinoff, original), listOf(original, spinoff, namesake)).forEach { items ->
+                val selected = rankIptvArtworkCandidates("The Blacklist", items, duration, null, originals).first()
+                assertEquals(46952, selected.id)
+                assertEquals("/2eIlCirgcvEwmCSYh2wDfz5Sxvz.jpg", selected.backdrop)
+            }
+        }
+        assertEquals(namesake, rankIptvArtworkCandidates("The Blacklist", listOf(original, namesake),
+            46 * 60_000L, 2022, originals).single())
+    }
+
+    @Test
+    fun `newest equalizer is preferred within the same original title family`() {
+        val old = MediaItem(4297, "The Equalizer", year = "1985", mediaType = MediaType.TV, popularity = 100f)
+        val current = old.copy(id = 95205, year = "2021", popularity = 49.48f)
+        val originals = mapOf((MediaType.TV to old.id) to "The Equalizer", (MediaType.TV to current.id) to "The Equalizer")
+
+        assertEquals(current, rankIptvArtworkCandidates("The Equalizer", listOf(old, current),
+            55 * 60_000L, null, originals).first())
+    }
+
+    @Test
+    fun `localized namesakes use title family relevance before release year`() {
+        val established = MediaItem(1, "Lokaler Titel", year = "2013", mediaType = MediaType.TV, popularity = 180f)
+        val unrelated = established.copy(id = 2, year = "2022", popularity = 0.5f)
+        val originals = mapOf((MediaType.TV to 1) to "Established Original", (MediaType.TV to 2) to "Different Original")
+
+        assertEquals(established, rankIptvArtworkCandidates("Lokaler Titel", listOf(unrelated, established),
+            46 * 60_000L, null, originals).first())
+    }
+
+    @Test
+    fun `shared title words and substrings alone cannot authorize artwork`() {
+        listOf(
+            "The Blacklist" to "Blacklist unrelated documentary",
+            "The Blacklist" to "The Blacklist Murders",
+            "It" to "Vikings",
+            "Tatort" to "Tatortreiniger",
+        ).forEach { (requested, candidate) ->
+            assertTrue(rankIptvArtworkCandidates(requested,
+                listOf(MediaItem(1, candidate, mediaType = MediaType.TV)), 46 * 60_000L, null).isEmpty())
+        }
+        assertTrue(iptvArtworkTitlesCompatible("NCIS: Origins: Enter Sandman", "NCIS: Origins"))
+        assertTrue(iptvArtworkTitlesCompatible("Ancient Aliens - Unerklärliche Phänomene", "Ancient Aliens"))
+    }
+
+    @Test
+    fun `equalizer prefers the latest series independently of popularity and result order`() {
+        val old = MediaItem(1, "The Equalizer", year = "1985", mediaType = MediaType.TV, popularity = 500f)
+        val current = old.copy(id = 2, year = "2021", popularity = 1f)
+        val movie = old.copy(id = 3, year = "2014", mediaType = MediaType.MOVIE, popularity = 1_000f)
+
+        listOf(listOf(old, movie, current), listOf(current, movie, old)).forEach { items ->
+            assertEquals(current, rankIptvArtworkCandidates("The Equalizer", items, 55 * 60_000L, null).first())
+        }
+        assertEquals(old, rankIptvArtworkCandidates("The Equalizer", listOf(current, old), 55 * 60_000L, 1985).single())
+        assertEquals(movie, rankIptvArtworkCandidates("The Equalizer", listOf(current, movie), 110 * 60_000L, null).first())
+    }
+
+    @Test
+    fun `year is retained separately while artwork search title stays clean`() {
+        assertEquals(2021, iptvArtworkYear("The Equalizer (2021) - S01 E02"))
+        assertEquals(1985, iptvArtworkYear("The Equalizer [1985]"))
+        assertEquals(2021, iptvArtworkYear("The Equalizer 2021"))
+        assertEquals("The Equalizer", cleanIptvArtworkTitle("The Equalizer (2021) - S01 E02"))
+        assertEquals("The Equalizer", cleanIptvArtworkTitle("The Equalizer 2021"))
+        assertEquals("1917", cleanIptvArtworkTitle("1917"))
+    }
+
+    @Test
+    fun `explicit year never falls back to another remake`() {
+        val old = MediaItem(1, "The Equalizer", year = "1985", mediaType = MediaType.TV)
+        assertTrue(rankIptvArtworkCandidates("The Equalizer", listOf(old), 55 * 60_000L, 2021).isEmpty())
+    }
+
+    @Test
+    fun `english alias keeps localized subtitle from promoting the older equalizer`() {
+        val old = MediaItem(1, "The Equalizer", year = "1985", mediaType = MediaType.TV)
+        val localized = MediaItem(2, "The Equalizer - Schutzengel in New York", year = "2021",
+            mediaType = MediaType.TV, backdrop = "/localized.jpg")
+        val english = localized.copy(title = "The Equalizer", backdrop = "/english.jpg")
+
+        val ranked = rankIptvArtworkCandidates("The Equalizer", listOf(old, localized, english), 55 * 60_000L, null)
+
+        assertEquals(2, ranked.size)
+        assertEquals(2, ranked.first().id)
+        assertEquals("/localized.jpg", ranked.first().backdrop)
+    }
+
     @Test
     fun `episode suffix is removed before series lookup`() {
         assertEquals("Die Höhle der Löwen", cleanIptvArtworkTitle("Die Höhle der Löwen - S12 E03 Gründer-Special"))

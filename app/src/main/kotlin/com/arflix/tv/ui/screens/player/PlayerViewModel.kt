@@ -4613,17 +4613,19 @@ class PlayerViewModel @Inject constructor(
             .ifBlank { currentTitle }
             .ifBlank { mediaRepository.getCachedItem(mediaType, currentMediaId)?.title.orEmpty() }
 
+        val lookupYear = mediaRepository.getCachedItem(mediaType, currentMediaId)?.year?.toIntOrNull()
         val vodSources = if (mediaType == MediaType.MOVIE) {
             streamRepository.resolveMovieVodSources(
                 imdbId = imdbId,
                 title = lookupTitle,
-                year = null,
+                year = lookupYear,
                 tmdbId = currentMediaId,
                 timeoutMs = timeoutMs
             )
         } else {
             streamRepository.resolveEpisodeVodSources(
                 imdbId = imdbId,
+                year = lookupYear,
                 season = seasonNumber ?: 1,
                 episode = episodeNumber ?: 1,
                 title = lookupTitle,

@@ -3000,7 +3000,8 @@ class StreamRepository @Inject constructor(
         title: String = "",
         tmdbId: Int? = null,
         tvdbId: Int? = null,
-        timeoutMs: Long = 45_000L
+        timeoutMs: Long = 45_000L,
+        year: Int? = null,
     ): StreamSource? = resolveEpisodeVodSources(
         imdbId = imdbId,
         season = season,
@@ -3008,7 +3009,8 @@ class StreamRepository @Inject constructor(
         title = title,
         tmdbId = tmdbId,
         tvdbId = tvdbId,
-        timeoutMs = timeoutMs
+        timeoutMs = timeoutMs,
+        year = year,
     ).firstOrNull()
 
     suspend fun resolveEpisodeHomeServerSources(
@@ -3039,7 +3041,8 @@ class StreamRepository @Inject constructor(
         title: String = "",
         tmdbId: Int? = null,
         tvdbId: Int? = null,
-        timeoutMs: Long = 45_000L
+        timeoutMs: Long = 45_000L,
+        year: Int? = null,
     ): List<StreamSource> = withContext(Dispatchers.IO) {
         withTimeoutOrNull(timeoutMs.coerceIn(500L, 90_000L)) {
             runCatching {
@@ -3049,6 +3052,7 @@ class StreamRepository @Inject constructor(
                     episode = episode,
                     imdbId = imdbId,
                     tmdbId = tmdbId,
+                    year = year,
                     allowNetwork = true
                 )
             }.onFailure { e ->
@@ -3071,7 +3075,8 @@ class StreamRepository @Inject constructor(
         season: Int,
         episode: Int,
         title: String = "",
-        tmdbId: Int? = null
+        tmdbId: Int? = null,
+        year: Int? = null,
     ) = withContext(Dispatchers.IO) {
         if (title.isBlank()) return@withContext
         runCatching {
@@ -3080,7 +3085,8 @@ class StreamRepository @Inject constructor(
                 season = season,
                 episode = episode,
                 imdbId = imdbId,
-                tmdbId = tmdbId
+                tmdbId = tmdbId,
+                year = year,
             )
         }
     }
@@ -3088,14 +3094,16 @@ class StreamRepository @Inject constructor(
     suspend fun prefetchSeriesVodInfo(
         imdbId: String?,
         title: String = "",
-        tmdbId: Int? = null
+        tmdbId: Int? = null,
+        year: Int? = null,
     ) = withContext(Dispatchers.IO) {
         if (title.isBlank()) return@withContext
         runCatching {
             iptvRepository.prefetchSeriesInfoForShow(
                 title = title,
                 imdbId = imdbId,
-                tmdbId = tmdbId
+                tmdbId = tmdbId,
+                year = year,
             )
         }
     }

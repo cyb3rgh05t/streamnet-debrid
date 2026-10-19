@@ -1095,6 +1095,7 @@ class DetailsViewModel @Inject constructor(
                             streamRepository.prefetchSeriesVodInfo(
                                 imdbId = null,
                                 title = titleForPrefetch,
+                                year = mergedItem.year.toIntOrNull(),
                                 tmdbId = mediaId
                             )
                         }.onFailure { logDetailsLoadFailure("series VOD prefetch", it) }
@@ -1103,6 +1104,7 @@ class DetailsViewModel @Inject constructor(
                             streamRepository.prefetchSeriesVodInfo(
                                 imdbId = externalIds?.imdbId,
                                 title = titleForPrefetch,
+                                year = mergedItem.year.toIntOrNull(),
                                 tmdbId = mediaId
                             )
                         }.onFailure { logDetailsLoadFailure("series VOD prefetch with IMDB ID", it) }
@@ -1119,6 +1121,7 @@ class DetailsViewModel @Inject constructor(
                         runCatching {
                             streamRepository.prefetchEpisodeVod(
                                 imdbId = externalIds?.imdbId,
+                                year = mergedItem.year.toIntOrNull(),
                                 season = targetSeason,
                                 episode = targetEpisode,
                                 title = titleForPrefetch,
@@ -3269,6 +3272,7 @@ class DetailsViewModel @Inject constructor(
             } else {
                 streamRepository.resolveEpisodeVodSources(
                     imdbId = imdbId,
+                    year = _uiState.value.item?.year?.toIntOrNull(),
                     season = season ?: 1,
                     episode = episode ?: 1,
                     title = itemTitle,

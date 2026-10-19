@@ -321,6 +321,7 @@ internal object IptvTitleNormalizer {
             .replace(releaseTagRegex, " ")
         return foldLetters(stripped)
             .lowercase(Locale.US)
+            .replace("&", " and ")
             .replace(nonAlphaNumericRegex, " ")
             .trim()
             .replace(multiSpaceRegex, " ")
@@ -361,32 +362,44 @@ internal object IptvTitleNormalizer {
     }
 }
 
-private val iptvVodTitleIgnoredTokens = setOf("the", "a", "an", "and", "of", "to", "in", "on")
+private val iptvVodTitleIgnoredTokens = setOf("the", "a", "an")
+
+internal fun iptvVodTitleKey(value: String): String {
+    val normalized = IptvTitleNormalizer.foldUmlautTranscription(IptvTitleNormalizer.normalize(value))
+    val tokens = normalized.split(' ')
+        .filter { it.isNotBlank() && it !in iptvVodTitleIgnoredTokens }
+    return tokens.filterIndexed { index, token ->
+        index != tokens.lastIndex || tokens.size == 1 || token.toIntOrNull() !in 1900..2099
+    }.joinToString(" ")
+}
 
 internal fun iptvVodTitlesMatchExactly(providerName: String, queryTitle: String): Boolean {
-    val provider = IptvTitleNormalizer.normalize(providerName)
-    val query = IptvTitleNormalizer.normalize(queryTitle)
-    if (provider.isBlank() || query.isBlank()) return false
+    val provider = iptvVodTitleKey(providerName)
+    return provider.isNotBlank() && provider == iptvVodTitleKey(queryTitle)
+}
 
-    fun meaningfulTokens(value: String): Set<String> = value
-        .split(' ')
-        .filter { token ->
-            token.isNotBlank() &&
-                token !in iptvVodTitleIgnoredTokens &&
-                (token.toIntOrNull()?.let { it !in 1900..2099 } ?: true)
-        }
-        .toSet()
+internal fun iptvVodIdentityMatch(
+    queryTmdb: String?,
+    queryImdb: String?,
+    providerTmdb: String?,
+    providerImdb: String?,
+): Boolean? = when {
+    queryTmdb != null && providerTmdb != null -> queryTmdb == providerTmdb
+    queryImdb != null && providerImdb != null -> queryImdb == providerImdb
+    else -> null
+}
 
-    val providerVariants = listOf(provider, IptvTitleNormalizer.foldUmlautTranscription(provider))
-    val queryVariants = listOf(query, IptvTitleNormalizer.foldUmlautTranscription(query))
-    return providerVariants.any { providerVariant ->
-        val variantTokens = meaningfulTokens(providerVariant)
-        queryVariants.any { queryVariant ->
-            val expectedTokens = meaningfulTokens(queryVariant)
-            expectedTokens.isNotEmpty() &&
-                variantTokens == expectedTokens
-        }
-    }
+internal fun iptvSeriesBindingKeys(
+    providerKey: String,
+    tmdb: String?,
+    imdb: String?,
+    title: String,
+    year: Int?,
+): List<String> = when {
+    !tmdb.isNullOrBlank() -> listOf("$providerKey|tmdb:$tmdb")
+    !imdb.isNullOrBlank() -> listOf("$providerKey|imdb:$imdb")
+    else -> iptvVodTitleKey(title).takeIf { it.isNotBlank() }
+        ?.let { listOf("$providerKey|title:$it|year:${year ?: ""}") }.orEmpty()
 }
 
 internal fun iptvVodYearsCompatible(queryYear: Int?, providerYear: Int?): Boolean =
@@ -4058,6 +4071,9 @@ class IptvRepository @Inject constructor(
     private data class XtreamSeriesItem(
         @SerializedName(value = "series_id", alternate = ["seriesid", "id"]) val seriesId: Int? = null,
         val name: String? = null,
+        val year: String? = null,
+        @SerializedName(value = "releaseDate", alternate = ["release_date", "releasedate"])
+        val releaseDate: String? = null,
         @SerializedName(value = "imdb", alternate = ["imdb_id", "imdbid"]) val imdb: String? = null,
         @SerializedName(value = "tmdb", alternate = ["tmdb_id", "tmdbid"]) val tmdb: String? = null,
         val cover: String? = null,
@@ -4133,7 +4149,7 @@ class IptvRepository @Inject constructor(
     )
 
     private inner class IptvSeriesResolverService {
-        private val prefs by lazy { context.getSharedPreferences("iptv_series_resolver_cache_v1", Context.MODE_PRIVATE) }
+        private val prefs by lazy { context.getSharedPreferences("iptv_series_resolver_cache_v2", Context.MODE_PRIVATE) }
         private val catalogLoadMutex = Mutex()
         private val catalogTtlMs = 24 * 60 * 60_000L
         private val resolvedTtlMs = 24 * 60 * 60_000L
@@ -4250,7 +4266,8 @@ class IptvRepository @Inject constructor(
             season: Int,
             episode: Int,
             tmdbId: Int?,
-            imdbId: String?
+            imdbId: String?,
+            year: Int? = null,
         ): List<ResolverCachedResolvedEpisode> {
             val normalizedShow = normalizeLookupText(showTitle)
             val normalizedTmdb = normalizeTmdbId(tmdbId)
@@ -4259,7 +4276,8 @@ class IptvRepository @Inject constructor(
                 providerKey = providerKey,
                 normalizedTmdb = normalizedTmdb,
                 normalizedImdb = normalizedImdb,
-                normalizedShow = normalizedShow
+                normalizedShow = normalizedShow,
+                year = year,
             )
             val seriesIds = readSeriesBinding(bindingKeys)
             if (seriesIds.isEmpty()) return emptyList()
@@ -4320,7 +4338,7 @@ class IptvRepository @Inject constructor(
                 return emptyList()
             }
 
-            val cacheKey = buildResolvedCacheKey(providerKey, normalizedTmdb, normalizedImdb, normalizedShow, season, episode)
+            val cacheKey = buildResolvedCacheKey(providerKey, normalizedTmdb, normalizedImdb, normalizedShow, season, episode, year)
             val cachedResolved = readResolved(cacheKey)?.takeIf { cached ->
                 System.currentTimeMillis() - cached.savedAtMs < resolvedTtlMs
             }
@@ -4333,7 +4351,8 @@ class IptvRepository @Inject constructor(
                 providerKey = providerKey,
                 normalizedTmdb = normalizedTmdb,
                 normalizedImdb = normalizedImdb,
-                normalizedShow = normalizedShow
+                normalizedShow = normalizedShow,
+                year = year,
             )
             val boundSeriesIds = readSeriesBinding(bindingKeys)
             if (boundSeriesIds.isNotEmpty()) {
@@ -4558,11 +4577,11 @@ class IptvRepository @Inject constructor(
                             seriesId = seriesId,
                             name = name,
                             normalizedName = normalizedName,
-                            canonicalTitleKey = toCanonicalTitleKeyFromTokens(tokens),
+                            canonicalTitleKey = toCanonicalTitleKey(name),
                             titleTokens = tokens,
                             tmdb = normalizeTmdbId(item.tmdb),
                             imdb = normalizeImdbId(item.imdb),
-                            year = parseYear(item.name ?: "")
+                            year = item.year?.toIntOrNull() ?: parseYear(item.releaseDate.orEmpty()) ?: parseYear(name)
                         )
                     }
                 }.orEmpty()
@@ -4596,7 +4615,7 @@ class IptvRepository @Inject constructor(
             val normalizedEntries = entries.map { entry ->
                 val normalizedName = entry.normalizedName.ifBlank { normalizeLookupText(entry.name) }
                 val titleTokens = if (entry.titleTokens.isEmpty()) extractTitleTokensFromNormalized(normalizedName) else entry.titleTokens
-                val canonicalTitleKey = entry.canonicalTitleKey.ifBlank { toCanonicalTitleKeyFromTokens(titleTokens) }
+                val canonicalTitleKey = toCanonicalTitleKey(entry.name)
                 entry.copy(
                     normalizedName = normalizedName,
                     canonicalTitleKey = canonicalTitleKey,
@@ -4650,17 +4669,24 @@ class IptvRepository @Inject constructor(
             }
             if (!normalizedImdb.isNullOrBlank()) {
                 catalog.imdbMap[normalizedImdb].orEmpty().forEach { entry ->
+                    if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, entry.tmdb, entry.imdb) == false) return@forEach
                     val prev = out[entry.seriesId]
                     if (prev == null || prev.confidence < 0.99f) {
                         out[entry.seriesId] = ResolverCandidate(entry, confidence = 0.99f, method = "imdb_id", baseScore = 21_000)
                     }
                 }
             }
+            if (out.isNotEmpty()) {
+                return out.values.sortedByDescending { it.confidence }
+            }
 
             if (normalizedShow.isNotBlank()) {
                 val canonicalShow = toCanonicalTitleKey(normalizedShow)
                 if (canonicalShow.isNotBlank()) {
                     catalog.canonicalTitleMap[canonicalShow].orEmpty().forEach { entry ->
+                        if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, entry.tmdb, entry.imdb) == false ||
+                            !iptvVodTitlesMatchExactly(entry.name, normalizedShow)
+                        ) return@forEach
                         val yearDelta = when {
                             inputYear == null || entry.year == null -> 0
                             else -> kotlin.math.abs(inputYear - entry.year)
@@ -4692,6 +4718,7 @@ class IptvRepository @Inject constructor(
                         }
                     }
                     candidatePool.values.forEach { entry ->
+                        if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, entry.tmdb, entry.imdb) == false) return@forEach
                         if (!iptvVodTitlesMatchExactly(entry.name, normalizedShow)) return@forEach
                         val overlap = entry.titleTokens.intersect(queryTokens).size
                         if (overlap <= 0) return@forEach
@@ -4812,13 +4839,15 @@ class IptvRepository @Inject constructor(
             imdb: String?,
             normalizedTitle: String,
             season: Int,
-            episode: Int
+            episode: Int,
+            year: Int?,
         ): String {
             return listOf(
                 providerKey,
                 tmdb.orEmpty(),
                 imdb.orEmpty(),
                 normalizedTitle,
+                year?.toString().orEmpty(),
                 season.toString(),
                 episode.toString()
             ).joinToString("|")
@@ -4858,20 +4887,13 @@ class IptvRepository @Inject constructor(
             providerKey: String,
             normalizedTmdb: String?,
             normalizedImdb: String?,
-            normalizedShow: String
-        ): List<String> {
-            val keys = mutableListOf<String>()
-            if (!normalizedTmdb.isNullOrBlank()) keys += "$providerKey|tmdb:$normalizedTmdb"
-            if (!normalizedImdb.isNullOrBlank()) keys += "$providerKey|imdb:$normalizedImdb"
-            val canonicalShow = toCanonicalTitleKey(normalizedShow)
-            if (canonicalShow.isNotBlank()) keys += "$providerKey|title:$canonicalShow"
-            return keys.distinct()
-        }
+            normalizedShow: String,
+            year: Int? = null,
+        ): List<String> = iptvSeriesBindingKeys(providerKey, normalizedTmdb, normalizedImdb, normalizedShow, year)
 
         /**
-         * Returns the union of bound series IDs across all binding keys. The
-         * order preserves match-confidence priority (TMDB-id keys come before
-         * IMDb keys, then title keys — see [buildSeriesBindingKeys]).
+         * Returns bound provider variants for a single media identity.
+         * ID lookups never reuse ambiguous title-only bindings.
          */
         private fun readSeriesBinding(keys: List<String>): List<Int> {
             if (keys.isEmpty()) return emptyList()
@@ -5025,7 +5047,10 @@ class IptvRepository @Inject constructor(
                 }
             }
             if (!normalizedImdb.isNullOrBlank()) {
-                val hits = idIndex.imdbMap[normalizedImdb].orEmpty()
+                val hits = idIndex.imdbMap[normalizedImdb].orEmpty().filter { idx ->
+                    iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, normalizeTmdbId(idIndex.items[idx].tmdb),
+                        normalizeImdbId(idIndex.items[idx].imdb)) != false
+                }
                 if (hits.isNotEmpty()) {
                     return@withContext finalizeIdMatches(hits.map { idIndex.items[it] }, normalizedImdb)
                 }
@@ -5070,14 +5095,16 @@ class IptvRepository @Inject constructor(
         episode: Int,
         imdbId: String? = null,
         tmdbId: Int? = null,
-        allowNetwork: Boolean = true
+        allowNetwork: Boolean = true,
+        year: Int? = null,
     ): StreamSource? = findEpisodeVodSources(
         title = title,
         season = season,
         episode = episode,
         imdbId = imdbId,
         tmdbId = tmdbId,
-        allowNetwork = allowNetwork
+        allowNetwork = allowNetwork,
+        year = year,
     ).firstOrNull()
 
     suspend fun findEpisodeVodSources(
@@ -5086,7 +5113,8 @@ class IptvRepository @Inject constructor(
         episode: Int,
         imdbId: String? = null,
         tmdbId: Int? = null,
-        allowNetwork: Boolean = true
+        allowNetwork: Boolean = true,
+        year: Int? = null,
     ): List<StreamSource> {
         return withContext(Dispatchers.IO) {
             if (!isVodSearchEnabled()) return@withContext emptyList()
@@ -5127,7 +5155,8 @@ class IptvRepository @Inject constructor(
                 season = season,
                 episode = episode,
                 tmdbId = tmdbId,
-                imdbId = imdbId
+                imdbId = imdbId,
+                year = year ?: parseYear(title),
             )
             if (fastResolved.isNotEmpty()) {
                 return@withContext sortVodSources(fastResolved.toSeriesVodSources())
@@ -5140,7 +5169,8 @@ class IptvRepository @Inject constructor(
                 episode = episode,
                 normalizedImdb = normalizedImdb,
                 normalizedTmdb = normalizedTmdb,
-                allowNetwork = false
+                allowNetwork = false,
+                year = year ?: parseYear(title),
             )
             if (cachedVodCatalogSources.isNotEmpty()) {
                 return@withContext cachedVodCatalogSources
@@ -5154,7 +5184,7 @@ class IptvRepository @Inject constructor(
                 episode = episode,
                 tmdbId = tmdbId,
                 imdbId = imdbId,
-                year = parseYear(title),
+                year = year ?: parseYear(title),
                 allowNetwork = false
             ).toSeriesVodSources()
 
@@ -5170,7 +5200,7 @@ class IptvRepository @Inject constructor(
                 episode = episode,
                 tmdbId = tmdbId,
                 imdbId = imdbId,
-                year = parseYear(title),
+                year = year ?: parseYear(title),
                 allowNetwork = true
             ).toSeriesVodSources()
             if (networkSeriesSources.isNotEmpty()) {
@@ -5184,7 +5214,8 @@ class IptvRepository @Inject constructor(
                 episode = episode,
                 normalizedImdb = normalizedImdb,
                 normalizedTmdb = normalizedTmdb,
-                allowNetwork = true
+                allowNetwork = true,
+                year = year ?: parseYear(title),
             )
             return@withContext sortVodSources(vodCatalogSources + cachedSeriesSources)
         }
@@ -5226,7 +5257,8 @@ class IptvRepository @Inject constructor(
         episode: Int,
         normalizedImdb: String?,
         normalizedTmdb: String?,
-        allowNetwork: Boolean
+        allowNetwork: Boolean,
+        year: Int? = null,
     ): List<StreamSource> {
         val normalizedTitle = normalizeLookupText(title)
         val vod = getXtreamVodStreams(creds, allowNetwork = allowNetwork, fast = true)
@@ -5245,8 +5277,12 @@ class IptvRepository @Inject constructor(
 
                 val imdbScore = if (!normalizedImdb.isNullOrBlank() && normalizeImdbId(item.imdb) == normalizedImdb) 10_000 else 0
                 val tmdbScore = if (!normalizedTmdb.isNullOrBlank() && normalizeTmdbId(item.tmdb) == normalizedTmdb) 9_500 else 0
+                if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, normalizeTmdbId(item.tmdb),
+                        normalizeImdbId(item.imdb)?.takeIf { it != IptvIdSentinels.IMDB_NONE }) == false
+                ) return@mapNotNull null
                 if (imdbScore == 0 && tmdbScore == 0 &&
-                    !iptvVodTitlesMatchExactly(name, normalizedTitle)
+                    (!iptvVodTitlesMatchExactly(name, normalizedTitle) ||
+                        !iptvVodYearsCompatible(year, parseYear(item.year.orEmpty()) ?: parseYear(name)))
                 ) {
                     return@mapNotNull null
                 }
@@ -5343,7 +5379,8 @@ class IptvRepository @Inject constructor(
         season: Int,
         episode: Int,
         imdbId: String? = null,
-        tmdbId: Int? = null
+        tmdbId: Int? = null,
+        year: Int? = null,
     ) {
         withContext(Dispatchers.IO) {
             if (!isVodSearchEnabled()) return@withContext
@@ -5360,7 +5397,7 @@ class IptvRepository @Inject constructor(
                     episode = episode,
                     tmdbId = tmdbId,
                     imdbId = imdbId,
-                    year = parseYear(title),
+                    year = year ?: parseYear(title),
                     allowNetwork = true
                 )
             }
@@ -5370,7 +5407,8 @@ class IptvRepository @Inject constructor(
     suspend fun prefetchSeriesInfoForShow(
         title: String,
         imdbId: String? = null,
-        tmdbId: Int? = null
+        tmdbId: Int? = null,
+        year: Int? = null,
     ) {
         withContext(Dispatchers.IO) {
             if (!isVodSearchEnabled()) return@withContext
@@ -5385,7 +5423,7 @@ class IptvRepository @Inject constructor(
                     showTitle = title,
                     tmdbId = tmdbId,
                     imdbId = imdbId,
-                    year = parseYear(title)
+                    year = year ?: parseYear(title)
                 )
             }
         }
@@ -5885,28 +5923,21 @@ class IptvRepository @Inject constructor(
     }
 
     private fun toCanonicalTitleKey(value: String): String {
-        val tokens = extractTitleTokens(value)
-        if (tokens.isEmpty()) return ""
-        return tokens.sorted().joinToString(" ")
-    }
-
-    /** Fast version: uses pre-computed tokens. */
-    private fun toCanonicalTitleKeyFromTokens(tokens: Set<String>): String {
-        if (tokens.isEmpty()) return ""
-        return tokens.sorted().joinToString(" ")
+        return iptvVodTitleKey(value)
     }
 
     private fun normalizeImdbId(value: String?): String? {
         if (value.isNullOrBlank()) return null
         val cleaned = value.trim().lowercase(Locale.US)
         val match = IMDB_ID_REGEX.find(cleaned)?.value
-        return match ?: cleaned.takeIf { it.startsWith("tt") && it.length >= 7 }
+        return (match ?: cleaned.takeIf { it.startsWith("tt") && it.length >= 7 })
+            ?.takeUnless { it.removePrefix("tt").all { digit -> digit == '0' } }
     }
 
     private fun normalizeTmdbId(value: String?): String? {
         if (value.isNullOrBlank()) return null
         val digits = TMDB_ID_REGEX.find(value.trim())?.value
-        return digits?.trimStart('0')?.ifBlank { "0" }
+        return digits?.trimStart('0')?.takeIf { it.isNotBlank() }
     }
 
     private fun normalizeTmdbId(value: Int?): String? {
@@ -5960,6 +5991,7 @@ class IptvRepository @Inject constructor(
     }
 
     private fun scoreNameMatch(providerName: String, normalizedInput: String): Int {
+        if (iptvVodTitlesMatchExactly(providerName, normalizedInput)) return 120
         val normalizedProvider = normalizeLookupText(providerName)
         val direct = scoreNormalizedNameMatch(normalizedProvider, normalizedInput)
         val alias = IptvTitleNormalizer.foldUmlautTranscription(normalizedProvider)
@@ -9095,8 +9127,7 @@ class IptvRepository @Inject constructor(
     ) {
         fun contains(item: MediaItem): Boolean {
             if (item.mediaType != MediaType.MOVIE && item.mediaType != MediaType.TV) return false
-            val normalizedTitle = normalizeIptvArtworkTitle(cleanIptvArtworkTitle(item.title))
-            if (normalizedTitle.isBlank()) return false
+            val itemTitleKey = iptvVodTitleKey(item.title)
             val itemTmdbId = item.id.takeIf { it > 0 }?.toString()
             val itemImdbId = item.homeServerImdbId
                 ?.trim()
@@ -9107,16 +9138,11 @@ class IptvRepository @Inject constructor(
                 .firstOrNull()
 
             return keys.asSequence()
-                .filter { key ->
-                    key.mediaType == item.mediaType && key.normalizedTitle == normalizedTitle
-                }
+                .filter { key -> key.mediaType == item.mediaType }
                 .any { key ->
-                    when {
-                        itemTmdbId != null && key.tmdbId != null -> itemTmdbId == key.tmdbId
-                        itemImdbId != null && key.imdbId != null -> itemImdbId == key.imdbId
-                        itemYear != null && key.year != null -> itemYear == key.year
-                        else -> true
-                    }
+                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId)
+                        ?: (itemTitleKey.isNotBlank() && key.normalizedTitle == itemTitleKey &&
+                            iptvVodYearsCompatible(itemYear, key.year))
                 }
         }
     }
@@ -9308,7 +9334,7 @@ class IptvRepository @Inject constructor(
                     mediaType = MediaType.TV,
                     tmdbId = item.tmdb,
                     imdbId = item.imdb,
-                    year = parseYear(item.name.orEmpty()),
+                    year = item.year?.toIntOrNull() ?: parseYear(item.releaseDate.orEmpty()) ?: parseYear(item.name.orEmpty()),
                 )
             }
         }
@@ -9323,14 +9349,14 @@ class IptvRepository @Inject constructor(
         year: Int? = null,
     ): XtreamVodAvailabilityKey? {
         val title = rawTitle?.trim().orEmpty()
-        val normalizedTitle = normalizeIptvArtworkTitle(cleanIptvArtworkTitle(title))
+        val normalizedTitle = iptvVodTitleKey(title)
         if (normalizedTitle.isBlank()) return null
         return XtreamVodAvailabilityKey(
             mediaType = mediaType,
             normalizedTitle = normalizedTitle,
             tmdbId = normalizeTmdbId(tmdbId),
             imdbId = normalizeImdbId(imdbId)?.takeIf { it != IptvIdSentinels.IMDB_NONE },
-            year = year?.takeIf { it in 1870..2100 },
+            year = year?.takeIf { it in 1870..2100 } ?: parseYear(title),
         )
     }
 
@@ -9414,11 +9440,11 @@ class IptvRepository @Inject constructor(
             if (name.isNotBlank()) {
                 val normalized = normalizeLookupText(name)
                 val tokens = extractTitleTokensFromNormalized(normalized)
+                val canonical = toCanonicalTitleKey(name)
+                if (canonical.isNotBlank()) {
+                    canonicalTitleMap.getOrPut(canonical) { mutableListOf() }.add(idx)
+                }
                 if (tokens.isNotEmpty()) {
-                    val canonical = toCanonicalTitleKeyFromTokens(tokens)
-                    if (canonical.isNotBlank()) {
-                        canonicalTitleMap.getOrPut(canonical) { mutableListOf() }.add(idx)
-                    }
                     tokens.forEach { token ->
                         tokenMap.getOrPut(token) { mutableListOf() }.add(idx)
                     }
@@ -9461,7 +9487,10 @@ class IptvRepository @Inject constructor(
             if (hits.isNotEmpty()) return hits.map { index.items[it] }
         }
         if (!normalizedImdb.isNullOrBlank() && normalizedImdb != IptvIdSentinels.IMDB_NONE) {
-            val hits = index.imdbMap[normalizedImdb].orEmpty()
+            val hits = index.imdbMap[normalizedImdb].orEmpty().filter { idx ->
+                iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, normalizeTmdbId(index.items[idx].tmdb),
+                    normalizeImdbId(index.items[idx].imdb)) != false
+            }
             if (hits.isNotEmpty()) return hits.map { index.items[it] }
         }
         if (normalizedTitle.isBlank()) return emptyList()
@@ -9486,6 +9515,9 @@ class IptvRepository @Inject constructor(
             .mapNotNull { item ->
                 val name = item.name?.trim().orEmpty()
                 if (name.isBlank()) return@mapNotNull null
+                if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, normalizeTmdbId(item.tmdb),
+                        normalizeImdbId(item.imdb)?.takeIf { it != IptvIdSentinels.IMDB_NONE }) == false
+                ) return@mapNotNull null
                 if (!iptvVodTitlesMatchExactly(name, normalizedTitle)) return@mapNotNull null
                 val score = scoreNameMatch(name, normalizedTitle)
                 if (score <= 0) return@mapNotNull null
@@ -9522,7 +9554,7 @@ class IptvRepository @Inject constructor(
     )
 
     private val iptvMovieSourcePrefs by lazy {
-        context.getSharedPreferences("iptv_movie_source_cache_v1", Context.MODE_PRIVATE)
+        context.getSharedPreferences("iptv_movie_source_cache_v2", Context.MODE_PRIVATE)
     }
     private val iptvMovieSourcePrefsKey = "movie_source_map"
 

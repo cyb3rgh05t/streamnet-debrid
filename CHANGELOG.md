@@ -2,6 +2,14 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.071] - 2026-10-19
+
+- Android IPTV Artwork Nachkorrektur: Der Screenshot-Fall „The Blacklist“ wurde mit echten TMDB-Treffern und dem Bild der gleichnamigen arabischen Serie reproduziert. Originaltitel und Relevanz der Originaltitel-Familie haben jetzt Vorrang vor dem Jahr; „neueste Fassung“ gilt innerhalb derselben Familie. Bloße Wortüberschneidungen oder Teilwörter reichen nicht mehr für ein Sendungsbild. Diagnose-Logs enthalten ausgewählten Titel, Originaltitel, ID und Jahr.
+- Android IPTV Artwork: Gleichnamige Serien innerhalb derselben Originaltitel-Familie bevorzugen ohne Jahresangabe die neueste Fassung, etwa „The Equalizer“ von 2021 statt 1985. Explizite Jahresangaben bleiben bei Suche und Caching erhalten. Fehlende Bilder oder Logos führen nicht mehr zum Wechsel auf eine andere TMDB-Fassung.
+- Android IPTV-only: Suche und VOD-Wiedergabe verwenden dieselbe Titel- und Jahresprüfung. Bekannte IDs haben Vorrang vor lokalisierten Titeln; widersprüchliche IDs werden beim Titel-Fallback ausgeschlossen. Serien-Bindings sind nach Identität statt zusätzlich nach gemeinsamem Titel getrennt; Serienjahre werden von Details und Player bis zum Resolver weitergegeben. Alte Auflösungs-Caches werden nicht weiterverwendet.
+
+- Android-Version: `2.5.071` / Code `472`.
+
 ## [2.5.070] - 2026-10-18
 
 - Android Home Scrollen: „Flüssiges Scrollen“ verwendet in Home und Settings einheitlich „Aus“ als Standard, solange kein Profilwert gespeichert ist. Bei „Aus“ erfolgen horizontale und vertikale Home-Positionswechsel ohne Scrollanimation; „Ein“ behält die bestehenden Animationen. Gespeicherte Profilwerte und Cloud-Sync bleiben unverändert; Regressionstests prüfen Standardwerte, Profiltrennung und laufende Einstellungsänderungen.

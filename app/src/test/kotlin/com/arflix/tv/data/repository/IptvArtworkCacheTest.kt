@@ -18,6 +18,20 @@ class IptvArtworkCacheTest {
     private val key = iptvArtworkKey("Tatort", "de-DE", null)
 
     @Test
+    fun `same title remakes and unknown year use independent caches`() = runBlocking {
+        val cache = IptvArtworkCache { 0L }
+        val old = iptvArtworkKey("The Equalizer (1985)", "de-DE", 55 * 60_000L)
+        val current = iptvArtworkKey("The Equalizer (2021)", "de-DE", 55 * 60_000L)
+        val unknown = iptvArtworkKey("The Equalizer", "de-DE", 55 * 60_000L)
+        assertNotEquals(old, current)
+        assertNotEquals(current, unknown)
+        assertEquals("old", cache.getOrLoad(old) { "old" })
+        assertEquals("current", cache.getOrLoad(current) { "current" })
+        assertEquals("latest", cache.getOrLoad(unknown) { "latest" })
+        assertEquals(current, iptvArtworkKey("The Equalizer [2021] - S01 E02", "de-DE", 45 * 60_000L))
+    }
+
+    @Test
     fun `home and tv reuse the same normalized program result`() = runBlocking {
         val cache = IptvArtworkCache { 0L }
         var loads = 0
