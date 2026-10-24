@@ -1435,21 +1435,20 @@ class HomeViewModel @Inject constructor(
         )
     }
 
-    private suspend fun buildTvCategories(
-        visibleCatalogIds: Set<String> = savedCatalogById.keys.toSet(),
-    ): Map<String, Category> {
-        val watchedCategories = buildRecentlyWatchedCategories(
-            visibleCatalogIds = visibleCatalogIds,
-        )
+    /**
+     * Favorite/Recent TV rows only depend on local IPTV caches. They must never wait for the
+     * watched-state initialisation (Trakt/Supabase network calls) that the recently-watched rows need.
+     */
+    private suspend fun buildIptvTvCategories(): Map<String, Category> {
         val snapshot = iptvRepository.getMemoryCachedSnapshot()
             ?: iptvRepository.getCachedSnapshotOrNull()
-            ?: return watchedCategories
+            ?: return emptyMap()
         val favoriteIds = iptvRepository.observeFavoriteChannels().first().toHashSet()
         val recentIds = recentTvHomeChannelIds(
             iptvRepository.observeTvSessionState().first().recentChannelIds
         )
         val relevantIds = favoriteIds + recentIds
-        if (relevantIds.isEmpty()) return watchedCategories
+        if (relevantIds.isEmpty()) return emptyMap()
 
         iptvRepository.reDeriveCachedNowNext(relevantIds)
         val freshSnapshot = iptvRepository.getMemoryCachedSnapshot() ?: snapshot
@@ -1477,7 +1476,6 @@ class HomeViewModel @Inject constructor(
         }
 
         return buildMap {
-            putAll(watchedCategories)
             category(
                 FAVORITE_TV_CATEGORY_ID,
                 "Favorite TV",
@@ -1828,7 +1826,7 @@ class HomeViewModel @Inject constructor(
                 // Re-derive now/next from (possibly updated) cached data
                 iptvRepository.reDeriveCachedNowNext(channelIds)
 
-                val freshCategories = runCatching { buildTvCategories() }.getOrDefault(emptyMap())
+                val freshCategories = runCatching { buildIptvTvCategories() }.getOrDefault(emptyMap())
                 if (freshCategories.isEmpty()) return@launch
 
                 withContext(Dispatchers.Main.immediate) {
@@ -3388,7 +3386,7 @@ class HomeViewModel @Inject constructor(
                 launchContinueWatchingFetch()
                 val localCatalogs = withContext(Dispatchers.IO) { catalogRepository.getCatalogs() }
                 val localTv = withContext(Dispatchers.IO) {
-                    buildTvCategories(localCatalogs.mapTo(mutableSetOf()) { it.id })
+                    runCatching { buildIptvTvCategories() }.getOrDefault(emptyMap())
                 }
                 if (requestId != loadHomeRequestId) return@loadHome
                 val localRows = mergeIptvHomeCategories(
@@ -3570,10 +3568,15 @@ class HomeViewModel @Inject constructor(
                 val currentBaseCategories = _uiState.value.categories.filter {
                     it.id != "continue_watching" && !it.id.startsWith("collection_row_")
                 }
-                val tvCategories = withContext(Dispatchers.IO) {
+                val watchedCategoriesDeferred = async(Dispatchers.IO) {
                     runCatching {
-                        buildTvCategories(savedCatalogs.mapTo(mutableSetOf()) { it.id })
+                        buildRecentlyWatchedCategories(
+                            visibleCatalogIds = savedCatalogs.mapTo(mutableSetOf()) { it.id },
+                        )
                     }.getOrDefault(emptyMap())
+                }
+                val tvCategories = withContext(Dispatchers.IO) {
+                    runCatching { buildIptvTvCategories() }.getOrDefault(emptyMap())
                 }
                 if (requestId != loadHomeRequestId) return@loadHome
                 val earlyTvCategories = mergeIptvHomeCategories(
@@ -3635,6 +3638,7 @@ class HomeViewModel @Inject constructor(
                     loadedFreshCatalogRows = baseCategories.any(::hasRealItems)
                     logLoadStage("tmdb_rows_ready")
 
+                    val watchedCategories = watchedCategoriesDeferred.await()
                     val baseById = LinkedHashMap<String, Category>().apply {
                         currentBaseCategories.forEach { put(it.id, it) }
                         baseCategories.forEach { put(it.id, it) }
@@ -3645,7 +3649,7 @@ class HomeViewModel @Inject constructor(
                             RECENTLY_WATCHED_MOVIES_CATEGORY_ID,
                             RECENTLY_WATCHED_SERIES_CATEGORY_ID,
                         ).forEach { categoryId ->
-                            val category = tvCategories[categoryId]
+                            val category = tvCategories[categoryId] ?: watchedCategories[categoryId]
                             if (category != null) put(categoryId, category) else remove(categoryId)
                         }
                     }
@@ -4587,7 +4591,7 @@ class HomeViewModel @Inject constructor(
             val catalogs = runCatching { catalogRepository.getCatalogs() }.getOrDefault(emptyList())
             val catalogOrder = catalogs.map { it.id }
             val configuredTitles = catalogs.associate { it.id to it.title }
-            val freshCategories = runCatching { buildTvCategories() }
+            val freshCategories = runCatching { buildIptvTvCategories() }
                 .getOrDefault(emptyMap())
                 .mapValues { (categoryId, category) ->
                     configuredTitles[categoryId]

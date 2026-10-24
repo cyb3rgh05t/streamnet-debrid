@@ -162,6 +162,7 @@ private object IptvIdSentinels {
 }
 
 private const val LargeIptvListChannelCount = 10_000
+private const val LoadLockMemoryWaitMs = 10_000L
 internal const val IPTV_GROUP_ORDER_SCHEMA = 3
 
 internal enum class IptvGroupOrderMove { UP, DOWN, TOP }
@@ -2708,10 +2709,26 @@ class IptvRepository @Inject constructor(
     }
 
     /**
+     * [loadSnapshot] holds [loadMutex] for the whole playlist + EPG download. While it runs, cache-only
+     * readers use the in-memory cache (which [loadSnapshot] fills from disk first) instead of queueing
+     * behind the network work. Returns null when no load is running or memory stays empty.
+     */
+    private suspend fun memorySnapshotWhileLoading(): IptvSnapshot? {
+        if (!loadMutex.isLocked) return null
+        var waitedMs = 0L
+        while (cachedChannels.isEmpty() && loadMutex.isLocked && waitedMs < LoadLockMemoryWaitMs) {
+            delay(50L)
+            waitedMs += 50L
+        }
+        return if (loadMutex.isLocked) getMemoryCachedSnapshot() else null
+    }
+
+    /**
      * Cache-only warmup used at app start.
      * Never performs network calls, so startup cannot get blocked by heavy playlists.
      */
     suspend fun warmupFromCacheOnly() {
+        if (memorySnapshotWhileLoading() != null) return
         withContext(Dispatchers.IO) {
             loadMutex.withLock {
                 val config = observeConfig().first()
@@ -2756,6 +2773,7 @@ class IptvRepository @Inject constructor(
      * Never performs network calls.
      */
     suspend fun getCachedSnapshotOrNull(): IptvSnapshot? {
+        memorySnapshotWhileLoading()?.let { return it }
         return withContext(Dispatchers.IO) {
             loadMutex.withLock {
                 val config = observeConfig().first()

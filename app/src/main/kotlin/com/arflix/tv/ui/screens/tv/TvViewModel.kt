@@ -73,7 +73,7 @@ data class TvUiState(
     val tvSession: IptvTvSessionState = IptvTvSessionState(),
     val iptvPreferencesLoaded: Boolean = false,
     val tvSessionLoaded: Boolean = false,
-    val favoritesOnly: Boolean = false,
+    val channelsBootstrapped: Boolean = false,
     val query: String = "",
     val epgLoadingChannelIds: Set<String> = emptySet(),
     val epgAttemptedChannelIds: Set<String> = emptySet(),
@@ -274,6 +274,7 @@ class TvViewModel @Inject constructor(
                 refresh(force = false, showLoading = false, forceEpg = false)
             }
             cacheBootstrapComplete = true
+            _uiState.value = _uiState.value.copy(channelsBootstrapped = true)
             startPeriodicEpgRefresh()
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,12 +62,14 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -78,6 +82,7 @@ import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.ui.components.LoadingIndicator
+import com.arflix.tv.ui.components.SkeletonBox
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
@@ -115,6 +120,7 @@ internal fun LiveTvNetflixLayout(
     isFullScreen: Boolean,
     previewVideoEnabled: Boolean = true,
     isBuffering: Boolean = false,
+    isLoadingChannels: Boolean = false,
     lookupBackdrop: suspend (IptvProgram) -> String? = { null },
     lookupLogo: suspend (IptvProgram) -> String? = { null },
     titleTextSize: String = "Normal",
@@ -134,6 +140,21 @@ internal fun LiveTvNetflixLayout(
     categoryFocusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
+    // Cancel the global TV UI size so this layout keeps its 100 % proportions
+    // (smaller UI sizes would otherwise leave large empty areas here).
+    val tvUiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current
+    val currentDensity = LocalDensity.current
+    val layoutDensity = remember(currentDensity, tvUiScale) {
+        if (tvUiScale == 1f || tvUiScale <= 0f) {
+            currentDensity
+        } else {
+            Density(
+                density = currentDensity.density / tvUiScale,
+                fontScale = currentDensity.fontScale,
+            )
+        }
+    }
+    CompositionLocalProvider(LocalDensity provides layoutDensity) {
     var railEntrySignal by remember { mutableIntStateOf(0) }
     var railFocusPending by remember { mutableStateOf(false) }
     val heroFocusRequester = remember { FocusRequester() }
@@ -153,6 +174,7 @@ internal fun LiveTvNetflixLayout(
     val previewNowNext = previewChannel?.let { nowNextMap[it.id] }
     val emptyCategoryMessage = when {
         channels.isNotEmpty() -> null
+        isLoadingChannels -> stringResource(R.string.live_loading_channels)
         selectedCategoryId == "fav" -> stringResource(R.string.live_empty_no_favorites)
         else -> stringResource(R.string.live_empty_no_channels_category)
     }
@@ -268,11 +290,13 @@ internal fun LiveTvNetflixLayout(
             railFocusPending = railFocusPending,
             onRailFocusSettled = { railFocusPending = false },
             emptyMessage = emptyCategoryMessage,
+            isLoading = isLoadingChannels,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
                 .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
         )
+    }
     }
 }
 
@@ -803,9 +827,14 @@ private fun NetflixChannelRail(
     railFocusPending: Boolean,
     onRailFocusSettled: () -> Unit,
     emptyMessage: String?,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     if (channels.isEmpty()) {
+        if (isLoading) {
+            NetflixChannelSkeletonRail(modifier = modifier)
+            return
+        }
         Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
             Text(text = emptyMessage ?: stringResource(R.string.live_empty_no_channels_category),
                 style = LiveType.CatLabel.copy(color = LiveColors.FgMute),
@@ -873,6 +902,26 @@ private fun NetflixChannelRail(
                 onLongPress = { if (variantCountFor(ch) > 1) onOpenVariants(ch) else onFavoriteToggle(ch.id) },
                 onKeyMoveUp = onMoveUp,
                 modifier = Modifier.focusRequester(requester),
+            )
+        }
+    }
+}
+
+@Composable
+private fun NetflixChannelSkeletonRail(modifier: Modifier = Modifier) {
+    LazyRow(
+        modifier = modifier,
+        userScrollEnabled = false,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        contentPadding = PaddingValues(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items(count = 8, key = { "skeleton_$it" }) {
+            SkeletonBox(
+                modifier = Modifier
+                    .width(ChannelCardWidth)
+                    .aspectRatio(16f / 9f),
+                shape = RoundedCornerShape(8.dp),
             )
         }
     }

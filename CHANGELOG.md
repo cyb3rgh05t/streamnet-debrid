@@ -2,6 +2,15 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.073] - 2026-10-24
+
+- Android Home: „Favorite TV“ und „Recently Watched TV“ werden ausschließlich aus lokalen IPTV-Caches gebaut und warten nicht mehr auf die Initialisierung des Watched-Status (Trakt/Cloud-Netzwerkaufrufe). Die „Recently Watched“-Reihen werden parallel dazu geladen; das minütliche EPG-Update überschreibt sie nicht mehr.
+- Android IPTV: Cache-Lesezugriffe (`getCachedSnapshotOrNull`, `warmupFromCacheOnly`) warten nicht mehr hinter einem laufenden Playlist-/EPG-Download (`loadSnapshot`), sondern nutzen den bereits geladenen Speicher-Cache. Betrifft Home-TV-Reihen und das Öffnen von Live-TV direkt nach dem App-Start.
+- Android Live-TV Netflix-Layout: Die lokale TV-UI-Größe (90/85/80 %) wirkt hier nicht mehr; das Layout behält seine Proportionen wie bei 100 % und lässt keine großen Leerflächen mehr. Übrige Bildschirme bleiben skaliert.
+- Android Live-TV Netflix-Layout: Solange die Senderliste noch nicht geladen ist, zeigt die Senderreihe animierte, nicht fokussierbare Skeleton-Karten, und das Infofeld meldet „Sender werden geladen…“ statt „Keine Sender in dieser Kategorie“.
+
+- Android-Version: `2.5.073` / Code `474`.
+
 ## [Web 1.0.069] - 2026-10-24
 
 - Web Startseite: Hero-Backdrop ausgewogen aufgehellt, überlagerte schwarze Verläufe reduziert und den zusätzlichen inneren Schatten entfernt. Textschutz links und der weiche Übergang zu den Rails bleiben auf Desktop und Mobilgeräten erhalten.

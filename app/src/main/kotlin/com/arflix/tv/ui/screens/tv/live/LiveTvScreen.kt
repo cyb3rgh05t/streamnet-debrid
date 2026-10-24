@@ -3320,6 +3320,7 @@ fun LiveTvScreen(
                     exoPlayer = exoPlayer,
                     guideClockMillis = guideClockMillis,
                     isBuffering = playerIsBuffering,
+                    isLoadingChannels = !state.channelsBootstrapped || state.isLoading,
                     variantCountFor = { ch -> variantCountFor(ch, variantGroups) },
                     isFullScreen = isFullScreen,
                     previewVideoEnabled = liveTvPreviewOutputEnabled(isFullScreen, fsProgress),
