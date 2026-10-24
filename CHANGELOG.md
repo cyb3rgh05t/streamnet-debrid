@@ -2,6 +2,12 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [2.5.075] - 2026-10-24
+
+- Android-Version: `2.5.075` / Code `476`.
+
+- Android Quellensuche: Für „Lupin“ (TMDB 96677) weicht die Staffelzählung der Quellen von der App ab. Die Quellensuche fragt Staffel 1, Folge 1–5 als Quell-Staffel 1, Staffel 1, Folge 6–10 als Quell-Staffel 2 (Folge 1–5), Staffel 2 als Quell-Staffel 3 und Staffel 3 als Quell-Staffel 4 an. Nur die Suche wird umgerechnet, die App zeigt weiter ihre eigenen Staffeln und Folgen; Cache-Schlüssel und Telegram-Suche verwenden die umgerechneten Werte. Weitere Serien lassen sich über `SourceSeasonRemap` ergänzen.
+
 ## [2.5.074] - 2026-10-24
 
 - Android-Version: `2.5.074` / Code `475`.

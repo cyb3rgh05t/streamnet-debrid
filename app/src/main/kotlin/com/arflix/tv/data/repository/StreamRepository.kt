@@ -2733,6 +2733,10 @@ class StreamRepository @Inject constructor(
         animeQueryOverride: String? = null,
         airDate: String? = null
     ): StreamResult = withContext(Dispatchers.IO) {
+        // Some series are numbered differently in the sources than in the app (see SourceSeasonRemap).
+        val sourceTarget = SourceSeasonRemap.resolve(tmdbId, season, episode)
+        @Suppress("NAME_SHADOWING") val season = sourceTarget.season
+        @Suppress("NAME_SHADOWING") val episode = sourceTarget.episode
         ensureAddonHealthLoaded()
         val subtitles = mutableListOf<Subtitle>()
         val allAddons = installedAddonsForSourceResolution()
@@ -2806,6 +2810,9 @@ class StreamRepository @Inject constructor(
         airDate: String? = null
     ): Flow<ProgressiveStreamResult> = callbackFlow {
         repositoryScope.launch {
+            val sourceTarget = SourceSeasonRemap.resolve(tmdbId, season, episode)
+            @Suppress("NAME_SHADOWING") val season = sourceTarget.season
+            @Suppress("NAME_SHADOWING") val episode = sourceTarget.episode
             ensureAddonHealthLoaded()
             val allAddons = installedAddonsForSourceResolution()
             val isAnime = animeMapper.isAnimeContent(tmdbId, genreIds, originalLanguage)
