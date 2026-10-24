@@ -2,6 +2,10 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Web 1.0.069] - 2026-10-24
+
+- Web Startseite: Hero-Backdrop ausgewogen aufgehellt, überlagerte schwarze Verläufe reduziert und den zusätzlichen inneren Schatten entfernt. Textschutz links und der weiche Übergang zu den Rails bleiben auf Desktop und Mobilgeräten erhalten.
+
 ## [Backend 1.0.024] - 2026-10-19
 
 - Backend Remote Config: Global neu hinzugefügte Kataloge werden pro Profil vorne in die gespeicherte Reihenfolge eingefügt und erscheinen nach dem Sync direkt unter „Weiterschauen“ (ohne CW ganz oben). Aktualisierungen bereits vorhandener Kataloge behalten deren Position; die Reihenfolge der übrigen Kataloge bleibt erhalten.

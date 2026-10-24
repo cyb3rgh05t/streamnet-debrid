@@ -11081,6 +11081,7 @@ button,
   padding: clamp(145px, 17.5vh, 200px) 3.35vw clamp(150px, 20vh, 240px) !important;
   background-position: 68% top !important;
   background-size: cover !important;
+  box-shadow: none;
   isolation: isolate;
 }
 
@@ -11091,31 +11092,25 @@ button,
     radial-gradient(
       ellipse 118% 92% at 82% 34%,
       rgba(0, 0, 0, 0) 0%,
-      rgba(0, 0, 0, 0.035) 34%,
-      rgba(0, 0, 0, 0.24) 68%,
-      rgba(0, 0, 0, 0.78) 100%
-    ),
-    radial-gradient(
-      ellipse 88% 76% at 9% 48%,
-      rgba(0, 0, 0, 0.76) 0%,
-      rgba(0, 0, 0, 0.5) 44%,
-      rgba(0, 0, 0, 0) 100%
+      rgba(0, 0, 0, 0.02) 34%,
+      rgba(0, 0, 0, 0.12) 68%,
+      rgba(0, 0, 0, 0.5) 100%
     ),
     linear-gradient(
       90deg,
       rgba(0, 0, 0, 0.98) 0%,
-      rgba(0, 0, 0, 0.88) 24%,
-      rgba(0, 0, 0, 0.46) 50%,
-      rgba(0, 0, 0, 0.17) 78%,
-      rgba(0, 0, 0, 0.08) 100%
+      rgba(0, 0, 0, 0.8) 24%,
+      rgba(0, 0, 0, 0.22) 50%,
+      rgba(0, 0, 0, 0.03) 78%,
+      transparent 100%
     ),
     linear-gradient(
       180deg,
-      rgba(0, 0, 0, 0.5) 0%,
-      rgba(0, 0, 0, 0.08) 30%,
-      rgba(0, 0, 0, 0.12) 56%,
-      rgba(0, 0, 0, 0.34) 78%,
-      rgba(0, 0, 0, 0.72) 100%
+      rgba(0, 0, 0, 0.25) 0%,
+      rgba(0, 0, 0, 0.02) 30%,
+      rgba(0, 0, 0, 0.04) 56%,
+      rgba(0, 0, 0, 0.18) 78%,
+      rgba(0, 0, 0, 0.6) 100%
     ) !important;
 }
 
@@ -11131,20 +11126,9 @@ button,
       180deg,
       rgba(0, 0, 0, 0) 0%,
       rgba(0, 0, 0, 0.025) 18%,
-      rgba(0, 0, 0, 0.13) 42%,
-      rgba(0, 0, 0, 0.54) 72%,
+      rgba(0, 0, 0, 0.08) 42%,
+      rgba(0, 0, 0, 0.4) 72%,
       #000 100%
-    ),
-    radial-gradient(
-      ellipse 112% 100% at 8% 100%,
-      rgba(0, 0, 0, 0.86) 0%,
-      rgba(0, 0, 0, 0.5) 42%,
-      rgba(0, 0, 0, 0) 78%
-    ),
-    radial-gradient(
-      ellipse 100% 78% at 100% 100%,
-      rgba(0, 0, 0, 0.54) 0%,
-      rgba(0, 0, 0, 0) 70%
     ) !important;
 }
 
@@ -11207,21 +11191,21 @@ button,
       radial-gradient(
         ellipse 120% 92% at 50% 22%,
         rgba(0, 0, 0, 0.02) 0%,
-        rgba(0, 0, 0, 0.2) 48%,
-        rgba(0, 0, 0, 0.74) 100%
+        rgba(0, 0, 0, 0.1) 48%,
+        rgba(0, 0, 0, 0.6) 100%
       ),
       linear-gradient(
         180deg,
-        rgba(0, 0, 0, 0.46) 0%,
-        rgba(0, 0, 0, 0.08) 32%,
-        rgba(0, 0, 0, 0.36) 68%,
+        rgba(0, 0, 0, 0.3) 0%,
+        rgba(0, 0, 0, 0.03) 32%,
+        rgba(0, 0, 0, 0.28) 68%,
         rgba(0, 0, 0, 0.82) 100%
       ),
       linear-gradient(
         90deg,
         rgba(0, 0, 0, 0.76),
-        rgba(0, 0, 0, 0.16) 64%,
-        rgba(0, 0, 0, 0.08)
+        rgba(0, 0, 0, 0.08) 64%,
+        transparent
       ) !important;
   }
 
