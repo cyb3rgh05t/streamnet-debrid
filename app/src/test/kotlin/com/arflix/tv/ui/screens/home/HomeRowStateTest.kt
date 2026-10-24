@@ -538,6 +538,19 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `focus follows the same title when its episode suffix changes`() {
+        val keys = listOf("TV-5_S1E3", "MOVIE-2", "TV-9_S2E1")
+
+        val resolvedIndex = resolveHomeItemIndex(
+            itemKeys = keys,
+            preferredItemKey = "TV-9_S2E4",
+            fallbackIndex = 0
+        )
+
+        assertThat(resolvedIndex).isEqualTo(2)
+    }
+
+    @Test
     fun `empty refreshing catalog resets poster index`() {
         val resolvedIndex = resolveHomeItemIndex(
             itemKeys = emptyList(),

@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -58,6 +59,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
@@ -111,6 +113,8 @@ fun CategorySidebar(
     onTopBoundaryFocusChanged: (Boolean) -> Unit = {},
     focusSelectedCategorySignal: Int = 0,
     focusSearchSignal: Int = 0,
+    // False while another zone (e.g. the top navigation bar) owns the D-pad focus.
+    active: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
     val targetWidth = if (expanded) LiveDims.SidebarExpanded else LiveDims.SidebarCollapsed
@@ -123,6 +127,10 @@ fun CategorySidebar(
     var expandedAll by rememberSaveable { mutableStateOf(false) }
     var activeMenu by remember { mutableStateOf<CategoryMenuState?>(null) }
     var allowSearchFocus by remember { mutableStateOf(false) }
+    // Search may only take focus when the user is already inside the sidebar (D-pad up from the first
+    // category) or asks for it explicitly. Otherwise the platform's "first focusable" fallback parked
+    // the selector on the search row, which then looked permanently focused.
+    var sidebarHasFocus by remember { mutableStateOf(false) }
     val searchFocusRequester = remember { FocusRequester() }
     val selectedCategoryFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -279,6 +287,7 @@ fun CategorySidebar(
             .background(LiveColors.PanelDeep)
             .focusGroup()
             .onFocusChanged { focusState ->
+                sidebarHasFocus = focusState.hasFocus
                 if (focusState.hasFocus) {
                     onFocusEnter()
                 }
@@ -335,15 +344,10 @@ fun CategorySidebar(
             },
             onFocusChanged = { isFocused ->
                 onTopBoundaryFocusChanged(isFocused)
-                if (isFocused) {
-                    if (allowSearchFocus) {
-                        allowSearchFocus = false
-                    } else {
-                        // Guard against accidental focus fallback to search.
-                        runCatching { selectedCategoryFocusRequester.requestFocus() }
-                    }
-                }
+                if (isFocused) allowSearchFocus = false
             },
+            canFocus = allowSearchFocus || sidebarHasFocus,
+            showFocus = active,
             focusRequester = searchFocusRequester,
         )
         Spacer(Modifier.height(8.dp))
@@ -528,90 +532,86 @@ fun CategorySidebar(
 private fun SearchEntry(
     onClick: () -> Unit,
     expanded: Boolean,
+    canFocus: Boolean = true,
+    showFocus: Boolean = true,
     onMoveUp: () -> Unit = {},
     onMoveDown: () -> Unit = {},
     onFocusChanged: (Boolean) -> Unit = {},
     focusRequester: FocusRequester? = null,
 ) {
     val focusManager = LocalFocusManager.current
-    var focused by remember { mutableStateOf(false) }
-    Row(
+    var hasFocus by remember { mutableStateOf(false) }
+    // While the top navigation bar is the active zone the platform focus can still rest here;
+    // it must not be drawn as focused then.
+    val focused = hasFocus && showFocus
+    // Same geometry and states as SidebarRow: transparent while idle, raised surface plus
+    // accent ring only while it really holds focus.
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(40.dp)
-            .onFocusChanged {
-                focused = it.isFocused
-                onFocusChanged(it.isFocused)
-            }
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
-            .onPreviewKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) {
-                    false
-                } else when (ev.key) {
-                    Key.DirectionUp -> {
-                        onMoveUp()
-                        focusManager.moveFocus(FocusDirection.Up)
-                        true
-                    }
-                    Key.DirectionDown -> {
-                        onMoveDown()
-                        focusManager.moveFocus(FocusDirection.Down)
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter -> {
-                        onClick()
-                        true
-                    }
-                    else -> false
-                }
-            }
-            .border(
-                width = if (focused) 1.dp else 0.dp,
-                color = if (focused) LiveColors.FocusRing else Color.Transparent,
-                shape = RoundedCornerShape(10.dp),
-            )
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) LiveColors.FocusBg else LiveColors.Panel)
-            .focusable()
-            .onKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
-                when (ev.key) {
-                    Key.DirectionUp -> {
-                        onMoveUp()
-                        true
-                    }
-                    Key.DirectionDown -> {
-                        onMoveDown()
-                        true
-                    }
-                    Key.DirectionCenter, Key.Enter -> {
-                        onClick()
-                        true
-                    }
-                    else -> false
-                }
-            }
-            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .height(LiveDims.SidebarRowHeight + 6.dp)
+            .padding(start = 10.dp, end = 12.dp),
     ) {
-        Icon(
-            imageVector = Icons.Filled.Search,
-            contentDescription = stringResource(R.string.search),
-            tint = LiveColors.FgDim,
-            modifier = Modifier.size(14.dp),
-        )
-        if (expanded) {
-            Text(
-                text = stringResource(R.string.search),
-                style = LiveType.CatLabel.copy(color = LiveColors.FgDim),
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .onFocusChanged {
+                    hasFocus = it.isFocused
+                    onFocusChanged(it.isFocused)
+                }
+                .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+                .onPreviewKeyEvent { ev ->
+                    if (ev.type != KeyEventType.KeyDown) {
+                        false
+                    } else when (ev.key) {
+                        Key.DirectionUp -> {
+                            onMoveUp()
+                            focusManager.moveFocus(FocusDirection.Up)
+                            true
+                        }
+                        Key.DirectionDown -> {
+                            onMoveDown()
+                            focusManager.moveFocus(FocusDirection.Down)
+                            true
+                        }
+                        Key.DirectionCenter, Key.Enter -> {
+                            onClick()
+                            true
+                        }
+                        else -> false
+                    }
+                }
+                .border(
+                    width = if (focused) 1.dp else 0.dp,
+                    color = if (focused) LiveColors.FocusRing else Color.Transparent,
+                    shape = RoundedCornerShape(8.dp),
+                )
+                .clip(RoundedCornerShape(8.dp))
+                .background(if (focused) LiveColors.PanelRaised else Color.Transparent)
+                .focusProperties { this.canFocus = canFocus }
+                .focusable()
+                .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) }
+                .padding(horizontal = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Filled.Search,
+                contentDescription = stringResource(R.string.search),
+                tint = if (focused) LiveColors.Accent else LiveColors.FgDim,
+                modifier = Modifier.size(14.dp),
             )
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = "/",
-                style = LiveType.NumberMono.copy(color = LiveColors.FgMute),
-            )
+            if (expanded) {
+                Text(
+                    text = stringResource(R.string.search),
+                    style = LiveType.CatLabel.copy(
+                        color = if (focused) LiveColors.Fg else LiveColors.FgDim,
+                        fontSize = 11.sp,
+                    ),
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+            }
         }
     }
 }
@@ -672,19 +672,11 @@ private fun SidebarRow(
             .height(LiveDims.SidebarRowHeight)
             .padding(start = indent),
     ) {
-        if (active) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(LiveDims.ActiveIndicator)
-                    .background(LiveColors.Accent),
-            )
-        }
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(start = if (active) 12.dp else 10.dp, end = 12.dp)
+                .padding(start = 10.dp, end = 12.dp)
                 .onFocusChanged {
                     focused = it.isFocused
                     if (it.isFocused) onFocused?.invoke()

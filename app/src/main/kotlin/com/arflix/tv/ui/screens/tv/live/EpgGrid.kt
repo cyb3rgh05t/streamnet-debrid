@@ -333,12 +333,12 @@ fun EpgGrid(
             ?: return@LaunchedEffect
         val idx = channelIndexById[id] ?: return@LaunchedEffect
         val nowMin = ((clockTickMillis - windowStartMillis) / 60_000L).toInt()
-        repeat(6) {
+        repeat(30) {
             if (requestNearestProgramFocus(idx, nowMin)) {
                 handledEpgFocusSignal = focusEpgSignal
                 return@LaunchedEffect
             }
-            delay(50L)
+            delay(30L)
         }
         keepChannelFocus(idx)
         handledEpgFocusSignal = focusEpgSignal
@@ -439,7 +439,7 @@ fun EpgGrid(
                     val nowOffset = (nowMin * pxPerMin).dp
                     Box(
                         modifier = Modifier
-                            .offset(x = nowOffset - 46.dp, y = 6.dp)
+                            .offset(x = nowOffset, y = 6.dp)
                             .clip(RoundedCornerShape(4.dp))
                             .background(LiveColors.Accent)
                             .padding(horizontal = 8.dp, vertical = 3.dp),
@@ -540,11 +540,11 @@ fun EpgGrid(
                                 onMoveRight = {
                                     val nowMin = ((clockTickMillis - windowStartMillis) / 60_000L).toInt()
                                     onEnterEpg(ch)
-                                    if (requestNearestProgramFocus(idx, nowMin)) {
-                                        true
-                                    } else {
-                                        keepChannelFocus(idx)
-                                    }
+                                    // Program cells only become focusable once the zone is EPG, so the first
+                                    // attempt usually misses. The focus-signal effect keeps retrying until
+                                    // they exist; falling back to the channel here fought with that retry
+                                    // and made entering the grid feel stuck.
+                                    requestNearestProgramFocus(idx, nowMin)
                                     true
                                 },
                                 onMoveUp = { moveChannelFocus(-1) },
@@ -652,7 +652,7 @@ fun EpgGrid(
                     }
                 }
 
-                // NOW glow line across full body
+                // NOW line across full body
                 if (clockTickMillis in windowStartMillis until windowEndMillis) {
                     val nowMin = ((clockTickMillis - windowStartMillis) / 60_000L).toInt()
                     val xDpInside = (nowMin * pxPerMin).dp - with(density) { hScroll.value.toDp() }
@@ -664,14 +664,6 @@ fun EpgGrid(
                                 .fillMaxHeight()
                                 .width(2.dp)
                                 .background(LiveColors.Accent),
-                        )
-                        // Glow behind the 2dp line
-                        Box(
-                            modifier = Modifier
-                                .offset(x = xDp - 3.dp)
-                                .fillMaxHeight()
-                                .width(8.dp)
-                                .background(LiveColors.Accent.copy(alpha = 0.22f)),
                         )
                     }
                 }
@@ -850,14 +842,6 @@ private fun NowLine(
             .fillMaxHeight()
             .width(2.dp)
             .background(LiveColors.Accent),
-    )
-    // Glow behind the 2dp line
-    Box(
-        modifier = Modifier
-            .offset(x = xDp - 3.dp)
-            .fillMaxHeight()
-            .width(8.dp)
-            .background(LiveColors.Accent.copy(alpha = 0.22f)),
     )
 }
 

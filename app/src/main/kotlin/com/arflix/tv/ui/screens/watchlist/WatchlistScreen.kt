@@ -2,6 +2,8 @@ package com.arflix.tv.ui.screens.watchlist
 
 import android.os.SystemClock
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -9,6 +11,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -50,14 +53,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -66,6 +72,9 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import com.arflix.tv.ui.screens.home.animateHomeScrollDelta
+import kotlin.math.abs
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -104,7 +113,9 @@ import com.arflix.tv.ui.components.rememberCardLayoutMode
 import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
 import com.arflix.tv.ui.skin.resolveAccentColor
+import coil.compose.AsyncImage
 import com.arflix.tv.ui.theme.ArflixTypography
+import com.arflix.tv.ui.theme.LocalOledBlackBackground
 import com.arflix.tv.ui.theme.Pink
 import com.arflix.tv.ui.theme.TextPrimary
 import com.arflix.tv.ui.theme.appBackgroundDark
@@ -188,6 +199,7 @@ fun WatchlistScreen(
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val libraryState by viewModel.libraryState.collectAsStateWithLifecycle()
+    val smoothScrolling by viewModel.smoothScrolling.collectAsStateWithLifecycle()
     val logoUrls by viewModel.logoUrls.collectAsStateWithLifecycle()
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val usePosterCards = rememberCardLayoutMode() == CardLayoutMode.POSTER
@@ -338,6 +350,18 @@ fun WatchlistScreen(
     val isLibraryMode = isHomeServerMode || isTrackerMode
     val visibleLibraryItems = activeLibraryState.items
 
+    // Fanart behind the focused card; disabled with the OLED black background and on touch devices.
+    val fanartEnabled = !isMobile && !LocalOledBlackBackground.current
+    val fanartUrl: String? = if (fanartEnabled && focusZone == WatchlistFocusZone.CONTENT) {
+        val focused = if (isLibraryMode) {
+            visibleLibraryItems.getOrNull(focusedItemIndex)
+        } else {
+            watchlistSections.getOrNull(focusedSectionIndex)?.second?.getOrNull(focusedItemIndex)
+        }
+        focused?.backdrop?.takeIf { it.isNotBlank() } ?: focused?.image?.takeIf { it.isNotBlank() }
+    } else {
+        null
+    }
     fun moveToContent() {
         focusZone = WatchlistFocusZone.CONTENT
         focusedItemIndex = focusedItemIndex.coerceIn(
@@ -432,7 +456,7 @@ fun WatchlistScreen(
     LaunchedEffect(focusedItemIndex, isLibraryMode, visibleLibraryItems.size) {
         if (isLibraryMode && visibleLibraryItems.isNotEmpty()) {
             val safe = focusedItemIndex.coerceIn(0, visibleLibraryItems.lastIndex)
-            libraryGridState.animateScrollToItem(safe)
+            libraryGridState.bringItemIntoView(safe)
             if (safe >= visibleLibraryItems.size - libraryColumns * 2) {
                 if (isHomeServerMode) viewModel.loadMoreLibrary() else viewModel.loadMoreActiveSource()
             }
@@ -631,6 +655,9 @@ fun WatchlistScreen(
                 }
             }
     ) {
+        if (fanartEnabled) {
+            WatchlistFanartBackground(url = fanartUrl)
+        }
         if (!isMobile) {
             AppTopBar(
                 selectedItem = SidebarItem.WATCHLIST,
@@ -713,6 +740,7 @@ fun WatchlistScreen(
                     isMobile = isMobile,
                     focusedSectionIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedSectionIndex else -1,
                     focusedItemIndex = if (focusZone == WatchlistFocusZone.CONTENT) focusedItemIndex else -1,
+                    smoothScrolling = smoothScrolling,
                     listState = watchlistColumnState,
                     onItemFocused = { index -> focusedItemIndex = index },
                     onItemClick = { onNavigateToDetails(it.mediaType, it.id) },
@@ -1306,7 +1334,8 @@ private fun ColumnScope.LibraryResults(
                                 isLandscape = isLandscape,
                                 logoImageUrl = logoUrls[watchlistLogoKey(item)],
                                 showTitle = true,
-                                titleMaxLines = 2,
+                                titleMaxLines = 1,
+                                marqueeTitleOnFocus = true,
                                 isFocusedOverride = index == focusedItemIndex,
                                 enableSystemFocus = false,
                                 onFocused = { onItemFocused(index) },
@@ -1354,6 +1383,7 @@ private fun ColumnScope.WatchlistContent(
     isMobile: Boolean,
     focusedSectionIndex: Int,
     focusedItemIndex: Int,
+    smoothScrolling: Boolean = false,
     listState: androidx.compose.foundation.lazy.LazyListState,
     onItemFocused: (Int) -> Unit,
     onItemClick: (MediaItem) -> Unit,
@@ -1387,6 +1417,7 @@ private fun ColumnScope.WatchlistContent(
                         isLandscape = isLandscape,
                         isMobile = isMobile,
                         focusedItemIndex = if (focusedSectionIndex == sectionIdx) focusedItemIndex else -1,
+                        smoothScrolling = smoothScrolling,
                         onItemFocused = onItemFocused,
                         onItemClick = onItemClick,
                         onItemLongPress = onItemLongPress
@@ -1469,6 +1500,73 @@ private fun CenteredLoading() {
     }
 }
 
+/**
+ * Scrolls only when the focused item is not fully visible, and only by the missing distance.
+ */
+private suspend fun androidx.compose.foundation.lazy.grid.LazyGridState.bringItemIntoView(index: Int) {
+    val info = layoutInfo
+    val item = info.visibleItemsInfo.firstOrNull { it.index == index }
+    if (item == null) {
+        animateScrollToItem(index)
+        return
+    }
+    val start = info.viewportStartOffset + info.beforeContentPadding
+    val end = info.viewportEndOffset - info.afterContentPadding
+    val top = item.offset.y
+    val bottom = top + item.size.height
+    val delta = when {
+        top < start -> top - start
+        bottom > end -> bottom - end
+        else -> 0
+    }
+    if (delta != 0) animateScrollBy(delta.toFloat(), tween(durationMillis = 140, easing = LinearOutSlowInEasing))
+}
+
+@Composable
+private fun WatchlistFanartBackground(url: String?) {
+    val base = appBackgroundDark()
+    // Wait for the D-pad to rest so fast scrolling does not decode a full-screen image per step.
+    val shownUrl by produceState<String?>(initialValue = url, url) {
+        if (url == null) {
+            value = null
+        } else {
+            delay(280)
+            value = url
+        }
+    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Crossfade(targetState = shownUrl, animationSpec = tween(durationMillis = 350), label = "watchlist-fanart") { target ->
+            if (target != null) {
+                AsyncImage(
+                    model = target,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f }
+                )
+            }
+        }
+        // Keep the top bar, tabs and card text readable on top of the artwork.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(base.copy(alpha = 0.78f), base.copy(alpha = 0.55f), base.copy(alpha = 0.92f))
+                    )
+                )
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(base.copy(alpha = 0.7f), Color.Transparent)
+                    )
+                )
+        )
+    }
+}
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 private fun LibraryMessage(title: String, subtitle: String) {
@@ -1489,6 +1587,7 @@ private fun WatchlistItemsSection(
     isLandscape: Boolean,
     isMobile: Boolean = false,
     focusedItemIndex: Int = -1,
+    smoothScrolling: Boolean = false,
     onItemFocused: (Int) -> Unit = {},
     onItemClick: (MediaItem) -> Unit,
     onItemLongPress: (MediaItem) -> Unit = {}
@@ -1502,18 +1601,27 @@ private fun WatchlistItemsSection(
         )
 
         val lazyListState = rememberLazyListState()
+        val density = LocalDensity.current
+        val itemSpanPx = remember(density, cardWidth) { with(density) { (cardWidth + 16.dp).toPx().coerceAtLeast(1f) } }
+        // Same rail behaviour as the Home rows: the focused card sits in the first slot and the
+        // row moves underneath it. "Smooth scrolling" (default off) decides between a spring and a snap.
         LaunchedEffect(focusedItemIndex) {
             if (focusedItemIndex < 0) return@LaunchedEffect
-            val safe = focusedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
-            // A prior scroll animation cancelled mid-flight (fast D-pad navigation) can leave
-            // firstVisibleItemIndex already correct while its pixel offset is still nonzero,
-            // which renders that item half-cut-off. Guard on the offset too, not just the index.
-            if (safe == lazyListState.firstVisibleItemIndex && lazyListState.firstVisibleItemScrollOffset == 0) {
+            val target = focusedItemIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
+            val currentFirst = lazyListState.firstVisibleItemIndex
+            val currentOffset = lazyListState.firstVisibleItemScrollOffset
+            if (target == currentFirst && currentOffset == 0) return@LaunchedEffect
+            if (!smoothScrolling || abs(target - currentFirst) > 7) {
+                lazyListState.scrollToItem(target)
                 return@LaunchedEffect
             }
-            val first = lazyListState.firstVisibleItemIndex
-            val last = lazyListState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: first
-            if (safe < first || safe > last) lazyListState.scrollToItem(safe) else lazyListState.animateScrollToItem(safe)
+            lazyListState.animateHomeScrollDelta(
+                deltaPx = (target - currentFirst) * itemSpanPx - currentOffset,
+                durationMillis = if (abs(target - currentFirst) >= 3) 180 else 150
+            )
+            if (lazyListState.firstVisibleItemIndex != target || lazyListState.firstVisibleItemScrollOffset > 6) {
+                lazyListState.scrollToItem(target)
+            }
         }
 
         LazyRow(
@@ -1533,7 +1641,8 @@ private fun WatchlistItemsSection(
                     isLandscape = isLandscape,
                     logoImageUrl = logoUrls[watchlistLogoKey(item)],
                     showTitle = true,
-                    titleMaxLines = 2,
+                    titleMaxLines = 1,
+                    marqueeTitleOnFocus = true,
                     isFocusedOverride = index == focusedItemIndex && focusedItemIndex >= 0,
                     enableSystemFocus = false,
                     onFocused = { onItemFocused(index) },

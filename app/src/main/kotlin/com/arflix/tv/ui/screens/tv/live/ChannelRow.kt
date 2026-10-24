@@ -19,12 +19,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,7 +35,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -84,15 +87,16 @@ fun ChannelRow(
 ) {
     var focused by remember { mutableStateOf(false) }
     val visuallyFocused = focused || forceFocused
-    val bg = when {
-        visuallyFocused -> LiveColors.PanelRaised
-        isActive -> LiveColors.FocusBg
-        stripe -> LiveColors.RowStripe
-        else -> Color.Transparent
+    val shape = RoundedCornerShape(14.dp)
+    val accent = LiveColors.Accent
+    val rowBrush: Brush = when {
+        visuallyFocused -> Brush.horizontalGradient(listOf(accent.copy(alpha = 0.28f), LiveColors.PanelRaised))
+        isActive -> Brush.horizontalGradient(listOf(accent.copy(alpha = 0.20f), accent.copy(alpha = 0.04f)))
+        else -> SolidColor(LiveColors.Panel.copy(alpha = 0.42f))
     }
     val now = nowNext?.now
     val animatedBorderWidth by animateDpAsState(
-        targetValue = if (visuallyFocused) 1.dp else 0.dp,
+        targetValue = if (visuallyFocused) 1.5.dp else 0.dp,
         animationSpec = tween(durationMillis = 70),
         label = "channel-row-border",
     )
@@ -105,6 +109,8 @@ fun ChannelRow(
         modifier = modifier
             .fillMaxWidth()
             .height(rowHeight)
+            // Inset so every row reads as its own rounded card instead of a flat stripe.
+            .padding(horizontal = 6.dp, vertical = 3.dp)
             .graphicsLayer {
                 scaleX = animatedScale
                 scaleY = animatedScale
@@ -115,9 +121,11 @@ fun ChannelRow(
             }
             .border(
                 width = animatedBorderWidth,
-                color = if (visuallyFocused) LiveColors.FocusRing else Color.Transparent,
+                color = if (visuallyFocused) accent else Color.Transparent,
+                shape = shape,
             )
-            .background(if (visuallyFocused) LiveColors.PanelRaised else bg)
+            .clip(shape)
+            .background(rowBrush)
             .focusable()
             .onPreviewKeyEvent { ev ->
                 if (ev.type == KeyEventType.KeyDown) {
@@ -154,35 +162,23 @@ fun ChannelRow(
             },
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // ─ active left indicator ─────────────────────────────
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(LiveDims.ActiveIndicator)
-                .background(if (isActive) LiveColors.Accent else Color.Transparent),
-        )
+        Spacer(Modifier.width(10.dp))
 
-        if (compact) {
-            ChannelLogo(channel = channel, size = 36.dp)
-            Spacer(Modifier.width(8.dp))
-        }
+        ChannelLogo(channel = channel, size = 34.dp, cornerRadius = 10.dp, showBackground = false)
 
-        if (!compact) {
-            ChannelLogo(channel = channel, size = 36.dp)
-        }
-
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(10.dp))
 
         // ─ name / program / progress / time ──────────────────
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
+            verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = channel.name,
                     style = LiveType.CellTitle.copy(
-                        color = if (isActive) LiveColors.Accent else LiveColors.Fg,
+                        color = if (isActive || visuallyFocused) accent else LiveColors.Fg,
+                        fontWeight = if (isActive || visuallyFocused) FontWeight.SemiBold else FontWeight.W500,
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -212,12 +208,20 @@ fun ChannelRow(
             // the right, not smeared across the channel name column.
             val progress = remember(now, clockTickMillis) { progressOf(now) }
             if (progress != null) {
-                LinearProgressIndicator(
-                    progress = { progress },
-                    modifier = Modifier.width(80.dp).height(2.dp),
-                    color = LiveColors.Accent,
-                    trackColor = LiveColors.Divider,
-                )
+                Box(
+                    modifier = Modifier
+                        .width(84.dp)
+                        .height(3.dp)
+                        .clip(CircleShape)
+                        .background(LiveColors.FgMute.copy(alpha = 0.35f)),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(progress.coerceIn(0f, 1f))
+                            .background(accent),
+                    )
+                }
             }
         }
 

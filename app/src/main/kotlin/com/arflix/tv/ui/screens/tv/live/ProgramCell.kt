@@ -197,20 +197,6 @@ fun ProgramCell(
             )
             .padding(horizontal = 6.dp, vertical = 4.dp),
     ) {
-        if (isNow) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                LiveColors.Accent.copy(alpha = 0.22f),
-                                Color.Transparent,
-                            )
-                        )
-                    )
-            )
-        }
         val titleInset = pinnedTitleInset.coerceAtMost((width - 18.dp).coerceAtLeast(0.dp))
         val titleWidth = pinnedTitleWidth.coerceAtMost((width - titleInset).coerceAtLeast(0.dp))
         if (titleWidth > 18.dp) {

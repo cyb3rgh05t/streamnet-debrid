@@ -1679,6 +1679,10 @@ fun LiveTvScreen(
     // box. focusPlaylistSearch() still bumps it when the user actually asks
     // for search.
     var focusSearchCategorySignal by remember { mutableIntStateOf(0) }
+    // Set when the top bar was entered from the search row, so Down returns to search
+    // instead of jumping on to the selected category.
+    var returnToSearchFromTopBar by remember { mutableStateOf(false) }
+    var skipNextSidebarClaim by remember { mutableStateOf(false) }
     // Full-screen playback mode — pressing OK on an EPG row expands the
     // mini-player to cover the whole screen. Back collapses back to the grid.
     var isFullScreen by if (isTouchDevice) {
@@ -1780,6 +1784,29 @@ fun LiveTvScreen(
             focusSelectedChannelSignal += 1
         }
         startupFocusApplied = true
+    }
+
+    // The startup flags above are rememberSaveable, so after a trip to Settings (or a layout switch)
+    // they come back as "already applied" while the platform focus died with the old composition.
+    // Category and channel stay selected but nothing holds D-pad focus. Re-request it once per visit.
+    var focusRestorePending by remember { mutableStateOf(startupFocusApplied) }
+    LaunchedEffect(focusRestorePending, filteredChannelsWindowKey, selectedDisplayChannelId, startupChannelApplied) {
+        if (!focusRestorePending) return@LaunchedEffect
+        if (isTouchDevice) {
+            focusRestorePending = false
+            return@LaunchedEffect
+        }
+        if (!startupChannelApplied) return@LaunchedEffect
+        selectedDisplayChannelId?.takeIf { it in filteredChannelIndexById } ?: return@LaunchedEffect
+        // Let the sidebar and channel list compose before asking for focus.
+        delay(150L)
+        if (focusZone == LiveTvFocusZone.CATEGORY_LIST) {
+            focusSelectedCategorySignal += 1
+        } else {
+            focusZone = if (focusZone == LiveTvFocusZone.EPG) LiveTvFocusZone.EPG else LiveTvFocusZone.CHANNEL_LIST
+            focusSelectedChannelSignal += 1
+        }
+        focusRestorePending = false
     }
 
     // Persist sidebar category/channel navigation even before playback starts,
@@ -1940,6 +1967,10 @@ fun LiveTvScreen(
     // layout is stable and normal focus handling behaves predictably.
     val channelsReady = currentUiState.snapshot.channels.isNotEmpty()
     LaunchedEffect(focusZone, isTouchDevice, channelsReady) {
+        if (skipNextSidebarClaim) {
+            skipNextSidebarClaim = false
+            return@LaunchedEffect
+        }
         if (LiveTvStartup.shouldClaimSidebarFocus(
                 isTouchDevice = isTouchDevice,
                 isCategoryZoneActive = focusZone == LiveTvFocusZone.CATEGORY_LIST,
@@ -2975,7 +3006,15 @@ fun LiveTvScreen(
                                             focusZone = LiveTvFocusZone.CATEGORY_LIST
                                             runCatching { emptyStateButtonFocus.requestFocus() }
                                         } else if (useClassicLayout) {
-                                            if (providerFilters.size > 1) focusProviderSwitcher() else focusClassicCategoryRail()
+                                            if (returnToSearchFromTopBar) {
+                                                returnToSearchFromTopBar = false
+                                                skipNextSidebarClaim = true
+                                                focusPlaylistSearch()
+                                            } else if (providerFilters.size > 1) {
+                                                focusProviderSwitcher()
+                                            } else {
+                                                focusClassicCategoryRail()
+                                            }
                                         } else {
                                             focusPlaylistSearch()
                                             focusSelectedCategorySignal += 1
@@ -3070,36 +3109,6 @@ fun LiveTvScreen(
                 }
             )
     ) {
-        if (!isFullScreen && !isTouchDevice) {
-            androidx.compose.foundation.Image(
-                painter = painterResource(R.drawable.live_tv_theatre_fanart),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.52f },
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.horizontalGradient(
-                            colors = listOf(
-                                LiveColors.Bg.copy(alpha = 0.72f),
-                                LiveColors.Bg.copy(alpha = 0.42f),
-                                LiveColors.Bg.copy(alpha = 0.66f),
-                            ),
-                        ),
-                    )
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(
-                                LiveColors.Bg.copy(alpha = 0.38f),
-                                Color.Transparent,
-                                LiveColors.Bg.copy(alpha = 0.58f),
-                            ),
-                        ),
-                    ),
-            )
-        }
         val fsProgress by animateFloatAsState(
             targetValue = if (isFullScreen) 1f else 0f,
             animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing),
@@ -3270,12 +3279,14 @@ fun LiveTvScreen(
                         focusChannelList(focusedChannelId ?: playingChannelId ?: guideDisplayChannels.firstOrNull()?.id)
                     },
                     onMoveUpFromSearch = {
+                        returnToSearchFromTopBar = true
                         topBarFocusIndex = topBarSelectedIndex(SidebarItem.TV, hasProfile, hasOfflineDownloads)
                             .coerceIn(0, maxTopBarIndex)
                         focusZone = LiveTvFocusZone.TOPBAR
                     },
                     focusSelectedCategorySignal = focusSelectedCategorySignal,
                     focusSearchCategorySignal = focusSearchCategorySignal,
+                    categoryZoneActive = focusZone != LiveTvFocusZone.TOPBAR,
                     guideDisplayChannels = guideDisplayChannels,
                     channelWindowOffset = normalizedGuideStart,
                     totalChannelCount = selectedCategoryTotalCount,
@@ -3786,6 +3797,13 @@ fun LiveTvScreen(
             SearchOverlay(
                 channels = allDisplayChannels,
                 nowNext = effectiveGuideNowNext,
+                guideProvider = { ids ->
+                    viewModel.iptvRepository.indexedGuideWindow(
+                        ids,
+                        guideClockMillis - VisibleGuidePastWindowMs,
+                        guideClockMillis + VisibleGuideFutureWindowMs,
+                    )
+                },
                 searchProvider = { query ->
                     viewModel.iptvRepository
                         .pagedSearchChannels(query, limit = 200)

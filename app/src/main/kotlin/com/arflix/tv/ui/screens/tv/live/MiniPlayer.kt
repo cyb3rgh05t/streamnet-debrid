@@ -33,6 +33,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.BiasAlignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
@@ -302,7 +303,6 @@ private fun VideoCard(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
-            LiveBug(modifier = Modifier.align(Alignment.TopEnd).padding(10.dp))
         }
 
         if (isTouchDevice && onFullscreenClick != null) {
@@ -329,37 +329,6 @@ private fun VideoCard(
                 )
             }
         }
-    }
-}
-
-@OptIn(ExperimentalTvMaterial3Api::class)
-@Composable
-private fun LiveBug(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "live-bug")
-    val alpha by transition.animateFloat(
-        initialValue = 1f,
-        targetValue = 0.55f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse),
-        label = "live-alpha",
-    )
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xAA000000))
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .alpha(alpha)
-                .background(LiveColors.LiveRed, CircleShape),
-        )
-        Text(
-            text = stringResource(R.string.live_badge_live),
-            style = LiveType.Badge.copy(color = Color.White),
-        )
     }
 }
 
@@ -410,6 +379,9 @@ private fun InfoColumn(
                 model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                // The panel is a wide, flat strip: centre-cropping a 16:9 backdrop showed only
+                // torso/chin. Anchoring towards the top keeps heads and faces in view.
+                alignment = BiasAlignment(horizontalBias = 0f, verticalBias = -1f),
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.42f },
             )
         } else if (tvHeroLayout && channel != null) {
@@ -716,6 +688,7 @@ private fun NowCard(
                 model = backdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
+                alignment = BiasAlignment(horizontalBias = 0f, verticalBias = -1f),
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = 0.38f }
@@ -810,7 +783,7 @@ private fun NextRow(nowNext: IptvNowNext?) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(stringResource(R.string.live_badge_next), style = LiveType.SectionTag.copy(color = LiveColors.FgMute))
+        Text(stringResource(R.string.live_badge_next), style = LiveType.SectionTag.copy(color = LiveColors.Accent))
         Text(
             text = formatClock(next.startUtcMillis),
             style = LiveType.TimeMono.copy(color = LiveColors.FgDim),

@@ -45,6 +45,7 @@ fun ChannelLogo(
     modifier: Modifier = Modifier,
     showBackground: Boolean = true,
     imagePadding: Dp? = null,
+    cornerRadius: Dp? = null,
 ) {
     val initials = remember(channel.name) { initialsFor(channel.name) }
     val variant = (channel.name.firstOrNull()?.code ?: 0) % 3
@@ -60,7 +61,7 @@ fun ChannelLogo(
     Box(
         modifier = modifier
             .size(size)
-            .clip(RoundedCornerShape((size.value / 5.5f).dp))
+            .clip(RoundedCornerShape(cornerRadius ?: (size.value / 5.5f).dp))
             .then(
                 if (effectiveBackground != null) Modifier.background(effectiveBackground)
                 else Modifier

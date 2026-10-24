@@ -1,5 +1,7 @@
 package com.arflix.tv.ui.components
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -97,7 +99,7 @@ internal fun formatCardReleaseDate(rawDate: String?): String? {
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun MediaCard(
     item: MediaItem,
@@ -120,6 +122,8 @@ fun MediaCard(
     showReleaseYear: Boolean = false,
     titleMaxLines: Int = 1,
     subtitleMaxLines: Int = 1,
+    // Single-line title that auto-scrolls horizontally while focused (ellipsis otherwise).
+    marqueeTitleOnFocus: Boolean = false,
     isFocusedOverride: Boolean = false,
     focusedScale: Float = 1.045f,
     enableSystemFocus: Boolean = true,
@@ -535,6 +539,7 @@ fun MediaCard(
         if (showTitle && !showCollectionTitleOverlay) {
             Spacer(modifier = Modifier.height(ArvioSkin.spacing.x2))
 
+            val marqueeActive = marqueeTitleOnFocus && visualFocused
             Text(
                 text = item.title,
                 style = if (isMobile) ArvioSkin.typography.cardTitle.copy(
@@ -556,8 +561,19 @@ fun MediaCard(
                 } else {
                     ArvioSkin.colors.textPrimary.copy(alpha = 0.85f)
                 },
-                maxLines = titleMaxLines,
-                overflow = TextOverflow.Ellipsis,
+                maxLines = if (marqueeActive) 1 else titleMaxLines,
+                softWrap = !marqueeActive,
+                overflow = if (marqueeActive) TextOverflow.Clip else TextOverflow.Ellipsis,
+                modifier = if (marqueeActive) {
+                    Modifier.basicMarquee(
+                        iterations = Int.MAX_VALUE,
+                        initialDelayMillis = 900,
+                        delayMillis = 1_200,
+                        velocity = 32.dp
+                    )
+                } else {
+                    Modifier
+                },
             )
 
             if (showSubtitle) {

@@ -38,7 +38,9 @@ data class LocalWatchlistItem(
     val posterPath: String? = null,
     val backdropPath: String? = null,
     val addedAt: Long = System.currentTimeMillis(),
-    val sourceOrder: Int = Int.MAX_VALUE
+    val sourceOrder: Int = Int.MAX_VALUE,
+    // Display date ("dd.MM.yyyy") cached from TMDB so un-enriched cards still show a release date.
+    val releaseDate: String? = null
 )
 
 /** Cap on persisted removal tombstones so the synced payload cannot grow without bound. */
@@ -488,6 +490,26 @@ class WatchlistRepository @Inject constructor(
         cacheLoaded = false
     }
 
+    private suspend fun reloadCacheFromStorage() {
+        val items = loadWatchlistRaw().map { it.toBasicMediaItem() }
+        cacheMutex.withLock {
+            // Keep already enriched details (dates, overview, ...) for titles that are still present.
+            val previous = itemsCache.associateBy { cacheKey(it.mediaType, it.id) }
+            val merged = items.map { basic ->
+                previous[cacheKey(basic.mediaType, basic.id)]?.copy(
+                    addedAt = basic.addedAt,
+                    sourceOrder = basic.sourceOrder
+                ) ?: basic
+            }
+            itemsCache.clear()
+            itemsCache.addAll(merged)
+            keyCache.clear()
+            merged.forEach { item -> keyCache.add(cacheKey(item.mediaType, item.id)) }
+            _watchlistItems.value = merged
+            cacheLoaded = true
+        }
+    }
+
     suspend fun exportWatchlistForProfile(profileId: String): List<LocalWatchlistItem> {
         val safeProfileId = profileId.trim().ifBlank { "default" }
         return try {
@@ -595,7 +617,9 @@ class WatchlistRepository @Inject constructor(
             }
             invalidationBus.markDirty(CloudSyncScope.WATCHLIST, safeProfileId, "import watchlist")
             if (profileManager.getProfileIdSync() == safeProfileId) {
-                clearWatchlistCache()
+                // Reload instead of clearing: clearing emits an empty list, which made an open
+                // Watchlist screen flash its empty state whenever a cloud pull was applied.
+                reloadCacheFromStorage()
             }
         } catch (e: kotlinx.coroutines.CancellationException) {
             throw e
@@ -682,6 +706,7 @@ class WatchlistRepository @Inject constructor(
                 } else {
                     raw.copy(
                         title = enriched.title.ifBlank { raw.title },
+                        releaseDate = enriched.releaseDate?.takeIf { it.isNotBlank() } ?: raw.releaseDate,
                         posterPath = normalizeWatchlistArtworkUrl(enriched.image, isBackdrop = false)
                             ?: normalizeWatchlistArtworkUrl(raw.posterPath, isBackdrop = false),
                         backdropPath = normalizeWatchlistArtworkUrl(enriched.backdrop, isBackdrop = true)
@@ -800,7 +825,8 @@ class WatchlistRepository @Inject constructor(
             title = title,
             subtitle = if (type == MediaType.TV) context.getString(R.string.component_label_tv_series) else context.getString(R.string.movie),
             overview = "",
-            year = "",
+            year = releaseDate?.takeIf { it.length == 10 }?.takeLast(4).orEmpty(),
+            releaseDate = releaseDate.orEmpty(),
             mediaType = type,
             image = normalizeWatchlistArtworkUrl(posterPath, isBackdrop = false).orEmpty(),
             backdrop = normalizeWatchlistArtworkUrl(backdropPath, isBackdrop = true),

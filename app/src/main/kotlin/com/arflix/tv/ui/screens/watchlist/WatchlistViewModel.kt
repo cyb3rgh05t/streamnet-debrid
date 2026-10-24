@@ -26,6 +26,8 @@ import com.arflix.tv.data.repository.WatchlistRepository
 import com.arflix.tv.data.repository.simkl.SimklAuthManager
 import com.arflix.tv.data.repository.simkl.SimklSyncService
 import com.arflix.tv.util.AppLogger
+import com.arflix.tv.util.settingsDataStore
+import com.arflix.tv.ui.screens.home.observeHomeProfilePreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
@@ -34,12 +36,15 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
@@ -209,6 +214,15 @@ class WatchlistViewModel @Inject constructor(
 
     private val _libraryState = MutableStateFlow(HomeLibraryUiState())
     val libraryState: StateFlow<HomeLibraryUiState> = _libraryState.asStateFlow()
+
+    // Same per-profile "Smooth scrolling" setting that the Home rows use.
+    val smoothScrolling: StateFlow<Boolean> = observeHomeProfilePreferences(
+        profileManager.activeProfileId,
+        context.settingsDataStore.data
+    )
+        .map { it.smoothScrolling }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
     private val libraryCache = linkedMapOf<String, Pair<List<MediaItem>, Boolean>>()
     private var libraryLoadJob: Job? = null
     private var librarySearchJob: Job? = null
@@ -307,9 +321,16 @@ class WatchlistViewModel @Inject constructor(
 
     private fun observeWatchlistChanges() {
         viewModelScope.launch {
-            watchlistRepository.watchlistItems.collect { items ->
+            watchlistRepository.watchlistItems.collect { emitted ->
                 if (traktSyncInFlight) return@collect
                 if (_uiState.value.selectedSourceId == WatchlistSourceItem.MyWatchlist.id) {
+                    // A cache reset emits an empty list; confirm against storage so only a truly
+                    // empty watchlist (e.g. the last item was removed) shows the empty state.
+                    val items = if (emitted.isEmpty() && sourceItemsCache[WatchlistSourceItem.MyWatchlist.id].orEmpty().isNotEmpty()) {
+                        watchlistRepository.getLocalWatchlistItems()
+                    } else {
+                        emitted
+                    }
                     val orderedItems = mergeHomeServerWatchlistItems(items)
                         .watchlistDisplayOrder()
                         .enrichWithPlaybackProgress()

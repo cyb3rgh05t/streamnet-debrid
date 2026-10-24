@@ -14,9 +14,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -75,10 +77,14 @@ fun SearchOverlay(
     channels: List<EnrichedChannel>,
     nowNext: Map<String, IptvNowNext> = emptyMap(),
     searchProvider: (suspend (String) -> List<EnrichedChannel>)? = null,
+    // Programme data for search hits: the shared guide map only covers the channels currently on screen.
+    guideProvider: (suspend (Set<String>) -> Map<String, IptvNowNext>)? = null,
     onDismiss: () -> Unit,
     onPick: (EnrichedChannel) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var inputFocused by remember { mutableStateOf(false) }
+    var resultGuide by remember { mutableStateOf<Map<String, IptvNowNext>>(emptyMap()) }
     var debounced by remember { mutableStateOf("") }
     var results by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
     val focusRequester = remember { FocusRequester() }
@@ -172,6 +178,18 @@ fun SearchOverlay(
         }
     }
 
+    LaunchedEffect(results, guideProvider) {
+        val provider = guideProvider ?: return@LaunchedEffect
+        val ids = results.asSequence()
+            .map { it.channel.id }
+            .filter { it.isNotBlank() && it !in resultGuide }
+            .take(80)
+            .toSet()
+        if (ids.isEmpty()) return@LaunchedEffect
+        val fetched = withContext(Dispatchers.IO) { runCatching { provider(ids) }.getOrDefault(emptyMap()) }
+        if (fetched.isNotEmpty()) resultGuide = resultGuide + fetched
+    }
+
     BackHandler {
         onDismiss()
     }
@@ -185,11 +203,14 @@ fun SearchOverlay(
     ) {
         Column(
             modifier = Modifier
-                .width(760.dp)
-                .padding(top = 64.dp)
+                // Keep the panel inside the viewport: clear of the top bar, bounded by the screen height.
+                .padding(top = 72.dp, bottom = 32.dp)
+                .fillMaxWidth(0.92f)
+                .widthIn(max = 760.dp)
+                .heightIn(max = 620.dp)
                 .clip(RoundedCornerShape(16.dp))
                 .background(LiveColors.PanelRaised)
-                .border(1.dp, LiveColors.Divider, RoundedCornerShape(16.dp))
+                .border(1.5.dp, LiveColors.Accent.copy(alpha = 0.75f), RoundedCornerShape(16.dp))
                 .padding(16.dp)
                 .pointerInput(Unit) { detectTapGestures(onTap = {}) },
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -199,12 +220,19 @@ fun SearchOverlay(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(if (inputFocused) LiveColors.FocusBg else LiveColors.PanelDeep)
+                    .border(
+                        width = if (inputFocused) 1.5.dp else 1.dp,
+                        color = LiveColors.Accent.copy(alpha = if (inputFocused) 1f else 0.42f),
+                        shape = RoundedCornerShape(12.dp),
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
             ) {
                 Icon(
                     imageVector = Icons.Filled.Search,
                     contentDescription = null,
-                    tint = LiveColors.FgDim,
+                    tint = LiveColors.Accent,
                     modifier = Modifier.size(20.dp),
                 )
                 BasicTextField(
@@ -222,6 +250,7 @@ fun SearchOverlay(
                     ),
                     modifier = Modifier
                         .weight(1f)
+                        .onFocusChanged { inputFocused = it.isFocused }
                         .focusRequester(focusRequester)
                         .focusable()
                         .pointerInput(Unit) {
@@ -269,10 +298,10 @@ fun SearchOverlay(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(1.dp)
-                    .background(LiveColors.Divider),
+                    .background(LiveColors.Accent.copy(alpha = 0.28f)),
             )
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().height(440.dp),
+                modifier = Modifier.fillMaxWidth().weight(1f, fill = false),
                 verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 itemsIndexed(results, key = { index, result -> "${result.channel.id}#$index" }) { _, result ->
@@ -283,6 +312,7 @@ fun SearchOverlay(
                     SearchResultRow(
                         channel = ch,
                         matchText = result.matchText,
+                        nowNext = resultGuide[ch.id] ?: nowNext[ch.id],
                         onPick = onPick,
                         onMoveUp = if (results.isNotEmpty() && ch.id == results.first().channel.id) {
                             { runCatching { focusRequester.requestFocus() } }
@@ -341,6 +371,7 @@ private fun labelProgramMatch(
 private fun SearchResultRow(
     channel: EnrichedChannel,
     matchText: String?,
+    nowNext: IptvNowNext?,
     onPick: (EnrichedChannel) -> Unit,
     onMoveUp: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -351,7 +382,7 @@ private fun SearchResultRow(
             .fillMaxWidth()
             .height(64.dp)
             .clip(RoundedCornerShape(10.dp))
-            .background(if (focused) LiveColors.Panel else Color.Transparent)
+            .background(if (focused) LiveColors.FocusBg else Color.Transparent)
             .border(
                 width = if (focused) 1.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
@@ -387,6 +418,8 @@ private fun SearchResultRow(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         ChannelLogo(channel = channel, size = 40.dp)
+        val nowProgram = nowNext?.now
+        val nextProgram = nowNext?.next
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = channel.name,
@@ -394,12 +427,58 @@ private fun SearchResultRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = matchText ?: formatGenreName(channel.genre.name),
-                style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            when {
+                // A hit inside the guide already names the matching programme.
+                matchText != null -> Text(
+                    text = matchText,
+                    style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                nowProgram != null -> Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.live_badge_now),
+                        style = LiveType.SectionTag.copy(color = LiveColors.Accent),
+                    )
+                    Text(
+                        text = formatTimeWindow(nowProgram),
+                        style = LiveType.TimeMono.copy(color = LiveColors.FgMute),
+                    )
+                    Text(
+                        text = nowProgram.title,
+                        style = LiveType.SectionTag.copy(color = LiveColors.FgDim),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                }
+                else -> Text(
+                    text = formatGenreName(channel.genre.name),
+                    style = LiveType.SectionTag.copy(color = LiveColors.FgMute),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        if (nextProgram != null && matchText == null) {
+            Column(
+                modifier = Modifier.width(190.dp),
+                verticalArrangement = Arrangement.spacedBy(1.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.live_badge_next),
+                    style = LiveType.SectionTag.copy(color = LiveColors.Accent),
+                )
+                Text(
+                    text = "${formatClock(nextProgram.startUtcMillis)}  ${nextProgram.title}",
+                    style = LiveType.SectionTag.copy(color = LiveColors.FgDim),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }

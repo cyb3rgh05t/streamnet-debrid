@@ -279,24 +279,41 @@ private class HomeFocusState(
     val rowItemKeysByCategoryId = mutableMapOf<String, String>()
 
     companion object {
+        private const val KEY_SEPARATOR = '\u0001'
+
         // `userHasNavigated` is saved as the 4th element (0/1). Without it,
         // returning from a Collection/Details screen caused the "preferred
         // start row" reset to fire (since the field defaulted back to false),
         // which snapped the scroll position to Trending Movies — losing the
         // user's place in Franchises or wherever they were.
-        val Saver: androidx.compose.runtime.saveable.Saver<HomeFocusState, List<Int>> =
+        // The 5th element carries the focused item key per row: after watching
+        // something, Continue Watching is reordered, so the index alone would
+        // point to a different title when returning from Details.
+        val Saver: androidx.compose.runtime.saveable.Saver<HomeFocusState, List<Any>> =
             androidx.compose.runtime.saveable.Saver(
                 save = {
                     listOf(
                         it.currentRowIndex,
                         it.currentItemIndex,
                         it.sidebarFocusIndex,
-                        if (it.userHasNavigated) 1 else 0
+                        if (it.userHasNavigated) 1 else 0,
+                        ArrayList(
+                            it.rowItemKeysByCategoryId.map { (categoryId, itemKey) ->
+                                "$categoryId$KEY_SEPARATOR$itemKey"
+                            }
+                        )
                     )
                 },
                 restore = {
-                    HomeFocusState(it[0], it[1], it[2]).apply {
-                        userHasNavigated = (it.getOrNull(3) ?: 0) == 1
+                    HomeFocusState(it[0] as Int, it[1] as Int, it[2] as Int).apply {
+                        userHasNavigated = ((it.getOrNull(3) as? Int) ?: 0) == 1
+                        (it.getOrNull(4) as? List<*>)?.forEach { entry ->
+                            val text = entry as? String ?: return@forEach
+                            val split = text.indexOf(KEY_SEPARATOR)
+                            if (split > 0) {
+                                rowItemKeysByCategoryId[text.substring(0, split)] = text.substring(split + 1)
+                            }
+                        }
                     }
                 }
             )
@@ -445,9 +462,20 @@ internal fun resolveHomeItemIndex(
 ): Int {
     val preferredIndex = preferredItemKey?.let(itemKeys::indexOf) ?: -1
     if (preferredIndex >= 0) return preferredIndex
+    // Same title, different episode suffix (e.g. Continue Watching advanced to the next episode).
+    val preferredIdentity = preferredItemKey?.let(::homeRowItemIdentity)
+    if (preferredIdentity != null) {
+        val identityIndex = itemKeys.indexOfFirst { homeRowItemIdentity(it) == preferredIdentity }
+        if (identityIndex >= 0) return identityIndex
+    }
     if (itemKeys.isEmpty()) return 0
     return fallbackIndex.coerceIn(0, itemKeys.lastIndex)
 }
+
+private val homeRowEpisodeSuffix = Regex("_S\\d+E\\d+")
+
+private fun homeRowItemIdentity(itemKey: String): String =
+    itemKey.substringBefore("#duplicate").replace(homeRowEpisodeSuffix, "")
 
 internal fun clampHomeItemIndex(items: List<MediaItem>, index: Int): Int {
     val realItemCount = items.count { !it.isPlaceholder }
@@ -601,7 +629,7 @@ private fun createHomeHeroPlaybackHandles(context: Context): HomeHeroPlaybackHan
     )
 }
 
-private suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeScrollDelta(
+internal suspend fun androidx.compose.foundation.lazy.LazyListState.animateHomeScrollDelta(
     deltaPx: Float,
     durationMillis: Int,
     isRtl: Boolean = false

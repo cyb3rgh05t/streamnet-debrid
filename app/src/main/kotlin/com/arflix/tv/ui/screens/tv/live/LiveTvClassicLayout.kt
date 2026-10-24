@@ -62,6 +62,7 @@ internal fun LiveTvClassicLayout(
     onMoveUpFromSearch: () -> Unit,
     focusSelectedCategorySignal: Int,
     focusSearchCategorySignal: Int,
+    categoryZoneActive: Boolean = true,
     guideDisplayChannels: List<EnrichedChannel>,
     channelWindowOffset: Int,
     totalChannelCount: Int,
@@ -204,6 +205,7 @@ internal fun LiveTvClassicLayout(
                     onMoveUpFromSearch = onMoveUpFromSearch,
                     focusSelectedCategorySignal = focusSelectedCategorySignal,
                     focusSearchSignal = focusSearchCategorySignal,
+                    active = categoryZoneActive,
                     modifier = Modifier.fillMaxHeight().focusGroup(),
                 )
                 EpgGrid(
