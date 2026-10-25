@@ -210,6 +210,18 @@ private val CATEGORY_ARTWORK_RULES = listOf(
 internal fun liveChannelFallbackArtwork(channel: IptvChannel): LiveChannelFallbackArtwork? =
     liveChannelFallbackArtwork(channel.group, channel.traits().country)
 
+/** Same as above, but the selected category (name / country) wins over the channel's own metadata. */
+internal fun liveChannelFallbackArtwork(
+    channel: IptvChannel,
+    selectedCountryCode: String?,
+    selectedCategoryName: String?,
+): LiveChannelFallbackArtwork? = liveChannelFallbackArtwork(
+    groupName = channel.group,
+    countryCode = channel.traits().country,
+    selectedCountryCode = selectedCountryCode,
+    selectedCategoryName = selectedCategoryName,
+)
+
 internal fun liveChannelFallbackArtwork(
     groupName: String?,
     countryCode: String?,

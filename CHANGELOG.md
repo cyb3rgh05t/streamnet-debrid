@@ -2,6 +2,20 @@
 
 Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokumentiert.
 
+## [Unreleased]
+
+## [2.5.076] - 2026-10-25
+
+- Android-Version: `2.5.076` / Code `477`.
+
+- Android TV Live-TV Netflix-Layout: „Hoch“ aus der Senderreihe führt wieder zuverlässig zu den Kategorie-Chips, auch wenn der aktive Chip aus dem sichtbaren Bereich gescrollt wurde. Der Fokus-Anker hing nur am aktiven Chip, der dann nicht mehr existierte; die Chip-Reihe scrollt ihn jetzt zuerst zurück und fokussiert ihn dann. Verlässt der Fokus die Chip-Reihe, springt sie wieder zum aktiven Chip zurück.
+- Android TV Live-TV Netflix-Layout: Nach einem Kategoriewechsel springt der Fokus beim Zurückgehen aus den Kategorien nicht mehr auf die erste Karte. Der Fokus-Anker blieb auf einem Sender der vorher geöffneten Kategorie stehen (die Korrektur im Screen pausiert nach einem Kategoriewechsel und lief danach nicht neu), die Senderreihe fand ihn nicht und fiel auf die erste Karte zurück. Der Fokus-Anker wird jetzt je Kategorie aufgelöst: laufender Sender, sofern er in der offenen Kategorie liegt (hat Vorrang vor der Scroll-Position), sonst der dort gemerkte, sonst der zuletzt fokussierte, sonst der erste.
+- Android TV Live-TV Netflix-Layout: Kategorie und Sender gehen beim Betreten nicht mehr verloren (von Home, aus dem Vollbild, nach Einstellungen oder Layoutwechsel). Ursachen: (1) Eine vom klassischen Layout gespeicherte Kategorie (Land-/Genre-Unterpunkt wie „DE-news“) hat im Netflix-Layout keinen Chip, deshalb war keine Kategorie aktiv und der Fokus landete auf „Suche“; sie wird jetzt auf die passende Playlist-Gruppe des laufenden Senders oder „Alle Sender“ abgebildet. (2) Ein veraltetes Fokus-Signal zog den Fokus beim Betreten von der Senderreihe auf den Kategorie-Chip; Chips nehmen den Fokus jetzt nur noch für ein Signal, das nach ihrem Erscheinen kam. (3) Die aktive Kategorie wird beim Betreten ins Bild gescrollt (nur wenn sie nicht sichtbar ist, damit die Reihe beim Auswählen nicht springt). (4) Das Netflix-Layout stellt den Fokus immer auf den Sender, nicht auf die Kategorien. (5) Nach dem Vollbild geht der Fokus auf den laufenden Sender, wenn er in der offenen Kategorie liegt, sonst auf den zuletzt dort fokussierten.
+- Android TV Live-TV Netflix-Layout: Fallback-Bild (Länderflagge bzw. Kategorie-Grafik) richtet sich nach der gewählten Kategorie statt nach dem geratenen Land des einzelnen Senders. In „Luxembourg“ zeigen Sender ohne Programmbild die LU-Flagge, auch wenn ihr eigener Gruppenname auf ein anderes Land hindeutet. Die Logik existierte schon (samt Tests), wurde im Netflix-Layout aber nicht verwendet.
+- Android TV Live-TV Netflix-Layout: Das Vorschau-Video wird in eine SurfaceView statt in eine TextureView gerendert (wie im klassischen Mini-Player). Videobilder laufen damit unabhängig vom UI-Thread und ruckeln nicht mehr, wenn die Senderreihe scrollt. Bis zum ersten gerenderten Bild verdeckt weiter das Senderlogo auf dem Verlauf das Video. Hinweis: Die TextureView war mit 2.5.070 gegen grünes Flackern beim Wechsel zwischen Vollbild und Vorschau eingeführt worden (damals nicht bestätigt); tritt es wieder auf, ist das der Ansatzpunkt.
+- Android TV Live-TV Netflix-Layout: Weniger Render-Last beim Scrollen. Bilder in Karten und Infofeld nutzen den Bild-Alpha-Parameter statt einer `graphicsLayer`-Transparenz und erzeugen damit keine Offscreen-Ebene pro Bild.
+- Android TV Live-TV: Im Such-Dialog (beide Layouts) erscheint die Bildschirmtastatur wieder. Das Eingabefeld hatte neben dem eigentlichen Textfeld eine zusätzliche Fokusfläche; der Fokus landete dort statt im Textfeld, und ohne fokussiertes Textfeld startet Android TV keine Tastatur. Die zusätzliche Fokusfläche entfällt, die Tastatur wird angezeigt, sobald das Feld den Fokus bekommt (beim Öffnen und beim Zurückgehen aus der Trefferliste) und beim Wechsel in die Treffer ausgeblendet.
+
 ## [2.5.075] - 2026-10-24
 
 - Android-Version: `2.5.075` / Code `476`.

@@ -100,6 +100,14 @@ fun SearchOverlay(
             if (attempt < 4) delay(60L)
         }
     }
+    // The IME session only exists once the field really holds focus, so show the keyboard
+    // whenever focus arrives (opening the dialog, or coming back up from the result list).
+    LaunchedEffect(inputFocused) {
+        if (inputFocused) {
+            delay(120L)
+            keyboardController?.show()
+        }
+    }
 
     // Resolved up front so they can be used inside the non-composable search LaunchedEffect.
     val nowFormat = stringResource(R.string.live_search_now)
@@ -250,9 +258,11 @@ fun SearchOverlay(
                     ),
                     modifier = Modifier
                         .weight(1f)
-                        .onFocusChanged { inputFocused = it.isFocused }
+                        // No extra .focusable() here: it created an outer focus target that the
+                        // FocusRequester resolved to, so the text field itself never got focus and
+                        // Android TV never started the on-screen keyboard.
+                        .onFocusChanged { inputFocused = it.hasFocus }
                         .focusRequester(focusRequester)
-                        .focusable()
                         .pointerInput(Unit) {
                             detectTapGestures(onTap = { focusSearchInput() })
                         }
@@ -261,6 +271,7 @@ fun SearchOverlay(
                             when (ev.key) {
                                 Key.DirectionDown -> {
                                     if (results.isNotEmpty()) {
+                                        keyboardController?.hide()
                                         runCatching { firstResultFocus.requestFocus() }
                                         true
                                     } else {

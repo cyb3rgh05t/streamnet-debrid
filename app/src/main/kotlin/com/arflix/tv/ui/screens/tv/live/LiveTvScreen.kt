@@ -549,6 +549,7 @@ fun LiveTvScreen(
     }.collectAsStateWithLifecycle(initialValue = "Normal")
     val useTouchRail = isTouchDevice
     val useClassicLayout = !isTouchDevice && liveTvLayoutMode == "classic"
+    val useNetflixLayout = !useTouchRail && !useClassicLayout
     val miniPlayerLayout = liveTvMiniPlayerLayout(
         isTouchDevice = isTouchDevice,
         smallestScreenWidthDp = configuration.smallestScreenWidthDp,
@@ -1773,9 +1774,12 @@ fun LiveTvScreen(
         val restoredFocusZone = runCatching {
             LiveTvFocusZone.valueOf(state.tvSession.lastFocusedZone)
         }.getOrDefault(LiveTvFocusZone.CHANNEL_LIST)
-        focusZone = when (restoredFocusZone) {
-            LiveTvFocusZone.CATEGORY_LIST -> LiveTvFocusZone.CATEGORY_LIST
-            LiveTvFocusZone.EPG -> LiveTvFocusZone.EPG
+        focusZone = when {
+            // The Netflix layout always returns to the channel rail; the chip row only shows
+            // which category is active.
+            useNetflixLayout -> LiveTvFocusZone.CHANNEL_LIST
+            restoredFocusZone == LiveTvFocusZone.CATEGORY_LIST -> LiveTvFocusZone.CATEGORY_LIST
+            restoredFocusZone == LiveTvFocusZone.EPG -> LiveTvFocusZone.EPG
             else -> LiveTvFocusZone.CHANNEL_LIST
         }
         if (focusZone == LiveTvFocusZone.CATEGORY_LIST) {
@@ -1800,13 +1804,24 @@ fun LiveTvScreen(
         selectedDisplayChannelId?.takeIf { it in filteredChannelIndexById } ?: return@LaunchedEffect
         // Let the sidebar and channel list compose before asking for focus.
         delay(150L)
-        if (focusZone == LiveTvFocusZone.CATEGORY_LIST) {
+        if (focusZone == LiveTvFocusZone.CATEGORY_LIST && !useNetflixLayout) {
             focusSelectedCategorySignal += 1
         } else {
-            focusZone = if (focusZone == LiveTvFocusZone.EPG) LiveTvFocusZone.EPG else LiveTvFocusZone.CHANNEL_LIST
+            focusZone = if (focusZone == LiveTvFocusZone.EPG && !useNetflixLayout) LiveTvFocusZone.EPG else LiveTvFocusZone.CHANNEL_LIST
             focusSelectedChannelSignal += 1
         }
         focusRestorePending = false
+    }
+
+    // The Netflix layout only offers a subset of the classic categories (no country / genre
+    // sub-entries). A category saved by the classic layout would leave no chip active, so map it to
+    // the closest category that has one (the playing channel's playlist group, else "All").
+    LaunchedEffect(useNetflixLayout, visibleEnrichedState.value.tree, selectedCategoryId, startupCategoryApplied, playingChannel?.id) {
+        if (!useNetflixLayout || !startupCategoryApplied) return@LaunchedEffect
+        val tree = visibleEnrichedState.value.tree
+        if (tree.top.isEmpty() && tree.global.categories.isEmpty()) return@LaunchedEffect
+        val mapped = netflixCategoryFor(selectedCategoryId, tree, playingChannel)
+        if (mapped != selectedCategoryId) selectedCategoryId = mapped
     }
 
     // Persist sidebar category/channel navigation even before playback starts,
@@ -2023,7 +2038,18 @@ fun LiveTvScreen(
     }
 
     fun exitFullScreenPlayback() {
-        val returnFocusChannelId = playingChannelId ?: focusedChannelId
+        // Return to the channel that was playing when it is part of the open category; otherwise to
+        // the one last focused there. Landing on the first card made the position look lost.
+        val byId = visibleEnrichedState.value.index.byId
+        val playingDisplayId = displayChannelIdFor(playingChannelId, byId, variantGroups)
+        val returnFocusChannelId = sequenceOf(
+            playingDisplayId,
+            playingChannelId,
+            rememberedChannelByCategory[selectedCategoryId],
+            focusedChannelId,
+        ).firstOrNull { id -> id != null && id in filteredChannelIndexById }
+            ?: playingChannelId
+            ?: focusedChannelId
         fullscreenGuideOpen = false
         isFullScreen = false
         hudPokeSignal++
@@ -3322,7 +3348,13 @@ fun LiveTvScreen(
                     groupOrder = state.snapshot.groupOrder,
                     channels = filteredChannels,
                     playingChannelId = playingChannelId,
-                    focusedChannelId = focusedChannelId,
+                    focusedChannelId = resolveNetflixAnchorChannelId(
+                        playingChannelId,
+                        rememberedChannelByCategory[selectedCategoryId],
+                        focusedChannelId,
+                        filteredChannelIndexById,
+                        filteredChannels.firstOrNull()?.id,
+                    ),
                     playingChannel = playingDisplayChannel,
                     nowNextMap = remember(state.snapshot.nowNext, effectiveGuideNowNext) {
                         state.snapshot.nowNext + effectiveGuideNowNext

@@ -96,7 +96,48 @@ private val HeroCornerRadius = 18.dp
 private val CardCornerRadius = 14.dp
 private const val HeroUpcomingMax = 2
 
+/**
+ * Channel the rail should anchor on for the open category: the playing channel if it is listed here,
+ * else the one remembered for the category, else the last focused one, else the first. The scroll
+ * position must not win over the playing channel when the user returns to the active category.
+ */
+internal fun resolveNetflixAnchorChannelId(
+    playingId: String?,
+    rememberedId: String?,
+    focusedId: String?,
+    indexById: Map<String, Int>,
+    firstId: String?,
+): String? =
+    listOf(playingId, rememberedId, focusedId).firstOrNull { it != null && it in indexById } ?: firstId
+
 private data class NetflixCategoryItem(val id: String, val label: String, val count: Int)
+
+/** Categories the Netflix chip row can show (a subset of what the classic sidebar offers). */
+internal fun netflixSelectableCategoryIds(tree: LiveCategoryTree): Set<String> = buildSet {
+    tree.top.forEach { add(it.id) }
+    tree.global.categories.forEach { add(it.id) }
+    tree.countries.categories.forEach { add(it.id) }
+    tree.adult.categories.forEach { add(it.id) }
+}
+
+/**
+ * Category the Netflix layout should show as active. The saved selection can come from the classic
+ * layout (country / genre sub-entries such as "DE-news") which has no chip here; without a chip no
+ * category looks active and focus lands on the search chip.
+ */
+internal fun netflixCategoryFor(
+    selectedId: String,
+    tree: LiveCategoryTree,
+    channel: EnrichedChannel?,
+): String {
+    val selectable = netflixSelectableCategoryIds(tree)
+    if (selectable.isEmpty() || selectedId in selectable) return selectedId
+    channel?.let { bestCategoryIdForChannel(it, tree) }
+        ?.takeIf { it in selectable }
+        ?.let { return it }
+    if ("all" in selectable) return "all"
+    return tree.global.categories.firstOrNull()?.id ?: tree.top.firstOrNull()?.id ?: selectedId
+}
 
 internal fun liveTvPreviewOutputEnabled(isFullScreen: Boolean, fullscreenProgress: Float): Boolean =
     !isFullScreen && fullscreenProgress <= 0f
@@ -156,6 +197,7 @@ internal fun LiveTvNetflixLayout(
     }
     CompositionLocalProvider(LocalDensity provides layoutDensity) {
     var railEntrySignal by remember { mutableIntStateOf(0) }
+    var chipEntrySignal by remember { mutableIntStateOf(0) }
     var railFocusPending by remember { mutableStateOf(false) }
     val heroFocusRequester = remember { FocusRequester() }
     var previewChannelId by remember { mutableStateOf(focusedChannelId ?: playingChannelId) }
@@ -172,6 +214,10 @@ internal fun LiveTvNetflixLayout(
         channels.firstOrNull { it.id == previewChannelId } ?: playingChannel
     }
     val previewNowNext = previewChannel?.let { nowNextMap[it.id] }
+    // The selected category decides the fallback artwork (country flag / category art), not just
+    // each channel's own guessed country.
+    val selectedCategoryName = remember(tree, selectedCategoryId) { tree.byId(selectedCategoryId)?.label }
+    val selectedCountryCode = remember(tree, selectedCategoryId) { tree.countryCodeForCategory(selectedCategoryId) }
     val emptyCategoryMessage = when {
         channels.isNotEmpty() -> null
         isLoadingChannels -> stringResource(R.string.live_loading_channels)
@@ -180,9 +226,11 @@ internal fun LiveTvNetflixLayout(
     }
     val previewFallbackArtwork = remember(
         previewChannel?.source,
+        selectedCountryCode,
+        selectedCategoryName,
     ) {
         previewChannel?.let { channel ->
-            liveChannelFallbackArtwork(channel.source)
+            liveChannelFallbackArtwork(channel.source, selectedCountryCode, selectedCategoryName)
         }
     }
     val previewBackdropUrl by produceState<String?>(
@@ -262,6 +310,7 @@ internal fun LiveTvNetflixLayout(
             },
             focusRequester = categoryFocusRequester,
             focusSelectedCategorySignal = focusSelectedCategorySignal,
+            chipEntrySignal = chipEntrySignal,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(CategoryRowHeight)
@@ -275,6 +324,8 @@ internal fun LiveTvNetflixLayout(
             nowNextMap = nowNextMap,
             favoriteSet = favoriteSet,
             clockTickMillis = guideClockMillis,
+            selectedCountryCode = selectedCountryCode,
+            selectedCategoryName = selectedCategoryName,
             lookupBackdrop = lookupBackdrop,
             onChannelFocused = { channel ->
                 previewChannelId = channel.id
@@ -284,7 +335,7 @@ internal fun LiveTvNetflixLayout(
             onFavoriteToggle = onFavoriteToggle,
             variantCountFor = variantCountFor,
             onOpenVariants = onOpenVariants,
-            onMoveUp = { runCatching { categoryFocusRequester.requestFocus() } },
+            onMoveUp = { chipEntrySignal += 1 },
             focusSelectedChannelSignal = focusSelectedChannelSignal,
             railEntrySignal = railEntrySignal,
             railFocusPending = railFocusPending,
@@ -314,17 +365,19 @@ private fun HeroVideoCard(
     onMoveDown: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val textureViewRef = remember { mutableStateOf<android.view.TextureView?>(null) }
+    // SurfaceView instead of TextureView: video frames go to their own hardware layer and no longer
+    // depend on the UI thread finishing its frame, so scrolling the channel rail cannot starve them.
+    val surfaceViewRef = remember { mutableStateOf<android.view.SurfaceView?>(null) }
     var firstFrameRendered by remember(exoPlayer, videoOutputEnabled) { mutableStateOf(false) }
     var focused by remember { mutableStateOf(false) }
 
-    DisposableEffect(exoPlayer, videoOutputEnabled, textureViewRef.value) {
-        val textureView = textureViewRef.value
+    DisposableEffect(exoPlayer, videoOutputEnabled, surfaceViewRef.value) {
+        val surfaceView = surfaceViewRef.value
         firstFrameRendered = false
-        if (videoOutputEnabled && textureView != null) {
+        if (videoOutputEnabled && surfaceView != null) {
             val listener = object : Player.Listener {
                 override fun onRenderedFirstFrame() {
-                    if (textureView.isAvailable) firstFrameRendered = true
+                    firstFrameRendered = true
                 }
 
                 override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
@@ -332,15 +385,21 @@ private fun HeroVideoCard(
                 }
             }
             exoPlayer.addListener(listener)
-            exoPlayer.setVideoTextureView(textureView)
+            exoPlayer.setVideoSurfaceView(surfaceView)
             onDispose {
                 exoPlayer.removeListener(listener)
-                runCatching { exoPlayer.clearVideoTextureView(textureView) }
+                runCatching { exoPlayer.clearVideoSurfaceView(surfaceView) }
             }
         } else {
             onDispose { }
         }
     }
+    // Covers the video (channel logo on a gradient) until the first frame has been rendered.
+    val coverAlpha by animateFloatAsState(
+        targetValue = if (videoOutputEnabled && firstFrameRendered) 0f else 1f,
+        animationSpec = tween(durationMillis = 120),
+        label = "hero-video-cover",
+    )
 
     Box(
         modifier = modifier
@@ -369,30 +428,31 @@ private fun HeroVideoCard(
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(LiveColors.Panel, LiveColors.PanelDeep),
-                    )
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (channel != null) {
-                ChannelLogo(channel = channel, size = 72.dp, showBackground = false)
-            }
-        }
         AndroidView(
             factory = { ctx ->
-                android.view.TextureView(ctx).also { tv ->
-                    textureViewRef.value = tv
+                android.view.SurfaceView(ctx).also { sv ->
+                    surfaceViewRef.value = sv
                 }
             },
-            modifier = Modifier.fillMaxSize().graphicsLayer {
-                alpha = if (videoOutputEnabled && firstFrameRendered) 1f else 0f
-            },
+            modifier = Modifier.fillMaxSize(),
         )
+        if (coverAlpha > 0f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer { alpha = coverAlpha }
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(LiveColors.Panel, LiveColors.PanelDeep),
+                        )
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (channel != null) {
+                    ChannelLogo(channel = channel, size = 72.dp, showBackground = false)
+                }
+            }
+        }
         if (isBuffering && !isFullScreen) {
             Box(
                 modifier = Modifier
@@ -447,17 +507,19 @@ private fun HeroInfoPanel(
             AsyncImage(
                 model = effectiveBackdropUrl, contentDescription = null, contentScale = ContentScale.Crop,
                 alignment = Alignment.TopCenter,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.55f },
+                // alpha as an image parameter: no offscreen layer for the large backdrop.
+                alpha = 0.55f,
+                modifier = Modifier.fillMaxSize(),
             )
         } else if (!backgroundLogoUrl.isNullOrBlank()) {
             AsyncImage(
                 model = backgroundLogoUrl,
                 contentDescription = null,
                 contentScale = ContentScale.FillBounds,
+                alpha = 0.26f,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        alpha = 0.26f
                         scaleX = 1.16f
                         scaleY = 1.16f
                     },
@@ -660,6 +722,7 @@ private fun NetflixCategoryChipRow(
     onMoveDown: () -> Unit,
     focusRequester: FocusRequester,
     focusSelectedCategorySignal: Int,
+    chipEntrySignal: Int,
     modifier: Modifier = Modifier,
 ) {
     val items = rememberNetflixCategoryItems(tree, hiddenGroups, groupOrder)
@@ -667,17 +730,68 @@ private fun NetflixCategoryChipRow(
     val selectedCategoryIndex = remember(items, selectedId) {
         items.indexOfFirst { it.id == selectedId }
     }
-    LaunchedEffect(focusSelectedCategorySignal, selectedCategoryIndex) {
-        if (focusSelectedCategorySignal > 0) {
-            if (selectedCategoryIndex >= 0) {
-                runCatching { listState.scrollToItem(selectedCategoryIndex + 1) }
+    // Keep the active chip in view whenever the layout appears (home, fullscreen return, settings)
+    // or the selection changes. Only scroll when it is not visible, so choosing a visible chip
+    // does not make the row jump.
+    LaunchedEffect(selectedCategoryIndex, items.size) {
+        if (selectedCategoryIndex < 0) return@LaunchedEffect
+        val target = selectedCategoryIndex + 1 // +1: the search chip comes first
+        val visible = listState.layoutInfo.visibleItemsInfo.any { it.index == target }
+        if (!visible) runCatching { listState.scrollToItem(target) }
+    }
+    // Focus the chip only for a signal raised after this row appeared. A leftover signal from an
+    // earlier visit used to pull focus off the channel rail when coming back from fullscreen.
+    var handledCategorySignal by remember { mutableIntStateOf(focusSelectedCategorySignal) }
+    // The requester sits on the selected chip only; when that chip was scrolled out of the row it
+    // is not composed, so scroll it back before asking for focus.
+    suspend fun focusSelectedChip() {
+        if (selectedCategoryIndex >= 0) {
+            val target = selectedCategoryIndex + 1
+            if (listState.layoutInfo.visibleItemsInfo.none { it.index == target }) {
+                runCatching { listState.scrollToItem(target) }
             }
-            runCatching { focusRequester.requestFocus() }
+        }
+        repeat(20) {
+            if (runCatching { focusRequester.requestFocus() }.isSuccess) return
+            delay(50L)
+        }
+    }
+    LaunchedEffect(focusSelectedCategorySignal) {
+        if (focusSelectedCategorySignal != handledCategorySignal) {
+            handledCategorySignal = focusSelectedCategorySignal
+            focusSelectedChip()
+        }
+    }
+    var handledChipEntry by remember { mutableIntStateOf(chipEntrySignal) }
+    LaunchedEffect(chipEntrySignal) {
+        if (chipEntrySignal != handledChipEntry) {
+            handledChipEntry = chipEntrySignal
+            focusSelectedChip()
+        }
+    }
+    // When focus leaves the chip row, bring the active chip back into view so the row does not
+    // stay scrolled to wherever the user browsed.
+    var rowFocused by remember { mutableStateOf(false) }
+    var rowWasFocused by remember { mutableStateOf(false) }
+    LaunchedEffect(rowFocused) {
+        if (rowFocused) {
+            rowWasFocused = true
+        } else if (rowWasFocused) {
+            rowWasFocused = false
+            if (selectedCategoryIndex < 0) return@LaunchedEffect
+            val target = selectedCategoryIndex + 1
+            val info = listState.layoutInfo
+            val fullyVisible = info.visibleItemsInfo.any {
+                it.index == target && it.offset >= 0 && it.offset + it.size <= info.viewportEndOffset
+            }
+            if (!fullyVisible) runCatching { listState.animateScrollToItem(target) }
         }
     }
     LazyRow(
         state = listState,
-        modifier = modifier.padding(horizontal = 4.dp),
+        modifier = modifier
+            .padding(horizontal = 4.dp)
+            .onFocusChanged { rowFocused = it.hasFocus },
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -815,6 +929,8 @@ private fun NetflixChannelRail(
     nowNextMap: Map<String, IptvNowNext>,
     favoriteSet: Set<String>,
     clockTickMillis: Long,
+    selectedCountryCode: String?,
+    selectedCategoryName: String?,
     lookupBackdrop: suspend (IptvProgram) -> String?,
     onChannelFocused: (EnrichedChannel) -> Unit,
     onChannelSelected: (EnrichedChannel) -> Unit,
@@ -896,6 +1012,8 @@ private fun NetflixChannelRail(
                 clockTickMillis = clockTickMillis,
                 isPlaying = ch.id == playingChannelId,
                 isFavorite = ch.id in favoriteSet,
+                selectedCountryCode = selectedCountryCode,
+                selectedCategoryName = selectedCategoryName,
                 lookupBackdrop = lookupBackdrop,
                 onFocused = { onChannelFocused(ch) },
                 onClick = { onChannelSelected(ch) },
@@ -935,6 +1053,8 @@ private fun NetflixChannelCard(
     clockTickMillis: Long,
     isPlaying: Boolean,
     isFavorite: Boolean,
+    selectedCountryCode: String?,
+    selectedCategoryName: String?,
     lookupBackdrop: suspend (IptvProgram) -> String?,
     onFocused: () -> Unit,
     onClick: () -> Unit,
@@ -951,8 +1071,8 @@ private fun NetflixChannelCard(
     } ?: 0f
     val minsLeft = now?.let { ((it.endUtcMillis - clockTickMillis) / 60_000L).coerceAtLeast(0L) }
     val backgroundLogoUrl = remember(channel.logo) { safeChannelLogoUrl(channel.logo) }
-    val fallbackArtwork = remember(channel.source) {
-        liveChannelFallbackArtwork(channel.source)
+    val fallbackArtwork = remember(channel.source, selectedCountryCode, selectedCategoryName) {
+        liveChannelFallbackArtwork(channel.source, selectedCountryCode, selectedCategoryName)
     }
 
     // Async artwork for the current program; shared with Home through MediaRepository.
@@ -1029,7 +1149,8 @@ private fun NetflixChannelCard(
                 model = cardBackdropUrl,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.52f },
+                alpha = 0.52f,
+                modifier = Modifier.fillMaxSize(),
             )
         }
         if (cardBackdropUrl.isNullOrBlank() && fallbackArtwork?.assetPath != null) {
@@ -1037,7 +1158,8 @@ private fun NetflixChannelCard(
                 model = fallbackArtwork.assetPath,
                 contentDescription = null,
                 contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = 0.58f },
+                alpha = 0.58f,
+                modifier = Modifier.fillMaxSize(),
             )
         }
         if (cardBackdropUrl.isNullOrBlank() && fallbackArtwork == null && !backgroundLogoUrl.isNullOrBlank()) {
@@ -1045,10 +1167,10 @@ private fun NetflixChannelCard(
                 model = backgroundLogoUrl,
                 contentDescription = null,
                 contentScale = ContentScale.FillBounds,
+                alpha = 0.26f,
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        alpha = 0.26f
                         scaleX = 1.16f
                         scaleY = 1.16f
                     },
