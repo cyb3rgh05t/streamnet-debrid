@@ -140,6 +140,13 @@ val bottomBarItems = listOf(
     BottomBarItem(R.string.settings, Icons.Default.Settings, "settings")
 )
 
+/**
+ * Matches the route's base name only. The previous `contains` also matched argument names, so a
+ * route such as `settings?...&openStreamNetTv=...` marked the TV item as active as well.
+ */
+internal fun isBottomBarItemSelected(currentRoute: String?, itemRoute: String): Boolean =
+    currentRoute?.substringBefore('?')?.substringBefore('/')?.equals(itemRoute, ignoreCase = true) == true
+
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun AppBottomBar(
@@ -174,7 +181,7 @@ fun AppBottomBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             bottomBarItems.forEach { item ->
-                val isSelected = currentRoute?.contains(item.route, ignoreCase = true) == true
+                val isSelected = isBottomBarItemSelected(currentRoute, item.route)
                 var isFocused by remember { mutableStateOf(false) }
                 val label = stringResource(item.labelRes)
 

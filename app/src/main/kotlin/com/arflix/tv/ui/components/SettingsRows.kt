@@ -39,6 +39,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -315,6 +316,7 @@ fun MobileSettingsRow(
     isExternalLink: Boolean = false,
     actionIcon: ImageVector? = null,
     showDivider: Boolean = true,
+    footnote: String? = null,
     onClick: () -> Unit
 ) {
     val safeValue = value.orEmpty()
@@ -410,6 +412,16 @@ fun MobileSettingsRow(
                             color = TextSecondary,
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    if (!footnote.isNullOrBlank()) {
+                        Text(
+                            text = footnote,
+                            style = ArflixTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+                            color = accentColor,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 3.dp)
                         )
                     }
                 }

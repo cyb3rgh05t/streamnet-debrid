@@ -84,7 +84,16 @@
     <string name="settings_lock_enabled_toast">Einstellungen-Sperre aktiviert</string>
     <string name="settings_lock_disabled_toast">Einstellungen-Sperre deaktiviert</string>
     <string name="connect_to_cloud">Mit StreamNet Cloud verbinden</string>
-    <string name="profile_cloud_button">StreamNet Cloud</string>
+    <string name="cloud_connect_subtitle">Melde dich an, um Profile, Addons und Einstellungen geräteübergreifend zu synchronisieren.</string>
+    <string name="cloud_connect_scan_title">Mit dem Handy verbinden</string>
+    <string name="cloud_connect_scan_hint">Scanne den QR-Code oder öffne %1$s und gib den Code ein.</string>
+    <string name="cloud_connect_new_code">Neuen Code anfordern</string>
+    <string name="streamnet_tv_login_title">StreamNet TV</string>
+    <string name="streamnet_tv_login_paste">Aus Zwischenablage einfügen</string>
+    <string name="streamnet_tv_login_connect">Verbinden</string>
+    <string name="cloud_connect_email">Mit E-Mail anmelden</string>
+    <string name="cloud_connect_skip">Überspringen</string>
+    <string name="cloud_connect_skip_hint">Optional: Mit „Überspringen“ wird diese Seite nicht mehr angezeigt. Die Cloud lässt sich jederzeit in den Einstellungen verbinden.</string>
     <string name="next">Weiter</string>
     <string name="player_loading_video_stream">Videostream wird geladen…</string>
     <string name="player_loading_subtitles">Untertitel werden geladen…</string>

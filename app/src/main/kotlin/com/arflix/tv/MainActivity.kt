@@ -78,6 +78,10 @@ import com.arflix.tv.util.deviceHasTouchScreen
 import com.arflix.tv.util.readProfileAccentColor
 import com.arflix.tv.util.settingsDataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
+import com.arflix.tv.util.CLOUD_CONNECT_DISMISSED_KEY
+import com.arflix.tv.util.tvSetupPromptedKey
+import com.arflix.tv.navigation.shouldPromptTvSetup
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -730,7 +734,12 @@ fun ArflixApp(
         startupIntroComplete = true
     }
     val activeProfile = (activeProfileState as? ActiveProfileLoadState.Loaded)?.profile
+    var cloudConnectDismissed by remember { mutableStateOf<Boolean?>(null) }
+    LaunchedEffect(Unit) {
+        cloudConnectDismissed = context.settingsDataStore.data.first()[CLOUD_CONNECT_DISMISSED_KEY] ?: false
+    }
     val startupReady = skipProfileSelection != null &&
+        cloudConnectDismissed != null &&
         activeProfileState is ActiveProfileLoadState.Loaded &&
         authState !is AuthState.Loading
 
@@ -755,10 +764,15 @@ fun ArflixApp(
         }
     }
 
-    val startDestination = if (skipProfileSelection == true && activeProfile != null) {
-        Screen.Home.route
-    } else {
-        Screen.ProfileSelection.route
+    // Frozen on first composition: the cloud/profile state changes while the user signs in and must
+    // not swap the start destination of an already created NavHost.
+    val startDestination = remember {
+        com.arflix.tv.navigation.resolveStartDestination(
+            isCloudConnected = isCloudConnected,
+            cloudConnectDismissed = cloudConnectDismissed == true,
+            skipProfileSelection = skipProfileSelection == true,
+            hasActiveProfile = activeProfile != null,
+        )
     }
 
     val deviceType = LocalDeviceType.current
@@ -788,6 +802,7 @@ fun ArflixApp(
         !iptvFullscreen &&
         !currentRoute.contains("player") &&
         !currentRoute.contains("profile") &&
+        !currentRoute.contains("cloud_connect") &&
         !currentRoute.contains("login")
 
     CompositionLocalProvider(
@@ -828,6 +843,27 @@ fun ArflixApp(
                 preloadedTrendingBackdropUrls = preloadedTrendingBackdropUrls,
                 currentProfile = activeProfile,
                 isCloudConnected = isCloudConnected,
+                resolveProfileSetupRoute = {
+                    val profileId = profileRepository.getActiveProfile()?.id
+                    if (profileId == null) {
+                        null
+                    } else {
+                        val promptedKey = tvSetupPromptedKey(profileId)
+                        val alreadyPrompted = context.settingsDataStore.data.first()[promptedKey] ?: false
+                        val hasSource = iptvRepository.observeConfig().first().hasConfiguredSource()
+                        if (shouldPromptTvSetup(isCloudConnected, hasSource, alreadyPrompted)) {
+                            context.settingsDataStore.edit { it[promptedKey] = true }
+                            Screen.Settings.createRoute(initialSection = "iptv", openStreamNetTv = true)
+                        } else {
+                            null
+                        }
+                    }
+                },
+                onCloudConnectSkipped = {
+                    appCoroutineScope.launch {
+                        context.settingsDataStore.edit { it[CLOUD_CONNECT_DISMISSED_KEY] = true }
+                    }
+                },
                 onSwitchProfile = {
                     appCoroutineScope.launch {
                         traktRepository.clearAllProfileCaches()

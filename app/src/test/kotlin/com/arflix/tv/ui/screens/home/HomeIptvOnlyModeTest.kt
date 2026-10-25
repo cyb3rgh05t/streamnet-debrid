@@ -117,6 +117,27 @@ class HomeIptvOnlyModeTest {
     }
 
     @Test
+    fun `enabled mode keeps the upcoming rows that can never be in the provider library`() {
+        val upcomingMovie = MediaItem(id = 60, title = "Not Released Yet", mediaType = MediaType.MOVIE)
+        val upcomingSeries = MediaItem(id = 61, title = "Soon Show", mediaType = MediaType.TV)
+        val state = HomeUiState(
+            categories = listOf(
+                Category("coming_soon", "Upcoming Movies", listOf(upcomingMovie)),
+                Category("upcoming_series", "Upcoming Series", listOf(upcomingSeries)),
+                Category("movies", "Popular Movies", listOf(movie)),
+            ),
+        )
+        val emptyAvailability = IptvRepository.XtreamVodAvailability(emptySet())
+
+        val beforeAvailability = projectHomeForIptvOnlyMode(state, enabled = true, availability = null)
+        val withAvailability = projectHomeForIptvOnlyMode(state, enabled = true, availability = emptyAvailability)
+
+        assertEquals(listOf("coming_soon", "upcoming_series"), beforeAvailability.categories.map { it.id })
+        assertEquals(listOf("coming_soon", "upcoming_series"), withAvailability.categories.map { it.id })
+        assertEquals(listOf(upcomingMovie), withAvailability.categories.first().items)
+    }
+
+    @Test
     fun `enabled mode keeps home server items independent from IPTV availability`() {
         val homeServerMovie = MediaItem(
             id = 42,

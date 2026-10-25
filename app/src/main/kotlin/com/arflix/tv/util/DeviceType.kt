@@ -36,6 +36,12 @@ val DEVICE_MODE_OVERRIDE_KEY = stringPreferencesKey("device_mode_override")
 /** Key for skipping profile selection on startup */
 val SKIP_PROFILE_SELECTION_KEY = booleanPreferencesKey("skip_profile_selection")
 
+/** Set when the user chose "Don't show again" on the cloud sign-in page; device-local, not synced. */
+val CLOUD_CONNECT_DISMISSED_KEY = booleanPreferencesKey("cloud_connect_dismissed")
+
+/** Set once the TV setup (StreamNet TV data) was offered right after the first profile selection. */
+fun tvSetupPromptedKey(profileId: String) = booleanPreferencesKey("tv_setup_prompted_$profileId")
+
 /** Key for forcing pure-black (OLED) app background */
 val OLED_BLACK_BACKGROUND_KEY = booleanPreferencesKey("oled_black_background")
 

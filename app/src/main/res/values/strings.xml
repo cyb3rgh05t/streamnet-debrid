@@ -284,7 +284,16 @@
     <string name="done">Done</string>
     <string name="save">Save</string>
     <string name="connect_to_cloud">Connect to StreamNet Cloud</string>
-    <string name="profile_cloud_button">StreamNet Cloud</string>
+    <string name="cloud_connect_subtitle">Sign in to sync your profiles, addons and settings across devices.</string>
+    <string name="cloud_connect_scan_title">Connect with your phone</string>
+    <string name="cloud_connect_scan_hint">Scan the QR code or open %1$s and enter the code.</string>
+    <string name="cloud_connect_new_code">Request a new code</string>
+    <string name="streamnet_tv_login_title">StreamNet TV</string>
+    <string name="streamnet_tv_login_paste">Paste from clipboard</string>
+    <string name="streamnet_tv_login_connect">Connect</string>
+    <string name="cloud_connect_email">Sign in with e-mail</string>
+    <string name="cloud_connect_skip">Skip for now</string>
+    <string name="cloud_connect_skip_hint">Optional: Skipping hides this page from now on. You can connect the cloud any time in Settings.</string>
     <string name="view_collection">View Collection</string>
 
     <!-- In-player subtitle settings panel -->

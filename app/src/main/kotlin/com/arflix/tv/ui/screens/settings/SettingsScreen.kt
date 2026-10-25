@@ -84,6 +84,8 @@ import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.LiveTv
 import androidx.compose.material.icons.filled.Widgets
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -265,7 +267,7 @@ class SettingsFocusTracker {
 val LocalSettingsFocusTracker = compositionLocalOf<SettingsFocusTracker?> { null }
 
 private const val ACCOUNT_DELETION_URL = "https://auth.mystreamnet.club/delete-account"
-private const val PRIVACY_POLICY_URL = "https://auth.mystreamnet.club/privacy"
+internal const val PRIVACY_POLICY_URL = "https://auth.mystreamnet.club/privacy"
 
 private val tvGeneralSectionIds = setOf(
     "language",
@@ -328,7 +330,7 @@ internal fun movedIptvCategoryFocusIndex(
     else -> focusedIndex
 }
 
-private fun openExternalUrl(context: Context, url: String) {
+internal fun openExternalUrl(context: Context, url: String) {
     runCatching {
         context.startActivity(
             Intent(Intent.ACTION_VIEW, Uri.parse(url))
@@ -378,6 +380,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel(),
     currentProfile: com.arflix.tv.data.model.Profile? = null,
     autoStartCloudAuth: Boolean = false,
+    autoOpenStreamNetTv: Boolean = false,
     initialSection: String? = null,
     installPackUrl: String? = null,
     onNavigateToHome: () -> Unit = {},
@@ -520,6 +523,18 @@ fun SettingsScreen(
     var customAddonUrl by remember { mutableStateOf("") }
     var showIptvInput by remember { mutableStateOf(false) }
     var editingIptvIndex by remember { mutableIntStateOf(-1) }
+    // Offer the StreamNet TV sign-in whenever the TV section is shown while that entry has no credentials.
+    // The flag resets when the section is left, so it comes back on the next visit but not right after Cancel.
+    val streamNetTvSectionActive = autoOpenStreamNetTv || sections.getOrNull(sectionIndex) == "iptv"
+    var streamNetTvPrompted by remember(streamNetTvSectionActive) { mutableStateOf(false) }
+    LaunchedEffect(streamNetTvSectionActive, uiState.iptvPlaylists, uiState.iptvM3uUrl, uiState.iptvStalkerUrl, showIptvInput) {
+        if (!streamNetTvSectionActive || streamNetTvPrompted || showIptvInput) return@LaunchedEffect
+        if (shouldPromptStreamNetTv(uiState.iptvPlaylists, uiState.iptvM3uUrl, uiState.iptvStalkerUrl)) {
+            streamNetTvPrompted = true
+            editingIptvIndex = uiState.iptvPlaylists.indexOfFirst(::isStreamNetTvPlaylist)
+            showIptvInput = true
+        }
+    }
     var iptvEditName by remember { mutableStateOf("") }
     var iptvEditUrl by remember { mutableStateOf("") }
     var iptvEditEpg by remember { mutableStateOf("") }
@@ -2221,27 +2236,33 @@ fun SettingsScreen(
         if (showIptvInput) {
             val editingPlaylist = uiState.iptvPlaylists.getOrNull(editingIptvIndex)
             val isStreamNetTvEditor = editingPlaylist?.let(::isStreamNetTvPlaylist) == true
-            InputModal(
-                title = if (isStreamNetTvEditor) stringResource(R.string.settings_streamnet_tv_login)
-                    else if (editingIptvIndex >= 0) stringResource(R.string.settings_edit_tv_playlist)
+            if (isStreamNetTvEditor) {
+                StreamNetTvLoginModal(
+                    username = iptvEditXtreamUser,
+                    password = iptvEditXtreamPass,
+                    onUsernameChange = { iptvEditXtreamUser = it },
+                    onPasswordChange = { iptvEditXtreamPass = it },
+                    onConfirm = {
+                        viewModel.activateStreamNetTvPlaylist(
+                            playlists = uiState.iptvPlaylists,
+                            username = iptvEditXtreamUser,
+                            password = iptvEditXtreamPass,
+                        )
+                        if (
+                            BuildConfig.STREAMNET_TV_XTREAM_URL.isNotBlank() &&
+                            iptvEditXtreamUser.isNotBlank() &&
+                            iptvEditXtreamPass.isNotBlank()
+                        ) {
+                            showIptvInput = false
+                        }
+                    },
+                    onDismiss = { showIptvInput = false }
+                )
+            } else InputModal(
+                title = if (editingIptvIndex >= 0) stringResource(R.string.settings_edit_tv_playlist)
                     else stringResource(R.string.settings_add_tv_playlist),
-                supportingText = if (isStreamNetTvEditor) stringResource(R.string.settings_streamnet_tv_login_note)
-                    else stringResource(R.string.settings_iptv_epg_note),
-                fields = if (isStreamNetTvEditor) listOf(
-                    InputField(
-                        label = stringResource(R.string.settings_label_streamnet_user),
-                        value = iptvEditXtreamUser,
-                        placeholder = stringResource(R.string.settings_ph_streamnet_user),
-                        onValueChange = { iptvEditXtreamUser = it }
-                    ),
-                    InputField(
-                        label = stringResource(R.string.settings_label_streamnet_password),
-                        value = iptvEditXtreamPass,
-                        placeholder = stringResource(R.string.settings_ph_streamnet_password),
-                        isSecret = true,
-                        onValueChange = { iptvEditXtreamPass = it }
-                    )
-                ) else listOf(
+                supportingText = stringResource(R.string.settings_iptv_epg_note),
+                fields = listOf(
                     InputField(
                         label = stringResource(R.string.settings_label_playlist_name),
                         value = iptvEditName,
@@ -2275,7 +2296,7 @@ fun SettingsScreen(
                         onValueChange = { iptvEditEpg = it }
                     )
                 ),
-                toggleFields = if (isStreamNetTvEditor) emptyList() else listOf(
+                toggleFields = listOf(
                     ToggleField(
                         label = stringResource(R.string.live),
                         value = iptvEditImportLiveTv,
@@ -2293,21 +2314,6 @@ fun SettingsScreen(
                     )
                 ),
                 onConfirm = {
-                    if (isStreamNetTvEditor) {
-                        viewModel.activateStreamNetTvPlaylist(
-                            playlists = uiState.iptvPlaylists,
-                            username = iptvEditXtreamUser,
-                            password = iptvEditXtreamPass,
-                        )
-                        if (
-                            BuildConfig.STREAMNET_TV_XTREAM_URL.isNotBlank() &&
-                            iptvEditXtreamUser.isNotBlank() &&
-                            iptvEditXtreamPass.isNotBlank()
-                        ) {
-                            showIptvInput = false
-                        }
-                        return@InputModal
-                    }
                     // Build the m3uUrl: if Xtream credentials are provided, combine as "host user pass"
                     val hasXtream = iptvEditXtreamUser.isNotBlank() && iptvEditXtreamPass.isNotBlank()
                     val finalM3uUrl = if (hasXtream) {
@@ -2867,8 +2873,9 @@ private fun IptvLoadingOverlay(
 }
 
 @Composable
-private fun ModalScrim(
+internal fun ModalScrim(
     onDismiss: () -> Unit,
+    showFrame: Boolean = true,
     content: @Composable BoxScope.() -> Unit
 ) {
     val scrimInteraction = remember { MutableInteractionSource() }
@@ -2893,7 +2900,7 @@ private fun ModalScrim(
                 indication = null,
                 onClick = {}
             ).then(
-                if (isTouchDevice) {
+                if (isTouchDevice && showFrame) {
                     Modifier.border(
                         width = 1.5.dp,
                         color = accentColor.copy(alpha = 0.72f),
@@ -3308,7 +3315,7 @@ private fun QualityFilterEditorModal(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun CloudEmailPasswordModal(
+internal fun CloudEmailPasswordModal(
     email: String,
     password: String,
     onEmailChange: (String) -> Unit,
@@ -3342,14 +3349,30 @@ private fun CloudEmailPasswordModal(
             usePlatformDefaultWidth = false
         )
     ) {
-        ModalScrim(onDismiss = onDismiss) {
+        ModalScrim(onDismiss = onDismiss, showFrame = false) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth(if (LocalDeviceType.current.isTouchDevice()) 0.92f else 1f)
                     .widthIn(max = 600.dp)
-                    .background(BackgroundElevated, RoundedCornerShape(16.dp))
-                    .border(1.dp, accentColor.copy(alpha = 0.26f), RoundedCornerShape(16.dp))
-                    .padding(if (LocalDeviceType.current.isTouchDevice()) 20.dp else 32.dp)
+                    .background(ArvioSkin.colors.surfaceRaised, RoundedCornerShape(24.dp))
+                    .background(
+                        Brush.linearGradient(
+                            listOf(
+                                accentColor.copy(alpha = 0.07f),
+                                ArvioSkin.colors.surfaceRaised,
+                                ArvioSkin.colors.surfaceRaised
+                            )
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            listOf(accentColor.copy(alpha = 0.75f), accentColor.copy(alpha = 0.18f))
+                        ),
+                        RoundedCornerShape(24.dp)
+                    )
+                    .padding(if (LocalDeviceType.current.isTouchDevice()) 22.dp else 36.dp)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown) {
                             when (event.key) {
@@ -3407,11 +3430,27 @@ private fun CloudEmailPasswordModal(
                     },
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(id = R.drawable.streamnet_tv_logo_full),
+                    contentDescription = stringResource(R.string.app_name),
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier
+                        .widthIn(max = 210.dp)
+                        .height(52.dp)
+                )
+                Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = stringResource(R.string.settings_cloud_signin_title),
                     style = ArflixTypography.sectionTitle,
-                    color = TextPrimary,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    color = TextPrimary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = stringResource(R.string.cloud_connect_subtitle),
+                    style = ArflixTypography.caption,
+                    color = TextSecondary,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 26.dp)
                 )
 
                 Column(modifier = Modifier.fillMaxWidth()) {
@@ -3426,11 +3465,20 @@ private fun CloudEmailPasswordModal(
                         onValueChange = onEmailChange,
                         enabled = !isWorking,
                         singleLine = true,
+                        shape = RoundedCornerShape(14.dp),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = null,
+                                tint = if (focusedIndex == 0) accentColor else TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         textStyle = ArflixTypography.body.copy(color = TextPrimary),
                         colors = androidx.compose.material3.TextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                            focusedContainerColor = accentColor.copy(alpha = 0.08f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
@@ -3441,8 +3489,8 @@ private fun CloudEmailPasswordModal(
                             .focusRequester(emailRequester)
                             .border(
                                 width = if (focusedIndex == 0) 2.dp else 1.dp,
-                                color = if (focusedIndex == 0) accentColor else Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (focusedIndex == 0) accentColor else Color.White.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(14.dp)
                             )
                     )
                 }
@@ -3462,11 +3510,20 @@ private fun CloudEmailPasswordModal(
                         enabled = !isWorking,
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        shape = RoundedCornerShape(14.dp),
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = if (focusedIndex == 1) accentColor else TextSecondary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
                         textStyle = ArflixTypography.body.copy(color = TextPrimary),
                         colors = androidx.compose.material3.TextFieldDefaults.colors(
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = Color.White.copy(alpha = 0.1f),
+                            focusedContainerColor = accentColor.copy(alpha = 0.08f),
                             unfocusedContainerColor = Color.White.copy(alpha = 0.05f),
                             focusedIndicatorColor = Color.Transparent,
                             unfocusedIndicatorColor = Color.Transparent,
@@ -3477,8 +3534,8 @@ private fun CloudEmailPasswordModal(
                             .focusRequester(passwordRequester)
                             .border(
                                 width = if (focusedIndex == 1) 2.dp else 1.dp,
-                                color = if (focusedIndex == 1) accentColor else Color.White.copy(alpha = 0.2f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (focusedIndex == 1) accentColor else Color.White.copy(alpha = 0.16f),
+                                shape = RoundedCornerShape(14.dp)
                             )
                     )
                 }
@@ -3499,79 +3556,38 @@ private fun CloudEmailPasswordModal(
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val isCancelFocused = focusedIndex == 2
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                color = if (isCancelFocused) Color.White.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f)
-                            )
-                            .clickable(enabled = !isWorking) { onDismiss() }
-                            .border(
-                                width = if (isCancelFocused) 2.dp else 0.dp,
-                                color = if (isCancelFocused) accentColor else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(vertical = 14.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.cancel),
-                            style = ArflixTypography.button,
-                            color = if (isCancelFocused) TextPrimary else TextSecondary
-                        )
-                    }
-
-                    val isSignInFocused = focusedIndex == 3
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                color = if (isSignInFocused) accentColor else accentColor.copy(alpha = 0.56f)
-                            )
-                            .clickable(enabled = !isWorking) { onSignIn() }
-                            .border(
-                                width = if (isSignInFocused) 2.dp else 0.dp,
-                                color = if (isSignInFocused) accentColor.copy(alpha = 0.7f) else Color.Transparent,
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(vertical = 14.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.sign_in),
-                            style = ArflixTypography.button,
-                            color = contrastingContentColor(accentColor)
-                        )
-                    }
-
-                    val isCreateFocused = focusedIndex == 4
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(
-                                color = if (isCreateFocused) accentColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.08f)
-                            )
-                            .clickable(enabled = !isWorking) { onCreateAccount() }
-                            .border(
-                                width = if (isCreateFocused) 2.dp else 1.dp,
-                                color = if (isCreateFocused) accentColor else Color.White.copy(alpha = 0.16f),
-                                shape = RoundedCornerShape(8.dp)
-                            )
-                            .padding(vertical = 14.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = stringResource(R.string.settings_btn_create),
-                            style = ArflixTypography.button,
-                            color = if (isCreateFocused) accentColor else Color.White
-                        )
-                    }
+                    CloudActionButton(
+                        label = stringResource(R.string.cancel),
+                        icon = Icons.Default.Close,
+                        focused = focusedIndex == 2,
+                        style = CloudActionStyle.Ghost,
+                        accentColor = accentColor,
+                        enabled = !isWorking,
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f)
+                    )
+                    CloudActionButton(
+                        label = stringResource(R.string.sign_in),
+                        icon = Icons.Default.Check,
+                        focused = focusedIndex == 3,
+                        style = CloudActionStyle.Primary,
+                        accentColor = accentColor,
+                        enabled = !isWorking,
+                        onClick = onSignIn,
+                        modifier = Modifier.weight(1.2f)
+                    )
+                    CloudActionButton(
+                        label = stringResource(R.string.settings_btn_create),
+                        icon = Icons.Default.Add,
+                        focused = focusedIndex == 4,
+                        style = CloudActionStyle.Outlined,
+                        accentColor = accentColor,
+                        enabled = !isWorking,
+                        onClick = onCreateAccount,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -3603,24 +3619,34 @@ private fun CloudEmailPasswordModal(
                     color = TextSecondary,
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(14.dp))
                 Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
+                        .clip(RoundedCornerShape(50))
+                        .background(if (focusedIndex == 5) accentColor.copy(alpha = 0.14f) else Color.Transparent)
                         .clickable(onClick = onOpenPrivacy)
                         .border(
                             width = if (focusedIndex == 5) 2.dp else 1.dp,
                             color = if (focusedIndex == 5) accentColor else Color.White.copy(alpha = 0.14f),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(50)
                         )
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 18.dp, vertical = 9.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = stringResource(R.string.login_read_privacy_policy),
-                        style = ArflixTypography.button,
-                        color = if (focusedIndex == 5) TextPrimary else TextSecondary
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = null,
+                            tint = if (focusedIndex == 5) accentColor else TextSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.login_read_privacy_policy),
+                            style = ArflixTypography.caption,
+                            color = if (focusedIndex == 5) TextPrimary else TextSecondary
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -3636,7 +3662,7 @@ private fun CloudEmailPasswordModal(
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-private fun CloudPairModal(
+internal fun CloudPairModal(
     verificationUrl: String,
     userCode: String,
     isWorking: Boolean,
@@ -8378,7 +8404,6 @@ private fun IptvSettings(
                     epgSourceCount = epgSourceCount
                 )
                 val expirationText = playlist.settingsPlaylistExpirationText()
-                val expirationColor = resolveAccentColor(fallback = Pink)
                 MobileSettingsCategory(title = playlist.name.uppercase()) {
                     MobileSettingsRow(
                         icon = Icons.Default.LiveTv,
@@ -8387,16 +8412,9 @@ private fun IptvSettings(
                         value = "",
                         actionIcon = Icons.Default.Edit,
                         isFocused = false,
+                        footnote = expirationText.takeIf { isConfigured },
                         onClick = { onEditPlaylist(index) },
                     )
-                    if (isConfigured) {
-                        Text(
-                            text = expirationText,
-                            style = ArflixTypography.caption.copy(fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-                            color = expirationColor,
-                            modifier = Modifier.padding(start = 52.dp, end = 16.dp, bottom = 4.dp)
-                        )
-                    }
                     MobileSettingsRow(
                         icon = if (playlist.enabled) Icons.Default.Check else Icons.Default.VisibilityOff,
                         title = stringResource(R.string.settings_enabled),

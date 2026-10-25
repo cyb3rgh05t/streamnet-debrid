@@ -2990,9 +2990,14 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun startCloudAuth() {
+    /**
+     * [forcePairing] starts the TV pairing session even on touch hardware. Used by the cloud page
+     * when the UI mode was forced to TV: the QR code needs a session, which the direct e-mail
+     * login of touch devices never creates.
+     */
+    fun startCloudAuth(forcePairing: Boolean = false) {
         if (_uiState.value.isLoggedIn || _uiState.value.isCloudAuthWorking) return
-        if (usesDirectCloudAuth) {
+        if (usesDirectCloudAuth && !forcePairing) {
             _uiState.value = _uiState.value.copy(
                 showCloudPairDialog = false,
                 showCloudEmailPasswordDialog = true,

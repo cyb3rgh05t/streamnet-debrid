@@ -445,7 +445,12 @@ data class IptvConfig(
     val excludedVodCategoryIds: List<String> = emptyList(),
     val excludedSeriesCategoryIds: List<String> = emptyList(),
     val sortOrder: String = "provider"
-)
+) {
+    /** True when at least one usable source exists; the empty StreamNet TV system preset does not count. */
+    fun hasConfiguredSource(): Boolean =
+        m3uUrl.isNotBlank() || stalkerPortalUrl.isNotBlank() ||
+            playlists.any { it.enabled && it.m3uUrl.isNotBlank() }
+}
 
 internal fun isXtreamVodCategoryIncluded(categoryId: String?, excludedCategoryIds: Set<String>): Boolean =
     categoryId?.trim().orEmpty() !in excludedCategoryIds

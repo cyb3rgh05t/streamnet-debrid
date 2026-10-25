@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
+import kotlinx.coroutines.launch
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -27,6 +28,7 @@ import com.arflix.tv.ui.screens.offline.OfflineDownloadsScreen
 import com.arflix.tv.ui.screens.player.PlayerScreen
 import com.arflix.tv.ui.screens.collections.CollectionDetailsScreen
 import com.arflix.tv.ui.screens.search.SearchScreen
+import com.arflix.tv.ui.screens.settings.CloudConnectScreen
 import com.arflix.tv.ui.screens.settings.SettingsScreen
 import com.arflix.tv.ui.screens.settings.telegram.TelegramSettingsScreen
 import com.arflix.tv.ui.screens.tv.live.LiveTvScreen
@@ -39,6 +41,7 @@ import com.arflix.tv.util.LocalDeviceType
  */
 sealed class Screen(val route: String) {
     data object Login : Screen("login")
+    data object CloudConnect : Screen("cloud_connect")
     data object Home : Screen("home")
     data object Search : Screen("search")
     data object Watchlist : Screen("watchlist")
@@ -57,11 +60,16 @@ sealed class Screen(val route: String) {
         }
     }
     data object Settings : Screen("settings") {
-        fun createRoute(autoCloudAuth: Boolean = false, initialSection: String? = null): String {
+        fun createRoute(
+            autoCloudAuth: Boolean = false,
+            initialSection: String? = null,
+            openStreamNetTv: Boolean = false,
+        ): String {
             val base = "settings"
             val params = mutableListOf<String>()
             if (autoCloudAuth) params.add("autoCloudAuth=true")
             initialSection?.let { params.add("initialSection=$it") }
+            if (openStreamNetTv) params.add("openStreamNetTv=true")
             return if (params.isNotEmpty()) "$base?${params.joinToString("&")}" else base
         }
     }
@@ -123,6 +131,27 @@ sealed class Screen(val route: String) {
     }
 }
 
+internal fun resolveStartDestination(
+    isCloudConnected: Boolean,
+    cloudConnectDismissed: Boolean,
+    skipProfileSelection: Boolean,
+    hasActiveProfile: Boolean,
+): String = when {
+    !isCloudConnected && !cloudConnectDismissed -> Screen.CloudConnect.route
+    skipProfileSelection && hasActiveProfile -> Screen.Home.route
+    else -> Screen.ProfileSelection.route
+}
+
+/**
+ * Without a cloud account and without any IPTV source Home has nothing to build from, so the first
+ * profile selection opens the TV settings once instead of an empty Home.
+ */
+internal fun shouldPromptTvSetup(
+    isCloudConnected: Boolean,
+    hasIptvSource: Boolean,
+    alreadyPrompted: Boolean,
+): Boolean = !isCloudConnected && !hasIptvSource && !alreadyPrompted
+
 internal fun NavHostController.navigateToProfileSelection() {
     navigate(Screen.ProfileSelection.route) {
         popUpTo(graph.id) { inclusive = false }
@@ -145,9 +174,12 @@ fun AppNavigation(
     currentProfile: Profile? = null,
     isCloudConnected: Boolean = false,
     onSwitchProfile: () -> Unit = {},
+    onCloudConnectSkipped: () -> Unit = {},
+    resolveProfileSetupRoute: suspend () -> String? = { null },
     onTvFullscreenChanged: (Boolean) -> Unit = {},
     onExitApp: () -> Unit = {}
 ) {
+    val navigationScope = androidx.compose.runtime.rememberCoroutineScope()
     val navigateTopLevel: (String) -> Unit = { route ->
         navController.navigate(route) {
             popUpTo(Screen.Home.route) { saveState = true }
@@ -185,6 +217,18 @@ fun AppNavigation(
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
+                }
+            )
+        }
+
+        // Cloud sign-in page shown before the profile selection while no cloud account is connected
+        composable(Screen.CloudConnect.route) {
+            CloudConnectScreen(
+                backdropUrls = preloadedTrendingBackdropUrls,
+                onConnected = { navController.navigateToProfileSelection() },
+                onSkip = {
+                    onCloudConnectSkipped()
+                    navController.navigateToProfileSelection()
                 }
             )
         }
@@ -344,8 +388,12 @@ fun AppNavigation(
 
         // Settings screen
         composable(
-            route = "settings?autoCloudAuth={autoCloudAuth}&initialSection={initialSection}&installPackUrl={installPackUrl}",
+            route = "settings?autoCloudAuth={autoCloudAuth}&initialSection={initialSection}&installPackUrl={installPackUrl}&openStreamNetTv={openStreamNetTv}",
             arguments = listOf(
+                navArgument("openStreamNetTv") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                },
                 navArgument("autoCloudAuth") {
                     type = NavType.BoolType
                     defaultValue = false
@@ -365,12 +413,25 @@ fun AppNavigation(
             val autoCloudAuth = backStackEntry.arguments?.getBoolean("autoCloudAuth") ?: false
             val initialSection = backStackEntry.arguments?.getString("initialSection")
             val installPackUrl = backStackEntry.arguments?.getString("installPackUrl")
+            val openStreamNetTv = backStackEntry.arguments?.getBoolean("openStreamNetTv") ?: false
+            // Settings can be the first destination (TV setup after the first profile selection).
+            val goHomeFromSettings: () -> Unit = {
+                if (navController.previousBackStackEntry != null) {
+                    navigateHome()
+                } else {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(navController.graph.id) { inclusive = false }
+                        launchSingleTop = true
+                    }
+                }
+            }
             SettingsScreen(
                 currentProfile = currentProfile,
                 autoStartCloudAuth = autoCloudAuth,
+                autoOpenStreamNetTv = openStreamNetTv,
                 initialSection = initialSection,
                 installPackUrl = installPackUrl,
-                onNavigateToHome = { navigateHome() },
+                onNavigateToHome = goHomeFromSettings,
                 onNavigateToSearch = { navigateTopLevel(Screen.Search.route) },
                 onNavigateToTv = { navigateTopLevel(Screen.Tv.createRoute()) },
                 onNavigateToWatchlist = { navigateTopLevel(Screen.Watchlist.route) },
@@ -397,7 +458,10 @@ fun AppNavigation(
                     onSwitchProfile()
                     navController.navigateToProfileSelection()
                 },
-                onBack = { navController.popBackStack() }
+                onBack = {
+                    if (navController.previousBackStackEntry != null) navController.popBackStack()
+                    else goHomeFromSettings()
+                }
             )
         }
 
@@ -411,15 +475,14 @@ fun AppNavigation(
             ProfileSelectionScreen(
                 trendingBackdropUrls = preloadedTrendingBackdropUrls,
                 onProfileSelected = {
-                    navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.ProfileSelection.route) { inclusive = true }
+                    navigationScope.launch {
+                        val target = resolveProfileSetupRoute() ?: Screen.Home.route
+                        navController.navigate(target) {
+                            popUpTo(Screen.ProfileSelection.route) { inclusive = true }
+                        }
                     }
                 },
-                onShowAddProfile = { /* Handled internally by ProfileSelectionScreen */ },
-                onConnectCloud = {
-                    navController.navigate("settings?autoCloudAuth=true")
-                },
-                isCloudConnected = isCloudConnected
+                onShowAddProfile = { /* Handled internally by ProfileSelectionScreen */ }
             )
         }
 

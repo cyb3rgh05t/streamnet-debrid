@@ -225,6 +225,12 @@ internal fun isAvailableInXtreamVod(
 private fun isIptvOnlyCollectionCategory(category: Category): Boolean =
     category.id == "collection_row_service" || category.id == "collection_row_franchise"
 
+/**
+ * Rows that announce unreleased titles. They can never be part of the provider's VOD library, so the
+ * IPTV-only availability filter would always empty and drop them.
+ */
+internal val IPTV_ONLY_INFORMATIONAL_CATEGORY_IDS = setOf("coming_soon", "upcoming_series")
+
 internal fun recentTvHomeChannelIds(channelIds: List<String>): List<String> =
     newestFirstChannelIds(channelIds).take(RECENT_TV_HOME_ITEM_LIMIT)
 
@@ -356,11 +362,19 @@ internal fun preserveLiveHomeRows(
     current: List<Category>,
     incoming: List<Category>,
     catalogOrder: List<String>,
+    keepContinueWatchingPlaceholders: Boolean = true,
 ): List<Category> {
     fun isLiveRow(category: Category): Boolean =
         category.id == "continue_watching" || isIptvLiveHomeCategory(category.id)
+    // A placeholder-only Continue Watching row is only worth keeping while a source (Trakt) may still
+    // deliver data; otherwise it would shimmer forever above the real rows.
+    fun isDeadContinueWatchingPlaceholder(category: Category): Boolean =
+        !keepContinueWatchingPlaceholders &&
+            category.id == "continue_watching" &&
+            category.items.none { !it.isPlaceholder }
     return orderHomeCategories(
-        incoming.filterNot(::isLiveRow) + current.filter(::isLiveRow),
+        incoming.filterNot(::isLiveRow) +
+            current.filter { isLiveRow(it) && !isDeadContinueWatchingPlaceholder(it) },
         catalogOrder,
     )
 }
@@ -437,6 +451,7 @@ internal fun projectHomeForIptvOnlyMode(
         when {
             category.id == "continue_watching" -> category
             isIptvLiveHomeCategory(category.id) -> category
+            category.id in IPTV_ONLY_INFORMATIONAL_CATEGORY_IDS -> category
             availability == null -> null
             category.id.startsWith("collection_row_") -> category
                 .takeIf(::isIptvOnlyCollectionCategory)
@@ -3325,7 +3340,31 @@ class HomeViewModel @Inject constructor(
                     severity = "warning"
                 )
             }
+            if (cached.isEmpty() && instant.isEmpty() && fresh.isEmpty() &&
+                continueWatchingUpdates.revision == localUpdateRevision
+            ) {
+                withContext(Dispatchers.Main) { dropPlaceholderContinueWatching() }
+            }
         }
+    }
+
+    private suspend fun isTraktConnectedSafe(): Boolean = try {
+        traktRepository.hasTrakt()
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        false
+    }
+
+    /** Removes a Continue Watching row that has no real items, e.g. the skeleton row after an empty fetch. */
+    private fun dropPlaceholderContinueWatching() {
+        val current = _uiState.value.categories
+        val index = current.indexOfFirst { it.id == "continue_watching" }
+        val row = current.getOrNull(index) ?: return
+        if (row.items.any { !it.isPlaceholder }) return
+        _uiState.value = _uiState.value.copy(
+            categories = current.toMutableList().also { it.removeAt(index) }
+        )
     }
 
     private fun restartContinueWatchingFetch() {
@@ -3857,10 +3896,12 @@ class HomeViewModel @Inject constructor(
                     .asSequence()
                     .flatMap { it.items.asSequence() }
                     .associateBy { "${it.mediaType.name}:${it.id}" }
+                val awaitingContinueWatching = isTraktConnectedSafe()
                 val stabilizedCategories = preserveLiveHomeRows(
                     current = _uiState.value.categories,
                     incoming = categories,
                     catalogOrder = savedCatalogs.map { it.id },
+                    keepContinueWatchingPlaceholders = awaitingContinueWatching,
                 ).map { category ->
                     val latestCategory = _uiState.value.categories.firstOrNull { it.id == category.id }
                     val retainedCategory = mergeReadyHomeCategory(
