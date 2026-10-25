@@ -783,6 +783,7 @@ const operationFields = [
   "delete_addon",
   "upsert_playlist",
   "delete_playlist",
+  "change_streamnet_host",
 ];
 
 const operationWarnings = {
@@ -793,6 +794,8 @@ const operationWarnings = {
   upsert_playlist:
     "Diese Änderung gilt nur für das gewählte Profil und erzeugt sofort eine neue Cloud-Revision.",
   delete_playlist: "Die Playlist wird nur aus dem gewählten Profil entfernt.",
+  change_streamnet_host:
+    "Gilt nur für diesen Account und erzeugt sofort eine neue Cloud-Revision. Ohne Profilauswahl werden alle Profile mit StreamNet TV umgestellt.",
 };
 
 function populateAddonSelect() {
@@ -847,14 +850,35 @@ function updateOperationFields() {
   const operation = byId("mutation-operation").value;
   const isProfileScoped =
     operation === "upsert_playlist" || operation === "delete_playlist";
-  byId("mutation-profile-field").classList.toggle("hidden", !isProfileScoped);
+  const isHostChange = operation === "change_streamnet_host";
+  byId("mutation-profile-field").classList.toggle(
+    "hidden",
+    !isProfileScoped && !isHostChange,
+  );
   byId("mutation-profile").required = isProfileScoped;
+  // The host change may target all profiles of the account, which the other operations cannot.
+  const profileSelect = byId("mutation-profile");
+  const allOption = profileSelect.querySelector('option[data-all="true"]');
+  if (isHostChange && !allOption) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.dataset.all = "true";
+    option.textContent = "Alle Profile";
+    profileSelect.prepend(option);
+    profileSelect.value = "";
+  } else if (!isHostChange && allOption) {
+    allOption.remove();
+    if (profileSelect.options.length) profileSelect.selectedIndex = 0;
+  }
   for (const id of operationFields) {
     byId(`fields-${id}`).classList.toggle("hidden", id !== operation);
   }
   byId("mutation-warning").textContent = operationWarnings[operation] || "";
   if (operation === "delete_addon") populateAddonSelect();
   if (operation === "delete_playlist") populatePlaylistSelect();
+  if (operation === "change_streamnet_host") {
+    byId("streamnet-host").value = "";
+  }
   if (operation === "upsert_addon") {
     byId("addon-url").value = "";
     byId("addon-enabled").checked = true;
@@ -903,6 +927,11 @@ async function submitMutation(event) {
     };
     if (operation === "upsert_playlist" || operation === "delete_playlist") {
       request.profileId = byId("mutation-profile").value;
+    }
+    if (operation === "change_streamnet_host") {
+      const profileId = byId("mutation-profile").value;
+      if (profileId) request.profileId = profileId;
+      request.data = { host: byId("streamnet-host").value.trim() };
     }
     if (operation === "upsert_addon") {
       normalizeAddonLinkField();

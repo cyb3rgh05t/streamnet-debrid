@@ -482,6 +482,22 @@ export function applyAdminSnapshotMutation(
     return merged;
   }
 
+  if (operation === "change_streamnet_host") {
+    // Single-account variant of the global host change; credentials and options stay untouched.
+    const profileId = request.profileId ? requireProfile(payload, request.profileId) : null;
+    const mutation = prepareAdminGlobalMutation({
+      operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: data?.host },
+    });
+    const configured = [...profileIds(payload)].some((id) =>
+      (!profileId || id === profileId) &&
+      Array.isArray(payload.iptvByProfile?.[id]?.playlists) &&
+      payload.iptvByProfile[id].playlists.some((item) => item?.id === "streamnet_tv"));
+    if (!configured) throw new Error("StreamNet TV is not configured for this account");
+    const next = applyAdminGlobalMutation(payload, mutation, now, profileId);
+    if (!next) throw new Error("StreamNet TV host is already set");
+    return next;
+  }
+
   if (operation === "upsert_addon") {
     const addon = normalizeAddon(data);
     replaceAccountAddons(
@@ -862,7 +878,7 @@ export function adminGlobalInventory(payload) {
   };
 }
 
-export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now()) {
+export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(), onlyProfileId = null) {
   if (!isPlainObject(payloadValue)) throw new Error("Snapshot payload is invalid");
   const payload = cloneJson(payloadValue, "Snapshot payload", adminSnapshotMaxBytes);
   for (const id of profileIds(payload)) cleanIdentifier(id, "profileId");
@@ -895,6 +911,7 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
   } else {
     let changed = false;
     for (const profileId of profileIds(payload)) {
+      if (onlyProfileId && profileId !== onlyProfileId) continue;
       const previous = payload.iptvByProfile?.[profileId];
       const items = Array.isArray(previous?.playlists) ? previous.playlists : [];
       const selected = items.find((item) => item?.id === targetId);

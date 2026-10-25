@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.025] - 2026-10-25
+
+- Backend-Admin-Panel: Im Account-Detail gibt es die neue Aktion **StreamNet TV: Host ändern** (`change_streamnet_host`, `PATCH /admin-api/accounts/:accountId/snapshot`). Sie ändert den Server der StreamNet-TV-Playlist (`streamnet_tv`) nur für diesen einen Account, wahlweise für „Alle Profile“ oder ein einzelnes Profil, und nutzt dieselbe Host-Logik wie die globale Aktion `change_xtream_host`: Benutzername, Passwort, Aktivierung und Importoptionen bleiben erhalten, M3U-/EPG-Adressen werden neu aufgebaut, `streamNetHostOverride` wird gesetzt und Ablaufprüfungen zurückgesetzt. Die Änderung erzeugt wie jede Account-Mutation eine neue Cloud-Revision und einen Audit-Eintrag (inklusive neuem Host). Fehlerfälle: `streamnet_tv_not_configured` (Account/Profil hat keine StreamNet-TV-Playlist) und `streamnet_tv_host_unchanged` (Host bereits gesetzt). `applyAdminGlobalMutation` hat dafür den optionalen Parameter `onlyProfileId`. Tests in `admin-snapshots.test.js`, Doku in `backend-cloud/README.md`. Hinweis: Der Server muss neu deployt werden; die Android-App braucht dafür keine Änderung (sie unterstützt `streamNetHostOverride` bereits).
+
 ## [2.5.076] - 2026-10-25
 
 - Android-Version: `2.5.076` / Code `477`.

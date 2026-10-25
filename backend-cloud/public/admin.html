@@ -339,8 +339,25 @@
                       Playlist hinzufügen / ersetzen
                     </option>
                     <option value="delete_playlist">Playlist entfernen</option>
+                    <option value="change_streamnet_host">
+                      StreamNet TV: Host ändern
+                    </option>
                   </select>
                 </label>
+
+                <div id="fields-change_streamnet_host" class="op-fields hidden">
+                  <div class="quick-panel">
+                    Ändert nur den Server der StreamNet-TV-Playlist dieses
+                    Accounts. Benutzername, Passwort, Aktivierung und
+                    Importoptionen bleiben erhalten.
+                  </div>
+                  <label
+                    >Neuer Host<input
+                      id="streamnet-host"
+                      type="url"
+                      placeholder="https://tv.example.com:8080"
+                  /></label>
+                </div>
 
                 <div id="fields-upsert_addon" class="op-fields hidden">
                   <div class="quick-panel">

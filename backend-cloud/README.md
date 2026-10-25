@@ -166,6 +166,20 @@ The admin-only endpoints are `GET /admin-api/global` (redacted inventory),
 `POST /admin-api/global/preview`, and `PATCH /admin-api/global/snapshot`.
 Mutation operations are `add_playlist`, `edit_playlist`, `delete_playlist`,
 `clear_playlists`, `change_xtream_host`, `add_addon`, `edit_addon`, `delete_addon`, and `clear_addons`.
+
+### StreamNet TV host for a single account
+
+The account detail page has the action **StreamNet TV: Host ändern**
+(`change_streamnet_host` on `PATCH /admin-api/accounts/:accountId/snapshot`). It
+applies the same host-only logic as `change_xtream_host` with the fixed
+`streamnet_tv` ID, but only to that account: pass `data.host` and optionally a
+`profileId` to restrict it to one profile (the UI offers "Alle Profile" as the
+default). Credentials, activation and import flags are kept, M3U/EPG addresses are
+rebuilt and `streamNetHostOverride` is set. Like every account mutation it needs
+`expectedRevision`, writes a new revision and an audit entry (the audit details
+include the new host). It fails with `streamnet_tv_not_configured` when the
+account (or selected profile) has no `streamnet_tv` entry, and with
+`streamnet_tv_host_unchanged` when the host is already set.
 Edit/delete requests supply `targetId`; add/edit requests supply `data`.
 Apply requests additionally supply the preview's `state` as `expectedState`
 and `confirmation: "ALLE ACCOUNTS"`, with an optional audit `reason`.

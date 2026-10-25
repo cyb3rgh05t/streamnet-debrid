@@ -55,6 +55,8 @@ const mutationFailureReasons = new Map([
   ["Selected playlist has no valid Xtream credentials", "missing_xtream_credentials"],
   ["Playlist source type is invalid", "invalid_playlist_source_type"],
   ["Select StreamNet TV to edit its configuration", "invalid_streamnet_tv_target"],
+  ["StreamNet TV is not configured for this account", "streamnet_tv_not_configured"],
+  ["StreamNet TV host is already set", "streamnet_tv_host_unchanged"],
   ["rootKey is invalid", "invalid_profile_root"],
   ["field is invalid", "invalid_profile_field"],
   [
@@ -166,6 +168,9 @@ function auditDetails(request) {
     reason: String(request.reason || "").trim() || null,
     itemId: String(data.id || "").trim() || null,
     itemName: String(data.name || "").trim() || null,
+    host: request.operation === "change_streamnet_host"
+      ? String(data.host || "").trim().slice(0, 300) || null
+      : null,
     rootKey: request.rootKey || null,
     field: request.field || null,
   };

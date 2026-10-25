@@ -451,6 +451,60 @@ test("Xtream validation rejects invalid hosts, empty credentials and wrong Strea
   }), /Select StreamNet TV/);
 });
 
+test("single-account StreamNet host change keeps credentials, options and other profiles on request", () => {
+  const value = snapshot();
+  value.iptvByProfile.kids = {
+    playlists: [{ id: "streamnet_tv", name: "StreamNet TV", m3uUrl: "https://old.test/get.php?username=kid&password=pw&type=m3u_plus&output=ts", enabled: false, importVod: false }],
+    m3uUrl: "https://old.test/get.php?username=kid&password=pw&type=m3u_plus&output=ts",
+  };
+  value.iptvByProfile["living-room"].playlists = [{
+    id: "streamnet_tv", name: "StreamNet TV",
+    m3uUrl: "https://old.test/get.php?username=adult&password=pw2&type=m3u_plus&output=ts", enabled: true,
+  }];
+  const all = applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", data: { host: "https://new.test:8080/" },
+  }, 7000);
+  for (const [profile, user] of [["kids", "kid"], ["living-room", "adult"]]) {
+    const playlist = all.iptvByProfile[profile].playlists[0];
+    assert.equal(new URL(playlist.m3uUrl).origin, "https://new.test:8080");
+    assert.equal(new URL(playlist.m3uUrl).searchParams.get("username"), user);
+    assert.equal(playlist.streamNetHostOverride, "https://new.test:8080");
+  }
+  assert.equal(all.iptvByProfile.kids.playlists[0].enabled, false);
+  assert.equal(all.iptvByProfile.kids.playlists[0].importVod, false);
+  assert.equal(all.updatedAt, 7000);
+
+  const single = applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", profileId: "kids", data: { host: "https://new.test" },
+  }, 7000);
+  assert.equal(new URL(single.iptvByProfile.kids.playlists[0].m3uUrl).origin, "https://new.test");
+  assert.equal(single.iptvByProfile["living-room"].playlists[0].m3uUrl, value.iptvByProfile["living-room"].playlists[0].m3uUrl);
+  assert.equal(new URL(value.iptvByProfile.kids.playlists[0].m3uUrl).origin, "https://old.test");
+});
+
+test("single-account StreamNet host change rejects missing setup, unchanged host and bad input", () => {
+  const value = snapshot();
+  assert.throws(() => applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", data: { host: "https://new.test" },
+  }), /not configured for this account/);
+  value.iptvByProfile.kids.playlists = [{ id: "streamnet_tv", m3uUrl: "https://old.test/get.php?username=u&password=p" }];
+  assert.throws(() => applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", profileId: "living-room", data: { host: "https://new.test" },
+  }), /not configured for this account/);
+  assert.throws(() => applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", profileId: "missing", data: { host: "https://new.test" },
+  }), /Unknown profile/);
+  assert.throws(() => applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", data: { host: "file:///tmp" },
+  }), /server URL is invalid/);
+  const changed = applyAdminSnapshotMutation(value, {
+    operation: "change_streamnet_host", data: { host: "https://new.test" },
+  });
+  assert.throws(() => applyAdminSnapshotMutation(changed, {
+    operation: "change_streamnet_host", data: { host: "https://new.test" },
+  }), /already set/);
+});
+
 test("upserts an account-wide addon with an initial state for every profile", () => {
   const result = applyAdminSnapshotMutation(
     snapshot(),
