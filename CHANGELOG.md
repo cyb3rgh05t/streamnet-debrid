@@ -4,6 +4,20 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.078] - 2026-10-26
+
+- Android-Version: `2.5.078` / Code `479`.
+
+- Android TV Live-TV Netflix-Layout: Direkt nach dem App-Start zeigte der Bildschirm kurz „Keine Sender in dieser Kategorie“ statt eines Ladezustands. Die Kategorie-Chips samt Zahlen kommen aus dem Snapshot, die Senderliste der gewählten Kategorie wird aber erst danach asynchron aufgebaut; in dieser Lücke galt das Laden schon als beendet. Hat die Kategorie Sender (Zähler > 0) und fehlt nur noch das Fenster, zeigt die Senderreihe jetzt die Skeleton-Karten, das Infofeld „Sender werden geladen…“ und die Vorschau einen Lade-Spinner. Nach 10 Sekunden ohne Sender fällt es auf die normale Leer-Meldung zurück, damit ein dauerhaft leeres Fenster nicht ewig lädt.
+
+- Android IPTV: Der User-Agent für IPTV-Playlists, EPG und Live-Wiedergabe enthält jetzt App-Name und Version: `VLC/3.0.20 LibVLC/3.0.20 StreamNet/<Version>` (z. B. `…StreamNet/2.5.078`; bei Debug-Builds mit Suffix `-debug`). Die VLC-Angaben bleiben vorn, damit Panels und Anbieter, die darauf prüfen, weiter funktionieren; in der Verbindungsübersicht des Xtream-Panels ist so erkennbar, welche App und Version verbunden ist. Ein in den Einstellungen gesetzter eigener User-Agent hat weiter Vorrang. Film-/Serien-Player und Addon-Anfragen behalten ihre bisherigen Browser-User-Agents.
+- Android Wiedergabe: Der User-Agent wurde bei Live-TV doppelt gesendet („VLC/3.0.20 LibVLC/3.0.20, VLC/3.0.20 LibVLC/3.0.20“, sichtbar z. B. in der Verbindungsübersicht des Xtream-Panels). `OkHttpDataSource` hängt `setUserAgent()` zusätzlich an die Standard-Request-Header an; der User-Agent stand in beiden. Er steht jetzt nur noch in den Request-Properties (Live-TV und Film-/Serien-Player), und Header werden mit `mergeRequestHeaders` ohne Beachtung der Groß-/Kleinschreibung zusammengeführt. Dadurch ersetzt ein vom Kanal (IPTV-Header) oder vom Addon (`proxyHeaders`) gelieferter User-Agent den Standard, statt zusätzlich mitgesendet zu werden. Auch das Frame-Rate-Probing nutzt jetzt denselben User-Agent wie die Wiedergabe.
+
+- Android StreamNet TV: Ein per Remote Config/Admin-Panel gesetzter Host (`streamNetHostOverride`) wird beim erneuten Eintragen der Zugangsdaten nicht mehr auf den im APK eingebauten Server zurückgesetzt. `activateStreamNetTvPlaylist` baute den Eintrag bisher immer mit dem eingebauten Host und ohne Override neu auf und schrieb das auch in die Cloud. Jetzt gilt: gesetzter Override-Host vor eingebautem Host, und der Override bleibt am Eintrag erhalten (`streamNetLoginHost`, `configuredStreamNetTvPlaylist(hostOverride)`). Bekannt und beabsichtigt (Test `configuredPresetMovesToChangedHostWithoutLosingCredentials`): Ein StreamNet-TV-Eintrag **ohne** Override folgt bei einem App-Update weiter dem im APK eingebauten Host; nur der Override schützt einen abweichenden Host.
+
+- Android TV Live-TV Netflix-Layout: Die Senderkarten haben jetzt dieselbe Breite wie die Karten der Home-Reihen (210 dp statt 220 dp, Abstand 14 dp statt 12 dp). Das Layout hebt die globale TV-UI-Größe auf; die Home-Werte werden deshalb mit diesem Faktor skaliert, sodass die Karten auf dem Bildschirm genauso breit sind wie in Home. Geplante Chevrons am Reihenrand wurden verworfen.
+- Android Navigation (obere Leiste, untere Leiste, Seitenleiste): „Start“/„Home“ heißt jetzt „Discover“ und „TV“ heißt „Live TV“ (neue Strings `nav_discover`, `nav_live_tv` in Deutsch und Englisch; `topbar_tv` entfällt). Andere Stellen, die „Home“ als Wort nutzen, bleiben unverändert.
+
 ## [2.5.077] - 2026-10-25
 
 - Android-Version: `2.5.077` / Code `478`.

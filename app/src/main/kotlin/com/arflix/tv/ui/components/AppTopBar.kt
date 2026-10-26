@@ -282,11 +282,7 @@ private fun TopBarNavChip(
         animationSpec = spring(dampingRatio = 0.75f, stiffness = 400f),
         label = "topbar_scale"
     )
-    val label = if (item == SidebarItem.TV) {
-        stringResource(R.string.topbar_tv)
-    } else {
-        stringResource(item.labelRes)
-    }
+    val label = stringResource(item.labelRes)
 
     Row(
         modifier = Modifier

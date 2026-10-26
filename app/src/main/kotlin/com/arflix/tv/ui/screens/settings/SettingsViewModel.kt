@@ -44,6 +44,7 @@ import com.arflix.tv.data.repository.IptvRepository
 import com.arflix.tv.data.repository.configuredIptvPlaylistCount
 import com.arflix.tv.data.repository.configuredStreamNetTvPlaylist
 import com.arflix.tv.data.repository.ensureStreamNetTvPreset
+import com.arflix.tv.data.repository.streamNetLoginHost
 import com.arflix.tv.data.repository.isStreamNetTvPlaylist
 import com.arflix.tv.data.repository.normalizeIptvSortOrder
 import com.arflix.tv.data.repository.IptvPlaylistEntry
@@ -2757,13 +2758,16 @@ class SettingsViewModel @Inject constructor(
         username: String,
         password: String,
     ) {
+        val existingPreset = playlists.firstOrNull(::isStreamNetTvPlaylist)
+        val loginHost = streamNetLoginHost(existingPreset, BuildConfig.STREAMNET_TV_XTREAM_URL)
         val entry = configuredStreamNetTvPlaylist(
-            host = BuildConfig.STREAMNET_TV_XTREAM_URL,
+            host = loginHost,
             username = username,
             password = password,
+            hostOverride = existingPreset?.streamNetHostOverride.orEmpty(),
         )
         if (entry == null) {
-            val message = if (BuildConfig.STREAMNET_TV_XTREAM_URL.isBlank()) {
+            val message = if (loginHost.isBlank()) {
                 context.getString(R.string.toast_streamnet_tv_unavailable)
             } else {
                 context.getString(R.string.toast_streamnet_credentials_required)

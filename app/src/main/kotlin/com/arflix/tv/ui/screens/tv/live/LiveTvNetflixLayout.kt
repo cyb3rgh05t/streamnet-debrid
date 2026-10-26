@@ -91,7 +91,18 @@ import java.util.Date
 
 private val HeroHeight = 260.dp          // smaller hero → more room for channel rail
 private val CategoryRowHeight = 48.dp
-private val ChannelCardWidth = 220.dp
+// Same card width as the Home rails (210 dp). This layout cancels the global TV UI size, so the Home
+// value is scaled by that factor to end up exactly as wide on screen as a Home card.
+private const val HomeCardWidthDp = 210f
+private const val HomeCardSpacingDp = 14f
+
+@Composable
+private fun channelCardWidth() =
+    (HomeCardWidthDp * com.arflix.tv.util.LocalTvUiScaleFactor.current.coerceAtLeast(0.1f)).dp
+
+@Composable
+private fun channelCardSpacing() =
+    (HomeCardSpacingDp * com.arflix.tv.util.LocalTvUiScaleFactor.current.coerceAtLeast(0.1f)).dp
 private val HeroCornerRadius = 18.dp
 private val CardCornerRadius = 14.dp
 private const val HeroUpcomingMax = 2
@@ -218,9 +229,23 @@ internal fun LiveTvNetflixLayout(
     // each channel's own guessed country.
     val selectedCategoryName = remember(tree, selectedCategoryId) { tree.byId(selectedCategoryId)?.label }
     val selectedCountryCode = remember(tree, selectedCategoryId) { tree.countryCodeForCategory(selectedCategoryId) }
+    // The category chips (and their counts) come from the snapshot, but the channel window of the selected
+    // category is built asynchronously afterwards. While it is missing although the category has channels,
+    // this is still loading, not "empty". Gives up after a while so a truly broken window does not shimmer forever.
+    val selectedCategoryCount = remember(tree, selectedCategoryId) { tree.byId(selectedCategoryId)?.count ?: 0 }
+    val channelWindowPending = channels.isEmpty() && selectedCategoryCount > 0
+    var channelWindowPendingExpired by remember(selectedCategoryId) { mutableStateOf(false) }
+    LaunchedEffect(selectedCategoryId, channelWindowPending) {
+        channelWindowPendingExpired = false
+        if (channelWindowPending) {
+            delay(10_000L)
+            channelWindowPendingExpired = true
+        }
+    }
+    val showChannelsLoading = isLoadingChannels || (channelWindowPending && !channelWindowPendingExpired)
     val emptyCategoryMessage = when {
         channels.isNotEmpty() -> null
-        isLoadingChannels -> stringResource(R.string.live_loading_channels)
+        showChannelsLoading -> stringResource(R.string.live_loading_channels)
         selectedCategoryId == "fav" -> stringResource(R.string.live_empty_no_favorites)
         else -> stringResource(R.string.live_empty_no_channels_category)
     }
@@ -265,20 +290,28 @@ internal fun LiveTvNetflixLayout(
                 .padding(start = 24.dp, end = 24.dp, top = 12.dp, bottom = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(20.dp),
         ) {
-            HeroVideoCard(
-                exoPlayer = exoPlayer,
-                channel = playingChannel,
-                isFullScreen = isFullScreen,
-                videoOutputEnabled = previewVideoEnabled,
-                isBuffering = isBuffering,
-                focusRequester = heroFocusRequester,
-                onClick = onOpenFullscreen,
-                onMoveUp = onMoveUpFromCategory,
-                onMoveDown = { runCatching { categoryFocusRequester.requestFocus() } },
+            Box(
                 modifier = Modifier
                     .fillMaxHeight()
                     .aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                HeroVideoCard(
+                    exoPlayer = exoPlayer,
+                    channel = playingChannel,
+                    isFullScreen = isFullScreen,
+                    videoOutputEnabled = previewVideoEnabled,
+                    isBuffering = isBuffering,
+                    focusRequester = heroFocusRequester,
+                    onClick = onOpenFullscreen,
+                    onMoveUp = onMoveUpFromCategory,
+                    onMoveDown = { runCatching { categoryFocusRequester.requestFocus() } },
+                    modifier = Modifier.fillMaxSize(),
+                )
+                if (showChannelsLoading && channels.isEmpty()) {
+                    LoadingIndicator(size = 40.dp)
+                }
+            }
             HeroInfoPanel(
                 channel = previewChannel,
                 clockTickMillis = guideClockMillis,
@@ -341,7 +374,7 @@ internal fun LiveTvNetflixLayout(
             railFocusPending = railFocusPending,
             onRailFocusSettled = { railFocusPending = false },
             emptyMessage = emptyCategoryMessage,
-            isLoading = isLoadingChannels,
+            isLoading = showChannelsLoading,
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
@@ -996,7 +1029,7 @@ private fun NetflixChannelRail(
 
     LazyRow(
         state = listState, modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(channelCardSpacing()),
         contentPadding = PaddingValues(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -1030,14 +1063,14 @@ private fun NetflixChannelSkeletonRail(modifier: Modifier = Modifier) {
     LazyRow(
         modifier = modifier,
         userScrollEnabled = false,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(channelCardSpacing()),
         contentPadding = PaddingValues(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         items(count = 8, key = { "skeleton_$it" }) {
             SkeletonBox(
                 modifier = Modifier
-                    .width(ChannelCardWidth)
+                    .width(channelCardWidth())
                     .aspectRatio(16f / 9f),
                 shape = RoundedCornerShape(8.dp),
             )
@@ -1093,7 +1126,7 @@ private fun NetflixChannelCard(
 
     Box(
         modifier = modifier
-            .width(ChannelCardWidth)
+            .width(channelCardWidth())
             .aspectRatio(16f / 9f)
             .clip(shape)
             .background(when {

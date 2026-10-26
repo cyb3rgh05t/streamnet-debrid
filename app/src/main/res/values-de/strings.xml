@@ -2,6 +2,7 @@
 <resources>
     <string name="player_nzb_smart_play_manual">Kein einzelner NZB-Release verfügbar. Smart Play bitte im Quellenmenü manuell auswählen.</string>
     <string name="home">Start</string>
+    <string name="nav_discover">Discover</string>
     <string name="search">Suche</string>
     <string name="watchlist">Merkliste</string>
     <string name="settings">Einstellungen</string>
@@ -416,7 +417,7 @@
     <!-- Ergänzende Basis-, Wiedergabe- und Einstellungsübersetzungen -->
     <string name="app_name">StreamNet</string>
     <string name="now_playing">LÄUFT GERADE</string>
-    <string name="topbar_tv">TV</string>
+    <string name="nav_live_tv">Live TV</string>
     <string name="my_watchlist">Meine Merkliste</string>
     <string name="auto_play_next">Nächste Folge automatisch abspielen</string>
     <string name="add_to_watchlist">Zur Merkliste hinzufügen</string>

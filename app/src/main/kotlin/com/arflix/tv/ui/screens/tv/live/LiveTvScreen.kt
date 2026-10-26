@@ -140,7 +140,7 @@ private const val GuideVisibleFirstRows = 28
 private const val GuideVisibleFirstRowsAllChannels = 18
 private const val CatchupSeekStepMs = 30_000L
 private const val CatchupUrlAnchorGranularityMs = 60_000L
-private const val IptvPlaybackUserAgent = "VLC/3.0.20 LibVLC/3.0.20"
+private const val IptvPlaybackUserAgent = com.arflix.tv.network.IPTV_USER_AGENT
 private const val LiveBufferRecoveryTimeoutMs = 12_000L
 private const val LiveBufferRecoveryMaxAttempts = 3
 private const val VisibleGuidePastWindowMs = 48L * 60L * 60_000L
@@ -2228,9 +2228,10 @@ fun LiveTvScreen(
             "Connection" to "keep-alive"
         )
     }
+    // The User-Agent lives only in the request properties: OkHttpDataSource appends setUserAgent() on top
+    // of them, which sent it twice.
     val iptvDataSourceFactory = remember(iptvHttpClient, baseRequestHeaders) {
         OkHttpDataSource.Factory(iptvHttpClient)
-            .setUserAgent(OkHttpProvider.userAgentOr(IptvPlaybackUserAgent))
             .setDefaultRequestProperties(baseRequestHeaders)
     }
     val mediaSourceFactory = remember(iptvDataSourceFactory) {
@@ -2386,7 +2387,7 @@ fun LiveTvScreen(
         drmInfo: com.arflix.tv.data.model.DrmInfo? = null,
         forcePrepare: Boolean = false,
     ) {
-        val mergedHeaders = (baseRequestHeaders + headers).safePlaybackHeaders()
+        val mergedHeaders = com.arflix.tv.network.mergeRequestHeaders(baseRequestHeaders, headers.safePlaybackHeaders())
         iptvDataSourceFactory.setDefaultRequestProperties(mergedHeaders)
 
         if (!forcePrepare &&

@@ -60,10 +60,10 @@ import com.arflix.tv.ui.theme.TextSecondary
  */
 enum class SidebarItem(val icon: ImageVector, @StringRes val labelRes: Int) {
     SEARCH(Icons.Outlined.Search, R.string.search),
-    HOME(Icons.Outlined.Home, R.string.home),
+    HOME(Icons.Outlined.Home, R.string.nav_discover),
     WATCHLIST(Icons.Outlined.Bookmark, R.string.library_default),
     OFFLINE(Icons.Outlined.Download, R.string.offline_downloads_section),
-    TV(Icons.Outlined.LiveTv, R.string.tv_shows),
+    TV(Icons.Outlined.LiveTv, R.string.nav_live_tv),
     SETTINGS(Icons.Outlined.Settings, R.string.settings)
 }
 

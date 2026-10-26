@@ -609,6 +609,7 @@ internal fun configuredStreamNetTvPlaylist(
     host: String,
     username: String,
     password: String,
+    hostOverride: String = "",
 ): IptvPlaylistEntry? {
     val normalizedHost = host.trim().trimEnd('/')
     val normalizedUsername = username.trim()
@@ -622,8 +623,16 @@ internal fun configuredStreamNetTvPlaylist(
         epgUrl = xtreamInput,
         enabled = true,
         epgUrls = listOf(xtreamInput),
+        streamNetHostOverride = hostOverride.trim().trimEnd('/'),
     )
 }
+
+/**
+ * Host a (re-)login must use: an explicit server set remotely (Remote Config / admin panel) wins over the
+ * server built into the APK. Without this a re-login silently moved the entry back to the built-in server.
+ */
+internal fun streamNetLoginHost(existing: IptvPlaylistEntry?, builtInHost: String): String =
+    existing?.streamNetHostOverride.orEmpty().trim().trimEnd('/').ifBlank { builtInHost }
 
 data class IptvLoadProgress(
     val message: String,
@@ -9725,7 +9734,7 @@ class IptvRepository @Inject constructor(
         const val CONFIG_KEY_ALIAS = "arvio_iptv_config_v1"
         const val MAX_IPTV_CACHE_BYTES = 25L * 1024L * 1024L
         val PARTIAL_PAGED_CACHE_REPAIR_COUNTS = setOf(144, 240)
-        const val IPTV_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20"
+        const val IPTV_USER_AGENT = com.arflix.tv.network.IPTV_USER_AGENT
         const val BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
         val BRACKET_CONTENT_REGEX = Regex("""\[[^\]]*]""")

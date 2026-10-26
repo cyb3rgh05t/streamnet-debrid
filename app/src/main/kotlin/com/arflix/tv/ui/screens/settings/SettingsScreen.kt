@@ -2249,7 +2249,8 @@ fun SettingsScreen(
                             password = iptvEditXtreamPass,
                         )
                         if (
-                            BuildConfig.STREAMNET_TV_XTREAM_URL.isNotBlank() &&
+                            (BuildConfig.STREAMNET_TV_XTREAM_URL.isNotBlank() ||
+                                !editingPlaylist?.streamNetHostOverride.isNullOrBlank()) &&
                             iptvEditXtreamUser.isNotBlank() &&
                             iptvEditXtreamPass.isNotBlank()
                         ) {

@@ -29,6 +29,30 @@ class IptvActivePlaylistsTest {
         assertEquals("", result.streamNetHostOverride)
     }
 
+    @Test
+    fun `re-login keeps a remotely set StreamNet host instead of the built-in one`() {
+        val remote = configuredStreamNetTvPlaylist(
+            "https://remote.example", "old", "pw", hostOverride = "https://remote.example"
+        )!!
+
+        val host = streamNetLoginHost(remote, "https://built-in.example")
+        val relogin = configuredStreamNetTvPlaylist(host, "new", "pw2", hostOverride = remote.streamNetHostOverride)!!
+        val result = ensureStreamNetTvPreset(listOf(relogin), "https://built-in.example").single()
+
+        assertEquals("https://remote.example", host)
+        assertEquals("https://remote.example new pw2", result.m3uUrl)
+        assertEquals("https://remote.example", result.streamNetHostOverride)
+    }
+
+    @Test
+    fun `re-login without a remote override uses the built-in host`() {
+        val local = configuredStreamNetTvPlaylist("https://built-in.example", "old", "pw")!!
+
+        assertEquals("https://built-in.example", streamNetLoginHost(local, "https://built-in.example"))
+        assertEquals("https://built-in.example", streamNetLoginHost(null, "https://built-in.example"))
+        assertEquals("", local.streamNetHostOverride)
+    }
+
     private fun newRepository(): IptvRepository = IptvRepository(
         context = io.mockk.mockk(relaxed = true),
         okHttpClient = io.mockk.mockk(relaxed = true),

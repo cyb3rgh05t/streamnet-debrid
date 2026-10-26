@@ -995,6 +995,7 @@ fun PlayerScreen(
         mapOf(
             "Accept" to "*/*",
             "Accept-Encoding" to "identity",
+            "User-Agent" to OkHttpProvider.userAgent,
             "Connection" to "keep-alive"
         )
     }
@@ -1004,9 +1005,10 @@ fun PlayerScreen(
             .cookieJar(playbackCookieJar)
             .build()
     }
+    // The User-Agent lives only in the request properties (OkHttpDataSource would append setUserAgent()
+    // on top and send it twice); an addon-supplied one replaces it via mergeRequestHeaders.
     val httpDataSourceFactory = remember(playbackHttpClient) {
         OkHttpDataSource.Factory(playbackHttpClient)
-            .setUserAgent(OkHttpProvider.userAgent)
             .setDefaultRequestProperties(baseRequestHeaders)
     }
     val mediaCache = remember(context) { PlaybackCacheSingleton.getInstance(context) }
@@ -1894,7 +1896,7 @@ fun PlayerScreen(
                         launch(kotlinx.coroutines.Dispatchers.IO) {
                             com.arflix.tv.util.FrameRateUtils.detectFrameRateCached(
                                 sourceUrl = url,
-                                headers = baseRequestHeaders + streamHeaders
+                                headers = com.arflix.tv.network.mergeRequestHeaders(baseRequestHeaders, streamHeaders)
                             )
                         }
                     }
@@ -1933,7 +1935,9 @@ fun PlayerScreen(
                         .build()
                 }
             }
-            httpDataSourceFactory.setDefaultRequestProperties(baseRequestHeaders + streamHeaders)
+            httpDataSourceFactory.setDefaultRequestProperties(
+                com.arflix.tv.network.mergeRequestHeaders(baseRequestHeaders, streamHeaders)
+            )
 
             // Track when stream was selected
             // (Moved up before frame rate probe)

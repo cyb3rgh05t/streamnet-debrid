@@ -132,11 +132,11 @@ data class BottomBarItem(
 )
 
 val bottomBarItems = listOf(
-    BottomBarItem(R.string.home, Icons.Default.Home, "home"),
+    BottomBarItem(R.string.nav_discover, Icons.Default.Home, "home"),
     BottomBarItem(R.string.search, Icons.Default.Search, "search"),
     BottomBarItem(R.string.library_default, Icons.Default.Bookmark, "watchlist"),
     BottomBarItem(R.string.offline_downloads_section, Icons.Default.Download, "offline"),
-    BottomBarItem(R.string.topbar_tv, Icons.Default.LiveTv, "tv"),
+    BottomBarItem(R.string.nav_live_tv, Icons.Default.LiveTv, "tv"),
     BottomBarItem(R.string.settings, Icons.Default.Settings, "settings")
 )
 
