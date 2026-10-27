@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.026] - 2026-10-27
+
+- Cloud-Anmeldeseite (`backend-cloud/public/index.html`): „Passwort vergessen?“ ist kein großer Button mehr, sondern ein kleiner klickbarer Text-Link rechts direkt unter dem Passwort-Feld (Muted-Farbe, Akzent und Unterstreichung bei Hover/Fokus). Der Button unter „Konto erstellen“ entfällt; `id="forgot"` und die Reset-Logik bleiben unverändert. Der Bereich „Konto löschen“ ist neu gestaltet: statt eines kleinen Buttons eine Karte mit rotem Papierkorb-Symbol, Titel „Konto löschen“, Hinweis „Konto und Cloud-Daten dauerhaft entfernen.“ (neuer Text `auth.deleteHint`, Deutsch und Englisch) und Pfeil; die ganze Karte verlinkt weiter auf `/delete-account`.
+
+- Backend-Admin-Panel: Der Host-Override der StreamNet-TV-Playlist (`streamNetHostOverride`) lässt sich jetzt wieder entfernen, **global** (Remote Config → „StreamNet TV: Host-Override entfernen (zurück auf App-Server)“, mit Vorschau und „ALLE ACCOUNTS“-Bestätigung) und **pro Account** (Account-Detail → „StreamNet TV: Host-Override entfernen“, wahlweise für „Alle Profile“ oder ein Profil). Operation `clear_streamnet_host_override`: Es wird nur das Feld entfernt; Zugangsdaten, Aktivierung, Importoptionen und die gespeicherten M3U-/EPG-Adressen bleiben. Ohne Override setzt die App StreamNet TV beim nächsten Laden auf ihren eingebauten Server zurück (das Backend kennt diesen Host nicht und schreibt die Adressen daher nicht um). Fehlerfälle pro Account: `streamnet_tv_not_configured` und `streamnet_tv_no_override`; global werden Accounts ohne Override als unverändert gezählt. Tests in `admin-snapshots.test.js`, Doku in `backend-cloud/README.md`. Server muss neu deployt werden.
+
 ## [2.5.078] - 2026-10-26
 
 - Android-Version: `2.5.078` / Code `479`.

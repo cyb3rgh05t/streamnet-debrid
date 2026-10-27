@@ -482,19 +482,24 @@ export function applyAdminSnapshotMutation(
     return merged;
   }
 
-  if (operation === "change_streamnet_host") {
-    // Single-account variant of the global host change; credentials and options stay untouched.
+  if (operation === "change_streamnet_host" || operation === "clear_streamnet_host_override") {
+    // Single-account variants of the global StreamNet TV host actions; credentials and options stay untouched.
     const profileId = request.profileId ? requireProfile(payload, request.profileId) : null;
-    const mutation = prepareAdminGlobalMutation({
-      operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: data?.host },
-    });
+    const clearing = operation === "clear_streamnet_host_override";
+    const mutation = clearing
+      ? prepareAdminGlobalMutation({ operation: "clear_streamnet_host_override" })
+      : prepareAdminGlobalMutation({
+        operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: data?.host },
+      });
     const configured = [...profileIds(payload)].some((id) =>
       (!profileId || id === profileId) &&
       Array.isArray(payload.iptvByProfile?.[id]?.playlists) &&
       payload.iptvByProfile[id].playlists.some((item) => item?.id === "streamnet_tv"));
     if (!configured) throw new Error("StreamNet TV is not configured for this account");
     const next = applyAdminGlobalMutation(payload, mutation, now, profileId);
-    if (!next) throw new Error("StreamNet TV host is already set");
+    if (!next) {
+      throw new Error(clearing ? "StreamNet TV has no host override" : "StreamNet TV host is already set");
+    }
     return next;
   }
 
@@ -630,11 +635,13 @@ export function prepareAdminGlobalMutation(request) {
   const allowed = new Set([
     "add_addon", "edit_addon", "delete_addon", "clear_addons",
     "add_playlist", "edit_playlist", "delete_playlist", "clear_playlists",
-    "change_xtream_host",
+    "change_xtream_host", "clear_streamnet_host_override",
     "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
   ]);
   if (!allowed.has(operation)) throw new Error("Unsupported operation");
-  const targetId = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host"
+  const targetId = operation === "clear_streamnet_host_override"
+    ? "streamnet_tv"
+    : /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host"
     ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : operation.includes("catalog") ? "Catalog id" : "Playlist id")
     : null;
   let data = null;
@@ -915,9 +922,15 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
       const previous = payload.iptvByProfile?.[profileId];
       const items = Array.isArray(previous?.playlists) ? previous.playlists : [];
       const selected = items.find((item) => item?.id === targetId);
-      if ((/^(edit|delete)_playlist$/.test(operation) || operation === "change_xtream_host") && !selected) continue;
+      if ((/^(edit|delete)_playlist$/.test(operation) ||
+          operation === "change_xtream_host" || operation === "clear_streamnet_host_override") && !selected) continue;
       const iptv = objectAt(payload, "iptvByProfile", profileId);
-      if (operation === "clear_playlists") {
+      if (operation === "clear_streamnet_host_override") {
+        // Only the override goes. Credentials and options stay; the app moves an entry without an
+        // override back to its built-in server on the next load.
+        const { streamNetHostOverride: _removed, ...withoutOverride } = selected;
+        iptv.playlists = upsertById(items, withoutOverride);
+      } else if (operation === "clear_playlists") {
         iptv.playlists = [];
         iptv.m3uUrl = "";
         iptv.epgUrl = "";

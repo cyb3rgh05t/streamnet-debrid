@@ -796,6 +796,8 @@ const operationWarnings = {
   delete_playlist: "Die Playlist wird nur aus dem gewählten Profil entfernt.",
   change_streamnet_host:
     "Gilt nur für diesen Account und erzeugt sofort eine neue Cloud-Revision. Ohne Profilauswahl werden alle Profile mit StreamNet TV umgestellt.",
+  clear_streamnet_host_override:
+    "Entfernt nur das Feld streamNetHostOverride (Zugangsdaten und Optionen bleiben). Die App setzt StreamNet TV danach beim nächsten Laden auf ihren eingebauten Server zurück. Gilt nur für diesen Account; ohne Profilauswahl für alle Profile.",
 };
 
 function populateAddonSelect() {
@@ -850,7 +852,9 @@ function updateOperationFields() {
   const operation = byId("mutation-operation").value;
   const isProfileScoped =
     operation === "upsert_playlist" || operation === "delete_playlist";
-  const isHostChange = operation === "change_streamnet_host";
+  const isHostChange =
+    operation === "change_streamnet_host" ||
+    operation === "clear_streamnet_host_override";
   byId("mutation-profile-field").classList.toggle(
     "hidden",
     !isProfileScoped && !isHostChange,
@@ -932,6 +936,10 @@ async function submitMutation(event) {
       const profileId = byId("mutation-profile").value;
       if (profileId) request.profileId = profileId;
       request.data = { host: byId("streamnet-host").value.trim() };
+    }
+    if (operation === "clear_streamnet_host_override") {
+      const profileId = byId("mutation-profile").value;
+      if (profileId) request.profileId = profileId;
     }
     if (operation === "upsert_addon") {
       normalizeAddonLinkField();

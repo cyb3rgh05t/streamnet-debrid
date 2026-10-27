@@ -165,7 +165,7 @@ the override when normalizing and synchronizing playlists.
 The admin-only endpoints are `GET /admin-api/global` (redacted inventory),
 `POST /admin-api/global/preview`, and `PATCH /admin-api/global/snapshot`.
 Mutation operations are `add_playlist`, `edit_playlist`, `delete_playlist`,
-`clear_playlists`, `change_xtream_host`, `add_addon`, `edit_addon`, `delete_addon`, and `clear_addons`.
+`clear_playlists`, `change_xtream_host`, `clear_streamnet_host_override`, `add_addon`, `edit_addon`, `delete_addon`, and `clear_addons`.
 
 ### StreamNet TV host for a single account
 
@@ -180,6 +180,23 @@ rebuilt and `streamNetHostOverride` is set. Like every account mutation it needs
 include the new host). It fails with `streamnet_tv_not_configured` when the
 account (or selected profile) has no `streamnet_tv` entry, and with
 `streamnet_tv_host_unchanged` when the host is already set.
+
+### Removing the StreamNet TV host override
+
+The action **StreamNet TV: Host-Override entfernen** (`clear_streamnet_host_override`) removes only the
+`streamNetHostOverride` field of the `streamnet_tv` entry. Credentials, activation, import flags and the
+stored M3U/EPG addresses stay as they are. Without an override the Android app moves the entry back to its
+built-in server on the next load (the migration in `ensureStreamNetTvPreset`), so this is how a host
+set by `change_xtream_host` / `change_streamnet_host` is undone. The backend does not know the built-in
+host and therefore does not rewrite the addresses itself.
+
+- **Global:** Remote Config → operation `clear_streamnet_host_override` (no target needed; the ID is fixed).
+  Same preview and `ALLE ACCOUNTS` confirmation as the other global actions; accounts without an override
+  are reported as unchanged.
+- **Single account:** account detail → `clear_streamnet_host_override` on
+  `PATCH /admin-api/accounts/:accountId/snapshot`, optionally with a `profileId` (the UI offers "Alle Profile").
+  Fails with `streamnet_tv_not_configured` when there is no `streamnet_tv` entry and with
+  `streamnet_tv_no_override` when no override is set.
 Edit/delete requests supply `targetId`; add/edit requests supply `data`.
 Apply requests additionally supply the preview's `state` as `expectedState`
 and `confirmation: "ALLE ACCOUNTS"`, with an optional audit `reason`.

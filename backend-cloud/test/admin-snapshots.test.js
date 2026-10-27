@@ -505,6 +505,69 @@ test("single-account StreamNet host change rejects missing setup, unchanged host
   }), /already set/);
 });
 
+test("global StreamNet host override removal keeps credentials and options and skips accounts without override", () => {
+  const value = snapshot();
+  value.iptvByProfile.kids = {
+    playlists: [{
+      id: "streamnet_tv", name: "StreamNet TV", enabled: false, importVod: false,
+      m3uUrl: "https://remote.test/get.php?username=kid&password=pw&type=m3u_plus&output=ts",
+      streamNetHostOverride: "https://remote.test",
+    }],
+  };
+  value.iptvByProfile["living-room"].playlists = [{
+    id: "streamnet_tv", name: "StreamNet TV", enabled: true,
+    m3uUrl: "https://builtin.test/get.php?username=adult&password=pw2",
+  }];
+  const mutation = prepareAdminGlobalMutation({ operation: "clear_streamnet_host_override" });
+  assert.equal(mutation.targetId, "streamnet_tv");
+
+  const result = applyAdminGlobalMutation(value, mutation, 8000);
+  const kids = result.iptvByProfile.kids.playlists[0];
+  assert.equal(Object.hasOwn(kids, "streamNetHostOverride"), false);
+  assert.equal(kids.m3uUrl, value.iptvByProfile.kids.playlists[0].m3uUrl);
+  assert.equal(kids.enabled, false);
+  assert.equal(kids.importVod, false);
+  assert.equal(result.fieldUpdatedAt["i:kids:playlists"], 8000);
+  assert.equal(result.fieldUpdatedAt["i:living-room:playlists"], undefined);
+  assert.equal(value.iptvByProfile.kids.playlists[0].streamNetHostOverride, "https://remote.test");
+
+  // Nothing left to remove: every account is already clean, so no change is reported.
+  assert.equal(applyAdminGlobalMutation(result, mutation, 9000), null);
+  assert.equal(applyAdminGlobalMutation(snapshot(), mutation, 9000), null);
+});
+
+test("single-account StreamNet host override removal honours the profile and reports missing setup", () => {
+  const value = snapshot();
+  const entry = (host) => ({
+    id: "streamnet_tv", name: "StreamNet TV",
+    m3uUrl: `${host}/get.php?username=u&password=p`, streamNetHostOverride: host,
+  });
+  value.iptvByProfile.kids.playlists = [entry("https://remote.test")];
+  value.iptvByProfile["living-room"].playlists = [entry("https://remote.test")];
+
+  const one = applyAdminSnapshotMutation(value, {
+    operation: "clear_streamnet_host_override", profileId: "kids",
+  }, 7000);
+  assert.equal(Object.hasOwn(one.iptvByProfile.kids.playlists[0], "streamNetHostOverride"), false);
+  assert.equal(one.iptvByProfile["living-room"].playlists[0].streamNetHostOverride, "https://remote.test");
+
+  const all = applyAdminSnapshotMutation(value, { operation: "clear_streamnet_host_override" }, 7000);
+  for (const id of ["kids", "living-room"]) {
+    assert.equal(Object.hasOwn(all.iptvByProfile[id].playlists[0], "streamNetHostOverride"), false);
+  }
+  assert.equal(all.updatedAt, 7000);
+
+  assert.throws(() => applyAdminSnapshotMutation(all, {
+    operation: "clear_streamnet_host_override",
+  }), /has no host override/);
+  assert.throws(() => applyAdminSnapshotMutation(snapshot(), {
+    operation: "clear_streamnet_host_override",
+  }), /not configured for this account/);
+  assert.throws(() => applyAdminSnapshotMutation(value, {
+    operation: "clear_streamnet_host_override", profileId: "missing",
+  }), /Unknown profile/);
+});
+
 test("upserts an account-wide addon with an initial state for every profile", () => {
   const result = applyAdminSnapshotMutation(
     snapshot(),

@@ -57,6 +57,7 @@ const mutationFailureReasons = new Map([
   ["Select StreamNet TV to edit its configuration", "invalid_streamnet_tv_target"],
   ["StreamNet TV is not configured for this account", "streamnet_tv_not_configured"],
   ["StreamNet TV host is already set", "streamnet_tv_host_unchanged"],
+  ["StreamNet TV has no host override", "streamnet_tv_no_override"],
   ["rootKey is invalid", "invalid_profile_root"],
   ["field is invalid", "invalid_profile_field"],
   [
