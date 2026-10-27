@@ -1,17 +1,20 @@
 import pg from "pg";
 import { config } from "../src/config.js";
-import { normalizeAndValidateEmail } from "../src/email.js";
+import { normalizeAdminUsername } from "../src/admin-username.js";
 import { hashScryptPassword } from "../src/passwords.js";
 
-const email = normalizeAndValidateEmail(process.env.STREAMNET_ADMIN_EMAIL);
+const username = normalizeAdminUsername(process.env.STREAMNET_ADMIN_USERNAME);
 const password = String(process.env.STREAMNET_ADMIN_PASSWORD || "");
 const replacePassword = process.env.STREAMNET_ADMIN_REPLACE_PASSWORD === "1";
 
-if (!email)
-  throw new Error("STREAMNET_ADMIN_EMAIL must be a valid email address");
-if (password.length < 14) {
+if (!username) {
   throw new Error(
-    "STREAMNET_ADMIN_PASSWORD must contain at least 14 characters",
+    "STREAMNET_ADMIN_USERNAME must be 3-64 characters (a-z, 0-9, '.', '_', '-') and start and end with a letter or digit",
+  );
+}
+if (password.length < 8) {
+  throw new Error(
+    "STREAMNET_ADMIN_PASSWORD must contain at least 8 characters",
   );
 }
 
@@ -27,14 +30,14 @@ try {
            set email = excluded.email, password_hash = excluded.password_hash,
                password_hash_scheme = 'scrypt_v1', disabled_at = null, updated_at = now()
          returning id, email`,
-        [email, passwordHash],
+        [username, passwordHash],
       )
     : await pool.query(
         `insert into admin_accounts (email, email_normalized, password_hash)
          values ($1, $1, $2)
          on conflict (email_normalized) do nothing
          returning id, email`,
-        [email, passwordHash],
+        [username, passwordHash],
       );
   if (!result.rows[0]) {
     throw new Error(

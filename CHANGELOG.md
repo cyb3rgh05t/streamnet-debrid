@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.027] - 2026-10-27
+
+- Backend-Admin-Dashboard: Die Anmeldung nutzt jetzt einen **Benutzernamen statt einer E-Mail-Adresse** (3–64 Zeichen: `a-z`, `0-9`, `.`, `_`, `-`; Anfang und Ende Buchstabe oder Ziffer; Groß-/Kleinschreibung egal). Eine E-Mail-Adresse wird beim Admin-Login nicht mehr akzeptiert. `POST /admin-api/login` erwartet `username` statt `email` und liefert `admin.username`. Das Skript `npm run create:admin` liest `STREAMNET_ADMIN_USERNAME` statt `STREAMNET_ADMIN_EMAIL` (Passwort jetzt mindestens 8 statt 14 Zeichen, ersetzen mit `STREAMNET_ADMIN_REPLACE_PASSWORD=1`). Keine Migration nötig: die Spalten `admin_accounts.email` und `email_normalized` speichern den Benutzernamen. Bereits mit E-Mail angelegte Admins können sich nicht mehr anmelden; neuen Admin mit Benutzernamen anlegen und den alten deaktivieren (Befehl im README). Neue Prüf-Funktion `src/admin-username.js`, Tests in `admin-login.test.js`. Server muss neu deployt werden.
+
+- Backend-Admin-Dashboard: Die Login-Box ist zentriert (Logo, „CONTROL ROOM“, Titel und Hinweistext); die Felder bleiben linksbündig.
+
 ## [Backend 1.0.026] - 2026-10-27
 
 - Cloud-Anmeldeseite (`backend-cloud/public/index.html`): „Passwort vergessen?“ ist kein großer Button mehr, sondern ein kleiner klickbarer Text-Link rechts direkt unter dem Passwort-Feld (Muted-Farbe, Akzent und Unterstreichung bei Hover/Fokus). Der Button unter „Konto erstellen“ entfällt; `id="forgot"` und die Reset-Logik bleiben unverändert. Der Bereich „Konto löschen“ ist neu gestaltet: statt eines kleinen Buttons eine Karte mit rotem Papierkorb-Symbol, Titel „Konto löschen“, Hinweis „Konto und Cloud-Daten dauerhaft entfernen.“ (neuer Text `auth.deleteHint`, Deutsch und Englisch) und Pfeil; die ganze Karte verlinkt weiter auf `/delete-account`.

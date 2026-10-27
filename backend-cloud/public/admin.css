@@ -117,6 +117,7 @@ button:disabled {
 .login-panel {
   width: min(430px, 100%);
   padding: 40px;
+  text-align: center;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -127,8 +128,14 @@ button:disabled {
   display: block;
   width: 230px;
   max-width: 100%;
-  margin-bottom: 34px;
+  margin: 0 auto 34px;
   filter: drop-shadow(0 8px 24px rgba(229, 162, 9, 0.18));
+}
+.login-panel label {
+  text-align: left;
+}
+.login-panel .muted {
+  text-wrap: balance;
 }
 h1,
 h2,

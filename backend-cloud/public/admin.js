@@ -1,6 +1,6 @@
 const state = {
   token: sessionStorage.getItem("streamnet:admin-token"),
-  adminEmail: sessionStorage.getItem("streamnet:admin-email"),
+  adminUsername: sessionStorage.getItem("streamnet:admin-username"),
   selectedAccount: null,
   searchTimer: null,
   pendingRequests: 0,
@@ -179,16 +179,16 @@ async function api(path, options = {}) {
 function showDashboard() {
   byId("login-view").classList.add("hidden");
   byId("dashboard-view").classList.remove("hidden");
-  byId("admin-email").textContent = state.adminEmail || "Admin";
+  byId("admin-username").textContent = state.adminUsername || "Admin";
 }
 
 function logout() {
   state.token = null;
-  state.adminEmail = null;
+  state.adminUsername = null;
   state.selectedAccount = null;
   state.global = null;
   sessionStorage.removeItem("streamnet:admin-token");
-  sessionStorage.removeItem("streamnet:admin-email");
+  sessionStorage.removeItem("streamnet:admin-username");
   byId("dashboard-view").classList.add("hidden");
   byId("login-view").classList.remove("hidden");
   byId("login-password").value = "";
@@ -1278,14 +1278,14 @@ byId("login-form").addEventListener("submit", async (event) => {
     const result = await api("/admin-api/login", {
       method: "POST",
       body: JSON.stringify({
-        email: byId("login-email").value,
+        username: byId("login-username").value,
         password: byId("login-password").value,
       }),
     });
     state.token = result.access_token;
-    state.adminEmail = result.admin.email;
+    state.adminUsername = result.admin.username;
     sessionStorage.setItem("streamnet:admin-token", state.token);
-    sessionStorage.setItem("streamnet:admin-email", state.adminEmail);
+    sessionStorage.setItem("streamnet:admin-username", state.adminUsername);
     showDashboard();
     await loadOverview();
   } catch (error) {

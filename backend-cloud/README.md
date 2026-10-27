@@ -54,19 +54,29 @@ profile, app version, online status, and account-scoped audit history. Manual
 redacted JSON editing remains available as an advanced snapshot editor.
 
 Run migration `009_admin_dashboard.sql`, then create the first administrator
-from the server shell. The password is not stored in `.env` and must contain at
-least 14 characters:
+from the server shell. The administrator signs in with a username (3-64
+characters: `a-z`, `0-9`, `.`, `_`, `-`; it must start and end with a letter or
+digit; case is ignored; an e-mail address is not accepted). The password is not
+stored in `.env` and must contain at least 8 characters:
 
 ```sh
-read -rp "Admin email: " STREAMNET_ADMIN_EMAIL
+read -rp "Admin username: " STREAMNET_ADMIN_USERNAME
 read -rsp "Admin password: " STREAMNET_ADMIN_PASSWORD; echo
-export STREAMNET_ADMIN_EMAIL STREAMNET_ADMIN_PASSWORD
-docker compose exec -e STREAMNET_ADMIN_EMAIL -e STREAMNET_ADMIN_PASSWORD streamnet-backend npm run create:admin
-unset STREAMNET_ADMIN_EMAIL STREAMNET_ADMIN_PASSWORD
+export STREAMNET_ADMIN_USERNAME STREAMNET_ADMIN_PASSWORD
+docker compose exec -e STREAMNET_ADMIN_USERNAME -e STREAMNET_ADMIN_PASSWORD streamnet-backend npm run create:admin
+unset STREAMNET_ADMIN_USERNAME STREAMNET_ADMIN_PASSWORD
 ```
 
 To intentionally replace an existing administrator password, additionally pass
-`-e STREAMNET_ADMIN_REPLACE_PASSWORD=1`. Admin access uses a separate 30-minute
+`-e STREAMNET_ADMIN_REPLACE_PASSWORD=1`. Administrators that were created
+earlier with an e-mail address can no longer sign in; create a new one with a
+username and disable the old entry:
+
+```sh
+docker compose exec postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "update admin_accounts set disabled_at = now() where email_normalized like '"'"'%@%'"'"'"'
+```
+
+Admin access uses a separate 30-minute
 JWT purpose and never accepts a normal StreamNet account token. The dashboard
 masks tokens, passwords, API keys, playlist URLs, portal URLs, and MAC addresses.
 Place an IP allowlist or an interactive access proxy in front of `/admin` and

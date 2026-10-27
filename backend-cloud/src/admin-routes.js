@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { SignJWT, jwtVerify } from "jose";
-import { normalizeAndValidateEmail } from "./email.js";
+import { normalizeAdminUsername } from "./admin-username.js";
 import { verifyScryptPassword } from "./passwords.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
@@ -380,13 +380,13 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
 
   app.post("/admin-api/login", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
-    const email = normalizeAndValidateEmail(request.body?.email);
+    const username = normalizeAdminUsername(request.body?.username);
     const password = String(request.body?.password || "");
     const attemptKey = loginAttemptKey(request);
     if (isLoginBlocked(attemptKey)) {
       return reply.code(429).send({ error: "Too many sign-in attempts" });
     }
-    if (!email || !password) {
+    if (!username || !password) {
       recordLoginFailure(attemptKey);
       return reply.code(401).send({ error: "Invalid admin credentials" });
     }
@@ -394,7 +394,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       `select id, email, email_normalized, password_hash
          from admin_accounts
         where email_normalized = $1 and disabled_at is null`,
-      [email],
+      [username],
     );
     const admin = result.rows[0];
     if (
@@ -413,7 +413,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       access_token: await issueAdminToken(admin, jwtKey),
       token_type: "bearer",
       expires_in: 1800,
-      admin: { id: admin.id, email: admin.email },
+      admin: { id: admin.id, username: admin.email },
     };
   });
 

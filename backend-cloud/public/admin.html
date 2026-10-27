@@ -25,10 +25,12 @@
         </p>
         <form id="login-form" class="form-stack">
           <label
-            >E-Mail<input
-              id="login-email"
-              type="email"
+            >Benutzername<input
+              id="login-username"
+              type="text"
               autocomplete="username"
+              autocapitalize="none"
+              spellcheck="false"
               required
           /></label>
           <label
@@ -101,7 +103,7 @@
           </button>
         </nav>
         <div class="admin-session">
-          <span id="admin-email"></span>
+          <span id="admin-username"></span>
           <button id="logout-button" class="text-button" type="button">
             Abmelden
           </button>
