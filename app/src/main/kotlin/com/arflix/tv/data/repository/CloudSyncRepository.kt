@@ -2066,22 +2066,42 @@ class CloudSyncRepository @Inject constructor(
         val preservedLocalSettings = settingsMerge?.otherWonKeys?.isNotEmpty() == true
         val root = JSONObject(settingsMerge?.json ?: payload)
 
-        val fallbackDefaultSubtitle = root.optString("defaultSubtitle", "Off")
-        val fallbackDefaultAudioLanguage = root.optString("defaultAudioLanguage", "Auto (Original)")
-        val fallbackCardLayoutMode = normalizeCardLayoutMode(root.optString("cardLayoutMode", CARD_LAYOUT_MODE_LANDSCAPE))
-        val fallbackLiveTvLayoutMode = normalizeLiveTvLayoutMode(root.optString("liveTvLayoutMode", "streamnet"))
-        val fallbackLiveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixTitleSize", "Normal"))
-        val fallbackLiveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixDescriptionSize", "Normal"))
-        val fallbackLiveTvClassicTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicTitleSize", "Normal"))
-        val fallbackLiveTvClassicDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicDescriptionSize", "Normal"))
-        val fallbackFrameRateMatchingMode = normalizeFrameRateMode(root.optString("frameRateMatchingMode", "Off"))
-        val fallbackAutoPlayNext = root.optBoolean("autoPlayNext", true)
-        val fallbackAutoPlaySingleSource = root.optBoolean("autoPlaySingleSource", true)
-        val fallbackAutoPlayMinQuality = normalizeAutoPlayMinQuality(root.optString("autoPlayMinQuality", "Any"))
-        val fallbackIncludeSpecials = root.optBoolean("includeSpecials", false)
-        val fallbackSubtitleSettingsUpdatedAt = root.optLong("subtitleSettingsUpdatedAt", 0L)
-        var preservedNewerLocalSubtitle = false
+        // The apply steps live in separate functions: one huge method exceeds ART's compiler
+        // instruction limit and would stay interpreted forever.
+        applyCloudProfiles(root)
+        val activeProfileId = profileRepository.getActiveProfileId()
+            ?: profileRepository.getProfiles().firstOrNull()?.id ?: "default"
+        val preservedNewerLocalSubtitle = applyCloudProfileSettings(root, activeProfileId)
+        applyCloudGlobalSettings(root, activeProfileId)
+        if (preservedNewerLocalSubtitle) {
+            markLocalStateDirty()
+        } else {
+            authRepository.saveDefaultSubtitleToProfile(root.optString("defaultSubtitle", "Off"))
+        }
+        authRepository.saveAutoPlayNextToProfile(root.optBoolean("autoPlayNext", true))
+        applyCloudIntegrations(root, forceApplyRemote)
+        applyCloudCatalogs(root, activeProfileId, forceApplyRemote)
+        applyCloudIptv(root, activeProfileId)
+        applyCloudWatchState(root)
+        traktRepository.clearAllProfileCaches()
+        // Continue Watching is backed by the separate /watch-history API. An
+        // account snapshot restore does not change that data, so keep its cache
+        // warm and avoid refetching it after every CloudSync pull.
+        applyCloudPlugins(root)
 
+        // Reset the per-field baseline/timestamps to the merged result so the next snapshot build
+        // does not see remote-applied values as fresh local changes (ping-pong guard). If we
+        // preserved a newer-local setting, mark dirty so it gets pushed up — safe now that push
+        // merges by timestamp and can't revert a peer.
+        if (incomingHasFieldTs) {
+            persistFieldStateFromApplied(root)
+            if (preservedLocalSettings) markLocalStateDirty()
+        }
+
+        System.err.println("[CLOUD-SYNC] Full cloud restore applied successfully")
+    }
+
+    private suspend fun applyCloudProfiles(root: JSONObject) {
         // ── Profiles ──
         val avatarImagesById = root.optJSONObject("profileAvatarImagesById")
         root.optJSONArray("profiles")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
@@ -2133,9 +2153,24 @@ class CloudSyncRepository @Inject constructor(
             }
         }
 
-        val allProfiles = profileRepository.getProfiles()
-        val activeProfileId = profileRepository.getActiveProfileId()
-            ?: allProfiles.firstOrNull()?.id ?: "default"
+    }
+
+    private suspend fun applyCloudProfileSettings(root: JSONObject, activeProfileId: String): Boolean {
+        val fallbackDefaultSubtitle = root.optString("defaultSubtitle", "Off")
+        val fallbackDefaultAudioLanguage = root.optString("defaultAudioLanguage", "Auto (Original)")
+        val fallbackCardLayoutMode = normalizeCardLayoutMode(root.optString("cardLayoutMode", CARD_LAYOUT_MODE_LANDSCAPE))
+        val fallbackLiveTvLayoutMode = normalizeLiveTvLayoutMode(root.optString("liveTvLayoutMode", "streamnet"))
+        val fallbackLiveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixTitleSize", "Normal"))
+        val fallbackLiveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixDescriptionSize", "Normal"))
+        val fallbackLiveTvClassicTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicTitleSize", "Normal"))
+        val fallbackLiveTvClassicDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicDescriptionSize", "Normal"))
+        val fallbackFrameRateMatchingMode = normalizeFrameRateMode(root.optString("frameRateMatchingMode", "Off"))
+        val fallbackAutoPlayNext = root.optBoolean("autoPlayNext", true)
+        val fallbackAutoPlaySingleSource = root.optBoolean("autoPlaySingleSource", true)
+        val fallbackAutoPlayMinQuality = normalizeAutoPlayMinQuality(root.optString("autoPlayMinQuality", "Any"))
+        val fallbackIncludeSpecials = root.optBoolean("includeSpecials", false)
+        val fallbackSubtitleSettingsUpdatedAt = root.optLong("subtitleSettingsUpdatedAt", 0L)
+        var preservedNewerLocalSubtitle = false
         val homeServerConnectionsToImport = linkedMapOf<String, String?>()
         val torrServerUrlsToImport = linkedMapOf<String, String?>()
 
@@ -2282,7 +2317,10 @@ class CloudSyncRepository @Inject constructor(
         torrServerUrlsToImport.forEach { (profileId, url) ->
             streamRepository.importTorrServerBaseUrlForProfile(profileId, url)
         }
+        return preservedNewerLocalSubtitle
+    }
 
+    private suspend fun applyCloudGlobalSettings(root: JSONObject, activeProfileId: String) {
         var restoredDnsProvider: String? = null
         var restoredCustomUserAgent: String? = null
         if (
@@ -2353,13 +2391,9 @@ class CloudSyncRepository @Inject constructor(
                 prefs[subtitleRemoveHearingImpairedKey] = root.optBoolean("subtitleRemoveHearingImpaired", true)
             }
         }
-        if (preservedNewerLocalSubtitle) {
-            markLocalStateDirty()
-        } else {
-            authRepository.saveDefaultSubtitleToProfile(fallbackDefaultSubtitle)
-        }
-        authRepository.saveAutoPlayNextToProfile(fallbackAutoPlayNext)
+    }
 
+    private suspend fun applyCloudIntegrations(root: JSONObject, forceApplyRemote: Boolean) {
         // ── Trakt tokens ──
         runCatching {
             root.optJSONObject("traktTokens")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
@@ -2436,6 +2470,9 @@ class CloudSyncRepository @Inject constructor(
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_addons")) }
 
+    }
+
+    private suspend fun applyCloudCatalogs(root: JSONObject, activeProfileId: String, forceApplyRemote: Boolean) {
         // ── Catalogs ──
         runCatching {
             val catalogsUpdatedAt = root.optJSONObject("catalogsUpdatedAtByProfile")
@@ -2548,6 +2585,9 @@ class CloudSyncRepository @Inject constructor(
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_hidden_custom")) }
 
+    }
+
+    private suspend fun applyCloudIptv(root: JSONObject, activeProfileId: String) {
         // ── IPTV config + favorites ──
         runCatching {
             var importedActiveProfileIptv = false
@@ -2598,6 +2638,9 @@ class CloudSyncRepository @Inject constructor(
             }
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_iptv")) }
 
+    }
+
+    private suspend fun applyCloudWatchState(root: JSONObject) {
         // ── Watchlist ──
         runCatching {
             root.optJSONObject("watchlistByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
@@ -2675,11 +2718,9 @@ class CloudSyncRepository @Inject constructor(
             traktRepository.importLocalWatchedChangesForProfiles(movieChanges, episodeChanges)
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_local_watched")) }
 
-        traktRepository.clearAllProfileCaches()
-        // Continue Watching is backed by the separate /watch-history API. An
-        // account snapshot restore does not change that data, so keep its cache
-        // warm and avoid refetching it after every CloudSync pull.
+    }
 
+    private suspend fun applyCloudPlugins(root: JSONObject) {
         // Restore plugin repositories and scrapers
         runCatching {
             root.optJSONArray("pluginRepositories")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
@@ -2694,16 +2735,5 @@ class CloudSyncRepository @Inject constructor(
             }
             if (root.has("pluginsEnabled")) pluginDataStore.setPluginsEnabled(root.optBoolean("pluginsEnabled", false))
         }.onFailure { AppLogger.recordException(it, mapOf("error_area" to "CloudSync", "cloud_flow" to "apply_plugins")) }
-
-        // Reset the per-field baseline/timestamps to the merged result so the next snapshot build
-        // does not see remote-applied values as fresh local changes (ping-pong guard). If we
-        // preserved a newer-local setting, mark dirty so it gets pushed up — safe now that push
-        // merges by timestamp and can't revert a peer.
-        if (incomingHasFieldTs) {
-            persistFieldStateFromApplied(root)
-            if (preservedLocalSettings) markLocalStateDirty()
-        }
-
-        System.err.println("[CLOUD-SYNC] Full cloud restore applied successfully")
     }
 }

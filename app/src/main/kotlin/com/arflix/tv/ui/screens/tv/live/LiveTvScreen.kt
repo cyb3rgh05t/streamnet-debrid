@@ -2997,6 +2997,9 @@ fun LiveTvScreen(
         }
     }
 
+    // The screen body is a separate composable lambda so it compiles to its own method; one
+    // monolithic method exceeds ART's compiler instruction limit and stays interpreted.
+    val liveTvContent: @Composable () -> Unit = {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -3889,6 +3892,8 @@ fun LiveTvScreen(
                 .padding(bottom = if (isFullScreen) 72.dp else 24.dp),
         )
     }
+    }
+    liveTvContent()
 }
 
 /** State bundle of the enriched channel list + category tree. */

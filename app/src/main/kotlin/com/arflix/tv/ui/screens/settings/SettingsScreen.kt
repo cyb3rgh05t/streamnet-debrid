@@ -127,6 +127,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.activity.compose.BackHandler
 import androidx.compose.material3.Icon
 import com.arflix.tv.ui.components.LoadingIndicator
+import com.arflix.tv.ui.components.SplitComposable
 import com.arflix.tv.ui.components.MobileSettingsCategory
 import com.arflix.tv.ui.components.MobileSettingsRow
 import com.arflix.tv.ui.components.QrCodeImage
@@ -228,6 +229,8 @@ import com.arflix.tv.ui.components.toggleCatalogueRowLayoutMode
 import com.arflix.tv.ui.components.topBarFocusedItem
 import com.arflix.tv.ui.components.topBarMaxIndex
 import com.arflix.tv.ui.focus.arvioDpadFocusGroup
+import com.arflix.tv.ui.focus.isArvioDpadNavigationKey
+import com.arflix.tv.ui.focus.rememberArvioDpadRepeatGate
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
 import com.arflix.tv.ui.theme.AccentYellow
@@ -609,6 +612,11 @@ fun SettingsScreen(
     }
 
     val focusRequester = remember { FocusRequester() }
+    // Held D-pad keys repeat faster than the settings screen can recompose.
+    val dpadRepeatGate = rememberArvioDpadRepeatGate(
+        horizontalMinRepeatIntervalMs = 80L,
+        verticalMinRepeatIntervalMs = 90L
+    )
     val scrollState = rememberScrollState()
     val sectionScrollState = rememberScrollState()
     val focusTracker = remember { SettingsFocusTracker() }
@@ -882,6 +890,21 @@ fun SettingsScreen(
             .onPreviewKeyEvent { event ->
                     if (isTouchDevice) return@onPreviewKeyEvent false
                     if (hasBlockingModal) return@onPreviewKeyEvent false
+
+                if (event.type == KeyEventType.KeyUp && isArvioDpadNavigationKey(event.key)) {
+                    dpadRepeatGate.reset()
+                }
+                if (
+                    event.type == KeyEventType.KeyDown &&
+                    isArvioDpadNavigationKey(event.key) &&
+                    dpadRepeatGate.shouldSkip(
+                        keyCode = event.nativeKeyEvent.keyCode,
+                        repeatCount = event.nativeKeyEvent.repeatCount,
+                        nowMs = SystemClock.elapsedRealtime()
+                    )
+                ) {
+                    return@onPreviewKeyEvent true
+                }
 
                 if (event.type == KeyEventType.KeyDown) {
                     val currentSection = sections.getOrNull(sectionIndex).orEmpty()
@@ -1490,6 +1513,7 @@ fun SettingsScreen(
                 } else false
             }
     ) {
+        SplitComposable {
         if (isTouchDevice) {
             MobileSettingsLayout(
                 page = mobilePage,
@@ -1672,160 +1696,26 @@ fun SettingsScreen(
                   CompositionLocalProvider(LocalSettingsFocusTracker provides focusTracker) {
                     when (sections[sectionIndex]) {
                         in tvGeneralSectionIds -> {
-                        TvGeneralSettingsRows(
+                        TvGeneralSettingsSection(
                             section = sections[sectionIndex],
-                            defaultSubtitle = uiState.defaultSubtitle,
-                            secondarySubtitle = uiState.secondarySubtitle,
-                            defaultAudioLanguage = uiState.defaultAudioLanguage,
-                            dnsProvider = uiState.dnsProvider,
-                            cardLayoutMode = uiState.cardLayoutMode,
-                            liveTvLayoutMode = uiState.liveTvLayoutMode,
-                            liveTvNetflixTitleSize = uiState.liveTvNetflixTitleSize,
-                            liveTvNetflixDescriptionSize = uiState.liveTvNetflixDescriptionSize,
-                            liveTvClassicTitleSize = uiState.liveTvClassicTitleSize,
-                            liveTvClassicDescriptionSize = uiState.liveTvClassicDescriptionSize,
-                            frameRateMatchingMode = uiState.frameRateMatchingMode,
-                            autoPlayNext = uiState.autoPlayNext,
-                            autoPlaySingleSource = uiState.autoPlaySingleSource,
-                            autoPlayMinQuality = uiState.autoPlayMinQuality,
-                            contentLanguage = uiState.contentLanguage,
-                            subtitleSize = uiState.subtitleSize,
-                            subtitleColor = uiState.subtitleColor,
-                            subtitleOffset = uiState.subtitleOffset,
-                            subtitleStyle = uiState.subtitleStyle,
-                            subtitleFont = uiState.subtitleFont,
-                            subtitleStylized = uiState.subtitleStylized,
-                            deviceModeOverride = uiState.deviceModeOverride,
-                            skipProfileSelection = uiState.skipProfileSelection,
-                            settingsLockEnabled = uiState.settingsLockEnabled,
-                            hasSettingsPin = uiState.hasSettingsPin,
-                            oledBlackBackground = uiState.oledBlackBackground,
-                            clockFormat = uiState.clockFormat,
-                            showBudget = uiState.showBudget,
-                            showCertification = uiState.showCertification,
-                            autoScrollHomeOverview = uiState.autoScrollHomeOverview,
-                            volumeBoostDb = uiState.volumeBoostDb,
+                            uiState = uiState,
+                            viewModel = viewModel,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
-                            onSubtitleClick = openSubtitlePicker,
-                            onSecondarySubtitleClick = openSecondarySubtitlePicker,
-                            onAudioLanguageClick = openAudioLanguagePicker,
-                            onCardLayoutToggle = { viewModel.toggleCardLayoutMode() },
-                            onLiveTvLayoutToggle = { viewModel.toggleLiveTvLayoutMode() },
-                            onLiveTvNetflixTitleSizeClick = { viewModel.cycleLiveTvNetflixTitleSize() },
-                            onLiveTvNetflixDescriptionSizeClick = { viewModel.cycleLiveTvNetflixDescriptionSize() },
-                            onLiveTvClassicTitleSizeClick = { viewModel.cycleLiveTvClassicTitleSize() },
-                            onLiveTvClassicDescriptionSizeClick = { viewModel.cycleLiveTvClassicDescriptionSize() },
-                            onFrameRateMatchingClick = { viewModel.cycleFrameRateMatchingMode() },
-                            onDnsProviderClick = openDnsProviderPicker,
-                            onAutoPlayToggle = { viewModel.setAutoPlayNext(it) },
-                            onAutoPlaySingleSourceToggle = { viewModel.setAutoPlaySingleSource(it) },
-                            onAutoPlayMinQualityClick = { viewModel.cycleAutoPlayMinQuality() },
-                            trailerAutoPlay = uiState.trailerAutoPlay,
-                            onTrailerAutoPlayToggle = { viewModel.setTrailerAutoPlay(it) },
-                            trailerSoundEnabled = uiState.trailerSoundEnabled,
-                            onTrailerSoundEnabledToggle = { viewModel.setTrailerSoundEnabled(it) },
-                            trailerInCards = uiState.trailerInCards,
-                            onTrailerInCardsToggle = { viewModel.setTrailerInCards(it) },
-                            trailerDelaySeconds = uiState.trailerDelaySeconds,
-                            onTrailerDelayClick = { viewModel.cycleTrailerDelay() },
-                            onDeviceModeClick = openUiModeWarningDialog,
-                            onContentLanguageClick = openContentLanguagePicker,
-                            onSkipProfileSelectionToggle = { viewModel.setSkipProfileSelection(it) },
-                            onSettingsLockToggle = { enabled ->
-                                if (enabled && !uiState.hasSettingsPin) {
-                                    showSettingsPinSetup = true
-                                } else {
-                                    viewModel.setSettingsLockEnabled(enabled)
-                                }
-                            },
-                            onSetupSettingsPin = { showSettingsPinSetup = true },
-                            onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
-                            onClockFormatClick = { viewModel.cycleClockFormat() },
-                            onShowBudgetToggle = { viewModel.setShowBudget(it) },
-                            onShowCertificationToggle = { viewModel.setShowCertification(it) },
-                            onHomeOverviewModeClick = { viewModel.setAutoScrollHomeOverview(!uiState.autoScrollHomeOverview) },
-                            showEpisodeRatings = uiState.showEpisodeRatings,
-                            onShowEpisodeRatingsToggle = { viewModel.setShowEpisodeRatings(it) },
-                            smoothScrolling = uiState.smoothScrolling,
-                            onSmoothScrollingToggle = { viewModel.setSmoothScrolling(it) },
-                            tvUiScalePercent = uiState.tvUiScalePercent,
-                            onTvUiScaleClick = { viewModel.toggleTvUiScale() },
-                            spoilerBlurEnabled = uiState.spoilerBlurEnabled,
-                            onSpoilerBlurToggle = { viewModel.setSpoilerBlurEnabled(it) },
-                            accentColor = uiState.accentColor,
-                            onAccentColorClick = { viewModel.cycleAccentColor() },
-                            showLoadingStats = uiState.showLoadingStats,
-                            onShowLoadingStatsToggle = { viewModel.setShowLoadingStats(it) },
-                            onVolumeBoostClick = { viewModel.cycleVolumeBoost() },
-                            onSubtitleSizeClick = { viewModel.cycleSubtitleSize() },
-                            onSubtitleColorClick = { viewModel.cycleSubtitleColor() },
-                            onSubtitleOffsetClick = { viewModel.cycleSubtitleOffset() },
-                            onSubtitleStyleClick = { viewModel.cycleSubtitleStyle() },
-                            onSubtitleFontClick = { viewModel.cycleSubtitleFont() },
-                            onSubtitleStylizedToggle = { viewModel.toggleSubtitleStylized() },
-                            filterSubtitlesByLanguage = uiState.filterSubtitlesByLanguage,
-                            onFilterSubtitlesByLanguageToggle = { viewModel.setFilterSubtitlesByLanguage(it) },
-                            qualityFilterValue = uiState.qualityFilterPresetLabel,
-                            onQualityFiltersClick = { showQualityFiltersModal = true },
-                            subtitleAiEnabled = uiState.subtitleAiEnabled,
-                            subtitleAiAutoSelect = uiState.subtitleAiAutoSelect,
-                            subtitleAiFindBestMatch = uiState.subtitleAiFindBestMatch,
-                            subtitlePreloadEnabled = uiState.subtitlePreloadEnabled,
-                            dolbyVisionCompatEnabled = uiState.dolbyVisionCompatEnabled,
-                            subtitleAiApiKey = uiState.subtitleAiApiKey,
-                            subtitleAiModel = uiState.subtitleAiModel,
-                            subtitleRemoveHearingImpaired = uiState.subtitleRemoveHearingImpaired,
-                            onSubtitleAiEnabledToggle = { viewModel.setSubtitleAiEnabled(it) },
-                            onSubtitleAiModelClick = { showAiModelDialog = true },
-                            onSubtitleAiAutoSelectToggle = { viewModel.setSubtitleAiAutoSelect(it) },
-                            onSubtitleAiFindBestMatchToggle = { viewModel.setSubtitleAiFindBestMatch(it) },
-                            onSubtitlePreloadToggle = { viewModel.setSubtitlePreloadEnabled(it) },
-                            onDolbyVisionCompatToggle = { viewModel.setDolbyVisionCompatEnabled(it) },
-                            onSubtitleRemoveHearingImpairedToggle = { viewModel.setSubtitleRemoveHearingImpaired(it) },
-                            onSubtitleAiApiKeyClick = { showAiApiKeyDialog = true },
-                            onSubtitleAiQrClick = { viewModel.startAiKeyServer() },
-                            customUserAgent = uiState.customUserAgent,
-                            onCustomUserAgentClick = { showCustomUserAgentDialog = true }
+                            showAiModelDialog = showAiModelDialog,
+                            showAiApiKeyDialog = showAiApiKeyDialog,
+                            showCustomUserAgentDialog = showCustomUserAgentDialog,
+                            onShowAiModelDialog = { showAiModelDialog = it },
+                            onShowAiApiKeyDialog = { showAiApiKeyDialog = it },
+                            onShowCustomUserAgentDialog = { showCustomUserAgentDialog = it },
+                            onShowSettingsPinSetup = { showSettingsPinSetup = true },
+                            onShowQualityFilters = { showQualityFiltersModal = true },
+                            openSubtitlePicker = openSubtitlePicker,
+                            openSecondarySubtitlePicker = openSecondarySubtitlePicker,
+                            openAudioLanguagePicker = openAudioLanguagePicker,
+                            openDnsProviderPicker = openDnsProviderPicker,
+                            openUiModeWarningDialog = openUiModeWarningDialog,
+                            openContentLanguagePicker = openContentLanguagePicker
                         )
-                        if (showAiModelDialog) {
-                            AiModelDialog(
-                                currentModel = uiState.subtitleAiModel,
-                                onModelSelected = { model ->
-                                    viewModel.setSubtitleAiModel(model)
-                                    showAiModelDialog = false
-                                },
-                                onDismiss = { showAiModelDialog = false }
-                            )
-                        }
-                        if (showAiApiKeyDialog) {
-                            AiApiKeyDialog(
-                                currentKey = uiState.subtitleAiApiKey,
-                                model = uiState.subtitleAiModel,
-                                onSave = { key ->
-                                    viewModel.saveSubtitleAiApiKey(key)
-                                    showAiApiKeyDialog = false
-                                },
-                                onDismiss = { showAiApiKeyDialog = false }
-                            )
-                        }
-                        if (showCustomUserAgentDialog) {
-                            CustomUserAgentDialog(
-                                currentValue = uiState.customUserAgent,
-                                onSave = { value ->
-                                    viewModel.setCustomUserAgent(value)
-                                    showCustomUserAgentDialog = false
-                                },
-                                onDismiss = { showCustomUserAgentDialog = false }
-                            )
-                        }
-                        if (uiState.aiKeyServerState.isActive) {
-                            AiKeyQrOverlay(
-                                qrBitmap = uiState.aiKeyServerState.qrBitmap,
-                                serverUrl = uiState.aiKeyServerState.serverUrl,
-                                keyReceived = uiState.aiKeyServerState.keyReceived,
-                                onClose = { viewModel.stopAiKeyServer() }
-                            )
-                        }
                         } // end "general" block
                         "iptv" -> if (showIptvCategoriesSettings) {
                             IptvCategoriesSettings(
@@ -1840,112 +1730,24 @@ fun SettingsScreen(
                                 onMoveDown = { viewModel.moveIptvGroupDown(uiState.iptvSelectedPlaylistId ?: "", it) },
                                 onReset = { viewModel.resetIptvGroupOrder(uiState.iptvSelectedPlaylistId ?: "") }
                             )
-                        } else IptvSettings(
-                            playlists = uiState.iptvPlaylists,
-                            channelCount = uiState.iptvChannelCount,
-                            isLoading = uiState.isIptvLoading,
-                            error = uiState.iptvError,
-                            statusMessage = uiState.iptvStatusMessage,
-                            statusType = uiState.iptvStatusType,
-                            progressText = uiState.iptvProgressText,
-                            progressPercent = uiState.iptvProgressPercent,
+                        } else TvIptvSettingsSection(
+                            uiState = uiState,
+                            viewModel = viewModel,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
                             focusedActionIndex = iptvActionIndex,
                             onConfigure = { editingIptvIndex = -1; showIptvInput = true },
                             onEditPlaylist = { idx -> editingIptvIndex = idx; showIptvInput = true },
-                            onTogglePlaylist = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                val item = updated.getOrNull(idx) ?: return@IptvSettings
-                                updated[idx] = item.copy(enabled = !item.enabled)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onMovePlaylistUp = { idx ->
-                                if (idx <= 0) return@IptvSettings
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                val item = updated.removeAt(idx)
-                                updated.add(idx - 1, item)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onMovePlaylistDown = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                if (idx !in 0 until updated.lastIndex) return@IptvSettings
-                                val item = updated.removeAt(idx)
-                                updated.add(idx + 1, item)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onDeletePlaylist = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                if (idx in updated.indices) {
-                                    updated.removeAt(idx)
-                                    viewModel.saveIptvPlaylists(updated)
-                                }
-                            },
-                            onRefresh = { viewModel.refreshIptv() },
-                            onDelete = { viewModel.clearIptvConfig() },
                             onManageCategories = openIptvCategories,
-                            onManageVodCategories = openIptvVodCategories,
-                            showSpecialCategories = uiState.iptvShowSpecialCategories,
-                            iptvOnlyMode = uiState.iptvOnlyMode,
-                            vodSearchEnabled = uiState.iptvVodSearchEnabled,
-                            hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
-                            onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
-                            onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
-                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
-                            sortOrder = uiState.iptvSortOrder,
-                            onSortOrderChange = { viewModel.setIptvSortOrder(it) }
+                            onManageVodCategories = openIptvVodCategories
                         )
-                        "TV" -> IptvSettings(
-                            playlists = uiState.iptvPlaylists,
-                            channelCount = uiState.iptvChannelCount,
-                            isLoading = uiState.isIptvLoading,
-                            error = uiState.iptvError,
-                            statusMessage = uiState.iptvStatusMessage,
-                            statusType = uiState.iptvStatusType,
-                            progressText = uiState.iptvProgressText,
-                            progressPercent = uiState.iptvProgressPercent,
+                        "TV" -> TvIptvSettingsSection(
+                            uiState = uiState,
+                            viewModel = viewModel,
                             focusedIndex = if (activeZone == Zone.CONTENT) contentFocusIndex else -1,
                             focusedActionIndex = iptvActionIndex,
                             onConfigure = { editingIptvIndex = -1; showIptvInput = true },
                             onEditPlaylist = { idx -> editingIptvIndex = idx; showIptvInput = true },
-                            onTogglePlaylist = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                val item = updated.getOrNull(idx) ?: return@IptvSettings
-                                updated[idx] = item.copy(enabled = !item.enabled)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onMovePlaylistUp = { idx ->
-                                if (idx <= 0) return@IptvSettings
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                val item = updated.removeAt(idx)
-                                updated.add(idx - 1, item)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onMovePlaylistDown = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                if (idx !in 0 until updated.lastIndex) return@IptvSettings
-                                val item = updated.removeAt(idx)
-                                updated.add(idx + 1, item)
-                                viewModel.saveIptvPlaylists(updated)
-                            },
-                            onDeletePlaylist = { idx ->
-                                val updated = uiState.iptvPlaylists.toMutableList()
-                                if (idx in updated.indices) {
-                                    updated.removeAt(idx)
-                                    viewModel.saveIptvPlaylists(updated)
-                                }
-                            },
-                            onRefresh = { viewModel.refreshIptv() },
-                            onDelete = { viewModel.clearIptvConfig() },
-                            onManageCategories = openIptvCategories,
-                            showSpecialCategories = uiState.iptvShowSpecialCategories,
-                            iptvOnlyMode = uiState.iptvOnlyMode,
-                            vodSearchEnabled = uiState.iptvVodSearchEnabled,
-                            hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
-                            onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
-                            onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
-                            sortOrder = uiState.iptvSortOrder,
-                            onSortOrderChange = { viewModel.setIptvSortOrder(it) },
-                            onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) }
+                            onManageCategories = openIptvCategories
                         )
                         "home_server" -> HomeServerSettings(
                             connections = uiState.homeServerConnections,
@@ -2087,7 +1889,9 @@ fun SettingsScreen(
                 }
             }
         }
+        }
 
+        SplitComposable {
         if (showSettingsPinSetup) {
             PinEntryDialog(
                 setupTitle = stringResource(R.string.settings_set_pin_title),
@@ -2460,7 +2264,9 @@ fun SettingsScreen(
                 }
             )
         }
+        }
 
+        SplitComposable {
         if (showQualityFiltersModal) {
             QualityFiltersModal(
                 filters = uiState.qualityFilters,
@@ -2796,6 +2602,7 @@ fun SettingsScreen(
                     showUiModeWarningDialog = false
                 }
             )
+        }
         }
 
         if (uiState.isIptvLoading) {
@@ -6132,6 +5939,254 @@ private fun SettingsSectionItem(
             )
         }
     }
+}
+
+/**
+ * The general TV settings rows and their dialogs. Kept out of [SettingsScreen] because that
+ * composable exceeded ART's compiler instruction limit and would otherwise stay interpreted.
+ */
+@Composable
+private fun TvGeneralSettingsSection(
+    section: String,
+    uiState: SettingsUiState,
+    viewModel: SettingsViewModel,
+    focusedIndex: Int,
+    showAiModelDialog: Boolean,
+    showAiApiKeyDialog: Boolean,
+    showCustomUserAgentDialog: Boolean,
+    onShowAiModelDialog: (Boolean) -> Unit,
+    onShowAiApiKeyDialog: (Boolean) -> Unit,
+    onShowCustomUserAgentDialog: (Boolean) -> Unit,
+    onShowSettingsPinSetup: () -> Unit,
+    onShowQualityFilters: () -> Unit,
+    openSubtitlePicker: () -> Unit,
+    openSecondarySubtitlePicker: () -> Unit,
+    openAudioLanguagePicker: () -> Unit,
+    openDnsProviderPicker: () -> Unit,
+    openUiModeWarningDialog: () -> Unit,
+    openContentLanguagePicker: () -> Unit
+) {
+    TvGeneralSettingsRows(
+        section = section,
+        defaultSubtitle = uiState.defaultSubtitle,
+        secondarySubtitle = uiState.secondarySubtitle,
+        defaultAudioLanguage = uiState.defaultAudioLanguage,
+        dnsProvider = uiState.dnsProvider,
+        cardLayoutMode = uiState.cardLayoutMode,
+        liveTvLayoutMode = uiState.liveTvLayoutMode,
+        liveTvNetflixTitleSize = uiState.liveTvNetflixTitleSize,
+        liveTvNetflixDescriptionSize = uiState.liveTvNetflixDescriptionSize,
+        liveTvClassicTitleSize = uiState.liveTvClassicTitleSize,
+        liveTvClassicDescriptionSize = uiState.liveTvClassicDescriptionSize,
+        frameRateMatchingMode = uiState.frameRateMatchingMode,
+        autoPlayNext = uiState.autoPlayNext,
+        autoPlaySingleSource = uiState.autoPlaySingleSource,
+        autoPlayMinQuality = uiState.autoPlayMinQuality,
+        contentLanguage = uiState.contentLanguage,
+        subtitleSize = uiState.subtitleSize,
+        subtitleColor = uiState.subtitleColor,
+        subtitleOffset = uiState.subtitleOffset,
+        subtitleStyle = uiState.subtitleStyle,
+        subtitleFont = uiState.subtitleFont,
+        subtitleStylized = uiState.subtitleStylized,
+        deviceModeOverride = uiState.deviceModeOverride,
+        skipProfileSelection = uiState.skipProfileSelection,
+        settingsLockEnabled = uiState.settingsLockEnabled,
+        hasSettingsPin = uiState.hasSettingsPin,
+        oledBlackBackground = uiState.oledBlackBackground,
+        clockFormat = uiState.clockFormat,
+        showBudget = uiState.showBudget,
+        showCertification = uiState.showCertification,
+        autoScrollHomeOverview = uiState.autoScrollHomeOverview,
+        volumeBoostDb = uiState.volumeBoostDb,
+        focusedIndex = focusedIndex,
+        onSubtitleClick = openSubtitlePicker,
+        onSecondarySubtitleClick = openSecondarySubtitlePicker,
+        onAudioLanguageClick = openAudioLanguagePicker,
+        onCardLayoutToggle = { viewModel.toggleCardLayoutMode() },
+        onLiveTvLayoutToggle = { viewModel.toggleLiveTvLayoutMode() },
+        onLiveTvNetflixTitleSizeClick = { viewModel.cycleLiveTvNetflixTitleSize() },
+        onLiveTvNetflixDescriptionSizeClick = { viewModel.cycleLiveTvNetflixDescriptionSize() },
+        onLiveTvClassicTitleSizeClick = { viewModel.cycleLiveTvClassicTitleSize() },
+        onLiveTvClassicDescriptionSizeClick = { viewModel.cycleLiveTvClassicDescriptionSize() },
+        onFrameRateMatchingClick = { viewModel.cycleFrameRateMatchingMode() },
+        onDnsProviderClick = openDnsProviderPicker,
+        onAutoPlayToggle = { viewModel.setAutoPlayNext(it) },
+        onAutoPlaySingleSourceToggle = { viewModel.setAutoPlaySingleSource(it) },
+        onAutoPlayMinQualityClick = { viewModel.cycleAutoPlayMinQuality() },
+        trailerAutoPlay = uiState.trailerAutoPlay,
+        onTrailerAutoPlayToggle = { viewModel.setTrailerAutoPlay(it) },
+        trailerSoundEnabled = uiState.trailerSoundEnabled,
+        onTrailerSoundEnabledToggle = { viewModel.setTrailerSoundEnabled(it) },
+        trailerInCards = uiState.trailerInCards,
+        onTrailerInCardsToggle = { viewModel.setTrailerInCards(it) },
+        trailerDelaySeconds = uiState.trailerDelaySeconds,
+        onTrailerDelayClick = { viewModel.cycleTrailerDelay() },
+        onDeviceModeClick = openUiModeWarningDialog,
+        onContentLanguageClick = openContentLanguagePicker,
+        onSkipProfileSelectionToggle = { viewModel.setSkipProfileSelection(it) },
+        onSettingsLockToggle = { enabled ->
+            if (enabled && !uiState.hasSettingsPin) {
+                onShowSettingsPinSetup()
+            } else {
+                viewModel.setSettingsLockEnabled(enabled)
+            }
+        },
+        onSetupSettingsPin = onShowSettingsPinSetup,
+        onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
+        onClockFormatClick = { viewModel.cycleClockFormat() },
+        onShowBudgetToggle = { viewModel.setShowBudget(it) },
+        onShowCertificationToggle = { viewModel.setShowCertification(it) },
+        onHomeOverviewModeClick = { viewModel.setAutoScrollHomeOverview(!uiState.autoScrollHomeOverview) },
+        showEpisodeRatings = uiState.showEpisodeRatings,
+        onShowEpisodeRatingsToggle = { viewModel.setShowEpisodeRatings(it) },
+        smoothScrolling = uiState.smoothScrolling,
+        onSmoothScrollingToggle = { viewModel.setSmoothScrolling(it) },
+        tvUiScalePercent = uiState.tvUiScalePercent,
+        onTvUiScaleClick = { viewModel.toggleTvUiScale() },
+        spoilerBlurEnabled = uiState.spoilerBlurEnabled,
+        onSpoilerBlurToggle = { viewModel.setSpoilerBlurEnabled(it) },
+        accentColor = uiState.accentColor,
+        onAccentColorClick = { viewModel.cycleAccentColor() },
+        showLoadingStats = uiState.showLoadingStats,
+        onShowLoadingStatsToggle = { viewModel.setShowLoadingStats(it) },
+        onVolumeBoostClick = { viewModel.cycleVolumeBoost() },
+        onSubtitleSizeClick = { viewModel.cycleSubtitleSize() },
+        onSubtitleColorClick = { viewModel.cycleSubtitleColor() },
+        onSubtitleOffsetClick = { viewModel.cycleSubtitleOffset() },
+        onSubtitleStyleClick = { viewModel.cycleSubtitleStyle() },
+        onSubtitleFontClick = { viewModel.cycleSubtitleFont() },
+        onSubtitleStylizedToggle = { viewModel.toggleSubtitleStylized() },
+        filterSubtitlesByLanguage = uiState.filterSubtitlesByLanguage,
+        onFilterSubtitlesByLanguageToggle = { viewModel.setFilterSubtitlesByLanguage(it) },
+        qualityFilterValue = uiState.qualityFilterPresetLabel,
+        onQualityFiltersClick = onShowQualityFilters,
+        subtitleAiEnabled = uiState.subtitleAiEnabled,
+        subtitleAiAutoSelect = uiState.subtitleAiAutoSelect,
+        subtitleAiFindBestMatch = uiState.subtitleAiFindBestMatch,
+        subtitlePreloadEnabled = uiState.subtitlePreloadEnabled,
+        dolbyVisionCompatEnabled = uiState.dolbyVisionCompatEnabled,
+        subtitleAiApiKey = uiState.subtitleAiApiKey,
+        subtitleAiModel = uiState.subtitleAiModel,
+        subtitleRemoveHearingImpaired = uiState.subtitleRemoveHearingImpaired,
+        onSubtitleAiEnabledToggle = { viewModel.setSubtitleAiEnabled(it) },
+        onSubtitleAiModelClick = { onShowAiModelDialog(true) },
+        onSubtitleAiAutoSelectToggle = { viewModel.setSubtitleAiAutoSelect(it) },
+        onSubtitleAiFindBestMatchToggle = { viewModel.setSubtitleAiFindBestMatch(it) },
+        onSubtitlePreloadToggle = { viewModel.setSubtitlePreloadEnabled(it) },
+        onDolbyVisionCompatToggle = { viewModel.setDolbyVisionCompatEnabled(it) },
+        onSubtitleRemoveHearingImpairedToggle = { viewModel.setSubtitleRemoveHearingImpaired(it) },
+        onSubtitleAiApiKeyClick = { onShowAiApiKeyDialog(true) },
+        onSubtitleAiQrClick = { viewModel.startAiKeyServer() },
+        customUserAgent = uiState.customUserAgent,
+        onCustomUserAgentClick = { onShowCustomUserAgentDialog(true) }
+    )
+    if (showAiModelDialog) {
+        AiModelDialog(
+            currentModel = uiState.subtitleAiModel,
+            onModelSelected = { model ->
+                viewModel.setSubtitleAiModel(model)
+                onShowAiModelDialog(false)
+            },
+            onDismiss = { onShowAiModelDialog(false) }
+        )
+    }
+    if (showAiApiKeyDialog) {
+        AiApiKeyDialog(
+            currentKey = uiState.subtitleAiApiKey,
+            model = uiState.subtitleAiModel,
+            onSave = { key ->
+                viewModel.saveSubtitleAiApiKey(key)
+                onShowAiApiKeyDialog(false)
+            },
+            onDismiss = { onShowAiApiKeyDialog(false) }
+        )
+    }
+    if (showCustomUserAgentDialog) {
+        CustomUserAgentDialog(
+            currentValue = uiState.customUserAgent,
+            onSave = { value ->
+                viewModel.setCustomUserAgent(value)
+                onShowCustomUserAgentDialog(false)
+            },
+            onDismiss = { onShowCustomUserAgentDialog(false) }
+        )
+    }
+    if (uiState.aiKeyServerState.isActive) {
+        AiKeyQrOverlay(
+            qrBitmap = uiState.aiKeyServerState.qrBitmap,
+            serverUrl = uiState.aiKeyServerState.serverUrl,
+            keyReceived = uiState.aiKeyServerState.keyReceived,
+            onClose = { viewModel.stopAiKeyServer() }
+        )
+    }
+}
+
+@Composable
+private fun TvIptvSettingsSection(
+    uiState: SettingsUiState,
+    viewModel: SettingsViewModel,
+    focusedIndex: Int,
+    focusedActionIndex: Int,
+    onConfigure: () -> Unit,
+    onEditPlaylist: (Int) -> Unit,
+    onManageCategories: (String) -> Unit,
+    onManageVodCategories: () -> Unit = {}
+) {
+    IptvSettings(
+        playlists = uiState.iptvPlaylists,
+        channelCount = uiState.iptvChannelCount,
+        isLoading = uiState.isIptvLoading,
+        error = uiState.iptvError,
+        statusMessage = uiState.iptvStatusMessage,
+        statusType = uiState.iptvStatusType,
+        progressText = uiState.iptvProgressText,
+        progressPercent = uiState.iptvProgressPercent,
+        focusedIndex = focusedIndex,
+        focusedActionIndex = focusedActionIndex,
+        onConfigure = onConfigure,
+        onEditPlaylist = onEditPlaylist,
+        onTogglePlaylist = { idx ->
+            val updated = uiState.iptvPlaylists.toMutableList()
+            val item = updated.getOrNull(idx) ?: return@IptvSettings
+            updated[idx] = item.copy(enabled = !item.enabled)
+            viewModel.saveIptvPlaylists(updated)
+        },
+        onMovePlaylistUp = { idx ->
+            if (idx <= 0) return@IptvSettings
+            val updated = uiState.iptvPlaylists.toMutableList()
+            val item = updated.removeAt(idx)
+            updated.add(idx - 1, item)
+            viewModel.saveIptvPlaylists(updated)
+        },
+        onMovePlaylistDown = { idx ->
+            val updated = uiState.iptvPlaylists.toMutableList()
+            if (idx !in 0 until updated.lastIndex) return@IptvSettings
+            val item = updated.removeAt(idx)
+            updated.add(idx + 1, item)
+            viewModel.saveIptvPlaylists(updated)
+        },
+        onDeletePlaylist = { idx ->
+            val updated = uiState.iptvPlaylists.toMutableList()
+            if (idx in updated.indices) {
+                updated.removeAt(idx)
+                viewModel.saveIptvPlaylists(updated)
+            }
+        },
+        onRefresh = { viewModel.refreshIptv() },
+        onDelete = { viewModel.clearIptvConfig() },
+        onManageCategories = onManageCategories,
+        onManageVodCategories = onManageVodCategories,
+        showSpecialCategories = uiState.iptvShowSpecialCategories,
+        iptvOnlyMode = uiState.iptvOnlyMode,
+        vodSearchEnabled = uiState.iptvVodSearchEnabled,
+        hasVodAddon = uiState.addons.any(::isEnabledVodStreamingAddon),
+        onIptvOnlyModeChange = { viewModel.setIptvOnlyMode(it) },
+        onVodSearchToggle = { viewModel.setIptvVodSearchEnabled(it) },
+        onShowSpecialCategoriesChange = { viewModel.setIptvShowSpecialCategories(it) },
+        sortOrder = uiState.iptvSortOrder,
+        onSortOrderChange = { viewModel.setIptvSortOrder(it) }
+    )
 }
 
 @Composable

@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.079] - 2026-10-28
+
+- Android-Version: `2.5.079` / Code `480`.
+
+- Android Performance (Einstellungen, Live TV, Cloud-Sync): Drei sehr große Methoden wurden von ART gar nicht kompiliert und liefen dauerhaft interpretiert (Logcat: „Method exceeds compiler instruction limit“, Grenze 16.383 Code-Units): `SettingsScreen` (17.688), `LiveTvScreen` (24.179) und `CloudSyncRepository.applyCloudPayload` (30.864). Das erklärt das Stottern bei D-Pad und Scrollen in den Einstellungen und in Live TV auch in Release-Builds. `applyCloudPayload` ist in Teilfunktionen pro Datenbereich zerlegt (gleiche Reihenfolge und Logik). `SettingsScreen` und `LiveTvScreen` lagern große Layout- und Dialogblöcke über den neuen Helfer `SplitComposable` bzw. ein lokales Composable-Lambda in eigene Methoden aus. Gemessen im R8-Staging-Build per `dexdump`: `LiveTvScreen` 14.940, `SettingsScreen` und `applyCloudPayload` unter 8.000. Im Emulator-Logcat des Staging-Builds kommt die Meldung nicht mehr vor (vorher 41-mal), und der JIT kompiliert `SettingsScreen` und den Live-TV-Block. Nicht auf der Shield gemessen. Prüfen nach größeren Umbauten: Logcat nach „exceeds compiler instruction limit“ filtern.
+
+- Android TV Einstellungen: Gedrückt gehaltene D-Pad-Tasten werden jetzt gedrosselt (Wiederholungen frühestens nach 80 ms horizontal bzw. 90 ms vertikal, wie schon in Home und Details). Vorher löste jede Tastenwiederholung eine komplette Neuberechnung des sehr großen Einstellungs-Bildschirms samt Scroll-Animation aus, was beim Halten von Hoch/Runter zu Stottern führen konnte. Der erste Tastendruck bleibt unverzögert.
+- Android Baseline-Profil: Einstellungen (`ui/screens/settings`), `SettingsRows` und `ui/focus` sind jetzt per Wildcard-Regeln im Profil enthalten (vorher 0 Treffer, das Profil stammt von Mai). Wirkt nur in Release-/Staging-Builds; Debug-Builds nutzen kein Baseline-Profil. Nicht auf der Shield gemessen.
+
 ## [Backend 1.0.027] - 2026-10-27
 
 - Backend-Admin-Dashboard: Die Anmeldung nutzt jetzt einen **Benutzernamen statt einer E-Mail-Adresse** (3–64 Zeichen: `a-z`, `0-9`, `.`, `_`, `-`; Anfang und Ende Buchstabe oder Ziffer; Groß-/Kleinschreibung egal). Eine E-Mail-Adresse wird beim Admin-Login nicht mehr akzeptiert. `POST /admin-api/login` erwartet `username` statt `email` und liefert `admin.username`. Das Skript `npm run create:admin` liest `STREAMNET_ADMIN_USERNAME` statt `STREAMNET_ADMIN_EMAIL` (Passwort jetzt mindestens 8 statt 14 Zeichen, ersetzen mit `STREAMNET_ADMIN_REPLACE_PASSWORD=1`). Keine Migration nötig: die Spalten `admin_accounts.email` und `email_normalized` speichern den Benutzernamen. Bereits mit E-Mail angelegte Admins können sich nicht mehr anmelden; neuen Admin mit Benutzernamen anlegen und den alten deaktivieren (Befehl im README). Neue Prüf-Funktion `src/admin-username.js`, Tests in `admin-login.test.js`. Server muss neu deployt werden.
