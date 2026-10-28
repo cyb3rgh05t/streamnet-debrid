@@ -1,6 +1,5 @@
 const state = {
   token: sessionStorage.getItem("streamnet:admin-token"),
-  adminUsername: sessionStorage.getItem("streamnet:admin-username"),
   selectedAccount: null,
   searchTimer: null,
   pendingRequests: 0,
@@ -179,12 +178,10 @@ async function api(path, options = {}) {
 function showDashboard() {
   byId("login-view").classList.add("hidden");
   byId("dashboard-view").classList.remove("hidden");
-  byId("admin-username").textContent = state.adminUsername || "Admin";
 }
 
 function logout() {
   state.token = null;
-  state.adminUsername = null;
   state.selectedAccount = null;
   state.global = null;
   sessionStorage.removeItem("streamnet:admin-token");
@@ -411,7 +408,7 @@ function renderMetrics(metrics) {
       item.addEventListener("click", () => {
         state.onlineOnly = !state.onlineOnly;
         state.accounts.offset = 0;
-        loadOverview().catch((error) => showToast(error.message, true));
+        selectView("accounts");
       });
     } else if (action === "sessions-info") {
       item.title =
@@ -426,22 +423,27 @@ function renderMetrics(metrics) {
   });
 }
 
-async function loadOverview() {
-  const [metrics, accountResult] = await Promise.all([
-    api("/admin-api/overview"),
-    api(
-      `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}&online_only=${state.onlineOnly ? "1" : "0"}`,
-    ),
-  ]);
+async function loadDashboard() {
+  const metrics = await api("/admin-api/overview");
+  renderMetrics(metrics);
+  byId("dashboard-updated").textContent = new Intl.DateTimeFormat("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date());
+}
+
+async function loadAccounts() {
+  const accountResult = await api(
+    `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}&online_only=${state.onlineOnly ? "1" : "0"}`,
+  );
   state.accounts.total = accountResult.total;
   state.accounts.limit = accountResult.limit;
   state.accounts.offset = accountResult.offset;
-  renderMetrics(metrics);
   byId("accounts-filter-note").classList.toggle("hidden", !state.onlineOnly);
   renderAccounts(accountResult.accounts);
   renderPagination("accounts-pagination", state.accounts, (offset) => {
     state.accounts.offset = offset;
-    loadOverview().catch((error) => showToast(error.message, true));
+    loadAccounts().catch((error) => showToast(error.message, true));
   });
 }
 
@@ -1257,15 +1259,32 @@ function selectView(view) {
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === view);
   });
+  byId("dashboard-header-actions").classList.toggle(
+    "hidden",
+    view !== "dashboard",
+  );
   byId("account-view").classList.add("hidden");
+  byId("dashboard-home-view").classList.toggle("hidden", view !== "dashboard");
   byId("accounts-view").classList.toggle("hidden", view !== "accounts");
   byId("global-view").classList.toggle("hidden", view !== "global");
   byId("audits-view").classList.toggle("hidden", view !== "audits");
   byId("page-title").textContent =
-    view === "accounts" ? "Accounts" : view === "global" ? "Remote Config" : "Audit-Protokoll";
-  (view === "accounts" ? loadOverview() : view === "global" ? loadGlobal() : loadAudits()).catch((error) =>
-    showToast(error.message, true),
-  );
+    view === "dashboard"
+      ? "Dashboard"
+      : view === "accounts"
+        ? "Accounts"
+        : view === "global"
+          ? "Remote Config"
+          : "Audit-Protokoll";
+  const load =
+    view === "dashboard"
+      ? loadDashboard
+      : view === "accounts"
+        ? loadAccounts
+        : view === "global"
+          ? loadGlobal
+          : loadAudits;
+  load().catch((error) => showToast(error.message, true));
 }
 
 byId("login-form").addEventListener("submit", async (event) => {
@@ -1283,11 +1302,10 @@ byId("login-form").addEventListener("submit", async (event) => {
       }),
     });
     state.token = result.access_token;
-    state.adminUsername = result.admin.username;
     sessionStorage.setItem("streamnet:admin-token", state.token);
-    sessionStorage.setItem("streamnet:admin-username", state.adminUsername);
+    sessionStorage.removeItem("streamnet:admin-username");
     showDashboard();
-    await loadOverview();
+    selectView("dashboard");
   } catch (error) {
     errorNode.textContent = error.message;
   } finally {
@@ -1306,21 +1324,35 @@ byId("global-target").addEventListener("change", () => {
   }
 });
 byId("global-form").addEventListener("submit", submitGlobalMutation);
-byId("global-refresh").addEventListener("click", () => {
-  loadGlobal().catch((error) => showToast(error.message, true));
-});
-byId("refresh-button").addEventListener("click", (event) => {
-  const button = event.currentTarget;
-  setButtonBusy(button, true, "Aktualisieren…");
-  state.accounts.offset = 0;
-  loadOverview()
-    .catch((error) => showToast(error.message, true))
-    .finally(() => setButtonBusy(button, false));
-});
+for (const [id, load] of [
+  ["global-refresh", loadGlobal],
+  ["dashboard-refresh", loadDashboard],
+  ["refresh-button", loadAccounts],
+]) {
+  byId(id).addEventListener("click", async (event) => {
+    const button = event.currentTarget;
+    const label = button.querySelector("span");
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.setAttribute("aria-busy", "true");
+    label.textContent = "Aktualisiere...";
+    if (id === "refresh-button") state.accounts.offset = 0;
+    try {
+      await load();
+    } catch (error) {
+      showToast(error.message, true);
+    } finally {
+      button.disabled = false;
+      button.classList.remove("is-loading");
+      button.removeAttribute("aria-busy");
+      label.textContent = "Aktualisieren";
+    }
+  });
+}
 byId("clear-online-filter").addEventListener("click", () => {
   state.onlineOnly = false;
   state.accounts.offset = 0;
-  loadOverview().catch((error) => showToast(error.message, true));
+  loadAccounts().catch((error) => showToast(error.message, true));
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
@@ -1534,7 +1566,7 @@ byId("account-search").addEventListener("input", () => {
   window.clearTimeout(state.searchTimer);
   state.accounts.offset = 0;
   state.searchTimer = window.setTimeout(
-    () => loadOverview().catch((error) => showToast(error.message, true)),
+    () => loadAccounts().catch((error) => showToast(error.message, true)),
     250,
   );
 });
@@ -1545,5 +1577,5 @@ document.querySelectorAll("select").forEach(enhanceSelect);
 
 if (state.token) {
   showDashboard();
-  loadOverview().catch((error) => showToast(error.message, true));
+  selectView("dashboard");
 }

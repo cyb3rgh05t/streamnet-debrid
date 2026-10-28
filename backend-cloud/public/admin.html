@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css" />
-    <script src="/admin/admin.js" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.029" />
+    <script src="/admin/admin.js?v=1.0.029" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -54,7 +54,26 @@
           class="brand-logo"
         />
         <nav aria-label="Admin Navigation">
-          <button class="nav-item active" data-view="accounts">
+          <button class="nav-item active" data-view="dashboard">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="7" height="9" rx="1" />
+              <rect x="14" y="3" width="7" height="5" rx="1" />
+              <rect x="14" y="12" width="7" height="9" rx="1" />
+              <rect x="3" y="16" width="7" height="5" rx="1" />
+            </svg>
+            Dashboard
+          </button>
+          <button class="nav-item" data-view="accounts">
             <svg
               width="16"
               height="16"
@@ -103,40 +122,140 @@
           </button>
         </nav>
         <div class="admin-session">
-          <span id="admin-username"></span>
-          <button id="logout-button" class="text-button" type="button">
-            Abmelden
+          <div class="admin-session-divider" aria-hidden="true"></div>
+          <button id="logout-button" class="logout-button" type="button">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+              <path d="M16 17l5-5-5-5" />
+              <path d="M21 12H9" />
+            </svg>
+            <span>Abmelden</span>
           </button>
+          <span class="version-badge">Version 1.0.029</span>
         </div>
       </aside>
 
       <main class="workspace">
-        <header class="workspace-header">
+        <header id="workspace-header" class="workspace-header">
           <div>
             <p class="eyebrow">STREAMNET CLOUD</p>
             <h1 id="page-title">Accounts</h1>
           </div>
-          <span id="connection-status" class="status-pill">Verbunden</span>
+          <div class="workspace-header-actions">
+            <span id="connection-status" class="status-pill">Verbunden</span>
+            <div id="dashboard-header-actions" class="dashboard-header-actions hidden">
+              <span class="dashboard-updated">Aktualisiert <time id="dashboard-updated">—</time></span>
+              <button id="dashboard-refresh" class="button secondary" type="button">
+                <svg
+                  class="refresh-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 7v5h-5" />
+                  <path d="M4 17v-5h5" />
+                  <path d="M5.6 9a7 7 0 0 1 11.6-2L20 12" />
+                  <path d="M18.4 15a7 7 0 0 1-11.6 2L4 12" />
+                </svg>
+                <span>Aktualisieren</span>
+              </button>
+            </div>
+          </div>
         </header>
 
-        <section id="accounts-view">
+        <section id="dashboard-home-view">
           <div
             id="metrics"
             class="metrics"
             aria-label="Datenbankübersicht"
           ></div>
+          <section class="version-panel" aria-labelledby="versions-title">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">SYSTEMSTATUS</p>
+                <h2 id="versions-title">Versionen &amp; Releases</h2>
+              </div>
+            </div>
+            <div class="version-grid">
+              <article class="version-card">
+                <span class="version-card-label">Backend</span>
+                <strong class="version-card-value">1.0.029</strong>
+                <span class="version-card-detail"><i></i> Admin API</span>
+              </article>
+              <article class="version-card">
+                <span class="version-card-label">Cloud-Schema</span>
+                <strong class="version-card-value">Migration 011</strong>
+                <span class="version-card-detail"><i></i> Account-Metadaten</span>
+              </article>
+              <article class="version-card">
+                <span class="version-card-label">Web</span>
+                <strong class="version-card-value">1.0.069</strong>
+                <span class="version-card-detail"><i></i> Webplayer</span>
+              </article>
+              <article class="version-card">
+                <span class="version-card-label">Android</span>
+                <strong class="version-card-value">2.5.079</strong>
+                <span class="version-card-detail"><i></i> Version 480</span>
+              </article>
+            </div>
+          </section>
+        </section>
+
+        <section id="accounts-view">
           <div class="toolbar">
             <label class="search-field">
               <span>Account suchen</span>
-              <input
-                id="account-search"
-                type="search"
-                placeholder="E-Mail-Adresse"
-                autocomplete="off"
-              />
+              <span class="search-input-wrap">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-4-4" />
+                </svg>
+                <input
+                  id="account-search"
+                  type="search"
+                  placeholder="E-Mail-Adresse"
+                  autocomplete="off"
+                />
+              </span>
             </label>
             <button id="refresh-button" class="button secondary" type="button">
-              Aktualisieren
+              <svg
+                class="refresh-icon"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 7v5h-5" />
+                <path d="M4 17v-5h5" />
+                <path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" />
+              </svg>
+              <span>Aktualisieren</span>
             </button>
           </div>
           <p id="accounts-filter-note" class="filter-note hidden">
@@ -172,7 +291,24 @@
                 <p class="eyebrow">ALLE REGISTRIERTEN ACCOUNTS</p>
                 <h2 id="global-title">Remote Config</h2>
               </div>
-              <button id="global-refresh" class="button secondary" type="button">Aktualisieren</button>
+              <button id="global-refresh" class="button secondary" type="button">
+                <svg
+                  class="refresh-icon"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M20 7v5h-5" />
+                  <path d="M4 17v-5h5" />
+                  <path d="M5.6 9a7 7 0 0 1 11.6-2L20 12" />
+                  <path d="M18.4 15a7 7 0 0 1-11.6 2L4 12" />
+                </svg>
+                <span>Aktualisieren</span>
+              </button>
             </div>
             <p id="global-summary" class="filter-note" role="status"></p>
             <div class="warning">
@@ -603,7 +739,6 @@
         <section id="audits-view" class="hidden">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">NACHVOLLZIEHBAR</p>
               <h2>Letzte Änderungen</h2>
             </div>
             <button

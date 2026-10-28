@@ -31,6 +31,17 @@ The production APK uses this service as its account and synchronization backend.
 
 ## Admin Dashboard
 
+The admin panel opens on the Dashboard page. Overview metrics live there rather
+than above the Accounts table; the online-devices card opens the filtered account
+list. Version cards are release-time reference values, not live checks of remote
+Web/Android deployments or the database migration state.
+
+For a database-free local UI preview, run `npm run preview:admin` and open
+`http://127.0.0.1:4173/admin`. Sign in with `preview` / `preview1234`.
+The preview uses fake data, does not load `.env`, binds only to loopback, and
+disables unsupported account-detail and mutation actions. It is not the backend
+server and must not be used for production.
+
 The protected dashboard is served at `PUBLIC_BASE_URL/admin`. It shows database
 health, accounts, profile and snapshot metrics, a redacted payload view, and the
 admin audit log. It can add or replace an account-wide add-on, add or replace a

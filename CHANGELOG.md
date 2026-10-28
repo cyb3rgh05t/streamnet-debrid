@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.029] - 2026-10-28
+
+- Admin-Panel: Neue Dashboard-Startseite mit den bisherigen Account-Statuskarten und Versionskarten für Backend, Cloud-Schema, Web und Android. Accounts zeigt Suche und Tabelle; die Online-Karte öffnet die gefilterte Account-Liste.
+- Einheitliches dunkles Admin-Theme mit schlichten äußeren Flächen, goldenen Verläufen auf inneren Karten, Akzent-Versionsnummern und überarbeiteter Sidebar mit Abmelden-Icon und Versions-Badge.
+- Dashboard, Accounts und Remote Config verwenden einheitliche Refresh-Icons mit Ladeanimation und „Aktualisiere...“-Beschriftung. Größere Dashboard-Statuskarten ohne erneute Einblendanimation; kompakterer Audit-Kopfbereich.
+- Lokale, datenbankfreie Admin-Vorschau mit Fake-Daten über `npm run preview:admin`; bindet ausschließlich an `127.0.0.1:4173`. Demo-Aktionen außerhalb der Übersicht, Suche und Audit-Liste sind deaktiviert.
+
 ## [Backend 1.0.028] - 2026-10-28
 
 - Backend-Admin-Dashboard: Layout Theme Update.
