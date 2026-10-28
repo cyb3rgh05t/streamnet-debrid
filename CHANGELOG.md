@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.028] - 2026-10-28
+
+- Backend-Admin-Dashboard: Layout Theme Update.
+
 ## [2.5.079] - 2026-10-28
 
 - Android-Version: `2.5.079` / Code `480`.

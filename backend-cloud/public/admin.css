@@ -1128,3 +1128,79 @@ pre {
     padding: 26px 20px;
   }
 }
+
+/* NZBStreamer-style header: "Eyebrow / Page title" with accent title */
+.workspace-header > div {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 10px;
+}
+.workspace-header .eyebrow {
+  margin: 0;
+  color: var(--muted);
+}
+.workspace-header .eyebrow::after {
+  content: "/";
+  margin-left: 10px;
+  color: var(--line-strong);
+}
+.workspace-header h1 {
+  margin: 0;
+  color: var(--accent);
+}
+.checkbox-field input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.checkbox-field input:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.button.primary {
+  box-shadow: 0 4px 16px rgba(229, 162, 9, 0.18);
+}
+.button:focus-visible,
+.nav-item:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Accent gradients, corner tint and accent edges (NZBStreamer dashboard look) */
+.metric {
+  position: relative;
+  overflow: hidden;
+  border-top: 2px solid var(--line-strong);
+  background: linear-gradient(135deg, var(--accent-soft), transparent 85%), var(--surface);
+}
+.metric::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0 0 0 100%;
+  background: var(--accent-soft);
+  pointer-events: none;
+}
+.metric-value {
+  color: var(--accent);
+}
+.detail-panel,
+.editor-panel,
+.payload-panel,
+.profile-row {
+  border-left: 3px solid var(--line-strong);
+  background: linear-gradient(90deg, var(--accent-soft), transparent 40%), var(--surface);
+}
+.detail-panel .section-heading,
+.editor-panel .section-heading,
+.payload-panel .section-heading {
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+.login-panel {
+  border-top: 2px solid var(--accent);
+  background: linear-gradient(135deg, var(--accent-soft), transparent 35%), var(--surface);
+}
