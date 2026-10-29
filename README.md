@@ -11,6 +11,18 @@ Removed/omitted surfaces include the upstream marketing site, browser web app, r
 
 ## Screenshots
 
+### TV launcher Continue Watching
+
+On supported Android TV / Google TV devices (Android 8+), StreamNet publishes
+the active profile's Continue Watching list as both its own preview channel and
+system Watch Next entries. These are two launcher surfaces, not two copies within
+one row. The launcher controls visibility, card styling and final ranking.
+Landscape artwork, localized resume/episode text and playback progress are supplied
+by the app; app-specific overlays and colors cannot be imposed on the launcher.
+Publishing is serialized, updates existing entries by stable identity, removes
+duplicate/stale entries and preserves source order through preview weights and
+descending Watch Next timestamps. Existing duplicates are reconciled on refresh.
+
 ### Mobile
 
 | Home                                                                          | Live TV                                                                       |

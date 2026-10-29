@@ -24,6 +24,8 @@ import com.arflix.tv.util.Constants
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -35,6 +37,29 @@ data class LauncherContinueWatchingRequest(
     val episode: Int? = null,
     val startPositionMs: Long? = null
 )
+
+internal fun launcherPublishingItems(items: List<ContinueWatchingItem>): List<ContinueWatchingItem> =
+    items.distinctBy { listOf(it.mediaType.name, it.id, it.season, it.episode) }
+        .take(Constants.MAX_CONTINUE_WATCHING)
+
+internal fun launcherEngagementTime(baseTimeMs: Long, index: Int): Long =
+    baseTimeMs - index * 1000L
+
+internal data class LauncherPlayback(val durationMs: Int, val positionMs: Int)
+
+internal fun ContinueWatchingItem.launcherPlayback(): LauncherPlayback {
+    val duration = durationSeconds.coerceIn(0L, Int.MAX_VALUE / 1000L) * 1000L
+    val position = when {
+        isUpNext -> 0L
+        resumePositionSeconds > 0L -> resumePositionSeconds.coerceAtMost(Int.MAX_VALUE / 1000L) * 1000L
+        progress > 5 -> duration * progress.coerceIn(0, 100) / 100L
+        else -> 0L
+    }
+    return LauncherPlayback(
+        duration.toInt(),
+        (if (duration > 0L) position.coerceAtMost(duration) else position).toInt()
+    )
+}
 
 @Singleton
 class LauncherContinueWatchingRepository @Inject constructor(
@@ -54,16 +79,19 @@ class LauncherContinueWatchingRepository @Inject constructor(
         private const val URI_HOST = "continue"
     }
 
-    suspend fun refreshForCurrentProfile() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsLauncherPublishing()) return
+    private val publishMutex = Mutex()
+
+    suspend fun refreshForCurrentProfile() = publishMutex.withLock {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsLauncherPublishing()) return@withLock
 
         val activeProfileId = runCatching { profileManager.getProfileIdSync() }.getOrDefault("")
         if (activeProfileId.isBlank()) {
-            clearPublishedPrograms()
-            return
+            clearPublishedProgramsLocked()
+            return@withLock
         }
 
-        val items = loadPublisherItems()
+        val items = launcherPublishingItems(loadPublisherItems())
+        if (profileManager.getProfileIdSync() != activeProfileId) return@withLock
         withContext(Dispatchers.IO) {
             runTvProviderCall("refresh launcher continue watching") {
                 syncPublishedRows(items)
@@ -71,7 +99,11 @@ class LauncherContinueWatchingRepository @Inject constructor(
         }
     }
 
-    suspend fun clearPublishedPrograms() {
+    suspend fun clearPublishedPrograms() = publishMutex.withLock {
+        clearPublishedProgramsLocked()
+    }
+
+    private suspend fun clearPublishedProgramsLocked() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || !supportsLauncherPublishing()) return
         withContext(Dispatchers.IO) {
             runTvProviderCall("clear launcher continue watching") {
@@ -110,7 +142,7 @@ class LauncherContinueWatchingRepository @Inject constructor(
             )
         }
         if (filteredPrimary.isNotEmpty()) {
-            return filteredPrimary.take(Constants.MAX_CONTINUE_WATCHING)
+            return filteredPrimary
         }
 
         val historyFallback = runCatching { watchHistoryRepository.getContinueWatching() }.getOrDefault(emptyList())
@@ -142,23 +174,54 @@ class LauncherContinueWatchingRepository @Inject constructor(
                 )
             }
             .distinctBy { "${it.mediaType}:${it.id}:${it.season ?: -1}:${it.episode ?: -1}" }
-            .take(Constants.MAX_CONTINUE_WATCHING)
     }
 
 
     @RequiresApi(Build.VERSION_CODES.O)
     private fun syncPublishedRows(items: List<ContinueWatchingItem>) {
         val channelId = ensurePreviewChannel() ?: return
-        deletePreviewPrograms(channelId)
-        deleteWatchNextPrograms()
+        val engagementTimeMs = System.currentTimeMillis()
+        syncPrograms(
+            TvContractCompat.PreviewPrograms.CONTENT_URI,
+            PREVIEW_PROGRAM_PREFIX,
+            items.mapIndexed { index, item -> previewProgramValues(channelId, item, index) }
+        )
+        syncPrograms(
+            TvContractCompat.WatchNextPrograms.CONTENT_URI,
+            WATCH_NEXT_PROGRAM_PREFIX,
+            items.mapIndexed { index, item -> watchNextProgramValues(item, index, engagementTimeMs) }
+        )
+    }
 
-        if (items.isEmpty()) {
-            return
+    private fun syncPrograms(uri: Uri, prefix: String, programs: List<ContentValues>) {
+        val idColumn = TvContractCompat.PreviewPrograms.COLUMN_INTERNAL_PROVIDER_ID
+        val existing = mutableMapOf<String, Long>()
+        context.contentResolver.query(uri, arrayOf(BaseColumns._ID, idColumn), null, null, null)
+            ?.use { cursor ->
+                val rowIndex = cursor.getColumnIndexOrThrow(BaseColumns._ID)
+                val keyIndex = cursor.getColumnIndexOrThrow(idColumn)
+                while (cursor.moveToNext()) {
+                    val key = cursor.getString(keyIndex).orEmpty()
+                    if (!key.startsWith("$prefix:")) continue
+                    val id = cursor.getLong(rowIndex)
+                    if (existing.putIfAbsent(key, id) != null) {
+                        context.contentResolver.delete(ContentUris.withAppendedId(uri, id), null, null)
+                    }
+                }
+            } ?: error("TV provider returned no cursor for $uri")
+        for (values in programs) {
+            val key = values.getAsString(idColumn)
+            val existingId = existing.remove(key)
+            if (existingId == null) {
+                checkNotNull(context.contentResolver.insert(uri, values)) { "TV provider insert failed for $key" }
+            } else {
+                check(context.contentResolver.update(ContentUris.withAppendedId(uri, existingId), values, null, null) == 1) {
+                    "TV provider update failed for $key"
+                }
+            }
         }
-
-        items.forEachIndexed { index, item ->
-            insertPreviewProgram(channelId = channelId, item = item, index = index)
-            insertWatchNextProgram(item = item, index = index)
+        existing.values.forEach { id ->
+            context.contentResolver.delete(ContentUris.withAppendedId(uri, id), null, null)
         }
     }
 
@@ -187,9 +250,10 @@ class LauncherContinueWatchingRepository @Inject constructor(
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun insertPreviewProgram(channelId: Long, item: ContinueWatchingItem, index: Int) {
+    private fun previewProgramValues(channelId: Long, item: ContinueWatchingItem, index: Int): ContentValues {
         val posterUri = item.launcherPosterArtUri()
         val thumbnailUri = item.launcherBackdropUri()
+        val playback = item.launcherPlayback()
         val program = PreviewProgram.Builder()
             .setChannelId(channelId)
             .setType(item.toPreviewType())
@@ -200,15 +264,17 @@ class LauncherContinueWatchingRepository @Inject constructor(
             .setThumbnailUri(thumbnailUri)
             .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
             .setThumbnailAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
+            .setDurationMillis(playback.durationMs)
+            .setLastPlaybackPositionMillis(playback.positionMs)
             .setIntentUri(buildLaunchIntent(item).toUri(Intent.URI_INTENT_SCHEME).let(Uri::parse))
             .setWeight((Constants.MAX_CONTINUE_WATCHING - index).coerceAtLeast(1))
             .build()
 
-        context.contentResolver.insert(TvContractCompat.PreviewPrograms.CONTENT_URI, program.toContentValues())
+        return program.toContentValues()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
-    private fun insertWatchNextProgram(item: ContinueWatchingItem, index: Int) {
+    private fun watchNextProgramValues(item: ContinueWatchingItem, index: Int, engagementTimeMs: Long): ContentValues {
         val posterUri = item.launcherPosterArtUri()
         val thumbnailUri = item.launcherBackdropUri()
         val builder = WatchNextProgram.Builder()
@@ -221,19 +287,13 @@ class LauncherContinueWatchingRepository @Inject constructor(
             .setThumbnailUri(thumbnailUri)
             .setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
             .setThumbnailAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9)
-            .setWatchNextType(TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
-            .setLastEngagementTimeUtcMillis(System.currentTimeMillis() - index)
-
-        val durationMs = item.durationSeconds.coerceAtLeast(0L) * 1000L
-        val positionMs = item.resumePositionSeconds.coerceAtLeast(0L) * 1000L
-        if (durationMs > 0L) {
-            builder.setDurationMillis(durationMs.toInt())
-        }
-        if (positionMs > 0L) {
-            builder.setLastPlaybackPositionMillis(positionMs.toInt())
-        }
-
-        context.contentResolver.insert(TvContractCompat.WatchNextPrograms.CONTENT_URI, builder.build().toContentValues())
+            .setWatchNextType(if (item.isUpNext) TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_NEXT
+                else TvContractCompat.WatchNextPrograms.WATCH_NEXT_TYPE_CONTINUE)
+            .setLastEngagementTimeUtcMillis(launcherEngagementTime(engagementTimeMs, index))
+        val playback = item.launcherPlayback()
+        builder.setDurationMillis(playback.durationMs)
+        builder.setLastPlaybackPositionMillis(playback.positionMs)
+        return builder.build().toContentValues()
     }
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -373,6 +433,10 @@ class LauncherContinueWatchingRepository @Inject constructor(
         if (value.isBlank()) return null
 
         return when {
+            value.startsWith("/") -> {
+                val base = if (preferBackdrop) Constants.BACKDROP_BASE_LARGE else Constants.IMAGE_BASE_LARGE
+                "$base$value"
+            }
             value.startsWith(Constants.BACKDROP_BASE) || value.startsWith(Constants.BACKDROP_BASE_LARGE) -> {
                 if (preferBackdrop) {
                     value.substringAfter("/t/p/", missingDelimiterValue = value)
@@ -410,33 +474,7 @@ class LauncherContinueWatchingRepository @Inject constructor(
     }
 
     private fun ContinueWatchingItem.buildSubtitle(): String {
-        val episodeLabel = if (mediaType == MediaType.TV && season != null && episode != null) {
-            context.getString(R.string.continue_season_episode, season, episode)
-        } else {
-            context.getString(R.string.continue_label)
-        }
-        val resumeClock = resumePositionSeconds.takeIf { it > 0L }?.let(::formatResumeClock)
-        return when {
-            !resumeClock.isNullOrBlank() ->
-                context.getString(R.string.launcher_continue_from, episodeLabel, resumeClock)
-            mediaType == MediaType.TV && progress <= 0 && resumePositionSeconds <= 0L && season == 1 && episode == 1 ->
-                context.getString(R.string.play_start_s1e1)
-            !episodeTitle.isNullOrBlank() ->
-                context.getString(R.string.launcher_continue_dash, episodeLabel, episodeTitle)
-            else -> episodeLabel
-        }
-    }
-
-    private fun formatResumeClock(totalSeconds: Long): String {
-        val safe = totalSeconds.coerceAtLeast(0L)
-        val hours = safe / 3600L
-        val minutes = (safe % 3600L) / 60L
-        val seconds = safe % 60L
-        return if (hours > 0L) {
-            String.format("%d:%02d:%02d", hours, minutes, seconds)
-        } else {
-            String.format("%02d:%02d", minutes, seconds)
-        }
+        return toMediaItem(context).subtitle.orEmpty()
     }
 }
 

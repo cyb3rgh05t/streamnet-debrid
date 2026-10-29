@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.083] - 2026-10-29
+
+- Android-Version: `2.5.083` / Code `484`.
+- Android-TV-/Google-TV-Launcher: Weiteransehen-Veröffentlichung synchronisiert, vorhandene Einträge anhand stabiler IDs aktualisiert und doppelte/veraltete Einträge beim Refresh bereinigt, statt bei jeder Aktualisierung alles neu anzulegen.
+- Reihenfolge der systemweiten Watch-Next-Einträge durch einen gemeinsamen Zeitstempel mit absteigender Priorität korrigiert; doppelte Quelldaten werden vor dem Veröffentlichungslimit entfernt.
+- Landschaftsbilder mit relativen TMDB-Pfaden korrekt aufgelöst. Fortsetzen-/Folgentexte verwenden dieselbe Aufbereitung wie die App; Fortschrittsdaten auch für die eigene Launcher-Reihe, nächste Folgen ohne falsche Abspielposition.
+- Android-Kompilierung und 13 gezielte Launcher-/Weiteransehen-Tests erfolgreich. Darstellung und endgültige Sortierung bleiben launcherabhängig; noch nicht auf einer echten TV-Box geprüft.
+
 ## [Backend 1.0.034] - 2026-10-29
 
 - Geräteübersicht zeigt nur Geräte mit Live-Heartbeat; alte App-Start-Einträge und Login-Sessions bleiben gespeichert, sind aber ausgeblendet. Geräteart, Plattform, Profil, Version und Event als vertikal ausgerichtete Badges; Installations-IDs und Aktionsspalte entfernt.
