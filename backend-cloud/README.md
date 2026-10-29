@@ -39,15 +39,25 @@ and host memory. CPU is the process average since startup (100% = one core);
 host memory is not a container memory limit. Database status reflects the
 successful overview query, not an independent continuous health check.
 
-The backend version is read from the running package and the schema version
-from `schema_migrations`. Web/Android versions and the Android build are
-release-time references maintained in `src/admin-routes.js`, not live checks
-of deployed clients. **Updates prüfen** uses the authenticated, read-only
-`GET /admin-api/updates` endpoint to compare these values against the public
-version files on GitHub `main`. It fetches only fixed public URLs, sends no
-account data or GitHub credentials, has an eight-second timeout per request,
-and reports failures per component. A newer source version does not prove a
-published release or deployed update. The local demo simulates this check.
+Audit operations use shared German labels in the dashboard and audit tables,
+with a `Global:` prefix for global actions; unknown operation codes remain visible.
+
+The version cards show the running backend package, the deployed Web version
+from `https://web.streamnet.live/api/version`, and the latest published Android
+APK release from GitHub (validated to contain the matching APK asset).
+The Web endpoint must be deployed with the Webplayer before it can report
+the version; a missing endpoint is an explicit error, never a reference fallback.
+No versions are read from GitHub `main` or hardcoded Web/Android references.
+
+The authenticated `GET /admin-api/versions` endpoint (also available at
+`/admin-api/updates`) runs automatically on dashboard load and via
+**Versionen live prüfen**. Only fixed public URLs are fetched, without account
+data or GitHub credentials, with eight-second timeouts, redirects rejected,
+and per-component errors. Android device versions come separately from each
+installation's latest usage event within 30 days, grouped by version, build
+and distribution, with counts and last-report timestamps. These are reported
+versions, not proof of the current installed version or online presence.
+The local demo explicitly simulates version sources and device reports.
 Accent gradients and decorative corner bubbles are reserved for the Dashboard cards; the other admin pages
 use solid element backgrounds.
 

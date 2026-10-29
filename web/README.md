@@ -9,6 +9,14 @@ This folder contains the self-hosted StreamNet webplayer. It is deployed separat
 - map to the StreamNet backend contract
 - keep CloudSync as the canonical state layer
 
+## Deployed version
+
+`GET /api/version` returns the deployed package's `version` and the optional
+public build stamp (`build`). The endpoint is dynamic, disables response caching,
+and exposes no configuration or credentials. The backend admin dashboard uses
+`https://web.streamnet.live/api/version`; deploy this Webplayer change before
+expecting the dashboard's live Web-version check to succeed.
+
 ## Playback maintenance notes
 
 Movie/episode progress is shared through StreamNet account sync independently

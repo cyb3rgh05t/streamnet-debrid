@@ -20,6 +20,9 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
         new_accounts_24h: "2", new_accounts_7d: "4", syncs_24h: "6",
       }] };
       if (sql.includes("from schema_migrations")) return { rows: migrations.map(version => ({ version })) };
+      if (sql.includes("from app_usage_events") && sql.includes("group by app_version")) return { rows: [
+        { app_version: "2.5.081", app_version_code: 482, distribution: "sideload", devices: 3, last_seen: "2026-10-29T09:00:00Z" },
+      ] };
       if (sql.includes("from admin_audit_logs")) return { rows: [{
         id: "audit-a", operation: "upsert_addon", account_email: "demo@example.test",
         created_at: "2026-10-29T09:00:00Z", reason: "Demo",
@@ -43,7 +46,7 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
 test("dashboard endpoints require admin authentication before querying or fetching", async (t) => {
   const { app, queries } = await fixture(t);
   t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected fetch"); });
-  for (const url of ["/admin-api/overview", "/admin-api/updates"]) {
+  for (const url of ["/admin-api/overview", "/admin-api/updates", "/admin-api/versions"]) {
     assert.equal((await app.inject({ url })).statusCode, 401);
   }
   assert.equal(queries.length, 0);
@@ -69,7 +72,13 @@ test("overview preserves numeric metrics and adds runtime, schema and recent act
     assert.ok(Number.isFinite(body.system[field]) && body.system[field] >= 0, field);
   }
   assert.equal(body.system.node_version, process.version);
-  assert.equal(body.versions.android_build, 482);
+  assert.deepEqual(Object.keys(body.versions), ["backend"]);
+  assert.equal(body.android_devices[0].app_version_code, 482);
+  assert.equal(body.android_devices[0].devices, 3);
+  const deviceSql = queries.find(sql => sql.includes("group by app_version"));
+  assert.ok(deviceSql.includes("distinct on (install_id)"));
+  assert.ok(deviceSql.includes("interval '30 days'"));
+  assert.ok(deviceSql.includes("where platform = 'android'"));
   assert.equal(body.recent_accounts.length, 1);
   assert.equal(body.recent_audits[0].operation, "upsert_addon");
   assert.ok(queries.some(sql => sql.includes("jsonb_typeof(payload->'profiles')")));
@@ -90,41 +99,57 @@ test("database failure is not presented as a healthy overview", async (t) => {
   assert.equal(response.json().system, undefined);
 });
 
-test("update check fetches only fixed public version files without credentials", async (t) => {
+test("live versions fetch deployed web and published APK without credentials", async (t) => {
   const { app, headers } = await fixture(t);
   const calls = [];
   t.mock.method(globalThis, "fetch", async (url, options) => {
     calls.push({ url, options });
-    return new Response(url.endsWith(".kts")
-      ? 'versionCode = 483\nversionName = "2.5.082"'
-      : JSON.stringify({ version: url.includes("backend-cloud") ? "1.0.030" : "1.0.070" }));
+    return Response.json(url.includes("api.github.com")
+      ? { tag_name: "2.5.082", published_at: "2026-10-29T09:00:00Z", draft: false, prerelease: false, assets: [{ name: "StreamNet-Debrid-2.5.082.apk" }] }
+      : { version: "1.0.070", build: "12345" });
   });
-  const response = await app.inject({ url: "/admin-api/updates", headers });
+  const response = await app.inject({ url: "/admin-api/versions", headers });
   assert.equal(response.statusCode, 200);
   assert.equal(response.headers["cache-control"], "no-store");
-  assert.deepEqual(response.json().components, [
-    { component: "backend", version: "1.0.030", build: null },
-    { component: "web", version: "1.0.070", build: null },
-    { component: "android", version: "2.5.082", build: 483 },
+  const components = response.json().components;
+  assert.equal(components[0].component, "backend");
+  assert.equal(components[1].version, "1.0.070");
+  assert.equal(components[1].build, "12345");
+  assert.equal(components[2].version, "2.5.082");
+  assert.equal(components[2].published_at, "2026-10-29T09:00:00Z");
+  assert.deepEqual(calls.map(call => call.url), [
+    "https://web.streamnet.live/api/version",
+    "https://api.github.com/repos/cyb3rgh05t/streamnet-debrid/releases/latest",
   ]);
-  assert.equal(calls.length, 3);
   for (const { url, options } of calls) {
-    assert.ok(url.startsWith("https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/"));
-    assert.equal(options.headers, undefined);
+    assert.deepEqual(options.headers, { accept: "application/json" });
+    assert.equal(options.redirect, "error");
+    assert.equal(options.cache, "no-store");
     assert.ok(options.signal instanceof AbortSignal);
   }
 });
 
-test("update check surfaces HTTP, invalid data and timeout errors per component", async (t) => {
+test("live version check reports missing deployed endpoint and invalid release data", async (t) => {
   const { app, headers } = await fixture(t);
   t.mock.method(globalThis, "fetch", async url => {
-    if (url.includes("backend-cloud")) return new Response("unavailable", { status: 503 });
-    if (url.includes("web/")) return new Response('{"version":"invalid"}');
-    throw new Error("Request timed out");
+    if (url.includes("web.streamnet.live")) return new Response("missing", { status: 404 });
+    return Response.json({ tag_name: "invalid" });
   });
   const response = await app.inject({ url: "/admin-api/updates", headers });
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(response.json().components.map(item => item.error), [
-    "GitHub HTTP 503", "Ungültige Versionsdatei", "Request timed out",
+  assert.deepEqual(response.json().components.slice(1).map(item => item.error), [
+    "Webplayer HTTP 404", "Ungültige Versionsantwort",
+  ]);
+});
+
+test("live version check rejects releases without an APK and reports timeouts", async (t) => {
+  const { app, headers } = await fixture(t);
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.includes("web.streamnet.live")) throw new Error("Request timed out");
+    return Response.json({ tag_name: "2.5.082", published_at: "2026-10-29T09:00:00Z", assets: [] });
+  });
+  const response = await app.inject({ url: "/admin-api/versions", headers });
+  assert.deepEqual(response.json().components.slice(1).map(item => item.error), [
+    "Request timed out", "Kein veröffentlichtes APK-Release gefunden",
   ]);
 });

@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.030" />
-    <script src="/admin/admin.js?v=1.0.030" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.031" />
+    <script src="/admin/admin.js?v=1.0.031" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -141,7 +141,7 @@
             </svg>
             <span>Abmelden</span>
           </button>
-          <span class="version-badge">Version 1.0.030</span>
+          <span class="version-badge">Version 1.0.031</span>
         </div>
       </aside>
 
@@ -212,27 +212,25 @@
                 <span class="version-card-detail">Laufendes Backend</span>
               </article>
               <article class="version-card">
-                <span class="version-card-label">Cloud-Schema</span>
-                <strong id="dashboard-schema-version" class="version-card-value">—</strong>
-                <span id="dashboard-schema-file" class="version-card-detail">Wird aus der Datenbank gelesen</span>
-              </article>
-              <article class="version-card">
                 <span class="version-card-label">Web</span>
                 <strong id="dashboard-web-version" class="version-card-value">—</strong>
-                <span class="version-card-detail">Referenzstand, nicht live geprüft</span>
+                <span id="dashboard-web-source" class="version-card-detail">web.streamnet.live · Wird geprüft...</span>
               </article>
               <article class="version-card">
                 <span class="version-card-label">Android</span>
                 <strong id="dashboard-android-version" class="version-card-value">—</strong>
-                <span id="dashboard-android-build" class="version-card-detail">Referenzstand, nicht live geprüft</span>
+                <span id="dashboard-android-build" class="version-card-detail">Veröffentlichtes APK-Release · Wird geprüft...</span>
               </article>
             </div>
             <div class="dashboard-update-actions">
-              <button id="dashboard-check-updates" class="button secondary" type="button" disabled>Updates prüfen</button>
+              <button id="dashboard-check-updates" class="button secondary" type="button" disabled>Versionen live prüfen</button>
               <a class="text-button" href="https://github.com/cyb3rgh05t/streamnet-debrid" target="_blank" rel="noopener noreferrer">Repository öffnen</a>
             </div>
-            <p id="dashboard-update-status" class="dashboard-note" role="status">Noch nicht geprüft. Vergleicht mit GitHub main, nicht mit veröffentlichten Deployments.</p>
+            <p id="dashboard-update-status" class="dashboard-note" role="status">Webplayer und veröffentlichtes APK-Release werden live abgefragt.</p>
             <ul id="dashboard-updates" class="dashboard-activity-list"></ul>
+            <h3 class="dashboard-device-heading">Android-Versionen auf Geräten</h3>
+            <p class="dashboard-note">Letzte Meldung je Installation innerhalb von 30 Tagen. Nicht zwingend aktuell online; Geräte können seitdem aktualisiert worden sein.</p>
+            <ul id="dashboard-android-devices" class="dashboard-activity-list"></ul>
           </section>
           <div class="dashboard-detail-grid dashboard-activity-grid">
             <section class="version-panel" aria-labelledby="recent-accounts-title">

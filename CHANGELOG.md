@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.031] - 2026-10-29
+
+- Versionskarten ohne feste Web-/Android-Referenzwerte: Live-Abfrage des Webplayers unter web.streamnet.live und der zuletzt veröffentlichten Android-APK auf GitHub. Quellen werden automatisch beim Laden und manuell geprüft; Fehler werden pro Komponente angezeigt, ohne auf erfundene Versionsstände zurückzufallen.
+- Android-Geräteversionen separat nach Version, Build und Verteilung mit Installationsanzahl und letzter Meldung innerhalb von 30 Tagen. Gemeldete Versionen sind kein Nachweis für aktuelle Online-Präsenz.
+- Cloud-Schema-Karte entfernt; Backend, Web und Android nutzen drei Spalten. Speicherwerte mit passenden Einheiten und deutschem Dezimalkomma; Labels in den drei Dashboard-Infoboxen in Akzentfarbe.
+- Verständliche deutsche Operationsnamen in Dashboard, Audit-Protokoll und Account-Details; globale Aktionen bleiben als solche gekennzeichnet.
+
+## [Web 1.0.070] - 2026-10-29
+
+- Neuer öffentlicher, nicht gecachter Endpunkt GET /api/version meldet die tatsächlich deployte Web-Paketversion und den optionalen öffentlichen Build-Zeitstempel. Ermöglicht die Live-Versionsanzeige im Backend-Admin-Dashboard.
+
 ## [Backend 1.0.030] - 2026-10-29
 
 - Admin-Dashboard: Zusätzliche Systeminformationen mit Backend-Erreichbarkeit, Laufzeit, Datenbank-Abfragezeit, Node.js und Plattform; Cloud-Zähler für Profile, Wiedergabeverlauf, Wiedergabestände, neue Accounts und zuletzt aktualisierte Snapshots.

@@ -8,7 +8,6 @@ const state = {
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
   global: null,
-  dashboardVersions: null,
 };
 
 const byId = (id) => document.getElementById(id);
@@ -209,8 +208,45 @@ function formatDate(value) {
 
 function formatBytes(value) {
   const bytes = Number(value || 0);
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let amount = bytes;
+  let unit = 0;
+  while (amount >= 1024 && unit < units.length - 1) {
+    amount /= 1024;
+    unit += 1;
+  }
+  return `${amount.toLocaleString("de-DE", { maximumFractionDigits: 1 })} ${units[unit]}`;
+}
+
+function formatAuditOperation(operation) {
+  const labels = {
+    upsert_addon: "Add-on hinzugefügt / aktualisiert",
+    delete_addon: "Add-on entfernt",
+    upsert_playlist: "Playlist hinzugefügt / aktualisiert",
+    delete_playlist: "Playlist entfernt",
+    delete_profile: "Profil entfernt",
+    set_profile_field: "Profileinstellung geändert",
+    edit_payload: "Cloud-Daten bearbeitet",
+    change_streamnet_host: "StreamNet-TV-Server geändert",
+    clear_streamnet_host_override: "StreamNet-TV-Server zurückgesetzt",
+    revoke_sessions: "Alle Logins widerrufen",
+    delete_account: "Account gelöscht",
+    add_playlist: "Playlist hinzugefügt / aktualisiert",
+    edit_playlist: "Playlist bearbeitet",
+    clear_playlists: "Alle Playlists entfernt",
+    change_xtream_host: "Xtream-/StreamNet-TV-Server geändert",
+    add_addon: "Add-on hinzugefügt / aktualisiert",
+    edit_addon: "Add-on bearbeitet",
+    clear_addons: "Alle Add-ons entfernt",
+    add_catalog: "Katalog hinzugefügt / aktualisiert",
+    rename_catalog: "Katalog umbenannt",
+    set_catalog_enabled: "Katalogaktivierung geändert",
+    delete_catalog: "Katalog entfernt / ausgeblendet",
+  };
+  const global = typeof operation === "string" && operation.startsWith("global_");
+  const key = global ? operation.slice(7) : operation;
+  const label = Object.hasOwn(labels, key) ? labels[key] : null;
+  return label ? `${global ? "Global: " : ""}${label}` : operation;
 }
 
 function shortInstallId(value) {
@@ -462,26 +498,23 @@ async function loadDashboard() {
     ["Host-RAM frei / gesamt", `${formatBytes(system.host_memory_free_bytes)} / ${formatBytes(system.host_memory_total_bytes)}`],
     ["Prozess-CPU · Ø seit Start", `${system.cpu_average_percent.toLocaleString("de-DE")} %`],
   ]);
-  state.dashboardVersions = metrics.versions;
-  for (const component of ["backend", "web", "android"]) {
-    byId(`dashboard-${component}-version`).textContent = metrics.versions[component];
-  }
-  const schema = system.schema_version;
-  byId("dashboard-schema-version").textContent = schema ? `Migration ${schema.split("_")[0]}` : "Keine Migration";
-  byId("dashboard-schema-file").textContent = schema || "Noch keine Migration in schema_migrations erfasst";
-  byId("dashboard-android-build").textContent = `Build ${metrics.versions.android_build} · Referenzstand`;
+  byId("dashboard-backend-version").textContent = metrics.versions.backend;
+  renderDashboardActivity("dashboard-android-devices", metrics.android_devices.map(device => ({
+    title: `${device.app_version || "Version unbekannt"}${device.app_version_code == null ? "" : ` · Build ${device.app_version_code}`}${device.distribution ? ` · ${device.distribution}` : ""}`,
+    detail: `${device.devices.toLocaleString("de-DE")} Installation(en) · Zuletzt gemeldet ${formatDate(device.last_seen)}`,
+  })), "Keine Android-Gerätemeldungen in den letzten 30 Tagen.");
   renderDashboardActivity("dashboard-recent-accounts", metrics.recent_accounts.map(account => ({
     title: account.email, detail: `Registriert · ${formatDate(account.created_at)}`,
   })), "Noch keine Accounts vorhanden.");
   renderDashboardActivity("dashboard-recent-audits", metrics.recent_audits.map(audit => ({
-    title: audit.operation,
+    title: formatAuditOperation(audit.operation),
     detail: `${audit.account_email || "Account entfernt"} · ${formatDate(audit.created_at)}${audit.reason ? ` · ${audit.reason}` : ""}`,
   })), "Noch keine Änderungen protokolliert.");
-  byId("dashboard-check-updates").disabled = false;
   byId("dashboard-updated").textContent = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
+  await loadLiveVersions();
 }
 
 function renderDashboardFacts(id, entries) {
@@ -517,50 +550,49 @@ function renderDashboardActivity(id, entries, emptyLabel) {
   }
 }
 
-function compareVersions(left, right) {
-  const a = left.split(".").map(Number);
-  const b = right.split(".").map(Number);
-  for (let index = 0; index < 3; index += 1) {
-    if (a[index] !== b[index]) return Math.sign(a[index] - b[index]);
-  }
-  return 0;
-}
-
-byId("dashboard-check-updates").addEventListener("click", async () => {
+async function loadLiveVersions() {
   const button = byId("dashboard-check-updates");
   button.disabled = true;
   button.textContent = "Prüfe...";
   button.setAttribute("aria-busy", "true");
   const status = byId("dashboard-update-status");
   byId("dashboard-updates").replaceChildren();
-  status.textContent = "Versionsdateien werden von GitHub geladen...";
+  status.textContent = "Live-Webplayer und veröffentlichtes APK-Release werden abgefragt...";
+  for (const component of ["web", "android"]) {
+    byId(`dashboard-${component}-version`).textContent = "—";
+  }
+  byId("dashboard-web-source").textContent = "web.streamnet.live · Wird geprüft...";
+  byId("dashboard-android-build").textContent = "Veröffentlichtes APK-Release · Wird geprüft...";
   try {
-    const result = await api("/admin-api/updates");
+    const result = await api("/admin-api/versions");
     renderDashboardActivity("dashboard-updates", result.components.map(component => {
-      const current = state.dashboardVersions[component.component];
       let detail;
       if (component.error) {
         detail = `Prüfung fehlgeschlagen: ${component.error}`;
       } else {
-        let comparison = compareVersions(component.version, current);
-        if (comparison === 0 && component.component === "android") {
-          comparison = Math.sign(component.build - state.dashboardVersions.android_build);
-        }
-        const label = comparison > 0 ? "Neuerer Quellstand verfügbar" : comparison < 0 ? "Lokaler Stand voraus" : "Stand entspricht main";
-        detail = `${label} · main ${component.version}${component.build !== null ? ` / Build ${component.build}` : ""} · Vergleich ${current}`;
+        byId(`dashboard-${component.component}-version`).textContent = component.version;
+        detail = component.source;
+        if (component.component === "web" && component.build) detail += ` · Build ${component.build}`;
+        if (component.component === "android") detail += ` · Veröffentlicht ${formatDate(component.published_at)}`;
       }
-      return { title: component.component === "backend" ? "Backend (laufend)" : `${component.component === "web" ? "Web" : "Android"} (Referenz)`, detail };
+      if (component.component === "web") byId("dashboard-web-source").textContent = detail;
+      if (component.component === "android") byId("dashboard-android-build").textContent = detail;
+      return { title: component.component === "backend" ? "Backend (laufend)" : component.component === "web" ? "Web (live)" : "Android (veröffentlicht)", detail };
     }), "");
     status.textContent = `${result.source} · Geprüft ${formatDate(result.checked_at)}`;
   } catch (error) {
-    status.textContent = `Update-Prüfung fehlgeschlagen: ${error.message}`;
+    status.textContent = `Versionsprüfung fehlgeschlagen: ${error.message}`;
+    byId("dashboard-web-source").textContent = status.textContent;
+    byId("dashboard-android-build").textContent = status.textContent;
     showToast(error.message, true);
   } finally {
     button.disabled = false;
-    button.textContent = "Updates prüfen";
+    button.textContent = "Versionen live prüfen";
     button.removeAttribute("aria-busy");
   }
-});
+}
+
+byId("dashboard-check-updates").addEventListener("click", loadLiveVersions);
 
 async function loadAccounts() {
   const accountResult = await api(
@@ -1150,7 +1182,7 @@ function renderAuditRows(body, audits, includeAccount) {
       ...(includeAccount
         ? [audit.account_email || audit.account_id || "Gelöscht"]
         : []),
-      audit.operation,
+      formatAuditOperation(audit.operation),
       audit.profile_id,
       `${audit.revision_before} → ${audit.revision_after}`,
       audit.reason,

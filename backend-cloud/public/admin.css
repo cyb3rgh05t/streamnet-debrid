@@ -427,7 +427,7 @@ button.metric {
 }
 .version-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 .version-card {
@@ -513,7 +513,7 @@ button.metric {
   border-bottom: 0;
 }
 .dashboard-facts dt {
-  color: var(--muted);
+  color: var(--accent);
 }
 .dashboard-facts dd {
   margin: 0;

@@ -20,12 +20,6 @@ import {
 const backendPackage = JSON.parse(
   await readFile(new URL("../package.json", import.meta.url), "utf8"),
 );
-const versionReferences = {
-  backend: backendPackage.version,
-  web: "1.0.069",
-  android: "2.5.081",
-  android_build: 482,
-};
 
 const adminLoginAttempts = new Map();
 const adminLoginWindowMs = 15 * 60_000;
@@ -458,7 +452,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          pg_database_size(current_database())::bigint as database_bytes`,
     );
     const databaseQueryMs = performance.now() - queryStarted;
-    const [recentAccounts, recentAudits, migrations] = await Promise.all([
+    const [recentAccounts, recentAudits, migrations, androidDevices] = await Promise.all([
       pool.query("select id, email, created_at from accounts order by created_at desc, id desc limit 5"),
       pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
                         accounts.email as account_email
@@ -466,6 +460,19 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
                    left join accounts on accounts.id = audit.account_id
                   order by audit.created_at desc, audit.id desc limit 5`),
       pool.query("select version from schema_migrations order by version desc limit 1"),
+      pool.query(`select app_version, app_version_code, distribution,
+                         count(*)::int as devices, max(created_at) as last_seen
+                    from (
+                      select distinct on (install_id)
+                             install_id, platform, app_version, app_version_code, distribution, created_at
+                        from app_usage_events
+                       where coalesce(install_id, '') <> ''
+                         and created_at >= now() - interval '30 days'
+                       order by install_id, created_at desc, id desc
+                    ) latest
+                   where platform = 'android'
+                   group by app_version, app_version_code, distribution
+                   order by max(created_at) desc`),
     ]);
     const row = result.rows[0];
     const memory = process.memoryUsage();
@@ -490,49 +497,57 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         platform: `${process.platform} / ${process.arch}`,
         schema_version: migrations.rows[0]?.version ?? null,
       },
-      versions: versionReferences,
+      versions: { backend: backendPackage.version },
+      android_devices: androidDevices.rows,
       recent_accounts: recentAccounts.rows,
       recent_audits: recentAudits.rows,
     };
   });
 
-  app.get("/admin-api/updates", async (request, reply) => {
+  async function liveVersions(request, reply) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     const sources = [
-      ["backend", "backend-cloud/package.json"],
-      ["web", "web/package.json"],
-      ["android", "app/build.gradle.kts"],
+      ["web", "https://web.streamnet.live/api/version"],
+      ["android", "https://api.github.com/repos/cyb3rgh05t/streamnet-debrid/releases/latest"],
     ];
-    const results = await Promise.allSettled(sources.map(async ([component, file]) => {
-      const response = await fetch(
-        `https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/${file}`,
-        { signal: AbortSignal.timeout(8000) },
-      );
-      if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
-      const text = await response.text();
+    const results = await Promise.allSettled(sources.map(async ([component, url]) => {
+      const response = await fetch(url, {
+        signal: AbortSignal.timeout(8000),
+        redirect: "error",
+        headers: { accept: "application/json" },
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error(`${component === "web" ? "Webplayer" : "GitHub"} HTTP ${response.status}`);
+      const data = await response.json();
       const version = component === "android"
-        ? text.match(/versionName\s*=\s*"([^"]+)"/)?.[1]
-        : JSON.parse(text).version;
-      const build = component === "android"
-        ? Number(text.match(/versionCode\s*=\s*(\d+)/)?.[1])
-        : null;
-      if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version) ||
-          (component === "android" && !Number.isSafeInteger(build))) {
-        throw new Error("Ungültige Versionsdatei");
+        ? data.tag_name
+        : data.version;
+      if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) {
+        throw new Error("Ungültige Versionsantwort");
       }
-      return { component, version, build };
+      if (component === "android" && (data.draft || data.prerelease ||
+          !Array.isArray(data.assets) ||
+          !data.assets.some(asset => asset.name === `StreamNet-Debrid-${version}.apk`) ||
+          !Number.isFinite(Date.parse(data.published_at)))) {
+        throw new Error("Kein veröffentlichtes APK-Release gefunden");
+      }
+      return component === "web"
+        ? { component, version, build: data.build == null ? null : String(data.build), source: "web.streamnet.live · Live-Abfrage" }
+        : { component, version, published_at: data.published_at, source: "GitHub · Veröffentlichtes APK-Release" };
     }));
     return {
       checked_at: new Date().toISOString(),
-      source: "GitHub main (Quellstand, kein Deployment-Nachweis)",
-      components: results.map((result, index) => {
+      source: "Live-Webplayer und veröffentlichtes APK-Release",
+      components: [{ component: "backend", version: backendPackage.version, source: "Laufender Backend-Prozess" }, ...results.map((result, index) => {
         if (result.status === "fulfilled") return result.value;
         request.log.warn({ err: result.reason, component: sources[index][0] }, "Admin update check failed");
         return { component: sources[index][0], error: result.reason.message };
-      }),
+      })],
     };
-  });
+  }
+  app.get("/admin-api/versions", liveVersions);
+  app.get("/admin-api/updates", liveVersions);
 
   app.get("/admin-api/accounts", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
