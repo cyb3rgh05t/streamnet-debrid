@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.081] - 2026-10-29
+
+- Android-Version: `2.5.081` / Code `482`.
+
+- Android TV Cloud-Anmeldeseite (`CloudConnectScreen`): Auf einem als TV erkannten PC-Monitor (27 Zoll, wenige dp Höhe) wirkte die Seite gequetscht. Die Überschrift „Mit StreamNet Cloud verbinden“ hatte keine feste Zeilenhöhe, die zwei Zeilen klebten aneinander (jetzt 34 sp mit 42 sp Zeilenhöhe; Handy 26/32 sp). Der Hinweis unter dem QR-Code („Scanne den QR-Code oder öffne …“) war mit 14 sp und 70 % Weiß auf dem Hintergrundbild schlecht lesbar (jetzt 16 sp, mittelfett, 92 % Weiß). Die QR-Größe richtet sich nach der Bildschirmhöhe (34 %, zwischen 150 und 220 dp), damit QR-Code, Code und Hinweis auch auf kleinen Anzeigen vollständig sichtbar bleiben. Kompiliert und Tests grün; nicht visuell geprüft, weil der Emulator einen Touchscreen hat und deshalb nie das TV-Layout zeigt.
+
 ## [2.5.080] - 2026-10-29
 
 - Android-Version: `2.5.080` / Code `481`.

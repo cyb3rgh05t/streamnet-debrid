@@ -50,8 +50,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -87,6 +89,7 @@ fun CloudConnectScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
+    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -214,7 +217,9 @@ fun CloudConnectScreen(
                     canRequestNewCode = pairingSettled,
                     accentColor = accentColor,
                     onRequestNewCode = { viewModel.startCloudAuth(forcePairing = true) },
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    // Small desktop monitors report few dp of height; keep QR, code and hint on screen.
+                    qrSize = (screenHeight * 0.34f).coerceIn(150.dp, 220.dp)
                 )
             }
         }
@@ -307,6 +312,7 @@ private fun CloudConnectIntro(centered: Boolean) {
         Text(
             text = stringResource(R.string.connect_to_cloud),
             fontSize = if (centered) 26.sp else 34.sp,
+            lineHeight = if (centered) 32.sp else 42.sp,
             fontWeight = FontWeight.Bold,
             color = Color.White,
             textAlign = textAlign
@@ -347,6 +353,7 @@ private fun CloudPairingPanel(
     accentColor: Color,
     onRequestNewCode: () -> Unit,
     modifier: Modifier = Modifier,
+    qrSize: Dp = 220.dp,
 ) {
     val link = remember(verificationUrl, userCode) {
         verificationUrl.ifBlank { userCode.takeIf { it.isNotBlank() }?.let { CloudLinkFallbackUrl + it }.orEmpty() }
@@ -373,7 +380,7 @@ private fun CloudPairingPanel(
         Spacer(modifier = Modifier.height(18.dp))
         Box(
             modifier = Modifier
-                .size(220.dp)
+                .size(qrSize)
                 .clip(RoundedCornerShape(18.dp))
                 .background(Color.White)
                 .padding(12.dp),
@@ -394,9 +401,10 @@ private fun CloudPairingPanel(
         Spacer(modifier = Modifier.height(18.dp))
         Text(
             text = stringResource(R.string.cloud_connect_scan_hint, host),
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 16.sp,
+            lineHeight = 23.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.White.copy(alpha = 0.92f),
             textAlign = TextAlign.Center
         )
         if (userCode.isNotBlank()) {
