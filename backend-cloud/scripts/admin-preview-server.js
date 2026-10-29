@@ -86,6 +86,42 @@ const server = createServer(async (request, reply) => {
         watch_history_items: 5821,
         watch_state_items: 193,
         database_bytes: 83_886_080,
+        profiles: 274,
+        new_accounts_24h: 4,
+        new_accounts_7d: 19,
+        syncs_24h: 67,
+        system: {
+          checked_at: new Date().toISOString(),
+          uptime_seconds: 347820,
+          database_connected: true,
+          database_query_ms: 12,
+          memory_rss_bytes: 157_286_400,
+          heap_used_bytes: 48_234_496,
+          heap_total_bytes: 67_108_864,
+          host_memory_total_bytes: 8_589_934_592,
+          host_memory_free_bytes: 4_294_967_296,
+          cpu_average_percent: 2.4,
+          node_version: "v24.15.0 (Demo)",
+          platform: "linux / x64 (Demo)",
+          schema_version: "011_account_session_metadata.sql",
+        },
+        versions: { backend: "1.0.030", web: "1.0.069", android: "2.5.081", android_build: 482 },
+        recent_accounts: accounts,
+        recent_audits: [
+          { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
+          { id: "demo-audit-2", operation: "upsert_addon", account_email: accounts[1].email, reason: "Demo: Add-on hinzugefügt", created_at: "2026-10-29T08:42:00.000Z" },
+        ],
+      });
+    }
+    if (url.pathname === "/admin-api/updates") {
+      return json(reply, 200, {
+        checked_at: new Date().toISOString(),
+        source: "Demo-Versionsdaten (kein GitHub-Aufruf)",
+        components: [
+          { component: "backend", version: "1.0.031", build: null },
+          { component: "web", version: "1.0.069", build: null },
+          { component: "android", version: "2.5.081", build: 482 },
+        ],
       });
     }
     if (url.pathname === "/admin-api/accounts") {

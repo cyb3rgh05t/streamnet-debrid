@@ -1,0 +1,130 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import Fastify from "fastify";
+import { SignJWT } from "jose";
+import { registerAdminRoutes } from "../src/admin-routes.js";
+
+const key = new TextEncoder().encode("test-overview-key-not-for-production");
+
+async function fixture(t, { failDatabase = false, migrations = ["011_account_session_metadata.sql"] } = {}) {
+  const queries = [];
+  const pool = {
+    async query(sql) {
+      queries.push(sql);
+      if (sql.includes("from admin_accounts")) return { rows: [{ id: "admin-a" }] };
+      if (failDatabase) throw new Error("database unavailable");
+      if (sql.includes("pg_database_size")) return { rows: [{
+        accounts: "12", snapshots: "10", profiles: "24", active_sessions: "7",
+        online_devices: "3", events_24h: "50", watch_history_items: "81",
+        watch_state_items: "9", database_bytes: "83886080",
+        new_accounts_24h: "2", new_accounts_7d: "4", syncs_24h: "6",
+      }] };
+      if (sql.includes("from schema_migrations")) return { rows: migrations.map(version => ({ version })) };
+      if (sql.includes("from admin_audit_logs")) return { rows: [{
+        id: "audit-a", operation: "upsert_addon", account_email: "demo@example.test",
+        created_at: "2026-10-29T09:00:00Z", reason: "Demo",
+      }] };
+      if (sql.includes("select id, email, created_at from accounts")) return { rows: [{
+        id: "account-a", email: "demo@example.test", created_at: "2026-10-29T08:00:00Z",
+      }] };
+      throw new Error(`Unexpected query: ${sql}`);
+    },
+  };
+  const app = Fastify();
+  registerAdminRoutes(app, { pool, jwtKey: key, publicDirectory: "" });
+  t.after(() => app.close());
+  const token = await new SignJWT({ purpose: "admin" })
+    .setProtectedHeader({ alg: "HS256" }).setSubject("admin-a")
+    .setExpirationTime("5m").sign(key);
+  const headers = { authorization: `Bearer ${token}` };
+  return { app, queries, headers };
+}
+
+test("dashboard endpoints require admin authentication before querying or fetching", async (t) => {
+  const { app, queries } = await fixture(t);
+  t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected fetch"); });
+  for (const url of ["/admin-api/overview", "/admin-api/updates"]) {
+    assert.equal((await app.inject({ url })).statusCode, 401);
+  }
+  assert.equal(queries.length, 0);
+});
+
+test("overview preserves numeric metrics and adds runtime, schema and recent activity", async (t) => {
+  const { app, headers, queries } = await fixture(t);
+  const response = await app.inject({ url: "/admin-api/overview", headers });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["cache-control"], "no-store");
+  const body = response.json();
+  assert.equal(body.accounts, 12);
+  assert.equal(body.profiles, 24);
+  assert.equal(body.watch_history_items, 81);
+  assert.equal(body.new_accounts_24h, 2);
+  assert.equal(body.new_accounts_7d, 4);
+  assert.equal(body.syncs_24h, 6);
+  assert.equal(body.system.database_connected, true);
+  assert.equal(body.system.schema_version, "011_account_session_metadata.sql");
+  for (const field of ["uptime_seconds", "database_query_ms", "memory_rss_bytes",
+    "heap_used_bytes", "heap_total_bytes", "host_memory_total_bytes",
+    "host_memory_free_bytes", "cpu_average_percent"]) {
+    assert.ok(Number.isFinite(body.system[field]) && body.system[field] >= 0, field);
+  }
+  assert.equal(body.system.node_version, process.version);
+  assert.equal(body.versions.android_build, 482);
+  assert.equal(body.recent_accounts.length, 1);
+  assert.equal(body.recent_audits[0].operation, "upsert_addon");
+  assert.ok(queries.some(sql => sql.includes("jsonb_typeof(payload->'profiles')")));
+  assert.ok(queries.filter(sql => sql.includes("limit 5")).length === 2);
+});
+
+test("overview explicitly reports an empty migration history", async (t) => {
+  const { app, headers } = await fixture(t, { migrations: [] });
+  const response = await app.inject({ url: "/admin-api/overview", headers });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().system.schema_version, null);
+});
+
+test("database failure is not presented as a healthy overview", async (t) => {
+  const { app, headers } = await fixture(t, { failDatabase: true });
+  const response = await app.inject({ url: "/admin-api/overview", headers });
+  assert.equal(response.statusCode, 500);
+  assert.equal(response.json().system, undefined);
+});
+
+test("update check fetches only fixed public version files without credentials", async (t) => {
+  const { app, headers } = await fixture(t);
+  const calls = [];
+  t.mock.method(globalThis, "fetch", async (url, options) => {
+    calls.push({ url, options });
+    return new Response(url.endsWith(".kts")
+      ? 'versionCode = 483\nversionName = "2.5.082"'
+      : JSON.stringify({ version: url.includes("backend-cloud") ? "1.0.030" : "1.0.070" }));
+  });
+  const response = await app.inject({ url: "/admin-api/updates", headers });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.deepEqual(response.json().components, [
+    { component: "backend", version: "1.0.030", build: null },
+    { component: "web", version: "1.0.070", build: null },
+    { component: "android", version: "2.5.082", build: 483 },
+  ]);
+  assert.equal(calls.length, 3);
+  for (const { url, options } of calls) {
+    assert.ok(url.startsWith("https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/"));
+    assert.equal(options.headers, undefined);
+    assert.ok(options.signal instanceof AbortSignal);
+  }
+});
+
+test("update check surfaces HTTP, invalid data and timeout errors per component", async (t) => {
+  const { app, headers } = await fixture(t);
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.includes("backend-cloud")) return new Response("unavailable", { status: 503 });
+    if (url.includes("web/")) return new Response('{"version":"invalid"}');
+    throw new Error("Request timed out");
+  });
+  const response = await app.inject({ url: "/admin-api/updates", headers });
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json().components.map(item => item.error), [
+    "GitHub HTTP 503", "Ungültige Versionsdatei", "Request timed out",
+  ]);
+});

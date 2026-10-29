@@ -33,8 +33,23 @@ The production APK uses this service as its account and synchronization backend.
 
 The admin panel opens on the Dashboard page. Overview metrics live there rather
 than above the Accounts table; the online-devices card opens the filtered account
-list. Version cards are release-time reference values, not live checks of remote
-Web/Android deployments or the database migration state.
+list. The dashboard also shows profile/playback counts, newly registered accounts,
+recent admin changes, process uptime, database query time, process memory/CPU,
+and host memory. CPU is the process average since startup (100% = one core);
+host memory is not a container memory limit. Database status reflects the
+successful overview query, not an independent continuous health check.
+
+The backend version is read from the running package and the schema version
+from `schema_migrations`. Web/Android versions and the Android build are
+release-time references maintained in `src/admin-routes.js`, not live checks
+of deployed clients. **Updates prüfen** uses the authenticated, read-only
+`GET /admin-api/updates` endpoint to compare these values against the public
+version files on GitHub `main`. It fetches only fixed public URLs, sends no
+account data or GitHub credentials, has an eight-second timeout per request,
+and reports failures per component. A newer source version does not prove a
+published release or deployed update. The local demo simulates this check.
+Accent gradients and decorative corner bubbles are reserved for the Dashboard cards; the other admin pages
+use solid element backgrounds.
 
 For a database-free local UI preview, run `npm run preview:admin` and open
 `http://127.0.0.1:4173/admin`. Sign in with `preview` / `preview1234`.

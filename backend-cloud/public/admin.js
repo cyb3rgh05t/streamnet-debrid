@@ -8,6 +8,7 @@ const state = {
   audits: { limit: 10, offset: 0, total: 0 },
   accountAudits: { limit: 10, offset: 0, total: 0 },
   global: null,
+  dashboardVersions: null,
 };
 
 const byId = (id) => document.getElementById(id);
@@ -424,13 +425,142 @@ function renderMetrics(metrics) {
 }
 
 async function loadDashboard() {
-  const metrics = await api("/admin-api/overview");
+  byId("dashboard-check-updates").disabled = true;
+  const started = performance.now();
+  let metrics;
+  try {
+    metrics = await api("/admin-api/overview");
+  } catch (error) {
+    byId("dashboard-system").replaceChildren();
+    renderDashboardFacts("dashboard-system", [["Backend / Datenbank", "Prüfung fehlgeschlagen"], ["Fehler", error.message]]);
+    throw error;
+  }
+  const responseMs = Math.round(performance.now() - started);
   renderMetrics(metrics);
+  const system = metrics.system;
+  const hours = Math.floor(system.uptime_seconds / 3600);
+  renderDashboardFacts("dashboard-system", [
+    ["Admin API", `Erreichbar · ${responseMs} ms`],
+    ["Datenbank", system.database_connected ? `Verbunden · Abfrage ${system.database_query_ms} ms` : "Nicht verbunden"],
+    ["Laufzeit", `${Math.floor(hours / 24)} Tage · ${hours % 24} Std. · ${Math.floor(system.uptime_seconds / 60) % 60} Min.`],
+    ["Node.js", system.node_version],
+    ["Plattform", system.platform],
+    ["Messzeitpunkt", formatDate(system.checked_at)],
+  ]);
+  renderDashboardFacts("dashboard-cloud", [
+    ["Profile", metrics.profiles],
+    ["Wiedergabeverlauf", metrics.watch_history_items],
+    ["Wiedergabestände", metrics.watch_state_items],
+    ["Neue Accounts · 24 h", metrics.new_accounts_24h],
+    ["Neue Accounts · 7 Tage", metrics.new_accounts_7d],
+    ["Snapshots aktualisiert · 24 h", metrics.syncs_24h],
+  ]);
+  renderDashboardFacts("dashboard-resources", [
+    ["Datenbankgröße", formatBytes(metrics.database_bytes)],
+    ["Prozess-RAM (RSS)", formatBytes(system.memory_rss_bytes)],
+    ["JS-Heap belegt / reserviert", `${formatBytes(system.heap_used_bytes)} / ${formatBytes(system.heap_total_bytes)}`],
+    ["Host-RAM frei / gesamt", `${formatBytes(system.host_memory_free_bytes)} / ${formatBytes(system.host_memory_total_bytes)}`],
+    ["Prozess-CPU · Ø seit Start", `${system.cpu_average_percent.toLocaleString("de-DE")} %`],
+  ]);
+  state.dashboardVersions = metrics.versions;
+  for (const component of ["backend", "web", "android"]) {
+    byId(`dashboard-${component}-version`).textContent = metrics.versions[component];
+  }
+  const schema = system.schema_version;
+  byId("dashboard-schema-version").textContent = schema ? `Migration ${schema.split("_")[0]}` : "Keine Migration";
+  byId("dashboard-schema-file").textContent = schema || "Noch keine Migration in schema_migrations erfasst";
+  byId("dashboard-android-build").textContent = `Build ${metrics.versions.android_build} · Referenzstand`;
+  renderDashboardActivity("dashboard-recent-accounts", metrics.recent_accounts.map(account => ({
+    title: account.email, detail: `Registriert · ${formatDate(account.created_at)}`,
+  })), "Noch keine Accounts vorhanden.");
+  renderDashboardActivity("dashboard-recent-audits", metrics.recent_audits.map(audit => ({
+    title: audit.operation,
+    detail: `${audit.account_email || "Account entfernt"} · ${formatDate(audit.created_at)}${audit.reason ? ` · ${audit.reason}` : ""}`,
+  })), "Noch keine Änderungen protokolliert.");
+  byId("dashboard-check-updates").disabled = false;
   byId("dashboard-updated").textContent = new Intl.DateTimeFormat("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
 }
+
+function renderDashboardFacts(id, entries) {
+  const container = byId(id);
+  container.replaceChildren();
+  for (const [label, value] of entries) {
+    const row = document.createElement("div");
+    const term = document.createElement("dt");
+    term.textContent = label;
+    const description = document.createElement("dd");
+    description.textContent = typeof value === "number" ? value.toLocaleString("de-DE") : value;
+    row.append(term, description);
+    container.append(row);
+  }
+}
+
+function renderDashboardActivity(id, entries, emptyLabel) {
+  const container = byId(id);
+  container.replaceChildren();
+  for (const entry of entries) {
+    const item = document.createElement("li");
+    const title = document.createElement("strong");
+    title.textContent = entry.title;
+    const detail = document.createElement("span");
+    detail.textContent = entry.detail;
+    item.append(title, detail);
+    container.append(item);
+  }
+  if (!entries.length) {
+    const item = document.createElement("li");
+    item.textContent = emptyLabel;
+    container.append(item);
+  }
+}
+
+function compareVersions(left, right) {
+  const a = left.split(".").map(Number);
+  const b = right.split(".").map(Number);
+  for (let index = 0; index < 3; index += 1) {
+    if (a[index] !== b[index]) return Math.sign(a[index] - b[index]);
+  }
+  return 0;
+}
+
+byId("dashboard-check-updates").addEventListener("click", async () => {
+  const button = byId("dashboard-check-updates");
+  button.disabled = true;
+  button.textContent = "Prüfe...";
+  button.setAttribute("aria-busy", "true");
+  const status = byId("dashboard-update-status");
+  byId("dashboard-updates").replaceChildren();
+  status.textContent = "Versionsdateien werden von GitHub geladen...";
+  try {
+    const result = await api("/admin-api/updates");
+    renderDashboardActivity("dashboard-updates", result.components.map(component => {
+      const current = state.dashboardVersions[component.component];
+      let detail;
+      if (component.error) {
+        detail = `Prüfung fehlgeschlagen: ${component.error}`;
+      } else {
+        let comparison = compareVersions(component.version, current);
+        if (comparison === 0 && component.component === "android") {
+          comparison = Math.sign(component.build - state.dashboardVersions.android_build);
+        }
+        const label = comparison > 0 ? "Neuerer Quellstand verfügbar" : comparison < 0 ? "Lokaler Stand voraus" : "Stand entspricht main";
+        detail = `${label} · main ${component.version}${component.build !== null ? ` / Build ${component.build}` : ""} · Vergleich ${current}`;
+      }
+      return { title: component.component === "backend" ? "Backend (laufend)" : `${component.component === "web" ? "Web" : "Android"} (Referenz)`, detail };
+    }), "");
+    status.textContent = `${result.source} · Geprüft ${formatDate(result.checked_at)}`;
+  } catch (error) {
+    status.textContent = `Update-Prüfung fehlgeschlagen: ${error.message}`;
+    showToast(error.message, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Updates prüfen";
+    button.removeAttribute("aria-busy");
+  }
+});
 
 async function loadAccounts() {
   const accountResult = await api(

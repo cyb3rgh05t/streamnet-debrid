@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.029" />
-    <script src="/admin/admin.js?v=1.0.029" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.030" />
+    <script src="/admin/admin.js?v=1.0.030" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -141,7 +141,7 @@
             </svg>
             <span>Abmelden</span>
           </button>
-          <span class="version-badge">Version 1.0.029</span>
+          <span class="version-badge">Version 1.0.030</span>
         </div>
       </aside>
 
@@ -183,36 +183,67 @@
             class="metrics"
             aria-label="Datenbankübersicht"
           ></div>
+          <div class="dashboard-detail-grid">
+            <section class="version-panel" aria-labelledby="runtime-title">
+              <div class="section-heading"><h2 id="runtime-title">System &amp; Laufzeit</h2></div>
+              <dl id="dashboard-system" class="dashboard-facts"></dl>
+            </section>
+            <section class="version-panel" aria-labelledby="cloud-data-title">
+              <div class="section-heading"><h2 id="cloud-data-title">Cloud-Daten &amp; Aktivität</h2></div>
+              <dl id="dashboard-cloud" class="dashboard-facts"></dl>
+            </section>
+            <section class="version-panel" aria-labelledby="resources-title">
+              <div class="section-heading"><h2 id="resources-title">Speicher &amp; Auslastung</h2></div>
+              <dl id="dashboard-resources" class="dashboard-facts"></dl>
+              <p class="dashboard-note">CPU: Prozessdurchschnitt seit Start, 100 % = ein Kern. Host-RAM ist kein Container-Limit.</p>
+            </section>
+          </div>
           <section class="version-panel" aria-labelledby="versions-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">SYSTEMSTATUS</p>
+                <p class="eyebrow">VERSIONSÜBERSICHT</p>
                 <h2 id="versions-title">Versionen &amp; Releases</h2>
               </div>
             </div>
             <div class="version-grid">
               <article class="version-card">
                 <span class="version-card-label">Backend</span>
-                <strong class="version-card-value">1.0.029</strong>
-                <span class="version-card-detail"><i></i> Admin API</span>
+                <strong id="dashboard-backend-version" class="version-card-value">—</strong>
+                <span class="version-card-detail">Laufendes Backend</span>
               </article>
               <article class="version-card">
                 <span class="version-card-label">Cloud-Schema</span>
-                <strong class="version-card-value">Migration 011</strong>
-                <span class="version-card-detail"><i></i> Account-Metadaten</span>
+                <strong id="dashboard-schema-version" class="version-card-value">—</strong>
+                <span id="dashboard-schema-file" class="version-card-detail">Wird aus der Datenbank gelesen</span>
               </article>
               <article class="version-card">
                 <span class="version-card-label">Web</span>
-                <strong class="version-card-value">1.0.069</strong>
-                <span class="version-card-detail"><i></i> Webplayer</span>
+                <strong id="dashboard-web-version" class="version-card-value">—</strong>
+                <span class="version-card-detail">Referenzstand, nicht live geprüft</span>
               </article>
               <article class="version-card">
                 <span class="version-card-label">Android</span>
-                <strong class="version-card-value">2.5.079</strong>
-                <span class="version-card-detail"><i></i> Version 480</span>
+                <strong id="dashboard-android-version" class="version-card-value">—</strong>
+                <span id="dashboard-android-build" class="version-card-detail">Referenzstand, nicht live geprüft</span>
               </article>
             </div>
+            <div class="dashboard-update-actions">
+              <button id="dashboard-check-updates" class="button secondary" type="button" disabled>Updates prüfen</button>
+              <a class="text-button" href="https://github.com/cyb3rgh05t/streamnet-debrid" target="_blank" rel="noopener noreferrer">Repository öffnen</a>
+            </div>
+            <p id="dashboard-update-status" class="dashboard-note" role="status">Noch nicht geprüft. Vergleicht mit GitHub main, nicht mit veröffentlichten Deployments.</p>
+            <ul id="dashboard-updates" class="dashboard-activity-list"></ul>
           </section>
+          <div class="dashboard-detail-grid dashboard-activity-grid">
+            <section class="version-panel" aria-labelledby="recent-accounts-title">
+              <div class="section-heading"><h2 id="recent-accounts-title">Neue Accounts</h2></div>
+              <ul id="dashboard-recent-accounts" class="dashboard-activity-list"></ul>
+            </section>
+            <section class="version-panel" aria-labelledby="recent-audits-title">
+              <div class="section-heading"><h2 id="recent-audits-title">Letzte Änderungen</h2></div>
+              <ul id="dashboard-recent-audits" class="dashboard-activity-list"></ul>
+            </section>
+          </div>
         </section>
 
         <section id="accounts-view">
@@ -351,11 +382,11 @@
                   <option value="streamnet_tv">StreamNet TV (System-Playlist)</option>
                 </select></label>
                 <label>Name<input id="global-playlist-name" maxlength="200" /></label>
-                <div id="global-m3u-fields">
+                <div id="global-m3u-fields" class="op-fields">
                   <label>M3U-URL<input id="global-playlist-url" type="url" placeholder="https://.../get.php?username=...&amp;password=..." /></label>
                   <label>EPG-URL (optional, leer entfernt die EPG-URL)<input id="global-playlist-epg" type="url" /></label>
                 </div>
-                <div id="global-xtream-fields" class="hidden">
+                <div id="global-xtream-fields" class="op-fields hidden">
                   <div class="warning">
                     Benutzername und Passwort werden für alle Zielaccounts gleich gesetzt.
                     Für individuelle Zugangsdaten stattdessen „nur Host ändern“ wählen.

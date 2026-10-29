@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { SignJWT, jwtVerify } from "jose";
 import { normalizeAdminUsername } from "./admin-username.js";
 import { verifyScryptPassword } from "./passwords.js";
@@ -15,6 +16,16 @@ import {
   hydrateAdminStremioAddon,
   summarizeAdminPayload,
 } from "./admin-snapshots.js";
+
+const backendPackage = JSON.parse(
+  await readFile(new URL("../package.json", import.meta.url), "utf8"),
+);
+const versionReferences = {
+  backend: backendPackage.version,
+  web: "1.0.069",
+  android: "2.5.081",
+  android_build: 482,
+};
 
 const adminLoginAttempts = new Map();
 const adminLoginWindowMs = 15 * 60_000;
@@ -420,6 +431,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   app.get("/admin-api/overview", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
+    const queryStarted = performance.now();
     const result = await pool.query(
       `select
          (select count(*)::int from accounts) as accounts,
@@ -437,12 +449,89 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          (select count(*)::int from app_usage_events where created_at >= now() - interval '24 hours') as events_24h,
          (select count(*)::int from watch_history) as watch_history_items,
          (select count(*)::int from watch_state) as watch_state_items,
+         (select coalesce(sum(case when jsonb_typeof(payload->'profiles') = 'array'
+            then jsonb_array_length(payload->'profiles') else 0 end), 0)::int
+            from account_sync_snapshots) as profiles,
+         (select count(*)::int from accounts where created_at >= now() - interval '24 hours') as new_accounts_24h,
+         (select count(*)::int from accounts where created_at >= now() - interval '7 days') as new_accounts_7d,
+         (select count(*)::int from account_sync_snapshots where updated_at >= now() - interval '24 hours') as syncs_24h,
          pg_database_size(current_database())::bigint as database_bytes`,
     );
+    const databaseQueryMs = performance.now() - queryStarted;
+    const [recentAccounts, recentAudits, migrations] = await Promise.all([
+      pool.query("select id, email, created_at from accounts order by created_at desc, id desc limit 5"),
+      pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
+                        accounts.email as account_email
+                   from admin_audit_logs audit
+                   left join accounts on accounts.id = audit.account_id
+                  order by audit.created_at desc, audit.id desc limit 5`),
+      pool.query("select version from schema_migrations order by version desc limit 1"),
+    ]);
     const row = result.rows[0];
-    return Object.fromEntries(
-      Object.entries(row).map(([key, value]) => [key, Number(value)]),
-    );
+    const memory = process.memoryUsage();
+    const cpu = process.cpuUsage();
+    const uptime = process.uptime();
+    return {
+      ...Object.fromEntries(
+        Object.entries(row).map(([key, value]) => [key, Number(value)]),
+      ),
+      system: {
+        checked_at: new Date().toISOString(),
+        uptime_seconds: Math.floor(uptime),
+        database_connected: true,
+        database_query_ms: Math.round(databaseQueryMs),
+        memory_rss_bytes: memory.rss,
+        heap_used_bytes: memory.heapUsed,
+        heap_total_bytes: memory.heapTotal,
+        host_memory_total_bytes: os.totalmem(),
+        host_memory_free_bytes: os.freemem(),
+        cpu_average_percent: Math.round((cpu.user + cpu.system) / (uptime * 1e6) * 1000) / 10,
+        node_version: process.version,
+        platform: `${process.platform} / ${process.arch}`,
+        schema_version: migrations.rows[0]?.version ?? null,
+      },
+      versions: versionReferences,
+      recent_accounts: recentAccounts.rows,
+      recent_audits: recentAudits.rows,
+    };
+  });
+
+  app.get("/admin-api/updates", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const sources = [
+      ["backend", "backend-cloud/package.json"],
+      ["web", "web/package.json"],
+      ["android", "app/build.gradle.kts"],
+    ];
+    const results = await Promise.allSettled(sources.map(async ([component, file]) => {
+      const response = await fetch(
+        `https://raw.githubusercontent.com/cyb3rgh05t/streamnet-debrid/main/${file}`,
+        { signal: AbortSignal.timeout(8000) },
+      );
+      if (!response.ok) throw new Error(`GitHub HTTP ${response.status}`);
+      const text = await response.text();
+      const version = component === "android"
+        ? text.match(/versionName\s*=\s*"([^"]+)"/)?.[1]
+        : JSON.parse(text).version;
+      const build = component === "android"
+        ? Number(text.match(/versionCode\s*=\s*(\d+)/)?.[1])
+        : null;
+      if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version) ||
+          (component === "android" && !Number.isSafeInteger(build))) {
+        throw new Error("Ungültige Versionsdatei");
+      }
+      return { component, version, build };
+    }));
+    return {
+      checked_at: new Date().toISOString(),
+      source: "GitHub main (Quellstand, kein Deployment-Nachweis)",
+      components: results.map((result, index) => {
+        if (result.status === "fulfilled") return result.value;
+        request.log.warn({ err: result.reason, component: sources[index][0] }, "Admin update check failed");
+        return { component: sources[index][0], error: result.reason.message };
+      }),
+    };
   });
 
   app.get("/admin-api/accounts", async (request, reply) => {

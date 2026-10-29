@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.030] - 2026-10-29
+
+- Admin-Dashboard: Zusätzliche Systeminformationen mit Backend-Erreichbarkeit, Laufzeit, Datenbank-Abfragezeit, Node.js und Plattform; Cloud-Zähler für Profile, Wiedergabeverlauf, Wiedergabestände, neue Accounts und zuletzt aktualisierte Snapshots.
+- Speicherübersicht mit Datenbankgröße, Prozess-RAM, JS-Heap, Host-RAM und durchschnittlicher Prozess-CPU seit Start. Neue Listen zeigen die letzten Registrierungen und Admin-Änderungen.
+- Versionsübersicht liest die laufende Backend-Version und die angewendete Datenbankmigration aus. Web-/Android-Versionen bleiben ausdrücklich gekennzeichnete Referenzstände; Android-Referenz auf 2.5.081 / Build 482 aktualisiert.
+- Authentifizierte Update-Prüfung auf Knopfdruck gegen öffentliche Versionsdateien auf GitHub main, mit Zeitlimit und Fehleranzeige pro Komponente. Die lokale Fake-Daten-Vorschau simuliert diese Prüfung.
+- Farbverläufe und dekorative Eck-Bubbles außerhalb des Dashboards entfernt. Einheitliche Abstände zwischen M3U-/EPG- und Xtream-Feldern in Remote Config.
+
 ## [2.5.081] - 2026-10-29
 
 - Android-Version: `2.5.081` / Code `482`.

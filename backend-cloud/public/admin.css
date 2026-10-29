@@ -34,13 +34,7 @@ body {
 }
 body {
   color: var(--text);
-  background:
-    radial-gradient(
-      1100px 560px at 12% -8%,
-      rgba(229, 162, 9, 0.08),
-      transparent 60%
-    ),
-    var(--bg);
+  background: var(--bg);
   font-family:
     Inter,
     ui-sans-serif,
@@ -92,7 +86,7 @@ button:disabled {
   right: 0;
   height: 2px;
   z-index: 90;
-  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
+  background: var(--accent);
   transform-origin: left;
   transform: scaleX(0);
   opacity: 0;
@@ -490,6 +484,93 @@ button.metric {
   box-shadow: 0 0 0 3px var(--ok-soft);
 }
 
+.dashboard-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+#dashboard-home-view .section-heading {
+  margin-top: 0;
+}
+.dashboard-activity-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dashboard-facts {
+  display: grid;
+  gap: 0;
+  margin: 0;
+}
+.dashboard-facts > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.dashboard-facts > div:last-child {
+  border-bottom: 0;
+}
+.dashboard-facts dt {
+  color: var(--muted);
+}
+.dashboard-facts dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.dashboard-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.dashboard-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 18px;
+}
+.dashboard-activity-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.dashboard-activity-list:not(:empty) {
+  margin-top: 14px;
+}
+.dashboard-activity-list li {
+  display: grid;
+  gap: 7px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(12, 11, 10, 0.3);
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.dashboard-activity-list strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.dashboard-activity-list span {
+  color: var(--muted);
+  line-height: 1.5;
+}
+.version-card-detail {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .dashboard-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .toolbar {
   margin: 0 0 16px;
 }
@@ -526,9 +607,7 @@ button.metric {
 .search-input-wrap input {
   min-height: 42px;
   padding-left: 40px;
-  background:
-    linear-gradient(135deg, rgba(229, 162, 9, 0.045), transparent 70%),
-    #14110e;
+  background: #14110e;
   border-color: var(--line);
 }
 .search-input-wrap:focus-within > svg {
@@ -747,7 +826,7 @@ textarea {
 .button.primary {
   color: #17110a;
   border-color: var(--accent);
-  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  background: var(--accent);
 }
 .button.primary:hover {
   filter: brightness(1.05);
@@ -856,14 +935,7 @@ tbody tr[data-account-id]:focus {
 .skeleton-bar {
   height: 12px;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    var(--surface-raised) 25%,
-    var(--surface-hover) 50%,
-    var(--surface-raised) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.3s ease-in-out infinite;
+  background: var(--surface-raised);
 }
 
 .account-heading {
@@ -1449,14 +1521,14 @@ pre {
   }
 }
 
-/* Accent gradients, corner tint and accent edges (NZBStreamer dashboard look) */
+/* Corner tint and accent edges */
 .metric {
   position: relative;
   overflow: hidden;
   border-top: 2px solid var(--line-strong);
-  background: linear-gradient(135deg, var(--accent-soft), transparent 85%), var(--surface);
+  background: var(--surface);
 }
-.metric::after {
+#dashboard-home-view .metric::after {
   content: "";
   position: absolute;
   top: 0;
@@ -1475,7 +1547,7 @@ pre {
 .payload-panel,
 .profile-row {
   border-left: 3px solid var(--line-strong);
-  background: linear-gradient(90deg, var(--accent-soft), transparent 40%), var(--surface);
+  background: var(--surface);
 }
 .detail-panel .section-heading,
 .editor-panel .section-heading,
@@ -1485,7 +1557,7 @@ pre {
 }
 .login-panel {
   border-top: 2px solid var(--accent);
-  background: linear-gradient(135deg, var(--accent-soft), transparent 35%), var(--surface);
+  background: var(--surface);
 }
 
 @media (max-width: 720px) {
@@ -1509,9 +1581,7 @@ pre {
 #audits-view .table-wrap,
 #account-view .table-wrap {
   border-color: rgba(229, 162, 9, 0.24);
-  background:
-    linear-gradient(110deg, rgba(229, 162, 9, 0.045), transparent 48%),
-    #151311;
+  background: #151311;
 }
 #accounts-view .toolbar {
   margin-bottom: 18px;
@@ -1524,30 +1594,22 @@ pre {
 }
 #account-view .metrics.compact .metric {
   border-color: rgba(229, 162, 9, 0.2);
-  background:
-    linear-gradient(120deg, rgba(229, 162, 9, 0.1), transparent 70%),
-    var(--surface);
+  background: var(--surface);
 }
 #account-view .profiles-grid .profile-row {
   border-color: rgba(229, 162, 9, 0.2);
   border-left: 3px solid var(--line-strong);
-  background:
-    linear-gradient(90deg, rgba(229, 162, 9, 0.1), transparent 55%),
-    var(--surface);
+  background: var(--surface);
 }
 #account-view .detail-panel,
 #account-view .editor-panel,
 #account-view .payload-panel {
   border-color: rgba(229, 162, 9, 0.2);
-  background:
-    linear-gradient(90deg, rgba(229, 162, 9, 0.1), transparent 40%),
-    var(--surface);
+  background: var(--surface);
 }
 #account-view .danger-zone {
   border-color: rgba(255, 135, 120, 0.28);
-  background:
-    linear-gradient(90deg, rgba(229, 162, 9, 0.06), transparent 48%),
-    rgba(255, 135, 120, 0.035);
+  background: rgba(255, 135, 120, 0.035);
 }
 #global-view > .editor-panel {
   border: 1px solid var(--line);
@@ -1564,29 +1626,13 @@ pre {
   overflow: hidden;
   border: 1px solid rgba(229, 162, 9, 0.24);
   border-left: 3px solid var(--line-strong);
-  background:
-    linear-gradient(135deg, rgba(229, 162, 9, 0.16), rgba(229, 162, 9, 0.045) 58%, rgba(12, 11, 10, 0.72)),
-    #171512;
-}
-#global-view .quick-panel::after,
-#global-view .warning::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 28px;
-  height: 28px;
-  border-radius: 0 0 0 100%;
-  background: rgba(229, 162, 9, 0.11);
-  pointer-events: none;
+  background: #171512;
 }
 #global-view input:not([type="checkbox"]),
 #global-view select,
 #global-view textarea {
   border-color: rgba(229, 162, 9, 0.18);
-  background:
-    linear-gradient(110deg, rgba(229, 162, 9, 0.055), transparent 64%),
-    #14110e;
+  background: #14110e;
 }
 #accounts-view .table-wrap,
 #audits-view .table-wrap,
@@ -1597,26 +1643,7 @@ pre {
 #account-view .payload-panel {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(135deg, rgba(229, 162, 9, 0.15), rgba(229, 162, 9, 0.045) 56%, rgba(12, 11, 10, 0.72)),
-    #171512;
-}
-#accounts-view .table-wrap::after,
-#audits-view .table-wrap::after,
-#account-view .table-wrap::after,
-#account-view .profiles-grid .profile-row::after,
-#account-view .detail-panel::after,
-#account-view .editor-panel::after,
-#account-view .payload-panel::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 32px;
-  height: 32px;
-  border-radius: 0 0 0 100%;
-  background: rgba(229, 162, 9, 0.11);
-  pointer-events: none;
+  background: #171512;
 }
 #accounts-view .table-wrap,
 #audits-view .table-wrap,
@@ -1628,11 +1655,6 @@ pre {
 #account-view .editor-panel,
 #account-view .payload-panel {
   overflow: visible;
-}
-#accounts-view .table-wrap::after,
-#audits-view .table-wrap::after,
-#account-view .table-wrap::after {
-  z-index: 2;
 }
 #accounts-view .table-wrap table,
 #audits-view .table-wrap table,
@@ -1672,9 +1694,7 @@ table {
 }
 th {
   color: var(--accent);
-  background:
-    linear-gradient(135deg, rgba(229, 162, 9, 0.09), transparent 72%),
-    var(--surface-raised);
+  background: var(--surface-raised);
   border-bottom: 1px solid var(--line-strong);
 }
 td {
@@ -1685,22 +1705,18 @@ td {
   font-variant-numeric: tabular-nums;
 }
 tbody tr {
-  background: linear-gradient(90deg, rgba(229, 162, 9, 0.018), transparent 45%);
+  background: transparent;
 }
 tbody tr:nth-child(even) {
   background-color: rgba(255, 255, 255, 0.012);
 }
 tbody tr[data-account-id]:hover {
-  background:
-    linear-gradient(90deg, rgba(229, 162, 9, 0.12), rgba(229, 162, 9, 0.025) 70%),
-    var(--surface);
+  background: var(--surface-hover);
 }
 tbody tr[data-account-id]:focus {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
-  background:
-    linear-gradient(90deg, rgba(229, 162, 9, 0.14), rgba(229, 162, 9, 0.035) 70%),
-    var(--surface);
+  background: var(--surface-hover);
 }
 tbody tr[data-account-id]:hover .account-primary,
 tbody tr[data-account-id]:focus .account-primary {
