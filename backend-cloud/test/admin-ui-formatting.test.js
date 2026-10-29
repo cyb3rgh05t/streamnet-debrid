@@ -5,12 +5,28 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../public/admin.js", import.meta.url), "utf8");
 const context = vm.createContext({});
-for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent"]) {
+for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent", "liveDeviceEntries"]) {
   const definition = source.match(new RegExp(`function ${name}\\([^]*?\\n\\}`));
   assert.ok(definition, `Missing ${name}`);
   vm.runInContext(definition[0], context);
 }
 
+test("device table retains online and offline heartbeat devices but hides sessions and legacy events", () => {
+  const devices = [
+    { kind: "app_event", event_name: "heartbeat", online: true },
+    { kind: "app_event", event_name: "heartbeat", online: false },
+    { kind: "app_event", event_name: "app_open", online: true },
+    { kind: "session", event_name: "active_session", online: false },
+    { kind: "session", event_name: "heartbeat", online: false },
+    { kind: "app_event", online: false },
+  ];
+  const visible = context.liveDeviceEntries(devices);
+  assert.equal(visible.length, 2);
+  assert.equal(visible[0], devices[0]);
+  assert.equal(visible[1], devices[1]);
+  assert.equal(devices.length, 6);
+  assert.equal(context.liveDeviceEntries([]).length, 0);
+});
 test("device events have readable labels without hiding unknown event types", () => {
   assert.equal(context.formatDeviceEvent("heartbeat"), "Live-Status gemeldet");
   assert.equal(context.formatDeviceEvent("app_open"), "App gestartet");

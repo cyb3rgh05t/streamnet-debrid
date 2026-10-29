@@ -435,7 +435,45 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
            where last_seen >= now() - interval '${presenceTimeoutSeconds} seconds') as online_devices,
          (select count(*)::int from app_usage_events where created_at >= now() - interval '24 hours') as events_24h,
          (select count(*)::int from watch_history) as watch_history_items,
-         (select count(*)::int from watch_state) as watch_state_items,
+         (with snapshot_lists as (
+            select snapshots.account_id, source.state_type, profiles.key as profile_id,
+                   profiles.value as items
+              from account_sync_snapshots snapshots
+              cross join lateral (values
+                ('watched_movies', snapshots.payload->'localWatchedMoviesByProfile'),
+                ('watched_episodes', snapshots.payload->'localWatchedEpisodesByProfile')
+              ) as source(state_type, by_profile)
+              cross join lateral jsonb_each(
+                case when jsonb_typeof(source.by_profile) = 'object'
+                  then source.by_profile else '{}'::jsonb end
+              ) profiles
+          ), snapshot_marks as (
+            select lists.account_id, lists.state_type,
+                   coalesce(nullif(lists.profile_id, ''), 'default') || '|' ||
+                   case when lists.state_type = 'watched_movies'
+                     then ltrim(item.value, '0')
+                     else ltrim(split_part(item.value, ':', 2), '0') || '|' ||
+                       coalesce(nullif(ltrim(split_part(item.value, ':', 3), '0'), ''), '0') || '|' ||
+                       coalesce(nullif(ltrim(split_part(item.value, ':', 4), '0'), ''), '0')
+                   end as state_key
+              from snapshot_lists lists
+              cross join lateral jsonb_array_elements_text(
+                case when jsonb_typeof(lists.items) = 'array'
+                  then lists.items else '[]'::jsonb end
+              ) item(value)
+             where (lists.state_type = 'watched_movies'
+                    and item.value ~ '^[0-9]+$' and item.value !~ '^0+$')
+                or (lists.state_type = 'watched_episodes'
+                    and item.value ~ '^show_tmdb:[0-9]+:[0-9]+:[0-9]+$'
+                    and split_part(item.value, ':', 2) !~ '^0+$')
+          ), watched_marks as (
+            select account_id, state_type, state_key from snapshot_marks
+            union
+            select account_id, state_type, state_key from watch_state
+             where state_type in ('watched_movies', 'watched_episodes')
+               and payload->>'watched' is distinct from 'false'
+          )
+          select count(*)::int from watched_marks) as watch_state_items,
          (select coalesce(sum(case when jsonb_typeof(payload->'profiles') = 'array'
             then jsonb_array_length(payload->'profiles') else 0 end), 0)::int
             from account_sync_snapshots) as profiles,

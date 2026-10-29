@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.034] - 2026-10-29
+
+- Geräteübersicht zeigt nur Geräte mit Live-Heartbeat; alte App-Start-Einträge und Login-Sessions bleiben gespeichert, sind aber ausgeblendet. Geräteart, Plattform, Profil, Version und Event als vertikal ausgerichtete Badges; Installations-IDs und Aktionsspalte entfernt.
+- Account-Aktionen auf „Alle Sitzungen abmelden“ und „Konto löschen“ reduziert. Bereinigungen unter „Erweitert“ mit Hinweis auf mögliche Login-Widerrufe; Aufklapp- und Gerätehistorie-Buttons im goldenen Theme.
+- Dashboard: „Gesehen-Markierungen“ berücksichtigt Filme und einzelne Folgen sowohl aus Cloud-Snapshots als auch aus der separaten Watch-State-Tabelle, ohne Doppelzählung pro Account und Profil. Technische Sync-Daten zählen nicht mehr mit; funktioniert auch ohne Trakt.
+- „Geräte online“ aktiviert den Account-Filter jetzt immer, statt ihn beim erneuten Aufruf auszuschalten. Veraltete Account-Antworten dürfen neuere Such-, Seiten- oder Filterergebnisse nicht mehr überschreiben.
+- Keine neue Datenbankmigration erforderlich; bestehende Migration 012 für Live-Präsenz bleibt Voraussetzung. Android- und Web-Versionen unverändert.
+
 ## [2.5.082] - 2026-10-29
 
 - Android-Version: `2.5.082` / Code `483`.

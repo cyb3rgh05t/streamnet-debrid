@@ -39,6 +39,20 @@ and host memory. CPU is the process average since startup (100% = one core);
 host memory is not a container memory limit. Database status reflects the
 successful overview query, not an independent continuous health check.
 
+The online-devices shortcut always enables the online-only account filter;
+only the explicit filter-removal button clears it. Account-list responses are
+applied only for the latest request with unchanged search, pagination, filter
+and admin session, so older unfiltered requests cannot overwrite filtered rows.
+
+"Gesehen-Markierungen" counts watched movies and individual watched episodes
+across both cloud snapshot fields (`localWatchedMoviesByProfile` and
+`localWatchedEpisodesByProfile`) and the separate `watch_state` table. The same
+account/profile/title/episode is counted once across both sources; different
+profiles and accounts count separately. Sync metadata and explicitly unwatched
+table records are excluded. This does not require Trakt and does not count plays
+or playback positions. Missing or malformed snapshot lists contribute no marks.
+The API field remains `watch_state_items` for compatibility.
+
 Audit operations use shared German labels in the dashboard and audit tables,
 with a `Global:` prefix for global actions; unknown operation codes remain visible.
 Audit profile names are resolved from that account's current snapshot. Missing
@@ -53,10 +67,16 @@ for its existing Playlists and Add-ons actions; the advanced snapshot editor is
 separate below. Playlist actions retain profile scope, host actions can target all
 profiles, and add-ons remain account-wide. Unlike global actions, individual
 changes retain their existing direct-save flow without a global preview.
-Device lists show the latest entry per kind (installation or session), platform
-and device type by default; older loaded entries can be expanded without deleting
-events or revoking logins. This is a display grouping, not physical-device identity.
-The existing limits remain 50 installations and 20 valid sessions per account.
+The device table shows only heartbeat-capable installations, both online and
+offline. Login sessions and legacy app-open events remain stored and available
+in the account API, but are hidden from this table. The latest device per platform
+and device type is shown by default; older loaded devices can be expanded without
+deleting events or revoking logins. This grouping is not physical-device identity.
+Device types, platforms, profiles, versions, builds, distribution and events use
+separate badges. Installation IDs are hidden in the UI but retained internally
+for heartbeat updates and device removal; they are random IDs, not hardware IDs.
+An explicit empty state appears when no heartbeat-capable devices have reported.
+The account API limits remain 50 installations and 20 valid sessions per account.
 Device events use readable labels: `heartbeat` is `Live-Status gemeldet`,
 `app_open` is `App gestartet`, and `active_session` is `Login erstellt`.
 Unknown event names remain visible unchanged.
@@ -68,7 +88,8 @@ on an unreliable final disconnect request. Allow approximately 90–105 seconds
 for an abrupt disconnect to appear offline. Admin status polling runs every
 15 seconds while the admin tab is visible, without reloading open editors.
 Polling failures are reported explicitly. Valid logins and legacy analytics are
-never online evidence; legacy-only installations show `Kein Live-Status`.
+never online evidence; legacy-only installations have no live status and are hidden
+from the device table.
 
 Deploy migration `012_device_presence.sql` and the new backend before updating
 Android/Web clients. `POST /device-presence` uses the account access token and
@@ -122,6 +143,12 @@ delete an account. Both actions require an admin reason. Account deletion keeps
 an audit entry with the deleted account id and email in the audit details while
 avoiding a live foreign-key reference to the deleted account, so the audit trail
 does not block the deletion itself.
+
+These two account actions remain directly visible. Offline-history reset and
+device/session cleanup are tucked into the collapsed "Erweitert" section, with a
+warning that cleanup can revoke older valid logins. The live-device table has no
+action column; removing history is not a device logout. Individual removal API
+endpoints remain available.
 
 For remote Stremio add-ons, paste either a `stremio://...` install link, a bare
 host/path, or a full `https://.../manifest.json` URL. The server fetches the

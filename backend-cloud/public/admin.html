@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.033" />
-    <script src="/admin/admin.js?v=1.0.033" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.034" />
+    <script src="/admin/admin.js?v=1.0.034" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -537,7 +537,8 @@
               <h2>Online & zuletzt gesehen</h2>
             </div>
           </div>
-          <p class="dashboard-note">Live-Status: Heartbeat alle 30 Sekunden bei geöffneter App bzw. sichtbarem Webplayer; nach 90 Sekunden ohne Signal offline. Anzeige wird alle 15 Sekunden aktualisiert. Alte Clients ohne Heartbeat haben keinen Live-Status. „Login gültig“ ist kein Online-Nachweis. Ältere Einträge je Plattform und Gerätetyp sind ausklappbar.</p>
+          <p class="dashboard-note">Nur Geräte mit Live-Status-Unterstützung: Heartbeat alle 30 Sekunden bei geöffneter App bzw. sichtbarem Webplayer; nach 90 Sekunden ohne Signal offline. Anzeige wird alle 15 Sekunden aktualisiert. Login-Sessions und alte App-Start-Einträge sind ausgeblendet, bleiben aber gespeichert. Ältere Geräte je Plattform und Gerätetyp sind ausklappbar.</p>
+          <p id="account-devices-empty" class="quick-panel hidden">Noch keine Geräte mit Live-Status gemeldet. Hier erscheinen angemeldete Geräte, sobald eine aktualisierte App oder der Webplayer einen Heartbeat sendet.</p>
           <div class="device-history-actions">
             <button id="account-devices-toggle" class="button secondary hidden" type="button" aria-expanded="false" aria-controls="account-devices-body">Ältere Einträge anzeigen</button>
           </div>
@@ -551,7 +552,6 @@
                   <th>App</th>
                   <th>Letztes Event</th>
                   <th>Zuletzt gesehen</th>
-                  <th>Aktion</th>
                 </tr>
               </thead>
               <tbody id="account-devices-body"></tbody>
@@ -801,20 +801,6 @@
             </p>
             <div class="account-actions">
               <button
-                id="reset-offline-devices-button"
-                class="button secondary"
-                type="button"
-              >
-                Offline-Verlauf zurücksetzen
-              </button>
-              <button
-                id="cleanup-devices-sessions-button"
-                class="button secondary"
-                type="button"
-              >
-                Geräte & Sessions bereinigen
-              </button>
-              <button
                 id="revoke-sessions-button"
                 class="button secondary"
                 type="button"
@@ -829,6 +815,20 @@
                 Konto löschen
               </button>
             </div>
+            <details class="account-actions-advanced">
+              <summary>Erweitert</summary>
+              <div class="account-actions-maintenance">
+              <p class="muted">Offline-Verlauf löschen entfernt nur alte Gerätehistorie. Die Bereinigung kann zusätzlich ältere, noch gültige Logins widerrufen.</p>
+              <div class="account-actions">
+                <button id="reset-offline-devices-button" class="button secondary" type="button">
+                  Offline-Verlauf zurücksetzen
+                </button>
+                <button id="cleanup-devices-sessions-button" class="button secondary" type="button">
+                  Geräte & Sessions bereinigen
+                </button>
+              </div>
+              </div>
+            </details>
           </section>
 
           <section class="detail-panel" aria-labelledby="account-audits-title">

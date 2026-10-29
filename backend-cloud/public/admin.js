@@ -249,12 +249,6 @@ function formatAuditOperation(operation) {
   return label ? `${global ? "Global: " : ""}${label}` : operation;
 }
 
-function shortInstallId(value) {
-  const raw = String(value || "");
-  if (raw.length <= 12) return raw || "—";
-  return `${raw.slice(0, 6)}…${raw.slice(-4)}`;
-}
-
 function showToast(message, error = false) {
   const toast = byId("global-message");
   toast.textContent = message;
@@ -439,11 +433,9 @@ function renderMetrics(metrics) {
     body.append(labelNode, valueNode);
     item.append(iconNode, body);
     if (action === "online-filter") {
-      item.title = state.onlineOnly
-        ? "Online-Filter entfernen"
-        : "Nur Accounts mit aktuell online gesehenen Geräten anzeigen";
+      item.title = "Nur Accounts mit aktuell online gesehenen Geräten anzeigen";
       item.addEventListener("click", () => {
-        state.onlineOnly = !state.onlineOnly;
+        state.onlineOnly = true;
         state.accounts.offset = 0;
         selectView("accounts");
       });
@@ -485,7 +477,7 @@ async function loadDashboard() {
   renderDashboardFacts("dashboard-cloud", [
     ["Profile", metrics.profiles],
     ["Wiedergabeverlauf", metrics.watch_history_items],
-    ["Wiedergabestände", metrics.watch_state_items],
+    ["Gesehen-Markierungen", metrics.watch_state_items],
     ["Neue Accounts · 24 h", metrics.new_accounts_24h],
     ["Neue Accounts · 7 Tage", metrics.new_accounts_7d],
     ["Snapshots aktualisiert · 24 h", metrics.syncs_24h],
@@ -586,10 +578,19 @@ async function loadLiveVersions() {
   }
 }
 
+let accountsRequestId = 0;
 async function loadAccounts() {
+  const requestId = ++accountsRequestId;
+  const token = state.token;
+  const search = byId("account-search").value;
+  const { limit, offset } = state.accounts;
+  const onlineOnly = state.onlineOnly;
   const accountResult = await api(
-    `/admin-api/accounts?q=${encodeURIComponent(byId("account-search").value)}&limit=${state.accounts.limit}&offset=${state.accounts.offset}&online_only=${state.onlineOnly ? "1" : "0"}`,
+    `/admin-api/accounts?q=${encodeURIComponent(search)}&limit=${limit}&offset=${offset}&online_only=${onlineOnly ? "1" : "0"}`,
   );
+  if (requestId !== accountsRequestId || token !== state.token ||
+      search !== byId("account-search").value || onlineOnly !== state.onlineOnly ||
+      limit !== state.accounts.limit || offset !== state.accounts.offset) return;
   state.accounts.total = accountResult.total;
   state.accounts.limit = accountResult.limit;
   state.accounts.offset = accountResult.offset;
@@ -711,18 +712,24 @@ function formatDeviceEvent(event) {
   return Object.hasOwn(labels, event) ? labels[event] : event || "—";
 }
 
+function liveDeviceEntries(devices) {
+  return devices.filter(device => device.kind !== "session" && device.event_name === "heartbeat");
+}
+
 function renderDeviceBadges(devices, preserveExpansion = false) {
+  const liveDevices = liveDeviceEntries(devices);
   const container = byId("account-devices");
   const body = byId("account-devices-body");
   body.replaceChildren();
-  container.classList.toggle("hidden", devices.length === 0);
+  container.classList.toggle("hidden", liveDevices.length === 0);
+  byId("account-devices-empty").classList.toggle("hidden", liveDevices.length !== 0);
   const profileNames = new Map(
     (state.selectedAccount?.snapshot?.profiles || []).map((profile) => [
       profile.id,
       profile.name || profile.id,
     ]),
   );
-  const entries = latestDeviceEntries(devices);
+  const entries = latestDeviceEntries(liveDevices);
   const olderCount = entries.filter(entry => entry.older).length;
   const toggle = byId("account-devices-toggle");
   const expanded = preserveExpansion && toggle.getAttribute("aria-expanded") === "true";
@@ -746,21 +753,25 @@ function renderDeviceBadges(devices, preserveExpansion = false) {
     status.textContent =
       device.status_label || (device.online ? "Online" : "Offline");
     const deviceCell = document.createElement("td");
-    const deviceTitle = document.createElement("div");
-    deviceTitle.className = "device-title";
-    deviceTitle.textContent = `${deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt"} · ${shortInstallId(device.install_id)}`;
+    const deviceType = badgeNode(deviceTypeLabels[device.device_type] || device.device_type || "Unbekannt");
+    deviceType.classList.add("device-type-badge");
     const deviceMeta = document.createElement("div");
     deviceMeta.className = "device-meta";
-    if (device.platform) deviceMeta.append(badgeNode(device.platform));
+    deviceMeta.append(deviceType);
+    if (device.platform) deviceMeta.append(badgeNode(device.platform === "android" ? "Android" : device.platform === "web" ? "Web" : device.platform));
     if (device.kind === "session") deviceMeta.append(badgeNode("Session"));
-    deviceCell.append(deviceTitle, deviceMeta);
+    deviceCell.append(deviceMeta);
     const profileName = device.profile_id
       ? profileNames.get(device.profile_id) || device.profile_id
       : "—";
     const appCell = document.createElement("td");
     const appBadges = document.createElement("div");
     appBadges.className = "device-meta";
-    if (device.app_version) appBadges.append(badgeNode(device.app_version));
+    if (device.app_version) {
+      const versionBadge = badgeNode(device.app_version);
+      versionBadge.classList.add("device-version-badge");
+      appBadges.append(versionBadge);
+    }
     if (device.app_version_code)
       appBadges.append(badgeNode(`Build ${device.app_version_code}`));
     if (device.distribution) appBadges.append(badgeNode(device.distribution));
@@ -768,27 +779,19 @@ function renderDeviceBadges(devices, preserveExpansion = false) {
     appCell.append(appBadges);
     const statusCell = document.createElement("td");
     statusCell.append(status);
-    const actionCell = document.createElement("td");
-    if (device.removable && device.install_id) {
-      const removeButton = document.createElement("button");
-      removeButton.type = "button";
-      removeButton.className = "text-button danger-link";
-      removeButton.textContent =
-        device.kind === "session" ? "Login widerrufen" : "Entfernen";
-      removeButton.addEventListener("click", () => removeDevice(device));
-      actionCell.append(removeButton);
-    } else {
-      actionCell.textContent = device.kind === "session" ? "Login" : "—";
-      actionCell.className = "muted-cell";
-    }
+    const profileCell = document.createElement("td");
+    profileCell.append(badgeNode(profileName));
+    const eventCell = document.createElement("td");
+    const eventBadge = badgeNode(formatDeviceEvent(device.event_name));
+    eventBadge.classList.add("device-event-badge");
+    eventCell.append(eventBadge);
     row.append(
       statusCell,
       deviceCell,
-      textCell(profileName),
+      profileCell,
       appCell,
-      textCell(formatDeviceEvent(device.event_name)),
+      eventCell,
       textCell(formatDate(device.last_seen)),
-      actionCell,
     );
     body.append(row);
   }
@@ -845,38 +848,6 @@ function badgeNode(label) {
   badge.className = "device-badge";
   badge.textContent = label;
   return badge;
-}
-
-async function removeDevice(device) {
-  const isSession = device.kind === "session";
-  const confirmed = await confirmAction({
-    title: isSession ? "Login widerrufen" : "Gerät entfernen",
-    message: isSession
-      ? "Diese Web-Login-Session wird abgemeldet. Andere Sitzungen bleiben aktiv."
-      : "Dieses Gerät wird aus der Admin-Gerätehistorie entfernt. Der Account selbst und gültige Logins bleiben unverändert.",
-    confirmLabel: isSession ? "Login widerrufen" : "Gerät entfernen",
-    danger: true,
-  });
-  if (!confirmed) return;
-  try {
-    const path = isSession
-      ? `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/sessions/${encodeURIComponent(device.install_id)}/revoke`
-      : `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/${encodeURIComponent(device.install_id)}`;
-    const result = await api(
-      path,
-      isSession
-        ? { method: "POST", body: JSON.stringify({}) }
-        : { method: "DELETE" },
-    );
-    showToast(
-      isSession
-        ? `${result.revoked_count || 0} Login(s) widerrufen.`
-        : `${result.removed_devices ?? result.removed_events ?? 0} Gerät(e) entfernt.`,
-    );
-    await openAccount(state.selectedAccount.account.id);
-  } catch (error) {
-    showToast(error.message, true);
-  }
 }
 
 async function openAccount(accountId) {

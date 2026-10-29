@@ -71,6 +71,7 @@ test("overview preserves numeric metrics and adds runtime, schema and recent act
   assert.equal(body.accounts, 12);
   assert.equal(body.profiles, 24);
   assert.equal(body.watch_history_items, 81);
+  assert.equal(body.watch_state_items, 9);
   assert.equal(body.new_accounts_24h, 2);
   assert.equal(body.new_accounts_7d, 4);
   assert.equal(body.syncs_24h, 6);
@@ -91,6 +92,11 @@ test("overview preserves numeric metrics and adds runtime, schema and recent act
   assert.equal(body.recent_accounts.length, 1);
   assert.equal(body.recent_audits[0].operation, "upsert_addon");
   assert.ok(queries.some(sql => sql.includes("jsonb_typeof(payload->'profiles')")));
+  assert.match(overviewSql, /localWatchedMoviesByProfile/);
+  assert.match(overviewSql, /localWatchedEpisodesByProfile/);
+  assert.match(overviewSql, /select account_id, state_type, state_key from snapshot_marks\s+union\s+select account_id, state_type, state_key from watch_state/);
+  assert.match(overviewSql, /state_type in \('watched_movies', 'watched_episodes'\)/);
+  assert.match(overviewSql, /payload->>'watched' is distinct from 'false'/);
   assert.ok(queries.filter(sql => sql.includes("limit 5")).length === 2);
 });
 
