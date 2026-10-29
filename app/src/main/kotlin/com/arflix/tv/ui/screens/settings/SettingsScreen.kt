@@ -2514,7 +2514,7 @@ fun SettingsScreen(
                 verificationUrl = uiState.cloudVerificationUrl.orEmpty(),
                 userCode = uiState.cloudUserCode.orEmpty(),
                 isWorking = uiState.isCloudAuthWorking,
-                statusMessage = uiState.cloudAuthStatusMessage,
+                statusMessage = uiState.cloudAuthStatusMessage?.let { stringResource(it) },
                 onDismiss = { viewModel.cancelCloudAuth() },
                 onUseEmailPassword = { viewModel.openCloudEmailPasswordDialog() }
             )

@@ -158,7 +158,7 @@ data class SettingsUiState(
     val showCloudPairDialog: Boolean = false,
     val cloudUserCode: String? = null,
     val cloudVerificationUrl: String? = null,
-    val cloudAuthStatusMessage: String? = null,
+    @androidx.annotation.StringRes val cloudAuthStatusMessage: Int? = null,
     val showCloudEmailPasswordDialog: Boolean = false,
     val isCloudAuthWorking: Boolean = false,
     val cloudEmailPasswordError: String? = null,
@@ -3015,7 +3015,7 @@ class SettingsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(
                 isCloudAuthWorking = true,
                 showCloudPairDialog = true,
-                cloudAuthStatusMessage = context.getString(R.string.settings_cloud_pair_starting)
+                cloudAuthStatusMessage = R.string.settings_cloud_pair_starting
             )
             ensureCloudAuthSession(startPolling = true)
                 .onSuccess {
@@ -3024,7 +3024,7 @@ class SettingsViewModel @Inject constructor(
                         showCloudPairDialog = true,
                         cloudUserCode = cloudUserCode,
                         cloudVerificationUrl = cloudVerificationUrl,
-                        cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval)
+                        cloudAuthStatusMessage = R.string.settings_waiting_for_approval
                     )
                 }
                 .onFailure { error ->
@@ -3235,7 +3235,7 @@ class SettingsViewModel @Inject constructor(
                     toastType = ToastType.INFO,
                     showCloudEmailPasswordDialog = false,
                     showCloudPairDialog = true,
-                    cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval),
+                    cloudAuthStatusMessage = R.string.settings_waiting_for_approval,
                     isCloudAuthWorking = true
                 )
                 startCloudPolling()
@@ -3264,7 +3264,7 @@ class SettingsViewModel @Inject constructor(
                 showCloudPairDialog = true,
                 cloudUserCode = cloudUserCode,
                 cloudVerificationUrl = cloudVerificationUrl,
-                cloudAuthStatusMessage = context.getString(R.string.settings_waiting_for_approval)
+                cloudAuthStatusMessage = R.string.settings_waiting_for_approval
             )
 
             val now = System.currentTimeMillis()
@@ -3295,7 +3295,7 @@ class SettingsViewModel @Inject constructor(
                         _uiState.value = _uiState.value.copy(
                             isCloudAuthWorking = true,
                             showCloudPairDialog = true,
-                            cloudAuthStatusMessage = context.getString(R.string.settings_cloud_pair_loading_data)
+                            cloudAuthStatusMessage = R.string.settings_cloud_pair_loading_data
                         )
 
                         val tokenImport = authRepository.signInWithSessionTokens(access, refresh)

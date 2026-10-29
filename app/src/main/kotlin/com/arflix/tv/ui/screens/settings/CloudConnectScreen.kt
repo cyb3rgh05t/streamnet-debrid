@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,7 +54,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -89,7 +89,6 @@ fun CloudConnectScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
-    val screenHeight = LocalConfiguration.current.screenHeightDp.dp
     val accentColor = resolveAccentColor(fallback = AccentYellow)
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -209,18 +208,22 @@ fun CloudConnectScreen(
                         CloudConnectSkipHint(centered = false)
                     }
                 }
-                CloudPairingPanel(
-                    userCode = uiState.cloudUserCode.orEmpty(),
-                    verificationUrl = uiState.cloudVerificationUrl.orEmpty(),
-                    statusMessage = uiState.cloudAuthStatusMessage,
-                    isWorking = uiState.isCloudAuthWorking,
-                    canRequestNewCode = pairingSettled,
-                    accentColor = accentColor,
-                    onRequestNewCode = { viewModel.startCloudAuth(forcePairing = true) },
-                    modifier = Modifier.weight(1f),
-                    // Small desktop monitors report few dp of height; keep QR, code and hint on screen.
-                    qrSize = (screenHeight * 0.34f).coerceIn(150.dp, 220.dp)
-                )
+                BoxWithConstraints(
+                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CloudPairingPanel(
+                        userCode = uiState.cloudUserCode.orEmpty(),
+                        verificationUrl = uiState.cloudVerificationUrl.orEmpty(),
+                        statusMessage = uiState.cloudAuthStatusMessage?.let { stringResource(it) },
+                        isWorking = uiState.isCloudAuthWorking,
+                        canRequestNewCode = pairingSettled,
+                        accentColor = accentColor,
+                        onRequestNewCode = { viewModel.startCloudAuth(forcePairing = true) },
+                        modifier = Modifier.fillMaxWidth(),
+                        qrSize = cloudPairingQrSize(maxHeight.value).dp
+                    )
+                }
             }
         }
 
@@ -358,15 +361,13 @@ private fun CloudPairingPanel(
     val link = remember(verificationUrl, userCode) {
         verificationUrl.ifBlank { userCode.takeIf { it.isNotBlank() }?.let { CloudLinkFallbackUrl + it }.orEmpty() }
     }
-    val host = remember(link) {
-        runCatching { android.net.Uri.parse(link).host }.getOrNull().orEmpty().ifBlank { "auth.mystreamnet.club" }
-    }
     val shape = RoundedCornerShape(24.dp)
     Column(
         modifier = modifier
             .clip(shape)
             .background(Color.Black.copy(alpha = 0.5f))
             .border(1.dp, accentColor.copy(alpha = 0.35f), shape)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 32.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -400,7 +401,7 @@ private fun CloudPairingPanel(
         }
         Spacer(modifier = Modifier.height(18.dp))
         Text(
-            text = stringResource(R.string.cloud_connect_scan_hint, host),
+            text = stringResource(R.string.cloud_connect_scan_hint),
             fontSize = 16.sp,
             lineHeight = 23.sp,
             fontWeight = FontWeight.Medium,
@@ -437,6 +438,7 @@ private fun CloudPairingPanel(
                     text = statusMessage?.takeIf { it.isNotBlank() }
                         ?: stringResource(R.string.settings_waiting_for_approval),
                     fontSize = 14.sp,
+                    lineHeight = 20.sp,
                     color = Color.White.copy(alpha = 0.8f)
                 )
             }
@@ -453,6 +455,9 @@ private fun CloudPairingPanel(
 }
 
 internal enum class CloudActionStyle { Primary, Outlined, Ghost }
+
+internal fun cloudPairingQrSize(availableHeightDp: Float): Float =
+    (availableHeightDp - 260f).coerceIn(64f, 220f)
 
 /** Visual-only button; the host decides [focused] (the e-mail dialog drives focus by key events). */
 @OptIn(ExperimentalTvMaterial3Api::class)

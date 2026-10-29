@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.084] - 2026-10-29
+
+- Android-Version: `2.5.084` / Code `485`.
+- Android Cloud-Anmeldung: QR-Hinweis auf „Scanne den QR-Code“ gekürzt. Pairing-Status wird in der aktuellen UI-Sprache aufgelöst statt vorab mit dem Anwendungskontext. QR-Größe berücksichtigt den verfügbaren Platz für Hinweis, Code und Wartestatus; bei sehr kleinen Ansichten bleibt das Panel scrollbar.
+- Android-Kompilierung und vier gezielte Pairing-/Lokalisierungstests erfolgreich; noch nicht auf einem echten TV geprüft. Backend und Web unverändert.
+
 ## [2.5.083] - 2026-10-29
 
 - Android-Version: `2.5.083` / Code `484`.
