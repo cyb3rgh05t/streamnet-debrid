@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.032" />
-    <script src="/admin/admin.js?v=1.0.032" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.033" />
+    <script src="/admin/admin.js?v=1.0.033" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -324,6 +324,7 @@
               <div>
                 <p class="eyebrow">ALLE REGISTRIERTEN ACCOUNTS</p>
                 <h2 id="global-title">Remote Config</h2>
+                <p class="global-intro">Playlists, Add-ons und Kataloge zentral verwalten.</p>
               </div>
               <button id="global-refresh" class="button secondary" type="button">
                 <svg
@@ -345,15 +346,27 @@
               </button>
             </div>
             <p id="global-summary" class="filter-note" role="status"></p>
-            <div class="warning">
-              Unabhängig von Suche und Online-Filter. Hinzufügen gilt für alle bestehenden
-              Profile; Bearbeiten und Entfernen nur für vorhandene Einträge mit der
-              ausgewählten ID. Accounts ohne Cloud-Snapshot oder Profile werden
-              übersprungen. Keine Vorgaben für zukünftige Accounts.
-              Der leere StreamNet-TV-Systemeintrag in der App bleibt bestehen;
-              vorhandene App-Limits für Playlists gelten weiterhin.
-            </div>
-            <form id="global-form" class="form-stack">
+            <nav class="global-categories" aria-label="Remote-Config-Bereiche">
+              <button type="button" class="global-category" data-global-category="playlists" aria-pressed="true" aria-controls="global-form">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m9 2 3 3 3-3M8 10h8M8 14h5" /></svg>
+                <span><strong>Playlists</strong><small>M3U, Xtream &amp; StreamNet TV</small></span>
+              </button>
+              <button type="button" class="global-category" data-global-category="addons" aria-pressed="false" aria-controls="global-form">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>
+                <span><strong>Add-ons</strong><small>Manifeste &amp; Profilzuordnungen</small></span>
+              </button>
+              <button type="button" class="global-category" data-global-category="catalogs" aria-pressed="false" aria-controls="global-form">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+                <span><strong>Kataloge</strong><small>Listen, System- &amp; Add-on-Kataloge</small></span>
+              </button>
+            </nav>
+            <form id="global-form" class="global-config-layout">
+              <div class="global-editor-main">
+              <section class="global-config-card" aria-labelledby="global-action-title">
+                <div class="global-card-heading">
+                  <span class="global-step" aria-hidden="true">01</span>
+                  <div><h3 id="global-action-title">Aktion auswählen</h3><p id="global-category-description">Playlists accountübergreifend verwalten.</p></div>
+                </div>
               <label>Aktion<select id="global-operation">
                 <option value="add_playlist">Playlist global hinzufügen / aktualisieren</option>
                 <option value="edit_playlist">Vorhandene Playlist global bearbeiten</option>
@@ -373,6 +386,13 @@
               <label id="global-target-field" class="hidden">Vorhandener Eintrag
                 <select id="global-target"></select>
               </label>
+              </section>
+              <section class="global-config-card" aria-labelledby="global-settings-title">
+                <div class="global-card-heading">
+                  <span class="global-step" aria-hidden="true">02</span>
+                  <div><h3 id="global-settings-title">Playlist-Einstellungen</h3><p>Nur die zur Aktion passenden Felder werden angezeigt.</p></div>
+                </div>
+                <p id="global-no-settings" class="quick-panel hidden">Keine weiteren Einstellungen nötig. Prüfe die betroffenen Accounts in der Vorschau, bevor du die Änderung bestätigst.</p>
               <div id="global-playlist-fields" class="op-fields">
                 <div class="quick-panel">
                   Beim Bearbeiten werden Name, M3U-/EPG-URL und die folgenden Optionen
@@ -449,9 +469,31 @@
                 <label>Manifest- oder Stremio-Link<input id="global-addon-url" placeholder="stremio://.../manifest.json oder https://.../manifest.json" /></label>
                 <label class="checkbox-field"><input id="global-addon-enabled" type="checkbox" checked /> In neuen Profilzuordnungen aktivieren</label>
               </div>
+              </section>
+              </div>
+              <aside class="global-confirm-column">
+              <section class="global-config-card" aria-labelledby="global-confirm-title">
+                <div class="global-card-heading">
+                  <span class="global-step" aria-hidden="true">03</span>
+                  <div><h3 id="global-confirm-title">Prüfen &amp; bestätigen</h3><p>Änderungen werden nicht sofort angewendet.</p></div>
+                </div>
+              <p id="global-action-summary" class="global-action-summary" aria-live="polite">Playlist global hinzufügen / aktualisieren</p>
               <label>Kommentar (optional)<input id="global-reason" maxlength="500" /></label>
+              <p class="global-confirm-note">Die Vorschau zeigt betroffene, unveränderte und übersprungene Accounts. Erst nach Eingabe von „ALLE ACCOUNTS“ wird gespeichert.</p>
               <button class="button primary" type="submit">Vorschau und Bestätigung</button>
               <p id="global-mutation-message" class="message" role="status"></p>
+              </section>
+              <section class="global-config-card global-scope" aria-labelledby="global-scope-title">
+                <h3 id="global-scope-title">Geltungsbereich</h3>
+                <ul>
+                  <li>Alle registrierten Accounts – unabhängig von Suche und Online-Filter.</li>
+                  <li>Hinzufügen gilt für alle bestehenden Profile. Bearbeiten und Entfernen nur für Einträge mit der ausgewählten ID.</li>
+                  <li>Accounts ohne Cloud-Snapshot oder Profile werden übersprungen.</li>
+                  <li>Keine Vorgaben für zukünftige Accounts.</li>
+                  <li>Der leere StreamNet-TV-Systemeintrag bleibt bestehen. App-Limits für Playlists gelten weiterhin.</li>
+                </ul>
+              </section>
+              </aside>
             </form>
           </section>
         </section>
@@ -489,15 +531,59 @@
           </div>
           <div id="profiles-grid" class="profiles-grid"></div>
 
-          <div class="split-layout">
+          <div class="section-heading compact-heading">
+            <div>
+              <p class="eyebrow">GERÄTE</p>
+              <h2>Online & zuletzt gesehen</h2>
+            </div>
+          </div>
+          <p class="dashboard-note">Live-Status: Heartbeat alle 30 Sekunden bei geöffneter App bzw. sichtbarem Webplayer; nach 90 Sekunden ohne Signal offline. Anzeige wird alle 15 Sekunden aktualisiert. Alte Clients ohne Heartbeat haben keinen Live-Status. „Login gültig“ ist kein Online-Nachweis. Ältere Einträge je Plattform und Gerätetyp sind ausklappbar.</p>
+          <div class="device-history-actions">
+            <button id="account-devices-toggle" class="button secondary hidden" type="button" aria-expanded="false" aria-controls="account-devices-body">Ältere Einträge anzeigen</button>
+          </div>
+          <div id="account-devices" class="table-wrap hidden">
+            <table>
+              <thead>
+                <tr>
+                  <th>Status</th>
+                  <th>Gerät</th>
+                  <th>Profil</th>
+                  <th>App</th>
+                  <th>Letztes Event</th>
+                  <th>Zuletzt gesehen</th>
+                  <th>Aktion</th>
+                </tr>
+              </thead>
+              <tbody id="account-devices-body"></tbody>
+            </table>
+          </div>
+
+          <div class="account-config-layout">
             <section class="editor-panel" aria-labelledby="editor-title">
               <div class="section-heading">
                 <div>
                   <p class="eyebrow">REMOTE STEUERUNG</p>
                   <h2 id="editor-title">Account konfigurieren</h2>
+                  <p class="global-intro">Playlists und Add-ons für diesen Account verwalten.</p>
                 </div>
               </div>
-              <form id="mutation-form" class="form-stack">
+              <nav id="account-config-categories" class="global-categories account-config-categories" aria-label="Account-Konfigurationsbereiche">
+                <button type="button" class="global-category" data-account-category="playlists" aria-pressed="true" aria-controls="mutation-form">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m9 2 3 3 3-3M8 10h8M8 14h5" /></svg>
+                  <span><strong>Playlists</strong><small>M3U &amp; StreamNet-TV-Server</small></span>
+                </button>
+                <button type="button" class="global-category" data-account-category="addons" aria-pressed="false" aria-controls="mutation-form">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>
+                  <span><strong>Add-ons</strong><small>Manifeste &amp; Profilzuordnungen</small></span>
+                </button>
+              </nav>
+              <form id="mutation-form" class="global-config-layout">
+                <div class="global-editor-main">
+                <section class="global-config-card" aria-labelledby="account-action-title">
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">01</span>
+                    <div><h3 id="account-action-title">Aktion auswählen</h3><p id="account-category-description">Playlists und Server für diesen Account verwalten.</p></div>
+                  </div>
                 <label id="mutation-profile-field"
                   >Profil<select id="mutation-profile" required></select
                 ></label>
@@ -520,7 +606,13 @@
                     </option>
                   </select>
                 </label>
-
+                </section>
+                <section class="global-config-card" aria-labelledby="account-settings-title">
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">02</span>
+                    <div><h3 id="account-settings-title">Playlist-Einstellungen</h3><p>Nur die zur Aktion passenden Felder werden angezeigt.</p></div>
+                  </div>
+                  <p id="account-no-settings" class="quick-panel hidden">Keine weiteren Einstellungen nötig. Der Host-Override wird für die gewählten Profile entfernt; Zugangsdaten und Optionen bleiben erhalten.</p>
                 <div id="fields-change_streamnet_host" class="op-fields hidden">
                   <div class="quick-panel">
                     Ändert nur den Server der StreamNet-TV-Playlist dieses
@@ -605,7 +697,15 @@
                     >Playlist<select id="delete-playlist-select"></select
                   ></label>
                 </div>
-
+                </section>
+                </div>
+                <aside class="global-confirm-column">
+                <section class="global-config-card" aria-labelledby="account-confirm-title">
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">03</span>
+                    <div><h3 id="account-confirm-title">Prüfen &amp; anwenden</h3><p>Änderungen werden direkt gespeichert und protokolliert.</p></div>
+                  </div>
+                <p id="account-action-summary" class="global-action-summary" aria-live="polite"></p>
                 <label
                   >Kommentar (optional)<input
                     id="mutation-reason"
@@ -617,6 +717,17 @@
                   Änderung anwenden
                 </button>
                 <p id="mutation-message" class="message" role="status"></p>
+                </section>
+                <section class="global-config-card global-scope" aria-labelledby="account-scope-title">
+                  <h3 id="account-scope-title">Geltungsbereich</h3>
+                  <ul>
+                    <li>Nur der geöffnete Account wird geändert.</li>
+                    <li>Playlists gelten für das gewählte Profil. StreamNet-TV-Hoständerungen können alle Profile betreffen.</li>
+                    <li>Add-ons werden accountweit für alle Profile verwaltet.</li>
+                    <li>Änderungen erzeugen eine neue Cloud-Revision und werden beim nächsten Cloud-Pull übernommen.</li>
+                  </ul>
+                </section>
+                </aside>
               </form>
             </section>
 
@@ -679,28 +790,6 @@
             </section>
           </div>
 
-          <div class="section-heading compact-heading">
-            <div>
-              <p class="eyebrow">GERÄTE</p>
-              <h2>Online & zuletzt gesehen</h2>
-            </div>
-          </div>
-          <div id="account-devices" class="table-wrap hidden">
-            <table>
-              <thead>
-                <tr>
-                  <th>Status</th>
-                  <th>Gerät</th>
-                  <th>Profil</th>
-                  <th>App</th>
-                  <th>Letztes Event</th>
-                  <th>Zuletzt gesehen</th>
-                  <th>Aktion</th>
-                </tr>
-              </thead>
-              <tbody id="account-devices-body"></tbody>
-            </table>
-          </div>
           <section class="danger-zone" aria-labelledby="account-danger-title">
             <div>
               <p class="eyebrow">DANGER ZONE</p>

@@ -41,6 +41,49 @@ successful overview query, not an independent continuous health check.
 
 Audit operations use shared German labels in the dashboard and audit tables,
 with a `Global:` prefix for global actions; unknown operation codes remain visible.
+Audit profile names are resolved from that account's current snapshot. Missing
+or deleted profiles retain an explicit unknown/deleted label and their ID.
+Remote Config separates Playlists, Add-ons and Catalogs into three selectable
+areas. Each filters the existing action list, with separate cards for action,
+settings, preview/confirmation and scope. Switching areas preserves field input
+but selects that area's default action; it never submits a change. The existing
+preview and explicit `ALLE ACCOUNTS` confirmation remain required.
+Individual account configuration uses the same action/settings/apply/scope cards
+for its existing Playlists and Add-ons actions; the advanced snapshot editor is
+separate below. Playlist actions retain profile scope, host actions can target all
+profiles, and add-ons remain account-wide. Unlike global actions, individual
+changes retain their existing direct-save flow without a global preview.
+Device lists show the latest entry per kind (installation or session), platform
+and device type by default; older loaded entries can be expanded without deleting
+events or revoking logins. This is a display grouping, not physical-device identity.
+The existing limits remain 50 installations and 20 valid sessions per account.
+Device events use readable labels: `heartbeat` is `Live-Status gemeldet`,
+`app_open` is `App gestartet`, and `active_session` is `Login erstellt`.
+Unknown event names remain visible unchanged.
+Online means an authenticated heartbeat received within the last 90 seconds.
+Updated Android clients send every 30 seconds while an activity is started;
+the Webplayer sends only while its tab is visible and signed in. Backgrounding,
+logout and network loss stop the signals; status expires rather than relying
+on an unreliable final disconnect request. Allow approximately 90–105 seconds
+for an abrupt disconnect to appear offline. Admin status polling runs every
+15 seconds while the admin tab is visible, without reloading open editors.
+Polling failures are reported explicitly. Valid logins and legacy analytics are
+never online evidence; legacy-only installations show `Kein Live-Status`.
+
+Deploy migration `012_device_presence.sql` and the new backend before updating
+Android/Web clients. `POST /device-presence` uses the account access token and
+derives account identity from it, never from client-provided user IDs. Required
+fields are `install_id`, `platform` (`android` or `web`) and `device_type`;
+optional fields are `profile_id`, `app_version`, `app_version_code`, `distribution`.
+One row per account/installation is upserted using server timestamps, without
+adding analytics events. Account deletion cascades to presence rows; removing
+a device removes its presence/history, not its credentials (an active device
+can reappear). Offline cleanup preserves installations with recent heartbeats.
+This operational status is independent of diagnostic analytics consent. Android
+reuses the existing installation ID; browsers share a persistent ID across tabs.
+Presence describes recent authenticated activity, not a guaranteed open socket
+or unique physical hardware. An already-issued access token remains usable until
+its normal expiry, including after refresh-session revocation.
 
 The version cards show the running backend package, the deployed Web version
 from `https://web.streamnet.live/api/version`, and the latest published Android

@@ -39,6 +39,12 @@ Removed/omitted surfaces include the upstream marketing site, browser web app, r
 | IPTV VOD details                                              |                                                          |
 | ![StreamNet IPTV VOD details](screenshots/tv/tv-vod2.png)     |                                                          |
 
+In Android TV Live TV fullscreen, D-pad Up/Down switches to the previous/next
+channel on the first press, even while the player HUD is visible. Holding a key
+does not repeatedly zap. OK/Enter opens the hidden player overlay and activates
+the focused control when it is already visible. Sender list, EPG and settings
+overlays retain their own directional navigation.
+
 ## Cloud Migration Status
 
 The production Android release uses the self-hosted backend at `https://auth.mystreamnet.club`. PostgreSQL is the canonical store for accounts and sync data.

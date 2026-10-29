@@ -146,6 +146,19 @@ private const val LiveBufferRecoveryMaxAttempts = 3
 private const val VisibleGuidePastWindowMs = 48L * 60L * 60_000L
 private const val VisibleGuideFutureWindowMs = 48L * 60L * 60_000L
 
+internal fun fullscreenChannelZapDirection(
+    key: Key,
+    isTouchDevice: Boolean,
+    overlayOpen: Boolean,
+): Int? {
+    if (isTouchDevice || overlayOpen) return null
+    return when (key) {
+        Key.DirectionUp -> -1
+        Key.DirectionDown -> 1
+        else -> null
+    }
+}
+
 private enum class LiveTvAspectMode(val resizeMode: Int) {
     AUTO(AspectRatioFrameLayout.RESIZE_MODE_FIT),
     FIT(AspectRatioFrameLayout.RESIZE_MODE_FIT),
@@ -3456,7 +3469,19 @@ fun LiveTvScreen(
                     .focusRequester(fsFocus)
                     .focusable()
                     .onPreviewKeyEvent { ev ->
-                        if (!isFullScreen || ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        if (!isFullScreen) return@onPreviewKeyEvent false
+                        val zapDirection = fullscreenChannelZapDirection(
+                            key = ev.key,
+                            isTouchDevice = isTouchDevice,
+                            overlayOpen = fullscreenSettingsOpen || fullscreenGuideOpen || quickZapOpen,
+                        )
+                        if (zapDirection != null) {
+                            if (ev.type == KeyEventType.KeyDown && ev.nativeKeyEvent.repeatCount == 0) {
+                                zapFullscreenChannel(zapDirection)
+                            }
+                            return@onPreviewKeyEvent true
+                        }
+                        if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                         if (fullscreenSettingsOpen) {
                             false
                         } else if (fullscreenGuideOpen) {
@@ -3509,12 +3534,6 @@ fun LiveTvScreen(
                                     hudPokeSignal++
                                     return@onPreviewKeyEvent handleChannelNumberDigit(digit)
                                 }
-                                // With the HUD hidden, only Up/Down changes channels.
-                                // With it visible, directional keys stay with Compose focus navigation.
-                                if (!isHudVisible && (ev.key == Key.DirectionUp || ev.key == Key.DirectionDown)) {
-                                    zapFullscreenChannel(if (ev.key == Key.DirectionDown) 1 else -1)
-                                    return@onPreviewKeyEvent true
-                                }
                                 if (!isHudVisible) {
                                     if (ev.key in listOf(Key.DirectionCenter, Key.Enter)) {
                                         hudPokeSignal++
@@ -3547,9 +3566,8 @@ fun LiveTvScreen(
                             }
                         } else if (isFullScreen && !fullscreenGuideOpen && !quickZapOpen && !fullscreenSettingsOpen) {
                             Modifier.onPreviewKeyEvent { ev ->
-                                val isHiddenHudChannelKey = !isHudVisible &&
-                                    (ev.key == Key.DirectionUp || ev.key == Key.DirectionDown)
-                                if (ev.type == KeyEventType.KeyDown && !isHiddenHudChannelKey) {
+                                val isChannelKey = ev.key == Key.DirectionUp || ev.key == Key.DirectionDown
+                                if (ev.type == KeyEventType.KeyDown && !isChannelKey) {
                                     hudPokeSignal++
                                 }
                                 false

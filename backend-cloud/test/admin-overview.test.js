@@ -20,8 +20,10 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
         new_accounts_24h: "2", new_accounts_7d: "4", syncs_24h: "6",
       }] };
       if (sql.includes("from schema_migrations")) return { rows: migrations.map(version => ({ version })) };
+      if (sql.includes("count(*)::int as total") && sql.includes("from admin_audit_logs")) return { rows: [{ total: 1 }] };
       if (sql.includes("from admin_audit_logs")) return { rows: [{
         id: "audit-a", operation: "upsert_addon", account_email: "demo@example.test",
+        profile_id: "profile-a", profile_name: "TV & Filme",
         created_at: "2026-10-29T09:00:00Z", reason: "Demo",
       }] };
       if (sql.includes("select id, email, created_at from accounts")) return { rows: [{
@@ -49,6 +51,17 @@ test("dashboard endpoints require admin authentication before querying or fetchi
   assert.equal(queries.length, 0);
 });
 
+test("audit response includes the account-scoped profile name", async (t) => {
+  const { app, headers, queries } = await fixture(t);
+  const response = await app.inject({ url: "/admin-api/audits", headers });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().audits[0].profile_name, "TV & Filme");
+  const sql = queries.find(query => query.includes("profile.name as profile_name"));
+  assert.ok(sql.includes("snapshots.account_id = audit.account_id"));
+  assert.ok(sql.includes("item->>'id' = audit.profile_id"));
+  assert.ok(sql.includes("jsonb_typeof"));
+});
+
 test("overview preserves numeric metrics and adds runtime, schema and recent activity", async (t) => {
   const { app, headers, queries } = await fixture(t);
   const response = await app.inject({ url: "/admin-api/overview", headers });
@@ -71,6 +84,9 @@ test("overview preserves numeric metrics and adds runtime, schema and recent act
   assert.equal(body.system.node_version, process.version);
   assert.deepEqual(Object.keys(body.versions), ["backend"]);
   assert.equal(body.android_devices, undefined);
+  const overviewSql = queries.find(sql => sql.includes("pg_database_size"));
+  assert.match(overviewSql, /from device_presence\s+where last_seen >= now\(\) - interval '90 seconds'/);
+  assert.doesNotMatch(overviewSql, /latest_events|distinct on \(install_id\)/);
   assert.equal(queries.some(sql => sql.includes("group by app_version")), false);
   assert.equal(body.recent_accounts.length, 1);
   assert.equal(body.recent_audits[0].operation, "upsert_addon");

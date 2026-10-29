@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
+import { presenceTimeoutSeconds } from "./presence.js";
 import { SignJWT, jwtVerify } from "jose";
 import { normalizeAdminUsername } from "./admin-username.js";
 import { verifyScryptPassword } from "./passwords.js";
@@ -24,7 +25,6 @@ const backendPackage = JSON.parse(
 const adminLoginAttempts = new Map();
 const adminLoginWindowMs = 15 * 60_000;
 const adminLoginMaxAttempts = 8;
-const onlineDeviceWindowMinutes = 10;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const mutationFailureReasons = new Map([
@@ -431,15 +431,8 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          (select count(*)::int from accounts) as accounts,
          (select count(*)::int from account_sync_snapshots) as snapshots,
          (select count(*)::int from account_sessions where revoked_at is null and expires_at > now()) as active_sessions,
-         (select count(*)::int
-            from (
-              select distinct on (install_id) install_id, created_at
-                from app_usage_events
-               where account_id is not null
-                 and coalesce(install_id, '') <> ''
-               order by install_id, created_at desc
-            ) latest_events
-           where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes') as online_devices,
+         (select count(*)::int from device_presence
+           where last_seen >= now() - interval '${presenceTimeoutSeconds} seconds') as online_devices,
          (select count(*)::int from app_usage_events where created_at >= now() - interval '24 hours') as events_24h,
          (select count(*)::int from watch_history) as watch_history_items,
          (select count(*)::int from watch_state) as watch_state_items,
@@ -556,14 +549,9 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
            left join account_sync_snapshots snapshots on snapshots.account_id = accounts.id
            left join lateral (
              select count(*)::int as online_device_count
-               from (
-                 select distinct on (events.install_id) events.install_id, events.created_at
-                   from app_usage_events events
-                  where events.account_id = accounts.id
-                    and coalesce(events.install_id, '') <> ''
-                  order by events.install_id, events.created_at desc
-               ) latest_events
-              where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
+               from device_presence
+              where account_id = accounts.id
+                and last_seen >= now() - interval '${presenceTimeoutSeconds} seconds'
            ) online_devices on true
           where ($1 = '' or accounts.email_normalized like '%' || $1 || '%')
             and ($4::boolean is false or online_devices.online_device_count > 0)
@@ -575,15 +563,9 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         `select count(*)::int as total from accounts
           where ($1 = '' or email_normalized like '%' || $1 || '%')
             and ($2::boolean is false or exists (
-              select 1
-                from (
-                  select distinct on (events.install_id) events.install_id, events.created_at
-                    from app_usage_events events
-                   where events.account_id = accounts.id
-                     and coalesce(events.install_id, '') <> ''
-                   order by events.install_id, events.created_at desc
-                ) latest_events
-               where latest_events.created_at >= now() - interval '${onlineDeviceWindowMinutes} minutes'
+              select 1 from device_presence
+               where account_id = accounts.id
+                 and last_seen >= now() - interval '${presenceTimeoutSeconds} seconds'
             ))`,
         [query, onlineOnly],
       ),
@@ -622,14 +604,25 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       pool.query(
         `select install_id, profile_id, platform, device_type, app_version,
                 app_version_code, distribution, event_name, last_seen,
-                last_seen >= now() - interval '${onlineDeviceWindowMinutes} minutes' as online
+                presence_supported,
+                presence_supported and last_seen >= now() - interval '${presenceTimeoutSeconds} seconds' as online
            from (
+             select install_id, profile_id, platform, device_type, app_version,
+                    app_version_code, distribution, 'heartbeat' as event_name,
+                    last_seen, true as presence_supported
+               from device_presence where account_id = $1
+             union all
+             select legacy.*, false as presence_supported from (
              select distinct on (install_id)
                     install_id, profile_id, platform, device_type, app_version,
                     app_version_code, distribution, event_name, created_at as last_seen
                from app_usage_events
               where account_id = $1 and coalesce(install_id, '') <> ''
-              order by install_id, created_at desc
+                and not exists (select 1 from device_presence presence
+                                 where presence.account_id = $1
+                                   and presence.install_id = app_usage_events.install_id)
+              order by install_id, created_at desc, id desc
+             ) legacy
            ) latest_events
           order by online desc, last_seen desc
           limit 50`,
@@ -670,6 +663,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
             event_name: row.event_name,
             last_seen: row.last_seen,
             online: row.online === true,
+            status_label: row.presence_supported ? (row.online ? "Online" : "Offline") : "Kein Live-Status",
           })),
           ...sessionsResult.rows.map((row) => ({
             kind: "session",
@@ -913,23 +907,35 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       const accountId = validAccountId(request, reply);
       if (!accountId) return;
       const result = await pool.query(
-        `with latest_events as (
-           select distinct on (install_id) install_id, created_at
-             from app_usage_events
+        `with offline_installs as (
+           select install_id from device_presence
+            where account_id = $1 and last_seen < now() - interval '${presenceTimeoutSeconds} seconds'
+           union
+           select distinct install_id from app_usage_events events
             where account_id = $1 and coalesce(install_id, '') <> ''
-            order by install_id, created_at desc
-         ), offline_installs as (
-           select install_id
-             from latest_events
-            where created_at < now() - interval '${onlineDeviceWindowMinutes} minutes'
-         )
+              and not exists (
+                select 1 from device_presence presence
+                 where presence.account_id = $1 and presence.install_id = events.install_id
+                   and presence.last_seen >= now() - interval '${presenceTimeoutSeconds} seconds'
+              )
+         ), removed_presence as (
+           delete from device_presence where account_id = $1
+             and install_id in (select install_id from offline_installs)
+           returning install_id
+         ), removed_events as (
          delete from app_usage_events events
           using offline_installs
           where events.account_id = $1
-            and events.install_id = offline_installs.install_id`,
+            and events.install_id = offline_installs.install_id
+          returning events.install_id
+         )
+         select (select count(*)::int from removed_events) as removed_events,
+                (select count(*)::int from (
+                  select install_id from removed_events union select install_id from removed_presence
+                ) removed) as removed_devices`,
         [accountId],
       );
-      return { accepted: true, removed_events: result.rowCount };
+      return { accepted: true, ...result.rows[0] };
     },
   );
 
@@ -994,11 +1000,19 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       if (!installId)
         return reply.code(400).send({ error: "Invalid device id" });
       const result = await pool.query(
-        `delete from app_usage_events
-          where account_id = $1 and install_id = $2`,
+        `with removed_presence as (
+           delete from device_presence where account_id = $1 and install_id = $2 returning install_id
+         ), removed_events as (
+         delete from app_usage_events
+          where account_id = $1 and install_id = $2 returning install_id
+         )
+         select (select count(*)::int from removed_events) as removed_events,
+                (select count(*)::int from (
+                  select install_id from removed_events union select install_id from removed_presence
+                ) removed) as removed_devices`,
         [accountId, installId],
       );
-      return { accepted: true, removed_events: result.rowCount };
+      return { accepted: true, ...result.rows[0] };
     },
   );
 
@@ -1066,10 +1080,21 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         `select audit.id, audit.operation, audit.profile_id, audit.reason,
                 audit.details, audit.revision_before, audit.revision_after,
                 audit.created_at, audit.account_id, accounts.email as account_email,
-                admins.email as admin_email
+                admins.email as admin_email,
+                profile.name as profile_name
            from admin_audit_logs audit
            join admin_accounts admins on admins.id = audit.admin_id
            left join accounts on accounts.id = audit.account_id
+           left join account_sync_snapshots snapshots on snapshots.account_id = audit.account_id
+           left join lateral (
+             select item->>'name' as name
+               from jsonb_array_elements(
+                 case when jsonb_typeof(snapshots.payload->'profiles') = 'array'
+                      then snapshots.payload->'profiles' else '[]'::jsonb end
+               ) item
+              where item->>'id' = audit.profile_id
+              limit 1
+           ) profile on true
           where ($1 = '' or audit.account_id::text = $1)
           order by audit.created_at desc
           limit $2 offset $3`,

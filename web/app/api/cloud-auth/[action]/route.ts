@@ -12,6 +12,7 @@ const allowed = new Set([
   "account-sync-push",
   "account-sync-events",
   "watch-history",
+  "device-presence",
 ]);
 
 async function proxy(

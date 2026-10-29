@@ -27,6 +27,7 @@ import coil.imageLoader
 import coil.memory.MemoryCache
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.data.repository.AppUsageAnalyticsRepository
+import com.arflix.tv.data.repository.DevicePresenceRepository
 import com.arflix.tv.data.repository.AuthRepository
 import com.arflix.tv.data.repository.AuthState
 import com.arflix.tv.data.repository.CloudSyncCoordinator
@@ -77,6 +78,8 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
     lateinit var watchlistRepository: WatchlistRepository
     @Inject
     lateinit var appUsageAnalyticsRepository: AppUsageAnalyticsRepository
+    @Inject
+    lateinit var devicePresenceRepository: DevicePresenceRepository
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
@@ -86,6 +89,7 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
     override fun onCreate() {
         super.onCreate()
         instance = this
+        registerActivityLifecycleCallbacks(devicePresenceRepository)
 
         // Initialize global DNS provider and user agent from DataStore before network calls.
         appScope.launch(Dispatchers.IO) {

@@ -449,7 +449,7 @@ function renderMetrics(metrics) {
       });
     } else if (action === "sessions-info") {
       item.title =
-        "Gültige Logins sind aktive Refresh-Sessions. Ein Gerät kann mehrere Logins haben; Geräte online basiert auf aktuellen App-/Web-Events.";
+        "Gültige Logins sind aktive Refresh-Sessions. Ein Gerät kann mehrere Logins haben; Geräte online basiert auf authentifizierten Heartbeats der letzten 90 Sekunden.";
       item.addEventListener("click", () =>
         showToast(
           "Gültige Logins = aktive Refresh-Sessions. Revisionen = Cloud-Snapshot-Versionen; jede gespeicherte Account-/Profiländerung erhöht sie um 1.",
@@ -691,7 +691,27 @@ function renderPagination(containerId, page, onPage) {
   container.append(label, previous, next);
 }
 
-function renderDeviceBadges(devices) {
+function latestDeviceEntries(devices) {
+  const seen = new Set();
+  return [...devices].sort((a, b) => Date.parse(b.last_seen) - Date.parse(a.last_seen))
+    .map(device => {
+      const key = JSON.stringify([device.kind, device.platform || "", device.device_type || ""]);
+      const older = seen.has(key);
+      seen.add(key);
+      return { device, older };
+    });
+}
+
+function formatDeviceEvent(event) {
+  const labels = {
+    heartbeat: "Live-Status gemeldet",
+    app_open: "App gestartet",
+    active_session: "Login erstellt",
+  };
+  return Object.hasOwn(labels, event) ? labels[event] : event || "—";
+}
+
+function renderDeviceBadges(devices, preserveExpansion = false) {
   const container = byId("account-devices");
   const body = byId("account-devices-body");
   body.replaceChildren();
@@ -702,8 +722,25 @@ function renderDeviceBadges(devices) {
       profile.name || profile.id,
     ]),
   );
-  for (const device of devices) {
+  const entries = latestDeviceEntries(devices);
+  const olderCount = entries.filter(entry => entry.older).length;
+  const toggle = byId("account-devices-toggle");
+  const expanded = preserveExpansion && toggle.getAttribute("aria-expanded") === "true";
+  toggle.classList.toggle("hidden", olderCount === 0);
+  toggle.setAttribute("aria-expanded", String(expanded));
+  toggle.textContent = expanded ? "Ältere Einträge ausblenden" : `Ältere Einträge anzeigen (${olderCount})`;
+  toggle.onclick = () => {
+    const expanded = toggle.getAttribute("aria-expanded") !== "true";
+    toggle.setAttribute("aria-expanded", String(expanded));
+    toggle.textContent = expanded ? "Ältere Einträge ausblenden" : `Ältere Einträge anzeigen (${olderCount})`;
+    body.querySelectorAll("[data-older-device]").forEach(row => row.classList.toggle("hidden", !expanded));
+  };
+  for (const { device, older } of entries) {
     const row = document.createElement("tr");
+    if (older) {
+      row.dataset.olderDevice = "true";
+      row.classList.toggle("hidden", !expanded);
+    }
     const status = document.createElement("span");
     status.className = `device-status${device.online ? " online" : ""}${device.kind === "session" ? " session" : ""}`;
     status.textContent =
@@ -749,13 +786,59 @@ function renderDeviceBadges(devices) {
       deviceCell,
       textCell(profileName),
       appCell,
-      textCell(device.event_name || "—"),
+      textCell(formatDeviceEvent(device.event_name)),
       textCell(formatDate(device.last_seen)),
       actionCell,
     );
     body.append(row);
   }
 }
+
+let presenceRefreshPending = false;
+let presenceRefreshFailed = false;
+async function refreshVisiblePresence() {
+  if (!state.token || document.visibilityState !== "visible" || presenceRefreshPending || state.pendingRequests) return;
+  const accountId = !byId("account-view").classList.contains("hidden")
+    ? state.selectedAccount?.account.id : null;
+  const dashboardVisible = !byId("dashboard-home-view").classList.contains("hidden");
+  const accountsVisible = !byId("accounts-view").classList.contains("hidden");
+  if (!accountId && !dashboardVisible && !accountsVisible) return;
+  presenceRefreshPending = true;
+  try {
+    if (accountId) {
+      const result = await api(`/admin-api/accounts/${encodeURIComponent(accountId)}`);
+      if (state.selectedAccount?.account.id === accountId && !byId("account-view").classList.contains("hidden")) {
+        renderDeviceBadges(result.account.devices, true);
+      }
+    } else if (dashboardVisible) {
+      const result = await api("/admin-api/overview");
+      if (!byId("dashboard-home-view").classList.contains("hidden")) {
+        byId("metrics").querySelector('[data-action="online-filter"] .metric-value').textContent = result.online_devices;
+      }
+    } else if (accountsVisible) {
+      await loadAccounts();
+    }
+    presenceRefreshFailed = false;
+  } catch (error) {
+    byId("account-devices-body").querySelectorAll(".device-status.online").forEach(status => {
+      status.classList.remove("online");
+      status.textContent = "Status unbekannt";
+    });
+    const onlineMetric = byId("metrics").querySelector('[data-action="online-filter"] .metric-value');
+    if (onlineMetric) onlineMetric.textContent = "—";
+    byId("accounts-body").querySelectorAll("tr").forEach(row => {
+      if (row.children[2]) row.children[2].textContent = "—";
+    });
+    if (!presenceRefreshFailed) showToast(`Live-Status konnte nicht aktualisiert werden: ${error.message}`, true);
+    presenceRefreshFailed = true;
+  } finally {
+    presenceRefreshPending = false;
+  }
+}
+window.setInterval(refreshVisiblePresence, 15_000);
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible") void refreshVisiblePresence();
+});
 
 function badgeNode(label) {
   const badge = document.createElement("span");
@@ -788,7 +871,7 @@ async function removeDevice(device) {
     showToast(
       isSession
         ? `${result.revoked_count || 0} Login(s) widerrufen.`
-        : `${result.removed_events || 0} Geräte-Event(s) entfernt.`,
+        : `${result.removed_devices ?? result.removed_events ?? 0} Gerät(e) entfernt.`,
     );
     await openAccount(state.selectedAccount.account.id);
   } catch (error) {
@@ -844,6 +927,7 @@ async function openAccount(accountId) {
   byId("edit-payload-button").classList.toggle("hidden", !snapshot);
   renderProfiles(snapshot?.profiles || []);
   byId("mutation-form").classList.toggle("hidden", !snapshot);
+  byId("account-config-categories").classList.toggle("hidden", !snapshot);
   if (snapshot) updateOperationFields();
   state.accountAudits.offset = 0;
   await loadAccountAudits(data.account.id);
@@ -1004,8 +1088,31 @@ function populatePlaylistSelect() {
   }
 }
 
+const accountOperationOptions = [...byId("mutation-operation").options].map(option => option.cloneNode(true));
+
+function selectAccountCategory(category) {
+  const select = byId("mutation-operation");
+  const previous = select.value;
+  const options = accountOperationOptions.filter(option => globalOperationCategory(option.value) === category);
+  select.replaceChildren(...options.map(option => option.cloneNode(true)));
+  if (options.some(option => option.value === previous)) select.value = previous;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  setMessage(byId("mutation-message"), "");
+}
+
 function updateOperationFields() {
   const operation = byId("mutation-operation").value;
+  const category = globalOperationCategory(operation);
+  document.querySelectorAll("[data-account-category]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.accountCategory === category));
+  });
+  byId("account-settings-title").textContent = category === "addons" ? "Add-on-Einstellungen" : "Playlist-Einstellungen";
+  byId("account-category-description").textContent = category === "addons"
+    ? "Add-ons accountweit für alle Profile verwalten."
+    : "Playlists und Server für diesen Account verwalten.";
+  byId("account-action-summary").textContent = byId("mutation-operation").selectedOptions[0].textContent.trim();
+  byId("account-action-summary").classList.toggle("is-destructive", /^(delete|clear)_/.test(operation));
+  byId("account-no-settings").classList.toggle("hidden", operation !== "clear_streamnet_host_override");
   const isProfileScoped =
     operation === "upsert_playlist" || operation === "delete_playlist";
   const isHostChange =
@@ -1031,7 +1138,9 @@ function updateOperationFields() {
     if (profileSelect.options.length) profileSelect.selectedIndex = 0;
   }
   for (const id of operationFields) {
-    byId(`fields-${id}`).classList.toggle("hidden", id !== operation);
+    const fields = byId(`fields-${id}`);
+    fields.classList.toggle("hidden", id !== operation);
+    fields.querySelectorAll("input, select").forEach(input => { input.disabled = id !== operation; });
   }
   byId("mutation-warning").textContent = operationWarnings[operation] || "";
   if (operation === "delete_addon") populateAddonSelect();
@@ -1175,7 +1284,7 @@ function renderAuditRows(body, audits, includeAccount) {
         ? [audit.account_email || audit.account_id || "Gelöscht"]
         : []),
       formatAuditOperation(audit.operation),
-      audit.profile_id,
+      audit.profile_name || (audit.profile_id ? `Unbekanntes / entferntes Profil · ${audit.profile_id}` : "—"),
       `${audit.revision_before} → ${audit.revision_after}`,
       audit.reason,
     ];
@@ -1225,6 +1334,24 @@ async function loadAudits() {
   });
 }
 
+const globalOperationOptions = [...byId("global-operation").options].map(option => option.cloneNode(true));
+
+function globalOperationCategory(operation) {
+  if (operation.includes("catalog")) return "catalogs";
+  if (operation.endsWith("addon") || operation === "clear_addons") return "addons";
+  return "playlists";
+}
+
+function selectGlobalCategory(category) {
+  const select = byId("global-operation");
+  const options = globalOperationOptions.filter(option => globalOperationCategory(option.value) === category);
+  const previous = select.value;
+  select.replaceChildren(...options.map(option => option.cloneNode(true)));
+  if (options.some(option => option.value === previous)) select.value = previous;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  setMessage(byId("global-mutation-message"), "");
+}
+
 async function loadGlobal() {
   state.global = await api("/admin-api/global");
   byId("global-summary").textContent =
@@ -1235,6 +1362,19 @@ async function loadGlobal() {
 
 function updateGlobalFields() {
   const operation = byId("global-operation").value;
+  const category = globalOperationCategory(operation);
+  const descriptions = {
+    playlists: ["Playlist-Einstellungen", "M3U, Xtream und StreamNet TV accountübergreifend verwalten."],
+    addons: ["Add-on-Einstellungen", "Add-ons und ihre Zuordnungen zu bestehenden Profilen verwalten."],
+    catalogs: ["Katalog-Einstellungen", "Trakt, MDBList, System- und Add-on-Kataloge verwalten."],
+  };
+  document.querySelectorAll("[data-global-category]").forEach(button => {
+    button.setAttribute("aria-pressed", String(button.dataset.globalCategory === category));
+  });
+  byId("global-settings-title").textContent = descriptions[category][0];
+  byId("global-category-description").textContent = descriptions[category][1];
+  byId("global-action-summary").textContent = byId("global-operation").selectedOptions[0].textContent;
+  byId("global-action-summary").classList.toggle("is-destructive", /^(delete|clear)_/.test(operation));
   const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host";
   const editsData = /^(add|edit)_/.test(operation);
   const isAddon = operation.endsWith("addon") || operation === "clear_addons";
@@ -1248,6 +1388,8 @@ function updateGlobalFields() {
     fields.querySelectorAll("input").forEach((input) => { input.disabled = !active; });
   }
   const hostOnly = operation === "change_xtream_host";
+  byId("global-no-settings").classList.toggle("hidden",
+    editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled");
   byId("global-host-fields").classList.toggle("hidden", !hostOnly);
   byId("global-host-url").disabled = !hostOnly;
   byId("global-host-url").required = hostOnly;
@@ -1469,6 +1611,10 @@ byId("login-form").addEventListener("submit", async (event) => {
 
 byId("logout-button").addEventListener("click", logout);
 byId("global-operation").addEventListener("change", updateGlobalFields);
+document.querySelectorAll("[data-global-category]").forEach(button => {
+  button.addEventListener("click", () => selectGlobalCategory(button.dataset.globalCategory));
+});
+selectGlobalCategory("playlists");
 byId("global-playlist-type").addEventListener("change", updateGlobalPlaylistFields);
 byId("global-catalog-type").addEventListener("change", updateGlobalCatalogFields);
 byId("global-target").addEventListener("change", () => {
@@ -1510,6 +1656,10 @@ byId("clear-online-filter").addEventListener("click", () => {
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
+document.querySelectorAll("[data-account-category]").forEach(button => {
+  button.addEventListener("click", () => selectAccountCategory(button.dataset.accountCategory));
+});
+selectAccountCategory("playlists");
 byId("addon-url").addEventListener("blur", () => normalizeAddonLinkField());
 byId("mutation-profile").addEventListener("change", () => {
   if (byId("mutation-operation").value === "delete_playlist")
@@ -1558,7 +1708,7 @@ byId("reset-offline-devices-button").addEventListener(
         `/admin-api/accounts/${encodeURIComponent(state.selectedAccount.account.id)}/devices/offline`,
         { method: "DELETE" },
       );
-      showToast(`${result.removed_events || 0} Offline-Event(s) entfernt.`);
+      showToast(`${result.removed_devices ?? result.removed_events ?? 0} Offline-Gerät(e) entfernt.`);
       await openAccount(state.selectedAccount.account.id);
     } catch (error) {
       showToast(error.message, true);

@@ -4,13 +4,13 @@ import android.content.Context
 import android.os.Build
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
-import androidx.datastore.preferences.core.stringPreferencesKey
 import com.arflix.tv.BuildConfig
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.DiagnosticsManager
 import com.arflix.tv.util.detectPhysicalDeviceType
 import com.arflix.tv.util.settingsDataStore
+import com.arflix.tv.util.getOrCreateInstallationId
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -21,7 +21,6 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -47,7 +46,7 @@ class AppUsageAnalyticsRepository @Inject constructor(
                 authRepository.authState.first { it !is AuthState.Loading }
             }
 
-            val installId = getOrCreateInstallId()
+            val installId = context.getOrCreateInstallationId()
             val profileId = try {
                 profileManager.getProfileId()
             } catch (e: Exception) {
@@ -102,29 +101,10 @@ class AppUsageAnalyticsRepository @Inject constructor(
         }
     }
 
-    private suspend fun getOrCreateInstallId(): String {
-        val key = INSTALL_ID_KEY
-        val existing = context.settingsDataStore.data.first()[key]
-        if (!existing.isNullOrBlank()) return existing
-
-        val created = UUID.randomUUID().toString()
-        var resolved = created
-        context.settingsDataStore.edit { prefs ->
-            val stored = prefs[key]
-            if (stored.isNullOrBlank()) {
-                prefs[key] = created
-            } else {
-                resolved = stored
-            }
-        }
-        return resolved
-    }
-
     private companion object {
         const val TAG = "AppUsageAnalytics"
         const val AUTH_STATE_WAIT_MS = 10_000L
         const val APP_OPEN_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000L
-        val INSTALL_ID_KEY = stringPreferencesKey("analytics_install_id_v1")
         val LAST_APP_OPEN_SENT_AT_KEY = longPreferencesKey("analytics_last_app_open_sent_at_v1")
     }
 }

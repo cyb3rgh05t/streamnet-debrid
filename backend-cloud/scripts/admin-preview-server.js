@@ -103,9 +103,9 @@ const server = createServer(async (request, reply) => {
           cpu_average_percent: 2.4,
           node_version: "v24.15.0 (Demo)",
           platform: "linux / x64 (Demo)",
-          schema_version: "011_account_session_metadata.sql",
+          schema_version: "012_device_presence.sql (Demo)",
         },
-        versions: { backend: "1.0.032" },
+        versions: { backend: "1.0.033" },
         recent_accounts: accounts,
         recent_audits: [
           { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
@@ -118,9 +118,24 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.032", source: "Demo-Backend" },
-          { component: "web", version: "1.0.070", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
-          { component: "android", version: "2.5.081", published_at: "2026-10-29T10:51:49Z", source: "Demo-APK-Release (simuliert)" },
+          { component: "backend", version: "1.0.033", source: "Demo-Backend" },
+          { component: "web", version: "1.0.071", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
+          { component: "android", version: "2.5.082", published_at: "2026-10-29T12:45:00Z", source: "Demo-APK-Release (simuliert)" },
+        ],
+      });
+    }
+    if (request.method === "GET" && url.pathname === "/admin-api/global") {
+      return json(reply, 200, {
+        total: 128, configurable: 116, skipped: 12,
+        playlists: [
+          { id: "streamnet_tv", name: "StreamNet TV", accountCount: 84 },
+          { id: "demo-playlist", name: "Demo-Playlist", accountCount: 32 },
+        ],
+        addons: [{ id: "demo-addon", name: "Demo-Add-on", accountCount: 72 }],
+        catalogs: [
+          { id: "demo-trakt", name: "Demo-Filmliste", sourceType: "TRAKT", accountCount: 28 },
+          { id: "demo-system", name: "Beliebte Filme", sourceType: "PREINSTALLED", accountCount: 116 },
+          { id: "demo-addon-catalog", name: "Demo-Add-on-Katalog", sourceType: "ADDON", accountCount: 72 },
         ],
       });
     }
@@ -139,6 +154,33 @@ const server = createServer(async (request, reply) => {
         total: filtered.length,
         limit,
         offset,
+      });
+    }
+    if (request.method === "GET" && url.pathname.startsWith("/admin-api/accounts/")) {
+      const account = accounts.find(item => url.pathname === `/admin-api/accounts/${item.id}`);
+      if (!account) return json(reply, 404, { error: "Demo-Account nicht gefunden" });
+      const device = {
+        kind: "app_event", removable: false, profile_id: "demo-profile",
+        platform: "android", device_type: "tv", app_version: "2.5.082",
+        app_version_code: 483, distribution: "sideload",
+      };
+      return json(reply, 200, {
+        account: { ...account, active_sessions: 1, watch_history_items: 24, watch_state_items: 3,
+          devices: [
+            { ...device, install_id: "demo-live", event_name: "heartbeat",
+              last_seen: new Date().toISOString(), online: true, status_label: "Online (Demo)" },
+            { ...device, install_id: "demo-old", event_name: "heartbeat",
+              last_seen: new Date(Date.now() - 3_600_000).toISOString(), online: false, status_label: "Offline (Demo)" },
+            { ...device, install_id: "demo-legacy", platform: "android", device_type: "phone",
+              event_name: "app_open", last_seen: new Date().toISOString(), online: false, status_label: "Kein Live-Status" },
+          ],
+        },
+        snapshot: {
+          revision: account.revision, updated_at: account.snapshot_updated_at,
+          profiles: [{ id: "demo-profile", name: "Wohnzimmer", addonCount: 0,
+            playlistCount: 0, catalogCount: 0, watchlistCount: 0 }],
+          addons: [], playlists: [], catalogs: [], payload: { profiles: [{ id: "demo-profile", name: "Wohnzimmer" }] },
+        },
       });
     }
     if (url.pathname === "/admin-api/audits") {

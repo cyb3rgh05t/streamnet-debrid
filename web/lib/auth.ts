@@ -44,7 +44,7 @@ function sessionFromResponse(
   };
 }
 
-function browserDeviceType() {
+export function browserDeviceType() {
   if (typeof navigator === "undefined") return "web";
   const userAgent = navigator.userAgent || "";
   if (/Android TV|SMART-TV|SmartTV|Tizen|Web0S|AppleTV|CrKey/i.test(userAgent))

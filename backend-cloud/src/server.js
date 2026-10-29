@@ -20,6 +20,7 @@ import { backendLoggerOptions, registerRequestLogging } from "./logger.js";
 import { deleteAccountData } from "./account-deletion.js";
 import { isValidWatchHistoryIdentity } from "./watch-history.js";
 import { registerAdminRoutes } from "./admin-routes.js";
+import { registerPresenceRoutes } from "./presence.js";
 
 const { Pool } = pg;
 const pool = new Pool({ connectionString: config.databaseUrl });
@@ -64,6 +65,7 @@ app.addHook("onRequest", async (request, reply) => {
 });
 
 registerAdminRoutes(app, { pool, jwtKey, publicDirectory });
+registerPresenceRoutes(app, { pool, authenticatedAccount });
 
 function randomCode(length) {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";

@@ -19,6 +19,7 @@ import {
   withAddonEnabled,
 } from "./addons";
 import { AuthClient, SESSION_KEY, decodeJwtPayload } from "./auth";
+import { startWebPresence } from "./presence";
 import { accentProfileColor, normalizeAccentName } from "./accent";
 import { config, getAuthPortalUrl } from "./config";
 import {
@@ -1102,6 +1103,7 @@ export function AppProvider({
   });
 
   const activeProfile = profiles.find((p) => p.id === activeProfileId) ?? null;
+  useEffect(() => startWebPresence(authClient, activeProfileId), [auth?.userId, activeProfileId]);
 
   const [heroPreview, setHeroPreview] = useState<MediaItem | null>(null);
   const hero =

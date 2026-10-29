@@ -4,6 +4,28 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.082] - 2026-10-29
+
+- Android-Version: `2.5.082` / Code `483`.
+- Authentifizierter Live-Gerätestatus: Heartbeat alle 30 Sekunden, solange die App im Vordergrund und der Account angemeldet ist. Verwendet die bestehende Installations-ID unabhängig von Diagnose-Analytics; Hintergrundwechsel und Abmelden beenden laufende Meldungen.
+- Android TV Live-TV-Vollbild: D-Pad Hoch/Runter schaltet bereits beim ersten Druck zum vorherigen/nächsten Sender, auch bei sichtbarer Player-Leiste. OK/Enter öffnet das ausgeblendete Overlay und bedient darin das fokussierte Element. Senderliste, EPG und Einstellungen behalten ihre Navigation.
+- Voraussetzung für den Live-Gerätestatus: Backend 1.0.033 mit Datenbankmigration 012. Android-Kompilierung und gezielte Heartbeat-/TV-Steuerungstests erfolgreich; D-Pad-Verhalten noch nicht auf einem echten TV geprüft.
+
+## [Backend 1.0.033] - 2026-10-29
+
+- Authentifizierter Heartbeat-Endpunkt und neue Migration `012_device_presence.sql`: eine aktualisierte Präsenzzeile je Account und Installation statt fortlaufender Analytics-Events. Account-Identität stammt ausschließlich aus dem geprüften Access-Token, Zeitstempel vom Server.
+- Dashboard, Account-Filter und Gerätedetails erkennen Online-Präsenz anhand der letzten 90 Sekunden. Sichtbare Admin-Seiten aktualisieren den Status alle 15 Sekunden, ohne offene Account-Editoren zurückzusetzen. Alte App-Start-Events und gültige Logins sind kein Online-Nachweis.
+- Gerätehistorie zeigt zunächst den neuesten Eintrag je Plattform, Gerätetyp und Eintragsart. Ältere Einträge lassen sich über einen abgesetzten Button einblenden. Geräteübersicht oberhalb der Remote-Steuerung; verständliche Event-Namen und Audit-Profilnamen statt reiner IDs.
+- Remote Config in Playlists, Add-ons und Kataloge aufgeteilt, mit getrennten Karten für Aktion, Einstellungen, Bestätigung und Geltungsbereich. Einzelne Accounts verwenden denselben Aufbau für ihre vorhandenen Playlist-/Add-on-Aktionen; der Snapshot-Editor steht separat darunter.
+- Geräteentfernung und Offline-Bereinigung berücksichtigen Präsenzdaten; Account-Löschung entfernt sie per Cascade. Lokale Fake-Daten-Vorschau um Account-Details und globale Bestandsdaten erweitert.
+- Deployment: Migration 012 vor den aktualisierten Clients anwenden. Ohne aktualisierte Android-/Web-Clients wird kein Live-Status gemeldet; nach Verbindungsabbruch dauert die Offline-Anzeige etwa 90–105 Sekunden.
+
+## [Web 1.0.071] - 2026-10-29
+
+- Authentifizierter Geräte-Heartbeat alle 30 Sekunden bei sichtbarem, angemeldetem Webplayer. Meldet die tatsächliche Web-Version und das gewählte Profil mit persistenter Browser-Installations-ID über den bestehenden Backend-Proxy.
+- Versteckte Tabs, Abmelden und Unmount stoppen laufende Meldungen; Rückkehr in den sichtbaren Tab löst sofort einen neuen Heartbeat aus. Account-Wechsel, Abbruch und schnelle Sichtbarkeitswechsel sind abgesichert.
+- Voraussetzung: Backend 1.0.033 mit Migration 012; Status ist unabhängig von Diagnose-Analytics und wird nach 90 Sekunden ohne Meldung offline.
+
 ## [Backend 1.0.032] - 2026-10-29
 
 - Dashboard: Versionsübersicht an erster Stelle. Backend- und Web-Karten öffnen den passenden Changelog-Eintrag, die Android-Karte die Release-Notizen der angezeigten Version.
