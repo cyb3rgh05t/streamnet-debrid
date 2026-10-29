@@ -584,16 +584,41 @@ internal fun ensureStreamNetTvPreset(
     }
 }
 
-internal fun migrateStreamNetGroupKeys(
-    keys: List<String>,
+/** Id of the playlist the app created for a single manually entered list, before StreamNet TV had its own entry. */
+internal const val LEGACY_DEFAULT_PLAYLIST_ID = "list_1"
+
+/**
+ * Playlist ids whose group and channel keys now belong to the StreamNet TV entry.
+ *
+ * A manual list pointing at the StreamNet server is merged into `streamnet_tv`, so its id vanishes from the
+ * playlists. Keys saved under that id (hidden groups, group order, favorite channels) then pointed at nothing:
+ * hidden groups reappeared and favorites were missing. The default list id is therefore treated as legacy
+ * whenever StreamNet TV is configured and no separate playlist still uses that id.
+ *
+ * [currentPlaylists] is the final list (after the merge); [playlists] is where legacy sources are looked up.
+ */
+internal fun legacyStreamNetPlaylistIds(
     playlists: List<IptvPlaylistEntry>,
     streamNetHost: String,
-): List<String> {
-    val legacyIds = playlists.asSequence()
+    currentPlaylists: List<IptvPlaylistEntry> = playlists,
+): Set<String> {
+    val sourceIds = playlists.asSequence()
         .filter { !isStreamNetTvPlaylist(it) && isStreamNetTvSource(it, streamNetHost) }
         .map { it.id.trim() }
         .filter(String::isNotBlank)
         .toSet()
+    val streamNetConfigured = currentPlaylists.any { isStreamNetTvPlaylist(it) && it.m3uUrl.isNotBlank() }
+    val defaultListGone = currentPlaylists.none { it.id.trim() == LEGACY_DEFAULT_PLAYLIST_ID }
+    return if (streamNetConfigured && defaultListGone) sourceIds + LEGACY_DEFAULT_PLAYLIST_ID else sourceIds
+}
+
+internal fun migrateStreamNetGroupKeys(
+    keys: List<String>,
+    playlists: List<IptvPlaylistEntry>,
+    streamNetHost: String,
+    currentPlaylists: List<IptvPlaylistEntry> = playlists,
+): List<String> {
+    val legacyIds = legacyStreamNetPlaylistIds(playlists, streamNetHost, currentPlaylists)
     if (legacyIds.isEmpty()) return keys.distinct()
     return keys.map { rawKey ->
         val key = PlaylistGroupKey(rawKey.trim())
@@ -602,6 +627,22 @@ internal fun migrateStreamNetGroupKeys(
         } else {
             rawKey.trim()
         }
+    }.filter(String::isNotBlank).distinct()
+}
+
+/** Channel ids look like `<playlistId>:xtream:<streamId>`; legacy playlist prefixes become `streamnet_tv`. */
+internal fun migrateStreamNetChannelIds(
+    channelIds: List<String>,
+    playlists: List<IptvPlaylistEntry>,
+    streamNetHost: String,
+    currentPlaylists: List<IptvPlaylistEntry> = playlists,
+): List<String> {
+    val legacyIds = legacyStreamNetPlaylistIds(playlists, streamNetHost, currentPlaylists)
+    if (legacyIds.isEmpty()) return channelIds.distinct()
+    return channelIds.map { rawId ->
+        val id = rawId.trim()
+        val legacyPrefix = legacyIds.firstOrNull { id.startsWith("$it:") }
+        if (legacyPrefix != null) "$STREAMNET_TV_PLAYLIST_ID:${id.removePrefix("$legacyPrefix:")}" else id
     }.filter(String::isNotBlank).distinct()
 }
 
@@ -3741,10 +3782,12 @@ class IptvRepository @Inject constructor(
             val type = TypeToken.getParameterized(List::class.java, String::class.java).type
             val list = gson.fromJson<List<String>>(raw, type)?.map { it.trim() }?.filter { it.isNotBlank() }?.distinct() ?: emptyList()
             val playlistsRaw = prefs[playlistsKeyFor(profileId)].orEmpty()
+            val storedPlaylists = decodePlaylists(playlistsRaw)
             val migrated = migrateStreamNetGroupKeys(
                 list,
-                decodePlaylists(playlistsRaw),
+                storedPlaylists,
                 BuildConfig.STREAMNET_TV_XTREAM_URL,
+                ensureStreamNetTvPreset(storedPlaylists, BuildConfig.STREAMNET_TV_XTREAM_URL),
             )
             if (migrated.any { !it.contains('|') }) {
                 if (playlistsRaw.isBlank()) {
@@ -3772,10 +3815,12 @@ class IptvRepository @Inject constructor(
             val type = TypeToken.getParameterized(List::class.java, String::class.java).type
             val list = gson.fromJson<List<String>>(raw, type)?.map { it.trim() }?.filter { it.isNotBlank() }?.distinct() ?: emptyList()
             val playlistsRaw = prefs[playlistsKeyFor(profileId)].orEmpty()
+            val storedPlaylists = decodePlaylists(playlistsRaw)
             val migrated = migrateStreamNetGroupKeys(
                 list,
-                decodePlaylists(playlistsRaw),
+                storedPlaylists,
                 BuildConfig.STREAMNET_TV_XTREAM_URL,
+                ensureStreamNetTvPreset(storedPlaylists, BuildConfig.STREAMNET_TV_XTREAM_URL),
             )
             if (migrated.any { !it.contains('|') }) {
                 if (playlistsRaw.isBlank()) {
@@ -3796,11 +3841,18 @@ class IptvRepository @Inject constructor(
         if (raw.isBlank()) return emptyList()
         return runCatching {
             val type = TypeToken.getParameterized(List::class.java, String::class.java).type
-            gson.fromJson<List<String>>(raw, type)
+            val ids = gson.fromJson<List<String>>(raw, type)
                 ?.map { it.trim() }
                 ?.filter { it.isNotBlank() }
                 ?.distinct()
                 ?: emptyList()
+            val storedPlaylists = decodePlaylists(prefs[playlistsKey()].orEmpty())
+            migrateStreamNetChannelIds(
+                ids,
+                storedPlaylists,
+                BuildConfig.STREAMNET_TV_XTREAM_URL,
+                ensureStreamNetTvPreset(storedPlaylists, BuildConfig.STREAMNET_TV_XTREAM_URL),
+            )
         }.getOrDefault(emptyList())
     }
 
@@ -3871,7 +3923,12 @@ class IptvRepository @Inject constructor(
             stalkerPortalUrl = decryptConfigValue(prefs[stalkerPortalUrlKeyFor(safeProfileId)].orEmpty()),
             stalkerMacAddress = prefs[stalkerMacAddressKeyFor(safeProfileId)].orEmpty(),
             favoriteGroups = decodeFavoriteGroups(prefs[favoriteGroupsKeyFor(safeProfileId)].orEmpty()),
-            favoriteChannels = decodeFavoriteChannels(prefs[favoriteChannelsKeyFor(safeProfileId)].orEmpty()),
+            favoriteChannels = migrateStreamNetChannelIds(
+                decodeFavoriteChannels(prefs[favoriteChannelsKeyFor(safeProfileId)].orEmpty()),
+                decodedPlaylists,
+                BuildConfig.STREAMNET_TV_XTREAM_URL,
+                playlists,
+            ),
             hiddenGroups = if (hiddenRaw.isNotBlank()) {
                 runCatching {
                     val type = TypeToken.getParameterized(List::class.java, String::class.java).type
@@ -3879,6 +3936,7 @@ class IptvRepository @Inject constructor(
                         gson.fromJson<List<String>>(hiddenRaw, type) ?: emptyList(),
                         decodedPlaylists,
                         BuildConfig.STREAMNET_TV_XTREAM_URL,
+                        playlists,
                     )
                 }.getOrDefault(emptyList())
             } else emptyList(),
@@ -3889,6 +3947,7 @@ class IptvRepository @Inject constructor(
                         gson.fromJson<List<String>>(orderRaw, type) ?: emptyList(),
                         decodedPlaylists,
                         BuildConfig.STREAMNET_TV_XTREAM_URL,
+                        playlists,
                     )
                 }.getOrDefault(emptyList())
             } else emptyList(),
@@ -3931,6 +3990,7 @@ class IptvRepository @Inject constructor(
             state.groupOrder,
             normalizedPlaylists,
             BuildConfig.STREAMNET_TV_XTREAM_URL,
+            effectivePlaylists,
         )
             .takeIf { state.groupOrderSchema >= IPTV_GROUP_ORDER_SCHEMA }
             .orEmpty()
@@ -3954,13 +4014,21 @@ class IptvRepository @Inject constructor(
                 prefs[stalkerMacAddressKeyFor(safeProfileId)] = it.trim().uppercase()
             }
             prefs[favoriteGroupsKeyFor(safeProfileId)] = gson.toJson(state.favoriteGroups.distinct())
-            prefs[favoriteChannelsKeyFor(safeProfileId)] = gson.toJson(state.favoriteChannels.distinct())
+            prefs[favoriteChannelsKeyFor(safeProfileId)] = gson.toJson(
+                migrateStreamNetChannelIds(
+                    state.favoriteChannels,
+                    normalizedPlaylists,
+                    BuildConfig.STREAMNET_TV_XTREAM_URL,
+                    effectivePlaylists,
+                )
+            )
             if (applyRemoteGroupPreferences) {
                 importedGroupPreferences = true
                 val normalizedHiddenGroups = migrateStreamNetGroupKeys(
                     state.hiddenGroups,
                     normalizedPlaylists,
                     BuildConfig.STREAMNET_TV_XTREAM_URL,
+                    effectivePlaylists,
                 )
                 if (normalizedHiddenGroups.isEmpty()) prefs.remove(hiddenGroupsKeyFor(safeProfileId))
                 else prefs[hiddenGroupsKeyFor(safeProfileId)] = gson.toJson(normalizedHiddenGroups)

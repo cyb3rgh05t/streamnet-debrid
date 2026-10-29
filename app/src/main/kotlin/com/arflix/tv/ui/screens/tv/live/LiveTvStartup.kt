@@ -116,4 +116,26 @@ object LiveTvStartup {
     /** Ids of the channels currently available, for [resumeChannelId]. */
     fun channelIds(channels: List<IptvChannel>): Set<String> =
         channels.mapTo(LinkedHashSet(channels.size)) { it.id }
+
+    /**
+     * Category that should stay selected once the category tree is known.
+     *
+     * The tree starts empty on every visit, so right after returning from Settings every category id
+     * looked unknown and the saved selection was replaced by the first playlist category (the user
+     * lost both category and channel position while playback kept the right channel). Until the tree
+     * has loaded the selection is left alone.
+     */
+    fun validatedCategoryId(
+        selectedId: String,
+        treeLoaded: Boolean,
+        categoryExists: Boolean,
+        categoryHidden: Boolean,
+        showSpecialCategories: Boolean,
+        fallbackId: String,
+    ): String = when {
+        !treeLoaded -> selectedId
+        selectedId == "all" -> if (showSpecialCategories) selectedId else fallbackId
+        !categoryExists || categoryHidden -> fallbackId
+        else -> selectedId
+    }
 }

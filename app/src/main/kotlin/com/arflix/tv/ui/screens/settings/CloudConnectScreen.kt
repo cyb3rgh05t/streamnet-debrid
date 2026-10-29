@@ -458,6 +458,7 @@ internal fun CloudActionButton(
     enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    compact: Boolean = false,
 ) {
     val shape = RoundedCornerShape(14.dp)
     val fill = when (style) {
@@ -481,7 +482,7 @@ internal fun CloudActionButton(
                 shape = shape
             )
             .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = if (compact) 8.dp else 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
@@ -489,15 +490,16 @@ internal fun CloudActionButton(
             imageVector = icon,
             contentDescription = null,
             tint = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(if (compact) 18.dp else 20.dp)
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(if (compact) 6.dp else 10.dp))
         Text(
             text = label,
-            fontSize = 16.sp,
+            fontSize = if (compact) 15.sp else 16.sp,
             fontWeight = if (style == CloudActionStyle.Primary) FontWeight.Bold else FontWeight.Medium,
             color = Color.White.copy(alpha = if (enabled) 1f else 0.5f),
-            maxLines = 1
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
     }
 }

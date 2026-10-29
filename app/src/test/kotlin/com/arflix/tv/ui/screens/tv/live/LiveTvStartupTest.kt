@@ -254,4 +254,40 @@ class LiveTvStartupTest {
 
         assertThat(entry).isEqualTo(LiveTvStartup.EntryFocus.NONE)
     }
+
+    @Test
+    fun savedCategorySurvivesWhileTheTreeIsStillEmpty() {
+        val kept = LiveTvStartup.validatedCategoryId(
+            selectedId = "grp:magenta",
+            treeLoaded = false,
+            categoryExists = false,
+            categoryHidden = false,
+            showSpecialCategories = false,
+            fallbackId = "grp:first",
+        )
+
+        assertThat(kept).isEqualTo("grp:magenta")
+    }
+
+    @Test
+    fun unknownOrHiddenCategoryFallsBackOnceTheTreeIsLoaded() {
+        val missing = LiveTvStartup.validatedCategoryId("grp:gone", true, false, false, false, "grp:first")
+        val hidden = LiveTvStartup.validatedCategoryId("grp:hidden", true, true, true, false, "grp:first")
+
+        assertThat(missing).isEqualTo("grp:first")
+        assertThat(hidden).isEqualTo("grp:first")
+    }
+
+    @Test
+    fun knownCategoryIsKeptOnceTheTreeIsLoaded() {
+        val kept = LiveTvStartup.validatedCategoryId("grp:magenta", true, true, false, false, "grp:first")
+
+        assertThat(kept).isEqualTo("grp:magenta")
+    }
+
+    @Test
+    fun allCategoryDependsOnSpecialCategories() {
+        assertThat(LiveTvStartup.validatedCategoryId("all", true, true, false, true, "grp:first")).isEqualTo("all")
+        assertThat(LiveTvStartup.validatedCategoryId("all", true, true, false, false, "grp:first")).isEqualTo("grp:first")
+    }
 }

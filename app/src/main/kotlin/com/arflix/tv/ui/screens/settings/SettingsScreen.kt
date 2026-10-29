@@ -159,6 +159,11 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -3140,6 +3145,7 @@ internal fun CloudEmailPasswordModal(
     var focusedIndex by remember { mutableIntStateOf(0) }
     val emailRequester = remember { FocusRequester() }
     val passwordRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LaunchedEffect(Unit) { emailRequester.requestFocus() }
     LaunchedEffect(focusedIndex) {
@@ -3160,6 +3166,7 @@ internal fun CloudEmailPasswordModal(
         ModalScrim(onDismiss = onDismiss, showFrame = false) {
             Column(
                 modifier = Modifier
+                    .imePadding()
                     .fillMaxWidth(if (LocalDeviceType.current.isTouchDevice()) 0.92f else 1f)
                     .widthIn(max = 600.dp)
                     .background(ArvioSkin.colors.surfaceRaised, RoundedCornerShape(24.dp))
@@ -3180,6 +3187,7 @@ internal fun CloudEmailPasswordModal(
                         ),
                         RoundedCornerShape(24.dp)
                     )
+                    .verticalScroll(rememberScrollState())
                     .padding(if (LocalDeviceType.current.isTouchDevice()) 22.dp else 36.dp)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown) {
@@ -3273,6 +3281,11 @@ internal fun CloudEmailPasswordModal(
                         onValueChange = onEmailChange,
                         enabled = !isWorking,
                         singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Next
+                        ),
+                        keyboardActions = KeyboardActions(onNext = { focusedIndex = 1 }),
                         shape = RoundedCornerShape(14.dp),
                         leadingIcon = {
                             Icon(
@@ -3295,6 +3308,7 @@ internal fun CloudEmailPasswordModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(emailRequester)
+                            .onFocusChanged { if (it.isFocused) focusedIndex = 0 }
                             .border(
                                 width = if (focusedIndex == 0) 2.dp else 1.dp,
                                 color = if (focusedIndex == 0) accentColor else Color.White.copy(alpha = 0.16f),
@@ -3318,6 +3332,14 @@ internal fun CloudEmailPasswordModal(
                         enabled = !isWorking,
                         singleLine = true,
                         visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(onDone = {
+                            keyboardController?.hide()
+                            if (!isWorking) onSignIn()
+                        }),
                         shape = RoundedCornerShape(14.dp),
                         leadingIcon = {
                             Icon(
@@ -3340,6 +3362,7 @@ internal fun CloudEmailPasswordModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .focusRequester(passwordRequester)
+                            .onFocusChanged { if (it.isFocused) focusedIndex = 1 }
                             .border(
                                 width = if (focusedIndex == 1) 2.dp else 1.dp,
                                 color = if (focusedIndex == 1) accentColor else Color.White.copy(alpha = 0.16f),
@@ -3362,40 +3385,71 @@ internal fun CloudEmailPasswordModal(
                     )
                 }
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CloudActionButton(
-                        label = stringResource(R.string.cancel),
-                        icon = Icons.Default.Close,
-                        focused = focusedIndex == 2,
-                        style = CloudActionStyle.Ghost,
-                        accentColor = accentColor,
-                        enabled = !isWorking,
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
-                    )
-                    CloudActionButton(
-                        label = stringResource(R.string.sign_in),
-                        icon = Icons.Default.Check,
-                        focused = focusedIndex == 3,
-                        style = CloudActionStyle.Primary,
-                        accentColor = accentColor,
-                        enabled = !isWorking,
-                        onClick = onSignIn,
-                        modifier = Modifier.weight(1.2f)
-                    )
-                    CloudActionButton(
-                        label = stringResource(R.string.settings_btn_create),
-                        icon = Icons.Default.Add,
-                        focused = focusedIndex == 4,
-                        style = CloudActionStyle.Outlined,
-                        accentColor = accentColor,
-                        enabled = !isWorking,
-                        onClick = onCreateAccount,
-                        modifier = Modifier.weight(1f)
-                    )
+                BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+                    // Three buttons side by side do not fit a phone: labels were cut to "Abb", "Anmel", "Erst".
+                    val stacked = maxWidth < 460.dp
+                    val cancelButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+                        CloudActionButton(
+                            label = stringResource(R.string.cancel),
+                            icon = Icons.Default.Close,
+                            focused = focusedIndex == 2,
+                            style = CloudActionStyle.Ghost,
+                            accentColor = accentColor,
+                            enabled = !isWorking,
+                            onClick = onDismiss,
+                            modifier = buttonModifier,
+                            compact = stacked
+                        )
+                    }
+                    val signInButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+                        CloudActionButton(
+                            label = stringResource(R.string.sign_in),
+                            icon = Icons.Default.Check,
+                            focused = focusedIndex == 3,
+                            style = CloudActionStyle.Primary,
+                            accentColor = accentColor,
+                            enabled = !isWorking,
+                            onClick = onSignIn,
+                            modifier = buttonModifier
+                        )
+                    }
+                    val createButton: @Composable (Modifier) -> Unit = { buttonModifier ->
+                        CloudActionButton(
+                            label = stringResource(R.string.settings_btn_create),
+                            icon = Icons.Default.Add,
+                            focused = focusedIndex == 4,
+                            style = CloudActionStyle.Outlined,
+                            accentColor = accentColor,
+                            enabled = !isWorking,
+                            onClick = onCreateAccount,
+                            modifier = buttonModifier,
+                            compact = stacked
+                        )
+                    }
+                    if (stacked) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            signInButton(Modifier.fillMaxWidth())
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                cancelButton(Modifier.weight(1f))
+                                createButton(Modifier.weight(1f))
+                            }
+                        }
+                    } else {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            cancelButton(Modifier.weight(1f))
+                            signInButton(Modifier.weight(1.2f))
+                            createButton(Modifier.weight(1f))
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))

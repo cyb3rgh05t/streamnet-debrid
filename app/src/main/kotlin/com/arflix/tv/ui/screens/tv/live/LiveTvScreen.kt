@@ -965,16 +965,17 @@ fun LiveTvScreen(
         visibleEnrichedState.value = EnrichedChannels(all = visibleChannels, tree = tree, index = index)
     }
     LaunchedEffect(hiddenGroupSet, selectedCategoryId, visibleEnrichedState.value.tree, state.config.showSpecialCategories) {
-        val tree = visibleEnrichedState.value.tree
-        val fallbackCategoryId = firstPlaylistCategoryId(tree)
-        if (selectedCategoryId == "all" && !state.config.showSpecialCategories) {
-            selectedCategoryId = fallbackCategoryId
-            return@LaunchedEffect
-        }
-        val selectedCategoryIsHidden = tree.hidden.categories.any { it.id == selectedCategoryId }
-        if (selectedCategoryId != "all" && (tree.byId(selectedCategoryId) == null || selectedCategoryIsHidden)) {
-            selectedCategoryId = fallbackCategoryId
-        }
+        val loaded = visibleEnrichedState.value
+        val tree = loaded.tree
+        val validated = LiveTvStartup.validatedCategoryId(
+            selectedId = selectedCategoryId,
+            treeLoaded = loaded !== EnrichedChannels.Empty,
+            categoryExists = tree.byId(selectedCategoryId) != null,
+            categoryHidden = tree.hidden.categories.any { it.id == selectedCategoryId },
+            showSpecialCategories = state.config.showSpecialCategories,
+            fallbackId = firstPlaylistCategoryId(tree),
+        )
+        if (validated != selectedCategoryId) selectedCategoryId = validated
     }
 
     // Selected category (persist across nav). Defaults to "all".
@@ -1659,7 +1660,14 @@ fun LiveTvScreen(
                 epgPrefetchAnchorId = focusedChannelId
             }
         }
-        if ((focusedChannelId == null || focusedChannelId !in filteredChannelIndexById) && !isGuideUserNavigating()) {
+        // Only repair a stale focus against the window of the selected category. Right after returning
+        // from Settings the list is empty or still belongs to another category, which used to wipe the
+        // saved focus (rail jumped to the first channel while playback kept the right one).
+        if ((focusedChannelId == null || focusedChannelId !in filteredChannelIndexById) &&
+            !isGuideUserNavigating() &&
+            filteredChannels.isNotEmpty() &&
+            LiveTvStartup.channelWindowMatchesCategory(selectedCategoryId, filteredChannelsCategoryKey)
+        ) {
             focusedChannelId = displayChannelIdFor(playingChannelId, visibleEnrichedState.value.index.byId, variantGroups)
                 ?.takeIf { id -> id in filteredChannelIndexById }
                 ?: filteredChannels.firstOrNull()?.id
