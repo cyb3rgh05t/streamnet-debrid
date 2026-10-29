@@ -362,6 +362,32 @@ button.metric {
 .dashboard-header-actions {
   gap: 10px;
 }
+.dashboard-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 6px 6px 18px;
+}
+.dashboard-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 17px;
+}
+.dashboard-panel-title svg {
+  width: 20px;
+  height: 20px;
+  color: var(--accent);
+}
+.dashboard-panel-description {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
 .dashboard-updated {
   padding: 7px 10px;
   border: 1px solid var(--line);
@@ -431,6 +457,7 @@ button.metric {
   gap: 10px;
 }
 .version-card {
+  text-decoration: none;
   position: relative;
   display: grid;
   align-content: start;
@@ -445,6 +472,13 @@ button.metric {
   background:
     linear-gradient(135deg, rgba(229, 162, 9, 0.15), rgba(229, 162, 9, 0.045) 56%, rgba(12, 11, 10, 0.72)),
     #171512;
+}
+.version-card:hover {
+  border-color: var(--accent);
+}
+.version-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 .version-card::after {
   content: "";
@@ -526,13 +560,6 @@ button.metric {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.6;
-}
-.dashboard-update-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-  margin-top: 18px;
 }
 .dashboard-activity-list {
   display: grid;
@@ -1408,8 +1435,7 @@ pre {
     gap: 8px;
   }
   .dashboard-header-actions {
-    align-items: flex-end;
-    flex-direction: column;
+    flex-wrap: wrap;
   }
   .toolbar {
     align-items: end;
@@ -1675,9 +1701,6 @@ pre {
   }
   .dashboard-header-actions {
     align-items: flex-end;
-  }
-  #dashboard-header-actions .dashboard-updated {
-    display: none;
   }
 }
 

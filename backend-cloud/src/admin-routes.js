@@ -452,7 +452,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          pg_database_size(current_database())::bigint as database_bytes`,
     );
     const databaseQueryMs = performance.now() - queryStarted;
-    const [recentAccounts, recentAudits, migrations, androidDevices] = await Promise.all([
+    const [recentAccounts, recentAudits, migrations] = await Promise.all([
       pool.query("select id, email, created_at from accounts order by created_at desc, id desc limit 5"),
       pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
                         accounts.email as account_email
@@ -460,19 +460,6 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
                    left join accounts on accounts.id = audit.account_id
                   order by audit.created_at desc, audit.id desc limit 5`),
       pool.query("select version from schema_migrations order by version desc limit 1"),
-      pool.query(`select app_version, app_version_code, distribution,
-                         count(*)::int as devices, max(created_at) as last_seen
-                    from (
-                      select distinct on (install_id)
-                             install_id, platform, app_version, app_version_code, distribution, created_at
-                        from app_usage_events
-                       where coalesce(install_id, '') <> ''
-                         and created_at >= now() - interval '30 days'
-                       order by install_id, created_at desc, id desc
-                    ) latest
-                   where platform = 'android'
-                   group by app_version, app_version_code, distribution
-                   order by max(created_at) desc`),
     ]);
     const row = result.rows[0];
     const memory = process.memoryUsage();
@@ -498,7 +485,6 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         schema_version: migrations.rows[0]?.version ?? null,
       },
       versions: { backend: backendPackage.version },
-      android_devices: androidDevices.rows,
       recent_accounts: recentAccounts.rows,
       recent_audits: recentAudits.rows,
     };

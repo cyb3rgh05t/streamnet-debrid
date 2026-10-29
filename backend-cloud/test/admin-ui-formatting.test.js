@@ -5,11 +5,21 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../public/admin.js", import.meta.url), "utf8");
 const context = vm.createContext({});
-for (const name of ["formatBytes", "formatAuditOperation"]) {
+for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl"]) {
   const definition = source.match(new RegExp(`function ${name}\\([^]*?\\n\\}`));
   assert.ok(definition, `Missing ${name}`);
   vm.runInContext(definition[0], context);
 }
+
+test("version cards link to component changelogs and the published Android release", () => {
+  const repository = "https://github.com/cyb3rgh05t/streamnet-debrid";
+  assert.equal(context.versionReleaseUrl("android", "2.5.081"), `${repository}/releases/tag/2.5.081`);
+  for (const component of ["backend", "web"]) {
+    const url = new URL(context.versionReleaseUrl(component, "1.0.031"));
+    assert.equal(url.pathname, "/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md");
+    assert.equal(decodeURIComponent(url.hash), `#:~:text=[${component === "backend" ? "Backend" : "Web"} 1.0.031]`);
+  }
+});
 
 test("memory formatting uses readable units and German decimals", () => {
   for (const [bytes, expected] of [

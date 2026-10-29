@@ -20,9 +20,6 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
         new_accounts_24h: "2", new_accounts_7d: "4", syncs_24h: "6",
       }] };
       if (sql.includes("from schema_migrations")) return { rows: migrations.map(version => ({ version })) };
-      if (sql.includes("from app_usage_events") && sql.includes("group by app_version")) return { rows: [
-        { app_version: "2.5.081", app_version_code: 482, distribution: "sideload", devices: 3, last_seen: "2026-10-29T09:00:00Z" },
-      ] };
       if (sql.includes("from admin_audit_logs")) return { rows: [{
         id: "audit-a", operation: "upsert_addon", account_email: "demo@example.test",
         created_at: "2026-10-29T09:00:00Z", reason: "Demo",
@@ -73,12 +70,8 @@ test("overview preserves numeric metrics and adds runtime, schema and recent act
   }
   assert.equal(body.system.node_version, process.version);
   assert.deepEqual(Object.keys(body.versions), ["backend"]);
-  assert.equal(body.android_devices[0].app_version_code, 482);
-  assert.equal(body.android_devices[0].devices, 3);
-  const deviceSql = queries.find(sql => sql.includes("group by app_version"));
-  assert.ok(deviceSql.includes("distinct on (install_id)"));
-  assert.ok(deviceSql.includes("interval '30 days'"));
-  assert.ok(deviceSql.includes("where platform = 'android'"));
+  assert.equal(body.android_devices, undefined);
+  assert.equal(queries.some(sql => sql.includes("group by app_version")), false);
   assert.equal(body.recent_accounts.length, 1);
   assert.equal(body.recent_audits[0].operation, "upsert_addon");
   assert.ok(queries.some(sql => sql.includes("jsonb_typeof(payload->'profiles')")));

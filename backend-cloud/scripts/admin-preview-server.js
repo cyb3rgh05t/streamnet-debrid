@@ -105,11 +105,7 @@ const server = createServer(async (request, reply) => {
           platform: "linux / x64 (Demo)",
           schema_version: "011_account_session_metadata.sql",
         },
-        versions: { backend: "1.0.031" },
-        android_devices: [
-          { app_version: "2.5.081", app_version_code: 482, distribution: "sideload", devices: 12, last_seen: new Date().toISOString() },
-          { app_version: "2.5.080", app_version_code: 481, distribution: "sideload", devices: 4, last_seen: "2026-10-28T15:52:00.000Z" },
-        ],
+        versions: { backend: "1.0.032" },
         recent_accounts: accounts,
         recent_audits: [
           { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
@@ -122,7 +118,7 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.031", source: "Demo-Backend" },
+          { component: "backend", version: "1.0.032", source: "Demo-Backend" },
           { component: "web", version: "1.0.070", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
           { component: "android", version: "2.5.081", published_at: "2026-10-29T10:51:49Z", source: "Demo-APK-Release (simuliert)" },
         ],

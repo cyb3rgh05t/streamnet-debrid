@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.032] - 2026-10-29
+
+- Dashboard: Versionsübersicht an erster Stelle. Backend- und Web-Karten öffnen den passenden Changelog-Eintrag, die Android-Karte die Release-Notizen der angezeigten Version.
+- Aktualisierungszeit und Refresh-Button in eine eigene Kopfzeile innerhalb der äußeren Dashboard-Karte verschoben, mit Titel und Beschreibung links sowie responsiven Bedienelementen rechts.
+- Separaten Button zur Live-Versionsprüfung, Repository-Link und doppelte Versionszusammenfassung entfernt. Versionsabfragen bleiben beim Öffnen und über „Aktualisieren“ aktiv; Quellen und Fehler stehen direkt in den Karten.
+- Android-Geräteversionsübersicht einschließlich ihrer Datenbankabfrage entfernt. Die veröffentlichte Android-Version bleibt erhalten.
+
 ## [Backend 1.0.031] - 2026-10-29
 
 - Versionskarten ohne feste Web-/Android-Referenzwerte: Live-Abfrage des Webplayers unter web.streamnet.live und der zuletzt veröffentlichten Android-APK auf GitHub. Quellen werden automatisch beim Laden und manuell geprüft; Fehler werden pro Komponente angezeigt, ohne auf erfundene Versionsstände zurückzufallen.

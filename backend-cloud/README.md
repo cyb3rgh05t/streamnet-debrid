@@ -48,16 +48,16 @@ APK release from GitHub (validated to contain the matching APK asset).
 The Web endpoint must be deployed with the Webplayer before it can report
 the version; a missing endpoint is an explicit error, never a reference fallback.
 No versions are read from GitHub `main` or hardcoded Web/Android references.
+Version cards link to the matching Backend/Web changelog text or Android release
+notes in the repository. Source details and errors appear directly in each card,
+without a separate version-summary list.
 
 The authenticated `GET /admin-api/versions` endpoint (also available at
-`/admin-api/updates`) runs automatically on dashboard load and via
-**Versionen live prüfen**. Only fixed public URLs are fetched, without account
+`/admin-api/updates`) runs automatically on dashboard load and via the
+dashboard's **Aktualisieren** button. Only fixed public URLs are fetched, without account
 data or GitHub credentials, with eight-second timeouts, redirects rejected,
-and per-component errors. Android device versions come separately from each
-installation's latest usage event within 30 days, grouped by version, build
-and distribution, with counts and last-report timestamps. These are reported
-versions, not proof of the current installed version or online presence.
-The local demo explicitly simulates version sources and device reports.
+and per-component errors. The dashboard does not display Android device-version
+statistics. The local demo explicitly simulates version sources.
 Accent gradients and decorative corner bubbles are reserved for the Dashboard cards; the other admin pages
 use solid element backgrounds.
 

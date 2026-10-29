@@ -461,7 +461,6 @@ function renderMetrics(metrics) {
 }
 
 async function loadDashboard() {
-  byId("dashboard-check-updates").disabled = true;
   const started = performance.now();
   let metrics;
   try {
@@ -499,10 +498,7 @@ async function loadDashboard() {
     ["Prozess-CPU · Ø seit Start", `${system.cpu_average_percent.toLocaleString("de-DE")} %`],
   ]);
   byId("dashboard-backend-version").textContent = metrics.versions.backend;
-  renderDashboardActivity("dashboard-android-devices", metrics.android_devices.map(device => ({
-    title: `${device.app_version || "Version unbekannt"}${device.app_version_code == null ? "" : ` · Build ${device.app_version_code}`}${device.distribution ? ` · ${device.distribution}` : ""}`,
-    detail: `${device.devices.toLocaleString("de-DE")} Installation(en) · Zuletzt gemeldet ${formatDate(device.last_seen)}`,
-  })), "Keine Android-Gerätemeldungen in den letzten 30 Tagen.");
+  byId("dashboard-backend-release").href = versionReleaseUrl("backend", metrics.versions.backend);
   renderDashboardActivity("dashboard-recent-accounts", metrics.recent_accounts.map(account => ({
     title: account.email, detail: `Registriert · ${formatDate(account.created_at)}`,
   })), "Noch keine Accounts vorhanden.");
@@ -550,49 +546,45 @@ function renderDashboardActivity(id, entries, emptyLabel) {
   }
 }
 
+function versionReleaseUrl(component, version) {
+  const repository = "https://github.com/cyb3rgh05t/streamnet-debrid";
+  if (component === "android") return `${repository}/releases/tag/${encodeURIComponent(version)}`;
+  const label = component === "backend" ? "Backend" : "Web";
+  return `${repository}/blob/main/CHANGELOG.md#:~:text=${encodeURIComponent(`[${label} ${version}]`)}`;
+}
+
 async function loadLiveVersions() {
-  const button = byId("dashboard-check-updates");
-  button.disabled = true;
-  button.textContent = "Prüfe...";
-  button.setAttribute("aria-busy", "true");
-  const status = byId("dashboard-update-status");
-  byId("dashboard-updates").replaceChildren();
-  status.textContent = "Live-Webplayer und veröffentlichtes APK-Release werden abgefragt...";
   for (const component of ["web", "android"]) {
     byId(`dashboard-${component}-version`).textContent = "—";
+    byId(`dashboard-${component}-release`).href = component === "android"
+      ? "https://github.com/cyb3rgh05t/streamnet-debrid/releases"
+      : "https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md";
   }
   byId("dashboard-web-source").textContent = "web.streamnet.live · Wird geprüft...";
   byId("dashboard-android-build").textContent = "Veröffentlichtes APK-Release · Wird geprüft...";
   try {
     const result = await api("/admin-api/versions");
-    renderDashboardActivity("dashboard-updates", result.components.map(component => {
+    for (const component of result.components) {
       let detail;
       if (component.error) {
         detail = `Prüfung fehlgeschlagen: ${component.error}`;
       } else {
         byId(`dashboard-${component.component}-version`).textContent = component.version;
+        byId(`dashboard-${component.component}-release`).href = versionReleaseUrl(component.component, component.version);
         detail = component.source;
         if (component.component === "web" && component.build) detail += ` · Build ${component.build}`;
         if (component.component === "android") detail += ` · Veröffentlicht ${formatDate(component.published_at)}`;
       }
       if (component.component === "web") byId("dashboard-web-source").textContent = detail;
       if (component.component === "android") byId("dashboard-android-build").textContent = detail;
-      return { title: component.component === "backend" ? "Backend (laufend)" : component.component === "web" ? "Web (live)" : "Android (veröffentlicht)", detail };
-    }), "");
-    status.textContent = `${result.source} · Geprüft ${formatDate(result.checked_at)}`;
+    }
   } catch (error) {
-    status.textContent = `Versionsprüfung fehlgeschlagen: ${error.message}`;
-    byId("dashboard-web-source").textContent = status.textContent;
-    byId("dashboard-android-build").textContent = status.textContent;
+    const message = `Versionsprüfung fehlgeschlagen: ${error.message}`;
+    byId("dashboard-web-source").textContent = message;
+    byId("dashboard-android-build").textContent = message;
     showToast(error.message, true);
-  } finally {
-    button.disabled = false;
-    button.textContent = "Versionen live prüfen";
-    button.removeAttribute("aria-busy");
   }
 }
-
-byId("dashboard-check-updates").addEventListener("click", loadLiveVersions);
 
 async function loadAccounts() {
   const accountResult = await api(
