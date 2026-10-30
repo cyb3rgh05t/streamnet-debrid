@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.036] - 2026-10-30
+
+- Geräteaktivitätsdiagramm startet wieder mit 7 Tagen; 30 Tage bleiben auswählbar.
+- Technischen Erklärungstext unter dem Diagrammtitel entfernt. Tageszählung und UTC-Zeitzone unverändert.
+- Keine neue Migration; Migration 013 aus Backend 1.0.035 bleibt erforderlich. Android und Web unverändert.
+
 ## [Backend 1.0.035] - 2026-10-30
 
 - Backend-Admin: Balkendiagramm „Aktive Geräte pro Tag“ mit 7-/30-Tage-Auswahl, UTC-Tagesgrenzen und ausdrücklich markierter Demo-Vorschau. Migration 013 speichert pro Account, Installation und Tag einen Eintrag atomar mit dem Heartbeat; keine rückwirkend erfundenen Statistiken. Fehler- und Leerzustände sowie mobil horizontal scrollbar.

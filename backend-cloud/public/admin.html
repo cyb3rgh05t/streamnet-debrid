@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.035" />
-    <script src="/admin/admin.js?v=1.0.035" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.036" />
+    <script src="/admin/admin.js?v=1.0.036" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -147,7 +147,7 @@
             </svg>
             <span>Abmelden</span>
           </button>
-          <span class="version-badge">Version 1.0.035</span>
+          <span class="version-badge">Version 1.0.036</span>
         </div>
         </div>
       </aside>
@@ -236,11 +236,10 @@
                 <h2 id="device-activity-title">Aktive Geräte pro Tag</h2>
               </div>
               <div class="device-activity-period" role="group" aria-label="Zeitraum">
-                <button class="button secondary" type="button" data-activity-days="7" aria-pressed="false">7 Tage</button>
-                <button class="button secondary" type="button" data-activity-days="30" aria-pressed="true">30 Tage</button>
+                <button class="button secondary" type="button" data-activity-days="7" aria-pressed="true">7 Tage</button>
+                <button class="button secondary" type="button" data-activity-days="30" aria-pressed="false">30 Tage</button>
               </div>
             </div>
-            <p class="dashboard-note">Unterschiedliche Installationen mit Heartbeat pro Account und Tag, nicht gleichzeitig online. Kalendertage in UTC; heute noch unvollständig. Erfassung ab Migration 013.</p>
             <p id="device-activity-status" role="status"></p>
             <div id="device-activity-chart" class="device-activity-chart" aria-label="Täglich aktive Geräte"></div>
           </section>

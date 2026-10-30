@@ -35,7 +35,7 @@ At widths up to 720px, a themed hamburger button expands the navigation and
 logout controls below the logo. Navigation, Escape and breakpoint changes close
 the menu; desktop navigation remains permanently visible.
 
-The "Aktive Geräte pro Tag" bar chart defaults to 30 days and supports 7/30 UTC calendar days, including
+The "Aktive Geräte pro Tag" bar chart defaults to 7 days and supports 7/30 UTC calendar days, including
 the incomplete current day. Migration `013_device_activity_daily.sql` must run
 before deploying the updated heartbeat handler. Each authenticated heartbeat
 atomically upserts presence and records one account/installation/day identity;

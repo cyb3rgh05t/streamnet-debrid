@@ -506,7 +506,7 @@ async function loadDashboard() {
   await Promise.all([loadLiveVersions(), loadDeviceActivity()]);
 }
 
-let deviceActivityDays = 30;
+let deviceActivityDays = 7;
 let deviceActivityRequest = 0;
 async function loadDeviceActivity() {
   const request = ++deviceActivityRequest;
