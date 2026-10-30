@@ -49,7 +49,7 @@ class DetailsResponsiveLayoutTest {
                 bottomPaddingDp = 276f,
                 topBarInsetDp = 98f,
             )
-        ).isEqualTo(114f)
+        ).isEqualTo(98f)
     }
 
     @Test
@@ -65,6 +65,32 @@ class DetailsResponsiveLayoutTest {
     }
 
     @Test
+    fun homeHeroReducesSynopsisToFitBetweenNavigationAndContinueWatching() {
+        assertThat(
+            resolveTvHomeHeroOverviewHeight(
+                viewportHeightDp = 720f,
+                measuredHeroHeightDp = 340f,
+                overviewHeightDp = 72f,
+                rowsViewportHeightDp = 284f,
+                topBarInsetDp = 98f,
+            )
+        ).isEqualTo(54f)
+    }
+
+    @Test
+    fun homeHeroKeepsFullSynopsisWhenItFitsItsReservedSpace() {
+        assertThat(
+            resolveTvHomeHeroOverviewHeight(
+                viewportHeightDp = 720f,
+                measuredHeroHeightDp = 270f,
+                overviewHeightDp = 72f,
+                rowsViewportHeightDp = 284f,
+                topBarInsetDp = 98f,
+            )
+        ).isEqualTo(72f)
+    }
+
+    @Test
     fun tvDetailsAnchorUsesMeasuredHomeHeightWithoutChangingHome() {
         val layout = resolveTvHeroLayout(720, homeHeroHeightDp = 190f, detailsHeaderHeightDp = 112f)
         assertThat(layout.logoTopDp).isWithin(0.01f).of(249.2f)
@@ -72,10 +98,22 @@ class DetailsResponsiveLayoutTest {
     }
 
     @Test
-    fun tvDetailsDoesNotPushTheHomeAnchorDownToAnEstimatedNavigationLimit() {
+    fun tvDetailsKeepsLogoAndMetadataBelowNavigation() {
         val layout = resolveTvHeroLayout(540, homeHeroHeightDp = 205f, detailsHeaderHeightDp = 127f)
-        assertThat(layout.logoTopDp).isEqualTo(59f)
-        assertThat(layout.bodyTopDp).isEqualTo(192f)
+        assertThat(layout.logoTopDp).isEqualTo(82f)
+        assertThat(layout.bodyTopDp).isEqualTo(215f)
+    }
+
+    @Test
+    fun tvDetailsUsesTheActualNavigationInsetWhenMetadataWraps() {
+        val layout = resolveTvHeroLayout(
+            screenHeightDp = 540,
+            homeHeroHeightDp = 270f,
+            detailsHeaderHeightDp = 180f,
+            topBarInsetDp = 110f,
+        )
+        assertThat(layout.logoTopDp).isEqualTo(110f)
+        assertThat(layout.bodyTopDp).isEqualTo(296f)
     }
 
     @Test

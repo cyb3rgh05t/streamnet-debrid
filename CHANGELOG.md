@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.089] - 2026-10-30
+
+- Android-Version: `2.5.089` / Code `490`.
+- Android-TV-Startseite: Home-Hero an der tatsächlichen CW-Rail-Position ausrichten; bei wenig Platz Synopsis dynamisch kürzen, damit sie weder Rail noch Navigation überlappt.
+- Android-TV: Hero auf Home und Details ohne zusätzlichen Abstand unterhalb der sichtbaren Topbar (82 dp) beginnen lassen; Beschreibung und Buttons folgen mit unveränderten internen Abständen.
+- 14 gezielte Layout-Regressionstests erfolgreich; Darstellung auf dem betroffenen TV noch gegenprüfen.
+- Backend und Web unverändert.
+
 ## [2.5.088] - 2026-10-30
 
 - Android-Version: `2.5.088` / Code `489`.

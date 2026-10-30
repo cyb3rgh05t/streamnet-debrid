@@ -158,7 +158,7 @@ import com.arflix.tv.ui.components.MediaCard as ArvioMediaCard
 import com.arflix.tv.ui.components.TrailerPlayer
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.AppTopBar
-import com.arflix.tv.ui.components.AppTopBarContentTopInset
+import com.arflix.tv.ui.components.AppTopBarHeight
 import com.arflix.tv.ui.components.AutoScrollingSynopsis
 import com.arflix.tv.ui.components.MobileHeroBanner
 import com.arflix.tv.ui.components.ProfileAvatarVisual
@@ -2197,6 +2197,7 @@ internal fun HeroSection(
     showBudget: Boolean = true,
     showCertification: Boolean = true,
     autoScrollHomeOverview: Boolean = true,
+    overviewMaxHeight: Dp = 72.dp,
     modifier: Modifier = Modifier,
     measurementOnly: Boolean = false
 ) {
@@ -2493,7 +2494,6 @@ internal fun HeroSection(
                     }
                 }
 
-                val overviewMaxHeight = 72.dp
                 if (measurementOnly || displayOverview.isBlank()) {
                     Spacer(modifier = Modifier.width(360.dp).height(overviewMaxHeight))
                 } else AutoScrollingSynopsis(
@@ -2594,7 +2594,6 @@ private fun HomeHeroLayer(
         // Mobile hero is rendered inline inside MobileHomeRowsLayer's LazyColumn — no fixed overlay needed.
     } else {
         // TV hero: full-screen overlay with clearlogo
-        val configuration = LocalConfiguration.current
         val uiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current
 
         SubcomposeLayout(
@@ -2602,9 +2601,9 @@ private fun HomeHeroLayer(
                 .fillMaxSize()
                 .zIndex(3f)
         ) { constraints ->
-            val heroBottomPadding = com.arflix.tv.ui.components.resolveTvHomeHeroBottomPadding(
-                screenHeightDp = configuration.screenHeightDp,
-                viewportHeightDp = constraints.maxHeight.toDp().value,
+            val viewportHeightDp = constraints.maxHeight.toDp().value
+            val rowsViewportHeightDp = com.arflix.tv.ui.components.resolveTvHomeRowsViewportHeight(
+                contentHeightDp = (viewportHeightDp - 24f).coerceAtLeast(0f),
                 uiScale = uiScale,
             )
             val item = heroItem
@@ -2613,8 +2612,9 @@ private fun HomeHeroLayer(
                 item?.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
                 item?.collectionGroup == CollectionGroupKind.TV_GENRE
             val hasHeroContent = item != null && (!isCollection || isGenreCollection)
+            val modifier = Modifier.padding(start = contentStartPadding, end = 400.dp)
             val heroContent = if (hasHeroContent) {
-                subcompose("homeHero") {
+                val metadataMeasure = subcompose("homeHeroMeasure") {
                     val contentModifier = Modifier
                         .padding(start = contentStartPadding, end = 400.dp)
                     when {
@@ -2625,8 +2625,10 @@ private fun HomeHeroLayer(
                             showBudget = showBudget,
                             showCertification = showCertification,
                             autoScrollHomeOverview = autoScrollHomeOverview,
+                            overviewMaxHeight = 72.dp,
+                            measurementOnly = true,
                             scrollIptvFallbackTitle = scrollIptvFallbackTitle,
-                            modifier = contentModifier,
+                            modifier = contentModifier
                         )
                         isGenreCollection -> HomeHeroMarqueeTitle(
                             text = item!!.title.uppercase(),
@@ -2652,15 +2654,58 @@ private fun HomeHeroLayer(
                         minHeight = 0,
                     )
                 )
+                val fittedOverviewHeight = com.arflix.tv.ui.components.resolveTvHomeHeroOverviewHeight(
+                    viewportHeightDp = viewportHeightDp,
+                    measuredHeroHeightDp = metadataMeasure.height.toDp().value,
+                    overviewHeightDp = 72f,
+                    rowsViewportHeightDp = rowsViewportHeightDp,
+                    topBarInsetDp = AppTopBarHeight.value,
+                ).dp
+                subcompose("homeHero") {
+                    when {
+                        !isCollection -> HeroSection(
+                            item = item!!,
+                            logoUrl = heroLogoUrl,
+                            overviewOverride = heroOverviewOverride,
+                            showBudget = showBudget,
+                            showCertification = showCertification,
+                            autoScrollHomeOverview = autoScrollHomeOverview,
+                            overviewMaxHeight = fittedOverviewHeight,
+                            scrollIptvFallbackTitle = scrollIptvFallbackTitle,
+                            modifier = modifier,
+                        )
+                        isGenreCollection -> HomeHeroMarqueeTitle(
+                            text = item!!.title.uppercase(),
+                            style = ArflixTypography.heroTitle.copy(
+                                fontSize = 38.sp,
+                                fontWeight = FontWeight.Black,
+                                shadow = Shadow(
+                                    color = Color.Black.copy(alpha = 0.95f),
+                                    offset = Offset(0f, 2f),
+                                    blurRadius = 10f
+                                )
+                            ),
+                            color = TextPrimary,
+                            maxLines = 1,
+                            modifier = modifier
+                                .width(420.dp)
+                                .height(72.dp)
+                        )
+                    }
+                }.single().measure(
+                    constraints.copy(minWidth = 0, minHeight = 0)
+                )
             } else {
                 null
             }
+            val rowsGapDp = 16f
+            val heroBottomPadding = rowsViewportHeightDp + rowsGapDp
             val heroTop = heroContent?.let {
                 com.arflix.tv.ui.components.resolveTvHomeHeroTop(
                     viewportHeightDp = constraints.maxHeight.toDp().value,
                     heroHeightDp = it.height.toDp().value,
                     bottomPaddingDp = heroBottomPadding,
-                    topBarInsetDp = AppTopBarContentTopInset.value,
+                    topBarInsetDp = AppTopBarHeight.value,
                 ).dp.roundToPx()
             }
             layout(constraints.maxWidth, constraints.maxHeight) {

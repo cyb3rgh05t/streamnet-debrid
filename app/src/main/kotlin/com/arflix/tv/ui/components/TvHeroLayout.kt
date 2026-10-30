@@ -26,11 +26,28 @@ internal fun resolveTvHomeHeroTop(
     heroHeightDp: Float,
     bottomPaddingDp: Float,
     topBarInsetDp: Float,
-    topBarGapDp: Float = 16f,
+    topBarGapDp: Float = 0f,
 ): Float = maxOf(
     viewportHeightDp - bottomPaddingDp - heroHeightDp,
     topBarInsetDp + topBarGapDp,
 )
+
+internal fun resolveTvHomeHeroOverviewHeight(
+    viewportHeightDp: Float,
+    measuredHeroHeightDp: Float,
+    overviewHeightDp: Float,
+    rowsViewportHeightDp: Float,
+    topBarInsetDp: Float,
+    topBarGapDp: Float = 0f,
+    rowsGapDp: Float = 16f,
+): Float {
+    val availableHeroHeight = (
+        viewportHeightDp - rowsViewportHeightDp - rowsGapDp -
+            topBarInsetDp - topBarGapDp
+        ).coerceAtLeast(0f)
+    val overflow = (measuredHeroHeightDp - availableHeroHeight).coerceAtLeast(0f)
+    return (overviewHeightDp - overflow).coerceAtLeast(0f)
+}
 
 internal fun resolveTvHomeRowsViewportHeight(
     contentHeightDp: Float,
@@ -49,9 +66,15 @@ internal fun resolveTvHeroLayout(
     detailsHeaderHeightDp: Float,
     viewportHeightDp: Float = screenHeightDp.toFloat(),
     uiScale: Float = 1f,
+    topBarInsetDp: Float = AppTopBarHeight.value,
 ): TvHeroLayout {
     val bottomPadding = resolveTvHomeHeroBottomPadding(screenHeightDp, viewportHeightDp, uiScale)
-    val top = (viewportHeightDp - bottomPadding - homeHeroHeightDp).coerceAtLeast(0f)
+    val top = resolveTvHomeHeroTop(
+        viewportHeightDp = viewportHeightDp,
+        heroHeightDp = homeHeroHeightDp,
+        bottomPaddingDp = bottomPadding,
+        topBarInsetDp = topBarInsetDp,
+    )
     return TvHeroLayout(top, top + detailsHeaderHeightDp + 6f)
 }
 
@@ -80,6 +103,7 @@ internal fun HomeMatchedDetailsHero(
                 detailsHeaderHeightDp = headerPlaceable.height.toDp().value,
                 viewportHeightDp = constraints.maxHeight.toDp().value,
                 uiScale = uiScale,
+                topBarInsetDp = topBarInset.value,
             )
         } else null
         val headerTop = heroLayout?.logoTopDp?.dp?.roundToPx() ?: 0

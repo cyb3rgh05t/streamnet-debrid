@@ -150,7 +150,7 @@ import com.arflix.tv.ui.components.SeasonContextMenu
 import com.arflix.tv.ui.components.resolveDetailsBackdropHeightDp
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.AppTopBar
-import com.arflix.tv.ui.components.AppTopBarContentTopInset
+import com.arflix.tv.ui.components.AppTopBarHeight
 import com.arflix.tv.ui.components.CardLayoutMode
 import com.arflix.tv.ui.components.MediaCard
 import com.arflix.tv.ui.components.PersonModal
@@ -2189,7 +2189,7 @@ internal fun DetailsContent(
 
         com.arflix.tv.ui.components.HomeMatchedDetailsHero(
             screenHeightDp = configuration.screenHeightDp,
-            topBarInset = AppTopBarContentTopInset,
+            topBarInset = AppTopBarHeight,
             showHeader = showHeroHeader,
             reference = {
                 Box(modifier = Modifier.padding(start = 36.dp, end = 400.dp)) {
