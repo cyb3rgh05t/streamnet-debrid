@@ -31,6 +31,21 @@ The production APK uses this service as its account and synchronization backend.
 
 ## Admin Dashboard
 
+At widths up to 720px, a themed hamburger button expands the navigation and
+logout controls below the logo. Navigation, Escape and breakpoint changes close
+the menu; desktop navigation remains permanently visible.
+
+The "Aktive Geräte pro Tag" bar chart defaults to 30 days and supports 7/30 UTC calendar days, including
+the incomplete current day. Migration `013_device_activity_daily.sql` must run
+before deploying the updated heartbeat handler. Each authenticated heartbeat
+atomically upserts presence and records one account/installation/day identity;
+repeated heartbeats and profile switches do not increase that day's count.
+The chart counts daily activity, not concurrent online devices. It starts at
+deployment with no reconstructed historical data. Account deletion cascades to
+daily records; removing presence/history does not erase the daily statistic.
+Daily records retain installation IDs until account deletion (no automatic
+retention cutoff). The local preview explicitly labels simulated chart values.
+
 The admin panel opens on the Dashboard page. Overview metrics live there rather
 than above the Accounts table; the online-devices card opens the filtered account
 list. The dashboard also shows profile/playback counts, newly registered accounts,

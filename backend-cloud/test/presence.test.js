@@ -52,6 +52,9 @@ test("heartbeat upserts account-scoped presence with server time, not analytics 
     assert.match(sql, /on conflict \(account_id, install_id\) do update/);
     assert.match(sql, /last_seen = now\(\)/);
     assert.doesNotMatch(sql, /app_usage_events/);
+    assert.match(sql, /insert into device_activity_daily/);
+    assert.match(sql, /on conflict \(activity_date, account_id, install_id\) do nothing/);
+    assert.match(sql, /time zone 'UTC'/);
   }
 });
 

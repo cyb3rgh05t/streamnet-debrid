@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.034" />
-    <script src="/admin/admin.js?v=1.0.034" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.035" />
+    <script src="/admin/admin.js?v=1.0.035" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -48,11 +48,17 @@
 
     <div id="dashboard-view" class="app-shell hidden">
       <aside class="sidebar">
+        <div class="sidebar-brand">
         <img
           src="/assets/streamnetapp-logo.svg"
           alt="StreamNet"
           class="brand-logo"
         />
+        <button id="mobile-menu-toggle" class="button secondary mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar-menu" aria-label="Menü öffnen">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
+        </button>
+        </div>
+        <div id="sidebar-menu" class="sidebar-menu">
         <nav aria-label="Admin Navigation">
           <button class="nav-item active" data-view="dashboard">
             <svg
@@ -141,7 +147,8 @@
             </svg>
             <span>Abmelden</span>
           </button>
-          <span class="version-badge">Version 1.0.032</span>
+          <span class="version-badge">Version 1.0.035</span>
+        </div>
         </div>
       </aside>
 
@@ -222,6 +229,21 @@
             class="metrics"
             aria-label="Datenbankübersicht"
           ></div>
+          <section class="version-panel device-activity-panel" aria-labelledby="device-activity-title">
+            <div class="device-activity-heading">
+              <div>
+                <p class="eyebrow">GERÄTEAKTIVITÄT</p>
+                <h2 id="device-activity-title">Aktive Geräte pro Tag</h2>
+              </div>
+              <div class="device-activity-period" role="group" aria-label="Zeitraum">
+                <button class="button secondary" type="button" data-activity-days="7" aria-pressed="false">7 Tage</button>
+                <button class="button secondary" type="button" data-activity-days="30" aria-pressed="true">30 Tage</button>
+              </div>
+            </div>
+            <p class="dashboard-note">Unterschiedliche Installationen mit Heartbeat pro Account und Tag, nicht gleichzeitig online. Kalendertage in UTC; heute noch unvollständig. Erfassung ab Migration 013.</p>
+            <p id="device-activity-status" role="status"></p>
+            <div id="device-activity-chart" class="device-activity-chart" aria-label="Täglich aktive Geräte"></div>
+          </section>
           <div class="dashboard-detail-grid">
             <section class="version-panel" aria-labelledby="runtime-title">
               <div class="section-heading"><h2 id="runtime-title">System &amp; Laufzeit</h2></div>

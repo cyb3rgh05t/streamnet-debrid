@@ -181,6 +181,7 @@ function showDashboard() {
 }
 
 function logout() {
+  setMobileMenuOpen(false);
   state.token = null;
   state.selectedAccount = null;
   state.global = null;
@@ -502,8 +503,65 @@ async function loadDashboard() {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date());
-  await loadLiveVersions();
+  await Promise.all([loadLiveVersions(), loadDeviceActivity()]);
 }
+
+let deviceActivityDays = 30;
+let deviceActivityRequest = 0;
+async function loadDeviceActivity() {
+  const request = ++deviceActivityRequest;
+  const token = state.token;
+  const chart = byId("device-activity-chart");
+  const status = byId("device-activity-status");
+  chart.replaceChildren();
+  status.textContent = "Geräteaktivität wird geladen…";
+  try {
+    const result = await api(`/admin-api/device-activity?days=${deviceActivityDays}`);
+    if (request !== deviceActivityRequest || token !== state.token) return;
+    const peak = Math.max(1, ...result.days.map(day => day.devices));
+    const total = result.days.reduce((sum, day) => sum + day.devices, 0);
+    status.textContent = result.demo ? "Demo-Daten · simulierte Geräteaktivität" :
+      total === 0 ? "Noch keine Aktivität im gewählten Zeitraum erfasst. Frühere Tage werden nicht nachträglich rekonstruiert." : "";
+    chart.style.setProperty("--activity-days", result.days.length);
+    result.days.forEach(day => {
+      const date = new Date(`${day.date}T00:00:00Z`);
+      const label = new Intl.DateTimeFormat("de-DE", { day: "2-digit", month: "2-digit", timeZone: "UTC" }).format(date);
+      const column = document.createElement("div");
+      column.className = "device-activity-column";
+      column.tabIndex = 0;
+      column.title = `${label} (UTC): ${day.devices} aktive Geräte`;
+      column.setAttribute("aria-label", column.title);
+      const value = document.createElement("span");
+      value.className = "device-activity-value";
+      value.textContent = day.devices;
+      const track = document.createElement("div");
+      track.className = "device-activity-track";
+      const bar = document.createElement("div");
+      bar.className = "device-activity-bar";
+      bar.style.height = `${day.devices / peak * 100}%`;
+      track.append(bar);
+      const caption = document.createElement("span");
+      caption.className = "device-activity-date";
+      caption.textContent = label;
+      column.append(value, track, caption);
+      chart.append(column);
+    });
+  } catch (error) {
+    if (request !== deviceActivityRequest || token !== state.token) return;
+    chart.replaceChildren();
+    status.textContent = `Geräteaktivität konnte nicht geladen werden: ${error.message}`;
+    showToast(error.message, true);
+  }
+}
+
+document.querySelectorAll("[data-activity-days]").forEach(button => {
+  button.addEventListener("click", () => {
+    deviceActivityDays = Number(button.dataset.activityDays);
+    document.querySelectorAll("[data-activity-days]").forEach(item =>
+      item.setAttribute("aria-pressed", String(item === button)));
+    loadDeviceActivity();
+  });
+});
 
 function renderDashboardFacts(id, entries) {
   const container = byId(id);
@@ -513,6 +571,11 @@ function renderDashboardFacts(id, entries) {
     const term = document.createElement("dt");
     term.textContent = label;
     const description = document.createElement("dd");
+    if (id === "dashboard-system" && ["Admin API", "Datenbank"].includes(label)) {
+      if (String(value).startsWith("Erreichbar") || String(value).startsWith("Verbunden")) {
+        description.classList.add("dashboard-fact-success");
+      }
+    }
     description.textContent = typeof value === "number" ? value.toLocaleString("de-DE") : value;
     row.append(term, description);
     container.append(row);
@@ -1522,7 +1585,29 @@ async function submitGlobalMutation(event) {
   }
 }
 
+function setMobileMenuOpen(open) {
+  const toggle = byId("mobile-menu-toggle");
+  toggle.setAttribute("aria-expanded", String(open));
+  toggle.setAttribute("aria-label", open ? "Menü schließen" : "Menü öffnen");
+  toggle.closest(".sidebar").classList.toggle("menu-open", open);
+}
+
+byId("mobile-menu-toggle").addEventListener("click", () => {
+  setMobileMenuOpen(byId("mobile-menu-toggle").getAttribute("aria-expanded") !== "true");
+});
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && byId("mobile-menu-toggle").getAttribute("aria-expanded") === "true") {
+    setMobileMenuOpen(false);
+    byId("mobile-menu-toggle").focus();
+  }
+});
+window.matchMedia("(max-width: 720px)").addEventListener("change", () => setMobileMenuOpen(false));
+
 function selectView(view) {
+  if (byId("mobile-menu-toggle").getAttribute("aria-expanded") === "true") {
+    byId("mobile-menu-toggle").focus();
+    setMobileMenuOpen(false);
+  }
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.classList.toggle("active", item.dataset.view === view);
   });

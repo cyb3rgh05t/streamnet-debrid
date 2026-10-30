@@ -24,7 +24,7 @@ export function registerPresenceRoutes(app, { pool, authenticatedAccount }) {
     const account = await authenticatedAccount(request);
     const body = request.body;
     await pool.query(
-      `insert into device_presence
+      `with presence as (insert into device_presence
          (account_id, install_id, profile_id, platform, device_type,
           app_version, app_version_code, distribution, last_seen)
        values ($1, $2, $3, $4, $5, $6, $7, $8, now())
@@ -32,7 +32,11 @@ export function registerPresenceRoutes(app, { pool, authenticatedAccount }) {
          profile_id = excluded.profile_id, platform = excluded.platform,
          device_type = excluded.device_type, app_version = excluded.app_version,
          app_version_code = excluded.app_version_code,
-         distribution = excluded.distribution, last_seen = now()`,
+         distribution = excluded.distribution, last_seen = now()
+         returning account_id, install_id)
+       insert into device_activity_daily (activity_date, account_id, install_id)
+       select (now() at time zone 'UTC')::date, account_id, install_id from presence
+       on conflict (activity_date, account_id, install_id) do nothing`,
       [account.id, body.install_id, body.profile_id || null, body.platform,
         body.device_type, body.app_version || null, body.app_version_code ?? null,
         body.distribution || null],

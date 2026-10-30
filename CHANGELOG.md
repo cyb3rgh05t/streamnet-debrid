@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.035] - 2026-10-30
+
+- Backend-Admin: Balkendiagramm „Aktive Geräte pro Tag“ mit 7-/30-Tage-Auswahl, UTC-Tagesgrenzen und ausdrücklich markierter Demo-Vorschau. Migration 013 speichert pro Account, Installation und Tag einen Eintrag atomar mit dem Heartbeat; keine rückwirkend erfundenen Statistiken. Fehler- und Leerzustände sowie mobil horizontal scrollbar.
+- Standardansicht des Diagramms: 30 Tage. Der heutige Tag ist noch unvollständig; die Werte zeigen täglich aktive Installationen, nicht gleichzeitig online befindliche Geräte.
+- Mobile Navigation bis 720 Pixel über einen goldenen Hamburger-Button ein-/ausklappbar. Menüauswahl, Escape und Wechsel des Breakpoints schließen das Menü; Desktop-Sidebar bleibt sichtbar.
+- Dashboard-Ergebnisse als abgesetzte Badges mit einheitlichen Abständen; erfolgreiche API-/Datenbankverbindung grün mit Statuspunkt. Sidebar-Versionsanzeige und Asset-Cache-Version aktualisiert.
+- Deployment: Migration `013_device_activity_daily.sql` mit dem neuen Image vor dem Start des aktualisierten Backends anwenden. Android und Web unverändert.
+
 ## [2.5.084] - 2026-10-29
 
 - Android-Version: `2.5.084` / Code `485`.

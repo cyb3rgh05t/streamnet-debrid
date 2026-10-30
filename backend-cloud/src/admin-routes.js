@@ -422,6 +422,25 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     };
   });
 
+  app.get("/admin-api/device-activity", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const days = String(request.query?.days || "7");
+    if (!["7", "30"].includes(days)) {
+      return reply.code(400).send({ error: "days must be 7 or 30" });
+    }
+    const result = await pool.query(
+      `select to_char(day, 'YYYY-MM-DD') as date, count(activity.install_id)::int as devices
+         from generate_series(
+           (now() at time zone 'UTC')::date - ($1::int - 1),
+           (now() at time zone 'UTC')::date, interval '1 day') as dates(day)
+         left join device_activity_daily activity on activity.activity_date = dates.day::date
+        group by day order by day`,
+      [Number(days)],
+    );
+    return { timezone: "UTC", days: result.rows };
+  });
+
   app.get("/admin-api/overview", async (request, reply) => {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);

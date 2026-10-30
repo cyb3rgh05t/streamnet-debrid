@@ -76,6 +76,18 @@ const server = createServer(async (request, reply) => {
     if (request.headers.authorization !== "Bearer local-admin-preview-token") {
       return json(reply, 401, { error: "Demo-Anmeldung erforderlich" });
     }
+    if (url.pathname === "/admin-api/device-activity") {
+      const days = url.searchParams.get("days") === "30" ? 30 : 7;
+      const today = new Date();
+      const counts = [24, 31, 28, 46, 39, 57, 42];
+      return json(reply, 200, {
+        timezone: "UTC", demo: true,
+        days: Array.from({ length: days }, (_, index) => {
+          const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1 + index));
+          return { date: date.toISOString().slice(0, 10), devices: counts[index % counts.length] };
+        }),
+      });
+    }
     if (url.pathname === "/admin-api/overview") {
       return json(reply, 200, {
         accounts: 128,
@@ -105,7 +117,7 @@ const server = createServer(async (request, reply) => {
           platform: "linux / x64 (Demo)",
           schema_version: "012_device_presence.sql (Demo)",
         },
-        versions: { backend: "1.0.034" },
+        versions: { backend: "1.0.035" },
         recent_accounts: accounts,
         recent_audits: [
           { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
@@ -118,7 +130,7 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.034", source: "Demo-Backend" },
+          { component: "backend", version: "1.0.035", source: "Demo-Backend" },
           { component: "web", version: "1.0.071", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
           { component: "android", version: "2.5.082", published_at: "2026-10-29T12:45:00Z", source: "Demo-APK-Release (simuliert)" },
         ],

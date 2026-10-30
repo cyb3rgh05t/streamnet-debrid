@@ -13,6 +13,7 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
       queries.push(sql);
       if (sql.includes("from admin_accounts")) return { rows: [{ id: "admin-a" }] };
       if (failDatabase) throw new Error("database unavailable");
+      if (sql.includes("generate_series")) return { rows: [{ date: "2026-10-30", devices: 3 }] };
       if (sql.includes("pg_database_size")) return { rows: [{
         accounts: "12", snapshots: "10", profiles: "24", active_sessions: "7",
         online_devices: "3", events_24h: "50", watch_history_items: "81",
@@ -45,10 +46,24 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
 test("dashboard endpoints require admin authentication before querying or fetching", async (t) => {
   const { app, queries } = await fixture(t);
   t.mock.method(globalThis, "fetch", () => { throw new Error("Unexpected fetch"); });
-  for (const url of ["/admin-api/overview", "/admin-api/updates", "/admin-api/versions"]) {
+  for (const url of ["/admin-api/overview", "/admin-api/updates", "/admin-api/versions", "/admin-api/device-activity"]) {
     assert.equal((await app.inject({ url })).statusCode, 401);
   }
   assert.equal(queries.length, 0);
+});
+
+test("daily device activity is admin-only, uncached and validates periods", async t => {
+  const { app, headers, queries } = await fixture(t);
+  for (const days of ["7", "30"]) {
+    const response = await app.inject({ url: `/admin-api/device-activity?days=${days}`, headers });
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.headers["cache-control"], "no-store");
+    assert.deepEqual(response.json(), { timezone: "UTC", days: [{ date: "2026-10-30", devices: 3 }] });
+  }
+  assert.equal((await app.inject({ url: "/admin-api/device-activity?days=999", headers })).statusCode, 400);
+  const sql = queries.find(query => query.includes("generate_series"));
+  assert.match(sql, /left join device_activity_daily/);
+  assert.match(sql, /time zone 'UTC'/);
 });
 
 test("audit response includes the account-scoped profile name", async (t) => {
