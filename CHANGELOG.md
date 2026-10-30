@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.088] - 2026-10-30
+
+- Android-Version: `2.5.088` / Code `489`.
+- Android-TV-Startseite: Hero-Inhalt dynamisch messen und unterhalb des Navigations-/Profilbereichs halten, auch wenn mehr Metadaten-Badges umbrechen.
+- Android Touch-Dialog „App schließen?“: Text des umrandeten Schließen-Buttons in kontrastreichem neutralem Weiß statt nahezu schwarzem Text.
+- Layout-Regressionstests und drei Touch-/D-Pad-Dialogtests erfolgreich.
+- Backend und Web unverändert.
+
 ## [2.5.087] - 2026-10-30
 
 - Android-Version: `2.5.087` / Code `488`.

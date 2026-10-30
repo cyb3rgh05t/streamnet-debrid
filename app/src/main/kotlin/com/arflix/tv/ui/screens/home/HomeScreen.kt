@@ -114,6 +114,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -2596,59 +2597,74 @@ private fun HomeHeroLayer(
         val configuration = LocalConfiguration.current
         val uiScale = com.arflix.tv.util.LocalTvUiScaleFactor.current
 
-        BoxWithConstraints(
+        SubcomposeLayout(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = AppTopBarContentTopInset)
                 .zIndex(3f)
-        ) {
+        ) { constraints ->
             val heroBottomPadding = com.arflix.tv.ui.components.resolveTvHomeHeroBottomPadding(
                 screenHeightDp = configuration.screenHeightDp,
-                viewportHeightDp = maxHeight.value + AppTopBarContentTopInset.value,
+                viewportHeightDp = constraints.maxHeight.toDp().value,
                 uiScale = uiScale,
-            ).dp
-            heroItem?.let { item ->
-                val isCollection = item.status.orEmpty().startsWith("collection:")
-                val isGenreCollection = item.collectionGroup == CollectionGroupKind.GENRE ||
-                    item.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
-                    item.collectionGroup == CollectionGroupKind.TV_GENRE
-                val heroContentModifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(
-                        start = contentStartPadding,
-                        end = 400.dp
+            )
+            val item = heroItem
+            val isCollection = item?.status.orEmpty().startsWith("collection:")
+            val isGenreCollection = item?.collectionGroup == CollectionGroupKind.GENRE ||
+                item?.collectionGroup == CollectionGroupKind.MOVIE_GENRE ||
+                item?.collectionGroup == CollectionGroupKind.TV_GENRE
+            val hasHeroContent = item != null && (!isCollection || isGenreCollection)
+            val heroContent = if (hasHeroContent) {
+                subcompose("homeHero") {
+                    val contentModifier = Modifier
+                        .padding(start = contentStartPadding, end = 400.dp)
+                    when {
+                        !isCollection -> HeroSection(
+                            item = item!!,
+                            logoUrl = heroLogoUrl,
+                            overviewOverride = heroOverviewOverride,
+                            showBudget = showBudget,
+                            showCertification = showCertification,
+                            autoScrollHomeOverview = autoScrollHomeOverview,
+                            scrollIptvFallbackTitle = scrollIptvFallbackTitle,
+                            modifier = contentModifier,
+                        )
+                        isGenreCollection -> HomeHeroMarqueeTitle(
+                            text = item!!.title.uppercase(),
+                            style = ArflixTypography.heroTitle.copy(
+                                fontSize = 38.sp,
+                                fontWeight = FontWeight.Black,
+                                shadow = Shadow(
+                                    color = Color.Black.copy(alpha = 0.95f),
+                                    offset = Offset(0f, 2f),
+                                    blurRadius = 10f
+                                )
+                            ),
+                            color = TextPrimary,
+                            maxLines = 1,
+                            modifier = contentModifier
+                                .width(420.dp)
+                                .height(72.dp)
+                        )
+                    }
+                }.single().measure(
+                    constraints.copy(
+                        minWidth = 0,
+                        minHeight = 0,
                     )
-                    .offset(y = -heroBottomPadding)
-
-                when {
-                    !isCollection -> HeroSection(
-                        item = item,
-                        logoUrl = heroLogoUrl,
-                        overviewOverride = heroOverviewOverride,
-                        showBudget = showBudget,
-                        showCertification = showCertification,
-                        autoScrollHomeOverview = autoScrollHomeOverview,
-                        scrollIptvFallbackTitle = scrollIptvFallbackTitle,
-                        modifier = heroContentModifier
-                    )
-                    isGenreCollection -> HomeHeroMarqueeTitle(
-                        text = item.title.uppercase(),
-                        style = ArflixTypography.heroTitle.copy(
-                            fontSize = 38.sp,
-                            fontWeight = FontWeight.Black,
-                            shadow = Shadow(
-                                color = Color.Black.copy(alpha = 0.95f),
-                                offset = Offset(0f, 2f),
-                                blurRadius = 10f
-                            )
-                        ),
-                        color = TextPrimary,
-                        maxLines = 1,
-                        modifier = heroContentModifier
-                            .width(420.dp)
-                            .height(72.dp)
-                    )
-                }
+                )
+            } else {
+                null
+            }
+            val heroTop = heroContent?.let {
+                com.arflix.tv.ui.components.resolveTvHomeHeroTop(
+                    viewportHeightDp = constraints.maxHeight.toDp().value,
+                    heroHeightDp = it.height.toDp().value,
+                    bottomPaddingDp = heroBottomPadding,
+                    topBarInsetDp = AppTopBarContentTopInset.value,
+                ).dp.roundToPx()
+            }
+            layout(constraints.maxWidth, constraints.maxHeight) {
+                heroContent?.placeRelative(0, heroTop ?: 0)
             }
         }
     }

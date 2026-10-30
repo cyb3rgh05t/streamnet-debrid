@@ -41,6 +41,30 @@ class DetailsResponsiveLayoutTest {
     }
 
     @Test
+    fun homeHeroStaysBelowNavigationWhenExpandedMetadataMakesItTooTall() {
+        assertThat(
+            resolveTvHomeHeroTop(
+                viewportHeightDp = 480f,
+                heroHeightDp = 310f,
+                bottomPaddingDp = 276f,
+                topBarInsetDp = 98f,
+            )
+        ).isEqualTo(114f)
+    }
+
+    @Test
+    fun homeHeroKeepsItsExistingPositionWhenItAlreadyClearsNavigation() {
+        assertThat(
+            resolveTvHomeHeroTop(
+                viewportHeightDp = 720f,
+                heroHeightDp = 220f,
+                bottomPaddingDp = 281f,
+                topBarInsetDp = 98f,
+            )
+        ).isEqualTo(219f)
+    }
+
+    @Test
     fun tvDetailsAnchorUsesMeasuredHomeHeightWithoutChangingHome() {
         val layout = resolveTvHeroLayout(720, homeHeroHeightDp = 190f, detailsHeaderHeightDp = 112f)
         assertThat(layout.logoTopDp).isWithin(0.01f).of(249.2f)

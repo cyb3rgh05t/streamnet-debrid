@@ -143,11 +143,12 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                             shape = buttonShape,
                             contentPadding = PaddingValues(horizontal = 8.dp),
                             border = BorderStroke(1.dp, accent),
-                            colors = TouchButtonDefaults.outlinedButtonColors(contentColor = colors.textMuted),
+                            colors = TouchButtonDefaults.outlinedButtonColors(contentColor = colors.textPrimary),
                         ) {
                             Text(
                                 text = stringResource(R.string.exit_app_confirm),
                                 style = ArvioSkin.typography.button,
+                                color = colors.textPrimary,
                                 maxLines = 1,
                             )
                         }

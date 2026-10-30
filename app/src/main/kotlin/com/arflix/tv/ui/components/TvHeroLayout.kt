@@ -21,6 +21,17 @@ internal fun resolveTvHomeHeroBottomPadding(
     return originalRowsHeight + 36f + viewportHeightDp * (1f - uiScale)
 }
 
+internal fun resolveTvHomeHeroTop(
+    viewportHeightDp: Float,
+    heroHeightDp: Float,
+    bottomPaddingDp: Float,
+    topBarInsetDp: Float,
+    topBarGapDp: Float = 16f,
+): Float = maxOf(
+    viewportHeightDp - bottomPaddingDp - heroHeightDp,
+    topBarInsetDp + topBarGapDp,
+)
+
 internal fun resolveTvHomeRowsViewportHeight(
     contentHeightDp: Float,
     uiScale: Float = 1f,
