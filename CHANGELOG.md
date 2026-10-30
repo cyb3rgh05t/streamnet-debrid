@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.087] - 2026-10-30
+
+- Android-Version: `2.5.087` / Code `488`.
+- Android-Startseite: Release-Datum, Laufdauer, FSK und Budget im Hero als kompakte dunkle Badges mit dezentem Akzentrahmen; Metadaten umbrechen bei Platzmangel. Anbieterlogo, IMDb und Profil-Sichtbarkeitseinstellungen bleiben erhalten.
+- Android-Detailscreens: Gleiche Metadaten-Badges auf TV, Smartphone und Tablet; auf schmalen Displays mit Zeilenumbruch statt horizontalem Scrollen. FSK und Film-Budget berücksichtigen weiterhin die Profil-Einstellungen.
+- Android: Genre ebenfalls als Badge; Reihenfolge auf Home und in Details: Genre, Release-Datum, Laufdauer.
+- Android-Home: Genre-IDs beim Nachladen und aus dem Detail-Cache übernehmen und bei Katalog-Aktualisierungen erhalten, damit das Genre-Badge auch bei unvollständigen Katalogeinträgen erscheint.
+- Android: IMDb-Rating im Home-Hero und Detailkopf mit Badge nur um die Zahl; IMDb-Logo bleibt separat.
+- Android-Home: Bereits geladene Hero-Metadaten bei Katalog- und Gesehen-Refresh erhalten; unvollständige CW-Zwischenstände und Platzhalterwerte lassen Badges nicht mehr kurz verschwinden.
+- 60 gezielte Home-/CW-Regressionstests und sieben Metadaten-UI-Tests im Emulator erfolgreich; keine FPS-Messung auf einem echten Gerät.
+- Backend und Web unverändert.
+
 ## [2.5.086] - 2026-10-30
 
 - Android-Version: `2.5.086` / Code `487`.

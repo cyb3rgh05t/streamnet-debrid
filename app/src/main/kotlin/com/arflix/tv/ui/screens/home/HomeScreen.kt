@@ -41,6 +41,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import com.arflix.tv.ui.components.HeroMetadataBadge
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -2179,7 +2182,7 @@ private fun IptvHeroSection(
     }
 }
 
-@OptIn(ExperimentalTvMaterial3Api::class)
+@OptIn(ExperimentalTvMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 internal fun HeroSection(
     item: MediaItem,
@@ -2394,82 +2397,30 @@ internal fun HeroSection(
 
                     Column(
                         modifier = Modifier.width(heroTextWidth),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(3.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            if (displayDate.isNotEmpty()) {
-                                Text(
-                                    text = displayDate,
-                                    style = ArflixTypography.caption.copy(
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        shadow = textShadow
-                                    ),
-                                    color = Color.White,
-                                    maxLines = 1
-                                )
-
-                                if (hasGenre || hasDuration) {
-                                    Text(
-                                        text = "|",
-                                        style = ArflixTypography.caption.copy(
-                                            fontSize = 13.sp,
-                                            shadow = textShadow
-                                        ),
-                                        color = resolveAccentColor(ArvioSkin.colors.accent)
-                                    )
-                                }
+                            if (hasGenre) {
+                                HeroMetadataBadge(genreText)
                             }
 
-                            if (hasGenre) {
-                                Text(
-                                    text = com.arflix.tv.ui.components.metadataTextWithAccentSeparators(
-                                        genreText, resolveAccentColor(ArvioSkin.colors.accent)
-                                    ),
-                                    style = ArflixTypography.caption.copy(
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        shadow = textShadow
-                                    ),
-                                    color = Color.White,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.weight(1f, fill = false)
-                                )
+                            if (displayDate.isNotEmpty()) {
+                                HeroMetadataBadge(displayDate)
                             }
 
                             if (hasDuration) {
-                                if (hasGenre) {
-                                    Text(
-                                        text = "|",
-                                        style = ArflixTypography.caption.copy(
-                                            fontSize = 13.sp,
-                                            shadow = textShadow
-                                        ),
-                                        color = resolveAccentColor(ArvioSkin.colors.accent)
-                                    )
-                                }
-                                Text(
-                                    text = currentItem.duration,
-                                    style = ArflixTypography.caption.copy(
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        shadow = textShadow
-                                    ),
-                                    color = Color.White,
-                                    maxLines = 1
-                                )
+                                HeroMetadataBadge(currentItem.duration)
                             }
                         }
 
                         if (hasSecondaryMetadata) {
-                            Row(
+                            FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
                                 if (primaryNetworkLogo != null) {
@@ -2490,79 +2441,42 @@ internal fun HeroSection(
                                         modifier = Modifier
                                             .height(16.dp)
                                             .width(58.dp)
+                                            .align(Alignment.CenterVertically)
                                     )
 
-                                    if (hasRatingMetadata || hasCertificationMetadata || hasBudgetMetadata) {
+                                    if (hasRatingMetadata) {
                                         Text(
                                             text = "|",
                                             style = ArflixTypography.caption.copy(
                                                 fontSize = 12.sp,
                                                 shadow = textShadow
                                             ),
-                                            color = resolveAccentColor(ArvioSkin.colors.accent)
+                                            color = resolveAccentColor(ArvioSkin.colors.accent),
+                                            modifier = Modifier.align(Alignment.CenterVertically)
                                         )
                                     }
                                 }
 
                                 if (hasRatingMetadata) {
-                                    ImdbSvgRatingBadge(
-                                        rating = rating,
-                                        imageLoader = metadataLogoImageLoader,
-                                        ratingFontSize = 13,
-                                        logoWidth = 36.dp,
-                                        logoHeight = 15.dp,
-                                        textShadow = textShadow
-                                    )
-
-                                    if (hasCertificationMetadata || hasBudgetMetadata) {
-                                        Text(
-                                            text = "|",
-                                            style = ArflixTypography.caption.copy(
-                                                fontSize = 12.sp,
-                                                shadow = textShadow
-                                            ),
-                                            color = resolveAccentColor(ArvioSkin.colors.accent)
+                                    Box(modifier = Modifier.align(Alignment.CenterVertically)) {
+                                        ImdbSvgRatingBadge(
+                                            rating = rating,
+                                            imageLoader = metadataLogoImageLoader,
+                                            ratingFontSize = 13,
+                                            logoWidth = 36.dp,
+                                            logoHeight = 15.dp,
+                                            badgeNumber = true,
+                                            textShadow = textShadow
                                         )
                                     }
                                 }
 
                                 if (hasCertificationMetadata) {
-                                    Text(
-                                        text = certificationText,
-                                        style = ArflixTypography.caption.copy(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            shadow = textShadow
-                                        ),
-                                        color = Color.White.copy(alpha = 0.74f),
-                                        maxLines = 1
-                                    )
-
-                                    if (hasBudgetMetadata) {
-                                        Text(
-                                            text = "|",
-                                            style = ArflixTypography.caption.copy(
-                                                fontSize = 12.sp,
-                                                shadow = textShadow
-                                            ),
-                                            color = resolveAccentColor(ArvioSkin.colors.accent)
-                                        )
-                                    }
+                                    HeroMetadataBadge(certificationText)
                                 }
 
                                 if (hasBudgetMetadata) {
-                                    Text(
-                                        text = "${stringResource(R.string.budget)} $budgetText",
-                                        style = ArflixTypography.caption.copy(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Medium,
-                                            shadow = textShadow
-                                        ),
-                                        color = Color.White.copy(alpha = 0.74f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f, fill = false)
-                                    )
+                                    HeroMetadataBadge("${stringResource(R.string.budget)} $budgetText")
                                 }
                             }
                         }
@@ -4358,7 +4272,8 @@ private fun ImdbSvgRatingBadge(
     ratingFontSize: Int,
     logoWidth: Dp,
     logoHeight: Dp,
-    textShadow: Shadow
+    textShadow: Shadow,
+    badgeNumber: Boolean = false
 ) {
     val context = LocalContext.current
     val request = remember(context) {
@@ -4381,7 +4296,9 @@ private fun ImdbSvgRatingBadge(
                 .width(logoWidth)
                 .height(logoHeight)
         )
-        Text(
+        if (badgeNumber) {
+            HeroMetadataBadge(rating)
+        } else Text(
             text = rating,
             style = ArflixTypography.caption.copy(
                 fontSize = ratingFontSize.sp,

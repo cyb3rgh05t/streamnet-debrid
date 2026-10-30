@@ -139,12 +139,13 @@ internal fun mergeHomeHeroMetadata(incoming: MediaItem, visible: MediaItem?): Me
         image = incoming.image.ifBlank { visible.image },
         backdrop = incoming.backdrop?.takeIf { it.isNotBlank() } ?: visible.backdrop,
         year = incoming.year.ifBlank { visible.year },
-        duration = incoming.duration.ifBlank { visible.duration },
+        genreIds = incoming.genreIds.ifEmpty { visible.genreIds },
+        duration = incoming.duration.takeIf { it.isNotBlank() && it != "0m" } ?: visible.duration,
         releaseDate = incoming.releaseDate?.takeIf { it.isNotBlank() } ?: visible.releaseDate,
         imdbRating = incoming.imdbRating.ifBlank { visible.imdbRating },
         tmdbRating = incoming.tmdbRating.ifBlank { visible.tmdbRating },
         certification = incoming.certification?.takeIf { it.isNotBlank() } ?: visible.certification,
-        budget = incoming.budget ?: visible.budget,
+        budget = incoming.budget?.takeIf { it > 0L } ?: visible.budget,
         overview = incoming.overview.ifBlank { visible.overview },
         primaryNetworkLogo = incoming.primaryNetworkLogo ?: visible.primaryNetworkLogo,
     )
@@ -570,7 +571,8 @@ class HomeViewModel @Inject constructor(
         val fullyLoaded: Boolean = false,
         val year: String = "",
         val image: String = "",
-        val backdrop: String? = null
+        val backdrop: String? = null,
+        val genreIds: List<Int> = emptyList()
     )
 
     private data class CategoryPaginationState(
@@ -963,14 +965,15 @@ class HomeViewModel @Inject constructor(
     private fun MediaItem.withHeroDetails(snapshot: HeroDetailsSnapshot): MediaItem {
         return copy(
             year = snapshot.year.ifBlank { year },
+            genreIds = snapshot.genreIds.ifEmpty { genreIds },
             image = snapshot.image.ifBlank { image },
             backdrop = snapshot.backdrop?.takeIf { it.isNotBlank() } ?: backdrop,
-            duration = snapshot.duration.ifEmpty { duration },
+            duration = snapshot.duration.takeIf { it.isNotBlank() && it != "0m" } ?: duration,
             releaseDate = snapshot.releaseDate?.takeIf { it.isNotBlank() } ?: releaseDate,
             imdbRating = snapshot.imdbRating.ifEmpty { imdbRating },
             tmdbRating = snapshot.tmdbRating.ifEmpty { tmdbRating },
             certification = snapshot.certification?.takeIf { it.isNotBlank() } ?: certification,
-            budget = snapshot.budget ?: budget,
+            budget = snapshot.budget?.takeIf { it > 0L } ?: budget,
             overview = snapshot.overview.ifBlank { overview },
             primaryNetworkLogo = snapshot.primaryNetworkLogo ?: primaryNetworkLogo
         )
@@ -990,7 +993,8 @@ class HomeViewModel @Inject constructor(
             fullyLoaded = false,
             year = cached.year,
             image = cached.image,
-            backdrop = cached.backdrop
+            backdrop = cached.backdrop,
+            genreIds = cached.genreIds
         )
     }
 
@@ -1056,7 +1060,8 @@ class HomeViewModel @Inject constructor(
                 fullyLoaded = details != null,
                 year = details?.year.orEmpty(),
                 image = details?.image.orEmpty(),
-                backdrop = details?.backdrop
+                backdrop = details?.backdrop,
+                genreIds = details?.genreIds.orEmpty()
             )
         }
     }
@@ -3926,10 +3931,11 @@ class HomeViewModel @Inject constructor(
                     )
                 }
                 val stabilizedHero = heroItem?.let { hero ->
-                    stabilizedCategories.asSequence()
+                    val candidate = stabilizedCategories.asSequence()
                         .flatMap { it.items.asSequence() }
                         .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
                         ?: hero
+                    mergeHomeHeroMetadata(candidate, _uiState.value.heroItem)
                 }
                 stabilizedCategories.forEach { category ->
                     categoryPaginationStates[category.id]?.loadedCount = category.items.size
@@ -5281,20 +5287,7 @@ class HomeViewModel @Inject constructor(
                         updatedCategories.asSequence()
                             .flatMap { it.items.asSequence() }
                             .firstOrNull { it.id == hero.id && it.mediaType == hero.mediaType }
-                            ?.let { candidate ->
-                                candidate.copy(
-                                    image = candidate.image.ifBlank { hero.image },
-                                    backdrop = candidate.backdrop ?: hero.backdrop,
-                                    duration = candidate.duration.ifBlank { hero.duration },
-                                    releaseDate = candidate.releaseDate ?: hero.releaseDate,
-                                    imdbRating = candidate.imdbRating.ifBlank { hero.imdbRating },
-                                    tmdbRating = candidate.tmdbRating.ifBlank { hero.tmdbRating },
-                                    certification = candidate.certification ?: hero.certification,
-                                    budget = candidate.budget ?: hero.budget,
-                                    overview = candidate.overview.ifBlank { hero.overview },
-                                    primaryNetworkLogo = candidate.primaryNetworkLogo ?: hero.primaryNetworkLogo,
-                                )
-                            }
+                            ?.let { candidate -> mergeHomeHeroMetadata(candidate, hero) }
                             ?: hero
                     }
                     _uiState.value = currentState.copy(
@@ -5512,6 +5505,7 @@ class HomeViewModel @Inject constructor(
             !looksTruncated &&
             item.duration.isNotBlank() &&
             item.duration != "0m" &&
+            item.genreIds.isNotEmpty() &&
             item.imdbRating.isNotBlank() &&
             item.primaryNetworkLogo != null
         ) {

@@ -8,6 +8,47 @@ import org.junit.Test
 
 class HomeStartupCacheTest {
     @Test
+    fun `partial continue watching refresh keeps badges but updates playback state`() {
+        val visible = MediaItem(
+            id = 1, title = "Movie", year = "1997", releaseDate = "12 Dec 1997",
+            duration = "2h 0m", genreIds = listOf(27, 53), imdbRating = "7.9",
+            certification = "FSK 18", budget = 24_000_000L,
+            primaryNetworkLogo = "provider-logo", progress = 20,
+        )
+        val partial = MediaItem(
+            id = 1, title = "Movie", duration = "0m", releaseDate = "",
+            certification = "", budget = 0L, progress = 55, isPartiallyWatched = true,
+        )
+        val refreshed = mergeHomeHeroMetadata(partial, visible)
+
+        assertEquals(
+            visible.copy(progress = 55, isPartiallyWatched = true),
+            refreshed,
+        )
+        assertEquals(refreshed, mergeHomeHeroMetadata(partial, refreshed))
+    }
+
+    @Test
+    fun `catalog refresh preserves hydrated hero genres`() {
+        val visible = MediaItem(id = 1, title = "Movie", genreIds = listOf(27, 53))
+        val incoming = MediaItem(id = 1, title = "Movie")
+
+        assertEquals(visible.genreIds, mergeHomeHeroMetadata(incoming, visible).genreIds)
+    }
+
+    @Test
+    fun `fresh hero genres replace previous genres without leaking across titles`() {
+        val visible = MediaItem(id = 1, title = "Movie", genreIds = listOf(27))
+        val incoming = MediaItem(id = 1, title = "Movie", genreIds = listOf(28))
+
+        assertEquals(listOf(28), mergeHomeHeroMetadata(incoming, visible).genreIds)
+        assertEquals(
+            emptyList<Int>(),
+            mergeHomeHeroMetadata(MediaItem(id = 2, title = "Other"), visible).genreIds
+        )
+    }
+
+    @Test
     fun `cache keeps a compact first page for every populated category`() {
         val categories = listOf(
             Category(
