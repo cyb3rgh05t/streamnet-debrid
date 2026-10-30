@@ -524,7 +524,7 @@ data class ArmMappingEntry(
 
 private object StreamApiRegexes {
     val QUALITY_TAGS_REGEX = Regex(".*\\[.*\\].*")
-    val EMOJI_SIZE_REGEX = """💾\s*([\d.]+\s*[GMKT]B)""".toRegex(RegexOption.IGNORE_CASE)
-    val PLAIN_SIZE_REGEX = """(\d+\.?\d*)\s*(GB|MB|TB|KB)""".toRegex(RegexOption.IGNORE_CASE)
+    val EMOJI_SIZE_REGEX = """💾\s*(\d+(?:[.,]\d+)?\s*[GMKT]B)(?![\p{L}\p{N}_/])""".toRegex(RegexOption.IGNORE_CASE)
+    val PLAIN_SIZE_REGEX = """(?<![\p{L}\p{N}_.,])(\d+(?:[.,]\d+)?)\s*(GB|MB|TB|KB)(?![\p{L}\p{N}_/])""".toRegex(RegexOption.IGNORE_CASE)
     val SEEDER_REGEX = """👤\s*(\d+)""".toRegex()
 }

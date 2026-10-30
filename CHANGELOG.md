@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.085] - 2026-10-30
+
+- Android-Version: `2.5.085` / Code `486`.
+- Android-Quellensuche: Größenparser verwechselt Bitraten wie „9.4 Mbps“ nicht mehr mit „9.4 MB“. Tatsächliche Paketgrößen wie „7.79 GB“ werden für Quellen-Badge, Sortierung und Player übernommen; Player-Fallback ebenfalls gegen Bitraten abgesichert.
+- Sechs gezielte Metadaten-/Größenparser-Tests erfolgreich. Backend und Web unverändert.
+
 ## [Backend 1.0.037] - 2026-10-30
 
 - Erneute Veröffentlichung mit aktualisierter Paket-, Sidebar- und Asset-Version; keine funktionalen Änderungen gegenüber Backend 1.0.036.

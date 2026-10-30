@@ -6765,7 +6765,7 @@ private object PlayerScreenRegexes {
     val FOUND_SOURCES_REGEX = Regex("^Found (\\d+) sources \\((\\d+)/(\\d+)\\)$")
     val BRACKET_REGEX = Regex("^\\[[^]]+]")
     val MULTI_SPACE_REGEX = Regex("\\s+")
-    val SIZE_REGEX = Regex("""(\d+(?:\.\d+)?)\s*(TIB|GIB|MIB|KIB|TB|GB|MB|KB)""")
+    val SIZE_REGEX = Regex("""(?<![\p{L}\p{N}_.,])(\d+(?:\.\d+)?)\s*(TIB|GIB|MIB|KIB|TB|GB|MB|KB)(?![\p{L}\p{N}_/])""")
 }
 
 @OptIn(ExperimentalTvMaterial3Api::class)
