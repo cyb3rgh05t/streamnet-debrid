@@ -117,7 +117,7 @@ const server = createServer(async (request, reply) => {
           platform: "linux / x64 (Demo)",
           schema_version: "012_device_presence.sql (Demo)",
         },
-        versions: { backend: "1.0.036" },
+        versions: { backend: "1.0.037" },
         recent_accounts: accounts,
         recent_audits: [
           { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
@@ -130,7 +130,7 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.036", source: "Demo-Backend" },
+          { component: "backend", version: "1.0.037", source: "Demo-Backend" },
           { component: "web", version: "1.0.071", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
           { component: "android", version: "2.5.082", published_at: "2026-10-29T12:45:00Z", source: "Demo-APK-Release (simuliert)" },
         ],

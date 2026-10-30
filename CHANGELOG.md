@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.037] - 2026-10-30
+
+- Erneute Veröffentlichung mit aktualisierter Paket-, Sidebar- und Asset-Version; keine funktionalen Änderungen gegenüber Backend 1.0.036.
+- Keine neue Datenbankmigration. Migration 013 bleibt erforderlich; Android und Web unverändert.
+
 ## [Backend 1.0.036] - 2026-10-30
 
 - Geräteaktivitätsdiagramm startet wieder mit 7 Tagen; 30 Tage bleiben auswählbar.
