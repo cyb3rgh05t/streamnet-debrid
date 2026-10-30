@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.086] - 2026-10-30
+
+- Android-Version: `2.5.086` / Code `487`.
+- Android: „App schließen?“-Dialog verwendet auf Smartphone/Tablet touchfähige Material-Buttons mit 48-dp-Tippflächen; TV-Fokus und D-Pad-Bedienung bleiben erhalten.
+- Android: Beim Zurückgehen aus dem Player nur noch auf die lokale Fortschritts-/Gesehen-Sicherung warten. History-, Tracking-, Cloud- und Launcher-Sync laufen geordnet außerhalb des Player-Lebenszyklus weiter; Profil-/Accountwechsel brechen alte Aufträge ab. Doppelte finale Speicherung und doppelte Cloud-Pushes vermieden; automatische Folgenwechsel behalten die vollständige Speicherbarriere.
+- Fortsetzen berücksichtigt neuere lokale Zeitstempel statt einen älteren Cloud-Stand nach Zurückspulen zu bevorzugen. Verzögerte Nächste-Folge-Einträge überschreiben keine neueren lokalen Wiedergabestände.
+- Debug-Build, 52 gezielte Playback-/History-/Fortsetzen-Tests und drei Touch-/D-Pad-Tests im Emulator erfolgreich. Player-Rückkehrzeit noch nicht auf einem echten Gerät gemessen.
+- Backend und Web unverändert.
+
 ## [2.5.085] - 2026-10-30
 
 - Android-Version: `2.5.085` / Code `486`.

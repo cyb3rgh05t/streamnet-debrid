@@ -9,6 +9,19 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, and release artifact folders.
 
+## Returning from playback
+
+Back pauses playback and waits for local Continue Watching / watched-state
+persistence, not network sync. An application-scoped queue finishes history,
+tracking, cloud and launcher updates after the player closes. Local writes and
+remote updates preserve submission order independently; pending network work does
+not block a newer local save. Profile/account changes cancel old queued work.
+Local changes notify the existing cloud-sync recovery mechanism; remote jobs
+themselves are in-process and do not survive process termination.
+
+Episode transitions retain the full-save barrier. Resume selection compares
+timestamps so an older cloud position cannot undo a newer local rewind.
+
 ## Screenshots
 
 ### TV launcher Continue Watching

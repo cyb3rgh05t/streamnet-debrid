@@ -738,13 +738,17 @@ class TraktRepository @Inject constructor(
     /**
      * Mark a movie watched in local caches and Supabase without sending another Trakt request.
      */
-    suspend fun markMovieWatchedWithoutTraktSync(tmdbId: Int) {
+    suspend fun markMovieWatchedWithoutTraktSync(tmdbId: Int, syncToBackend: Boolean = true) {
         ensureProfileCacheScope()
         updateWatchedCache(tmdbId, null, null, true)
         persistLocalWatchedSnapshotForCurrentProfile()
         recordLocalWatchedChange(tmdbId, null, null)
         removeFromContinueWatchingCache(tmdbId, null, null, MediaType.MOVIE)
 
+        if (syncToBackend) syncMovieWatchedToBackend(tmdbId)
+    }
+
+    suspend fun syncMovieWatchedToBackend(tmdbId: Int) {
         try {
             syncService.markMovieWatchedInSupabaseOnly(tmdbId)
         } catch (e: Exception) {
@@ -812,7 +816,12 @@ class TraktRepository @Inject constructor(
     /**
      * Mark episode watched in local caches and Supabase without sending another Trakt request.
      */
-    suspend fun markEpisodeWatchedWithoutTraktSync(showTmdbId: Int, season: Int, episode: Int) {
+    suspend fun markEpisodeWatchedWithoutTraktSync(
+        showTmdbId: Int,
+        season: Int,
+        episode: Int,
+        syncToBackend: Boolean = true,
+    ) {
         ensureProfileCacheScope()
         updateWatchedCache(showTmdbId, season, episode, true)
         updateShowWatchedCache(showTmdbId, season, episode, true)
@@ -820,6 +829,10 @@ class TraktRepository @Inject constructor(
         recordLocalWatchedChange(showTmdbId, season, episode)
         removeFromContinueWatchingCache(showTmdbId, season, episode)
 
+        if (syncToBackend) syncEpisodeWatchedToBackend(showTmdbId, season, episode)
+    }
+
+    suspend fun syncEpisodeWatchedToBackend(showTmdbId: Int, season: Int, episode: Int) {
         try {
             val traktShowId = tmdbToTraktIdCache[showTmdbId]
             syncService.markEpisodeWatchedInSupabaseOnly(showTmdbId, season, episode, traktShowId)
@@ -2370,7 +2383,8 @@ class TraktRepository @Inject constructor(
         streamKey: String? = null,
         streamAddonId: String? = null,
         streamTitle: String? = null,
-        year: String = ""
+        year: String = "",
+        onlyIfNotUpdatedAfter: Long? = null,
     ) {
         ensureProfileCacheScope()
         if (SportsAddonCapabilities.isLiveStreamOrSportsItem(
@@ -2414,27 +2428,28 @@ class TraktRepository @Inject constructor(
             updatedAtMs = System.currentTimeMillis()
         )
 
-        // Load existing items (raw - no enrichment needed when saving)
-        val existingItems = loadLocalContinueWatchingRaw().toMutableList()
-
-        // Remove ALL existing entries for this show/movie (will add updated one).
-        // For TV: removes any episode of the same show, so CW only has the latest episode per show.
-        existingItems.removeAll { existing ->
-            existing.id == tmdbId && existing.mediaType == mediaType
-        }
-
-        // Add to front (most recent)
-        existingItems.add(0, item)
-
-        // Keep only top items
-        val trimmed = existingItems.take(Constants.MAX_CONTINUE_WATCHING)
-
-        // Persist
-        val json = gson.toJson(trimmed)
         val saveKey = localContinueWatchingKey()
+        var savedItems: List<ContinueWatchingItem>? = null
         context.traktDataStore.edit { prefs ->
-            prefs[saveKey] = json
+            val existingItems = decodeContinueWatchingList(prefs[saveKey].orEmpty()).filterNot {
+                SportsAddonCapabilities.isLiveStreamOrSportsItem(
+                    mediaType = it.mediaType, id = it.id, streamAddonId = it.streamAddonId, title = it.title,
+                )
+            }
+            // A delayed completion must not replace progress from a newer playback session.
+            if (onlyIfNotUpdatedAfter != null && existingItems.any {
+                    it.id == tmdbId && it.mediaType == mediaType &&
+                        it.updatedAtMs >= onlyIfNotUpdatedAfter
+                }) {
+                return@edit
+            }
+            val trimmed = (listOf(item) + existingItems.filterNot {
+                it.id == tmdbId && it.mediaType == mediaType
+            }).take(Constants.MAX_CONTINUE_WATCHING)
+            prefs[saveKey] = gson.toJson(trimmed)
+            savedItems = trimmed
         }
+        val trimmed = savedItems ?: return
         clearDismissedContinueWatching(mediaType, tmdbId, season, episode)
 
         // Only update the in-memory CW cache for non-Trakt profiles.
@@ -2455,6 +2470,11 @@ class TraktRepository @Inject constructor(
             preloadedProfileCache[currentProfileId()] = trimmed
         }
         continueWatchingUpdates.upsert(currentProfileId(), item)
+        cloudSyncInvalidationBus.markDirty(
+            CloudSyncScope.LOCAL_HISTORY,
+            currentProfileId(),
+            "playback progress saved",
+        )
     }
 
     /**

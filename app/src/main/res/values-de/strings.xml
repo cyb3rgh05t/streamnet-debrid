@@ -1089,6 +1089,7 @@
     <string name="player_muted">Stummgeschaltet</string>
     <string name="player_cd_setup">Einrichten</string>
     <string name="player_cd_error">Fehler</string>
+    <string name="player_error_save_progress">Wiedergabestand konnte nicht gespeichert werden. Bitte erneut versuchen.</string>
     <string name="player_addon_setup_required">Addon-Einrichtung erforderlich</string>
     <string name="player_playback_error">Wiedergabefehler</string>
     <string name="player_error_generic">Ein unbekannter Fehler ist aufgetreten</string>

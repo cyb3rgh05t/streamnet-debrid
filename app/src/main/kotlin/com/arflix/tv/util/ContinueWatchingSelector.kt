@@ -1,5 +1,22 @@
 package com.arflix.tv.util
 
+import java.time.Instant
+import java.time.format.DateTimeParseException
+
+internal fun isLocalPlaybackNewer(
+    localUpdatedAtMs: Long,
+    remoteUpdatedAt: String?,
+    remotePausedAt: String?,
+): Boolean {
+    fun epoch(value: String?): Long = try {
+        value?.takeIf { it.isNotBlank() }?.let { Instant.parse(it).toEpochMilli() } ?: 0L
+    } catch (error: DateTimeParseException) {
+        AppLogger.w("PlaybackProgress", "Invalid remote playback timestamp")
+        0L
+    }
+    return localUpdatedAtMs > 0L && localUpdatedAtMs >= maxOf(epoch(remoteUpdatedAt), epoch(remotePausedAt))
+}
+
 data class EpisodePointer(val season: Int, val episode: Int)
 
 data class EpisodeProgressSnapshot(

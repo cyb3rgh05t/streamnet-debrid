@@ -310,24 +310,33 @@ fun PlayerScreen(
         if (!backNavigationInProgress) {
             backNavigationInProgress = true
             coroutineScope.launch {
-                val player = playerForBack
-                if (player != null) {
-                    val safeDuration = player.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
-                    val safePosition = player.currentPosition.coerceAtLeast(0L)
-                    val safeProgressPercent = if (safeDuration > 0L) {
-                        ((safePosition.toDouble() / safeDuration.toDouble()) * 100.0)
-                            .toInt()
-                            .coerceIn(0, 100)
-                    } else 0
-                    viewModel.saveProgressAndWait(
-                        position = safePosition,
-                        duration = safeDuration,
-                        progressPercent = safeProgressPercent,
-                        isPlaying = false,
-                        playbackState = player.playbackState,
-                    )
+                try {
+                    val player = playerForBack
+                    if (player != null) {
+                        val state = player.playbackState
+                        val safeDuration = player.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
+                        val safePosition = if (state == Player.STATE_ENDED) safeDuration else player.currentPosition.coerceAtLeast(0L)
+                        val safeProgressPercent = if (safeDuration > 0L) {
+                            ((safePosition.toDouble() / safeDuration.toDouble()) * 100.0)
+                                .toInt()
+                                .coerceIn(0, 100)
+                        } else 0
+                        player.pause()
+                        viewModel.saveProgressForExit(
+                            position = safePosition,
+                            duration = safeDuration,
+                            progressPercent = safeProgressPercent,
+                            playbackState = state,
+                        )
+                    }
+                    onBack()
+                } catch (error: Exception) {
+                    backNavigationInProgress = false
+                    if (error is kotlinx.coroutines.CancellationException) throw error
+                    android.widget.Toast.makeText(
+                        context, R.string.player_error_save_progress, android.widget.Toast.LENGTH_LONG,
+                    ).show()
                 }
-                onBack()
             }
         }
     }
@@ -2631,7 +2640,7 @@ fun PlayerScreen(
                 )
             }
 
-            if (currentPosition > 0 && duration > 0) {
+            if (currentPosition > 0 && duration > 0 && !backNavigationInProgress) {
                 val currentSecond = (currentPosition / 1000L).coerceAtLeast(0L)
                 val shouldReport =
                     (!exoPlayer.isPlaying && currentSecond != lastProgressReportSecond) ||
@@ -2658,14 +2667,7 @@ fun PlayerScreen(
                 exoPlayer.playbackState == Player.STATE_ENDED
             ) {
                 movieCompletionHandled = true
-                viewModel.saveProgress(
-                    position = duration,
-                    duration = duration,
-                    progressPercent = 100,
-                    isPlaying = false,
-                    playbackState = Player.STATE_ENDED,
-                )
-                onBack()
+                navigateBackAfterProgressSave()
                 break
             }
 
@@ -2728,7 +2730,7 @@ fun PlayerScreen(
             controlsSeekJob?.cancel()
             playerReleasedAtomic.set(true)
             playerReleased = true
-            if (!nextEpisodeTransitionInProgress) {
+            if (!nextEpisodeTransitionInProgress && !backNavigationInProgress) {
                 runCatching {
                     val safeDuration = exoPlayer.duration.takeIf { it > 0L && it != C.TIME_UNSET } ?: 0L
                     val safeProgressPercent = if (safeDuration > 0L) {
@@ -4674,7 +4676,7 @@ fun PlayerScreen(
                             text = stringResource(R.string.back).uppercase(),
                             isFocused = if (isSetup) errorModalFocusIndex == 0 else errorModalFocusIndex == 1,
                             isPrimary = isSetup,
-                            onClick = onBack
+                            onClick = navigateBackAfterProgressSave
                         )
                     }
                 }

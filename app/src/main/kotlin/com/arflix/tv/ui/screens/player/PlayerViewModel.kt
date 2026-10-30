@@ -24,6 +24,8 @@ import com.arflix.tv.data.model.isXtreamVodSource
 import com.arflix.tv.data.repository.MediaRepository
 import com.arflix.tv.data.repository.HomeServerRepository
 import com.arflix.tv.data.repository.PlaybackTelemetryRepository
+import com.arflix.tv.data.repository.PlaybackProgressSaveQueue
+import com.arflix.tv.data.repository.PendingPlaybackSave
 import com.arflix.tv.data.repository.ProfileManager
 import com.arflix.tv.data.repository.SkipInterval
 import com.arflix.tv.data.repository.SkipIntroRepository
@@ -39,6 +41,7 @@ import com.arflix.tv.util.AnimeMapper
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.fallbackAdjacentEpisodeIdentity
+import com.arflix.tv.util.isLocalPlaybackNewer
 import com.arflix.tv.util.settingsDataStore
 import com.arflix.tv.util.weightedSubtitleScore
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -246,6 +249,7 @@ class PlayerViewModel @Inject constructor(
     private val watchHistoryRepository: WatchHistoryRepository,
     private val cloudSyncRepository: CloudSyncRepository,
     private val launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
+    private val playbackProgressSaveQueue: PlaybackProgressSaveQueue,
     private val animeMapper: AnimeMapper,
     private val tmdbApi: TmdbApi,
     private val skipIntroRepository: SkipIntroRepository,
@@ -287,11 +291,19 @@ class PlayerViewModel @Inject constructor(
     private var currentAddonOrderedIds: List<String> = emptyList()
     private var currentInstalledAddons: List<Addon> = emptyList()
     private var currentIsLiveStreamPlayback: Boolean = false
-    private var lastScrobbleTime: Long = 0
-    private var lastWatchHistorySaveTime: Long = 0
-    private var lastWatchHistorySavedPositionSeconds: Long = -1L
-    private var lastIsPlaying: Boolean = false
-    private var hasMarkedWatched: Boolean = false
+    private class ProgressSaveState {
+        var lastScrobbleTime = 0L
+        var lastWatchHistorySaveTime = 0L
+        var lastWatchHistorySavedPositionSeconds = -1L
+        @Volatile var lastIsPlaying = false
+        var hasMarkedWatched = false
+        var lastCloudPushTime = 0L
+    }
+
+    private enum class ProgressScrobbleAction { START, PAUSE, PROGRESS }
+
+    private var progressSaveState = ProgressSaveState()
+    private val lastIsPlaying: Boolean get() = progressSaveState.lastIsPlaying
     private var hasManualSubtitleSelection: Boolean = false
     // True only when the user explicitly picked a subtitle track from the menu (not AI/auto-match).
     // A late-arriving embedded preferred-language track overrides auto selections but never this.
@@ -319,17 +331,23 @@ class PlayerViewModel @Inject constructor(
         return fallbackAdjacentEpisodeIdentity(current, forward)
     }
 
-    private suspend fun resolveNextEpisodeIdentity(): EpisodeIdentity? {
-        val season = currentSeason ?: return null
-        val episode = currentEpisode ?: return null
-        val currentSeasonDetails = tmdbApi.getTvSeason(currentMediaId, season, Constants.TMDB_API_KEY)
+    private suspend fun resolveNextEpisodeIdentity(
+        mediaId: Int = currentMediaId,
+        season: Int? = currentSeason,
+        episode: Int? = currentEpisode,
+        displaySeason: Int? = currentDisplaySeason,
+        displayEpisode: Int? = currentDisplayEpisode,
+    ): EpisodeIdentity? {
+        season ?: return null
+        episode ?: return null
+        val currentSeasonDetails = tmdbApi.getTvSeason(mediaId, season, Constants.TMDB_API_KEY)
         val nextInSeason = currentSeasonDetails.episodes
             .filter { it.seasonNumber == season && it.episodeNumber > episode }
             .minByOrNull { it.episodeNumber }
         if (nextInSeason != null) {
             return EpisodeIdentity(
-                displaySeason = currentDisplaySeason ?: season,
-                displayEpisode = (currentDisplayEpisode ?: episode) + 1,
+                displaySeason = displaySeason ?: season,
+                displayEpisode = (displayEpisode ?: episode) + 1,
                 tmdbSeason = season,
                 tmdbEpisode = nextInSeason.episodeNumber
             )
@@ -337,14 +355,14 @@ class PlayerViewModel @Inject constructor(
 
         val nextSeason = currentSeasonDetails.seasonNumber + 1
         val nextSeasonDetails = runCatching {
-            tmdbApi.getTvSeason(currentMediaId, nextSeason, Constants.TMDB_API_KEY)
+            tmdbApi.getTvSeason(mediaId, nextSeason, Constants.TMDB_API_KEY)
         }.getOrNull() ?: return null
         val firstEpisode = nextSeasonDetails.episodes
             .filter { it.seasonNumber == nextSeason && it.episodeNumber > 0 }
             .minByOrNull { it.episodeNumber }
             ?: return null
         return EpisodeIdentity(
-            displaySeason = (currentDisplaySeason ?: season) + 1,
+            displaySeason = (displaySeason ?: season) + 1,
             displayEpisode = firstEpisode.episodeNumber,
             tmdbSeason = nextSeason,
             tmdbEpisode = firstEpisode.episodeNumber
@@ -506,8 +524,6 @@ class PlayerViewModel @Inject constructor(
     private val WATCH_HISTORY_UPDATE_INTERVAL_MS = 60_000L
     private val CLOUD_PUSH_INTERVAL_MS = 5 * 60_000L // Push CW to cloud occasionally during active playback
 
-    private var lastCloudPushTime = 0L
-
     private fun defaultSubtitleKey() = profileManager.profileStringKey("default_subtitle")
     private fun defaultAudioLanguageKey() = profileManager.profileStringKey("default_audio_language")
     private fun subtitleUsageKey() = profileManager.profileStringKey("subtitle_usage_v1")
@@ -601,11 +617,8 @@ class PlayerViewModel @Inject constructor(
                 "preferredSource=${currentPreferredSourceName.orEmpty().take(120)}"
         )
         currentEpisodeTitle = null
-        hasMarkedWatched = false
-        lastIsPlaying = false
-        lastScrobbleTime = 0
-        lastWatchHistorySaveTime = 0
-        lastWatchHistorySavedPositionSeconds = -1L
+        progressSaveState = ProgressSaveState()
+        pendingProgressSave = null
         subtitleRefreshJob?.cancel()
         subtitleSelectionJob?.cancel()
         subtitlePreloadJob?.cancel()
@@ -4063,14 +4076,23 @@ class PlayerViewModel @Inject constructor(
                 else -> 0L
             }
         } ?: 0L
+        val localIsNewer = localEntry != null && isLocalPlaybackNewer(
+            localEntry.updatedAtMs, cloudEntry?.updated_at, cloudEntry?.paused_at,
+        )
 
         val finalPositionMs = when {
             navigationStartPositionMs != null -> navStart
+            localIsNewer -> localPositionMs
+            localEntry != null && localEntry.updatedAtMs > 0L && cloudEntry != null -> cloudPositionMs
             cloudPositionMs > 0L || localPositionMs > 0L -> maxOf(cloudPositionMs, localPositionMs)
             else -> 0L
         }
 
-        val useLocalStream = localPositionMs >= cloudPositionMs && localPositionMs > 0L
+        val useLocalStream = if (localEntry != null && localEntry.updatedAtMs > 0L) {
+            localIsNewer
+        } else {
+            localPositionMs >= cloudPositionMs && localPositionMs > 0L
+        }
         val streamKey = if (useLocalStream) {
             localEntry?.streamKey ?: cloudEntry?.stream_key
         } else {
@@ -4192,284 +4214,224 @@ class PlayerViewModel @Inject constructor(
         progressPercent: Int,
         isPlaying: Boolean,
         playbackState: Int
-    ): Job? {
+    ): Job? = scheduleProgressSave(position, duration, progressPercent, isPlaying, playbackState)?.completion
+
+    private fun scheduleProgressSave(
+        position: Long,
+        duration: Long,
+        progressPercent: Int,
+        isPlaying: Boolean,
+        playbackState: Int,
+    ): PendingPlaybackSave? {
         if (duration <= 0) return null
 
-        // On pause/stop, replace an in-flight periodic save. During normal playback,
-        // debounce by returning the save that is already running.
-        if (!isPlaying || playbackState == Player.STATE_ENDED) {
-            progressSaveJob?.cancel()
-        } else if (progressSaveJob?.isActive == true) {
-            return progressSaveJob
+        if (isPlaying && playbackState != Player.STATE_ENDED &&
+            pendingProgressSave?.completion?.isActive == true
+        ) {
+            return pendingProgressSave
         }
 
-        val job = viewModelScope.launch(Dispatchers.IO) {
-            val currentTime = System.currentTimeMillis()
-            val progressFraction = (progressPercent / 100f).coerceIn(0f, 1f)
-            val selectedStream = _uiState.value.selectedStream
-            val streamAddonIdForCheck = selectedStream?.addonId?.takeIf { it.isNotBlank() }
-            val isLiveStreamOrSports = SportsAddonCapabilities.isLiveStreamOrSportsItem(
-                mediaType = currentMediaType,
-                id = currentMediaId,
-                streamAddonId = streamAddonIdForCheck,
-                title = currentTitle,
-                isLiveStream = currentIsLiveStreamPlayback,
-                addons = currentInstalledAddons
-            )
+        // Freeze the playback identity before the screen can disappear or advance to another episode.
+        val mediaType = currentMediaType
+        val mediaId = currentMediaId
+        val season = currentSeason
+        val episode = currentEpisode
+        val displaySeason = currentDisplaySeason
+        val displayEpisode = currentDisplayEpisode
+        val title = currentTitle
+        val itemTitle = currentItemTitle.ifEmpty { title }
+        val poster = currentPoster
+        val backdrop = currentBackdrop
+        val episodeTitle = currentEpisodeTitle
+        val sessionStartTime = playbackSessionStartTime
+        val isAnime = isCurrentAnime()
+        val progressState = progressSaveState
+        val currentTime = System.currentTimeMillis()
+        val selectedStream = _uiState.value.selectedStream
+        val streamAddonId = selectedStream?.addonId?.takeIf { it.isNotBlank() }
+        val isLiveStreamOrSports = SportsAddonCapabilities.isLiveStreamOrSportsItem(
+            mediaType = mediaType,
+            id = mediaId,
+            streamAddonId = streamAddonId,
+            title = title,
+            isLiveStream = currentIsLiveStreamPlayback,
+            addons = currentInstalledAddons,
+        )
+        val isCompleted = playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD
+        val durationSeconds = (duration / 1000L).coerceAtLeast(1L)
+        val positionSeconds = (position / 1000L).coerceAtLeast(0L)
+        val streamKey = if (positionSeconds >= 30L) buildStreamKey(selectedStream) else null
+        val savedAddonId = streamAddonId.takeIf { positionSeconds >= 30L }
+        val streamTitle = selectedStream?.source?.take(200)?.takeIf { positionSeconds >= 30L && it.isNotBlank() }
+        var persistHistory = false
+        var markWatched = false
+        var pushCloud = false
+        var refreshLauncher = false
+        var scrobbleAction: ProgressScrobbleAction? = null
+        val owner = playbackProgressSaveQueue.owner()
 
-            // Scrobble start/pause/updates with debounce
-            if (!isLiveStreamOrSports && isPlaying && !lastIsPlaying) {
-                try {
-                    remoteSyncManager.scrobbleStart(
-                        mediaType = currentMediaType,
-                        tmdbId = currentMediaId,
-                        progress = progressPercent.toFloat(),
-                        season = currentSeason,
-                        episode = currentEpisode,
-                        isAnime = isCurrentAnime()
-                    )
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-
-                    // Scrobble start failed
+        val pending = playbackProgressSaveQueue.submit(
+            owner = owner,
+            saveLocal = {
+                if (!isLiveStreamOrSports) {
+                    scrobbleAction = when {
+                        isPlaying && !progressState.lastIsPlaying -> ProgressScrobbleAction.START
+                        !isPlaying && progressState.lastIsPlaying -> ProgressScrobbleAction.PAUSE
+                        isPlaying && currentTime - progressState.lastScrobbleTime >= SCROBBLE_UPDATE_INTERVAL_MS -> ProgressScrobbleAction.PROGRESS
+                        else -> null
+                    }
+                    if (scrobbleAction != null) progressState.lastScrobbleTime = currentTime
+                    val hasSeekJump = progressState.lastWatchHistorySavedPositionSeconds >= 0L &&
+                        kotlin.math.abs(positionSeconds - progressState.lastWatchHistorySavedPositionSeconds) >= 20L
+                    persistHistory = !isCompleted && (!isPlaying ||
+                        currentTime - progressState.lastWatchHistorySaveTime >= WATCH_HISTORY_UPDATE_INTERVAL_MS || hasSeekJump)
                 }
-                lastScrobbleTime = currentTime
-            } else if (!isLiveStreamOrSports && !isPlaying && lastIsPlaying) {
-                try {
-                    remoteSyncManager.scrobblePause(
-                        mediaType = currentMediaType,
-                        tmdbId = currentMediaId,
-                        progress = progressPercent.toFloat(),
-                        season = currentSeason,
-                        episode = currentEpisode,
-                        isAnime = isCurrentAnime()
-                    )
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-
-                    // Scrobble pause immediate failed
-                }
-                lastScrobbleTime = currentTime
-            } else if (!isLiveStreamOrSports && isPlaying && currentTime - lastScrobbleTime >= SCROBBLE_UPDATE_INTERVAL_MS) {
-                // Periodic heartbeat. SIMKL intentionally ignores this because it enforces a strict write lock.
-                try {
-                    remoteSyncManager.scrobbleProgress(
-                        mediaType = currentMediaType,
-                        tmdbId = currentMediaId,
-                        progress = progressPercent.toFloat(),
-                        season = currentSeason,
-                        episode = currentEpisode,
-                        isAnime = isCurrentAnime()
-                    )
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-
-                    // Scrobble update failed
-                }
-                lastScrobbleTime = currentTime
-            }
-
-            // Save to Supabase watch history (debounced + on pause/stop)
-            // Skip saving progress at watched threshold — the mark-watched block below handles
-            // the next-episode CW entry, and saving the finished episode's full position here
-            // would contaminate the next episode's resume time via show-level history fallback.
-            val isAtWatchedThreshold = progressPercent >= Constants.WATCHED_THRESHOLD
-            val durationSeconds = (duration / 1000L).coerceAtLeast(1L)
-            val positionSeconds = (position / 1000L).coerceAtLeast(0L)
-            val hasSeekJump = lastWatchHistorySavedPositionSeconds >= 0L &&
-                kotlin.math.abs(positionSeconds - lastWatchHistorySavedPositionSeconds) >= 20L
-            val shouldPersistWatchHistory = !isPlaying ||
-                currentTime - lastWatchHistorySaveTime >= WATCH_HISTORY_UPDATE_INTERVAL_MS ||
-                hasSeekJump
-            if (shouldPersistWatchHistory && !isAtWatchedThreshold && !isLiveStreamOrSports) {
-                lastWatchHistorySaveTime = currentTime
-                lastWatchHistorySavedPositionSeconds = positionSeconds
-                val shouldPersistStreamAffinity = positionSeconds >= 30L
-                val streamKey = if (shouldPersistStreamAffinity) buildStreamKey(selectedStream) else null
-                val streamAddonId = if (shouldPersistStreamAffinity) selectedStream?.addonId?.takeIf { it.isNotBlank() } else null
-                val streamTitle = if (shouldPersistStreamAffinity) selectedStream?.source?.take(200)?.takeIf { it.isNotBlank() } else null
-                watchHistoryRepository.saveProgress(
-                    mediaType = currentMediaType,
-                    tmdbId = currentMediaId,
-                    title = currentTitle,
-                    poster = currentPoster,
-                    backdrop = currentBackdrop,
-                    season = currentSeason,
-                    episode = currentEpisode,
-                    episodeTitle = currentEpisodeTitle,
-                    progress = progressFraction,
-                    duration = durationSeconds,
-                    position = positionSeconds,
-                    streamKey = streamKey,
-                    streamAddonId = streamAddonId,
-                    streamTitle = streamTitle,
-                    sessionStartTime = playbackSessionStartTime
-                )
-
-                // Also save to local Continue Watching (profile-scoped, for profiles without Trakt).
-                // Skip when at watched threshold — the watched-mark block below will handle
-                // creating the next-episode CW entry instead, avoiding a stale position/duration
-                // from the finished episode leaking into the next-episode's resume label.
-                if (progressPercent < Constants.WATCHED_THRESHOLD) {
+                if (persistHistory) {
                     traktRepository.saveLocalContinueWatching(
-                        mediaType = currentMediaType,
-                        tmdbId = currentMediaId,
-                        title = currentItemTitle.ifEmpty { currentTitle },
-                        posterPath = currentPoster,
-                        backdropPath = currentBackdrop,
-                        season = currentSeason,
-                        episode = currentEpisode,
-                        displaySeason = currentDisplaySeason,
-                        displayEpisode = currentDisplayEpisode,
-                        episodeTitle = currentEpisodeTitle,
+                        mediaType = mediaType,
+                        tmdbId = mediaId,
+                        title = itemTitle,
+                        posterPath = poster,
+                        backdropPath = backdrop,
+                        season = season,
+                        episode = episode,
+                        displaySeason = displaySeason,
+                        displayEpisode = displayEpisode,
+                        episodeTitle = episodeTitle,
                         progress = progressPercent,
                         positionSeconds = positionSeconds,
                         durationSeconds = durationSeconds,
                         streamKey = streamKey,
-                        streamAddonId = streamAddonId,
-                        streamTitle = streamTitle
+                        streamAddonId = savedAddonId,
+                        streamTitle = streamTitle,
                     )
-
-                    // Push local CW to cloud so other devices see mid-playback progress.
-                    // Throttled to avoid excessive writes during active playback.
-                    if (currentTime - lastCloudPushTime >= CLOUD_PUSH_INTERVAL_MS) {
-                        lastCloudPushTime = currentTime
-                        runCatching { cloudSyncRepository.pushToCloud() }
+                    progressState.lastWatchHistorySaveTime = currentTime
+                    progressState.lastWatchHistorySavedPositionSeconds = positionSeconds
+                    pushCloud = !isPlaying || currentTime - progressState.lastCloudPushTime >= CLOUD_PUSH_INTERVAL_MS
+                    refreshLauncher = !isPlaying
+                }
+                markWatched = !isLiveStreamOrSports && !progressState.hasMarkedWatched && isCompleted
+                if (markWatched) {
+                    if (mediaType == MediaType.MOVIE) {
+                        traktRepository.markMovieWatchedWithoutTraktSync(mediaId, syncToBackend = false)
+                    } else if (season != null && episode != null) {
+                        traktRepository.markEpisodeWatchedWithoutTraktSync(
+                            mediaId, season, episode, syncToBackend = false,
+                        )
+                    }
+                    progressState.hasMarkedWatched = true
+                    pushCloud = true
+                    refreshLauncher = true
+                }
+                if (pushCloud) progressState.lastCloudPushTime = currentTime
+                progressState.lastIsPlaying = isPlaying
+            },
+            syncRemote = {
+                syncProgressOperation("scrobble") {
+                    when (scrobbleAction) {
+                        ProgressScrobbleAction.START -> remoteSyncManager.scrobbleStart(mediaType, mediaId, progressPercent.toFloat(), season, episode, isAnime)
+                        ProgressScrobbleAction.PAUSE -> remoteSyncManager.scrobblePause(mediaType, mediaId, progressPercent.toFloat(), season, episode, isAnime)
+                        ProgressScrobbleAction.PROGRESS -> remoteSyncManager.scrobbleProgress(mediaType, mediaId, progressPercent.toFloat(), season, episode, isAnime)
+                        null -> Unit
                     }
                 }
-
-
-                if (!isPlaying || playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD) {
-                    runCatching { cloudSyncRepository.pushToCloud() }
-                    runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
-                }
-            }
-
-            // Mark as watched when playback ends or crosses threshold
-            if (!isLiveStreamOrSports && !hasMarkedWatched &&
-                (playbackState == Player.STATE_ENDED || progressPercent >= Constants.WATCHED_THRESHOLD)
-            ) {
-                hasMarkedWatched = true
-                val completedSeason = currentSeason
-                val completedEpisode = currentEpisode
-                if (currentMediaType == MediaType.MOVIE) {
-                    traktRepository.markMovieWatchedWithoutTraktSync(currentMediaId)
-                } else if (completedSeason != null && completedEpisode != null) {
-                    traktRepository.markEpisodeWatchedWithoutTraktSync(
-                        currentMediaId,
-                        completedSeason,
-                        completedEpisode
+                if (persistHistory) {
+                    watchHistoryRepository.saveProgress(
+                        mediaType = mediaType,
+                        tmdbId = mediaId,
+                        title = title,
+                        poster = poster,
+                        backdrop = backdrop,
+                        season = season,
+                        episode = episode,
+                        episodeTitle = episodeTitle,
+                        progress = (progressPercent / 100f).coerceIn(0f, 1f),
+                        duration = durationSeconds,
+                        position = positionSeconds,
+                        streamKey = streamKey,
+                        streamAddonId = savedAddonId,
+                        streamTitle = streamTitle,
+                        sessionStartTime = sessionStartTime,
                     )
                 }
-                try {
-                    remoteSyncManager.scrobbleStop(
-                        mediaType = currentMediaType,
-                        tmdbId = currentMediaId,
-                        progress = progressPercent.toFloat(),
-                        season = completedSeason,
-                        episode = completedEpisode,
-                        isAnime = isCurrentAnime()
-                    )
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-
-                    // Scrobble stop failed
-                }
-                try {
-                    val safeSeason = currentSeason
-                    val safeEpisode = currentEpisode
-                    remoteSyncManager.dismissContinueWatching(
-                        currentMediaType,
-                        currentMediaId,
-                        safeSeason,
-                        safeEpisode
-                    )
-                    // Clean up Supabase history for the finished episode so its stale
-                    // position doesn't resurface as a Continue Watching candidate.
-                    // Retry up to 2 times if the delete fails (network flakes).
-                    val deleteType = currentMediaType
-                    val deleteId = currentMediaId
-                    val delS = safeSeason
-                    val delE = safeEpisode
+                if (markWatched) {
+                    if (mediaType == MediaType.MOVIE) {
+                        traktRepository.syncMovieWatchedToBackend(mediaId)
+                    } else if (season != null && episode != null) {
+                        traktRepository.syncEpisodeWatchedToBackend(mediaId, season, episode)
+                    }
+                    syncProgressOperation("scrobble stop") {
+                        remoteSyncManager.scrobbleStop(mediaType, mediaId, progressPercent.toFloat(), season, episode, isAnime)
+                    }
+                    syncProgressOperation("dismiss completed playback") {
+                        remoteSyncManager.dismissContinueWatching(mediaType, mediaId, season, episode)
+                    }
                     for (attempt in 1..2) {
                         try {
-                            if (deleteType == MediaType.TV && delS != null && delE != null) {
-                                watchHistoryRepository.removeFromHistory(deleteId, delS, delE)
-                            } else if (deleteType == MediaType.MOVIE) {
-                                watchHistoryRepository.removeFromHistory(deleteId, null, null)
+                            if (mediaType == MediaType.MOVIE || (season != null && episode != null)) {
+                                watchHistoryRepository.removeFromHistory(mediaId, season, episode)
                             }
-                            break // Success
-                        } catch (_: Exception) {
-                            if (attempt < 2) kotlinx.coroutines.delay(500)
+                            break
+                        } catch (error: Exception) {
+                            if (error is kotlinx.coroutines.CancellationException) throw error
+                            AppLogger.e("PlaybackProgress", "Failed to remove completed history (attempt $attempt)", error)
+                            if (attempt < 2) delay(500)
                         }
                     }
-                } catch (e: Exception) {
-                    if (e is kotlinx.coroutines.CancellationException) throw e
-
-                    // Delete playback failed
-                }
-
-                // Remove the finished episode from CW cache so it doesn't resurface
-                // before the next refresh cycle picks up the server-side changes.
-                runCatching {
-                    traktRepository.removeFromContinueWatchingCache(
-                        currentMediaId,
-                        currentSeason,
-                        currentEpisode,
-                        currentMediaType
-                    )
-                }
-
-                // When a TV episode completes, immediately save the next episode to
-                // local Continue Watching so CW isn't empty between episodes.
-                val cwSeason = currentSeason
-                val cwEpisode = currentEpisode
-                if (currentMediaType == MediaType.TV && cwSeason != null && cwEpisode != null) {
-                    try {
-                        val nextIdentity = runCatching {
-                            animeMapper.resolveAnimeSeasonStructure(currentMediaId)
-                                ?.nextAfterDisplay(
-                                    currentDisplaySeason ?: cwSeason,
-                                    currentDisplayEpisode ?: cwEpisode
-                                )
-                                ?: resolveNextEpisodeIdentity()
-                        }.getOrNull()
-                        if (nextIdentity != null) {
-                            traktRepository.saveLocalContinueWatching(
-                                mediaType = currentMediaType,
-                                tmdbId = currentMediaId,
-                                title = currentItemTitle.ifEmpty { currentTitle },
-                                posterPath = currentPoster,
-                                backdropPath = currentBackdrop,
-                                season = nextIdentity.tmdbSeason,
-                                episode = nextIdentity.tmdbEpisode,
-                                displaySeason = nextIdentity.displaySeason,
-                                displayEpisode = nextIdentity.displayEpisode,
-                                episodeTitle = null,
-                                progress = 3,
-                                positionSeconds = 0L,
-                                durationSeconds = 0L
-                            )
+                    if (mediaType == MediaType.TV && season != null && episode != null) {
+                        syncProgressOperation("prepare next Continue Watching episode") {
+                            val nextIdentity = animeMapper.resolveAnimeSeasonStructure(mediaId)
+                                ?.nextAfterDisplay(displaySeason ?: season, displayEpisode ?: episode)
+                                ?: resolveNextEpisodeIdentity(mediaId, season, episode, displaySeason, displayEpisode)
+                            if (nextIdentity != null) {
+                                playbackProgressSaveQueue.writeLocal(owner) {
+                                    traktRepository.saveLocalContinueWatching(
+                                        mediaType = mediaType,
+                                        tmdbId = mediaId,
+                                        title = itemTitle,
+                                        posterPath = poster,
+                                        backdropPath = backdrop,
+                                        season = nextIdentity.tmdbSeason,
+                                        episode = nextIdentity.tmdbEpisode,
+                                        displaySeason = nextIdentity.displaySeason,
+                                        displayEpisode = nextIdentity.displayEpisode,
+                                        episodeTitle = null,
+                                        progress = 3,
+                                        positionSeconds = 0L,
+                                        durationSeconds = 0L,
+                                        onlyIfNotUpdatedAfter = currentTime,
+                                    )
+                                }
+                            }
                         }
-                    } catch (_: Exception) {
-                        // Best-effort: don't let CW save failure affect playback
                     }
                 }
+                if (pushCloud) syncProgressOperation("cloud push") { cloudSyncRepository.pushToCloud() }
+                if (refreshLauncher) syncProgressOperation("launcher refresh") {
+                    launcherContinueWatchingRepository.refreshForCurrentProfile()
+                }
+            },
+        )
+        pendingProgressSave = pending
+        return pending
+    }
 
-                runCatching { cloudSyncRepository.pushToCloud() }
-                runCatching { launcherContinueWatchingRepository.refreshForCurrentProfile() }
-            }
-
-            lastIsPlaying = isPlaying
+    private suspend fun syncProgressOperation(name: String, operation: suspend () -> Unit) {
+        try {
+            operation()
+        } catch (error: Exception) {
+            if (error is kotlinx.coroutines.CancellationException) throw error
+            AppLogger.e("PlaybackProgress", "Failed background operation: $name", error)
         }
+    }
 
-        progressSaveJob = job
-        job.invokeOnCompletion {
-            if (progressSaveJob === job) {
-                progressSaveJob = null
-            }
-        }
-        return job
+    suspend fun saveProgressForExit(
+        position: Long,
+        duration: Long,
+        progressPercent: Int,
+        playbackState: Int,
+    ) {
+        scheduleProgressSave(position, duration, progressPercent, false, playbackState)?.localSaved?.await()
     }
 
     suspend fun saveProgressAndWait(
@@ -4479,22 +4441,21 @@ class PlayerViewModel @Inject constructor(
         isPlaying: Boolean,
         playbackState: Int
     ) {
-        // Let an in-flight save finish before starting the final transition save.
-        // This avoids cancelling after hasMarkedWatched was set but before the
-        // corresponding remote/history writes completed.
-        progressSaveJob?.takeIf { it.isActive }?.join()
+        // Episode transitions retain the full-save barrier; Back only waits for local persistence.
+        pendingProgressSave?.completion?.join()
 
-        val finalJob = saveProgress(
+        val finalSave = scheduleProgressSave(
             position = position,
             duration = duration,
             progressPercent = progressPercent,
             isPlaying = isPlaying,
             playbackState = playbackState
         )
-        finalJob?.join()
+        finalSave?.localSaved?.await()
+        finalSave?.completion?.join()
     }
 
-    private var progressSaveJob: Job? = null
+    private var pendingProgressSave: PendingPlaybackSave? = null
     private var subtitleRefreshJob: Job? = null
     private var vodAppendJob: Job? = null
     private var homeServerAppendJob: Job? = null

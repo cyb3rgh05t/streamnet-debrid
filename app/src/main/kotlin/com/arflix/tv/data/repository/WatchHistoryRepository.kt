@@ -79,13 +79,6 @@ class WatchHistoryRepository @Inject constructor(
         return currentProfileId()
     }
 
-    private fun profileHistorySource(base: String): String {
-        // Use stable profile ID so rename/case changes do not split history.
-        // Profile IDs are synced via cloud profile sync.
-        val profileId = currentProfileId()
-        return "profile:$profileId:$base"
-    }
-
     /**
      * In-memory filter that accepts entries for the current profile only.
      * Matches by profile NAME (cross-device) and profile UUID (same device).
@@ -136,6 +129,7 @@ class WatchHistoryRepository @Inject constructor(
         streamTitle: String? = null,
         sessionStartTime: Long = 0L
     ) {
+        val profileId = currentProfileId()
         val userId = authRepositoryProvider.get().getCurrentUserId() ?: return
 
         if (sessionStartTime > 0L) {
@@ -155,7 +149,7 @@ class WatchHistoryRepository @Inject constructor(
 
         val entry = WatchHistoryEntry(
                 user_id = userId,
-                profile_id = currentProfileId(),
+                profile_id = profileId,
                 media_type = if (mediaType == MediaType.MOVIE) "movie" else "tv",
                 show_tmdb_id = tmdbId,
                 title = title,
@@ -167,7 +161,7 @@ class WatchHistoryRepository @Inject constructor(
                 progress = progress,
                 duration_seconds = duration,
                 position_seconds = position,
-                source = profileHistorySource("arvio"),
+                source = "profile:$profileId:arvio",
                 stream_key = streamKey,
                 stream_addon_id = streamAddonId,
                 stream_title = streamTitle
@@ -201,7 +195,6 @@ class WatchHistoryRepository @Inject constructor(
         // watch_history realtime event (which fires back to our own device) doesn't
         // trigger a redundant Home Continue Watching refresh. See issue #91 fix.
         if (saved) {
-            val profileId = currentProfileId()
             watchHistoryFetchedAtByProfile.remove(profileId)
             val nowIso = Instant.now().toString()
             val cachedEntry = entry.copy(
@@ -370,6 +363,7 @@ class WatchHistoryRepository @Inject constructor(
             }
             filterByProfile(records.map { it.toEntry(userId) }).firstOrNull()
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.e("WatchHistoryRepository", "Error returning null fallback", e)
             null
         }
@@ -400,6 +394,7 @@ class WatchHistoryRepository @Inject constructor(
                     parseEpoch(entry.updated_at).coerceAtLeast(parseEpoch(entry.paused_at))
                 }
         } catch (e: Exception) {
+            if (e is kotlinx.coroutines.CancellationException) throw e
             AppLogger.e("WatchHistoryRepository", "Error returning null fallback", e)
             null
         }

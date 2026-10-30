@@ -1146,6 +1146,7 @@
     <string name="player_muted">Muted</string>
     <string name="player_cd_setup">Setup</string>
     <string name="player_cd_error">Error</string>
+    <string name="player_error_save_progress">Could not save playback progress. Please try again.</string>
     <string name="player_addon_setup_required">Addon Setup Required</string>
     <string name="player_playback_error">Playback Error</string>
     <string name="player_error_generic">An unknown error occurred</string>

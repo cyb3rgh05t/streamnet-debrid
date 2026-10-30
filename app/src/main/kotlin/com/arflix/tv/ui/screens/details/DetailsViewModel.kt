@@ -35,6 +35,7 @@ import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.AnimeMapper
 import com.arflix.tv.util.AnimeSeasonStructure
 import com.arflix.tv.util.Constants
+import com.arflix.tv.util.isLocalPlaybackNewer
 import com.arflix.tv.util.settingsDataStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -2811,7 +2812,9 @@ class DetailsViewModel @Inject constructor(
                 null
             }
 
-            val resumeCandidate = remoteItem ?: localItem ?: localFallbackItem
+            val resumeCandidate = listOfNotNull(remoteItem, localItem, localFallbackItem)
+                .maxByOrNull { it.updatedAtMs }
+            val resumeUpdatedAtMs = resumeCandidate?.updatedAtMs ?: 0L
             val localResume = if (resumeCandidate != null) {
                 buildResumeFromProgress(
                     mediaType = mediaType,
@@ -2831,10 +2834,18 @@ class DetailsViewModel @Inject constructor(
                     // Never let a stale entry from a different episode bleed through.
                     val matchLocal = localResume?.takeIf { it.season == preferredSeason && it.episode == preferredEpisode }
                     val matchCloud = cloudResume?.takeIf { it.season == preferredSeason && it.episode == preferredEpisode }
-                    matchLocal ?: matchCloud
+                    if (matchLocal != null && matchCloud != null && resumeUpdatedAtMs > 0L) {
+                        if (isLocalPlaybackNewer(resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at)) {
+                            matchLocal
+                        } else matchCloud
+                    } else matchLocal ?: matchCloud
                 }
                 cloudResume == null -> localResume
                 localResume == null -> cloudResume
+                isLocalPlaybackNewer(
+                    resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at,
+                ) -> localResume
+                resumeUpdatedAtMs > 0L -> cloudResume
                 // When both exist, prefer the one for the later episode; if same episode, prefer higher position
                 localResume.season != null && cloudResume.season != null && localResume.episode != null && cloudResume.episode != null -> {
                     val localEp = localResume.season!! * 10000 + localResume.episode!!
@@ -2854,7 +2865,25 @@ class DetailsViewModel @Inject constructor(
 
     private suspend fun fetchResumeInfoFromHistoryOnly(tmdbId: Int, mediaType: MediaType): ResumeInfo? {
         return try {
-            val entry = watchHistoryRepository.getLatestProgress(mediaType, tmdbId) ?: return null
+            val entry = watchHistoryRepository.getLatestProgress(mediaType, tmdbId)
+            val local = traktRepository.getBestLocalContinueWatchingEntry(mediaType, tmdbId)
+            if (local != null && isLocalPlaybackNewer(
+                    local.updatedAtMs, entry?.updated_at, entry?.paused_at,
+                )) {
+                val isWatchedEpisode = mediaType == MediaType.TV &&
+                    traktRepository.getWatchedEpisodesFromCache()
+                        .contains("show_tmdb:$tmdbId:${local.season}:${local.episode}")
+                if (!isWatchedEpisode) {
+                    return buildResumeFromProgress(
+                        mediaType = mediaType, tmdbId = tmdbId, season = local.season,
+                        episode = local.episode, progress = local.progress / 100f,
+                        positionSeconds = local.resumePositionSeconds,
+                        durationSeconds = local.durationSeconds,
+                        allowProgressDerivedResume = !local.isUpNext,
+                    )
+                }
+            }
+            entry ?: return null
             if (mediaType == MediaType.TV && entry.season != null && entry.episode != null) {
                 val watchedKey = "show_tmdb:$tmdbId:${entry.season}:${entry.episode}"
                 val isWatched = runCatching {

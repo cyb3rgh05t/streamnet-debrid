@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -43,10 +44,15 @@ import com.arflix.tv.R
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.contrastingContentColor
+import com.arflix.tv.util.LocalDeviceType
+import androidx.compose.material3.Button as TouchButton
+import androidx.compose.material3.ButtonDefaults as TouchButtonDefaults
+import androidx.compose.material3.OutlinedButton as TouchOutlinedButton
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
 fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val isTouchDevice = LocalDeviceType.current.isTouchDevice()
     val cancelFocusRequester = remember { FocusRequester() }
     val colors = ArvioSkin.colors
     val accent = resolveAccentColor(colors.accent)
@@ -111,62 +117,97 @@ fun ExitAppDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(12.dp))
                 Spacer(Modifier.height(20.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(0.88f).align(Alignment.End),
+                    modifier = Modifier.fillMaxWidth(if (isTouchDevice) 1f else 0.88f).align(Alignment.End),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    val buttonColors = ButtonDefaults.colors(
-                        containerColor = Color.Transparent,
-                        contentColor = colors.textMuted,
-                        focusedContainerColor = accent,
-                        focusedContentColor = contrastingContentColor(accent)
-                    )
-                    val buttonBorder = ButtonDefaults.border(
-                        border = Border(
+                    if (isTouchDevice) {
+                        TouchButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = buttonShape,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            colors = TouchButtonDefaults.buttonColors(
+                                containerColor = accent,
+                                contentColor = contrastingContentColor(accent),
+                            ),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.cancel),
+                                style = ArvioSkin.typography.button,
+                                maxLines = 1,
+                            )
+                        }
+                        TouchOutlinedButton(
+                            onClick = onConfirm,
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = buttonShape,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
                             border = BorderStroke(1.dp, accent),
-                            shape = buttonShape
-                        ),
-                        focusedBorder = Border(
-                            border = BorderStroke(1.dp, accent),
-                            shape = buttonShape
+                            colors = TouchButtonDefaults.outlinedButtonColors(contentColor = colors.textMuted),
+                        ) {
+                            Text(
+                                text = stringResource(R.string.exit_app_confirm),
+                                style = ArvioSkin.typography.button,
+                                maxLines = 1,
+                            )
+                        }
+                    } else {
+                        val buttonColors = ButtonDefaults.colors(
+                            containerColor = Color.Transparent,
+                            contentColor = colors.textMuted,
+                            focusedContainerColor = accent,
+                            focusedContentColor = contrastingContentColor(accent)
                         )
-                    )
-                    val buttonShapes = ButtonDefaults.shape(shape = buttonShape)
-                    val buttonScale = ButtonDefaults.scale(focusedScale = 1f)
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.weight(1f).height(42.dp).focusRequester(cancelFocusRequester),
-                        colors = buttonColors,
-                        shape = buttonShapes,
-                        border = buttonBorder,
-                        scale = buttonScale
-                    ) {
-                        Text(
-                            text = stringResource(R.string.cancel),
-                            modifier = Modifier.fillMaxWidth(),
-                            style = ArvioSkin.typography.button,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
+                        val buttonBorder = ButtonDefaults.border(
+                            border = Border(
+                                border = BorderStroke(1.dp, accent),
+                                shape = buttonShape
+                            ),
+                            focusedBorder = Border(
+                                border = BorderStroke(1.dp, accent),
+                                shape = buttonShape
+                            )
                         )
-                    }
-                    Button(
-                        onClick = onConfirm,
-                        modifier = Modifier.weight(1f).height(42.dp),
-                        colors = buttonColors,
-                        shape = buttonShapes,
-                        border = buttonBorder,
-                        scale = buttonScale
-                    ) {
-                        Text(
-                            text = stringResource(R.string.exit_app_confirm),
-                            modifier = Modifier.fillMaxWidth(),
-                            style = ArvioSkin.typography.button,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1
-                        )
+                        val buttonShapes = ButtonDefaults.shape(shape = buttonShape)
+                        val buttonScale = ButtonDefaults.scale(focusedScale = 1f)
+                        Button(
+                            onClick = onDismiss,
+                            modifier = Modifier.weight(1f).height(42.dp).focusRequester(cancelFocusRequester),
+                            colors = buttonColors,
+                            shape = buttonShapes,
+                            border = buttonBorder,
+                            scale = buttonScale
+                        ) {
+                            Text(
+                                text = stringResource(R.string.cancel),
+                                modifier = Modifier.fillMaxWidth(),
+                                style = ArvioSkin.typography.button,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                        }
+                        Button(
+                            onClick = onConfirm,
+                            modifier = Modifier.weight(1f).height(42.dp),
+                            colors = buttonColors,
+                            shape = buttonShapes,
+                            border = buttonBorder,
+                            scale = buttonScale
+                        ) {
+                            Text(
+                                text = stringResource(R.string.exit_app_confirm),
+                                modifier = Modifier.fillMaxWidth(),
+                                style = ArvioSkin.typography.button,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                        }
                     }
                 }
             }
         }
-        LaunchedEffect(Unit) { cancelFocusRequester.requestFocus() }
+        LaunchedEffect(isTouchDevice) {
+            if (!isTouchDevice) cancelFocusRequester.requestFocus()
+        }
     }
 }
