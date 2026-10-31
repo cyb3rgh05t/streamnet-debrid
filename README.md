@@ -9,6 +9,15 @@ This repository intentionally keeps only the surfaces that are needed for the ap
 
 Removed/omitted surfaces include the upstream marketing site, browser web app, resolver worker, benchmark module, and release artifact folders.
 
+## TV navigation sound
+
+Settings > Appearance > TV navigation sound enables Android system navigation
+sounds for D-pad direction presses. It defaults to on in TV mode and can
+be disabled immediately. Touch layouts and player/fullscreen playback controls
+do not trigger it. Requests are limited to one per 80 ms. The sound and volume
+are controlled by Android; system sound effects must also be enabled on the
+device. No custom audio asset or network request is used.
+
 ## Returning from playback
 
 Back pauses playback and waits for local Continue Watching / watched-state

@@ -282,7 +282,8 @@ data class SettingsUiState(
     val subtitleRemoveHearingImpaired: Boolean = true,
     val aiKeyServerState: AiKeyServerState = AiKeyServerState(),
     val smoothScrolling: Boolean = false,
-    val tvUiScalePercent: Int = 100
+    val tvUiScalePercent: Int = 100,
+    val tvNavigationSoundEnabled: Boolean = true
 )
 
 internal fun SettingsUiState.withIptvConnecting(message: String): SettingsUiState = copy(
@@ -505,6 +506,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             context.deviceDisplayDataStore.data.collect { preferences ->
                 _uiState.value = _uiState.value.copy(
+                    tvNavigationSoundEnabled = preferences[com.arflix.tv.util.TV_NAVIGATION_SOUND_KEY] ?: true,
                     tvUiScalePercent = com.arflix.tv.util.normalizeTvUiScalePercent(
                         preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] ?: 100
                     )
@@ -1732,6 +1734,14 @@ class SettingsViewModel @Inject constructor(
                     preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] ?: 100
                 )
                 preferences[com.arflix.tv.util.TV_UI_SCALE_PERCENT_KEY] = com.arflix.tv.util.nextTvUiScalePercent(current)
+            }
+        }
+    }
+
+    fun setTvNavigationSoundEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            context.deviceDisplayDataStore.edit {
+                it[com.arflix.tv.util.TV_NAVIGATION_SOUND_KEY] = enabled
             }
         }
     }

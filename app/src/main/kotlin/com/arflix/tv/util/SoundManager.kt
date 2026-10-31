@@ -2,99 +2,58 @@ package com.arflix.tv.util
 
 import android.content.Context
 import android.media.AudioManager
-import android.view.SoundEffectConstants
-import android.view.View
-import dagger.hilt.android.qualifiers.ApplicationContext
-import javax.inject.Inject
-import javax.inject.Singleton
+import android.os.SystemClock
+import android.view.KeyEvent
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import java.io.Closeable
 
-/**
- * Manages UI sound effects for navigation
- * Uses Android's built-in sound effect system for consistent TV experience
- */
-@Singleton
-class SoundManager @Inject constructor(
-    @ApplicationContext private val context: Context
-) {
-    private val audioManager: AudioManager? = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-    private var isEnabled = true
+val TV_NAVIGATION_SOUND_KEY = booleanPreferencesKey("tv_navigation_sound")
 
-    /**
-     * Play navigation move sound (arrow key press)
-     * Uses system navigation sound
-     */
-    fun playMove(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.NAVIGATION_DOWN)
+internal fun isNavigationSoundAllowed(
+    isTv: Boolean,
+    enabled: Boolean,
+    route: String?,
+    isFullscreen: Boolean,
+): Boolean = isTv && enabled && route != null && !route.contains("player") && !isFullscreen
+
+internal class NavigationSoundGate {
+    private var lastPlayedAt: Long? = null
+
+    fun shouldPlay(action: Int, keyCode: Int, nowMs: Long): Boolean {
+        if (action != KeyEvent.ACTION_DOWN || keyCode !in directionalKeys) return false
+        val previous = lastPlayedAt
+        if (previous != null && nowMs - previous < 80L) return false
+        lastPlayedAt = nowMs
+        return true
     }
 
-    /**
-     * Play navigation up sound
-     */
-    fun playMoveUp(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.NAVIGATION_UP)
+    private companion object {
+        val directionalKeys = setOf(
+            KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT,
+        )
     }
+}
 
-    /**
-     * Play navigation left sound
-     */
-    fun playMoveLeft(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.NAVIGATION_LEFT)
-    }
+internal class SoundManager(context: Context) : Closeable {
+    private val gate = NavigationSoundGate()
+    private var closed = false
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    /**
-     * Play navigation right sound
-     */
-    fun playMoveRight(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.NAVIGATION_RIGHT)
-    }
-
-    /**
-     * Play selection sound (enter/OK button)
-     * Uses system click sound
-     */
-    fun playSelect(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.CLICK)
-    }
-
-    /**
-     * Play back sound (back button)
-     */
-    fun playBack(view: View?) {
-        playSoundSafely(view, SoundEffectConstants.NAVIGATION_UP)
-    }
-
-    private fun playSoundSafely(view: View?, effectType: Int) {
-        if (!isEnabled) return
-        try {
-            if (view?.isEnabled == true) {
-                view.playSoundEffect(effectType)
-            }
-        } catch (_: Exception) {
-            // Silently handle errors
+    fun onKeyEvent(event: KeyEvent): Boolean {
+        if (closed || !gate.shouldPlay(event.action, event.keyCode, SystemClock.uptimeMillis())) return false
+        val effect = when (event.keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> AudioManager.FX_FOCUS_NAVIGATION_UP
+            KeyEvent.KEYCODE_DPAD_DOWN -> AudioManager.FX_FOCUS_NAVIGATION_DOWN
+            KeyEvent.KEYCODE_DPAD_LEFT -> AudioManager.FX_FOCUS_NAVIGATION_LEFT
+            else -> AudioManager.FX_FOCUS_NAVIGATION_RIGHT
         }
+        audioManager.playSoundEffect(effect)
+        return true
     }
 
-    /**
-     * Play sound effect without a view (uses AudioManager)
-     */
-    fun playSoundEffect(effectType: Int) {
-        if (!isEnabled) return
-        try {
-            audioManager?.playSoundEffect(effectType, 1.0f)
-        } catch (_: Exception) {
-            // Silently handle errors
-        }
+    override fun close() {
+        if (closed) return
+        closed = true
     }
-
-    /**
-     * Enable/disable sound effects
-     */
-    fun setEnabled(enabled: Boolean) {
-        isEnabled = enabled
-    }
-
-    /**
-     * Check if sound effects are enabled
-     */
-    fun isEnabled(): Boolean = isEnabled
 }

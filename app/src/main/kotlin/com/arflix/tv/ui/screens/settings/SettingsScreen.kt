@@ -306,7 +306,7 @@ internal fun tvGeneralRowsForSection(section: String): List<Int> {
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(18, 53, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
+        "appearance" -> listOf(18, 53, 54, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -1143,6 +1143,7 @@ fun SettingsScreen(
                                                 51 -> viewModel.cycleLiveTvClassicDescriptionSize()
                                                 18 -> openUiModeWarningDialog()
                                                 53 -> viewModel.toggleTvUiScale()
+                                                54 -> viewModel.setTvNavigationSoundEnabled(!uiState.tvNavigationSoundEnabled)
                                                 19 -> viewModel.setSkipProfileSelection(!uiState.skipProfileSelection)
                                                 44 -> if (uiState.settingsLockEnabled) {
                                                     viewModel.setSettingsLockEnabled(false)
@@ -6098,6 +6099,8 @@ private fun TvGeneralSettingsSection(
         onSmoothScrollingToggle = { viewModel.setSmoothScrolling(it) },
         tvUiScalePercent = uiState.tvUiScalePercent,
         onTvUiScaleClick = { viewModel.toggleTvUiScale() },
+        tvNavigationSoundEnabled = uiState.tvNavigationSoundEnabled,
+        onTvNavigationSoundToggle = { viewModel.setTvNavigationSoundEnabled(it) },
         spoilerBlurEnabled = uiState.spoilerBlurEnabled,
         onSpoilerBlurToggle = { viewModel.setSpoilerBlurEnabled(it) },
         accentColor = uiState.accentColor,
@@ -6751,6 +6754,7 @@ private fun TvGeneralSettingsRows(
     showEpisodeRatings: Boolean = true,
     smoothScrolling: Boolean = false,
     tvUiScalePercent: Int = 100,
+    tvNavigationSoundEnabled: Boolean = true,
     spoilerBlurEnabled: Boolean = false,
     accentColor: String = "White",
     volumeBoostDb: Int = 0,
@@ -6782,6 +6786,7 @@ private fun TvGeneralSettingsRows(
     onShowEpisodeRatingsToggle: (Boolean) -> Unit = {},
     onSmoothScrollingToggle: (Boolean) -> Unit = {},
     onTvUiScaleClick: () -> Unit = {},
+    onTvNavigationSoundToggle: (Boolean) -> Unit = {},
     onSpoilerBlurToggle: (Boolean) -> Unit = {},
     onAccentColorClick: () -> Unit = {},
     showLoadingStats: Boolean = true,
@@ -6916,6 +6921,15 @@ private fun TvGeneralSettingsRows(
                     isFocused = focusedIndex == localIndex,
                     onClick = onTvUiScaleClick,
                     modifier = Modifier.settingsFocusSlot(localIndex)
+                )
+                54 -> SettingsToggleRow(
+                    Icons.Default.VolumeUp,
+                    stringResource(R.string.tv_navigation_sound),
+                    stringResource(R.string.tv_navigation_sound_desc),
+                    tvNavigationSoundEnabled,
+                    focusedIndex == localIndex,
+                    onTvNavigationSoundToggle,
+                    Modifier.settingsFocusSlot(localIndex)
                 )
                 19 -> SettingsToggleRow(Icons.Default.Person, stringResource(R.string.skip_profile), stringResource(R.string.skip_profile_desc), skipProfileSelection, focusedIndex == localIndex, onSkipProfileSelectionToggle, Modifier.settingsFocusSlot(localIndex))
                 44 -> SettingsToggleRow(

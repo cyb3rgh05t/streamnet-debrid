@@ -1,4 +1,5 @@
 package com.arflix.tv
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 
 import com.arflix.tv.util.deviceDisplayDataStore
 import android.content.Context
@@ -779,6 +780,19 @@ fun ArflixApp(
     val isMobile = deviceType.isTouchDevice()
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
+    val navigationSoundEnabled by remember(context) {
+        context.deviceDisplayDataStore.data.map {
+            it[com.arflix.tv.util.TV_NAVIGATION_SOUND_KEY] ?: true
+        }
+    }.collectAsStateWithLifecycle(initialValue = false)
+    val navigationSound = remember(isMobile, navigationSoundEnabled) {
+        if (!isMobile && navigationSoundEnabled) {
+            com.arflix.tv.util.SoundManager(context.applicationContext)
+        } else null
+    }
+    androidx.compose.runtime.DisposableEffect(navigationSound) {
+        onDispose { navigationSound?.close() }
+    }
     var iptvFullscreen by remember { mutableStateOf(false) }
     LaunchedEffect(offlineDownloadRepository) {
         offlineDownloadRepository.completionEvents.collect { event ->
@@ -831,6 +845,18 @@ fun ArflixApp(
             // systemBarsPadding() reads live WindowInsets, so it automatically
             // becomes 0 when the player hides the bars.
             .then(if (isMobile) Modifier.systemBarsPadding() else Modifier)
+            .onPreviewKeyEvent { event ->
+                if (com.arflix.tv.util.isNavigationSoundAllowed(
+                        isTv = !isMobile,
+                        enabled = navigationSoundEnabled,
+                        route = currentRoute,
+                        isFullscreen = iptvFullscreen,
+                    )
+                ) {
+                    navigationSound?.onKeyEvent(event.nativeKeyEvent)
+                }
+                false
+            }
         ) {
             Box(modifier = Modifier.weight(1f)) {
                 AppNavigation(

@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.090] - 2026-10-31
+
+- Android-Version: `2.5.090` / Code `491`.
+- Android-TV: Android-Systemton bei D-Pad-Navigation, standardmäßig aktiviert und unter Darstellung gerätelokal abschaltbar. Kein Ton bei Touch-Bedienung oder Player-Steuerung; schnelle Wiederholungen werden begrenzt. System-Soundeffekte müssen am Gerät aktiviert sein.
+- Navigationston-Einstellung wird nicht in die Cloud synchronisiert. Neun gezielte Unit-Tests und ein Systemton-Instrumentierungstest erfolgreich.
+- Backend und Web unverändert.
+
 ## [2.5.089] - 2026-10-30
 
 - Android-Version: `2.5.089` / Code `490`.

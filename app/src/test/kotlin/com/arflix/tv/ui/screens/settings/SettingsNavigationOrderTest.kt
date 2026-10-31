@@ -25,10 +25,11 @@ class SettingsNavigationOrderTest {
     @Test
     fun `tv scale follows device mode in appearance without duplicate focus slots`() {
         val rows = tvGeneralRowsForSection("appearance")
-        assertThat(rows.take(2)).containsExactly(18, 53).inOrder()
+        assertThat(rows.take(3)).containsExactly(18, 53, 54).inOrder()
         assertThat(rows.distinct()).isEqualTo(rows)
         listOf("language", "subtitles", "ai_subtitles", "playback", "profiles", "network").forEach {
             assertThat(tvGeneralRowsForSection(it)).doesNotContain(53)
+            assertThat(tvGeneralRowsForSection(it)).doesNotContain(54)
         }
     }
 
