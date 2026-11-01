@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.038] - 2026-11-01
+
+- Admin-Dashboard: Der Snapshot im Account-Detail ist jetzt ein durchsuchbarer, einklappbarer Baum mit Bereichs-Chips samt Anzahl, Namen und Typ der Listeneinträge, Trefferhervorhebung, „Alles auf-/zuklappen“ und farbigem `REDACTED`-Badge. „Rohes JSON“, Kopieren und Bearbeiten bleiben erhalten.
+- Admin-Snapshot-Bearbeitung: Änderungen an Katalogen und den versteckten Katalog-Listen eines Profils setzen dessen `catalogsUpdatedAtByProfile`-Zeitstempel, damit Geräte sie beim nächsten Cloud-Pull übernehmen. Watchlist und Profilliste bleiben unverändert.
+- Admin-Vorschau (`npm run preview:admin`) liefert realistische Demo-Snapshots. Drei neue Backend-Tests und drei Tests für die Snapshot-Ansicht erfolgreich; Asset-Version auf 1.0.038 angehoben.
+- Keine neue Datenbankmigration. Migration 013 bleibt erforderlich; Android und Web unverändert.
+
 ## [2.5.091] - 2026-11-01
 
 - Android-Version: `2.5.091` / Code `492`.
