@@ -2763,6 +2763,7 @@ class DetailsViewModel @Inject constructor(
             }
 
             val entry = exactEntry ?: watchHistoryRepository.getLatestProgress(mediaType, tmdbId)
+            val clockOffsetMs = watchHistoryRepository.currentServerClockOffsetMs()
             val cloudResume = if (entry != null) {
                 buildResumeFromProgress(
                     mediaType = mediaType,
@@ -2835,7 +2836,7 @@ class DetailsViewModel @Inject constructor(
                     val matchLocal = localResume?.takeIf { it.season == preferredSeason && it.episode == preferredEpisode }
                     val matchCloud = cloudResume?.takeIf { it.season == preferredSeason && it.episode == preferredEpisode }
                     if (matchLocal != null && matchCloud != null && resumeUpdatedAtMs > 0L) {
-                        if (isLocalPlaybackNewer(resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at)) {
+                        if (isLocalPlaybackNewer(resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at, clockOffsetMs)) {
                             matchLocal
                         } else matchCloud
                     } else matchLocal ?: matchCloud
@@ -2843,7 +2844,7 @@ class DetailsViewModel @Inject constructor(
                 cloudResume == null -> localResume
                 localResume == null -> cloudResume
                 isLocalPlaybackNewer(
-                    resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at,
+                    resumeUpdatedAtMs, entry?.updated_at, entry?.paused_at, clockOffsetMs,
                 ) -> localResume
                 resumeUpdatedAtMs > 0L -> cloudResume
                 // When both exist, prefer the one for the later episode; if same episode, prefer higher position
@@ -2869,6 +2870,7 @@ class DetailsViewModel @Inject constructor(
             val local = traktRepository.getBestLocalContinueWatchingEntry(mediaType, tmdbId)
             if (local != null && isLocalPlaybackNewer(
                     local.updatedAtMs, entry?.updated_at, entry?.paused_at,
+                    watchHistoryRepository.currentServerClockOffsetMs(),
                 )) {
                 val isWatchedEpisode = mediaType == MediaType.TV &&
                     traktRepository.getWatchedEpisodesFromCache()

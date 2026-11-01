@@ -5,6 +5,7 @@ import com.arflix.tv.data.model.SportsAddonCapabilities
 import com.arflix.tv.data.model.MediaType
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.AppLogger
+import com.arflix.tv.util.isStalePush
 import kotlinx.serialization.Serializable
 import kotlinx.coroutines.CompletableDeferred
 import retrofit2.HttpException
@@ -17,6 +18,8 @@ import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
+
+private const val MAX_CLOCK_SAMPLE_ROUND_TRIP_MS = 5_000L
 
 /**
  * Watch history entry for the account backend.
@@ -72,6 +75,28 @@ class WatchHistoryRepository @Inject constructor(
     private val watchHistoryFetchInFlight = AtomicReference<CompletableDeferred<List<WatchHistoryEntry>>?>(null)
     private val watchHistoryBurstCacheMs = 10_000L
     private val continueWatchingBurstCacheMs = 30_000L
+
+    // Server `updated_at` of our own latest push per entry, so the stale-push guard can tell
+    // our own earlier saves apart from writes made by another device.
+    private val lastOwnPushUpdatedAtMs = ConcurrentHashMap<String, Long>()
+
+    // Estimated server clock minus device clock, refreshed from every successful push.
+    @Volatile
+    private var serverClockOffsetMs: Long = 0L
+
+    fun currentServerClockOffsetMs(): Long = serverClockOffsetMs
+
+    private fun pushKey(profileId: String, mediaType: MediaType, tmdbId: Int, season: Int?, episode: Int?): String =
+        "$profileId|$mediaType|$tmdbId|${season ?: -1}|${episode ?: -1}"
+
+    private fun recordOwnPush(key: String, record: com.arflix.tv.data.api.WatchHistoryRecord, sentAtMs: Long, receivedAtMs: Long) {
+        val serverUpdatedAt = parseEpoch(record.updatedAt)
+        if (serverUpdatedAt <= 0L) return
+        lastOwnPushUpdatedAtMs[key] = serverUpdatedAt
+        if (receivedAtMs - sentAtMs <= MAX_CLOCK_SAMPLE_ROUND_TRIP_MS) {
+            serverClockOffsetMs = serverUpdatedAt - (sentAtMs + receivedAtMs) / 2
+        }
+    }
 
     private fun currentProfileId(): String = profileManager.getProfileIdSync().ifBlank { "default" }
 
@@ -132,11 +157,18 @@ class WatchHistoryRepository @Inject constructor(
         val profileId = currentProfileId()
         val userId = authRepositoryProvider.get().getCurrentUserId() ?: return
 
+        val pushKey = pushKey(profileId, mediaType, tmdbId, season, episode)
         if (sessionStartTime > 0L) {
             val existingProgress = getProgress(mediaType, tmdbId, season, episode)
             if (existingProgress != null) {
                 val cloudUpdatedAt = parseEpoch(existingProgress.updated_at)
-                if (cloudUpdatedAt > sessionStartTime + 10_000L) {
+                if (isStalePush(
+                        cloudUpdatedAtMs = cloudUpdatedAt,
+                        sessionStartMs = sessionStartTime,
+                        ownLastPushUpdatedAtMs = lastOwnPushUpdatedAtMs[pushKey] ?: 0L,
+                        serverClockOffsetMs = serverClockOffsetMs,
+                    )
+                ) {
                     com.arflix.tv.util.AppLogger.breadcrumb(
                         tag = "WatchHistory",
                         message = "Rejected stale push for $tmdbId. Cloud updated $cloudUpdatedAt, session start $sessionStartTime",
@@ -171,16 +203,20 @@ class WatchHistoryRepository @Inject constructor(
         // Retry without stream_* fields if an older backend rejects those fields.
         var saved = false
         try {
-                executeBackendCall("save watch progress") { auth ->
+            val sentAtMs = System.currentTimeMillis()
+            val record = executeBackendCall("save watch progress") { auth ->
                 watchHistoryApi.upsertWatchHistory(auth = auth, item = entry.toRecord())
             }
+            recordOwnPush(pushKey, record, sentAtMs, System.currentTimeMillis())
             saved = true
         } catch (e: HttpException) {
             try {
                 val fallback = entry.copy(stream_key = null, stream_addon_id = null, stream_title = null)
-                executeBackendCall("save watch progress fallback") { auth ->
+                val sentAtMs = System.currentTimeMillis()
+                val record = executeBackendCall("save watch progress fallback") { auth ->
                     watchHistoryApi.upsertWatchHistory(auth = auth, item = fallback.toRecord())
                 }
+                recordOwnPush(pushKey, record, sentAtMs, System.currentTimeMillis())
                 saved = true
             } catch (fallbackEx: Exception) {
                 if (fallbackEx is kotlinx.coroutines.CancellationException) throw fallbackEx

@@ -4078,6 +4078,7 @@ class PlayerViewModel @Inject constructor(
         } ?: 0L
         val localIsNewer = localEntry != null && isLocalPlaybackNewer(
             localEntry.updatedAtMs, cloudEntry?.updated_at, cloudEntry?.paused_at,
+            watchHistoryRepository.currentServerClockOffsetMs(),
         )
 
         val finalPositionMs = when {

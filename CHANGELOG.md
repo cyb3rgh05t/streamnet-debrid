@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.091] - 2026-11-01
+
+- Android-Version: `2.5.091` / Code `492`.
+- Android: Wiedergabestand wird nach „Intro/Recap/Credits überspringen“ und generell wieder zuverlässig in die Cloud übernommen. Der Schutz gegen veraltete Pushes hat zuvor eigene frühere Speicherungen derselben Sitzung als Fremdschreibzugriff gewertet und alle weiteren Cloud-Speicherungen, auch die beim Verlassen, verworfen.
+- Android: Zeitstempelvergleich für Fortsetzen (Details und Player) und der Schutz gegen veraltete Pushes berücksichtigen die geschätzte Abweichung zwischen Geräte- und Serveruhr.
+- Fünf neue Unit-Tests für Zeitstempel- und Stale-Push-Logik erfolgreich; nicht auf einem Gerät geprüft.
+- Backend und Web unverändert.
+
 ## [2.5.090] - 2026-10-31
 
 - Android-Version: `2.5.090` / Code `491`.
