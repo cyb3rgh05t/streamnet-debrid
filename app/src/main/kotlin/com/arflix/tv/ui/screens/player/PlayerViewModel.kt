@@ -1,6 +1,7 @@
 package com.arflix.tv.ui.screens.player
 import com.arflix.tv.data.model.isStreamNetNzbSource
 import com.arflix.tv.data.model.compareNzbSourceOrder
+import com.arflix.tv.data.model.sourceListPriority
 import com.arflix.tv.data.model.nzbAutoplayCandidates
 
 import android.content.Context
@@ -2248,8 +2249,8 @@ class PlayerViewModel @Inject constructor(
             .sortedWith(
                 // Streams stay grouped by addon order; within a group, self-ordered addons keep
                 // their original (arrival) order while everything else gets the quality sort.
-                compareByDescending<IndexedValue<StreamSource>> {
-                    if (it.value.isXtreamVodSource()) 1 else 0
+                compareBy<IndexedValue<StreamSource>> {
+                    it.value.sourceListPriority()
                 }.thenBy { addonOrderIndex(it.value) }
                     .then { a, b ->
                         if (a.value.isStreamNetNzbSource() && b.value.isStreamNetNzbSource()) {

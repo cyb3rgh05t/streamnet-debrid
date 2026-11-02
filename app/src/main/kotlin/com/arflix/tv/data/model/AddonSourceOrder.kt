@@ -1,12 +1,19 @@
 package com.arflix.tv.data.model
 
 internal fun StreamSource.isStreamNetNzbSource(): Boolean =
-    addonId.equals("com.usenet.streamer", ignoreCase = true) ||
+    addonId.equals("com.streamnet.nzb", ignoreCase = true) ||
+        addonId.equals("com.usenet.streamer", ignoreCase = true) ||
         addonName.substringBefore(" - ").trim().equals("StreamNet NZB", ignoreCase = true)
 
 internal fun StreamSource.isNzbSmartPlay(): Boolean =
     isStreamNetNzbSource() && listOfNotNull(rawLabel, addonTitle, source)
         .any { Regex("""\bsmart\s*play\b""", RegexOption.IGNORE_CASE).containsMatchIn(it) }
+
+internal fun StreamSource.sourceListPriority(): Int = when {
+    isXtreamVodSource() -> 0
+    isNzbSmartPlay() -> 1
+    else -> 2
+}
 
 internal fun compareNzbSourceOrder(a: StreamSource, b: StreamSource): Int =
     compareValues(if (a.isNzbSmartPlay()) 0 else 1, if (b.isNzbSmartPlay()) 0 else 1)

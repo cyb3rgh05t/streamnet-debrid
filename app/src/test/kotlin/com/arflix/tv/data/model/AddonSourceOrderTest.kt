@@ -6,6 +6,26 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AddonSourceOrderTest {
+    @Test
+    fun currentManifestIdPreservesOrderEvenWithResolutionInAddonName() {
+        val first = nzb(0).copy(addonId = "com.streamnet.nzb", addonName = "StreamNet NZB 1080p", size = "8 GB")
+        val second = first.copy(addonSourceOrder = 1, size = "50 GB", quality = "2160p")
+        assertTrue(first.isStreamNetNzbSource())
+        assertEquals(listOf(first, second), listOf(second, first).sortedWith(::compareNzbSourceOrder))
+        assertEquals(listOf(first, second), nzbAutoplayCandidates(listOf(second, first)))
+    }
+
+    @Test
+    fun vodAndSmartPlayPrecedeOtherAddonsRegardlessOfInstalledAddonOrder() {
+        val other = nzb(0).copy(addonId = "other", addonName = "Other")
+        val release = nzb(0)
+        val smart = nzb(5, "Smart Play").copy(addonId = "com.streamnet.nzb", addonName = "StreamNet NZB 1080p")
+        val vod = other.copy(addonId = "iptv_xtream_vod")
+        assertTrue(smart.isNzbSmartPlay())
+        assertEquals(listOf(vod, smart, other, release),
+            listOf(other, release, smart, vod).sortedBy { it.sourceListPriority() })
+    }
+
     private fun nzb(order: Int?, label: String = "Release") = StreamSource(
         source = label, addonName = "StreamNet NZB - NZB", addonId = "com.usenet.streamer",
         quality = "1080p", size = "1 GB", url = "https://example.test/release",

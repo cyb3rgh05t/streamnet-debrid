@@ -4,6 +4,7 @@ import com.arflix.tv.ui.motion.*
 import com.arflix.tv.data.model.isXtreamVodSource
 import com.arflix.tv.data.model.isStreamNetNzbSource
 import com.arflix.tv.data.model.compareNzbSourceOrder
+import com.arflix.tv.data.model.sourceListPriority
 
 import androidx.activity.compose.PredictiveBackHandler
 import androidx.compose.ui.graphics.graphicsLayer
@@ -355,9 +356,9 @@ fun StreamSelector(
             addonTabs.mapIndexed { index, tab -> tab.id to index }.toMap()
         }
     }
-    // Addon order first so "All Sources" groups by the user's installed-addon order.
+    // IPTV-VOD and Smart Play lead; remaining sources group by installed-addon order.
     // Within each addon, best quality floats up (resolution → release → size) — EXCEPT
-    // aggregator addons (AIOStreams): they sort server-side per the user's own web config, so
+    // self-ordered addons (StreamNet NZB, AIOStreams): they sort server-side, so
     // their streams keep arrival order (same exemption as PlayerViewModel.keepsOwnStreamOrder;
     // re-sorting here silently overrode the user's configured order in the source menu).
     val orderedPresentations = remember(presentations, addonOrder) {
@@ -367,8 +368,8 @@ fun StreamSelector(
             .thenBy { it.value.title.lowercase() }
         presentations.withIndex()
             .sortedWith(
-                compareByDescending<IndexedValue<SourcePresentation>> {
-                    if (it.value.stream.isXtreamVodSource()) 1 else 0
+                compareBy<IndexedValue<SourcePresentation>> {
+                    it.value.stream.sourceListPriority()
                 }.thenBy {
                     addonOrder[sourceTabId(it.value.stream)] ?: Int.MAX_VALUE
                 }.then { a, b ->

@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.093] - 2026-11-02
+
+- Android-Version: `2.5.093` / Code `494`.
+- Android-Quellenlisten: IPTV-VOD zuerst, danach Smart Play, anschließend Add-on-Reihenfolge. StreamNet NZB wird auch über die aktuelle Manifest-ID erkannt; reguläre NZB-Quellen behalten die vom Add-on gelieferte Reihenfolge statt einer lokalen Qualitäts-/Größensortierung. Gilt für Details und Quellenwechsel im Player; automatisches Abspielen überspringt Smart Play weiterhin.
+- 22 gezielte Quellenreihenfolge-, Identitäts- und Autoplay-Tests erfolgreich.
+- Backend und Web unverändert.
+
 ## [Backend 1.0.039] - 2026-11-02
 
 - Backend: Admin-Host-Overrides für StreamNet TV bleiben bei späteren Geräte-Pushes erhalten, auch wenn eine Ablaufprüfung oder Playlist-Änderung einen neueren Listen-Zeitstempel erzeugt. Zugangsdaten und Optionen bleiben synchronisierbar. Explizites Zurücksetzen wird gegen veraltete Geräte geschützt; vorhandene Overrides werden ohne Datenbankmigration übernommen.
