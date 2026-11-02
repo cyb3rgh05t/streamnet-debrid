@@ -6,8 +6,8 @@
     <meta name="robots" content="noindex,nofollow,noarchive" />
     <title>StreamNet Admin</title>
     <link rel="icon" href="/assets/streamnet-icon.svg" type="image/svg+xml" />
-    <link rel="stylesheet" href="/admin/admin.css?v=1.0.037" />
-    <script src="/admin/admin.js?v=1.0.037" defer></script>
+    <link rel="stylesheet" href="/admin/admin.css?v=1.0.038" />
+    <script src="/admin/admin.js?v=1.0.038" defer></script>
   </head>
   <body>
     <div id="page-loading"></div>
@@ -147,7 +147,7 @@
             </svg>
             <span>Abmelden</span>
           </button>
-          <span class="version-badge">Version 1.0.037</span>
+          <span class="version-badge">Version 1.0.038</span>
         </div>
         </div>
       </aside>
@@ -771,7 +771,53 @@
                   </button>
                 </div>
               </div>
-              <pre id="payload-json"></pre>
+              <div id="payload-viewer" class="snapshot-viewer">
+                <div class="snapshot-toolbar">
+                  <input
+                    id="snapshot-search"
+                    type="search"
+                    placeholder="Snapshot durchsuchen (Schlüssel oder Wert)…"
+                    aria-label="Snapshot durchsuchen"
+                    autocomplete="off"
+                    spellcheck="false"
+                  />
+                  <span
+                    id="snapshot-search-status"
+                    class="snapshot-status"
+                    aria-live="polite"
+                  ></span>
+                  <div class="snapshot-toolbar-actions">
+                    <button
+                      id="snapshot-expand-all"
+                      class="text-button"
+                      type="button"
+                    >
+                      Alles aufklappen
+                    </button>
+                    <button
+                      id="snapshot-collapse-all"
+                      class="text-button"
+                      type="button"
+                    >
+                      Alles zuklappen
+                    </button>
+                    <button
+                      id="snapshot-view-toggle"
+                      class="text-button"
+                      type="button"
+                    >
+                      Rohes JSON
+                    </button>
+                  </div>
+                </div>
+                <nav
+                  id="snapshot-sections"
+                  class="snapshot-sections"
+                  aria-label="Snapshot-Bereiche"
+                ></nav>
+                <div id="snapshot-tree" class="snapshot-tree"></div>
+                <pre id="payload-json" class="hidden"></pre>
+              </div>
               <form id="payload-edit-form" class="form-stack hidden">
                 <div class="warning">
                   Erweiterte Funktion: Werte, die als „[REDACTED]“ angezeigt

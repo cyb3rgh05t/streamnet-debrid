@@ -4,15 +4,30 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
-## [2.5.091] - 2026-11-02
+## [2.5.092] - 2026-11-02
 
-- Android-Version: `2.5.091` / Code `492`.
+- Android-Version: `2.5.092` / Code `493`.
 - Android Live-TV: Die EPG-Beschreibung fließt auf Home und in beiden Live-TV-Layouts in die gemeinsame Auswahl von Hintergrundbild und Logo ein. Mehrere unterscheidende Begriffe aus deutschen und englischen TMDB-Beschreibungen helfen bei gleichnamigen Filmen und Serien (z. B. Ghosts und Equalizer). Caches trennen unterschiedliche Sendungsbeschreibungen; ohne brauchbare Hinweise bleibt die bisherige Schätzung erhalten.
 - Android Live-TV: Folgenangaben im EPG-Titel priorisieren Serien auch bei langen Sendeplätzen. Gleichnamige Serien werden nach Originaltitel und Originalsprache gruppiert, damit ein neueres lokales Remake nicht allein durch sein Startjahr gewinnt. Hintergrundbilder und Logos verwenden dieselbe Zuordnung; unsichere Treffer bleiben bestmöglich geschätzt.
 - Android: Franchise-Filme und -Serien werden nach Veröffentlichungsdatum absteigend sortiert (neueste zuerst), Serien nach Erstausstrahlung. Timeline-Reihenfolgen bleiben unverändert; fehlende Datumsangaben stehen weiterhin am Ende.
 - Android-Details: Beschreibungsdialog mit Film-/Serientitel und kleinem Poster; Symbol als Ersatz bei fehlendem oder nicht ladbarem Poster.
 - Android-Details: Beschreibungsdialog und Mehr-lesen-Hinweis mit Profil-Akzenten, Titel-/Poster-Kopfbereich und neutral lesbarem Schließen-Button samt TV-Fokuszustand. Nur der Mehr-lesen-Hinweis wird bei Fokus hervorgehoben, nicht der gesamte Textblock.
 - Android-Details: Beschreibung auf acht Zeilen begrenzen; bei Überlauf vollständigen Text per Touch oder TV-D-Pad in einem scrollbaren Dialog öffnen.
+- Backend und Web unverändert.
+
+## [Backend 1.0.038] - 2026-11-01
+
+- Admin-Dashboard: Der Snapshot im Account-Detail ist jetzt ein durchsuchbarer, einklappbarer Baum mit Bereichs-Chips samt Anzahl, Namen und Typ der Listeneinträge, Trefferhervorhebung, „Alles auf-/zuklappen“ und farbigem `REDACTED`-Badge. „Rohes JSON“, Kopieren und Bearbeiten bleiben erhalten.
+- Admin-Snapshot-Bearbeitung: Änderungen an Katalogen und den versteckten Katalog-Listen eines Profils setzen dessen `catalogsUpdatedAtByProfile`-Zeitstempel, damit Geräte sie beim nächsten Cloud-Pull übernehmen. Watchlist und Profilliste bleiben unverändert.
+- Admin-Vorschau (`npm run preview:admin`) liefert realistische Demo-Snapshots. Drei neue Backend-Tests und drei Tests für die Snapshot-Ansicht erfolgreich; Asset-Version auf 1.0.038 angehoben.
+- Keine neue Datenbankmigration. Migration 013 bleibt erforderlich; Android und Web unverändert.
+
+## [2.5.091] - 2026-11-01
+
+- Android-Version: `2.5.091` / Code `492`.
+- Android: Wiedergabestand wird nach „Intro/Recap/Credits überspringen“ und generell wieder zuverlässig in die Cloud übernommen. Der Schutz gegen veraltete Pushes hat zuvor eigene frühere Speicherungen derselben Sitzung als Fremdschreibzugriff gewertet und alle weiteren Cloud-Speicherungen, auch die beim Verlassen, verworfen.
+- Android: Zeitstempelvergleich für Fortsetzen (Details und Player) und der Schutz gegen veraltete Pushes berücksichtigen die geschätzte Abweichung zwischen Geräte- und Serveruhr.
+- Fünf neue Unit-Tests für Zeitstempel- und Stale-Push-Logik erfolgreich; nicht auf einem Gerät geprüft.
 - Backend und Web unverändert.
 
 ## [2.5.090] - 2026-10-31

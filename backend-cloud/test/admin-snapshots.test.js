@@ -878,6 +878,66 @@ test("edits the whole payload while preserving redacted secret values", () => {
   assert.equal(result.fieldUpdatedAt["i:kids:sortOrder"], 5678);
 });
 
+test("payload edit stamps only profiles whose catalog state changed", () => {
+  const value = snapshot();
+  value.catalogsByProfile.kids = [{ id: "shows" }];
+  value.hiddenPreinstalledByProfile = { "living-room": [], kids: [] };
+  value.catalogsUpdatedAtByProfile = { "living-room": 100, kids: 200 };
+
+  const edited = JSON.parse(JSON.stringify(value));
+  edited.catalogsByProfile["living-room"].push({ id: "extra" });
+  edited.hiddenPreinstalledByProfile.kids = ["popular-movies"];
+
+  const result = applyAdminSnapshotMutation(
+    value,
+    { operation: "edit_payload", data: edited },
+    9000,
+  );
+
+  assert.equal(result.catalogsUpdatedAtByProfile["living-room"], 9000);
+  assert.equal(result.catalogsUpdatedAtByProfile.kids, 9000);
+
+  const untouched = JSON.parse(JSON.stringify(value));
+  untouched.profiles[0].name = "Lounge";
+  const unchanged = applyAdminSnapshotMutation(
+    value,
+    { operation: "edit_payload", data: untouched },
+    9100,
+  );
+  assert.deepEqual(unchanged.catalogsUpdatedAtByProfile, { "living-room": 100, kids: 200 });
+});
+
+test("payload edit keeps an explicitly edited catalog timestamp", () => {
+  const value = snapshot();
+  value.catalogsUpdatedAtByProfile = { "living-room": 100 };
+  const edited = JSON.parse(JSON.stringify(value));
+  edited.catalogsByProfile["living-room"] = [];
+  edited.catalogsUpdatedAtByProfile["living-room"] = 777;
+
+  const result = applyAdminSnapshotMutation(
+    value,
+    { operation: "edit_payload", data: edited },
+    9000,
+  );
+  assert.equal(result.catalogsUpdatedAtByProfile["living-room"], 777);
+});
+
+test("payload edit leaves watchlist and profile data without new merge timestamps", () => {
+  const value = snapshot();
+  const edited = JSON.parse(JSON.stringify(value));
+  edited.watchlistByProfile.kids.push({ id: "2" });
+  edited.profiles[0].name = "Lounge";
+
+  const result = applyAdminSnapshotMutation(
+    value,
+    { operation: "edit_payload", data: edited },
+    9000,
+  );
+  assert.equal(result.watchlistUpdatedAtByProfile, undefined);
+  assert.equal(result.catalogsUpdatedAtByProfile, undefined);
+  assert.equal(result.fieldUpdatedAt, undefined);
+});
+
 test("rejects a payload edit that removes every profile", () => {
   assert.throws(
     () =>

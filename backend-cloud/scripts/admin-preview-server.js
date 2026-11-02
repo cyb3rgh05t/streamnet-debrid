@@ -46,6 +46,89 @@ const mimeTypes = {
   ".svg": "image/svg+xml",
 };
 
+function buildDemoPayload(account) {
+  const addon = (id, name, type, version, extra = {}) => ({
+    id, name, type, version, url: `https://addons.example.test/${id}/manifest.json`,
+    isEnabled: true, isInstalled: true, runtimeKind: "STREMIO", installSource: "DIRECT_URL",
+    description: `${name} (Demo-Add-on)`, transportUrl: "[REDACTED]",
+    manifest: {
+      id, name, version, resources: ["catalog", "meta", "stream"], types: ["movie", "series"],
+      catalogs: [
+        { id: `${id}.popular`, type: "movie", name: "Beliebt" },
+        { id: `${id}.new`, type: "series", name: "Neu" },
+      ],
+      logo: `https://addons.example.test/${id}/icon.png`,
+    },
+    ...extra,
+  });
+  const addons = [
+    addon("opensubtitles", "OpenSubtitles v3", "SUBTITLE", "1.0.0"),
+    addon("com.demo.streamer.p.alpha", "StreamNet NZB (alpha)", "CUSTOM", "1.8.4"),
+    addon("com.demo.streamer.p.beta", "StreamNet NZB (beta)", "CUSTOM", "1.8.4", { isEnabled: false }),
+    addon("cinemeta", "Cinemeta", "OFFICIAL", "3.0.13"),
+    addon("com.demo.torrent", "Demo Torrent Hub", "CUSTOM", "0.9.2"),
+  ];
+  const profiles = [
+    { id: "profile-living-room", name: "Wohnzimmer", isKidsProfile: false, avatarColor: "#e5a209", language: "de-DE" },
+    { id: "profile-kids", name: "Kinder", isKidsProfile: true, avatarColor: "#68d89b", language: "de-DE" },
+  ];
+  const playlist = (id, name, count) => ({
+    id, name, m3uUrl: "[REDACTED]", epgUrl: "[REDACTED]", enabled: true,
+    channelCount: count, lastRefreshedAt: "2026-10-28T12:30:00.000Z",
+    xtream: { username: "[REDACTED]", password: "[REDACTED]", host: "[REDACTED]" },
+  });
+  const catalog = (id, name, sourceType) => ({
+    id, name, sourceType, isVisible: true, order: 0,
+    config: { mediaType: "movie", sort: "popularity.desc", pageSize: 20 },
+  });
+  const catalogs = [
+    catalog("popular-movies", "Beliebte Filme", "PREINSTALLED"),
+    catalog("trending-series", "Serien im Trend", "PREINSTALLED"),
+    catalog("trakt-watchlist", "Trakt-Watchlist", "TRAKT"),
+    catalog("addon-new", "Neu im Add-on", "ADDON"),
+  ];
+  const watchlist = (titles) => titles.map((title, index) => ({
+    tmdbId: 1000 + index * 37, mediaType: index % 2 ? "tv" : "movie", title,
+    addedAt: `2026-10-${String(10 + index).padStart(2, "0")}T18:00:00.000Z`,
+  }));
+  return {
+    schemaVersion: 4,
+    updatedAt: account.snapshot_updated_at,
+    addonsUpdatedAt: "2026-10-20T09:00:00.000Z",
+    profiles,
+    addons,
+    addonsByProfile: {
+      "profile-living-room": addons,
+      "profile-kids": addons.slice(0, 2),
+    },
+    iptvByProfile: {
+      "profile-living-room": { playlists: [playlist("streamnet_tv", "StreamNet TV", 1840), playlist("demo-sports", "Demo Sport", 212)] },
+      "profile-kids": { playlists: [playlist("streamnet_tv", "StreamNet TV", 1840)] },
+    },
+    catalogs,
+    catalogsByProfile: {
+      "profile-living-room": catalogs,
+      "profile-kids": catalogs.slice(0, 2),
+    },
+    catalogsUpdatedAtByProfile: {
+      "profile-living-room": "2026-10-21T10:00:00.000Z",
+      "profile-kids": "2026-10-18T16:40:00.000Z",
+    },
+    watchlistByProfile: {
+      "profile-living-room": watchlist(["Dune: Part Two", "Severance", "The Bear", "Arrival"]),
+      "profile-kids": watchlist(["Klaus"]),
+    },
+    settingsByProfile: {
+      "profile-living-room": { subtitleLanguage: "de", autoPlayNext: true, tvNavigationSound: true, hideBudget: false },
+      "profile-kids": { subtitleLanguage: "de", autoPlayNext: false, tvNavigationSound: false, hideBudget: true },
+    },
+    fieldUpdatedAt: {
+      "settings:profile-living-room:subtitleLanguage": "2026-10-12T20:00:00.000Z",
+      "settings:profile-kids:autoPlayNext": "2026-10-14T07:30:00.000Z",
+    },
+  };
+}
+
 function json(reply, status, value) {
   reply.writeHead(status, { "content-type": "application/json; charset=utf-8" });
   reply.end(JSON.stringify(value));
@@ -117,7 +200,7 @@ const server = createServer(async (request, reply) => {
           platform: "linux / x64 (Demo)",
           schema_version: "012_device_presence.sql (Demo)",
         },
-        versions: { backend: "1.0.037" },
+        versions: { backend: "1.0.038" },
         recent_accounts: accounts,
         recent_audits: [
           { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
@@ -130,7 +213,7 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.037", source: "Demo-Backend" },
+          { component: "backend", version: "1.0.038", source: "Demo-Backend" },
           { component: "web", version: "1.0.071", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
           { component: "android", version: "2.5.082", published_at: "2026-10-29T12:45:00Z", source: "Demo-APK-Release (simuliert)" },
         ],
@@ -171,6 +254,7 @@ const server = createServer(async (request, reply) => {
     if (request.method === "GET" && url.pathname.startsWith("/admin-api/accounts/")) {
       const account = accounts.find(item => url.pathname === `/admin-api/accounts/${item.id}`);
       if (!account) return json(reply, 404, { error: "Demo-Account nicht gefunden" });
+      const demoPayload = buildDemoPayload(account);
       const device = {
         kind: "app_event", removable: false, profile_id: "demo-profile",
         platform: "android", device_type: "tv", app_version: "2.5.082",
@@ -189,9 +273,15 @@ const server = createServer(async (request, reply) => {
         },
         snapshot: {
           revision: account.revision, updated_at: account.snapshot_updated_at,
-          profiles: [{ id: "demo-profile", name: "Wohnzimmer", addonCount: 0,
-            playlistCount: 0, catalogCount: 0, watchlistCount: 0 }],
-          addons: [], playlists: [], catalogs: [], payload: { profiles: [{ id: "demo-profile", name: "Wohnzimmer" }] },
+          profiles: demoPayload.profiles.map((profile) => ({
+            id: profile.id, name: profile.name,
+            addonCount: demoPayload.addonsByProfile[profile.id].length,
+            playlistCount: demoPayload.iptvByProfile[profile.id].playlists.length,
+            catalogCount: demoPayload.catalogsByProfile[profile.id].length,
+            watchlistCount: demoPayload.watchlistByProfile[profile.id].length,
+          })),
+          addons: demoPayload.addons, playlists: [], catalogs: demoPayload.catalogs,
+          payload: demoPayload,
         },
       });
     }

@@ -5,11 +5,44 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../public/admin.js", import.meta.url), "utf8");
 const context = vm.createContext({});
-for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent", "liveDeviceEntries"]) {
+for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent", "liveDeviceEntries", "jsonItemTitle", "jsonContainerSummary", "jsonSnapshotSections", "jsonQueryMatches"]) {
   const definition = source.match(new RegExp(`function ${name}\\([^]*?\\n\\}`));
   assert.ok(definition, `Missing ${name}`);
   vm.runInContext(definition[0], context);
 }
+
+test("snapshot explorer labels list items by name and type", () => {
+  assert.equal(context.jsonItemTitle({ id: "a", name: "OpenSubtitles", type: "SUBTITLE" }), "OpenSubtitles · SUBTITLE");
+  assert.equal(context.jsonItemTitle({ id: "streamnet_tv", enabled: true }), "streamnet_tv");
+  assert.equal(context.jsonItemTitle({ name: "X", type: "X" }), "X");
+  assert.equal(context.jsonItemTitle({ count: 3 }), "");
+  assert.equal(context.jsonItemTitle([1, 2]), "");
+  assert.equal(context.jsonItemTitle(null), "");
+});
+
+test("snapshot explorer summarises containers and top-level sections", () => {
+  assert.equal(context.jsonContainerSummary([]), "0 Einträge");
+  assert.equal(context.jsonContainerSummary([1]), "1 Eintrag");
+  assert.equal(context.jsonContainerSummary({ a: 1, b: 2 }), "2 Felder");
+  assert.equal(context.jsonContainerSummary({ a: 1 }), "1 Feld");
+  const sections = context.jsonSnapshotSections({ updatedAt: "x", addons: [1, 2, 3], settings: { a: 1 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(sections)), [
+    { key: "updatedAt", count: null },
+    { key: "addons", count: 3 },
+    { key: "settings", count: 1 },
+  ]);
+  assert.deepEqual(JSON.parse(JSON.stringify(context.jsonSnapshotSections(null))), []);
+});
+
+test("snapshot search matches keys and scalar values case-insensitively", () => {
+  assert.equal(context.jsonQueryMatches("transportUrl", "[REDACTED]", "redacted"), true);
+  assert.equal(context.jsonQueryMatches("name", "StreamNet NZB", "nzb"), true);
+  assert.equal(context.jsonQueryMatches("isEnabled", true, "ENABLED"), true);
+  assert.equal(context.jsonQueryMatches("count", 12, "12"), true);
+  assert.equal(context.jsonQueryMatches("name", "Cinemeta", "nzb"), false);
+  assert.equal(context.jsonQueryMatches("addons", [1], "zzz"), false);
+  assert.equal(context.jsonQueryMatches("name", "x", ""), false);
+});
 
 test("device table retains online and offline heartbeat devices but hides sessions and legacy events", () => {
   const devices = [

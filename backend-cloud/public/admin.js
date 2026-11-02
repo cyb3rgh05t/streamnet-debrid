@@ -219,6 +219,285 @@ function formatBytes(value) {
   return `${amount.toLocaleString("de-DE", { maximumFractionDigits: 1 })} ${units[unit]}`;
 }
 
+function jsonItemTitle(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return "";
+  const text = (key) => {
+    const item = value[key];
+    return typeof item === "string" || typeof item === "number"
+      ? String(item).trim()
+      : "";
+  };
+  const primary =
+    ["name", "title", "label", "displayName", "id", "key"]
+      .map(text)
+      .find(Boolean) || "";
+  const secondary =
+    ["type", "sourceType", "kind", "version"]
+      .map(text)
+      .find((item) => item && item !== primary) || "";
+  return [primary, secondary].filter(Boolean).join(" · ");
+}
+
+function jsonContainerSummary(value) {
+  if (Array.isArray(value)) {
+    return value.length === 1 ? "1 Eintrag" : `${value.length} Einträge`;
+  }
+  const count = Object.keys(value).length;
+  return count === 1 ? "1 Feld" : `${count} Felder`;
+}
+
+function jsonSnapshotSections(payload) {
+  if (!payload || typeof payload !== "object") return [];
+  return Object.entries(payload).map(([key, value]) => ({
+    key,
+    count:
+      value && typeof value === "object" ? Object.keys(value).length : null,
+  }));
+}
+
+function jsonQueryMatches(key, value, query) {
+  const needle = String(query || "").toLowerCase();
+  if (!needle) return false;
+  if (String(key).toLowerCase().includes(needle)) return true;
+  return value === null || typeof value !== "object"
+    ? String(value).toLowerCase().includes(needle)
+    : false;
+}
+
+const snapshotViewer = {
+  payload: undefined,
+  query: "",
+  openDepth: 1,
+  raw: false,
+  searchTimer: null,
+};
+const SNAPSHOT_LONG_STRING = 160;
+
+function appendHighlighted(parent, text, query) {
+  const needle = query.toLowerCase();
+  const haystack = text.toLowerCase();
+  let start = 0;
+  let index = needle ? haystack.indexOf(needle) : -1;
+  while (index !== -1) {
+    if (index > start) parent.append(text.slice(start, index));
+    const mark = document.createElement("mark");
+    mark.textContent = text.slice(index, index + needle.length);
+    parent.append(mark);
+    start = index + needle.length;
+    index = haystack.indexOf(needle, start);
+  }
+  if (start < text.length) parent.append(text.slice(start));
+}
+
+function snapshotKeyLabel(key, isIndex, query) {
+  const label = document.createElement("span");
+  label.className = isIndex ? "json-key json-index" : "json-key";
+  appendHighlighted(label, isIndex ? `[${key}]` : String(key), query);
+  return label;
+}
+
+function buildSnapshotLeaf(key, value, isIndex, query) {
+  const row = document.createElement("div");
+  row.className = "json-row";
+  const valueNode = document.createElement("span");
+  const type = value === null ? "null" : typeof value;
+  valueNode.className = `json-value json-${type}`;
+  if (value === "[REDACTED]") {
+    valueNode.className = "json-value json-redacted";
+    valueNode.textContent = "REDACTED";
+    valueNode.title = "Wert wird im Admin-Bereich maskiert";
+  } else if (type === "string") {
+    const full = value;
+    const collapsed = full.length > SNAPSHOT_LONG_STRING;
+    const render = (expanded) => {
+      valueNode.replaceChildren();
+      const shown = collapsed && !expanded
+        ? `${full.slice(0, SNAPSHOT_LONG_STRING)}…`
+        : full;
+      valueNode.append('"');
+      appendHighlighted(valueNode, shown, query);
+      valueNode.append('"');
+      if (collapsed) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "json-more";
+        toggle.textContent = expanded ? "weniger" : `mehr (${full.length})`;
+        toggle.addEventListener("click", () => render(!expanded));
+        valueNode.append(" ", toggle);
+      }
+    };
+    render(false);
+  } else {
+    appendHighlighted(valueNode, String(value), query);
+  }
+  row.append(snapshotKeyLabel(key, isIndex, query), ": ", valueNode);
+  return row;
+}
+
+function buildSnapshotChildren(container, query, stats, depth, path) {
+  const fragment = document.createDocumentFragment();
+  const isArray = Array.isArray(container);
+  for (const [key, value] of Object.entries(container)) {
+    const node = buildSnapshotNode(key, value, isArray, query, stats, depth, `${path}/${key}`);
+    if (node) fragment.append(node);
+  }
+  return fragment;
+}
+
+function buildSnapshotNode(key, value, isIndex, query, stats, depth, path) {
+  const keyMatches = Boolean(query) && String(key).toLowerCase().includes(query.toLowerCase());
+  if (value === null || typeof value !== "object") {
+    if (query && !jsonQueryMatches(key, value, query)) return null;
+    if (query) stats.matches += 1;
+    return buildSnapshotLeaf(key, value, isIndex, query);
+  }
+
+  const details = document.createElement("details");
+  details.className = "json-node";
+  details.dataset.path = path;
+  const summary = document.createElement("summary");
+  summary.append(snapshotKeyLabel(key, isIndex, query));
+  const title = isIndex ? jsonItemTitle(value) : "";
+  if (title) {
+    const titleNode = document.createElement("span");
+    titleNode.className = "json-title";
+    appendHighlighted(titleNode, title, query);
+    summary.append(titleNode);
+  }
+  const count = document.createElement("span");
+  count.className = "json-count";
+  count.textContent = jsonContainerSummary(value);
+  summary.append(count);
+  details.append(summary);
+
+  const body = document.createElement("div");
+  body.className = "json-children";
+  details.append(body);
+
+  let rendered = false;
+  const renderBody = (childQuery) => {
+    if (rendered) return;
+    rendered = true;
+    body.append(buildSnapshotChildren(value, childQuery, stats, depth + 1, path));
+  };
+
+  if (query && keyMatches) {
+    // The key itself is the hit: keep the branch collapsed and render it on demand.
+    stats.matches += 1;
+    details.addEventListener("toggle", () => {
+      if (details.open) renderBody("");
+    });
+  } else if (query) {
+    // Filtered view: only branches that contain a hit are rendered, already opened.
+    renderBody(query);
+    if (!body.childElementCount) return null;
+    details.open = true;
+  } else if (depth < snapshotViewer.openDepth) {
+    renderBody("");
+    details.open = true;
+  } else {
+    details.addEventListener("toggle", () => {
+      if (details.open) renderBody("");
+    });
+  }
+  return details;
+}
+
+function renderSnapshotTree() {
+  const tree = byId("snapshot-tree");
+  const status = byId("snapshot-search-status");
+  const payload = snapshotViewer.payload;
+  const query = snapshotViewer.query.trim();
+  tree.replaceChildren();
+  status.textContent = "";
+  if (payload === undefined) {
+    const empty = document.createElement("p");
+    empty.className = "snapshot-empty";
+    empty.textContent = "Kein Cloud-Snapshot vorhanden.";
+    tree.append(empty);
+    return;
+  }
+  if (payload === null || typeof payload !== "object") {
+    tree.append(buildSnapshotLeaf("snapshot", payload, false, ""));
+    return;
+  }
+  const stats = { matches: 0 };
+  tree.append(buildSnapshotChildren(payload, query, stats, 0, ""));
+  if (query) {
+    status.textContent =
+      stats.matches === 0
+        ? "Keine Treffer"
+        : stats.matches === 1
+          ? "1 Treffer"
+          : `${stats.matches} Treffer`;
+    if (stats.matches === 0) {
+      const empty = document.createElement("p");
+      empty.className = "snapshot-empty";
+      empty.textContent = `Nichts gefunden für „${query}“.`;
+      tree.append(empty);
+    }
+  }
+}
+
+function renderSnapshotSections() {
+  const nav = byId("snapshot-sections");
+  nav.replaceChildren();
+  for (const section of jsonSnapshotSections(snapshotViewer.payload)) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "snapshot-chip";
+    chip.append(section.key);
+    if (section.count !== null) {
+      const badge = document.createElement("span");
+      badge.textContent = String(section.count);
+      chip.append(badge);
+    }
+    chip.addEventListener("click", () => jumpToSnapshotSection(section.key));
+    nav.append(chip);
+  }
+  nav.classList.toggle("hidden", nav.childElementCount === 0);
+}
+
+function jumpToSnapshotSection(key) {
+  if (snapshotViewer.query) {
+    snapshotViewer.query = "";
+    byId("snapshot-search").value = "";
+    renderSnapshotTree();
+  }
+  const tree = byId("snapshot-tree");
+  const node = [...tree.querySelectorAll(":scope > details")].find(
+    (item) => item.dataset.path === `/${key}`,
+  );
+  if (!node) return;
+  node.open = true;
+  tree.scrollTo({ top: node.offsetTop - tree.offsetTop, behavior: "smooth" });
+}
+
+function applySnapshotViewMode() {
+  const raw = snapshotViewer.raw;
+  byId("payload-json").classList.toggle("hidden", !raw);
+  byId("snapshot-tree").classList.toggle("hidden", raw);
+  byId("snapshot-sections").classList.toggle(
+    "hidden",
+    raw || byId("snapshot-sections").childElementCount === 0,
+  );
+  for (const id of ["snapshot-search", "snapshot-search-status", "snapshot-expand-all", "snapshot-collapse-all"]) {
+    byId(id).classList.toggle("hidden", raw);
+  }
+  byId("snapshot-view-toggle").textContent = raw ? "Baumansicht" : "Rohes JSON";
+}
+
+function renderSnapshotViewer(payload) {
+  snapshotViewer.payload = payload;
+  snapshotViewer.query = "";
+  snapshotViewer.openDepth = 1;
+  snapshotViewer.raw = false;
+  byId("snapshot-search").value = "";
+  renderSnapshotSections();
+  renderSnapshotTree();
+  applySnapshotViewMode();
+}
+
 function formatAuditOperation(operation) {
   const labels = {
     upsert_addon: "Add-on hinzugefügt / aktualisiert",
@@ -956,7 +1235,8 @@ async function openAccount(accountId) {
   byId("payload-json").textContent = snapshot
     ? JSON.stringify(snapshot.payload, null, 2)
     : "Kein Cloud-Snapshot vorhanden.";
-  byId("payload-json").classList.remove("hidden");
+  renderSnapshotViewer(snapshot ? snapshot.payload : undefined);
+  byId("payload-viewer").classList.remove("hidden");
   byId("payload-edit-form").classList.add("hidden");
   byId("edit-payload-button").classList.toggle("hidden", !snapshot);
   renderProfiles(snapshot?.profiles || []);
@@ -1845,7 +2125,7 @@ byId("copy-payload").addEventListener("click", async () => {
 byId("edit-payload-button").addEventListener("click", () => {
   const snapshot = state.selectedAccount?.snapshot;
   if (!snapshot) return;
-  byId("payload-json").classList.add("hidden");
+  byId("payload-viewer").classList.add("hidden");
   byId("payload-edit-data").value = JSON.stringify(snapshot.payload, null, 2);
   byId("payload-edit-message").textContent = "";
   byId("payload-edit-message").className = "message";
@@ -1853,7 +2133,26 @@ byId("edit-payload-button").addEventListener("click", () => {
 });
 byId("payload-edit-cancel").addEventListener("click", () => {
   byId("payload-edit-form").classList.add("hidden");
-  byId("payload-json").classList.remove("hidden");
+  byId("payload-viewer").classList.remove("hidden");
+});
+byId("snapshot-search").addEventListener("input", (event) => {
+  clearTimeout(snapshotViewer.searchTimer);
+  snapshotViewer.searchTimer = setTimeout(() => {
+    snapshotViewer.query = event.target.value;
+    renderSnapshotTree();
+  }, 180);
+});
+byId("snapshot-expand-all").addEventListener("click", () => {
+  snapshotViewer.openDepth = Infinity;
+  renderSnapshotTree();
+});
+byId("snapshot-collapse-all").addEventListener("click", () => {
+  snapshotViewer.openDepth = 0;
+  renderSnapshotTree();
+});
+byId("snapshot-view-toggle").addEventListener("click", () => {
+  snapshotViewer.raw = !snapshotViewer.raw;
+  applySnapshotViewMode();
 });
 byId("payload-edit-form").addEventListener("submit", async (event) => {
   event.preventDefault();

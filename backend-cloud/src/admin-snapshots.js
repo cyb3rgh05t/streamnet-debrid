@@ -266,6 +266,43 @@ function stampEditedProfileFields(current, edited, rootKey, prefix, now) {
   }
 }
 
+// The app merges these per-profile lists as one unit, ordered by catalogsUpdatedAtByProfile.
+const catalogStateRoots = [
+  "catalogsByProfile",
+  "hiddenPreinstalledByProfile",
+  "hiddenAddonByProfile",
+  "hiddenHomeServerByProfile",
+  "hiddenCustomByProfile",
+];
+
+function stampEditedCatalogTimestamps(current, edited, now) {
+  const currentStamps = isPlainObject(current.catalogsUpdatedAtByProfile)
+    ? current.catalogsUpdatedAtByProfile
+    : {};
+  const editedStamps = isPlainObject(edited.catalogsUpdatedAtByProfile)
+    ? edited.catalogsUpdatedAtByProfile
+    : {};
+  const profileIdsToCheck = new Set();
+  for (const root of catalogStateRoots) {
+    for (const source of [current[root], edited[root]]) {
+      if (isPlainObject(source)) {
+        for (const profileId of Object.keys(source)) profileIdsToCheck.add(profileId);
+      }
+    }
+  }
+  for (const profileId of profileIdsToCheck) {
+    const changed = catalogStateRoots.some(
+      (root) => !jsonEqual(current[root]?.[profileId], edited[root]?.[profileId]),
+    );
+    // An explicitly edited timestamp is left alone; otherwise devices would keep their older state.
+    if (!changed || !jsonEqual(currentStamps[profileId], editedStamps[profileId])) continue;
+    if (!isPlainObject(edited.catalogsUpdatedAtByProfile)) {
+      edited.catalogsUpdatedAtByProfile = {};
+    }
+    edited.catalogsUpdatedAtByProfile[profileId] = now;
+  }
+}
+
 function stampEditedPayloadTimestamps(current, edited, now) {
   if (
     !jsonEqual(current.addons, edited.addons) ||
@@ -275,6 +312,7 @@ function stampEditedPayloadTimestamps(current, edited, now) {
   }
   stampEditedProfileFields(current, edited, "profileSettingsById", "p", now);
   stampEditedProfileFields(current, edited, "iptvByProfile", "i", now);
+  stampEditedCatalogTimestamps(current, edited, now);
 }
 
 function mirrorEditedTopLevelAddonsToProfiles(current, edited) {
