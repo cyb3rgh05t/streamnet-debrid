@@ -48,11 +48,23 @@ const mimeTypes = {
 
 function buildDemoPayload(account) {
   const addon = (id, name, type, version, extra = {}) => ({
-    id, name, type, version, url: `https://addons.example.test/${id}/manifest.json`,
-    isEnabled: true, isInstalled: true, runtimeKind: "STREMIO", installSource: "DIRECT_URL",
-    description: `${name} (Demo-Add-on)`, transportUrl: "[REDACTED]",
+    id,
+    name,
+    type,
+    version,
+    url: `https://addons.example.test/${id}/manifest.json`,
+    isEnabled: true,
+    isInstalled: true,
+    runtimeKind: "STREMIO",
+    installSource: "DIRECT_URL",
+    description: `${name} (Demo-Add-on)`,
+    transportUrl: "[REDACTED]",
     manifest: {
-      id, name, version, resources: ["catalog", "meta", "stream"], types: ["movie", "series"],
+      id,
+      name,
+      version,
+      resources: ["catalog", "meta", "stream"],
+      types: ["movie", "series"],
       catalogs: [
         { id: `${id}.popular`, type: "movie", name: "Beliebt" },
         { id: `${id}.new`, type: "series", name: "Neu" },
@@ -63,22 +75,58 @@ function buildDemoPayload(account) {
   });
   const addons = [
     addon("opensubtitles", "OpenSubtitles v3", "SUBTITLE", "1.0.0"),
-    addon("com.demo.streamer.p.alpha", "StreamNet NZB (alpha)", "CUSTOM", "1.8.4"),
-    addon("com.demo.streamer.p.beta", "StreamNet NZB (beta)", "CUSTOM", "1.8.4", { isEnabled: false }),
+    addon(
+      "com.demo.streamer.p.alpha",
+      "StreamNet NZB (alpha)",
+      "CUSTOM",
+      "1.8.4",
+    ),
+    addon(
+      "com.demo.streamer.p.beta",
+      "StreamNet NZB (beta)",
+      "CUSTOM",
+      "1.8.4",
+      { isEnabled: false },
+    ),
     addon("cinemeta", "Cinemeta", "OFFICIAL", "3.0.13"),
     addon("com.demo.torrent", "Demo Torrent Hub", "CUSTOM", "0.9.2"),
   ];
   const profiles = [
-    { id: "profile-living-room", name: "Wohnzimmer", isKidsProfile: false, avatarColor: "#e5a209", language: "de-DE" },
-    { id: "profile-kids", name: "Kinder", isKidsProfile: true, avatarColor: "#68d89b", language: "de-DE" },
+    {
+      id: "profile-living-room",
+      name: "Wohnzimmer",
+      isKidsProfile: false,
+      avatarColor: "#e5a209",
+      language: "de-DE",
+    },
+    {
+      id: "profile-kids",
+      name: "Kinder",
+      isKidsProfile: true,
+      avatarColor: "#68d89b",
+      language: "de-DE",
+    },
   ];
   const playlist = (id, name, count) => ({
-    id, name, m3uUrl: "[REDACTED]", epgUrl: "[REDACTED]", enabled: true,
-    channelCount: count, lastRefreshedAt: "2026-10-28T12:30:00.000Z",
-    xtream: { username: "[REDACTED]", password: "[REDACTED]", host: "[REDACTED]" },
+    id,
+    name,
+    m3uUrl: "[REDACTED]",
+    epgUrl: "[REDACTED]",
+    enabled: true,
+    channelCount: count,
+    lastRefreshedAt: "2026-10-28T12:30:00.000Z",
+    xtream: {
+      username: "[REDACTED]",
+      password: "[REDACTED]",
+      host: "[REDACTED]",
+    },
   });
   const catalog = (id, name, sourceType) => ({
-    id, name, sourceType, isVisible: true, order: 0,
+    id,
+    name,
+    sourceType,
+    isVisible: true,
+    order: 0,
     config: { mediaType: "movie", sort: "popularity.desc", pageSize: 20 },
   });
   const catalogs = [
@@ -87,10 +135,13 @@ function buildDemoPayload(account) {
     catalog("trakt-watchlist", "Trakt-Watchlist", "TRAKT"),
     catalog("addon-new", "Neu im Add-on", "ADDON"),
   ];
-  const watchlist = (titles) => titles.map((title, index) => ({
-    tmdbId: 1000 + index * 37, mediaType: index % 2 ? "tv" : "movie", title,
-    addedAt: `2026-10-${String(10 + index).padStart(2, "0")}T18:00:00.000Z`,
-  }));
+  const watchlist = (titles) =>
+    titles.map((title, index) => ({
+      tmdbId: 1000 + index * 37,
+      mediaType: index % 2 ? "tv" : "movie",
+      title,
+      addedAt: `2026-10-${String(10 + index).padStart(2, "0")}T18:00:00.000Z`,
+    }));
   return {
     schemaVersion: 4,
     updatedAt: account.snapshot_updated_at,
@@ -102,8 +153,15 @@ function buildDemoPayload(account) {
       "profile-kids": addons.slice(0, 2),
     },
     iptvByProfile: {
-      "profile-living-room": { playlists: [playlist("streamnet_tv", "StreamNet TV", 1840), playlist("demo-sports", "Demo Sport", 212)] },
-      "profile-kids": { playlists: [playlist("streamnet_tv", "StreamNet TV", 1840)] },
+      "profile-living-room": {
+        playlists: [
+          playlist("streamnet_tv", "StreamNet TV", 1840),
+          playlist("demo-sports", "Demo Sport", 212),
+        ],
+      },
+      "profile-kids": {
+        playlists: [playlist("streamnet_tv", "StreamNet TV", 1840)],
+      },
     },
     catalogs,
     catalogsByProfile: {
@@ -115,22 +173,40 @@ function buildDemoPayload(account) {
       "profile-kids": "2026-10-18T16:40:00.000Z",
     },
     watchlistByProfile: {
-      "profile-living-room": watchlist(["Dune: Part Two", "Severance", "The Bear", "Arrival"]),
+      "profile-living-room": watchlist([
+        "Dune: Part Two",
+        "Severance",
+        "The Bear",
+        "Arrival",
+      ]),
       "profile-kids": watchlist(["Klaus"]),
     },
     settingsByProfile: {
-      "profile-living-room": { subtitleLanguage: "de", autoPlayNext: true, tvNavigationSound: true, hideBudget: false },
-      "profile-kids": { subtitleLanguage: "de", autoPlayNext: false, tvNavigationSound: false, hideBudget: true },
+      "profile-living-room": {
+        subtitleLanguage: "de",
+        autoPlayNext: true,
+        tvNavigationSound: true,
+        hideBudget: false,
+      },
+      "profile-kids": {
+        subtitleLanguage: "de",
+        autoPlayNext: false,
+        tvNavigationSound: false,
+        hideBudget: true,
+      },
     },
     fieldUpdatedAt: {
-      "settings:profile-living-room:subtitleLanguage": "2026-10-12T20:00:00.000Z",
+      "settings:profile-living-room:subtitleLanguage":
+        "2026-10-12T20:00:00.000Z",
       "settings:profile-kids:autoPlayNext": "2026-10-14T07:30:00.000Z",
     },
   };
 }
 
 function json(reply, status, value) {
-  reply.writeHead(status, { "content-type": "application/json; charset=utf-8" });
+  reply.writeHead(status, {
+    "content-type": "application/json; charset=utf-8",
+  });
   reply.end(JSON.stringify(value));
 }
 
@@ -164,10 +240,20 @@ const server = createServer(async (request, reply) => {
       const today = new Date();
       const counts = [24, 31, 28, 46, 39, 57, 42];
       return json(reply, 200, {
-        timezone: "UTC", demo: true,
+        timezone: "UTC",
+        demo: true,
         days: Array.from({ length: days }, (_, index) => {
-          const date = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - days + 1 + index));
-          return { date: date.toISOString().slice(0, 10), devices: counts[index % counts.length] };
+          const date = new Date(
+            Date.UTC(
+              today.getUTCFullYear(),
+              today.getUTCMonth(),
+              today.getUTCDate() - days + 1 + index,
+            ),
+          );
+          return {
+            date: date.toISOString().slice(0, 10),
+            devices: counts[index % counts.length],
+          };
         }),
       });
     }
@@ -203,34 +289,76 @@ const server = createServer(async (request, reply) => {
         versions: { backend: "1.0.040" },
         recent_accounts: accounts,
         recent_audits: [
-          { id: "demo-audit-1", operation: "global_add_playlist", account_email: accounts[0].email, reason: "Demo: Senderliste aktualisiert", created_at: "2026-10-29T09:18:00.000Z" },
-          { id: "demo-audit-2", operation: "upsert_addon", account_email: accounts[1].email, reason: "Demo: Add-on hinzugefügt", created_at: "2026-10-29T08:42:00.000Z" },
+          {
+            id: "demo-audit-1",
+            operation: "global_add_playlist",
+            account_email: accounts[0].email,
+            reason: "Demo: Senderliste aktualisiert",
+            created_at: "2026-10-29T09:18:00.000Z",
+          },
+          {
+            id: "demo-audit-2",
+            operation: "upsert_addon",
+            account_email: accounts[1].email,
+            reason: "Demo: Add-on hinzugefügt",
+            created_at: "2026-10-29T08:42:00.000Z",
+          },
         ],
       });
     }
-    if (url.pathname === "/admin-api/updates" || url.pathname === "/admin-api/versions") {
+    if (
+      url.pathname === "/admin-api/updates" ||
+      url.pathname === "/admin-api/versions"
+    ) {
       return json(reply, 200, {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
           { component: "backend", version: "1.0.040", source: "Demo-Backend" },
-          { component: "web", version: "1.0.072", build: "1793268000000", source: "Demo-Webplayer (simuliert)" },
-          { component: "android", version: "2.5.082", published_at: "2026-10-29T12:45:00Z", source: "Demo-APK-Release (simuliert)" },
+          {
+            component: "web",
+            version: "1.0.072",
+            build: "1793268000000",
+            source: "Demo-Webplayer (simuliert)",
+          },
+          {
+            component: "android",
+            version: "2.5.082",
+            published_at: "2026-10-29T12:45:00Z",
+            source: "Demo-APK-Release (simuliert)",
+          },
         ],
       });
     }
     if (request.method === "GET" && url.pathname === "/admin-api/global") {
       return json(reply, 200, {
-        total: 128, configurable: 116, skipped: 12,
+        total: 128,
+        configurable: 116,
+        skipped: 12,
         playlists: [
           { id: "streamnet_tv", name: "StreamNet TV", accountCount: 84 },
           { id: "demo-playlist", name: "Demo-Playlist", accountCount: 32 },
         ],
         addons: [{ id: "demo-addon", name: "Demo-Add-on", accountCount: 72 }],
         catalogs: [
-          { id: "demo-trakt", name: "Demo-Filmliste", sourceType: "TRAKT", accountCount: 28 },
-          { id: "demo-system", name: "Beliebte Filme", sourceType: "PREINSTALLED", accountCount: 116 },
-          { id: "demo-addon-catalog", name: "Demo-Add-on-Katalog", sourceType: "ADDON", accountCount: 72 },
+          {
+            id: "demo-trakt",
+            name: "Demo-Filmliste",
+            sourceType: "TRAKT",
+            accountCount: 28,
+          },
+          {
+            id: "demo-system",
+            name: "Beliebte Filme",
+            sourceType: "PREINSTALLED",
+            accountCount: 116,
+          },
+          {
+            id: "demo-addon-catalog",
+            name: "Demo-Add-on-Katalog",
+            sourceType: "ADDON",
+            accountCount: 72,
+          },
         ],
       });
     }
@@ -251,36 +379,76 @@ const server = createServer(async (request, reply) => {
         offset,
       });
     }
-    if (request.method === "GET" && url.pathname.startsWith("/admin-api/accounts/")) {
-      const account = accounts.find(item => url.pathname === `/admin-api/accounts/${item.id}`);
-      if (!account) return json(reply, 404, { error: "Demo-Account nicht gefunden" });
+    if (
+      request.method === "GET" &&
+      url.pathname.startsWith("/admin-api/accounts/")
+    ) {
+      const account = accounts.find(
+        (item) => url.pathname === `/admin-api/accounts/${item.id}`,
+      );
+      if (!account)
+        return json(reply, 404, { error: "Demo-Account nicht gefunden" });
       const demoPayload = buildDemoPayload(account);
       const device = {
-        kind: "app_event", removable: false, profile_id: "demo-profile",
-        platform: "android", device_type: "tv", app_version: "2.5.082",
-        app_version_code: 483, distribution: "sideload",
+        kind: "app_event",
+        removable: false,
+        profile_id: "demo-profile",
+        platform: "android",
+        device_type: "tv",
+        app_version: "2.5.082",
+        app_version_code: 483,
+        distribution: "sideload",
       };
       return json(reply, 200, {
-        account: { ...account, active_sessions: 1, watch_history_items: 24, watch_state_items: 3,
+        account: {
+          ...account,
+          active_sessions: 1,
+          watch_history_items: 24,
+          watch_state_items: 3,
           devices: [
-            { ...device, install_id: "demo-live", event_name: "heartbeat",
-              last_seen: new Date().toISOString(), online: true, status_label: "Online (Demo)" },
-            { ...device, install_id: "demo-old", event_name: "heartbeat",
-              last_seen: new Date(Date.now() - 3_600_000).toISOString(), online: false, status_label: "Offline (Demo)" },
-            { ...device, install_id: "demo-legacy", platform: "android", device_type: "phone",
-              event_name: "app_open", last_seen: new Date().toISOString(), online: false, status_label: "Kein Live-Status" },
+            {
+              ...device,
+              install_id: "demo-live",
+              event_name: "heartbeat",
+              last_seen: new Date().toISOString(),
+              online: true,
+              status_label: "Online (Demo)",
+            },
+            {
+              ...device,
+              install_id: "demo-old",
+              event_name: "heartbeat",
+              last_seen: new Date(Date.now() - 3_600_000).toISOString(),
+              online: false,
+              status_label: "Offline (Demo)",
+            },
+            {
+              ...device,
+              install_id: "demo-legacy",
+              platform: "android",
+              device_type: "phone",
+              event_name: "app_open",
+              last_seen: new Date().toISOString(),
+              online: false,
+              status_label: "Kein Live-Status",
+            },
           ],
         },
         snapshot: {
-          revision: account.revision, updated_at: account.snapshot_updated_at,
+          revision: account.revision,
+          updated_at: account.snapshot_updated_at,
           profiles: demoPayload.profiles.map((profile) => ({
-            id: profile.id, name: profile.name,
+            id: profile.id,
+            name: profile.name,
             addonCount: demoPayload.addonsByProfile[profile.id].length,
-            playlistCount: demoPayload.iptvByProfile[profile.id].playlists.length,
+            playlistCount:
+              demoPayload.iptvByProfile[profile.id].playlists.length,
             catalogCount: demoPayload.catalogsByProfile[profile.id].length,
             watchlistCount: demoPayload.watchlistByProfile[profile.id].length,
           })),
-          addons: demoPayload.addons, playlists: [], catalogs: demoPayload.catalogs,
+          addons: demoPayload.addons,
+          playlists: [],
+          catalogs: demoPayload.catalogs,
           payload: demoPayload,
         },
       });
@@ -293,7 +461,9 @@ const server = createServer(async (request, reply) => {
         offset: Number(url.searchParams.get("offset") || 0),
       });
     }
-    return json(reply, 501, { error: "Diese Aktion ist im Demo-Modus deaktiviert" });
+    return json(reply, 501, {
+      error: "Diese Aktion ist im Demo-Modus deaktiviert",
+    });
   }
 
   const requestedPath =
@@ -317,9 +487,12 @@ const server = createServer(async (request, reply) => {
     });
     reply.end(content);
   } catch (error) {
-    if (error.code === "ENOENT") return json(reply, 404, { error: "Not found" });
+    if (error.code === "ENOENT")
+      return json(reply, 404, { error: "Not found" });
     console.error(error);
-    return json(reply, 500, { error: "Preview-Datei konnte nicht geladen werden" });
+    return json(reply, 500, {
+      error: "Preview-Datei konnte nicht geladen werden",
+    });
   }
 });
 

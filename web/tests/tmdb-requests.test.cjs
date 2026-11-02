@@ -11,7 +11,9 @@ test("TMDB coalesces only matching in-flight requests and releases completed ent
   global.window = { location: { origin: "http://localhost:3000" } };
   const calls = [];
   let release;
-  const gate = new Promise((resolve) => { release = resolve; });
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
   global.fetch = async (url, init) => {
     calls.push({ url, init });
     await gate;
@@ -51,10 +53,16 @@ test("TMDB failed requests are shared but do not prevent a later retry", async (
   try {
     const { tmdb } = await import(moduleUrl);
     const results = await Promise.allSettled([
-      tmdb("movie/404"), tmdb("movie/404"),
+      tmdb("movie/404"),
+      tmdb("movie/404"),
     ]);
     assert.equal(calls, 1);
-    assert.ok(results.every((result) => result.status === "rejected" && result.reason.status === 404));
+    assert.ok(
+      results.every(
+        (result) =>
+          result.status === "rejected" && result.reason.status === 404,
+      ),
+    );
     global.fetch = async () => {
       calls += 1;
       return Response.json({ id: 404 });

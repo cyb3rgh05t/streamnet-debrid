@@ -49,106 +49,132 @@
     <div id="dashboard-view" class="app-shell hidden">
       <aside class="sidebar">
         <div class="sidebar-brand">
-        <img
-          src="/assets/streamnetapp-logo.svg"
-          alt="StreamNet"
-          class="brand-logo"
-        />
-        <button id="mobile-menu-toggle" class="button secondary mobile-menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar-menu" aria-label="Menü öffnen">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" /></svg>
-        </button>
+          <img
+            src="/assets/streamnetapp-logo.svg"
+            alt="StreamNet"
+            class="brand-logo"
+          />
+          <button
+            id="mobile-menu-toggle"
+            class="button secondary mobile-menu-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="sidebar-menu"
+            aria-label="Menü öffnen"
+          >
+            <svg
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
         </div>
         <div id="sidebar-menu" class="sidebar-menu">
-        <nav aria-label="Admin Navigation">
-          <button class="nav-item active" data-view="dashboard">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <rect x="3" y="3" width="7" height="9" rx="1" />
-              <rect x="14" y="3" width="7" height="5" rx="1" />
-              <rect x="14" y="12" width="7" height="9" rx="1" />
-              <rect x="3" y="16" width="7" height="5" rx="1" />
-            </svg>
-            Dashboard
-          </button>
-          <button class="nav-item" data-view="accounts">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            Accounts
-          </button>
-          <button class="nav-item" data-view="global">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round"
-              stroke-linejoin="round" aria-hidden="true">
-              <path d="M4 7h16M4 17h16" />
-              <circle cx="9" cy="7" r="3" />
-              <circle cx="15" cy="17" r="3" />
-            </svg>
-            Remote Config
-          </button>
-          <button class="nav-item" data-view="audits">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
-              />
-              <path d="M14 2v6h6" />
-              <path d="M9 15l2 2 4-4" />
-            </svg>
-            Audit-Protokoll
-          </button>
-        </nav>
-        <div class="admin-session">
-          <div class="admin-session-divider" aria-hidden="true"></div>
-          <button id="logout-button" class="logout-button" type="button">
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.8"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <path d="M16 17l5-5-5-5" />
-              <path d="M21 12H9" />
-            </svg>
-            <span>Abmelden</span>
-          </button>
-          <span class="version-badge">Version 1.0.040</span>
-        </div>
+          <nav aria-label="Admin Navigation">
+            <button class="nav-item active" data-view="dashboard">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="3" y="3" width="7" height="9" rx="1" />
+                <rect x="14" y="3" width="7" height="5" rx="1" />
+                <rect x="14" y="12" width="7" height="9" rx="1" />
+                <rect x="3" y="16" width="7" height="5" rx="1" />
+              </svg>
+              Dashboard
+            </button>
+            <button class="nav-item" data-view="accounts">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+              </svg>
+              Accounts
+            </button>
+            <button class="nav-item" data-view="global">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M4 7h16M4 17h16" />
+                <circle cx="9" cy="7" r="3" />
+                <circle cx="15" cy="17" r="3" />
+              </svg>
+              Remote Config
+            </button>
+            <button class="nav-item" data-view="audits">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+                />
+                <path d="M14 2v6h6" />
+                <path d="M9 15l2 2 4-4" />
+              </svg>
+              Audit-Protokoll
+            </button>
+          </nav>
+          <div class="admin-session">
+            <div class="admin-session-divider" aria-hidden="true"></div>
+            <button id="logout-button" class="logout-button" type="button">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              <span>Abmelden</span>
+            </button>
+            <span class="version-badge">Version 1.0.040</span>
+          </div>
         </div>
       </aside>
 
@@ -167,7 +193,13 @@
           <header class="dashboard-panel-header">
             <div>
               <h2 class="dashboard-panel-title">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  aria-hidden="true"
+                >
                   <rect x="3" y="3" width="7" height="7" rx="1" />
                   <rect x="14" y="3" width="7" height="7" rx="1" />
                   <rect x="3" y="14" width="7" height="7" rx="1" />
@@ -175,11 +207,19 @@
                 </svg>
                 Dashboard
               </h2>
-              <p class="dashboard-panel-description">Versionen, Cloud-Aktivität und Systemstatus im Überblick.</p>
+              <p class="dashboard-panel-description">
+                Versionen, Cloud-Aktivität und Systemstatus im Überblick.
+              </p>
             </div>
             <div id="dashboard-header-actions" class="dashboard-header-actions">
-              <span class="dashboard-updated">Aktualisiert <time id="dashboard-updated">—</time></span>
-              <button id="dashboard-refresh" class="button secondary" type="button">
+              <span class="dashboard-updated"
+                >Aktualisiert <time id="dashboard-updated">—</time></span
+              >
+              <button
+                id="dashboard-refresh"
+                class="button secondary"
+                type="button"
+              >
                 <svg
                   class="refresh-icon"
                   viewBox="0 0 24 24"
@@ -207,20 +247,55 @@
               </div>
             </div>
             <div class="version-grid">
-              <a id="dashboard-backend-release" class="version-card" href="https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" title="Backend-Changelog öffnen">
+              <a
+                id="dashboard-backend-release"
+                class="version-card"
+                href="https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Backend-Changelog öffnen"
+              >
                 <span class="version-card-label">Backend</span>
-                <strong id="dashboard-backend-version" class="version-card-value">—</strong>
+                <strong
+                  id="dashboard-backend-version"
+                  class="version-card-value"
+                  >—</strong
+                >
                 <span class="version-card-detail">Laufendes Backend</span>
               </a>
-              <a id="dashboard-web-release" class="version-card" href="https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md" target="_blank" rel="noopener noreferrer" title="Web-Changelog öffnen">
+              <a
+                id="dashboard-web-release"
+                class="version-card"
+                href="https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Web-Changelog öffnen"
+              >
                 <span class="version-card-label">Web</span>
-                <strong id="dashboard-web-version" class="version-card-value">—</strong>
-                <span id="dashboard-web-source" class="version-card-detail">web.streamnet.live · Wird geprüft...</span>
+                <strong id="dashboard-web-version" class="version-card-value"
+                  >—</strong
+                >
+                <span id="dashboard-web-source" class="version-card-detail"
+                  >web.streamnet.live · Wird geprüft...</span
+                >
               </a>
-              <a id="dashboard-android-release" class="version-card" href="https://github.com/cyb3rgh05t/streamnet-debrid/releases" target="_blank" rel="noopener noreferrer" title="Android-Release-Notizen öffnen">
+              <a
+                id="dashboard-android-release"
+                class="version-card"
+                href="https://github.com/cyb3rgh05t/streamnet-debrid/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Android-Release-Notizen öffnen"
+              >
                 <span class="version-card-label">Android</span>
-                <strong id="dashboard-android-version" class="version-card-value">—</strong>
-                <span id="dashboard-android-build" class="version-card-detail">Veröffentlichtes APK-Release · Wird geprüft...</span>
+                <strong
+                  id="dashboard-android-version"
+                  class="version-card-value"
+                  >—</strong
+                >
+                <span id="dashboard-android-build" class="version-card-detail"
+                  >Veröffentlichtes APK-Release · Wird geprüft...</span
+                >
               </a>
             </div>
           </section>
@@ -229,43 +304,93 @@
             class="metrics"
             aria-label="Datenbankübersicht"
           ></div>
-          <section class="version-panel device-activity-panel" aria-labelledby="device-activity-title">
+          <section
+            class="version-panel device-activity-panel"
+            aria-labelledby="device-activity-title"
+          >
             <div class="device-activity-heading">
               <div>
                 <p class="eyebrow">GERÄTEAKTIVITÄT</p>
                 <h2 id="device-activity-title">Aktive Geräte pro Tag</h2>
               </div>
-              <div class="device-activity-period" role="group" aria-label="Zeitraum">
-                <button class="button secondary" type="button" data-activity-days="7" aria-pressed="true">7 Tage</button>
-                <button class="button secondary" type="button" data-activity-days="30" aria-pressed="false">30 Tage</button>
+              <div
+                class="device-activity-period"
+                role="group"
+                aria-label="Zeitraum"
+              >
+                <button
+                  class="button secondary"
+                  type="button"
+                  data-activity-days="7"
+                  aria-pressed="true"
+                >
+                  7 Tage
+                </button>
+                <button
+                  class="button secondary"
+                  type="button"
+                  data-activity-days="30"
+                  aria-pressed="false"
+                >
+                  30 Tage
+                </button>
               </div>
             </div>
             <p id="device-activity-status" role="status"></p>
-            <div id="device-activity-chart" class="device-activity-chart" aria-label="Täglich aktive Geräte"></div>
+            <div
+              id="device-activity-chart"
+              class="device-activity-chart"
+              aria-label="Täglich aktive Geräte"
+            ></div>
           </section>
           <div class="dashboard-detail-grid">
             <section class="version-panel" aria-labelledby="runtime-title">
-              <div class="section-heading"><h2 id="runtime-title">System &amp; Laufzeit</h2></div>
+              <div class="section-heading">
+                <h2 id="runtime-title">System &amp; Laufzeit</h2>
+              </div>
               <dl id="dashboard-system" class="dashboard-facts"></dl>
             </section>
             <section class="version-panel" aria-labelledby="cloud-data-title">
-              <div class="section-heading"><h2 id="cloud-data-title">Cloud-Daten &amp; Aktivität</h2></div>
+              <div class="section-heading">
+                <h2 id="cloud-data-title">Cloud-Daten &amp; Aktivität</h2>
+              </div>
               <dl id="dashboard-cloud" class="dashboard-facts"></dl>
             </section>
             <section class="version-panel" aria-labelledby="resources-title">
-              <div class="section-heading"><h2 id="resources-title">Speicher &amp; Auslastung</h2></div>
+              <div class="section-heading">
+                <h2 id="resources-title">Speicher &amp; Auslastung</h2>
+              </div>
               <dl id="dashboard-resources" class="dashboard-facts"></dl>
-              <p class="dashboard-note">CPU: Prozessdurchschnitt seit Start, 100 % = ein Kern. Host-RAM ist kein Container-Limit.</p>
+              <p class="dashboard-note">
+                CPU: Prozessdurchschnitt seit Start, 100 % = ein Kern. Host-RAM
+                ist kein Container-Limit.
+              </p>
             </section>
           </div>
           <div class="dashboard-detail-grid dashboard-activity-grid">
-            <section class="version-panel" aria-labelledby="recent-accounts-title">
-              <div class="section-heading"><h2 id="recent-accounts-title">Neue Accounts</h2></div>
-              <ul id="dashboard-recent-accounts" class="dashboard-activity-list"></ul>
+            <section
+              class="version-panel"
+              aria-labelledby="recent-accounts-title"
+            >
+              <div class="section-heading">
+                <h2 id="recent-accounts-title">Neue Accounts</h2>
+              </div>
+              <ul
+                id="dashboard-recent-accounts"
+                class="dashboard-activity-list"
+              ></ul>
             </section>
-            <section class="version-panel" aria-labelledby="recent-audits-title">
-              <div class="section-heading"><h2 id="recent-audits-title">Letzte Änderungen</h2></div>
-              <ul id="dashboard-recent-audits" class="dashboard-activity-list"></ul>
+            <section
+              class="version-panel"
+              aria-labelledby="recent-audits-title"
+            >
+              <div class="section-heading">
+                <h2 id="recent-audits-title">Letzte Änderungen</h2>
+              </div>
+              <ul
+                id="dashboard-recent-audits"
+                class="dashboard-activity-list"
+              ></ul>
             </section>
           </div>
         </section>
@@ -308,7 +433,9 @@
               >
                 <path d="M20 7v5h-5" />
                 <path d="M4 17v-5h5" />
-                <path d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2" />
+                <path
+                  d="M5.6 9a7 7 0 0 1 11.6-2L20 12M4 12l2.8 5a7 7 0 0 0 11.6-2"
+                />
               </svg>
               <span>Aktualisieren</span>
             </button>
@@ -345,9 +472,15 @@
               <div>
                 <p class="eyebrow">ALLE REGISTRIERTEN ACCOUNTS</p>
                 <h2 id="global-title">Remote Config</h2>
-                <p class="global-intro">Playlists, Add-ons und Kataloge zentral verwalten.</p>
+                <p class="global-intro">
+                  Playlists, Add-ons und Kataloge zentral verwalten.
+                </p>
               </div>
-              <button id="global-refresh" class="button secondary" type="button">
+              <button
+                id="global-refresh"
+                class="button secondary"
+                type="button"
+              >
                 <svg
                   class="refresh-icon"
                   viewBox="0 0 24 24"
@@ -368,152 +501,410 @@
             </div>
             <p id="global-summary" class="filter-note" role="status"></p>
             <nav class="global-categories" aria-label="Remote-Config-Bereiche">
-              <button type="button" class="global-category" data-global-category="playlists" aria-pressed="true" aria-controls="global-form">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m9 2 3 3 3-3M8 10h8M8 14h5" /></svg>
-                <span><strong>Playlists</strong><small>M3U, Xtream &amp; StreamNet TV</small></span>
+              <button
+                type="button"
+                class="global-category"
+                data-global-category="playlists"
+                aria-pressed="true"
+                aria-controls="global-form"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="5" width="18" height="14" rx="2" />
+                  <path d="m9 2 3 3 3-3M8 10h8M8 14h5" />
+                </svg>
+                <span
+                  ><strong>Playlists</strong
+                  ><small>M3U, Xtream &amp; StreamNet TV</small></span
+                >
               </button>
-              <button type="button" class="global-category" data-global-category="addons" aria-pressed="false" aria-controls="global-form">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>
-                <span><strong>Add-ons</strong><small>Manifeste &amp; Profilzuordnungen</small></span>
+              <button
+                type="button"
+                class="global-category"
+                data-global-category="addons"
+                aria-pressed="false"
+                aria-controls="global-form"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" />
+                </svg>
+                <span
+                  ><strong>Add-ons</strong
+                  ><small>Manifeste &amp; Profilzuordnungen</small></span
+                >
               </button>
-              <button type="button" class="global-category" data-global-category="catalogs" aria-pressed="false" aria-controls="global-form">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
-                <span><strong>Kataloge</strong><small>Listen, System- &amp; Add-on-Kataloge</small></span>
+              <button
+                type="button"
+                class="global-category"
+                data-global-category="catalogs"
+                aria-pressed="false"
+                aria-controls="global-form"
+              >
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.8"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  aria-hidden="true"
+                >
+                  <rect x="3" y="3" width="7" height="7" rx="1" />
+                  <rect x="14" y="3" width="7" height="7" rx="1" />
+                  <rect x="3" y="14" width="7" height="7" rx="1" />
+                  <rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+                <span
+                  ><strong>Kataloge</strong
+                  ><small>Listen, System- &amp; Add-on-Kataloge</small></span
+                >
               </button>
             </nav>
             <form id="global-form" class="global-config-layout">
               <div class="global-editor-main">
-              <section class="global-config-card" aria-labelledby="global-action-title">
-                <div class="global-card-heading">
-                  <span class="global-step" aria-hidden="true">01</span>
-                  <div><h3 id="global-action-title">Aktion auswählen</h3><p id="global-category-description">Playlists accountübergreifend verwalten.</p></div>
-                </div>
-              <label>Aktion<select id="global-operation">
-                <option value="add_playlist">Playlist global hinzufügen / aktualisieren</option>
-                <option value="edit_playlist">Vorhandene Playlist global bearbeiten</option>
-                <option value="change_xtream_host">Xtream / StreamNet TV: nur Host ändern</option>
-                <option value="clear_streamnet_host_override">StreamNet TV: Host-Override entfernen (zurück auf App-Server)</option>
-                <option value="delete_playlist">Ausgewählte Playlist global entfernen</option>
-                <option value="clear_playlists">Alle Playlists global entfernen</option>
-                <option value="add_addon">Add-on global hinzufügen / aktualisieren</option>
-                <option value="edit_addon">Vorhandenes Add-on global bearbeiten</option>
-                <option value="delete_addon">Ausgewähltes Add-on global entfernen</option>
-                <option value="clear_addons">Alle Add-ons global entfernen</option>
-                <option value="add_catalog">Katalog global hinzufügen / aktualisieren</option>
-                <option value="rename_catalog">Katalog global umbenennen</option>
-                <option value="set_catalog_enabled">Katalog global aktivieren / deaktivieren</option>
-                <option value="delete_catalog">Katalog global entfernen / ausblenden</option>
-              </select></label>
-              <label id="global-target-field" class="hidden">Vorhandener Eintrag
-                <select id="global-target"></select>
-              </label>
-              </section>
-              <section class="global-config-card" aria-labelledby="global-settings-title">
-                <div class="global-card-heading">
-                  <span class="global-step" aria-hidden="true">02</span>
-                  <div><h3 id="global-settings-title">Playlist-Einstellungen</h3><p>Nur die zur Aktion passenden Felder werden angezeigt.</p></div>
-                </div>
-                <p id="global-no-settings" class="quick-panel hidden">Keine weiteren Einstellungen nötig. Prüfe die betroffenen Accounts in der Vorschau, bevor du die Änderung bestätigst.</p>
-              <div id="global-playlist-fields" class="op-fields">
-                <div class="quick-panel">
-                  Beim Bearbeiten werden Name, M3U-/EPG-URL und die folgenden Optionen
-                  ersetzt. Die Playlist-ID und weitere Einstellungen bleiben erhalten.
-                  Gespeicherte URLs werden aus Sicherheitsgründen nicht angezeigt.
-                </div>
-                <label>Playlist-Typ<select id="global-playlist-type">
-                  <option value="m3u">M3U / get.php-Link</option>
-                  <option value="xtream">Xtream Codes</option>
-                  <option value="streamnet_tv">StreamNet TV (System-Playlist)</option>
-                </select></label>
-                <label>Name<input id="global-playlist-name" maxlength="200" /></label>
-                <div id="global-m3u-fields" class="op-fields">
-                  <label>M3U-URL<input id="global-playlist-url" type="url" placeholder="https://.../get.php?username=...&amp;password=..." /></label>
-                  <label>EPG-URL (optional, leer entfernt die EPG-URL)<input id="global-playlist-epg" type="url" /></label>
-                </div>
-                <div id="global-xtream-fields" class="op-fields hidden">
-                  <div class="warning">
-                    Benutzername und Passwort werden für alle Zielaccounts gleich gesetzt.
-                    Für individuelle Zugangsdaten stattdessen „nur Host ändern“ wählen.
-                    StreamNet TV verwendet die feste ID streamnet_tv.
-                    Eigene StreamNet-TV-Hosts erfordern die aktualisierte App mit
-                    Remote-Host-Unterstützung.
+                <section
+                  class="global-config-card"
+                  aria-labelledby="global-action-title"
+                >
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">01</span>
+                    <div>
+                      <h3 id="global-action-title">Aktion auswählen</h3>
+                      <p id="global-category-description">
+                        Playlists accountübergreifend verwalten.
+                      </p>
+                    </div>
                   </div>
-                  <label>Server-URL<input id="global-xtream-host" type="url" placeholder="https://server.example:8080" /></label>
-                  <label>Benutzername<input id="global-xtream-user" autocomplete="off" maxlength="500" /></label>
-                  <label>Passwort<input id="global-xtream-password" type="password" autocomplete="new-password" maxlength="500" /></label>
-                </div>
-                <div class="checkbox-grid">
-                  <label class="checkbox-field"><input id="global-playlist-enabled" type="checkbox" checked /> Aktiviert</label>
-                  <label class="checkbox-field"><input id="global-playlist-live" type="checkbox" checked /> Live-TV importieren</label>
-                  <label class="checkbox-field"><input id="global-playlist-vod" type="checkbox" checked /> Filme importieren</label>
-                  <label class="checkbox-field"><input id="global-playlist-series" type="checkbox" checked /> Serien importieren</label>
-                </div>
-              </div>
-              <div id="global-host-fields" class="op-fields hidden">
-                <div class="quick-panel">
-                  Nur für die ausgewählte Playlist-ID: individuelle Zugangsdaten,
-                  Name, Aktivierung und Importoptionen bleiben erhalten.
-                  M3U- und EPG-Adressen werden auf den neuen Xtream-Server gesetzt.
-                  Ungültige oder fehlende Xtream-Zugangsdaten brechen die gesamte Aktion ab.
-                  Ein eigener StreamNet-TV-Host erfordert eine App-Version mit Remote-Host-Unterstützung.
-                </div>
-                <label>Neue Server-URL<input id="global-host-url" type="url" placeholder="https://server.example:8080" /></label>
-              </div>
-                <div id="global-catalog-fields" class="op-fields hidden">
-                  <div class="quick-panel">
-                    Trakt und MDBList per Listen-Link. Eingebaute Kataloge und Add-on-Kataloge
-                    werden aus dem Cloud-Bestand bzw. installierten Manifesten ausgewählt.
-                    Add-on-Kataloge werden nur Accounts mit dem entsprechenden Add-on zugeordnet;
-                    das Add-on wird nicht automatisch installiert. Benötigte Anbieter-Verbindungen
-                    und API-Schlüssel bleiben Voraussetzung auf den Geräten.
-                    System-/Add-on-Kataloge werden beim Entfernen dauerhaft ausgeblendet,
-                    nicht aus der App oder dem Manifest gelöscht.
-                  </div>
-                  <label id="global-catalog-type-field">Quelle<select id="global-catalog-type">
-                    <option value="TRAKT">Trakt-Liste</option>
-                    <option value="MDBLIST">MDBList-Liste</option>
-                    <option value="PREINSTALLED">Eingebauter Katalog aus Bestand</option>
-                    <option value="ADDON">Katalog eines installierten Add-ons</option>
-                  </select></label>
-                  <label id="global-catalog-template-field" class="hidden">Katalogvorlage
-                    <select id="global-catalog-template"></select>
+                  <label
+                    >Aktion<select id="global-operation">
+                      <option value="add_playlist">
+                        Playlist global hinzufügen / aktualisieren
+                      </option>
+                      <option value="edit_playlist">
+                        Vorhandene Playlist global bearbeiten
+                      </option>
+                      <option value="change_xtream_host">
+                        Xtream / StreamNet TV: nur Host ändern
+                      </option>
+                      <option value="clear_streamnet_host_override">
+                        StreamNet TV: Host-Override entfernen (zurück auf
+                        App-Server)
+                      </option>
+                      <option value="delete_playlist">
+                        Ausgewählte Playlist global entfernen
+                      </option>
+                      <option value="clear_playlists">
+                        Alle Playlists global entfernen
+                      </option>
+                      <option value="add_addon">
+                        Add-on global hinzufügen / aktualisieren
+                      </option>
+                      <option value="edit_addon">
+                        Vorhandenes Add-on global bearbeiten
+                      </option>
+                      <option value="delete_addon">
+                        Ausgewähltes Add-on global entfernen
+                      </option>
+                      <option value="clear_addons">
+                        Alle Add-ons global entfernen
+                      </option>
+                      <option value="add_catalog">
+                        Katalog global hinzufügen / aktualisieren
+                      </option>
+                      <option value="rename_catalog">
+                        Katalog global umbenennen
+                      </option>
+                      <option value="set_catalog_enabled">
+                        Katalog global aktivieren / deaktivieren
+                      </option>
+                      <option value="delete_catalog">
+                        Katalog global entfernen / ausblenden
+                      </option>
+                    </select></label
+                  >
+                  <label id="global-target-field" class="hidden"
+                    >Vorhandener Eintrag
+                    <select id="global-target"></select>
                   </label>
-                  <label id="global-catalog-url-field">Listen-URL<input id="global-catalog-url" type="url" placeholder="https://trakt.tv/users/.../lists/... oder https://mdblist.com/lists/.../..." /></label>
-                  <label id="global-catalog-title-field">Name<input id="global-catalog-title" maxlength="200" /></label>
-                  <label id="global-catalog-enabled-field" class="checkbox-field"><input id="global-catalog-enabled" type="checkbox" checked /> Aktiviert</label>
-                </div>
-              <div id="global-addon-fields" class="op-fields hidden">
-                <div class="quick-panel">
-                  Das Manifest wird geladen. Beim Bearbeiten ersetzt der neue Link den
-                  ausgewählten Eintrag. Die Aktivierung bestehender Profile bleibt erhalten.
-                </div>
-                <label>Manifest- oder Stremio-Link<input id="global-addon-url" placeholder="stremio://.../manifest.json oder https://.../manifest.json" /></label>
-                <label class="checkbox-field"><input id="global-addon-enabled" type="checkbox" checked /> In neuen Profilzuordnungen aktivieren</label>
-              </div>
-              </section>
+                </section>
+                <section
+                  class="global-config-card"
+                  aria-labelledby="global-settings-title"
+                >
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">02</span>
+                    <div>
+                      <h3 id="global-settings-title">Playlist-Einstellungen</h3>
+                      <p>
+                        Nur die zur Aktion passenden Felder werden angezeigt.
+                      </p>
+                    </div>
+                  </div>
+                  <p id="global-no-settings" class="quick-panel hidden">
+                    Keine weiteren Einstellungen nötig. Prüfe die betroffenen
+                    Accounts in der Vorschau, bevor du die Änderung bestätigst.
+                  </p>
+                  <div id="global-playlist-fields" class="op-fields">
+                    <div class="quick-panel">
+                      Beim Bearbeiten werden Name, M3U-/EPG-URL und die
+                      folgenden Optionen ersetzt. Die Playlist-ID und weitere
+                      Einstellungen bleiben erhalten. Gespeicherte URLs werden
+                      aus Sicherheitsgründen nicht angezeigt.
+                    </div>
+                    <label
+                      >Playlist-Typ<select id="global-playlist-type">
+                        <option value="m3u">M3U / get.php-Link</option>
+                        <option value="xtream">Xtream Codes</option>
+                        <option value="streamnet_tv">
+                          StreamNet TV (System-Playlist)
+                        </option>
+                      </select></label
+                    >
+                    <label
+                      >Name<input id="global-playlist-name" maxlength="200"
+                    /></label>
+                    <div id="global-m3u-fields" class="op-fields">
+                      <label
+                        >M3U-URL<input
+                          id="global-playlist-url"
+                          type="url"
+                          placeholder="https://.../get.php?username=...&amp;password=..."
+                      /></label>
+                      <label
+                        >EPG-URL (optional, leer entfernt die EPG-URL)<input
+                          id="global-playlist-epg"
+                          type="url"
+                      /></label>
+                    </div>
+                    <div id="global-xtream-fields" class="op-fields hidden">
+                      <div class="warning">
+                        Benutzername und Passwort werden für alle Zielaccounts
+                        gleich gesetzt. Für individuelle Zugangsdaten
+                        stattdessen „nur Host ändern“ wählen. StreamNet TV
+                        verwendet die feste ID streamnet_tv. Eigene
+                        StreamNet-TV-Hosts erfordern die aktualisierte App mit
+                        Remote-Host-Unterstützung.
+                      </div>
+                      <label
+                        >Server-URL<input
+                          id="global-xtream-host"
+                          type="url"
+                          placeholder="https://server.example:8080"
+                      /></label>
+                      <label
+                        >Benutzername<input
+                          id="global-xtream-user"
+                          autocomplete="off"
+                          maxlength="500"
+                      /></label>
+                      <label
+                        >Passwort<input
+                          id="global-xtream-password"
+                          type="password"
+                          autocomplete="new-password"
+                          maxlength="500"
+                      /></label>
+                    </div>
+                    <div class="checkbox-grid">
+                      <label class="checkbox-field"
+                        ><input
+                          id="global-playlist-enabled"
+                          type="checkbox"
+                          checked
+                        />
+                        Aktiviert</label
+                      >
+                      <label class="checkbox-field"
+                        ><input
+                          id="global-playlist-live"
+                          type="checkbox"
+                          checked
+                        />
+                        Live-TV importieren</label
+                      >
+                      <label class="checkbox-field"
+                        ><input
+                          id="global-playlist-vod"
+                          type="checkbox"
+                          checked
+                        />
+                        Filme importieren</label
+                      >
+                      <label class="checkbox-field"
+                        ><input
+                          id="global-playlist-series"
+                          type="checkbox"
+                          checked
+                        />
+                        Serien importieren</label
+                      >
+                    </div>
+                  </div>
+                  <div id="global-host-fields" class="op-fields hidden">
+                    <div class="quick-panel">
+                      Nur für die ausgewählte Playlist-ID: individuelle
+                      Zugangsdaten, Name, Aktivierung und Importoptionen bleiben
+                      erhalten. M3U- und EPG-Adressen werden auf den neuen
+                      Xtream-Server gesetzt. Ungültige oder fehlende
+                      Xtream-Zugangsdaten brechen die gesamte Aktion ab. Ein
+                      eigener StreamNet-TV-Host erfordert eine App-Version mit
+                      Remote-Host-Unterstützung.
+                    </div>
+                    <label
+                      >Neue Server-URL<input
+                        id="global-host-url"
+                        type="url"
+                        placeholder="https://server.example:8080"
+                    /></label>
+                  </div>
+                  <div id="global-catalog-fields" class="op-fields hidden">
+                    <div class="quick-panel">
+                      Trakt und MDBList per Listen-Link. Eingebaute Kataloge und
+                      Add-on-Kataloge werden aus dem Cloud-Bestand bzw.
+                      installierten Manifesten ausgewählt. Add-on-Kataloge
+                      werden nur Accounts mit dem entsprechenden Add-on
+                      zugeordnet; das Add-on wird nicht automatisch installiert.
+                      Benötigte Anbieter-Verbindungen und API-Schlüssel bleiben
+                      Voraussetzung auf den Geräten. System-/Add-on-Kataloge
+                      werden beim Entfernen dauerhaft ausgeblendet, nicht aus
+                      der App oder dem Manifest gelöscht.
+                    </div>
+                    <label id="global-catalog-type-field"
+                      >Quelle<select id="global-catalog-type">
+                        <option value="TRAKT">Trakt-Liste</option>
+                        <option value="MDBLIST">MDBList-Liste</option>
+                        <option value="PREINSTALLED">
+                          Eingebauter Katalog aus Bestand
+                        </option>
+                        <option value="ADDON">
+                          Katalog eines installierten Add-ons
+                        </option>
+                      </select></label
+                    >
+                    <label id="global-catalog-template-field" class="hidden"
+                      >Katalogvorlage
+                      <select id="global-catalog-template"></select>
+                    </label>
+                    <label id="global-catalog-url-field"
+                      >Listen-URL<input
+                        id="global-catalog-url"
+                        type="url"
+                        placeholder="https://trakt.tv/users/.../lists/... oder https://mdblist.com/lists/.../..."
+                    /></label>
+                    <label id="global-catalog-title-field"
+                      >Name<input id="global-catalog-title" maxlength="200"
+                    /></label>
+                    <label
+                      id="global-catalog-enabled-field"
+                      class="checkbox-field"
+                      ><input
+                        id="global-catalog-enabled"
+                        type="checkbox"
+                        checked
+                      />
+                      Aktiviert</label
+                    >
+                  </div>
+                  <div id="global-addon-fields" class="op-fields hidden">
+                    <div class="quick-panel">
+                      Das Manifest wird geladen. Beim Bearbeiten ersetzt der
+                      neue Link den ausgewählten Eintrag. Die Aktivierung
+                      bestehender Profile bleibt erhalten.
+                    </div>
+                    <label
+                      >Manifest- oder Stremio-Link<input
+                        id="global-addon-url"
+                        placeholder="stremio://.../manifest.json oder https://.../manifest.json"
+                    /></label>
+                    <label class="checkbox-field"
+                      ><input
+                        id="global-addon-enabled"
+                        type="checkbox"
+                        checked
+                      />
+                      In neuen Profilzuordnungen aktivieren</label
+                    >
+                  </div>
+                </section>
               </div>
               <aside class="global-confirm-column">
-              <section class="global-config-card" aria-labelledby="global-confirm-title">
-                <div class="global-card-heading">
-                  <span class="global-step" aria-hidden="true">03</span>
-                  <div><h3 id="global-confirm-title">Prüfen &amp; bestätigen</h3><p>Änderungen werden nicht sofort angewendet.</p></div>
-                </div>
-              <p id="global-action-summary" class="global-action-summary" aria-live="polite">Playlist global hinzufügen / aktualisieren</p>
-              <label>Kommentar (optional)<input id="global-reason" maxlength="500" /></label>
-              <p class="global-confirm-note">Die Vorschau zeigt betroffene, unveränderte und übersprungene Accounts. Erst nach Eingabe von „ALLE ACCOUNTS“ wird gespeichert.</p>
-              <button class="button primary" type="submit">Vorschau und Bestätigung</button>
-              <p id="global-mutation-message" class="message" role="status"></p>
-              </section>
-              <section class="global-config-card global-scope" aria-labelledby="global-scope-title">
-                <h3 id="global-scope-title">Geltungsbereich</h3>
-                <ul>
-                  <li>Alle registrierten Accounts – unabhängig von Suche und Online-Filter.</li>
-                  <li>Hinzufügen gilt für alle bestehenden Profile. Bearbeiten und Entfernen nur für Einträge mit der ausgewählten ID.</li>
-                  <li>Accounts ohne Cloud-Snapshot oder Profile werden übersprungen.</li>
-                  <li>Keine Vorgaben für zukünftige Accounts.</li>
-                  <li>Der leere StreamNet-TV-Systemeintrag bleibt bestehen. App-Limits für Playlists gelten weiterhin.</li>
-                </ul>
-              </section>
+                <section
+                  class="global-config-card"
+                  aria-labelledby="global-confirm-title"
+                >
+                  <div class="global-card-heading">
+                    <span class="global-step" aria-hidden="true">03</span>
+                    <div>
+                      <h3 id="global-confirm-title">Prüfen &amp; bestätigen</h3>
+                      <p>Änderungen werden nicht sofort angewendet.</p>
+                    </div>
+                  </div>
+                  <p
+                    id="global-action-summary"
+                    class="global-action-summary"
+                    aria-live="polite"
+                  >
+                    Playlist global hinzufügen / aktualisieren
+                  </p>
+                  <label
+                    >Kommentar (optional)<input
+                      id="global-reason"
+                      maxlength="500"
+                  /></label>
+                  <p class="global-confirm-note">
+                    Die Vorschau zeigt betroffene, unveränderte und
+                    übersprungene Accounts. Erst nach Eingabe von „ALLE
+                    ACCOUNTS“ wird gespeichert.
+                  </p>
+                  <button class="button primary" type="submit">
+                    Vorschau und Bestätigung
+                  </button>
+                  <p
+                    id="global-mutation-message"
+                    class="message"
+                    role="status"
+                  ></p>
+                </section>
+                <section
+                  class="global-config-card global-scope"
+                  aria-labelledby="global-scope-title"
+                >
+                  <h3 id="global-scope-title">Geltungsbereich</h3>
+                  <ul>
+                    <li>
+                      Alle registrierten Accounts – unabhängig von Suche und
+                      Online-Filter.
+                    </li>
+                    <li>
+                      Hinzufügen gilt für alle bestehenden Profile. Bearbeiten
+                      und Entfernen nur für Einträge mit der ausgewählten ID.
+                    </li>
+                    <li>
+                      Accounts ohne Cloud-Snapshot oder Profile werden
+                      übersprungen.
+                    </li>
+                    <li>Keine Vorgaben für zukünftige Accounts.</li>
+                    <li>
+                      Der leere StreamNet-TV-Systemeintrag bleibt bestehen.
+                      App-Limits für Playlists gelten weiterhin.
+                    </li>
+                  </ul>
+                </section>
               </aside>
             </form>
           </section>
@@ -558,10 +949,29 @@
               <h2>Online & zuletzt gesehen</h2>
             </div>
           </div>
-          <p class="dashboard-note">Nur Geräte mit Live-Status-Unterstützung: Heartbeat alle 30 Sekunden bei geöffneter App bzw. sichtbarem Webplayer; nach 90 Sekunden ohne Signal offline. Anzeige wird alle 15 Sekunden aktualisiert. Login-Sessions und alte App-Start-Einträge sind ausgeblendet, bleiben aber gespeichert. Ältere Geräte je Plattform und Gerätetyp sind ausklappbar.</p>
-          <p id="account-devices-empty" class="quick-panel hidden">Noch keine Geräte mit Live-Status gemeldet. Hier erscheinen angemeldete Geräte, sobald eine aktualisierte App oder der Webplayer einen Heartbeat sendet.</p>
+          <p class="dashboard-note">
+            Nur Geräte mit Live-Status-Unterstützung: Heartbeat alle 30 Sekunden
+            bei geöffneter App bzw. sichtbarem Webplayer; nach 90 Sekunden ohne
+            Signal offline. Anzeige wird alle 15 Sekunden aktualisiert.
+            Login-Sessions und alte App-Start-Einträge sind ausgeblendet,
+            bleiben aber gespeichert. Ältere Geräte je Plattform und Gerätetyp
+            sind ausklappbar.
+          </p>
+          <p id="account-devices-empty" class="quick-panel hidden">
+            Noch keine Geräte mit Live-Status gemeldet. Hier erscheinen
+            angemeldete Geräte, sobald eine aktualisierte App oder der Webplayer
+            einen Heartbeat sendet.
+          </p>
           <div class="device-history-actions">
-            <button id="account-devices-toggle" class="button secondary hidden" type="button" aria-expanded="false" aria-controls="account-devices-body">Ältere Einträge anzeigen</button>
+            <button
+              id="account-devices-toggle"
+              class="button secondary hidden"
+              type="button"
+              aria-expanded="false"
+              aria-controls="account-devices-body"
+            >
+              Ältere Einträge anzeigen
+            </button>
           </div>
           <div id="account-devices" class="table-wrap hidden">
             <table>
@@ -585,169 +995,280 @@
                 <div>
                   <p class="eyebrow">REMOTE STEUERUNG</p>
                   <h2 id="editor-title">Account konfigurieren</h2>
-                  <p class="global-intro">Playlists und Add-ons für diesen Account verwalten.</p>
+                  <p class="global-intro">
+                    Playlists und Add-ons für diesen Account verwalten.
+                  </p>
                 </div>
               </div>
-              <nav id="account-config-categories" class="global-categories account-config-categories" aria-label="Account-Konfigurationsbereiche">
-                <button type="button" class="global-category" data-account-category="playlists" aria-pressed="true" aria-controls="mutation-form">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m9 2 3 3 3-3M8 10h8M8 14h5" /></svg>
-                  <span><strong>Playlists</strong><small>M3U &amp; StreamNet-TV-Server</small></span>
+              <nav
+                id="account-config-categories"
+                class="global-categories account-config-categories"
+                aria-label="Account-Konfigurationsbereiche"
+              >
+                <button
+                  type="button"
+                  class="global-category"
+                  data-account-category="playlists"
+                  aria-pressed="true"
+                  aria-controls="mutation-form"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <rect x="3" y="5" width="18" height="14" rx="2" />
+                    <path d="m9 2 3 3 3-3M8 10h8M8 14h5" />
+                  </svg>
+                  <span
+                    ><strong>Playlists</strong
+                    ><small>M3U &amp; StreamNet-TV-Server</small></span
+                  >
                 </button>
-                <button type="button" class="global-category" data-account-category="addons" aria-pressed="false" aria-controls="mutation-form">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5" /></svg>
-                  <span><strong>Add-ons</strong><small>Manifeste &amp; Profilzuordnungen</small></span>
+                <button
+                  type="button"
+                  class="global-category"
+                  data-account-category="addons"
+                  aria-pressed="false"
+                  aria-controls="mutation-form"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path
+                      d="m12 3 9 5-9 5-9-5 9-5ZM3 12l9 5 9-5M3 16l9 5 9-5"
+                    />
+                  </svg>
+                  <span
+                    ><strong>Add-ons</strong
+                    ><small>Manifeste &amp; Profilzuordnungen</small></span
+                  >
                 </button>
               </nav>
               <form id="mutation-form" class="global-config-layout">
                 <div class="global-editor-main">
-                <section class="global-config-card" aria-labelledby="account-action-title">
-                  <div class="global-card-heading">
-                    <span class="global-step" aria-hidden="true">01</span>
-                    <div><h3 id="account-action-title">Aktion auswählen</h3><p id="account-category-description">Playlists und Server für diesen Account verwalten.</p></div>
-                  </div>
-                <label id="mutation-profile-field"
-                  >Profil<select id="mutation-profile" required></select
-                ></label>
-                <label
-                  >Aktion
-                  <select id="mutation-operation">
-                    <option value="upsert_addon">
-                      Add-on hinzufügen / aktualisieren
-                    </option>
-                    <option value="delete_addon">Add-on entfernen</option>
-                    <option value="upsert_playlist">
-                      Playlist hinzufügen / ersetzen
-                    </option>
-                    <option value="delete_playlist">Playlist entfernen</option>
-                    <option value="change_streamnet_host">
-                      StreamNet TV: Host ändern
-                    </option>
-                    <option value="clear_streamnet_host_override">
-                      StreamNet TV: Host-Override entfernen
-                    </option>
-                  </select>
-                </label>
-                </section>
-                <section class="global-config-card" aria-labelledby="account-settings-title">
-                  <div class="global-card-heading">
-                    <span class="global-step" aria-hidden="true">02</span>
-                    <div><h3 id="account-settings-title">Playlist-Einstellungen</h3><p>Nur die zur Aktion passenden Felder werden angezeigt.</p></div>
-                  </div>
-                  <p id="account-no-settings" class="quick-panel hidden">Keine weiteren Einstellungen nötig. Der Host-Override wird für die gewählten Profile entfernt; Zugangsdaten und Optionen bleiben erhalten.</p>
-                <div id="fields-change_streamnet_host" class="op-fields hidden">
-                  <div class="quick-panel">
-                    Ändert nur den Server der StreamNet-TV-Playlist dieses
-                    Accounts. Benutzername, Passwort, Aktivierung und
-                    Importoptionen bleiben erhalten.
-                  </div>
-                  <label
-                    >Neuer Host<input
-                      id="streamnet-host"
-                      type="url"
-                      placeholder="https://tv.example.com:8080"
-                  /></label>
-                </div>
-
-                <div id="fields-upsert_addon" class="op-fields hidden">
-                  <div class="quick-panel">
-                    Stremio- oder Manifest-Link einfügen. Der Server lädt das
-                    Manifest wie die App und speichert das Add-on accountweit
-                    für alle Profile.
-                  </div>
-                  <label
-                    >Manifest- oder Stremio-Link<input
-                      id="addon-url"
-                      type="url"
-                      placeholder="stremio://.../manifest.json oder https://.../manifest.json"
-                  /></label>
-                  <label class="checkbox-field"
-                    ><input id="addon-enabled" type="checkbox" checked /> Beim
-                    Hinzufügen in allen Profilen aktivieren</label
+                  <section
+                    class="global-config-card"
+                    aria-labelledby="account-action-title"
                   >
-                </div>
+                    <div class="global-card-heading">
+                      <span class="global-step" aria-hidden="true">01</span>
+                      <div>
+                        <h3 id="account-action-title">Aktion auswählen</h3>
+                        <p id="account-category-description">
+                          Playlists und Server für diesen Account verwalten.
+                        </p>
+                      </div>
+                    </div>
+                    <label id="mutation-profile-field"
+                      >Profil<select id="mutation-profile" required></select
+                    ></label>
+                    <label
+                      >Aktion
+                      <select id="mutation-operation">
+                        <option value="upsert_addon">
+                          Add-on hinzufügen / aktualisieren
+                        </option>
+                        <option value="delete_addon">Add-on entfernen</option>
+                        <option value="upsert_playlist">
+                          Playlist hinzufügen / ersetzen
+                        </option>
+                        <option value="delete_playlist">
+                          Playlist entfernen
+                        </option>
+                        <option value="change_streamnet_host">
+                          StreamNet TV: Host ändern
+                        </option>
+                        <option value="clear_streamnet_host_override">
+                          StreamNet TV: Host-Override entfernen
+                        </option>
+                      </select>
+                    </label>
+                  </section>
+                  <section
+                    class="global-config-card"
+                    aria-labelledby="account-settings-title"
+                  >
+                    <div class="global-card-heading">
+                      <span class="global-step" aria-hidden="true">02</span>
+                      <div>
+                        <h3 id="account-settings-title">
+                          Playlist-Einstellungen
+                        </h3>
+                        <p>
+                          Nur die zur Aktion passenden Felder werden angezeigt.
+                        </p>
+                      </div>
+                    </div>
+                    <p id="account-no-settings" class="quick-panel hidden">
+                      Keine weiteren Einstellungen nötig. Der Host-Override wird
+                      für die gewählten Profile entfernt; Zugangsdaten und
+                      Optionen bleiben erhalten.
+                    </p>
+                    <div
+                      id="fields-change_streamnet_host"
+                      class="op-fields hidden"
+                    >
+                      <div class="quick-panel">
+                        Ändert nur den Server der StreamNet-TV-Playlist dieses
+                        Accounts. Benutzername, Passwort, Aktivierung und
+                        Importoptionen bleiben erhalten.
+                      </div>
+                      <label
+                        >Neuer Host<input
+                          id="streamnet-host"
+                          type="url"
+                          placeholder="https://tv.example.com:8080"
+                      /></label>
+                    </div>
 
-                <div id="fields-delete_addon" class="op-fields hidden">
-                  <label
-                    >Add-on<select id="delete-addon-select"></select
-                  ></label>
-                </div>
+                    <div id="fields-upsert_addon" class="op-fields hidden">
+                      <div class="quick-panel">
+                        Stremio- oder Manifest-Link einfügen. Der Server lädt
+                        das Manifest wie die App und speichert das Add-on
+                        accountweit für alle Profile.
+                      </div>
+                      <label
+                        >Manifest- oder Stremio-Link<input
+                          id="addon-url"
+                          type="url"
+                          placeholder="stremio://.../manifest.json oder https://.../manifest.json"
+                      /></label>
+                      <label class="checkbox-field"
+                        ><input id="addon-enabled" type="checkbox" checked />
+                        Beim Hinzufügen in allen Profilen aktivieren</label
+                      >
+                    </div>
 
-                <div id="fields-upsert_playlist" class="op-fields hidden">
-                  <div class="quick-panel">
-                    Playlist gilt nur für das oben gewählte Profil. Live, Filme
-                    und Serien werden beim nächsten Cloud-Pull auf den Geräten
-                    übernommen.
-                  </div>
-                  <label
-                    >Name<input id="playlist-name" placeholder="Meine Playlist"
-                  /></label>
-                  <label
-                    >M3U-URL<input
-                      id="playlist-m3u"
-                      type="url"
-                      placeholder="https://.../list.m3u"
-                  /></label>
-                  <label
-                    >EPG-URL (optional)<input
-                      id="playlist-epg"
-                      type="url"
-                      placeholder="https://.../epg.xml"
-                  /></label>
-                  <div class="checkbox-grid">
-                    <label class="checkbox-field"
-                      ><input id="playlist-enabled" type="checkbox" checked />
-                      Aktiviert</label
-                    >
-                    <label class="checkbox-field"
-                      ><input id="playlist-live" type="checkbox" checked />
-                      Live-TV importieren</label
-                    >
-                    <label class="checkbox-field"
-                      ><input id="playlist-vod" type="checkbox" checked /> Filme
-                      importieren</label
-                    >
-                    <label class="checkbox-field"
-                      ><input id="playlist-series" type="checkbox" checked />
-                      Serien importieren</label
-                    >
-                  </div>
-                </div>
+                    <div id="fields-delete_addon" class="op-fields hidden">
+                      <label
+                        >Add-on<select id="delete-addon-select"></select
+                      ></label>
+                    </div>
 
-                <div id="fields-delete_playlist" class="op-fields hidden">
-                  <label
-                    >Playlist<select id="delete-playlist-select"></select
-                  ></label>
-                </div>
-                </section>
+                    <div id="fields-upsert_playlist" class="op-fields hidden">
+                      <div class="quick-panel">
+                        Playlist gilt nur für das oben gewählte Profil. Live,
+                        Filme und Serien werden beim nächsten Cloud-Pull auf den
+                        Geräten übernommen.
+                      </div>
+                      <label
+                        >Name<input
+                          id="playlist-name"
+                          placeholder="Meine Playlist"
+                      /></label>
+                      <label
+                        >M3U-URL<input
+                          id="playlist-m3u"
+                          type="url"
+                          placeholder="https://.../list.m3u"
+                      /></label>
+                      <label
+                        >EPG-URL (optional)<input
+                          id="playlist-epg"
+                          type="url"
+                          placeholder="https://.../epg.xml"
+                      /></label>
+                      <div class="checkbox-grid">
+                        <label class="checkbox-field"
+                          ><input
+                            id="playlist-enabled"
+                            type="checkbox"
+                            checked
+                          />
+                          Aktiviert</label
+                        >
+                        <label class="checkbox-field"
+                          ><input id="playlist-live" type="checkbox" checked />
+                          Live-TV importieren</label
+                        >
+                        <label class="checkbox-field"
+                          ><input id="playlist-vod" type="checkbox" checked />
+                          Filme importieren</label
+                        >
+                        <label class="checkbox-field"
+                          ><input
+                            id="playlist-series"
+                            type="checkbox"
+                            checked
+                          />
+                          Serien importieren</label
+                        >
+                      </div>
+                    </div>
+
+                    <div id="fields-delete_playlist" class="op-fields hidden">
+                      <label
+                        >Playlist<select id="delete-playlist-select"></select
+                      ></label>
+                    </div>
+                  </section>
                 </div>
                 <aside class="global-confirm-column">
-                <section class="global-config-card" aria-labelledby="account-confirm-title">
-                  <div class="global-card-heading">
-                    <span class="global-step" aria-hidden="true">03</span>
-                    <div><h3 id="account-confirm-title">Prüfen &amp; anwenden</h3><p>Änderungen werden direkt gespeichert und protokolliert.</p></div>
-                  </div>
-                <p id="account-action-summary" class="global-action-summary" aria-live="polite"></p>
-                <label
-                  >Kommentar (optional)<input
-                    id="mutation-reason"
-                    maxlength="500"
-                    placeholder="Optionaler Hinweis für das Protokoll"
-                /></label>
-                <div id="mutation-warning" class="warning"></div>
-                <button class="button primary" type="submit">
-                  Änderung anwenden
-                </button>
-                <p id="mutation-message" class="message" role="status"></p>
-                </section>
-                <section class="global-config-card global-scope" aria-labelledby="account-scope-title">
-                  <h3 id="account-scope-title">Geltungsbereich</h3>
-                  <ul>
-                    <li>Nur der geöffnete Account wird geändert.</li>
-                    <li>Playlists gelten für das gewählte Profil. StreamNet-TV-Hoständerungen können alle Profile betreffen.</li>
-                    <li>Add-ons werden accountweit für alle Profile verwaltet.</li>
-                    <li>Änderungen erzeugen eine neue Cloud-Revision und werden beim nächsten Cloud-Pull übernommen.</li>
-                  </ul>
-                </section>
+                  <section
+                    class="global-config-card"
+                    aria-labelledby="account-confirm-title"
+                  >
+                    <div class="global-card-heading">
+                      <span class="global-step" aria-hidden="true">03</span>
+                      <div>
+                        <h3 id="account-confirm-title">
+                          Prüfen &amp; anwenden
+                        </h3>
+                        <p>
+                          Änderungen werden direkt gespeichert und
+                          protokolliert.
+                        </p>
+                      </div>
+                    </div>
+                    <p
+                      id="account-action-summary"
+                      class="global-action-summary"
+                      aria-live="polite"
+                    ></p>
+                    <label
+                      >Kommentar (optional)<input
+                        id="mutation-reason"
+                        maxlength="500"
+                        placeholder="Optionaler Hinweis für das Protokoll"
+                    /></label>
+                    <div id="mutation-warning" class="warning"></div>
+                    <button class="button primary" type="submit">
+                      Änderung anwenden
+                    </button>
+                    <p id="mutation-message" class="message" role="status"></p>
+                  </section>
+                  <section
+                    class="global-config-card global-scope"
+                    aria-labelledby="account-scope-title"
+                  >
+                    <h3 id="account-scope-title">Geltungsbereich</h3>
+                    <ul>
+                      <li>Nur der geöffnete Account wird geändert.</li>
+                      <li>
+                        Playlists gelten für das gewählte Profil.
+                        StreamNet-TV-Hoständerungen können alle Profile
+                        betreffen.
+                      </li>
+                      <li>
+                        Add-ons werden accountweit für alle Profile verwaltet.
+                      </li>
+                      <li>
+                        Änderungen erzeugen eine neue Cloud-Revision und werden
+                        beim nächsten Cloud-Pull übernommen.
+                      </li>
+                    </ul>
+                  </section>
                 </aside>
               </form>
             </section>
@@ -885,15 +1406,27 @@
             <details class="account-actions-advanced">
               <summary>Erweitert</summary>
               <div class="account-actions-maintenance">
-              <p class="muted">Offline-Verlauf löschen entfernt nur alte Gerätehistorie. Die Bereinigung kann zusätzlich ältere, noch gültige Logins widerrufen.</p>
-              <div class="account-actions">
-                <button id="reset-offline-devices-button" class="button secondary" type="button">
-                  Offline-Verlauf zurücksetzen
-                </button>
-                <button id="cleanup-devices-sessions-button" class="button secondary" type="button">
-                  Geräte & Sessions bereinigen
-                </button>
-              </div>
+                <p class="muted">
+                  Offline-Verlauf löschen entfernt nur alte Gerätehistorie. Die
+                  Bereinigung kann zusätzlich ältere, noch gültige Logins
+                  widerrufen.
+                </p>
+                <div class="account-actions">
+                  <button
+                    id="reset-offline-devices-button"
+                    class="button secondary"
+                    type="button"
+                  >
+                    Offline-Verlauf zurücksetzen
+                  </button>
+                  <button
+                    id="cleanup-devices-sessions-button"
+                    class="button secondary"
+                    type="button"
+                  >
+                    Geräte & Sessions bereinigen
+                  </button>
+                </div>
               </div>
             </details>
           </section>

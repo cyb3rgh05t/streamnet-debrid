@@ -122,7 +122,12 @@ test("adds a rotating file target when LOG_FILE is configured", () => {
 
 test("pretty logs use Berlin local time in winter and summer", () => {
   const loggerUrl = new URL("../src/logger.js", import.meta.url).href;
-  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+  const result = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `
     import pretty from "pino-pretty";
     import { backendLoggerOptions } from ${JSON.stringify(loggerUrl)};
     const options = backendLoggerOptions().transport.targets.find(
@@ -133,12 +138,21 @@ test("pretty logs use Berlin local time in winter and summer", () => {
       stream.write(JSON.stringify({ level: 30, time, msg: "timezone check" }) + "\\n");
     }
     stream.end();
-  `], {
-    cwd: new URL("..", import.meta.url),
-    encoding: "utf8",
-    timeout: 10_000,
-    env: { ...process.env, TZ: "Europe/Berlin", LOG_PRETTY: "true", LOG_COLOR: "false", LOG_FILE: "" },
-  });
+  `,
+    ],
+    {
+      cwd: new URL("..", import.meta.url),
+      encoding: "utf8",
+      timeout: 10_000,
+      env: {
+        ...process.env,
+        TZ: "Europe/Berlin",
+        LOG_PRETTY: "true",
+        LOG_COLOR: "false",
+        LOG_FILE: "",
+      },
+    },
+  );
 
   assert.ifError(result.error);
   assert.equal(result.status, 0, result.stderr);

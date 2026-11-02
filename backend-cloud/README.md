@@ -339,11 +339,11 @@ this policy; edit the playlist field rather than the internal policy map.
   `PATCH /admin-api/accounts/:accountId/snapshot`, optionally with a `profileId` (the UI offers "Alle Profile").
   Fails with `streamnet_tv_not_configured` when there is no `streamnet_tv` entry and with
   `streamnet_tv_no_override` when no override is set.
-Edit/delete requests supply `targetId`; add/edit requests supply `data`.
-Apply requests additionally supply the preview's `state` as `expectedState`
-and `confirmation: "ALLE ACCOUNTS"`, with an optional audit `reason`.
-Playlist data may include `sourceType: "xtream"` or `"streamnet_tv"` plus
-`host`, `username`, and `password` instead of manually supplied URLs.
+  Edit/delete requests supply `targetId`; add/edit requests supply `data`.
+  Apply requests additionally supply the preview's `state` as `expectedState`
+  and `confirmation: "ALLE ACCOUNTS"`, with an optional audit `reason`.
+  Playlist data may include `sourceType: "xtream"` or `"streamnet_tv"` plus
+  `host`, `username`, and `password` instead of manually supplied URLs.
 
 ## Upgrade Existing Production Server
 

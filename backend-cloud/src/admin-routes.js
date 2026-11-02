@@ -57,10 +57,19 @@ const mutationFailureReasons = new Map([
   ["Catalog template is unavailable", "catalog_template_unavailable"],
   ["Xtream server URL is invalid", "invalid_xtream_host"],
   ["Xtream username and password are required", "invalid_xtream_credentials"],
-  ["Selected playlist has no valid Xtream credentials", "missing_xtream_credentials"],
+  [
+    "Selected playlist has no valid Xtream credentials",
+    "missing_xtream_credentials",
+  ],
   ["Playlist source type is invalid", "invalid_playlist_source_type"],
-  ["Select StreamNet TV to edit its configuration", "invalid_streamnet_tv_target"],
-  ["StreamNet TV is not configured for this account", "streamnet_tv_not_configured"],
+  [
+    "Select StreamNet TV to edit its configuration",
+    "invalid_streamnet_tv_target",
+  ],
+  [
+    "StreamNet TV is not configured for this account",
+    "streamnet_tv_not_configured",
+  ],
   ["StreamNet TV host is already set", "streamnet_tv_host_unchanged"],
   ["StreamNet TV has no host override", "streamnet_tv_no_override"],
   ["rootKey is invalid", "invalid_profile_root"],
@@ -174,9 +183,12 @@ function auditDetails(request) {
     reason: String(request.reason || "").trim() || null,
     itemId: String(data.id || "").trim() || null,
     itemName: String(data.name || "").trim() || null,
-    host: request.operation === "change_streamnet_host"
-      ? String(data.host || "").trim().slice(0, 300) || null
-      : null,
+    host:
+      request.operation === "change_streamnet_host"
+        ? String(data.host || "")
+            .trim()
+            .slice(0, 300) || null
+        : null,
     rootKey: request.rootKey || null,
     field: request.field || null,
   };
@@ -213,9 +225,14 @@ function setAdminSecurityHeaders(reply) {
 }
 
 function globalState(rows) {
-  return crypto.createHash("sha256").update(JSON.stringify(
-    rows.map((row) => [row.account_id, row.revision, row.updated_at]),
-  )).digest("hex");
+  return crypto
+    .createHash("sha256")
+    .update(
+      JSON.stringify(
+        rows.map((row) => [row.account_id, row.revision, row.updated_at]),
+      ),
+    )
+    .digest("hex");
 }
 
 function globalSummary(rows) {
@@ -228,7 +245,11 @@ function globalSummary(rows) {
     const inventory = adminGlobalInventory(row.payload);
     if (!inventory.profileCount) continue;
     configurable += 1;
-    for (const [map, items] of [[addons, inventory.addons], [playlists, inventory.playlists], [catalogs, inventory.catalogs]]) {
+    for (const [map, items] of [
+      [addons, inventory.addons],
+      [playlists, inventory.playlists],
+      [catalogs, inventory.catalogs],
+    ]) {
       for (const item of items) {
         const entry = map.get(item.id) || { ...item, accountCount: 0 };
         entry.accountCount += 1;
@@ -242,8 +263,12 @@ function globalSummary(rows) {
     skipped: rows.length - configurable,
     state: globalState(rows),
     addons: [...addons.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    playlists: [...playlists.values()].sort((a, b) => a.name.localeCompare(b.name)),
-    catalogs: [...catalogs.values()].sort((a, b) => a.name.localeCompare(b.name)),
+    playlists: [...playlists.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
+    catalogs: [...catalogs.values()].sort((a, b) =>
+      a.name.localeCompare(b.name),
+    ),
   };
 }
 
@@ -261,10 +286,15 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   async function globalMutation(request, reply, preview) {
     reply.header("Cache-Control", "no-store");
     const admin = await authenticatedAdmin(request, pool, jwtKey);
-    if (!preview && (request.body?.confirmation !== "ALLE ACCOUNTS" ||
-        typeof request.body?.expectedState !== "string")) {
+    if (
+      !preview &&
+      (request.body?.confirmation !== "ALLE ACCOUNTS" ||
+        typeof request.body?.expectedState !== "string")
+    ) {
       request.backendFailureReason = "invalid_global_confirmation";
-      return reply.code(400).send({ error: "Globale Bestätigung und Vorschau sind erforderlich." });
+      return reply
+        .code(400)
+        .send({ error: "Globale Bestätigung und Vorschau sind erforderlich." });
     }
     let mutation;
     try {
@@ -283,45 +313,73 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       // Serialize with account deletion first, then with snapshot pushes.
       if (!preview) {
         await client.query("select id from accounts order by id for update");
-        await client.query("select account_id from account_sync_snapshots order by account_id for update");
+        await client.query(
+          "select account_id from account_sync_snapshots order by account_id for update",
+        );
       }
       const rows = (await client.query(globalAccountsQuery)).rows;
       const summary = globalSummary(rows);
       if (!preview && summary.state !== request.body.expectedState) {
         await client.query("rollback");
         request.backendFailureReason = "global_revision_conflict";
-        return reply.code(409).send({ error: "Accounts wurden zwischenzeitlich geändert. Bitte erneut eine Vorschau laden." });
+        return reply
+          .code(409)
+          .send({
+            error:
+              "Accounts wurden zwischenzeitlich geändert. Bitte erneut eine Vorschau laden.",
+          });
       }
       if (mutation.operation === "add_catalog" && mutation.data.templateId) {
         const input = mutation.data;
-        const template = rows.filter((row) => row.payload)
-          .map((row) => resolveAdminCatalogTemplate(row.payload, input.templateId))
-          .find((catalog) => catalog &&
-            (input.sourceType === "PREINSTALLED" ? catalog.isPreinstalled ||
-              String(catalog.sourceType).toUpperCase() === "PREINSTALLED" :
-              String(catalog.sourceType).toUpperCase() === input.sourceType));
+        const template = rows
+          .filter((row) => row.payload)
+          .map((row) =>
+            resolveAdminCatalogTemplate(row.payload, input.templateId),
+          )
+          .find(
+            (catalog) =>
+              catalog &&
+              (input.sourceType === "PREINSTALLED"
+                ? catalog.isPreinstalled ||
+                  String(catalog.sourceType).toUpperCase() === "PREINSTALLED"
+                : String(catalog.sourceType).toUpperCase() ===
+                  input.sourceType),
+          );
         if (!template) {
           await client.query("rollback");
           request.backendFailureReason = "catalog_template_unavailable";
-          return reply.code(400).send({ error: "Catalog template is unavailable" });
+          return reply
+            .code(400)
+            .send({ error: "Catalog template is unavailable" });
         }
         mutation.data = {
-          ...template, enabled: input.enabled, remoteManaged: true,
-          ...(input.title ? { title: input.title, name: input.title, remoteTitle: input.title } : {}),
+          ...template,
+          enabled: input.enabled,
+          remoteManaged: true,
+          ...(input.title
+            ? {
+                title: input.title,
+                name: input.title,
+                remoteTitle: input.title,
+              }
+            : {}),
         };
       }
       let changed = 0;
       const now = Date.now();
       const batchId = crypto.randomUUID();
       for (const row of rows) {
-        if (!row.payload || !adminGlobalInventory(row.payload).profileCount) continue;
+        if (!row.payload || !adminGlobalInventory(row.payload).profileCount)
+          continue;
         let nextPayload;
         try {
           nextPayload = applyAdminGlobalMutation(row.payload, mutation, now);
         } catch (error) {
           await client.query("rollback");
           request.backendFailureReason = mutationFailureReason(error);
-          return reply.code(400).send({ error: `Account ${row.account_id}: ${error.message}` });
+          return reply
+            .code(400)
+            .send({ error: `Account ${row.account_id}: ${error.message}` });
         }
         if (!nextPayload) continue;
         changed += 1;
@@ -331,25 +389,46 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
           `update account_sync_snapshots set payload = $2::jsonb, revision = $3,
             payload_updated_at = to_timestamp($4::double precision / 1000.0),
             source = 'admin', updated_at = now() where account_id = $1`,
-          [row.account_id, JSON.stringify(nextPayload), revision + 1, payloadUpdatedAtMillis(nextPayload)],
+          [
+            row.account_id,
+            JSON.stringify(nextPayload),
+            revision + 1,
+            payloadUpdatedAtMillis(nextPayload),
+          ],
         );
         await client.query(
           `insert into admin_audit_logs (
             id, admin_id, account_id, operation, reason, details,
             revision_before, revision_after, request_ip, user_agent
           ) values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)`,
-          [crypto.randomUUID(), admin.id, row.account_id, `global_${mutation.operation}`,
+          [
+            crypto.randomUUID(),
+            admin.id,
+            row.account_id,
+            `global_${mutation.operation}`,
             optionalAuditReason(request.body.reason),
-            JSON.stringify({ batchId, targetId: mutation.targetId, itemId: mutation.data?.id || null }),
-            revision, revision + 1, request.ip || null,
-            String(request.headers["user-agent"] || "").slice(0, 500) || null],
+            JSON.stringify({
+              batchId,
+              targetId: mutation.targetId,
+              itemId: mutation.data?.id || null,
+            }),
+            revision,
+            revision + 1,
+            request.ip || null,
+            String(request.headers["user-agent"] || "").slice(0, 500) || null,
+          ],
         );
       }
       await client.query("commit");
       return {
-        preview, accepted: !preview, state: summary.state,
-        total: summary.total, configurable: summary.configurable,
-        changed, unchanged: summary.configurable - changed, skipped: summary.skipped,
+        preview,
+        accepted: !preview,
+        state: summary.state,
+        total: summary.total,
+        configurable: summary.configurable,
+        changed,
+        unchanged: summary.configurable - changed,
+        skipped: summary.skipped,
       };
     } catch (error) {
       await client.query("rollback");
@@ -359,8 +438,12 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     }
   }
 
-  app.post("/admin-api/global/preview", (request, reply) => globalMutation(request, reply, true));
-  app.patch("/admin-api/global/snapshot", (request, reply) => globalMutation(request, reply, false));
+  app.post("/admin-api/global/preview", (request, reply) =>
+    globalMutation(request, reply, true),
+  );
+  app.patch("/admin-api/global/snapshot", (request, reply) =>
+    globalMutation(request, reply, false),
+  );
 
   app.get("/admin", async (_request, reply) => {
     setAdminSecurityHeaders(reply);
@@ -445,9 +528,10 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     const queryStarted = performance.now();
-    const [result, recentAccounts, recentAudits, migrations] = await Promise.all([
-      pool.query(
-      `select
+    const [result, recentAccounts, recentAudits, migrations] =
+      await Promise.all([
+        pool.query(
+          `select
          (select count(*)::int from accounts) as accounts,
          (select count(*)::int from account_sync_snapshots) as snapshots,
          (select count(*)::int from account_sessions where revoked_at is null and expires_at > now()) as active_sessions,
@@ -501,15 +585,19 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          (select count(*)::int from accounts where created_at >= now() - interval '7 days') as new_accounts_7d,
          (select count(*)::int from account_sync_snapshots where updated_at >= now() - interval '24 hours') as syncs_24h,
          pg_database_size(current_database())::bigint as database_bytes`,
-      ),
-      pool.query("select id, email, created_at from accounts order by created_at desc, id desc limit 5"),
-      pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
+        ),
+        pool.query(
+          "select id, email, created_at from accounts order by created_at desc, id desc limit 5",
+        ),
+        pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
                         accounts.email as account_email
                    from admin_audit_logs audit
                    left join accounts on accounts.id = audit.account_id
                   order by audit.created_at desc, audit.id desc limit 5`),
-      pool.query("select version from schema_migrations order by version desc limit 1"),
-    ]);
+        pool.query(
+          "select version from schema_migrations order by version desc limit 1",
+        ),
+      ]);
     const databaseQueryMs = performance.now() - queryStarted;
     const row = result.rows[0];
     const memory = process.memoryUsage();
@@ -529,7 +617,8 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         heap_total_bytes: memory.heapTotal,
         host_memory_total_bytes: os.totalmem(),
         host_memory_free_bytes: os.freemem(),
-        cpu_average_percent: Math.round((cpu.user + cpu.system) / (uptime * 1e6) * 1000) / 10,
+        cpu_average_percent:
+          Math.round(((cpu.user + cpu.system) / (uptime * 1e6)) * 1000) / 10,
         node_version: process.version,
         platform: `${process.platform} / ${process.arch}`,
         schema_version: migrations.rows[0]?.version ?? null,
@@ -545,41 +634,73 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     await authenticatedAdmin(request, pool, jwtKey);
     const sources = [
       ["web", "https://web.streamnet.live/api/version"],
-      ["android", "https://api.github.com/repos/cyb3rgh05t/streamnet-debrid/releases/latest"],
+      [
+        "android",
+        "https://api.github.com/repos/cyb3rgh05t/streamnet-debrid/releases/latest",
+      ],
     ];
-    const results = await Promise.allSettled(sources.map(async ([component, url]) => {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(8000),
-        redirect: "error",
-        headers: { accept: "application/json" },
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error(`${component === "web" ? "Webplayer" : "GitHub"} HTTP ${response.status}`);
-      const data = await response.json();
-      const version = component === "android"
-        ? data.tag_name
-        : data.version;
-      if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) {
-        throw new Error("Ungültige Versionsantwort");
-      }
-      if (component === "android" && (data.draft || data.prerelease ||
-          !Array.isArray(data.assets) ||
-          !data.assets.some(asset => asset.name === `StreamNet-Debrid-${version}.apk`) ||
-          !Number.isFinite(Date.parse(data.published_at)))) {
-        throw new Error("Kein veröffentlichtes APK-Release gefunden");
-      }
-      return component === "web"
-        ? { component, version, build: data.build == null ? null : String(data.build), source: "web.streamnet.live · Live-Abfrage" }
-        : { component, version, published_at: data.published_at, source: "GitHub · Veröffentlichtes APK-Release" };
-    }));
+    const results = await Promise.allSettled(
+      sources.map(async ([component, url]) => {
+        const response = await fetch(url, {
+          signal: AbortSignal.timeout(8000),
+          redirect: "error",
+          headers: { accept: "application/json" },
+          cache: "no-store",
+        });
+        if (!response.ok)
+          throw new Error(
+            `${component === "web" ? "Webplayer" : "GitHub"} HTTP ${response.status}`,
+          );
+        const data = await response.json();
+        const version = component === "android" ? data.tag_name : data.version;
+        if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) {
+          throw new Error("Ungültige Versionsantwort");
+        }
+        if (
+          component === "android" &&
+          (data.draft ||
+            data.prerelease ||
+            !Array.isArray(data.assets) ||
+            !data.assets.some(
+              (asset) => asset.name === `StreamNet-Debrid-${version}.apk`,
+            ) ||
+            !Number.isFinite(Date.parse(data.published_at)))
+        ) {
+          throw new Error("Kein veröffentlichtes APK-Release gefunden");
+        }
+        return component === "web"
+          ? {
+              component,
+              version,
+              build: data.build == null ? null : String(data.build),
+              source: "web.streamnet.live · Live-Abfrage",
+            }
+          : {
+              component,
+              version,
+              published_at: data.published_at,
+              source: "GitHub · Veröffentlichtes APK-Release",
+            };
+      }),
+    );
     return {
       checked_at: new Date().toISOString(),
       source: "Live-Webplayer und veröffentlichtes APK-Release",
-      components: [{ component: "backend", version: backendPackage.version, source: "Laufender Backend-Prozess" }, ...results.map((result, index) => {
-        if (result.status === "fulfilled") return result.value;
-        request.log.warn({ err: result.reason, component: sources[index][0] }, "Admin update check failed");
-        return { component: sources[index][0], error: result.reason.message };
-      })],
+      components: [
+        {
+          component: "backend",
+          version: backendPackage.version,
+          source: "Laufender Backend-Prozess",
+        },
+        ...results.map((result, index) => {
+          if (result.status === "fulfilled") return result.value;
+          request.log.warn(
+            { err: result.reason, component: sources[index][0] },
+            "Admin update check failed",
+          );
+          return { component: sources[index][0], error: result.reason.message };
+        }),
+      ],
     };
   }
   app.get("/admin-api/versions", liveVersions);
@@ -720,7 +841,11 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
             event_name: row.event_name,
             last_seen: row.last_seen,
             online: row.online === true,
-            status_label: row.presence_supported ? (row.online ? "Online" : "Offline") : "Kein Live-Status",
+            status_label: row.presence_supported
+              ? row.online
+                ? "Online"
+                : "Offline"
+              : "Kein Live-Status",
           })),
           ...sessionsResult.rows.map((row) => ({
             kind: "session",
