@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="summary_read_more">Read full description</string>
+    <string name="summary_full">Description</string>
+    <string name="summary_close">Close</string>
     <string name="player_nzb_smart_play_manual">No individual NZB release available. Select Smart Play manually in the sources menu.</string>
     <string name="app_name">StreamNet</string>
     <string name="now_playing">NOW PLAYING</string>

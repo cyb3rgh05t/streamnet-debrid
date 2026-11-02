@@ -37,20 +37,25 @@ internal data class IptvArtworkKey(
     val language: String,
     val preferredMediaType: MediaType?,
     val year: Int? = null,
+    val description: String = "",
 )
 
-internal fun iptvArtworkPreferredMediaType(durationMs: Long?): MediaType? = when {
+internal fun iptvArtworkPreferredMediaType(durationMs: Long?, rawTitle: String = ""): MediaType? = when {
+    iptvArtworkHasEpisodeHint(rawTitle) -> MediaType.TV
     durationMs == null || durationMs <= 0L -> null
     durationMs >= 75 * 60_000L -> MediaType.MOVIE
     else -> MediaType.TV
 }
 
-internal fun iptvArtworkKey(rawTitle: String, language: String, durationMs: Long?): IptvArtworkKey =
+internal fun iptvArtworkKey(
+    rawTitle: String, language: String, durationMs: Long?, description: String? = null,
+): IptvArtworkKey =
     IptvArtworkKey(
         title = cleanIptvArtworkTitle(rawTitle).lowercase(Locale.US),
         language = language,
-        preferredMediaType = iptvArtworkPreferredMediaType(durationMs),
+        preferredMediaType = iptvArtworkPreferredMediaType(durationMs, rawTitle),
         year = iptvArtworkYear(rawTitle),
+        description = normalizeIptvArtworkTitle(description.orEmpty()),
     )
 
 internal class IptvLookupCache<T>(

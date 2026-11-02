@@ -182,14 +182,14 @@ class CollectionOrderingTest {
     }
 
     @Test
-    fun `release order is oldest first across page boundary and beyond old 32 item lookahead`() {
+    fun `release order is newest first across page boundary and beyond old 32 item lookahead`() {
         val refs = (1..40).map { MediaType.MOVIE to it } + (MediaType.TV to 41)
         val dates = refs.associateWith { LocalDate.of(2000 + it.second, 1, 1) }
-        val sorted = sortFranchiseReleaseRefs(refs.reversed(), dates)
-        assertEquals(refs, sorted)
+        val sorted = sortFranchiseReleaseRefs(refs, dates)
+        assertEquals(refs.reversed(), sorted)
         val paged = sorted.chunked(8).flatten()
-        assertEquals(refs, paged)
-        assertEquals(MediaType.TV to 41, paged.last())
+        assertEquals(refs.reversed(), paged)
+        assertEquals(MediaType.TV to 41, paged.first())
         assertEquals(41, paged.distinct().size)
     }
 
@@ -203,7 +203,7 @@ class CollectionOrderingTest {
             refs[3] to LocalDate.of(2025, 12, 1)
         )
         assertEquals(
-            listOf(refs[0], refs[2], refs[3], refs[1], refs[4]),
+            listOf(refs[2], refs[3], refs[0], refs[1], refs[4]),
             sortFranchiseReleaseRefs(refs, dates)
         )
     }

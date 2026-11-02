@@ -1301,6 +1301,7 @@ fun HomeScreen(
             displayHeroItem?.liveProgramTitle,
             displayHeroItem?.liveProgramStartMs,
             displayHeroItem?.liveProgramEndMs,
+            displayHeroItem?.liveProgramDescription,
         ) {
             value = null
             val title = displayHeroItem
@@ -1312,6 +1313,7 @@ fun HomeScreen(
                 title,
                 displayHeroItem.liveProgramStartMs,
                 displayHeroItem.liveProgramEndMs,
+                displayHeroItem.liveProgramDescription,
             ).collect { value = it }
         }
         val iptvHeroCategoryBackdrop = remember(displayHeroItem?.subtitle) {
@@ -1325,6 +1327,7 @@ fun HomeScreen(
             displayHeroItem?.liveProgramTitle,
             displayHeroItem?.liveProgramStartMs,
             displayHeroItem?.liveProgramEndMs,
+            displayHeroItem?.liveProgramDescription,
         ) {
             val title = displayHeroItem
                 ?.takeIf(viewModel::isIptvItem)
@@ -1335,6 +1338,7 @@ fun HomeScreen(
                 title,
                 displayHeroItem.liveProgramStartMs,
                 displayHeroItem.liveProgramEndMs,
+                displayHeroItem.liveProgramDescription,
             ).collect { value = it }
         }
         val currentBackdrop = displayHeroItem?.let { item ->
@@ -1695,8 +1699,8 @@ fun HomeScreen(
         programDetailsItem?.let { item ->
             IptvProgramDetailsDialog(
                 item = item,
-                lookupBackdrop = { viewModel.observeIptvProgramBackdrop(it, item.liveProgramStartMs, item.liveProgramEndMs) },
-                lookupLogo = { viewModel.observeIptvProgramLogo(it, item.liveProgramStartMs, item.liveProgramEndMs) },
+                lookupBackdrop = { viewModel.observeIptvProgramBackdrop(it, item.liveProgramStartMs, item.liveProgramEndMs, item.liveProgramDescription) },
+                lookupLogo = { viewModel.observeIptvProgramLogo(it, item.liveProgramStartMs, item.liveProgramEndMs, item.liveProgramDescription) },
                 onPlay = {
                     programDetailsItem = null
                     onNavigateToTv(viewModel.getIptvChannelId(item), viewModel.getIptvStreamUrl(item.id))
@@ -1756,10 +1760,10 @@ private fun IptvProgramDetailsDialog(
     var focusedButton by remember(item.id) { mutableIntStateOf(1) }
     var interactionsArmed by remember(item.id) { mutableStateOf(isMobile) }
     val programTitle = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: item.title
-    val programBackdrop by produceState<String?>(null, programTitle) {
+    val programBackdrop by produceState<String?>(null, programTitle, item.liveProgramDescription, item.liveProgramStartMs) {
         lookupBackdrop(programTitle).collect { value = it }
     }
-    val programLogo by produceState<String?>(null, programTitle) {
+    val programLogo by produceState<String?>(null, programTitle, item.liveProgramDescription, item.liveProgramStartMs) {
         lookupLogo(programTitle).collect { value = it }
     }
     val fallbackBackdrop = remember(item.subtitle) {
@@ -3166,7 +3170,7 @@ private fun HomeInputLayer(
     onNavigateToOffline: () -> Unit,
     onNavigateToTv: (channelId: String?, streamUrl: String?) -> Unit,
     getIptvStreamUrl: (itemId: Int) -> String?,
-    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
+    lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     isSportsHomeItem: (MediaItem) -> Boolean = { false },
     onSportsHomeItemClick: (MediaItem) -> Unit = {},
     onNavigateToSettings: () -> Unit,
@@ -3671,7 +3675,7 @@ private fun HomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
+    lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null
 ) {
@@ -3738,7 +3742,7 @@ private fun MobileHomeRowsLayer(
     loadingCategoryIds: Set<String> = emptySet(),
     onLoadMoreCategory: (String) -> Unit = {},
     onNavigateToDetails: (MediaType, Int, Int?, Int?) -> Unit = { _, _, _, _ -> },
-    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
+    lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null,
     onCategoryVisiblePosition: (String, Int) -> Unit = { _, _ -> }
@@ -3995,7 +3999,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
+    lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit
 ) = TraceHomeComposition("StreamNet.Home.TVRows.compose") {
     // ── Focus-row stabilizer ──
@@ -4445,7 +4449,7 @@ private fun ContentRow(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
-    lookupIptvProgramBackdrop: (String, Long?, Long?) -> Flow<String?> = { _, _, _ -> flowOf(null) },
+    lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemFocused: (MediaItem, Int) -> Unit
 ) = TraceHomeComposition("StreamNet.Home.ContentRow.compose") {
@@ -4881,7 +4885,7 @@ private fun IptvHomeCard(
     width: Dp,
     matchLandscapeFootprint: Boolean = false,
     isFocused: Boolean,
-    lookupBackdrop: (String, Long?, Long?) -> Flow<String?>,
+    lookupBackdrop: (String, Long?, Long?, String?) -> Flow<String?>,
     onFocused: () -> Unit,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
@@ -4904,10 +4908,11 @@ private fun IptvHomeCard(
         item.liveProgramTitle,
         item.liveProgramStartMs,
         item.liveProgramEndMs,
+        item.liveProgramDescription,
     ) {
         value = null
         val title = item.liveProgramTitle?.takeIf { it.isNotBlank() } ?: return@produceState
-        lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs).collect { value = it }
+        lookupBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs, item.liveProgramDescription).collect { value = it }
     }
     val categoryBackdropUrl = remember(item.subtitle, item.backdrop, item.image) {
         item.backdrop

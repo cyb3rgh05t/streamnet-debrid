@@ -3293,10 +3293,10 @@ fun LiveTvScreen(
                     variantCountFor = { channel -> variantCountFor(channel, variantGroups) },
                     onOpenVariants = { channel -> openVariantPicker(channel) },
                     lookupBackdrop = { program ->
-                        viewModel.lookupProgramBackdrop(program.title, program.startUtcMillis, program.endUtcMillis)
+                        viewModel.lookupProgramBackdrop(program.title, program.startUtcMillis, program.endUtcMillis, program.description)
                     },
                     lookupLogo = { program ->
-                        viewModel.lookupProgramLogo(program.title, program.startUtcMillis, program.endUtcMillis)
+                        viewModel.lookupProgramLogo(program.title, program.startUtcMillis, program.endUtcMillis, program.description)
                     },
                     titleTextSize = liveTvClassicTitleSize,
                     descriptionTextSize = liveTvClassicDescriptionSize,
@@ -3397,6 +3397,7 @@ fun LiveTvScreen(
                             program.title,
                             program.startUtcMillis,
                             program.endUtcMillis,
+                            program.description,
                         )
                     },
                     lookupLogo = { program ->
@@ -3404,6 +3405,7 @@ fun LiveTvScreen(
                             program.title,
                             program.startUtcMillis,
                             program.endUtcMillis,
+                            program.description,
                         )
                     },
                     titleTextSize = liveTvNetflixTitleSize,

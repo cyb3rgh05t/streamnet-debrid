@@ -9,6 +9,39 @@ import org.junit.Test
 
 class IptvArtworkTitleTest {
     @Test
+    fun `ghosts ranks recent established original language family before a newer local remake`() {
+        val uk = MediaItem(1, "Ghosts", year = "2019", mediaType = MediaType.TV, popularity = 100f)
+        val us = uk.copy(id = 2, year = "2021", popularity = 80f)
+        val german = uk.copy(id = 3, year = "2025", popularity = 10f)
+        val languages = mapOf(
+            (MediaType.TV to 1) to "en", (MediaType.TV to 2) to "en", (MediaType.TV to 3) to "de",
+        )
+        listOf(listOf(german, uk, us), listOf(us, uk, german)).forEach { items ->
+            assertEquals(us, rankIptvArtworkCandidates(
+                "Ghosts", items, 30 * 60_000L, null, originalLanguages = languages,
+            ).first())
+        }
+        assertEquals(german, rankIptvArtworkCandidates(
+            "Ghosts", listOf(uk, us, german), 30 * 60_000L, 2025, originalLanguages = languages,
+        ).single())
+    }
+
+    @Test
+    fun `equalizer double episode keeps series preference and chooses current remake`() {
+        val old = MediaItem(1, "The Equalizer", year = "1985", mediaType = MediaType.TV, popularity = 100f)
+        val current = old.copy(id = 2, year = "2021", popularity = 10f)
+        val movie = old.copy(id = 3, year = "2014", mediaType = MediaType.MOVIE, popularity = 500f)
+        val rawTitle = "Equalizer - S02 E03"
+        val duration = 100 * 60_000L
+        val preferred = iptvArtworkPreferredMediaType(duration, rawTitle)
+        assertEquals(MediaType.TV, preferred)
+        assertEquals(current, rankIptvArtworkCandidates(
+            cleanIptvArtworkTitle(rawTitle), listOf(movie, old, current), duration, null,
+            preferredMediaType = preferred,
+        ).first())
+    }
+
+    @Test
     fun `real blacklist results prefer US original over newer translated namesake`() {
         val original = MediaItem(46952, "The Blacklist", year = "2013", mediaType = MediaType.TV,
             popularity = 182.36f, backdrop = "/2eIlCirgcvEwmCSYh2wDfz5Sxvz.jpg")

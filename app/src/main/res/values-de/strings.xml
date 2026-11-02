@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="summary_read_more">Vollständige Beschreibung lesen</string>
+    <string name="summary_full">Beschreibung</string>
+    <string name="summary_close">Schließen</string>
     <string name="player_nzb_smart_play_manual">Kein einzelner NZB-Release verfügbar. Smart Play bitte im Quellenmenü manuell auswählen.</string>
     <string name="home">Start</string>
     <string name="nav_discover">Discover</string>

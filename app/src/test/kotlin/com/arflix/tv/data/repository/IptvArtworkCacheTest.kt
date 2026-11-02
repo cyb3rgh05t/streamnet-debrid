@@ -18,6 +18,29 @@ class IptvArtworkCacheTest {
     private val key = iptvArtworkKey("Tatort", "de-DE", null)
 
     @Test
+    fun `same title and duration with different descriptions do not reuse artwork`() = runBlocking {
+        val cache = IptvArtworkCache { 0L }
+        val us = iptvArtworkKey("Ghosts", "de-DE", 30 * 60_000L, "Sam und Jay in Woodstone")
+        val uk = iptvArtworkKey("Ghosts", "de-DE", 30 * 60_000L, "Alison und Mike in Button House")
+        assertNotEquals(us, uk)
+        assertNotEquals(us, iptvArtworkKey("Ghosts", "de-DE", 30 * 60_000L))
+        assertEquals("us", cache.getOrLoad(us) { "us" })
+        assertEquals("uk", cache.getOrLoad(uk) { "uk" })
+        assertEquals(us, iptvArtworkKey("Ghosts", "de-DE", 30 * 60_000L, "SAM  und Jay in Woodstone"))
+        assertEquals(key, iptvArtworkKey("Tatort", "de-DE", null, " "))
+    }
+
+    @Test
+    fun `episode hint survives title cleaning and cannot reuse a long movie slot`() {
+        val duration = 100 * 60_000L
+        val episode = iptvArtworkKey("Equalizer - S02 E03", "de-DE", duration)
+        val movie = iptvArtworkKey("Equalizer", "de-DE", duration)
+        assertNotEquals(movie, episode)
+        assertEquals(iptvArtworkKey("Equalizer", "de-DE", 50 * 60_000L), episode)
+        assertEquals(episode, iptvArtworkKey("Equalizer: Staffel 2 Folge 3", "de-DE", duration))
+    }
+
+    @Test
     fun `same title remakes and unknown year use independent caches`() = runBlocking {
         val cache = IptvArtworkCache { 0L }
         val old = iptvArtworkKey("The Equalizer (1985)", "de-DE", 55 * 60_000L)

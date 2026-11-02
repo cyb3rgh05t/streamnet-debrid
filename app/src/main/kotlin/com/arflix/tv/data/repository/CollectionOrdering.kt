@@ -56,7 +56,7 @@ internal fun sortFranchiseReleaseRefs(
     refs: List<Pair<MediaType, Int>>,
     dates: Map<Pair<MediaType, Int>, LocalDate?>
 ): List<Pair<MediaType, Int>> = refs.sortedWith(
-    compareBy<Pair<MediaType, Int>> { dates[it] == null }.thenBy { dates[it] }
+    compareBy<Pair<MediaType, Int>> { dates[it] == null }.thenByDescending { dates[it] }
 )
 
 internal fun collectionReleaseDate(value: String?, year: String = ""): LocalDate? {

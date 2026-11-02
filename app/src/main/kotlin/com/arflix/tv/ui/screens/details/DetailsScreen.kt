@@ -250,6 +250,8 @@ fun DetailsScreen(
 
     var focusedSection by remember { mutableStateOf(FocusSection.BUTTONS) }
     var descriptionScrollRequest by remember(mediaType, mediaId) { mutableIntStateOf(0) }
+    var summaryOverflow by remember(mediaType, mediaId) { mutableStateOf(false) }
+    var summaryOpenRequest by remember(mediaType, mediaId) { mutableIntStateOf(0) }
     var descriptionAtTop by remember(mediaType, mediaId) { mutableStateOf(true) }
     var descriptionAtBottom by remember(mediaType, mediaId) { mutableStateOf(true) }
     var buttonIndex by remember { mutableIntStateOf(0) }
@@ -710,7 +712,8 @@ fun DetailsScreen(
                                 true
                             } else {
                                 if (focusedSection == FocusSection.BUTTONS) {
-                                    isSidebarFocused = true
+                                    if (summaryOverflow) focusedSection = FocusSection.DESCRIPTION
+                                    else isSidebarFocused = true
                                 } else if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtTop) {
                                     descriptionScrollRequest--
                                 } else if (focusedSection == FocusSection.DESCRIPTION) {
@@ -726,8 +729,8 @@ fun DetailsScreen(
                                 isSidebarFocused = false
                                 true
                             } else {
-                                if (focusedSection == FocusSection.DESCRIPTION && !descriptionAtBottom) {
-                                    descriptionScrollRequest++
+                                if (focusedSection == FocusSection.DESCRIPTION) {
+                                    focusedSection = FocusSection.BUTTONS
                                 } else {
                                     focusedSection = moveDetailsVerticalFocus(uiState, focusedSection, down = true)
                                 }
@@ -848,7 +851,7 @@ fun DetailsScreen(
                                 FocusSection.REVIEWS -> {
                                     // Reviews don't have an action on Enter, just focus
                                 }
-                                FocusSection.DESCRIPTION -> onButtonClickRemembered(0)
+                                FocusSection.DESCRIPTION -> summaryOpenRequest++
                                 FocusSection.SIMILAR -> {
                                     val similar = uiState.similar.getOrNull(similarIndex)
                                     if (similar != null) {
@@ -947,6 +950,8 @@ fun DetailsScreen(
                     collectionIndex = collectionIndex,
                     focusedSection = focusedSection,
                     descriptionScrollRequest = descriptionScrollRequest,
+                    summaryOpenRequest = summaryOpenRequest,
+                    onSummaryOverflowChanged = { summaryOverflow = it },
                     onDescriptionPositionChange = { atTop, atBottom ->
                         descriptionAtTop = atTop
                         descriptionAtBottom = atBottom
@@ -1295,6 +1300,8 @@ internal fun DetailsContent(
     collectionIndex: Int = 0,
     focusedSection: FocusSection,
     descriptionScrollRequest: Int,
+    summaryOpenRequest: Int = 0,
+    onSummaryOverflowChanged: (Boolean) -> Unit = {},
     onDescriptionPositionChange: (Boolean, Boolean) -> Unit,
     buttonIndex: Int,
     episodeIndex: Int,
@@ -1604,8 +1611,11 @@ internal fun DetailsContent(
                     Spacer(modifier = Modifier.height(18.dp))
 
                     // Description
-                    Text(
+                    com.arflix.tv.ui.components.DetailsSummary(
                         text = item.overview.ifBlank { stringResource(R.string.no_description_available) },
+                        title = item.title,
+                        posterUrl = item.image,
+                        onOverflowChanged = onSummaryOverflowChanged,
                         style = ArflixTypography.body.copy(
                             fontSize = 12.sp,
                             lineHeight = 18.sp,
@@ -2089,8 +2099,13 @@ internal fun DetailsContent(
                     stringResource(R.string.no_description_available)
                 }
 
-                Text(
+                com.arflix.tv.ui.components.DetailsSummary(
                     text = displayOverview,
+                    title = item.title,
+                    posterUrl = item.image,
+                    focused = focusSectionForUi == FocusSection.DESCRIPTION,
+                    openRequest = summaryOpenRequest,
+                    onOverflowChanged = onSummaryOverflowChanged,
                     style = ArflixTypography.body.copy(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Normal,

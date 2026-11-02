@@ -79,6 +79,14 @@ does not repeatedly zap. OK/Enter opens the hidden player overlay and activates
 the focused control when it is already visible. Sender list, EPG and settings
 overlays retain their own directional navigation.
 
+Live TV and Home use the same program-artwork matching for backgrounds and logos.
+EPG descriptions are compared with localized and English TMDB overviews; multiple
+distinctive shared terms can distinguish same-title series and movies even when
+the broadcast duration is misleading. Explicit title/year checks still apply.
+Different EPG descriptions have separate cache entries. Without useful description
+matches, the existing title, episode, duration and remake heuristics remain in use;
+the result is a best-effort match, not a guaranteed program identification.
+
 ## Cloud Migration Status
 
 The production Android release uses the self-hosted backend at `https://auth.mystreamnet.club`. PostgreSQL is the canonical store for accounts and sync data.

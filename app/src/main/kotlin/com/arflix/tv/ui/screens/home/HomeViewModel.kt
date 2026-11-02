@@ -1165,10 +1165,11 @@ class HomeViewModel @Inject constructor(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ): String? {
         val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
         return try {
-            mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
+            mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs, description)
         } catch (e: java.io.IOException) {
             AppLogger.e("HomeVM", "IPTV backdrop lookup failed", e)
             null
@@ -1182,10 +1183,11 @@ class HomeViewModel @Inject constructor(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ): String? {
         val durationMs = programDurationMs(startUtcMillis, endUtcMillis)
         return try {
-            mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs)
+            mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs, description)
         } catch (e: java.io.IOException) {
             AppLogger.e("HomeVM", "IPTV logo lookup failed", e)
             null
@@ -1206,20 +1208,24 @@ class HomeViewModel @Inject constructor(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ) = mediaRepository.observeIptvProgramArtwork(
         rawTitle,
         programDurationMs(startUtcMillis, endUtcMillis),
         preferLogo = false,
+        description = description,
     )
 
     fun observeIptvProgramLogo(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ) = mediaRepository.observeIptvProgramArtwork(
         rawTitle,
         programDurationMs(startUtcMillis, endUtcMillis),
         preferLogo = true,
+        description = description,
     )
 
     private data class IptvProgramQuery(
@@ -1730,10 +1736,10 @@ class HomeViewModel @Inject constructor(
             viewModelScope.launch(networkDispatcher) {
                 coroutineScope {
                     launch {
-                        lookupIptvProgramBackdrop(title, hero.liveProgramStartMs, hero.liveProgramEndMs)
+                        lookupIptvProgramBackdrop(title, hero.liveProgramStartMs, hero.liveProgramEndMs, hero.liveProgramDescription)
                     }
                     launch {
-                        lookupIptvProgramLogo(title, hero.liveProgramStartMs, hero.liveProgramEndMs)
+                        lookupIptvProgramLogo(title, hero.liveProgramStartMs, hero.liveProgramEndMs, hero.liveProgramDescription)
                     }
                 }
             }
@@ -1929,10 +1935,10 @@ class HomeViewModel @Inject constructor(
                         )
                         coroutineScope {
                             val backdrop = async {
-                                lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                                lookupIptvProgramBackdrop(title, item.liveProgramStartMs, item.liveProgramEndMs, item.liveProgramDescription)
                             }
                             val logo = async {
-                                lookupIptvProgramLogo(title, item.liveProgramStartMs, item.liveProgramEndMs)
+                                lookupIptvProgramLogo(title, item.liveProgramStartMs, item.liveProgramEndMs, item.liveProgramDescription)
                             }
                             backdrop.await()?.let { preloadBackdropImages(listOf(it)) }
                             logo.await()?.let { preloadLogoImages(listOf(it), batchLimit = 1) }

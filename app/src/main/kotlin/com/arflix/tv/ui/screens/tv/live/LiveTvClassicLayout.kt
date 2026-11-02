@@ -106,6 +106,7 @@ internal fun LiveTvClassicLayout(
             initialValue = null,
             key1 = previewDisplayChannel?.id,
             key2 = previewNowNext?.now?.startUtcMillis,
+            key3 = previewNowNext?.now,
         ) {
             value = null
             if (isTouchDevice) return@produceState
@@ -117,6 +118,7 @@ internal fun LiveTvClassicLayout(
             initialValue = null,
             key1 = previewDisplayChannel?.id,
             key2 = previewNowNext?.now?.startUtcMillis,
+            key3 = previewNowNext?.now,
         ) {
             value = null
             if (isTouchDevice) return@produceState

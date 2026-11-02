@@ -2064,12 +2064,13 @@ class TvViewModel @Inject constructor(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ): String? {
         val durationMs = if (
             startUtcMillis != null && endUtcMillis != null && endUtcMillis > startUtcMillis
         ) endUtcMillis - startUtcMillis else null
         return try {
-            mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs)
+            mediaRepository.lookupIptvProgramBackdrop(rawTitle, durationMs, description)
         } catch (e: java.io.IOException) {
             AppLogger.e("TvViewModel", "IPTV backdrop lookup failed", e)
             null
@@ -2083,12 +2084,13 @@ class TvViewModel @Inject constructor(
         rawTitle: String,
         startUtcMillis: Long? = null,
         endUtcMillis: Long? = null,
+        description: String? = null,
     ): String? {
         val durationMs = if (
             startUtcMillis != null && endUtcMillis != null && endUtcMillis > startUtcMillis
         ) endUtcMillis - startUtcMillis else null
         return try {
-            mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs)
+            mediaRepository.lookupIptvProgramLogo(rawTitle, durationMs, description)
         } catch (e: java.io.IOException) {
             AppLogger.e("TvViewModel", "IPTV logo lookup failed", e)
             null

@@ -264,6 +264,7 @@ internal fun LiveTvNetflixLayout(
         previewNowNext?.now?.startUtcMillis,
         previewNowNext?.now?.endUtcMillis,
         previewNowNext?.now?.title,
+        previewNowNext?.now?.description,
     ) {
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
@@ -276,6 +277,7 @@ internal fun LiveTvNetflixLayout(
         previewNowNext?.now?.startUtcMillis,
         previewNowNext?.now?.endUtcMillis,
         previewNowNext?.now?.title,
+        previewNowNext?.now?.description,
     ) {
         value = null
         val program = previewNowNext?.now?.takeIf { it.title.isNotBlank() } ?: return@produceState
@@ -1115,6 +1117,7 @@ private fun NetflixChannelCard(
         now?.startUtcMillis,
         now?.endUtcMillis,
         now?.title,
+        now?.description,
     ) {
         value = null
         val program = now?.takeIf { it.title.isNotBlank() } ?: return@produceState
