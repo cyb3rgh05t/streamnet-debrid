@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.039] - 2026-11-02
+
+- Backend: Admin-Host-Overrides für StreamNet TV bleiben bei späteren Geräte-Pushes erhalten, auch wenn eine Ablaufprüfung oder Playlist-Änderung einen neueren Listen-Zeitstempel erzeugt. Zugangsdaten und Optionen bleiben synchronisierbar. Explizites Zurücksetzen wird gegen veraltete Geräte geschützt; vorhandene Overrides werden ohne Datenbankmigration übernommen.
+- 137 Backend-Tests erfolgreich; ein bestehender Admin-Filter-Test scheitert unter Windows an CRLF-Zeilenenden und bleibt unverändert.
+- Keine neue Datenbankmigration. Android und Web unverändert.
+
 ## [2.5.092] - 2026-11-02
 
 - Android-Version: `2.5.092` / Code `493`.

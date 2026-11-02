@@ -289,9 +289,16 @@ This action also resets cached account expiry checks.
 StreamNet TV remote hosts set `streamNetHostOverride`. The updated Android app
 preserves that explicit configuration instead of migrating it back to the
 build-time server; without this field, existing migration behavior is unchanged.
+The backend also persists an admin-owned `streamNetHostOverridesByProfile` map.
+On every sync push it reapplies the configured host to the `streamnet_tv` entry,
+even if a device sends a newer playlist timestamp (for example after refreshing
+account expiry). Credentials, activation, import flags and custom playlists still
+sync normally. Existing overrides are adopted automatically, without a migration;
+client-supplied copies of the map cannot change the server policy.
 **Deploy the updated APK before relying on custom StreamNet TV hosts.** Older
-apps can restore the built-in server on their next sync. The WebUI preserves
-the override when normalizing and synchronizing playlists.
+apps can still use their built-in server locally; their pushes can no longer
+replace the admin host in the cloud. The WebUI preserves the override when
+normalizing and synchronizing playlists.
 
 The admin-only endpoints are `GET /admin-api/global` (redacted inventory),
 `POST /admin-api/global/preview`, and `PATCH /admin-api/global/snapshot`.
@@ -320,6 +327,10 @@ stored M3U/EPG addresses stay as they are. Without an override the Android app m
 built-in server on the next load (the migration in `ensureStreamNetTvPreset`), so this is how a host
 set by `change_xtream_host` / `change_streamnet_host` is undone. The backend does not know the built-in
 host and therefore does not rewrite the addresses itself.
+The server-owned map retains an empty-host reset tombstone, preventing a later
+push from an offline device from restoring the removed override. Admin host
+changes (including raw edits of the playlist's `streamNetHostOverride`) update
+this policy; edit the playlist field rather than the internal policy map.
 
 - **Global:** Remote Config → operation `clear_streamnet_host_override` (no target needed; the ID is fixed).
   Same preview and `ALLE ACCOUNTS` confirmation as the other global actions; accounts without an override

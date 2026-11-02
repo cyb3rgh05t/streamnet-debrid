@@ -1,4 +1,10 @@
 import crypto from "node:crypto";
+import {
+  normalizeXtreamHost,
+  rewriteXtreamPlaylistHost,
+  syncAdminStreamNetHostOverrides,
+  xtreamUrls,
+} from "./streamnet-host-overrides.js";
 
 const blockedPropertyNames = new Set(["__proto__", "constructor", "prototype"]);
 const sensitivePropertyPattern =
@@ -516,6 +522,7 @@ export function applyAdminSnapshotMutation(
     const merged = mergeRedactedPreservingSecrets(payload, edited);
     mirrorEditedTopLevelAddonsToProfiles(payload, merged);
     stampEditedPayloadTimestamps(payload, merged, now);
+    syncAdminStreamNetHostOverrides(payload, merged);
     merged.updatedAt = now;
     return merged;
   }
@@ -609,62 +616,8 @@ export function applyAdminSnapshotMutation(
   }
 
   payload.updatedAt = now;
+  syncAdminStreamNetHostOverrides(payloadValue, payload);
   return payload;
-}
-
-function normalizeXtreamHost(value) {
-  const raw = String(value || "").trim().replace(/\/+$/, "");
-  let url;
-  try {
-    url = new URL(raw);
-  } catch {
-    throw new Error("Xtream server URL is invalid");
-  }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password ||
-      url.search || url.hash || /\s/.test(raw)) {
-    throw new Error("Xtream server URL is invalid");
-  }
-  url.pathname = url.pathname.replace(/\/(?:get|player_api|xmltv)\.php$/i, "").replace(/\/+$/, "");
-  return url.toString().replace(/\/+$/, "");
-}
-
-function xtreamUrls(host, username, password) {
-  const user = String(username || "").trim();
-  const pass = String(password || "").trim();
-  if (!user || !pass || user.length > 500 || pass.length > 500) {
-    throw new Error("Xtream username and password are required");
-  }
-  const credentials = new URLSearchParams({ username: user, password: pass });
-  return {
-    m3uUrl: `${host}/get.php?${credentials}&type=m3u_plus&output=ts`,
-    epgUrl: `${host}/xmltv.php?${credentials}`,
-  };
-}
-
-function existingXtreamCredentials(value) {
-  const raw = String(value || "").trim();
-  try {
-    const url = new URL(raw);
-    if (["http:", "https:"].includes(url.protocol) &&
-        /\/(?:get|player_api)\.php$/i.test(url.pathname)) {
-      const username = url.searchParams.get("username");
-      const password = url.searchParams.get("password");
-      if (username && password) return {
-        username, password,
-        type: url.searchParams.get("type"),
-        output: url.searchParams.get("output"),
-      };
-    }
-  } catch {
-    // Android also stores Xtream access as a host/user/password triplet.
-  }
-  const parts = raw.split(/\s+/);
-  if (parts.length === 3) {
-    const host = parts[0].replace(/^(?:xtream|xstream|xtreamcodes):\/\//i, "http://");
-    normalizeXtreamHost(/^https?:\/\//i.test(host) ? host : `http://${host}`);
-    return { username: parts[1], password: parts[2] };
-  }
-  throw new Error("Selected playlist has no valid Xtream credentials");
 }
 
 export function prepareAdminGlobalMutation(request) {
@@ -981,23 +934,12 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
           if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = [];
         }
       } else if (operation === "change_xtream_host") {
-        const credentials = existingXtreamCredentials(selected.m3uUrl);
-        const urls = xtreamUrls(data.host, credentials.username, credentials.password);
-        const m3u = new URL(urls.m3uUrl);
-        for (const field of ["type", "output"]) {
-          if (credentials[field]) m3u.searchParams.set(field, credentials[field]);
-        }
-        urls.m3uUrl = m3u.toString();
-        const replacement = {
-          ...selected, ...urls, epgUrls: [urls.epgUrl],
-          expiresAtEpochSeconds: 0, expirationCheckedAtMillis: 0,
-          ...(targetId === "streamnet_tv" ? { streamNetHostOverride: data.host } : {}),
-        };
+        const replacement = rewriteXtreamPlaylistHost(selected, data.host);
         iptv.playlists = upsertById(items, replacement);
-        if (iptv.m3uUrl === selected.m3uUrl) iptv.m3uUrl = urls.m3uUrl;
+        if (iptv.m3uUrl === selected.m3uUrl) iptv.m3uUrl = replacement.m3uUrl;
         if (iptv.epgUrl === selected.epgUrl) {
-          iptv.epgUrl = urls.epgUrl;
-          if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = [urls.epgUrl];
+          iptv.epgUrl = replacement.epgUrl;
+          if (Object.hasOwn(iptv, "epgUrls")) iptv.epgUrls = replacement.epgUrls;
         }
       } else if (operation === "add_playlist" || operation === "edit_playlist") {
         iptv.playlists = upsertById(items, operation === "edit_playlist" ? { ...selected, ...data } : data);
@@ -1018,6 +960,7 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
     if (!changed) return null;
   }
   payload.updatedAt = now;
+  syncAdminStreamNetHostOverrides(payloadValue, payload);
   cloneJson(payload, "Payload data", adminSnapshotMaxBytes);
   return payload;
 }

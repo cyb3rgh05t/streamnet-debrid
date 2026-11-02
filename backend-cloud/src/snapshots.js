@@ -1,3 +1,5 @@
+import { preserveStreamNetHostOverrides } from "./streamnet-host-overrides.js";
+
 export function payloadMetrics(payload) {
   const profiles = Array.isArray(payload?.profiles) ? payload.profiles : null;
   const profileCount = profiles?.length ?? null;
@@ -186,10 +188,13 @@ export function mergePushPayloadByFieldTimestamps(
   incomingPayload,
   currentPayload,
 ) {
-  if (!isPlainObject(incomingPayload) || !isPlainObject(currentPayload)) {
+  if (!isPlainObject(incomingPayload)) {
     return incomingPayload;
   }
   const incoming = cloneJson(incomingPayload);
+  if (!isPlainObject(currentPayload)) {
+    return preserveStreamNetHostOverrides(incoming, {});
+  }
   const incomingAddonsUpdatedAt = Number(incoming.addonsUpdatedAt || 0);
   const currentAddonsUpdatedAt = Number(currentPayload.addonsUpdatedAt || 0);
   if (currentAddonsUpdatedAt > incomingAddonsUpdatedAt) {
@@ -248,5 +253,5 @@ export function mergePushPayloadByFieldTimestamps(
     }
   }
   incoming.fieldUpdatedAt = mergedTs;
-  return incoming;
+  return preserveStreamNetHostOverrides(incoming, currentPayload);
 }
