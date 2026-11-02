@@ -9,6 +9,56 @@ import org.junit.Test
 
 class IptvArtworkTitleTest {
     @Test
+    fun `dotted initialisms match compact titles without losing article letters`() {
+        listOf("S.W.A.T." to "SWAT", "S.W.A.T" to "SWAT", "N.C.I.S." to "NCIS", "A.I." to "AI").forEach { (dotted, compact) ->
+            assertEquals(normalizeIptvArtworkTitle(compact), normalizeIptvArtworkTitle(dotted))
+            assertEquals(1_000.0, iptvArtworkTitleScore(dotted, compact), 0.0)
+            assertTrue(iptvArtworkTitlesCompatible(compact, dotted))
+        }
+    }
+
+    @Test
+    fun `swat spelling variants keep current series separate from movie and spinoff`() {
+        val current = MediaItem(71790, "S.W.A.T.", year = "2017", mediaType = MediaType.TV, popularity = 114.77f)
+        val old = current.copy(id = 11129, year = "1975", popularity = 7.28f)
+        val movie = current.copy(id = 9257, title = "S.W.A.T. - Die Spezialeinheit", year = "2003", mediaType = MediaType.MOVIE)
+        val spinoff = current.copy(id = 292742, title = "S.W.A.T. Exiles", year = "2026")
+        val candidates = listOf(movie, old, spinoff, current)
+        for (title in listOf("S.W.A.T.", "S.W.A.T", "SWAT")) {
+            assertEquals(current.id, rankIptvArtworkCandidates(title, candidates, 45 * 60_000L, null).first().id)
+            assertEquals(old.id, rankIptvArtworkCandidates(title, candidates, 45 * 60_000L, 1975).single().id)
+        }
+        assertTrue(rankIptvArtworkCandidates("SWAT", listOf(spinoff), 45 * 60_000L, null).isEmpty())
+        assertEquals(spinoff.id, rankIptvArtworkCandidates("SWAT Exiles", candidates, 45 * 60_000L, null).single().id)
+    }
+
+    @Test
+    fun `for all mankind episode prefers series over documentary description overlap`() {
+        val series = MediaItem(
+            id = 87917, title = "For All Mankind", year = "2019", mediaType = MediaType.TV,
+            overview = "An alternate history of the space race and NASA families.", popularity = 53.57f,
+        )
+        val documentary = MediaItem(
+            id = 20423, title = "For All Mankind", year = "1989", mediaType = MediaType.MOVIE,
+            overview = "Apollo Missionen und Astronauten unter Praesident Nixon.", popularity = 1.72f,
+        )
+        val description = "Ein Unfall beim Training entfacht eine Debatte ueber weibliche Astronauten. " +
+            "Die Apollo 15 Crew wird veraendert. Praesident Nixon kuendigt einen Waffenstillstand an."
+
+        listOf(listOf(documentary, series), listOf(series, documentary)).forEach { candidates ->
+            assertEquals(series.id, rankIptvArtworkCandidates(
+                "For All Mankind", candidates, 64 * 60_000L, null, description = description,
+            ).first().id)
+            assertEquals(documentary.id, rankIptvArtworkCandidates(
+                "For All Mankind", candidates, 90 * 60_000L, null, description = description,
+            ).first().id)
+        }
+        assertEquals(documentary.id, rankIptvArtworkCandidates(
+            "For All Mankind", listOf(documentary), 64 * 60_000L, null, description = description,
+        ).single().id)
+    }
+
+    @Test
     fun `ghosts ranks recent established original language family before a newer local remake`() {
         val uk = MediaItem(1, "Ghosts", year = "2019", mediaType = MediaType.TV, popularity = 100f)
         val us = uk.copy(id = 2, year = "2021", popularity = 80f)

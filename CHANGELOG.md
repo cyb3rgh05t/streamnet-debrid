@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.094] - 2026-11-02
+
+- Android-Version: `2.5.094` / Code `495`.
+- Android: Gleichzeitige TMDB-Logoabrufe teilen sich eine laufende Anfrage; Logo-Cache und vorgewärmte Suchlogos sind nach Inhaltssprache getrennt. Netzwerkfehler bleiben erneut abrufbar, die Fehlerbehandlung gilt weiterhin je Aufrufer.
+- Android-Home: Fokus-Prefetch überspringt Live-TV-/Collection-Einträge; der objektbasierte Logoabruf schützt zusätzlich vor internen Hash-IDs als TMDB-IDs. Zwei Regressionstests decken die beobachteten Fehlanfragen und reguläre Serien ab.
+- Android Live-TV: Guide-, Interaktions- und Playeraufbau in getrennte Composable-Kompilierungseinheiten aufgeteilt; Hauptmethode von 22.322 auf 4.260 DEX-Einheiten verkleinert. Im Emulator erfolgreich JIT-kompiliert statt wiederholt wegen der Instruktionsgrenze abgewiesen. Sechs Einstellungsabonnements zu einem profilbezogenen Flow zusammengeführt; gleiche Schlüssel, Defaults und Lifecycle-Bindung.
+- Android Live-TV-Artwork: Beschreibungswertung nach dem Anteil unterscheidender Treffer an der EPG-Beschreibung gewichtet, damit wenige gemeinsame Themenwörter nicht allein die Serienzuordnung überstimmen. `For All Mankind` wird im geprüften Emulator-Fall als Serie von 2019 statt Dokumentarfilm erkannt; Gegenbeispiele für Equalizer und Ghosts bleiben getestet.
+- Android Live-TV-Artwork: Punktierte Initialwörter wie `S.W.A.T.`/`SWAT`, `N.C.I.S.`/`NCIS` und `A.I.`/`AI` vor der Artikelbereinigung vereinheitlicht. Schreibvarianten, Film, ältere Serie und Spin-off bleiben durch Regressionstests getrennt; der konkret gemeldete S.W.A.T.-Fehlgriff ist im verfügbaren Laufzeitlog noch nicht enthalten.
+- Android Live-TV-Videovorschau: Schwarze Ladeabdeckung mit zentriertem Senderlogo statt Farbverlauf, bis das erste Videobild gerendert wird. Ladeanzeige und Übergang zum Stream bleiben erhalten.
+- Android-Validierung: 903 Tests ohne Fehler, davon einer übersprungen; Debug-APK erfolgreich gebaut. Live-TV-/EPG-Laufzeittest separat vom Initialwort- und Ladefarben-Fix; kein gemessener FPS-Vergleich und keine Prüfung auf echter TV-Hardware. Details: [Performance-Prüfung](PERFORMANCE.md).
+- Backend und Web unverändert.
+
 ## [Backend 1.0.040] - 2026-11-02
 
 - Dashboard: Unabhängige Übersichtsabfragen starten parallel zur Statistikabfrage. Zähler und Authentifizierung unverändert; die angezeigte Datenbankzeit umfasst alle vier Übersichtsabfragen.

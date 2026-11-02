@@ -429,7 +429,7 @@ private fun HeroVideoCard(
             onDispose { }
         }
     }
-    // Covers the video (channel logo on a gradient) until the first frame has been rendered.
+    // Covers the video (channel logo on black) until the first frame has been rendered.
     val coverAlpha by animateFloatAsState(
         targetValue = if (videoOutputEnabled && firstFrameRendered) 0f else 1f,
         animationSpec = tween(durationMillis = 120),
@@ -439,7 +439,7 @@ private fun HeroVideoCard(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(HeroCornerRadius))
-            .background(LiveColors.PanelDeep)
+            .background(Color.Black)
             .border(
                 width = if (focused) 2.dp else 0.dp,
                 color = if (focused) LiveColors.FocusRing else Color.Transparent,
@@ -476,11 +476,7 @@ private fun HeroVideoCard(
                 modifier = Modifier
                     .fillMaxSize()
                     .graphicsLayer { alpha = coverAlpha }
-                    .background(
-                        Brush.verticalGradient(
-                            colors = listOf(LiveColors.Panel, LiveColors.PanelDeep),
-                        )
-                    ),
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center,
             ) {
                 if (channel != null) {

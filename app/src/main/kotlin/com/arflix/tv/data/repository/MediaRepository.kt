@@ -125,6 +125,7 @@ private val IPTV_ARTWORK_EPISODE_SUFFIX_REGEX = Regex(
 private val IPTV_ARTWORK_QUALIFIER_REGEX = Regex("""\([^)]*\)|\[[^]]*]""")
 private val IPTV_ARTWORK_FORMAT_REGEX = Regex("""(?i)\b(live|hd|uhd|4k)\b""")
 private val IPTV_ARTWORK_DIACRITICS_REGEX = Regex("""\p{M}+""")
+private val IPTV_ARTWORK_INITIALISM_REGEX = Regex("""\b[a-z](?:\.[a-z])+\b\.?""")
 private val IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX = Regex("""[^a-z0-9\s]""")
 private val IPTV_ARTWORK_ARTICLES_REGEX = Regex("""\b(the|a|an|der|die|das)\b""")
 private val IPTV_ARTWORK_NAVY_CIS_REGEX = Regex("""\bnavy\s+cis\b""")
@@ -150,6 +151,7 @@ internal fun normalizeIptvArtworkTitle(value: String): String =
     Normalizer.normalize(value, Normalizer.Form.NFD)
         .replace(IPTV_ARTWORK_DIACRITICS_REGEX, "")
         .lowercase(Locale.US)
+        .replace(IPTV_ARTWORK_INITIALISM_REGEX) { it.value.replace(".", "") }
         .replace("&", " and ")
         .replace(IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX, " ")
         .replace(IPTV_ARTWORK_NAVY_CIS_REGEX, "ncis")
@@ -397,6 +399,7 @@ class MediaRepository @Inject constructor(
     private val castCache = mutableMapOf<String, CacheEntry<List<CastMember>>>()
     private val similarCache = mutableMapOf<String, CacheEntry<List<MediaItem>>>()
     private val logoCache = ConcurrentHashMap<String, CacheEntry<String?>>()
+    private val logoInFlight = ConcurrentHashMap<String, CompletableDeferred<String?>>()
     private val logoRequestSemaphore = Semaphore(3)
     private val reviewsCache = mutableMapOf<String, CacheEntry<List<Review>>>()
     private val watchProvidersCache = mutableMapOf<String, CacheEntry<StreamingServicesResult?>>()
@@ -1036,7 +1039,7 @@ class MediaRepository @Inject constructor(
 
     fun cacheLogoUrl(mediaType: MediaType, mediaId: Int, logoUrl: String) {
         if (logoUrl.isBlank()) return
-        val cacheKey = "${mediaType}_logo_$mediaId"
+        val cacheKey = "${mediaType}_logo_$mediaId:${contentLanguage.lowercase(Locale.ROOT)}"
         logoCache[cacheKey] = CacheEntry(logoUrl, System.currentTimeMillis())
     }
 
@@ -4216,8 +4219,19 @@ class MediaRepository @Inject constructor(
         mediaType: MediaType,
         mediaId: Int,
         propagateNetworkFailure: Boolean = false,
+    ): String? = try {
+        loadLogoUrl(mediaType, mediaId)
+    } catch (error: Exception) {
+        if (error is kotlinx.coroutines.CancellationException || propagateNetworkFailure) throw error
+        null
+    }
+
+    private suspend fun loadLogoUrl(
+        mediaType: MediaType,
+        mediaId: Int,
     ): String? {
-        val cacheKey = "${mediaType}_logo_$mediaId"
+        val language = contentLanguage
+        val cacheKey = "${mediaType}_logo_$mediaId:${language.lowercase(Locale.ROOT)}"
         logoCache[cacheKey]?.let { cached ->
             if (System.currentTimeMillis() - cached.timestamp < CACHE_TTL_MS) {
                 return cached.data
@@ -4225,10 +4239,16 @@ class MediaRepository @Inject constructor(
             logoCache.remove(cacheKey)
         }
 
+        val pending = CompletableDeferred<String?>()
+        val active = logoInFlight.putIfAbsent(cacheKey, pending)
+        if (active != null) return active.await()
         val type = if (mediaType == MediaType.TV) "tv" else "movie"
-        return logoRequestSemaphore.withPermit {
-            try {
-                val appLanguageCode = contentLanguage.substringBefore('-').substringBefore('_').lowercase(Locale.US)
+        try {
+            val result = logoRequestSemaphore.withPermit {
+                logoCache[cacheKey]?.takeIf {
+                    System.currentTimeMillis() - it.timestamp < CACHE_TTL_MS
+                }?.let { return@withPermit it.data }
+                val appLanguageCode = language.substringBefore('-').substringBefore('_').lowercase(Locale.US)
                 val includedLanguages = listOf(appLanguageCode, "en", "null").distinct().joinToString(",")
                 val images = tmdbApi.getImages(
                     mediaType = type,
@@ -4246,7 +4266,7 @@ class MediaRepository @Inject constructor(
                     .filterNot { it.filePath!!.endsWith(".svg", ignoreCase = true) }
                     .sortedWith(
                         compareByDescending<TmdbImage> {
-                            artworkLanguageRank(it.iso6391, contentLanguage, neutralFirst = false)
+                            artworkLanguageRank(it.iso6391, language, neutralFirst = false)
                         }
                             .thenByDescending { it.voteAverage }
                             .thenByDescending { it.width }
@@ -4255,15 +4275,19 @@ class MediaRepository @Inject constructor(
                 val url = logo?.filePath?.let { "${Constants.LOGO_BASE}$it" }
                 logoCache[cacheKey] = CacheEntry(url, System.currentTimeMillis())
                 url
-            } catch (e: Exception) {
-                if (e is kotlinx.coroutines.CancellationException) throw e
-                if (propagateNetworkFailure) throw e
-                null
             }
+            pending.complete(result)
+            return result
+        } catch (error: Throwable) {
+            pending.completeExceptionally(error)
+            throw error
+        } finally {
+            logoInFlight.remove(cacheKey, pending)
         }
     }
 
     suspend fun getLogoUrl(item: MediaItem): String? {
+        if (item.status?.startsWith("iptv:") == true || item.status?.startsWith("collection:") == true) return null
         item.id.takeIf { it > 0 }?.let { return getLogoUrl(item.mediaType, it) }
         if (!item.isHomeServer) return null
 

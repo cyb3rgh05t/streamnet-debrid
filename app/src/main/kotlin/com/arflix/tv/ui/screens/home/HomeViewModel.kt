@@ -5689,7 +5689,7 @@ class HomeViewModel @Inject constructor(
                 .mapNotNull { category.items.getOrNull(it) }
 
             val actionableFocusWindowItems = focusWindowItems
-                .filter { isActionableMediaItem(it) }
+                .filter { isActionableMediaItem(it) && !isIptvItem(it) && !isCollectionItem(it) }
 
             val itemsToLoad = actionableFocusWindowItems.filter { item ->
                 val key = "${item.mediaType}_${item.id}"
@@ -5702,7 +5702,7 @@ class HomeViewModel @Inject constructor(
                     async(networkDispatcher) {
                         val key = "${item.mediaType}_${item.id}"
                         try {
-                            val logoUrl = mediaRepository.getLogoUrl(item.mediaType, item.id)
+                            val logoUrl = mediaRepository.getLogoUrl(item)
                             if (logoUrl != null) key to logoUrl else null
                         } catch (e: Exception) {
                 if (e is CancellationException) throw e

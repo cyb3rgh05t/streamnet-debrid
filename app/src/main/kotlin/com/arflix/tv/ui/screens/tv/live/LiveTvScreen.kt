@@ -108,6 +108,7 @@ import com.arflix.tv.util.settingsDataStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -498,6 +499,139 @@ private fun catchupPlaybackVariant(
         ?: channel
 }
 
+private class LiveTvOverlayState {
+    val fullscreenGuideOpen = mutableStateOf(false)
+    val fullscreenSettingsOpen = mutableStateOf(false)
+    val variantPickerChannel = mutableStateOf<EnrichedChannel?>(null)
+    val hudPokeSignal = mutableStateOf(0)
+    val quickZapOpen = mutableStateOf(false)
+    val isHudVisible = mutableStateOf(false)
+    val guideOpenedFromQuickZap = mutableStateOf(false)
+    val guideChannel = mutableStateOf<EnrichedChannel?>(null)
+}
+
+private class LiveTvFocusRequesters {
+    val sidebar = FocusRequester()
+    val provider = FocusRequester()
+    val epg = FocusRequester()
+    val fullscreen = FocusRequester()
+    val emptyState = FocusRequester()
+}
+
+@Composable
+private fun LiveTvBackHandlers(
+    searchOpen: Boolean,
+    variantPickerOpen: Boolean,
+    isFullScreen: Boolean,
+    fullscreenGuideOpen: Boolean,
+    fullscreenSettingsOpen: Boolean,
+    onCloseSearch: () -> Unit,
+    onCloseVariantPicker: () -> Unit,
+    onCloseGuide: () -> Unit,
+    onFullscreenBack: () -> Unit,
+    onCloseSettings: () -> Unit,
+    onRegularBack: () -> Unit,
+) {
+    BackHandler(enabled = searchOpen, onBack = onCloseSearch)
+    BackHandler(enabled = !searchOpen && variantPickerOpen, onBack = onCloseVariantPicker)
+    BackHandler(enabled = !searchOpen && isFullScreen && fullscreenGuideOpen, onBack = onCloseGuide)
+    BackHandler(
+        enabled = !searchOpen && isFullScreen && !fullscreenGuideOpen && !fullscreenSettingsOpen,
+        onBack = onFullscreenBack,
+    )
+    BackHandler(enabled = !searchOpen && isFullScreen && fullscreenSettingsOpen, onBack = onCloseSettings)
+    BackHandler(enabled = !searchOpen && !variantPickerOpen && !isFullScreen, onBack = onRegularBack)
+}
+
+private data class LiveTvPreferences(
+    val clockFormat: String = "24h",
+    val layoutMode: String = "streamnet",
+    val netflixTitleSize: String = "Normal",
+    val netflixDescriptionSize: String = "Normal",
+    val classicTitleSize: String = "Normal",
+    val classicDescriptionSize: String = "Normal",
+)
+
+@Composable
+private fun rememberLiveTvPreferences(profileId: String?): LiveTvPreferences {
+    val context = LocalContext.current
+    val value by remember(context, profileId) {
+        val prefix = "profile_${profileId ?: "default"}_"
+        val clockFormat = stringPreferencesKey("${prefix}clock_format")
+        val layoutMode = stringPreferencesKey("${prefix}live_tv_layout_mode")
+        val netflixTitleSize = stringPreferencesKey("${prefix}live_tv_netflix_title_size")
+        val netflixDescriptionSize = stringPreferencesKey("${prefix}live_tv_netflix_description_size")
+        val classicTitleSize = stringPreferencesKey("${prefix}live_tv_classic_title_size")
+        val classicDescriptionSize = stringPreferencesKey("${prefix}live_tv_classic_description_size")
+        context.settingsDataStore.data.map { preferences ->
+            LiveTvPreferences(
+                clockFormat = preferences[clockFormat] ?: "24h",
+                layoutMode = preferences[layoutMode] ?: "streamnet",
+                netflixTitleSize = preferences[netflixTitleSize] ?: "Normal",
+                netflixDescriptionSize = preferences[netflixDescriptionSize] ?: "Normal",
+                classicTitleSize = preferences[classicTitleSize] ?: "Normal",
+                classicDescriptionSize = preferences[classicDescriptionSize] ?: "Normal",
+            )
+        }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle(initialValue = LiveTvPreferences())
+    return value
+}
+
+private data class LiveTvChannelLists(
+    val variantGroups: Map<String, List<EnrichedChannel>>,
+    val allDisplayChannels: List<EnrichedChannel>,
+    val filteredChannels: List<EnrichedChannel>,
+    val filteredChannelIndexById: Map<String, Int>,
+)
+
+@Composable
+private fun rememberLiveTvChannelLists(
+    visibleChannels: List<EnrichedChannel>,
+    categoryChannels: List<EnrichedChannel>,
+): LiveTvChannelLists {
+    val variantGroupsState = remember { mutableStateOf<Map<String, List<EnrichedChannel>>>(emptyMap()) }
+    val allDisplayChannelsState = remember { mutableStateOf<List<EnrichedChannel>>(emptyList()) }
+    LaunchedEffect(visibleChannels) {
+        if (visibleChannels.isEmpty()) {
+            variantGroupsState.value = emptyMap()
+            allDisplayChannelsState.value = emptyList()
+            return@LaunchedEffect
+        }
+        if (visibleChannels.size > 8_000) {
+            variantGroupsState.value = emptyMap()
+            allDisplayChannelsState.value = visibleChannels
+            return@LaunchedEffect
+        }
+        val groups = withContext(Dispatchers.Default) { buildVariantGroups(visibleChannels) }
+        val collapsed = withContext(Dispatchers.Default) { collapseChannelVariants(visibleChannels, groups) }
+        variantGroupsState.value = groups
+        allDisplayChannelsState.value = collapsed
+    }
+    val variantGroups = variantGroupsState.value
+    val filteredChannelsState = remember { mutableStateOf<List<EnrichedChannel>>(emptyList()) }
+    val filteredChannelIndexState = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
+    LaunchedEffect(categoryChannels, variantGroups) {
+        val collapsed = if (variantGroups.isEmpty()) {
+            categoryChannels
+        } else {
+            withContext(Dispatchers.Default) { collapseChannelVariants(categoryChannels, variantGroups) }
+        }
+        val index = withContext(Dispatchers.Default) {
+            HashMap<String, Int>(collapsed.size).apply {
+                collapsed.forEachIndexed { idx, channel -> put(channel.id, idx) }
+            }
+        }
+        filteredChannelsState.value = collapsed
+        filteredChannelIndexState.value = index
+    }
+    return LiveTvChannelLists(
+        variantGroups = variantGroups,
+        allDisplayChannels = allDisplayChannelsState.value,
+        filteredChannels = filteredChannelsState.value,
+        filteredChannelIndexById = filteredChannelIndexState.value,
+    )
+}
+
 @Composable
 fun LiveTvScreen(
     viewModel: TvViewModel = hiltViewModel(),
@@ -524,42 +658,13 @@ fun LiveTvScreen(
     val configuration = LocalConfiguration.current
     val deviceType = LocalDeviceType.current
     val isTouchDevice = deviceType.isTouchDevice()
-    val clockFormatKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_clock_format")
-    }
-    val clockFormat by remember(context, clockFormatKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[clockFormatKey] ?: "24h" }
-    }.collectAsStateWithLifecycle(initialValue = "24h")
-    val liveTvLayoutModeKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_live_tv_layout_mode")
-    }
-    val liveTvLayoutMode by remember(context, liveTvLayoutModeKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[liveTvLayoutModeKey] ?: "streamnet" }
-    }.collectAsStateWithLifecycle(initialValue = "streamnet")
-    val liveTvNetflixTitleSizeKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_live_tv_netflix_title_size")
-    }
-    val liveTvNetflixTitleSize by remember(context, liveTvNetflixTitleSizeKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[liveTvNetflixTitleSizeKey] ?: "Normal" }
-    }.collectAsStateWithLifecycle(initialValue = "Normal")
-    val liveTvNetflixDescriptionSizeKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_live_tv_netflix_description_size")
-    }
-    val liveTvNetflixDescriptionSize by remember(context, liveTvNetflixDescriptionSizeKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[liveTvNetflixDescriptionSizeKey] ?: "Normal" }
-    }.collectAsStateWithLifecycle(initialValue = "Normal")
-    val liveTvClassicTitleSizeKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_live_tv_classic_title_size")
-    }
-    val liveTvClassicTitleSize by remember(context, liveTvClassicTitleSizeKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[liveTvClassicTitleSizeKey] ?: "Normal" }
-    }.collectAsStateWithLifecycle(initialValue = "Normal")
-    val liveTvClassicDescriptionSizeKey = remember(currentProfile?.id) {
-        stringPreferencesKey("profile_${currentProfile?.id ?: "default"}_live_tv_classic_description_size")
-    }
-    val liveTvClassicDescriptionSize by remember(context, liveTvClassicDescriptionSizeKey) {
-        context.settingsDataStore.data.map { preferences -> preferences[liveTvClassicDescriptionSizeKey] ?: "Normal" }
-    }.collectAsStateWithLifecycle(initialValue = "Normal")
+    val preferences = rememberLiveTvPreferences(currentProfile?.id)
+    val clockFormat = preferences.clockFormat
+    val liveTvLayoutMode = preferences.layoutMode
+    val liveTvNetflixTitleSize = preferences.netflixTitleSize
+    val liveTvNetflixDescriptionSize = preferences.netflixDescriptionSize
+    val liveTvClassicTitleSize = preferences.classicTitleSize
+    val liveTvClassicDescriptionSize = preferences.classicDescriptionSize
     val useTouchRail = isTouchDevice
     val useClassicLayout = !isTouchDevice && liveTvLayoutMode == "classic"
     val useNetflixLayout = !useTouchRail && !useClassicLayout
@@ -1123,48 +1228,12 @@ fun LiveTvScreen(
     // = janky nav + live-TV buffering + the guide unable to render). Above this
     // threshold we skip variant work entirely and show channels uncollapsed, reusing
     // the existing lists (no extra copies). Smaller lists keep variant collapsing.
-    val variantCollapseLimit = 8_000
-    val variantGroupsState = remember { mutableStateOf<Map<String, List<EnrichedChannel>>>(emptyMap()) }
-    val allDisplayChannelsState = remember { mutableStateOf<List<EnrichedChannel>>(emptyList()) }
-    LaunchedEffect(visibleChannels) {
-        if (visibleChannels.isEmpty()) {
-            variantGroupsState.value = emptyMap()
-            allDisplayChannelsState.value = emptyList()
-            return@LaunchedEffect
-        }
-        if (visibleChannels.size > variantCollapseLimit) {
-            variantGroupsState.value = emptyMap()
-            allDisplayChannelsState.value = visibleChannels
-            return@LaunchedEffect
-        }
-        val groups = withContext(Dispatchers.Default) { buildVariantGroups(visibleChannels) }
-        val collapsed = withContext(Dispatchers.Default) { collapseChannelVariants(visibleChannels, groups) }
-        variantGroupsState.value = groups
-        allDisplayChannelsState.value = collapsed
-    }
-    val variantGroups = variantGroupsState.value
-    val allDisplayChannels = allDisplayChannelsState.value
-
-    val filteredChannelsCollapsedState = remember { mutableStateOf<List<EnrichedChannel>>(emptyList()) }
-    val filteredChannelIndexState = remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
-    LaunchedEffect(filteredChannelsState.value, variantGroups) {
-        val source = filteredChannelsState.value
-        // No variant groups (large list) → reuse the source list as-is, no extra copy.
-        val collapsed = if (variantGroups.isEmpty()) {
-            source
-        } else {
-            withContext(Dispatchers.Default) { collapseChannelVariants(source, variantGroups) }
-        }
-        val index = withContext(Dispatchers.Default) {
-            HashMap<String, Int>(collapsed.size).apply {
-                collapsed.forEachIndexed { idx, channel -> put(channel.id, idx) }
-            }
-        }
-        filteredChannelsCollapsedState.value = collapsed
-        filteredChannelIndexState.value = index
-    }
-    val filteredChannels = filteredChannelsCollapsedState.value
-    val filteredChannelIndexById = filteredChannelIndexState.value
+    val channelLists = rememberLiveTvChannelLists(visibleChannels, filteredChannelsState.value)
+    val variantGroups = channelLists.variantGroups
+    val allDisplayChannels = channelLists.allDisplayChannels
+    val filteredChannels = channelLists.filteredChannels
+    val filteredChannelIndexById = channelLists.filteredChannelIndexById
+    val liveTvGuideContent: @Composable () -> Unit = {
     val indexedGuideNowNextState = remember { mutableStateOf<Map<String, IptvNowNext>>(emptyMap()) }
     val selectedCategoryTotalCount = remember(visibleEnrichedState.value.tree, selectedCategoryId, filteredChannels.size) {
         visibleEnrichedState.value.tree.countForCategory(selectedCategoryId)
@@ -1688,6 +1757,7 @@ fun LiveTvScreen(
         }
     }
 
+    val liveTvInteractionContent: @Composable () -> Unit = {
     val sidebarExpanded = !useTouchRail
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
@@ -1712,11 +1782,12 @@ fun LiveTvScreen(
     } else {
         rememberSaveable { mutableStateOf(initialStreamUrl != null) }
     }
-    var fullscreenGuideOpen by remember { mutableStateOf(false) }
-    var fullscreenSettingsOpen by remember { mutableStateOf(false) }
+    val overlayState = remember { LiveTvOverlayState() }
+    var fullscreenGuideOpen by overlayState.fullscreenGuideOpen
+    var fullscreenSettingsOpen by overlayState.fullscreenSettingsOpen
     var liveTvAspectMode by rememberSaveable { mutableStateOf(LiveTvAspectMode.AUTO) }
     val liveTvResizeMode = liveTvAspectMode.resizeMode
-    var variantPickerChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
+    var variantPickerChannel by overlayState.variantPickerChannel
     LaunchedEffect(isFullScreen) {
         onFullscreenChanged(isFullScreen)
     }
@@ -1724,18 +1795,19 @@ fun LiveTvScreen(
         onDispose { onFullscreenChanged(false) }
     }
     // Focus requesters for the three regions.
-    val sidebarFocus = remember { FocusRequester() }
-    val providerFocus = remember { FocusRequester() }
-    val epgFocus = remember { FocusRequester() }
-    val fsFocus = remember { FocusRequester() }
-    val emptyStateButtonFocus = remember { FocusRequester() }
+    val focusRequesters = remember { LiveTvFocusRequesters() }
+    val sidebarFocus = focusRequesters.sidebar
+    val providerFocus = focusRequesters.provider
+    val epgFocus = focusRequesters.epg
+    val fsFocus = focusRequesters.fullscreen
+    val emptyStateButtonFocus = focusRequesters.emptyState
     val sidebarListState = rememberLazyListState()
 
-    var hudPokeSignal by remember { mutableStateOf(0) }
-    var quickZapOpen by remember { mutableStateOf(false) }
-    var isHudVisible by remember { mutableStateOf(false) }
-    var guideOpenedFromQuickZap by remember { mutableStateOf(false) }
-    var guideChannel by remember { mutableStateOf<EnrichedChannel?>(null) }
+    var hudPokeSignal by overlayState.hudPokeSignal
+    var quickZapOpen by overlayState.quickZapOpen
+    var isHudVisible by overlayState.isHudVisible
+    var guideOpenedFromQuickZap by overlayState.guideOpenedFromQuickZap
+    var guideChannel by overlayState.guideChannel
 
     LaunchedEffect(
         visibleEnrichedState.value.tree,
@@ -2266,6 +2338,7 @@ fun LiveTvScreen(
             isLowRamDevice = activityManager?.isLowRamDevice == true
         )
     }
+    val liveTvPlayerContent: @Composable () -> Unit = {
     val exoPlayer = remember(livePlaybackBufferProfile) {
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
@@ -2969,23 +3042,27 @@ fun LiveTvScreen(
         }
     }
 
-    BackHandler(enabled = searchOpen) { searchOpen = false }
-    BackHandler(enabled = !searchOpen && variantPickerChannel != null) { variantPickerChannel = null }
-    BackHandler(enabled = !searchOpen && isFullScreen && fullscreenGuideOpen) {
-        fullscreenGuideOpen = false
-    }
-    BackHandler(enabled = !searchOpen && isFullScreen && !fullscreenGuideOpen && !fullscreenSettingsOpen) {
-        if (playingCatchupProgram != null) {
-            returnCatchupToLive()
-        } else {
-            exitFullScreenPlayback()
-        }
-    }
-    BackHandler(enabled = !searchOpen && isFullScreen && fullscreenSettingsOpen) {
-        fullscreenSettingsOpen = false
-        hudPokeSignal++
-    }
-    BackHandler(enabled = !searchOpen && variantPickerChannel == null && !isFullScreen) {
+    LiveTvBackHandlers(
+        searchOpen = searchOpen,
+        variantPickerOpen = variantPickerChannel != null,
+        isFullScreen = isFullScreen,
+        fullscreenGuideOpen = fullscreenGuideOpen,
+        fullscreenSettingsOpen = fullscreenSettingsOpen,
+        onCloseSearch = { searchOpen = false },
+        onCloseVariantPicker = { variantPickerChannel = null },
+        onCloseGuide = { fullscreenGuideOpen = false },
+        onFullscreenBack = {
+            if (playingCatchupProgram != null) {
+                returnCatchupToLive()
+            } else {
+                exitFullScreenPlayback()
+            }
+        },
+        onCloseSettings = {
+            fullscreenSettingsOpen = false
+            hudPokeSignal++
+        },
+        onRegularBack = {
         if (useClassicLayout && !isTouchDevice) {
             when (focusZone) {
                 LiveTvFocusZone.EPG -> focusChannelList(focusedChannelId ?: playingChannelId ?: guideDisplayChannels.firstOrNull()?.id)
@@ -3005,7 +3082,8 @@ fun LiveTvScreen(
         } else {
             onBack()
         }
-    }
+        },
+    )
 
     val channelNumberExactName = remember(channelNumberBuffer, visibleChannels) {
         visibleChannels.firstOrNull { it.number.toString() == channelNumberBuffer }?.name
@@ -3922,6 +4000,12 @@ fun LiveTvScreen(
     }
     }
     liveTvContent()
+    }
+    liveTvPlayerContent()
+    }
+    liveTvInteractionContent()
+    }
+    liveTvGuideContent()
 }
 
 /** State bundle of the enriched channel list + category tree. */

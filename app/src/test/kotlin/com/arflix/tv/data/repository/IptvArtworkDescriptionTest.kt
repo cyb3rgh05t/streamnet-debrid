@@ -21,6 +21,45 @@ class IptvArtworkDescriptionTest {
     )
 
     @Test
+    fun `scattered topic words in a long synopsis do not overpower the series slot`() {
+        val documentary = MediaItem(
+            id = 10, title = "Shared Title", mediaType = MediaType.MOVIE,
+            overview = "Apollo Astronauten Mond Raumfahrt.",
+        )
+        val series = MediaItem(
+            id = 20, title = "Shared Title", mediaType = MediaType.TV,
+            overview = "An alternate history with an international cast.",
+        )
+        val specific = "Apollo Astronauten Mond Raumfahrt."
+        val broad = specific + " Ein Unfall beim Training entfacht eine Debatte. " +
+            "Die Crew beschuetzt Familien waehrend eines politischen Konflikts. " +
+            "Geheime Plaene veraendern Beziehungen zwischen Freunden und Kollegen."
+        val candidates = listOf(documentary, series)
+        val ref = MediaType.MOVIE to documentary.id
+
+        val specificScore = iptvArtworkDescriptionScores(specific, candidates).getValue(ref)
+        val broadScore = iptvArtworkDescriptionScores(broad, candidates).getValue(ref)
+        assertTrue(specificScore > 150.0)
+        assertTrue(broadScore < 150.0)
+        assertEquals(documentary.id, rankIptvArtworkCandidates(
+            "Shared Title", candidates, 50 * 60_000L, null, description = specific,
+        ).first().id)
+        assertEquals(series.id, rankIptvArtworkCandidates(
+            "Shared Title", candidates, 50 * 60_000L, null, description = broad,
+        ).first().id)
+    }
+
+    @Test
+    fun `duplicate localized aliases do not increase description confidence`() {
+        val candidates = listOf(ukGhosts, usGhosts, germanGhosts)
+        val description = "Sam und Jay suchen einen Anwalt fur Woodstone."
+        assertEquals(
+            iptvArtworkDescriptionScores(description, candidates),
+            iptvArtworkDescriptionScores(description, candidates + usGhosts + usGhosts),
+        )
+    }
+
+    @Test
     fun `ghosts US episode description defeats more popular namesakes`() {
         val items = listOf(germanGhosts, ukGhosts, usGhosts)
         listOf(items, items.reversed()).forEach {

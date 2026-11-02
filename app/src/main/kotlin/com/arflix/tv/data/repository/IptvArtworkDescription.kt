@@ -32,6 +32,6 @@ internal fun iptvArtworkDescriptionScores(
             populated.count { token in it } * 2 <= populated.size
         }
         // A single shared word is not enough to override the existing title/type ranking.
-        if (distinctiveMatches < 2) 0.0 else 350.0 * distinctiveMatches / (distinctiveMatches + 1)
+        if (distinctiveMatches < 2) 0.0 else 350.0 * distinctiveMatches / requested.size
     }
 }
