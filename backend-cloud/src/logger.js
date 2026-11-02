@@ -61,7 +61,7 @@ export function backendLoggerOptions() {
                 messageFormat:
                   "{method} {path}  {statusLabel}  {durationLabel}  {msg}",
                 singleLine: true,
-                translateTime: "dd.mm.yyyy HH:MM:ss",
+                translateTime: "SYS:dd.mm.yyyy HH:MM:ss",
               },
             }
           : {

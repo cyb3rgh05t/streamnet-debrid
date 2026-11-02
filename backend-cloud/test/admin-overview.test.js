@@ -6,7 +6,7 @@ import { registerAdminRoutes } from "../src/admin-routes.js";
 
 const key = new TextEncoder().encode("test-overview-key-not-for-production");
 
-async function fixture(t, { failDatabase = false, migrations = ["011_account_session_metadata.sql"] } = {}) {
+async function fixture(t, { failDatabase = false, migrations = ["011_account_session_metadata.sql"], beforeMetrics = async () => {} } = {}) {
   const queries = [];
   const pool = {
     async query(sql) {
@@ -14,6 +14,7 @@ async function fixture(t, { failDatabase = false, migrations = ["011_account_ses
       if (sql.includes("from admin_accounts")) return { rows: [{ id: "admin-a" }] };
       if (failDatabase) throw new Error("database unavailable");
       if (sql.includes("generate_series")) return { rows: [{ date: "2026-10-30", devices: 3 }] };
+      if (sql.includes("pg_database_size")) await beforeMetrics();
       if (sql.includes("pg_database_size")) return { rows: [{
         accounts: "12", snapshots: "10", profiles: "24", active_sessions: "7",
         online_devices: "3", events_24h: "50", watch_history_items: "81",
@@ -120,6 +121,27 @@ test("overview explicitly reports an empty migration history", async (t) => {
   const response = await app.inject({ url: "/admin-api/overview", headers });
   assert.equal(response.statusCode, 200);
   assert.equal(response.json().system.schema_version, null);
+});
+
+test("overview starts independent queries without waiting for expensive metrics", async (t) => {
+  let releaseMetrics;
+  let metricsStarted;
+  const gate = new Promise(resolve => { releaseMetrics = resolve; });
+  const started = new Promise(resolve => { metricsStarted = resolve; });
+  const { app, headers, queries } = await fixture(t, {
+    beforeMetrics: async () => { metricsStarted(); await gate; },
+  });
+  const response = app.inject({ url: "/admin-api/overview", headers }).then(result => result);
+  try {
+    await started;
+    await new Promise(setImmediate);
+    assert.ok(queries.some(sql => sql.includes("select id, email, created_at from accounts")));
+    assert.ok(queries.some(sql => sql.includes("from admin_audit_logs")));
+    assert.ok(queries.some(sql => sql.includes("from schema_migrations")));
+  } finally {
+    releaseMetrics();
+    assert.equal((await response).statusCode, 200);
+  }
 });
 
 test("database failure is not presented as a healthy overview", async (t) => {

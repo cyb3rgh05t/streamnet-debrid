@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.040] - 2026-11-02
+
+- Dashboard: Unabhängige Übersichtsabfragen starten parallel zur Statistikabfrage. Zähler und Authentifizierung unverändert; die angezeigte Datenbankzeit umfasst alle vier Übersichtsabfragen.
+- Container: Laufzeitbenutzer auf UID/GID `1000:1000` umgestellt. Vor Serverumstellung müssen vorhandene Host-Logdateien für diesen Benutzer schreibbar sein; PostgreSQL-Rechte bleiben unverändert. Anleitung im Backend-README.
+- Lesbare Logs verwenden `Europe/Berlin` samt Zeitzonendaten und automatischer Sommer-/Winterzeit. Datenbank- und Sync-Zeitstempel unverändert.
+- Keine neue Datenbankmigration. Backend 139/140 Tests erfolgreich; ausschließlich der bekannte Windows-/CRLF-Admin-Filter-Test schlägt fehl. Android unverändert.
+
+## [Web 1.0.072] - 2026-11-02
+
+- Identische laufende TMDB-Anfragen werden vor dem Parallelitätslimit zusammengeführt. Parameterreihenfolge und führende Pfad-Slashes erzeugen keine Doppelabrufe; verschiedene Sprachen und API-Keys bleiben getrennt. Keine zusätzliche dauerhafte Ergebnisspeicherung; Fehler bleiben erneut abrufbar.
+- 114 Webtests und Produktionsbuild erfolgreich. Keine Android-Veröffentlichung.
+
 ## [2.5.093] - 2026-11-02
 
 - Android-Version: `2.5.093` / Code `494`.

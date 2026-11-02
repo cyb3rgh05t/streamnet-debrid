@@ -17,7 +17,7 @@ Password reset uses the Resend HTTP API. Configure `RESEND_API_KEY`, a verified 
 
 1. Copy `.env.example` to `.env` and set your real domain, passwords, JWT secret, and Google Web Client ID if Google sign-in is required.
 2. Keep or adjust `STREAMNET_POSTGRES_DATA_DIR=/opt/appdata/streamnet-backend/postgres` and `STREAMNET_BACKEND_LOG_DIR=/opt/appdata/streamnet-backend/logs`. These host folders are bind-mounted into the containers so database files and rotated backend logs are visible without entering the containers.
-3. Create the local mount folders before first start: `sudo mkdir -p /opt/appdata/streamnet-backend/postgres /opt/appdata/streamnet-backend/logs`.
+3. Create the local mount folders before first start: `sudo mkdir -p /opt/appdata/streamnet-backend/postgres /opt/appdata/streamnet-backend/logs`. The backend runs as UID/GID `1000:1000`; make only its log directory writable for that user: `sudo chown -R 1000:1000 /opt/appdata/streamnet-backend/logs` and `sudo chmod -R u+rwX /opt/appdata/streamnet-backend/logs`. Do not apply these ownership changes to the PostgreSQL data directory.
 4. This Compose file is preconfigured for the existing Traefik network `proxy`, entrypoint `https`, and certificate resolver `dns-cloudflare`. Change those values only if your server uses different names.
 5. Pull the published backend image and start PostgreSQL and the API with `docker compose pull && docker compose up -d`.
 6. Run migrations with `docker compose exec streamnet-backend npm run migrate`.
@@ -391,6 +391,47 @@ snapshot pull/push, and account deletion with a disposable test account. Do not
 test deletion with a production account. Migration 008 adds `ON DELETE CASCADE`
 to TV pairing and usage-event account references and is compatible with rolling
 the application container back if necessary.
+
+## Container User and Timezone
+
+The backend image and Compose service run as UID/GID `1000:1000` (the Node
+image's unprivileged user), not root. Application code remains root-owned and
+readable; `/app/logs` is writable by the runtime user. PostgreSQL retains its
+own image user and startup behavior; do not set its user to `1000` or change
+its data directory ownership to match the backend.
+
+The image includes `tzdata` and defaults to `TZ=Europe/Berlin`; Compose sets
+the same timezone explicitly. Pretty console logs use the system timezone,
+including automatic CET/CEST transitions. Structured JSON timestamps and
+database/synchronization timestamp semantics remain unchanged. A log viewer
+may add its own timestamp; configure that viewer for the same timezone if
+both timestamps should match.
+
+Existing bind mounts hide the permissions prepared inside the image. Existing
+root-owned log files therefore need their host permissions adjusted before
+the non-root service starts. Deploy the updated image and Compose file
+together. After the new image has been published, run from the server's
+Compose directory (adjust the log path if `STREAMNET_BACKEND_LOG_DIR` differs):
+
+```sh
+docker compose pull streamnet-backend
+docker compose stop streamnet-backend
+sudo mkdir -p /opt/appdata/streamnet-backend/logs
+sudo chown -R 1000:1000 /opt/appdata/streamnet-backend/logs
+sudo chmod -R u+rwX /opt/appdata/streamnet-backend/logs
+docker compose up -d --force-recreate streamnet-backend
+docker compose exec streamnet-backend id
+docker compose exec streamnet-backend date '+%Y-%m-%d %H:%M:%S %Z %z'
+docker compose exec streamnet-backend sh -c 'test -w /app/logs && echo "Log directory writable"'
+curl -fsS https://auth.mystreamnet.club/health
+```
+
+The identity check should report UID/GID `1000:1000`; Berlin time should show
+`CET +0100` in winter or `CEST +0200` in summer. No database migration is
+needed for this user/timezone change. Do not use `chmod 777` or run the backend
+as root to bypass log-directory permission errors. With rootless Docker or
+user-namespace remapping, host ownership must match the mapped container IDs
+instead of assuming host UID `1000` maps directly to container UID `1000`.
 
 ## Logging
 

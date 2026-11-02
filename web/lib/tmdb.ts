@@ -249,6 +249,7 @@ const TMDB_COOLDOWN_MS = 30_000;
 const TMDB_MAX_CONCURRENT = 4;
 let tmdbActiveRequests = 0;
 const tmdbWaiters: Array<() => void> = [];
+const tmdbInFlight = new Map<string, Promise<unknown>>();
 
 async function acquireTmdbSlot(): Promise<() => void> {
   if (tmdbActiveRequests >= TMDB_MAX_CONCURRENT) {
@@ -279,12 +280,27 @@ export async function tmdb<T>(
     if (value !== undefined && value !== "")
       url.searchParams.set(key, String(value));
   });
+  url.searchParams.sort();
+  const apiKey = customKey?.trim() ?? "";
+  const requestKey = JSON.stringify([url.toString(), apiKey]);
+  const pending = tmdbInFlight.get(requestKey);
+  if (pending) return pending as Promise<T>;
+  const request = performTmdbRequest<T>(url, apiKey);
+  tmdbInFlight.set(requestKey, request);
+  try {
+    return await request;
+  } finally {
+    tmdbInFlight.delete(requestKey);
+  }
+}
+
+async function performTmdbRequest<T>(url: URL, apiKey: string): Promise<T> {
   if (Date.now() < tmdbCooldownUntil) {
     throw new Error("Rate limited — TMDB requests are pausing briefly.");
   }
   const headers: Record<string, string> = {};
-  if (customKey?.trim()) {
-    headers["X-TMDB-API-Key"] = customKey.trim();
+  if (apiKey) {
+    headers["X-TMDB-API-Key"] = apiKey;
   }
   const releaseSlot = await acquireTmdbSlot();
   // Timeout + one retry. Callers swallow failures and render partial UI (a

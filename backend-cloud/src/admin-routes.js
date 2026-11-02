@@ -445,7 +445,8 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     const queryStarted = performance.now();
-    const result = await pool.query(
+    const [result, recentAccounts, recentAudits, migrations] = await Promise.all([
+      pool.query(
       `select
          (select count(*)::int from accounts) as accounts,
          (select count(*)::int from account_sync_snapshots) as snapshots,
@@ -500,9 +501,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
          (select count(*)::int from accounts where created_at >= now() - interval '7 days') as new_accounts_7d,
          (select count(*)::int from account_sync_snapshots where updated_at >= now() - interval '24 hours') as syncs_24h,
          pg_database_size(current_database())::bigint as database_bytes`,
-    );
-    const databaseQueryMs = performance.now() - queryStarted;
-    const [recentAccounts, recentAudits, migrations] = await Promise.all([
+      ),
       pool.query("select id, email, created_at from accounts order by created_at desc, id desc limit 5"),
       pool.query(`select audit.id, audit.operation, audit.reason, audit.created_at,
                         accounts.email as account_email
@@ -511,6 +510,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
                   order by audit.created_at desc, audit.id desc limit 5`),
       pool.query("select version from schema_migrations order by version desc limit 1"),
     ]);
+    const databaseQueryMs = performance.now() - queryStarted;
     const row = result.rows[0];
     const memory = process.memoryUsage();
     const cpu = process.cpuUsage();

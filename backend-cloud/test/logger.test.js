@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { backendLoggerOptions, requestLogDetails } from "../src/logger.js";
 
@@ -117,4 +118,30 @@ test("adds a rotating file target when LOG_FILE is configured", () => {
     if (previousLogFile === undefined) delete process.env.LOG_FILE;
     else process.env.LOG_FILE = previousLogFile;
   }
+});
+
+test("pretty logs use Berlin local time in winter and summer", () => {
+  const loggerUrl = new URL("../src/logger.js", import.meta.url).href;
+  const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `
+    import pretty from "pino-pretty";
+    import { backendLoggerOptions } from ${JSON.stringify(loggerUrl)};
+    const options = backendLoggerOptions().transport.targets.find(
+      target => target.target === "pino-pretty"
+    ).options;
+    const stream = pretty(options);
+    for (const time of [Date.UTC(2026, 10, 2, 11, 13, 1), Date.UTC(2026, 6, 2, 10, 13, 1)]) {
+      stream.write(JSON.stringify({ level: 30, time, msg: "timezone check" }) + "\\n");
+    }
+    stream.end();
+  `], {
+    cwd: new URL("..", import.meta.url),
+    encoding: "utf8",
+    timeout: 10_000,
+    env: { ...process.env, TZ: "Europe/Berlin", LOG_PRETTY: "true", LOG_COLOR: "false", LOG_FILE: "" },
+  });
+
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /02\.11\.2026 12:13:01/);
+  assert.match(result.stdout, /02\.07\.2026 12:13:01/);
 });
