@@ -4,8 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
-- Android TV: Der fokussierte `Schließen`-Button im Beschreibungsdialog ist jetzt voll mit Akzentfarbe gefüllt, hat einen 3 dp weißen Rahmen und kontrastreichen Text statt eines schwachen Farbtons.
+## [2.5.095] - 2026-11-03
+
+- Android-Version: `2.5.095` / Code `496`.
 - Android TV: Der Beschreibungsdialog (`Mehr lesen`) setzt den Fokus beim Öffnen auf `Schließen`; Zurück schließt, Hoch/Runter scrollt den Text. Der Dialog ist jetzt ein eigenes Layout statt `AlertDialog`; Touch-Bedienung, Poster-Fallback und 8-Zeilen-Grenze bleiben durch Instrumentationstests abgedeckt.
+- Android TV: Der fokussierte `Schließen`-Button hat einen 1,5 dp breiten Rahmen in Akzentfarbe (statt 1 dp); Füllung und Textfarbe bleiben unverändert.
+- Android-Validierung: 903 Unit-Tests ohne Fehler, davon einer übersprungen; `DetailsSummaryTest` auf dem Emulator bestanden (Fokus auf `Schließen` geprüft); keine Prüfung auf echter TV-Hardware.
+- Backend und Web unverändert.
 
 ## [Web 1.0.073] - 2026-11-03
 

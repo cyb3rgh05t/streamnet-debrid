@@ -1,23 +1,21 @@
 package com.arflix.tv.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Subject
@@ -33,13 +31,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.arflix.tv.R
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.util.LocalDeviceType
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import coil.compose.AsyncImage
 
@@ -93,19 +95,47 @@ internal fun DetailsSummary(
     if (expanded) {
         val scroll = rememberScrollState()
         val scope = rememberCoroutineScope()
-        val focus = remember { FocusRequester() }
+        val closeButtonFocus = remember { FocusRequester() }
         val isTv = !LocalDeviceType.current.isTouchDevice()
         val dialogShape = RoundedCornerShape(ArvioSkin.radius.lg)
         var closeFocused by remember { mutableStateOf(false) }
         var posterFailed by remember(posterUrl) { mutableStateOf(false) }
-        AlertDialog(
+        Dialog(
             onDismissRequest = { expanded = false },
-            modifier = Modifier
-                .border(1.dp, accent.copy(alpha = 0.32f), dialogShape),
-            shape = dialogShape,
-            tonalElevation = 0.dp,
-            containerColor = ArvioSkin.colors.surfaceRaised,
-            title = {
+            properties = DialogProperties(usePlatformDefaultWidth = false),
+        ) {
+            LaunchedEffect(isTv) {
+                if (isTv) {
+                    // Das Dialogfenster nimmt Fokusanfragen erst nach dem ersten Frame an.
+                    repeat(20) {
+                        delay(50)
+                        if (closeFocused) return@LaunchedEffect
+                        runCatching { closeButtonFocus.requestFocus() }
+                    }
+                }
+            }
+            Column(
+                modifier = Modifier
+                    .widthIn(min = 280.dp, max = 560.dp)
+                    .clip(dialogShape)
+                    .background(ArvioSkin.colors.surfaceRaised)
+                    .border(1.dp, accent.copy(alpha = 0.32f), dialogShape)
+                    .padding(24.dp)
+                    .onPreviewKeyEvent {
+                        if (it.key == Key.Back) {
+                            if (it.type == KeyEventType.KeyUp) expanded = false
+                            true
+                        } else if (it.type == KeyEventType.KeyDown &&
+                            (it.key == Key.DirectionDown || it.key == Key.DirectionUp)
+                        ) {
+                            val direction = if (it.key == Key.DirectionDown) 1 else -1
+                            scope.launch { scroll.animateScrollTo(
+                                (scroll.value + direction * 120).coerceIn(0, scroll.maxValue)
+                            ) }
+                            true
+                        } else false
+                    },
+            ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
@@ -142,40 +172,28 @@ internal fun DetailsSummary(
                         )
                     }
                 }
-            },
-            text = {
+                Spacer(Modifier.height(16.dp))
                 Text(
                     text = text, style = style.copy(shadow = null), color = ArvioSkin.colors.textPrimary,
-                    modifier = Modifier.heightIn(max = 360.dp)
-                        .focusRequester(focus)
-                        .onPreviewKeyEvent {
-                            if (it.key == Key.Back) {
-                                if (it.type == KeyEventType.KeyUp) expanded = false
-                                true
-                            } else if (it.type == KeyEventType.KeyDown &&
-                                (it.key == Key.DirectionDown || it.key == Key.DirectionUp)
-                            ) {
-                                val direction = if (it.key == Key.DirectionDown) 1 else -1
-                                scope.launch { scroll.animateScrollTo(
-                                    (scroll.value + direction * 120).coerceIn(0, scroll.maxValue)
-                                ) }
-                                true
-                            } else false
-                        }
-                        .verticalScroll(scroll).focusable(),
+                    modifier = Modifier.heightIn(max = 360.dp).verticalScroll(scroll),
                 )
-                LaunchedEffect(Unit) { if (isTv) focus.requestFocus() }
-            },
-            confirmButton = {
-                OutlinedButton(
-                    onClick = { expanded = false },
-                    modifier = Modifier.heightIn(min = 48.dp).onFocusChanged { closeFocused = it.isFocused },
-                    shape = RoundedCornerShape(10.dp),
-                    border = BorderStroke(1.dp, accent.copy(alpha = if (closeFocused) 1f else 0.45f)),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = accent.copy(alpha = if (closeFocused) 0.22f else 0.06f),
-                        contentColor = ArvioSkin.colors.textPrimary,
-                    ),
+                Spacer(Modifier.height(24.dp))
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.End)
+                        .focusRequester(closeButtonFocus)
+                        .onFocusChanged { closeFocused = it.isFocused }
+                        .heightIn(min = 48.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(accent.copy(alpha = if (closeFocused) 0.22f else 0.06f))
+                        .border(
+                            if (closeFocused) 1.5.dp else 1.dp,
+                            accent.copy(alpha = if (closeFocused) 1f else 0.45f),
+                            RoundedCornerShape(10.dp),
+                        )
+                        .clickable(role = Role.Button) { expanded = false }
+                        .padding(horizontal = 24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         stringResource(R.string.summary_close),
@@ -183,7 +201,7 @@ internal fun DetailsSummary(
                         color = ArvioSkin.colors.textPrimary,
                     )
                 }
-            },
-        )
+            }
+        }
     }
 }

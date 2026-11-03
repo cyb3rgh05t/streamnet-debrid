@@ -87,8 +87,13 @@ class DetailsSummaryTest {
             }
         }
         compose.onNodeWithText(context.getString(R.string.summary_read_more)).assertIsDisplayed()
+        // Auf einem Fernseher öffnet ein D-Pad-Druck den Dialog, daher gilt der Tastatur-Eingabemodus.
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         compose.runOnIdle { request.intValue++ }
         compose.onNodeWithText(context.getString(R.string.summary_full)).assertIsDisplayed()
+        // Der Fokus wird verzögert gesetzt, weil das Dialogfenster erst nach dem ersten Frame Anfragen annimmt.
+        compose.waitUntilAtLeastOneExists(isFocused(), 5_000)
+        compose.onNodeWithText(context.getString(R.string.summary_close)).assertIsFocused()
         compose.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNode(isFocused()).assertIsDisplayed()
         compose.onNode(isFocused()).performKeyInput { pressKey(Key.Back) }
