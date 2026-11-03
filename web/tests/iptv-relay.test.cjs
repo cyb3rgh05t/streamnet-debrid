@@ -105,6 +105,24 @@ test("App segment relay omits absent headers", async () => {
   assert.equal(result.searchParams.get("rewrite"), "streamnet");
 });
 
+test("StreamNet-Subdomains nutzen das App-Relay, Web/Resolver und Fremdhosts nicht", async () => {
+  const { isStreamNetRelayHost, isStreamNetRelayTarget } = await import(playbackUrl);
+  for (const host of ["lb1.streamnet.live", "xyzxyz.streamnet.live", "XUI.streamnet.live", "a.b.streamnet.live"])
+    assert.equal(isStreamNetRelayHost(host), true, host);
+  for (const host of [
+    "web.streamnet.live", "resolve.streamnet.live", "streamnet.live",
+    "streamnet.live.evil.example", "evilstreamnet.live", "lb1.streamnet.live.example", "127.0.0.1",
+  ]) assert.equal(isStreamNetRelayHost(host), false, host);
+  assert.equal(
+    isStreamNetRelayTarget("https://xyzxyz.streamnet.live/live/u/p/1.m3u8", "https://xui.streamnet.live"),
+    true,
+  );
+  assert.equal(
+    isStreamNetRelayTarget("ftp://lb1.streamnet.live/x", "https://xui.streamnet.live"),
+    false,
+  );
+});
+
 test("STREAMNET HLS uses the app first and independent resolver fallbacks afterwards", async () => {
   const { streamNetPlaybackAttempts } = await import(playbackUrl);
   const source = "https://xui.streamnet.live/live/user/pass/70223.m3u8";

@@ -13,12 +13,27 @@ export function streamNetRelayHosts(providerUrl: string): ReadonlySet<string> {
   ]);
 }
 
+// Panel- und Load-Balancer-Hosts (z. B. lb1.streamnet.live) wechseln, daher zählt die ganze Domain.
+const STREAMNET_DOMAIN_SUFFIX = ".streamnet.live";
+const STREAMNET_NON_MEDIA_LABELS = new Set(["web", "resolve", "www"]);
+
+export function isStreamNetRelayHost(
+  hostname: string,
+  hosts: ReadonlySet<string> = STREAMNET_RELAY_HOSTS,
+) {
+  const host = hostname.toLowerCase();
+  if (hosts.has(host)) return true;
+  if (!host.endsWith(STREAMNET_DOMAIN_SUFFIX)) return false;
+  const label = host.slice(0, -STREAMNET_DOMAIN_SUFFIX.length);
+  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(label) && !STREAMNET_NON_MEDIA_LABELS.has(label);
+}
+
 export function isStreamNetRelayTarget(url: string, providerUrl: string) {
   const target = new URL(url);
   return (
     ["http:", "https:"].includes(target.protocol) &&
     (target.origin === new URL(providerUrl).origin ||
-      STREAMNET_RELAY_HOSTS.has(target.hostname.toLowerCase()))
+      isStreamNetRelayHost(target.hostname))
   );
 }
 

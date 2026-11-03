@@ -135,6 +135,23 @@ for (const [name, env] of [
   });
 }
 
+test("StreamNet subdomains are relayed, web and resolver hosts are not", async (t) => {
+  const { default: worker } = await import(workerUrl);
+  const upstreamFetch = t.mock.method(globalThis, "fetch", async () =>
+    new Response("segment", { headers: { "content-type": "video/mp2t" } }),
+  );
+  const env = { ALLOWED_MEDIA_HOSTS: deployedHosts };
+  for (const host of ["lb1.streamnet.live", "xyzxyz.streamnet.live"]) {
+    const response = await worker.fetch(mediaRequest(`https://${host}/hls/test`), env);
+    assert.equal(response.status, 200, host);
+  }
+  for (const host of ["web.streamnet.live", "resolve.streamnet.live", "evil.example"]) {
+    const response = await worker.fetch(mediaRequest(`https://${host}/hls/test`), env);
+    assert.equal(response.status, 400, host);
+  }
+  assert.equal(upstreamFetch.mock.callCount(), 2);
+});
+
 test("Unknown hosts and disallowed origins remain blocked before upstream fetch", async (t) => {
   const { default: worker } = await import(workerUrl);
   const upstreamFetch = t.mock.method(globalThis, "fetch", async () => {

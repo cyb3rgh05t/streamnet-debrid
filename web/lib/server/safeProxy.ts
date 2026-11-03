@@ -101,7 +101,7 @@ export async function safeProxyFetch(
     textOnly?: boolean;
     allowInsecureRedirect?: boolean;
     allowMedia?: boolean;
-    allowedHosts?: ReadonlySet<string>;
+    allowedHosts?: { has(hostname: string): boolean };
     streamMedia?: boolean;
   } = {},
 ): Promise<Response> {

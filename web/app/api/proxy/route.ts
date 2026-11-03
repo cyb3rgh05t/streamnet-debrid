@@ -7,6 +7,7 @@ import {
   STREAMNET_RELAY_HOSTS,
 } from "@/lib/server/iptvRelay";
 import { config } from "@/lib/config";
+import { isStreamNetRelayHost } from "@/lib/iptvPlayback";
 import {
   allowsMediaProxy,
   safeProxyFetch,
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
   const rewriteMode = input.searchParams.get("rewrite");
   const streamNetRelayRequest =
     (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
-    STREAMNET_RELAY_HOSTS.has(target.hostname.toLowerCase());
+    isStreamNetRelayHost(target.hostname, STREAMNET_RELAY_HOSTS);
   if (
     (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
     !streamNetRelayRequest
@@ -511,7 +512,9 @@ async function fetchWithTimeout(
       return await safeProxyFetch(target, init, {
         allowMedia: true,
         allowInsecureRedirect: true,
-        allowedHosts: STREAMNET_RELAY_HOSTS,
+        allowedHosts: {
+          has: (host) => isStreamNetRelayHost(host, STREAMNET_RELAY_HOSTS),
+        },
         streamMedia: true,
       });
     }

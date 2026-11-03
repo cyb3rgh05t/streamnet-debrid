@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import { NextRequest, NextResponse } from "next/server";
 import { safeProxyFetch, withinProxyBudget } from "@/lib/server/safeProxy";
 import { STREAMNET_RELAY_HOSTS } from "@/lib/server/iptvRelay";
+import { isStreamNetRelayHost } from "@/lib/iptvPlayback";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,12 +14,16 @@ const DEFAULT_MAX_TRANSCODES = 4;
 let activeStreams = 0;
 
 function allowedHosts() {
-  return new Set(
+  const hosts = new Set(
     (process.env.STREAMNET_AUDIO_TRANSCODE_HOSTS || DEFAULT_HOSTS)
       .split(",")
       .map((host) => host.trim().toLowerCase())
       .filter(Boolean),
   );
+  return {
+    has: (host: string) =>
+      hosts.has(host) || isStreamNetRelayHost(host, STREAMNET_RELAY_HOSTS),
+  };
 }
 
 function maxConcurrentTranscodes() {

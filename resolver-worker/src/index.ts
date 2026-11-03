@@ -48,7 +48,7 @@ async function media(request: Request, input: URL, env: Env) {
   }
   if (
     !["http:", "https:"].includes(target.protocol) ||
-    !allowedMediaHosts(env).has(target.hostname.toLowerCase())
+    !isAllowedMediaHost(allowedMediaHosts(env), target.hostname)
   ) {
     return json({ error: "Media host not allowed" }, request, env, 400);
   }
@@ -75,7 +75,7 @@ async function media(request: Request, input: URL, env: Env) {
   }
 
   const finalUrl = safeUrl(upstream.url) ?? target;
-  if (!allowedMediaHosts(env).has(finalUrl.hostname.toLowerCase())) {
+  if (!isAllowedMediaHost(allowedMediaHosts(env), finalUrl.hostname)) {
     await upstream.body?.cancel();
     return json(
       { error: "Media redirect host not allowed" },
@@ -179,6 +179,19 @@ function configuredValues(raw: string | undefined, defaults: string[]) {
     .map((value) => value.trim())
     .filter(Boolean);
   return values?.length ? values : defaults;
+}
+
+// Panel- und Load-Balancer-Hosts wechseln; Gegenstück zu isStreamNetRelayHost in web/lib/iptvPlayback.ts.
+function isAllowedMediaHost(hosts: Set<string>, hostname: string) {
+  const host = hostname.toLowerCase();
+  if (hosts.has(host)) return true;
+  const suffix = ".streamnet.live";
+  if (!host.endsWith(suffix)) return false;
+  const label = host.slice(0, -suffix.length);
+  return (
+    /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(label) &&
+    !["web", "resolve", "www"].includes(label)
+  );
 }
 
 function allowedMediaHosts(env: Env) {

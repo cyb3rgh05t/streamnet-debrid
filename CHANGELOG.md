@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+- Android TV: Der fokussierte `Schließen`-Button im Beschreibungsdialog ist jetzt voll mit Akzentfarbe gefüllt, hat einen 3 dp weißen Rahmen und kontrastreichen Text statt eines schwachen Farbtons.
+- Android TV: Der Beschreibungsdialog (`Mehr lesen`) setzt den Fokus beim Öffnen auf `Schließen`; Zurück schließt, Hoch/Runter scrollt den Text. Der Dialog ist jetzt ein eigenes Layout statt `AlertDialog`; Touch-Bedienung, Poster-Fallback und 8-Zeilen-Grenze bleiben durch Instrumentationstests abgedeckt.
+
+## [Web 1.0.073] - 2026-11-03
+
+- Web-Version: `1.0.073`.
+- Webplayer Live-TV: Alle Subdomains von `streamnet.live` (z. B. Panel-Alias und Load-Balancer `lb1`) werden als StreamNet-Quelle erkannt und laufen über das App-Relay mit umgeschriebenen Segmenten. Zuvor wurde ein unbekannter Panelhost als Fremdanbieter behandelt (`rewrite=direct`), die Segmente gingen direkt an den Load-Balancer und scheiterten an CORS. `web` und `resolve` sowie Fremddomains bleiben ausgeschlossen; DNS-/Redirect-Prüfung unverändert.
+- Audio-Transcode-Fallback und Resolver-Worker akzeptieren dieselben StreamNet-Subdomains (Worker-Änderung wirkt erst nach dessen separatem Deployment).
+- Tests: Hostprüfung im Web und im Worker, 115 Web- und 8 Worker-Tests ohne Fehler. Kein Test gegen echte Kanäle.
+- Android und Backend unverändert.
+
 ## [2.5.094] - 2026-11-02
 
 - Android-Version: `2.5.094` / Code `495`.
