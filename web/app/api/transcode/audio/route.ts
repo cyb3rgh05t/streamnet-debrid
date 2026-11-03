@@ -8,8 +8,10 @@ import { isStreamNetRelayHost } from "@/lib/iptvPlayback";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_HOSTS =
-  [...STREAMNET_RELAY_HOSTS, "usenetstreamer.mystreamnet.club"].join(",");
+const DEFAULT_HOSTS = [
+  ...STREAMNET_RELAY_HOSTS,
+  "usenetstreamer.mystreamnet.club",
+].join(",");
 const DEFAULT_MAX_TRANSCODES = 4;
 let activeStreams = 0;
 

@@ -143,12 +143,16 @@ export async function GET(request: NextRequest) {
               : rewriteMode === "direct" || !ALLOW_MEDIA_PROXY
                 ? rewritePlaylistToDirectOrWorker(
                     text,
-                    new URL(response.headers.get("x-arvio-final-url") ?? target),
+                    new URL(
+                      response.headers.get("x-arvio-final-url") ?? target,
+                    ),
                     input.searchParams.get("headers"),
                   )
                 : rewritePlaylist(
                     text,
-                    new URL(response.headers.get("x-arvio-final-url") ?? target),
+                    new URL(
+                      response.headers.get("x-arvio-final-url") ?? target,
+                    ),
                     request,
                   );
     } catch (error) {

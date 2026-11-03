@@ -25,7 +25,10 @@ export function isStreamNetRelayHost(
   if (hosts.has(host)) return true;
   if (!host.endsWith(STREAMNET_DOMAIN_SUFFIX)) return false;
   const label = host.slice(0, -STREAMNET_DOMAIN_SUFFIX.length);
-  return /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(label) && !STREAMNET_NON_MEDIA_LABELS.has(label);
+  return (
+    /^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/.test(label) &&
+    !STREAMNET_NON_MEDIA_LABELS.has(label)
+  );
 }
 
 export function isStreamNetRelayTarget(url: string, providerUrl: string) {
@@ -42,7 +45,10 @@ export function iptvPlaybackSourceUrl(url: string, appOrigin: string): string {
   const seen = new Set<string>();
   for (let depth = 0; depth < 8; depth++) {
     const target = new URL(source, appOrigin);
-    if (target.origin !== new URL(appOrigin).origin || target.pathname !== "/api/proxy")
+    if (
+      target.origin !== new URL(appOrigin).origin ||
+      target.pathname !== "/api/proxy"
+    )
       return source;
     if (seen.has(target.toString())) throw new Error("Cyclic IPTV relay URL");
     seen.add(target.toString());
@@ -91,10 +97,17 @@ export function createLiveTransportFallback() {
 
 export function mseErrorDiagnostic(info: unknown): string {
   if (typeof info !== "object" || info === null) return "unknown";
-  const code = "code" in info && typeof info.code === "number" && Number.isInteger(info.code)
-    ? String(info.code) : "none";
+  const code =
+    "code" in info &&
+    typeof info.code === "number" &&
+    Number.isInteger(info.code)
+      ? String(info.code)
+      : "none";
   const message = "msg" in info && typeof info.msg === "string" ? info.msg : "";
-  const exception = message.match(/\b(?:InvalidStateError|NotSupportedError|QuotaExceededError|TypeError|AbortError)\b/)?.[0] ?? "unknown";
+  const exception =
+    message.match(
+      /\b(?:InvalidStateError|NotSupportedError|QuotaExceededError|TypeError|AbortError)\b/,
+    )?.[0] ?? "unknown";
   return `code=${code}; exception=${exception}`;
 }
 

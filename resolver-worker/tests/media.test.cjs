@@ -38,16 +38,23 @@ for (const [name, env] of [
 ]) {
   test(`Live TV HLS host is relayed with ${name}`, async (t) => {
     const { default: worker } = await import(workerUrl);
-    const upstreamFetch = t.mock.method(globalThis, "fetch", async (url, init) => {
-      assert.equal(url.toString(), target);
-      assert.equal(init.method, "GET");
-      assert.equal(init.headers.get("user-agent"), proxyHeaders["User-Agent"]);
-      assert.equal(init.headers.get("icy-metadata"), "1");
-      return new Response(
-        '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="key.bin"\nvariant.m3u8\nsegment.ts\n',
-        { headers: { "content-type": "application/vnd.apple.mpegurl" } },
-      );
-    });
+    const upstreamFetch = t.mock.method(
+      globalThis,
+      "fetch",
+      async (url, init) => {
+        assert.equal(url.toString(), target);
+        assert.equal(init.method, "GET");
+        assert.equal(
+          init.headers.get("user-agent"),
+          proxyHeaders["User-Agent"],
+        );
+        assert.equal(init.headers.get("icy-metadata"), "1");
+        return new Response(
+          '#EXTM3U\n#EXT-X-KEY:METHOD=AES-128,URI="key.bin"\nvariant.m3u8\nsegment.ts\n',
+          { headers: { "content-type": "application/vnd.apple.mpegurl" } },
+        );
+      },
+    );
 
     const response = await worker.fetch(mediaRequest(target), env);
     assert.equal(response.status, 200);
@@ -99,14 +106,21 @@ for (const [name, env] of [
   test(`85.209.176.85 segments are relayed with ${name}`, async (t) => {
     const { default: worker } = await import(workerUrl);
     const segmentUrl = "http://85.209.176.85/hls/test-token";
-    const upstreamFetch = t.mock.method(globalThis, "fetch", async (url, init) => {
-      assert.equal(url.toString(), segmentUrl);
-      assert.equal(init.headers.get("user-agent"), proxyHeaders["User-Agent"]);
-      assert.equal(init.headers.get("icy-metadata"), "1");
-      return new Response("segment-data", {
-        headers: { "content-type": "video/mp2t" },
-      });
-    });
+    const upstreamFetch = t.mock.method(
+      globalThis,
+      "fetch",
+      async (url, init) => {
+        assert.equal(url.toString(), segmentUrl);
+        assert.equal(
+          init.headers.get("user-agent"),
+          proxyHeaders["User-Agent"],
+        );
+        assert.equal(init.headers.get("icy-metadata"), "1");
+        return new Response("segment-data", {
+          headers: { "content-type": "video/mp2t" },
+        });
+      },
+    );
     const response = await worker.fetch(mediaRequest(segmentUrl), env);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get("content-type"), "video/mp2t");
@@ -117,8 +131,11 @@ for (const [name, env] of [
 
   test(`All built-in app relay hosts support worker fallback with ${name}`, async (t) => {
     const { default: worker } = await import(workerUrl);
-    const upstreamFetch = t.mock.method(globalThis, "fetch", async () =>
-      new Response("segment", { headers: { "content-type": "video/mp2t" } }),
+    const upstreamFetch = t.mock.method(
+      globalThis,
+      "fetch",
+      async () =>
+        new Response("segment", { headers: { "content-type": "video/mp2t" } }),
     );
     for (const host of [
       "xui.streamnet.live",
@@ -127,7 +144,10 @@ for (const [name, env] of [
       "85.209.176.85",
       "193.108.118.53",
     ]) {
-      const response = await worker.fetch(mediaRequest(`http://${host}/hls/test`), env);
+      const response = await worker.fetch(
+        mediaRequest(`http://${host}/hls/test`),
+        env,
+      );
       assert.equal(response.status, 200, host);
       assert.equal(await response.text(), "segment");
     }
@@ -137,16 +157,29 @@ for (const [name, env] of [
 
 test("StreamNet subdomains are relayed, web and resolver hosts are not", async (t) => {
   const { default: worker } = await import(workerUrl);
-  const upstreamFetch = t.mock.method(globalThis, "fetch", async () =>
-    new Response("segment", { headers: { "content-type": "video/mp2t" } }),
+  const upstreamFetch = t.mock.method(
+    globalThis,
+    "fetch",
+    async () =>
+      new Response("segment", { headers: { "content-type": "video/mp2t" } }),
   );
   const env = { ALLOWED_MEDIA_HOSTS: deployedHosts };
   for (const host of ["lb1.streamnet.live", "xyzxyz.streamnet.live"]) {
-    const response = await worker.fetch(mediaRequest(`https://${host}/hls/test`), env);
+    const response = await worker.fetch(
+      mediaRequest(`https://${host}/hls/test`),
+      env,
+    );
     assert.equal(response.status, 200, host);
   }
-  for (const host of ["web.streamnet.live", "resolve.streamnet.live", "evil.example"]) {
-    const response = await worker.fetch(mediaRequest(`https://${host}/hls/test`), env);
+  for (const host of [
+    "web.streamnet.live",
+    "resolve.streamnet.live",
+    "evil.example",
+  ]) {
+    const response = await worker.fetch(
+      mediaRequest(`https://${host}/hls/test`),
+      env,
+    );
     assert.equal(response.status, 400, host);
   }
   assert.equal(upstreamFetch.mock.callCount(), 2);
@@ -163,13 +196,17 @@ test("Unknown hosts and disallowed origins remain blocked before upstream fetch"
     env,
   );
   assert.equal(hostResponse.status, 400);
-  assert.deepEqual(await hostResponse.json(), { error: "Media host not allowed" });
+  assert.deepEqual(await hostResponse.json(), {
+    error: "Media host not allowed",
+  });
 
   const originResponse = await worker.fetch(
     mediaRequest(target, "https://untrusted.example"),
     env,
   );
   assert.equal(originResponse.status, 403);
-  assert.deepEqual(await originResponse.json(), { error: "Origin not allowed" });
+  assert.deepEqual(await originResponse.json(), {
+    error: "Origin not allowed",
+  });
   assert.equal(upstreamFetch.mock.callCount(), 0);
 });

@@ -11,7 +11,9 @@ const playbackUrl = pathToFileURL(
 ).href;
 
 test("Existing same-origin IPTV relay URLs resolve to provider before fallback", async () => {
-  const { iptvPlaybackSourceUrl, streamNetPlaybackAttempts } = await import(playbackUrl);
+  const { iptvPlaybackSourceUrl, streamNetPlaybackAttempts } = await import(
+    playbackUrl
+  );
   const origin = "https://web.streamnet.live";
   const provider = "https://xui.streamnet.live/live/test-user/test-pass/123.ts";
   const relay = new URL("/api/proxy", origin);
@@ -21,13 +23,21 @@ test("Existing same-origin IPTV relay URLs resolve to provider before fallback",
   nested.searchParams.set("url", relay.toString());
   const source = iptvPlaybackSourceUrl(nested.toString(), origin);
   assert.equal(source, provider);
-  assert.equal(iptvPlaybackSourceUrl(`${relay.pathname}${relay.search}`, origin), provider);
+  assert.equal(
+    iptvPlaybackSourceUrl(`${relay.pathname}${relay.search}`, origin),
+    provider,
+  );
   const attempts = streamNetPlaybackAttempts(source, {
-    appOrigin: origin, resolverUrl: "https://resolve.streamnet.live",
-    headers: {}, liveTransportFallback: true,
+    appOrigin: origin,
+    resolverUrl: "https://resolve.streamnet.live",
+    headers: {},
+    liveTransportFallback: true,
   });
   for (const attempt of attempts) {
-    assert.equal(new URL(new URL(attempt).searchParams.get("url")).hostname, "xui.streamnet.live");
+    assert.equal(
+      new URL(new URL(attempt).searchParams.get("url")).hostname,
+      "xui.streamnet.live",
+    );
   }
 });
 
@@ -38,18 +48,31 @@ test("IPTV source normalization leaves conversion and foreign endpoints untouche
     `${origin}/api/transcode/audio?url=https%3A%2F%2Fxui.streamnet.live%2F123.ts`,
     "https://other.example/api/proxy?url=https%3A%2F%2Fxui.streamnet.live%2F123.ts",
     "https://xui.streamnet.live/live/test/123.ts",
-  ]) assert.equal(iptvPlaybackSourceUrl(source, origin), source);
-  assert.throws(() => iptvPlaybackSourceUrl(`${origin}/api/proxy`, origin), /no upstream/);
-  assert.throws(() => iptvPlaybackSourceUrl(`${origin}/api/proxy?url=file%3A%2F%2F%2Fprivate`, origin), /protocol/);
+  ])
+    assert.equal(iptvPlaybackSourceUrl(source, origin), source);
+  assert.throws(
+    () => iptvPlaybackSourceUrl(`${origin}/api/proxy`, origin),
+    /no upstream/,
+  );
+  assert.throws(
+    () =>
+      iptvPlaybackSourceUrl(
+        `${origin}/api/proxy?url=file%3A%2F%2F%2Fprivate`,
+        origin,
+      ),
+    /protocol/,
+  );
 });
 
 test("Configured IPTV segment hosts use the restricted app relay", async () => {
   const { appSegmentRelayUrl, STREAMNET_RELAY_HOSTS } = await import(moduleUrl);
-  const headers = btoa(JSON.stringify({
-    Accept: "*/*",
-    "User-Agent": "VLC/3.0.20 LibVLC/3.0.20",
-    "Icy-MetaData": "1",
-  }));
+  const headers = btoa(
+    JSON.stringify({
+      Accept: "*/*",
+      "User-Agent": "VLC/3.0.20 LibVLC/3.0.20",
+      "Icy-MetaData": "1",
+    }),
+  );
   for (const host of ["50.7.184.250", "193.200.221.81", "85.209.176.85"]) {
     for (const protocol of ["http:", "https:"]) {
       const target = new URL(`${protocol}//${host}/hls/test-token?part=2`);
@@ -80,7 +103,10 @@ test("App segment relay keeps other hosts and unsupported protocols excluded", a
   assert.equal(STREAMNET_RELAY_HOSTS.has("50.7.184.251"), false);
   assert.equal(STREAMNET_RELAY_HOSTS.has("127.0.0.1"), false);
   assert.equal(
-    appSegmentRelayUrl(new URL("https://xui.streamnet.live/live/channel.m3u8"), null),
+    appSegmentRelayUrl(
+      new URL("https://xui.streamnet.live/live/channel.m3u8"),
+      null,
+    ),
     null,
   );
   for (const host of [
@@ -106,19 +132,38 @@ test("App segment relay omits absent headers", async () => {
 });
 
 test("StreamNet-Subdomains nutzen das App-Relay, Web/Resolver und Fremdhosts nicht", async () => {
-  const { isStreamNetRelayHost, isStreamNetRelayTarget } = await import(playbackUrl);
-  for (const host of ["lb1.streamnet.live", "xyzxyz.streamnet.live", "XUI.streamnet.live", "a.b.streamnet.live"])
+  const { isStreamNetRelayHost, isStreamNetRelayTarget } = await import(
+    playbackUrl
+  );
+  for (const host of [
+    "lb1.streamnet.live",
+    "xyzxyz.streamnet.live",
+    "XUI.streamnet.live",
+    "a.b.streamnet.live",
+  ])
     assert.equal(isStreamNetRelayHost(host), true, host);
   for (const host of [
-    "web.streamnet.live", "resolve.streamnet.live", "streamnet.live",
-    "streamnet.live.evil.example", "evilstreamnet.live", "lb1.streamnet.live.example", "127.0.0.1",
-  ]) assert.equal(isStreamNetRelayHost(host), false, host);
+    "web.streamnet.live",
+    "resolve.streamnet.live",
+    "streamnet.live",
+    "streamnet.live.evil.example",
+    "evilstreamnet.live",
+    "lb1.streamnet.live.example",
+    "127.0.0.1",
+  ])
+    assert.equal(isStreamNetRelayHost(host), false, host);
   assert.equal(
-    isStreamNetRelayTarget("https://xyzxyz.streamnet.live/live/u/p/1.m3u8", "https://xui.streamnet.live"),
+    isStreamNetRelayTarget(
+      "https://xyzxyz.streamnet.live/live/u/p/1.m3u8",
+      "https://xui.streamnet.live",
+    ),
     true,
   );
   assert.equal(
-    isStreamNetRelayTarget("ftp://lb1.streamnet.live/x", "https://xui.streamnet.live"),
+    isStreamNetRelayTarget(
+      "ftp://lb1.streamnet.live/x",
+      "https://xui.streamnet.live",
+    ),
     false,
   );
 });
@@ -142,7 +187,11 @@ test("STREAMNET HLS uses the app first and independent resolver fallbacks afterw
   for (const attempt of attempts) {
     assert.equal(attempt.searchParams.get("url"), source);
     assert.deepEqual(
-      JSON.parse(atob(attempt.searchParams.get("headers") ?? attempt.searchParams.get("h"))),
+      JSON.parse(
+        atob(
+          attempt.searchParams.get("headers") ?? attempt.searchParams.get("h"),
+        ),
+      ),
       headers,
     );
   }
@@ -151,21 +200,27 @@ test("STREAMNET HLS uses the app first and independent resolver fallbacks afterw
 test("Live TS test variants preserve tokens and exclude catch-up, VOD and segment URLs", async () => {
   const { xtreamLiveTsVariant } = await import(playbackUrl);
   assert.equal(
-    xtreamLiveTsVariant("https://xui.streamnet.live/live/user/pass/527.m3u8?token=test#live"),
+    xtreamLiveTsVariant(
+      "https://xui.streamnet.live/live/user/pass/527.m3u8?token=test#live",
+    ),
     "https://xui.streamnet.live/live/user/pass/527.ts?token=test#live",
   );
-  assert.equal(xtreamLiveTsVariant("https://xui.streamnet.live/user/pass/527.ts"),
-    "https://xui.streamnet.live/user/pass/527.ts");
+  assert.equal(
+    xtreamLiveTsVariant("https://xui.streamnet.live/user/pass/527.ts"),
+    "https://xui.streamnet.live/user/pass/527.ts",
+  );
   for (const source of [
     "https://xui.streamnet.live/timeshift/user/pass/60/date/527.ts",
     "https://xui.streamnet.live/movie/user/pass/527.m3u8",
     "http://50.7.184.250/hls/token",
-  ]) assert.equal(xtreamLiveTsVariant(source), null);
+  ])
+    assert.equal(xtreamLiveTsVariant(source), null);
 });
 
 test("Xtream TS prefers app HLS then app TS before using the worker", async () => {
   const { streamNetPlaybackAttempts } = await import(playbackUrl);
-  const source = "https://xui.streamnet.live/live/user/pass/70223.ts?token=test";
+  const source =
+    "https://xui.streamnet.live/live/user/pass/70223.ts?token=test";
   const hls = source.replace(".ts?", ".m3u8?");
   const attempts = streamNetPlaybackAttempts(source, {
     appOrigin: "https://web.streamnet.live",
@@ -173,7 +228,11 @@ test("Xtream TS prefers app HLS then app TS before using the worker", async () =
     headers: {},
   }).map((url) => new URL(url));
   assert.deepEqual(
-    attempts.map((url) => [url.pathname, url.searchParams.get("rewrite"), url.searchParams.get("url")]),
+    attempts.map((url) => [
+      url.pathname,
+      url.searchParams.get("rewrite"),
+      url.searchParams.get("url"),
+    ]),
     [
       ["/api/proxy", "streamnet", hls],
       ["/api/proxy", "streamnet", source],
@@ -199,10 +258,13 @@ test("TS-only live test selects exactly one app TS attempt, preserving tokens", 
     assert.equal(attempts.length, 1);
     const relay = new URL(attempts[0]);
     assert.equal(relay.searchParams.get("rewrite"), "streamnet");
-    assert.equal(relay.searchParams.get("url"),
-      "https://xui.streamnet.live/live/user/pass/527.ts?token=test#live");
-    assert.deepEqual(JSON.parse(atob(relay.searchParams.get("headers"))),
-      { "User-Agent": "test-player" });
+    assert.equal(
+      relay.searchParams.get("url"),
+      "https://xui.streamnet.live/live/user/pass/527.ts?token=test#live",
+    );
+    assert.deepEqual(JSON.parse(atob(relay.searchParams.get("headers"))), {
+      "User-Agent": "test-player",
+    });
   }
 });
 
@@ -218,10 +280,14 @@ test("Combined live playback starts app HLS then app TS for both source formats"
         liveTransportFallback: true,
       },
     ).map((url) => new URL(url));
-    assert.equal(attempts[0].searchParams.get("url"),
-      "https://xui.streamnet.live/live/user/pass/527.m3u8?token=test#live");
-    assert.equal(attempts[1].searchParams.get("url"),
-      "https://xui.streamnet.live/live/user/pass/527.ts?token=test#live");
+    assert.equal(
+      attempts[0].searchParams.get("url"),
+      "https://xui.streamnet.live/live/user/pass/527.m3u8?token=test#live",
+    );
+    assert.equal(
+      attempts[1].searchParams.get("url"),
+      "https://xui.streamnet.live/live/user/pass/527.ts?token=test#live",
+    );
     assert.equal(attempts[1].searchParams.get("rewrite"), "streamnet");
     assert.equal(attempts[2].searchParams.get("rewrite"), "resolver");
   }
@@ -242,11 +308,17 @@ test("Decoder fallback switches HLS to TS and back only once, even after playbac
 
 test("MSE diagnostics expose only numeric codes and known exceptions, never raw messages", async () => {
   const { mseErrorDiagnostic } = await import(playbackUrl);
-  assert.equal(mseErrorDiagnostic({
-    code: 11, msg: "InvalidStateError https://secret.example/user/password",
-  }), "code=11; exception=InvalidStateError");
-  assert.equal(mseErrorDiagnostic({ code: "password", msg: "private-token" }),
-    "code=none; exception=unknown");
+  assert.equal(
+    mseErrorDiagnostic({
+      code: 11,
+      msg: "InvalidStateError https://secret.example/user/password",
+    }),
+    "code=11; exception=InvalidStateError",
+  );
+  assert.equal(
+    mseErrorDiagnostic({ code: "password", msg: "private-token" }),
+    "code=none; exception=unknown",
+  );
   assert.equal(mseErrorDiagnostic(null), "unknown");
 });
 
@@ -280,11 +352,26 @@ test("Only STREAMNET and the configured provider use app-first playback", async 
     await import(playbackUrl);
   const provider = "https://custom-provider.example";
   for (const host of STREAMNET_RELAY_HOSTS) {
-    assert.equal(isStreamNetRelayTarget(`http://${host}/hls/test`, provider), true);
+    assert.equal(
+      isStreamNetRelayTarget(`http://${host}/hls/test`, provider),
+      true,
+    );
   }
-  assert.equal(isStreamNetRelayTarget(`${provider}/live/test.m3u8`, provider), true);
-  assert.equal(isStreamNetRelayTarget("https://untrusted.example/live/test.m3u8", provider), false);
-  assert.equal(isStreamNetRelayTarget("ftp://85.209.176.85/hls/test", provider), false);
+  assert.equal(
+    isStreamNetRelayTarget(`${provider}/live/test.m3u8`, provider),
+    true,
+  );
+  assert.equal(
+    isStreamNetRelayTarget(
+      "https://untrusted.example/live/test.m3u8",
+      provider,
+    ),
+    false,
+  );
+  assert.equal(
+    isStreamNetRelayTarget("ftp://85.209.176.85/hls/test", provider),
+    false,
+  );
   const allowed = streamNetRelayHosts(provider);
   assert.equal(allowed.has("custom-provider.example"), true);
   assert.equal(allowed.has("untrusted.example"), false);
@@ -303,7 +390,7 @@ test("Primary playlists relay segments, child playlists, maps and keys through t
     "#EXTINF:9.96,",
     "http://50.7.184.250/hls/test-token",
     "segment.ts",
-    'data:application/octet-stream;base64,YWJj',
+    "data:application/octet-stream;base64,YWJj",
   ].join("\n");
   const result = rewriteIptvPlaylist(playlist, base, headers, "streamnet");
   assert.ok(result.includes("#EXTINF:9.96,"));
@@ -319,8 +406,17 @@ test("Primary playlists relay segments, child playlists, maps and keys through t
     assert.equal(url.searchParams.get("rewrite"), "streamnet");
     assert.equal(url.searchParams.get("headers"), headers);
   }
-  assert.equal(new URL(urls[0], "https://web.streamnet.live").searchParams.get("url"), "http://85.209.176.85/hls/key.bin");
-  assert.ok(urls.some((raw) => new URL(raw, "https://web.streamnet.live").searchParams.get("url") === "http://50.7.184.250/hls/test-token"));
+  assert.equal(
+    new URL(urls[0], "https://web.streamnet.live").searchParams.get("url"),
+    "http://85.209.176.85/hls/key.bin",
+  );
+  assert.ok(
+    urls.some(
+      (raw) =>
+        new URL(raw, "https://web.streamnet.live").searchParams.get("url") ===
+        "http://50.7.184.250/hls/test-token",
+    ),
+  );
 });
 
 test("Resolver fallback never rewrites blocked IP segments back to the app", async () => {
@@ -331,7 +427,10 @@ test("Resolver fallback never rewrites blocked IP segments back to the app", asy
   for (const host of STREAMNET_RELAY_HOSTS) {
     const result = rewriteIptvPlaylist(
       `#EXTM3U\n#EXT-X-KEY:URI="http://${host}/hls/key"\nhttp://${host}/hls/test-token\nchild.m3u8\n`,
-      base, headers, "resolver", "https://resolve.streamnet.live",
+      base,
+      headers,
+      "resolver",
+      "https://resolve.streamnet.live",
     );
     const lines = result.split("\n");
     const key = new URL(lines[1].match(/URI="([^"]+)"/)[1]);
@@ -364,7 +463,9 @@ test("App relay playlist reader enforces the exact 2 MiB limit", async () => {
       chunks += 1;
       controller.enqueue(new Uint8Array(chunks === 1 ? limit : 1));
     },
-    cancel() { cancelled = true; },
+    cancel() {
+      cancelled = true;
+    },
   });
   await assert.rejects(
     readIptvPlaylist(new Response(body)),
@@ -379,20 +480,37 @@ test("Built-in app relay hosts are also allowed by the resolver deployment", asy
   const { readFileSync } = require("node:fs");
   const { STREAMNET_RELAY_HOSTS } = await import(playbackUrl);
   const config = readFileSync(
-    path.resolve(__dirname, "../../resolver-worker/wrangler.toml"), "utf8",
+    path.resolve(__dirname, "../../resolver-worker/wrangler.toml"),
+    "utf8",
   );
-  const hosts = new Set(config.match(/^ALLOWED_MEDIA_HOSTS\s*=\s*"([^"]+)"/m)[1].split(","));
-  for (const host of STREAMNET_RELAY_HOSTS) assert.equal(hosts.has(host), true, host);
+  const hosts = new Set(
+    config.match(/^ALLOWED_MEDIA_HOSTS\s*=\s*"([^"]+)"/m)[1].split(","),
+  );
+  for (const host of STREAMNET_RELAY_HOSTS)
+    assert.equal(hosts.has(host), true, host);
 });
 
 test("IPTV startup audio decoder failures convert once instead of switching relays", async () => {
   const { iptvStartupRecovery } = await import(playbackUrl);
-  const message = "PipelineStatus::DECODER_ERROR_NOT_SUPPORTED: audio decoder initialization failed with DecoderStatus::Codes::kUnsupportedConfig";
-  assert.equal(iptvStartupRecovery(undefined, 4, message, false), "audio-transcode");
-  assert.equal(iptvStartupRecovery("media", 3, message, false), "audio-transcode");
+  const message =
+    "PipelineStatus::DECODER_ERROR_NOT_SUPPORTED: audio decoder initialization failed with DecoderStatus::Codes::kUnsupportedConfig";
+  assert.equal(
+    iptvStartupRecovery(undefined, 4, message, false),
+    "audio-transcode",
+  );
+  assert.equal(
+    iptvStartupRecovery("media", 3, message, false),
+    "audio-transcode",
+  );
   assert.equal(iptvStartupRecovery(undefined, 4, message, true), "codec-error");
-  assert.equal(iptvStartupRecovery(undefined, 3, "Video decode failure", false), "codec-error");
-  assert.equal(iptvStartupRecovery("unsupported", undefined, "", false), "codec-error");
+  assert.equal(
+    iptvStartupRecovery(undefined, 3, "Video decode failure", false),
+    "codec-error",
+  );
+  assert.equal(
+    iptvStartupRecovery("unsupported", undefined, "", false),
+    "codec-error",
+  );
   assert.equal(iptvStartupRecovery("network", undefined, "", false), "relay");
   assert.equal(iptvStartupRecovery(undefined, 2, "", false), "relay");
   assert.equal(iptvStartupRecovery(undefined, undefined, "", false), "relay");
@@ -401,8 +519,14 @@ test("IPTV startup audio decoder failures convert once instead of switching rela
 test("Visible playback diagnostics identify paths without exposing credentials", async () => {
   const { playbackDiagnostic } = await import(playbackUrl);
   for (const [url, expected] of [
-    ["https://web.example/api/proxy?url=http://provider.example/user/secret&rewrite=streamnet&headers=secret", "app-relay"],
-    ["https://web.example/api/proxy?rewrite=resolver&url=secret", "manifest-relay"],
+    [
+      "https://web.example/api/proxy?url=http://provider.example/user/secret&rewrite=streamnet&headers=secret",
+      "app-relay",
+    ],
+    [
+      "https://web.example/api/proxy?rewrite=resolver&url=secret",
+      "manifest-relay",
+    ],
     ["https://resolve.example/media?url=secret&h=secret", "resolver"],
     ["/api/transcode/audio?url=secret", "audio-transcode"],
     ["https://provider.example/user/secret", "direct"],
@@ -415,8 +539,9 @@ test("Visible playback diagnostics identify paths without exposing credentials",
     assert.equal(result.includes("provider.example"), false);
   }
   assert.ok(
-    playbackDiagnostic("/api/proxy", "http://secret.example/token", 0)
-      .includes("reason=unknown"),
+    playbackDiagnostic("/api/proxy", "http://secret.example/token", 0).includes(
+      "reason=unknown",
+    ),
   );
 });
 
@@ -434,7 +559,13 @@ test("Decoder diagnostics retain known status tokens but never raw messages", as
   assert.ok(result.includes("decoder=kFailed"));
   assert.equal(result.includes("secret"), false);
   assert.equal(result.includes("private-token"), false);
-  const unknown = playbackDiagnostic("/api/proxy", "media-element-error", 1, 3, "https://secret.example");
+  const unknown = playbackDiagnostic(
+    "/api/proxy",
+    "media-element-error",
+    1,
+    3,
+    "https://secret.example",
+  );
   assert.ok(unknown.includes("track=unknown"));
   assert.equal(unknown.includes("secret"), false);
 });
