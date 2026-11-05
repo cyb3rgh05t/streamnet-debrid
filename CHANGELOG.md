@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.097] - 2026-11-05
+
+- Android-Version: `2.5.097` / Code `498`.
+- IPTV-User-Agent beginnt jetzt mit `StreamNet/2.5.097`, gefolgt von `VLC/3.0.20 LibVLC/3.0.20`. Die App-Version wird automatisch aus der jeweiligen Build-Version übernommen.
+- Android-Unit-Tests erfolgreich.
+
 ## [Backend 1.0.042] - 2026-11-05
 
 - Adminpanel: Globale Host-Änderungen werden nicht mehr durch unbeteiligte Cloud-Pushes oder Ablaufprüfungen zwischen Vorschau und Bestätigung mit HTTP 409 blockiert.

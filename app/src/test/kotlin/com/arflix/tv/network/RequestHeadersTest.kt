@@ -19,10 +19,9 @@ class RequestHeadersTest {
     }
 
     @Test
-    fun iptvUserAgentKeepsVlcTokensAndAddsAppNameAndVersion() {
-        assertThat(IPTV_USER_AGENT).startsWith("VLC/3.0.20 LibVLC/3.0.20 ")
-        assertThat(IPTV_USER_AGENT).contains("StreamNet/")
-        assertThat(IPTV_USER_AGENT).endsWith(com.arflix.tv.BuildConfig.VERSION_NAME)
+    fun iptvUserAgentStartsWithAppNameAndVersionThenKeepsVlcTokens() {
+        assertThat(IPTV_USER_AGENT)
+            .isEqualTo("StreamNet/${com.arflix.tv.BuildConfig.VERSION_NAME} VLC/3.0.20 LibVLC/3.0.20")
     }
 
     @Test

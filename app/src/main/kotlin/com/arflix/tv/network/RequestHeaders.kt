@@ -7,7 +7,7 @@ import com.arflix.tv.BuildConfig
  * and panels expect and appends the app name and version, so the connection list of a panel shows
  * which app (and release) is connected.
  */
-internal const val IPTV_USER_AGENT = "VLC/3.0.20 LibVLC/3.0.20 StreamNet/${BuildConfig.VERSION_NAME}"
+internal const val IPTV_USER_AGENT = "StreamNet/${BuildConfig.VERSION_NAME} VLC/3.0.20 LibVLC/3.0.20"
 
 /**
  * Merges HTTP request headers by name, ignoring case; entries of [overrides] replace those of [base].
