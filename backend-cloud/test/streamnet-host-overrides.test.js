@@ -133,6 +133,57 @@ test("global host and reset actions maintain independent profile policies", () =
   assert.deepEqual(reset.streamNetHostOverridesByProfile, { main: "", kids: "" });
 });
 
+test("host changes store policy on blank StreamNet presets without changing their setup", () => {
+  for (const m3uUrl of ["", "   ", undefined, null]) {
+    const initial = snapshot();
+    const preset = {
+      id: "streamnet_tv", name: "StreamNet TV", m3uUrl,
+      enabled: false, importVod: false, epgUrl: "", epgUrls: [],
+      expiresAtEpochSeconds: 100, expirationCheckedAtMillis: 1000,
+    };
+    initial.iptvByProfile.main = {
+      playlists: [preset], m3uUrl: "", epgUrl: "", epgUrls: [],
+    };
+    const current = setHost(initial);
+    assert.deepEqual(current.iptvByProfile.main.playlists[0], {
+      ...JSON.parse(JSON.stringify(preset)), streamNetHostOverride: "https://admin.test/base",
+    });
+    assert.equal(current.iptvByProfile.main.m3uUrl, "");
+    assert.equal(current.iptvByProfile.main.epgUrl, "");
+    assert.deepEqual(current.iptvByProfile.main.epgUrls, []);
+    assert.equal(current.fieldUpdatedAt["i:main:playlists"], 2000);
+    assert.equal(current.streamNetHostOverridesByProfile.main, "https://admin.test/base");
+    assert.deepEqual(current.iptvByProfile.kids, initial.iptvByProfile.kids);
+    assert.equal(initial.iptvByProfile.main.playlists[0].streamNetHostOverride, undefined);
+    assert.throws(() => setHost(current), /already set/);
+
+    const blankPush = push(structuredClone(initial), current);
+    assert.deepEqual(blankPush.iptvByProfile.main.playlists[0], current.iptvByProfile.main.playlists[0]);
+    const login = snapshot();
+    login.iptvByProfile.main.playlists[0].m3uUrl = "https://built-in.test new-user new-password";
+    const loggedIn = push(login, blankPush).iptvByProfile.main.playlists[0];
+    assert.equal(new URL(loggedIn.m3uUrl).origin, "https://admin.test");
+    assert.equal(new URL(loggedIn.m3uUrl).searchParams.get("username"), "new-user");
+    assert.equal(new URL(loggedIn.m3uUrl).searchParams.get("password"), "new-password");
+  }
+});
+
+test("host changes still reject malformed StreamNet URLs and blank custom playlists", () => {
+  for (const [id, m3uUrl] of [
+    ["streamnet_tv", "https://old.test/list.m3u"],
+    ["streamnet_tv", "https://old.test/get.php?username=user"],
+    ["custom", ""],
+  ]) {
+    const initial = snapshot();
+    initial.iptvByProfile.main.playlists = [{ id, m3uUrl }];
+    const mutation = prepareAdminGlobalMutation({
+      operation: "change_xtream_host", targetId: id, data: { host: "https://admin.test" },
+    });
+    assert.throws(() => applyAdminGlobalMutation(initial, mutation), /no valid Xtream credentials/);
+    assert.equal(initial.streamNetHostOverridesByProfile, undefined);
+  }
+});
+
 test("raw admin payload edits also update and reset the authoritative override", () => {
   const current = setHost(snapshot());
   const edited = structuredClone(current);

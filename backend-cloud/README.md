@@ -281,10 +281,13 @@ than creating a separate custom playlist.
 The **Xtream / StreamNet TV: only change host** action (`change_xtream_host`)
 instead retains each existing entry's credentials, ID, name, activation and
 import flags. Select its ID and enter `data.host`; M3U and EPG addresses are
-rebuilt for that server. Missing/invalid credentials fail the whole transaction,
-including preview, rather than silently skipping broken entries. Legacy
+rebuilt for that server. Empty `streamnet_tv` presets (blank or missing `m3uUrl`)
+only receive the host override for a later login; their URLs, activation, import
+flags and cached expiry fields remain unchanged. Other entries with
+missing/invalid credentials fail the whole transaction, including preview,
+rather than silently skipping broken entries. Legacy
 host/user/password triplets and credential-bearing Xtream URLs are supported.
-This action also resets cached account expiry checks.
+For configured entries this action also resets cached account expiry checks.
 
 StreamNet TV remote hosts set `streamNetHostOverride`. The updated Android app
 preserves that explicit configuration instead of migrating it back to the
@@ -313,8 +316,9 @@ applies the same host-only logic as `change_xtream_host` with the fixed
 `streamnet_tv` ID, but only to that account: pass `data.host` and optionally a
 `profileId` to restrict it to one profile (the UI offers "Alle Profile" as the
 default). Credentials, activation and import flags are kept, M3U/EPG addresses are
-rebuilt and `streamNetHostOverride` is set. Like every account mutation it needs
-`expectedRevision`, writes a new revision and an audit entry (the audit details
+rebuilt and `streamNetHostOverride` is set. Empty StreamNet TV presets only receive
+the override for a later login, just like the global action. Like every account
+mutation it needs `expectedRevision`, writes a new revision and an audit entry (the audit details
 include the new host). It fails with `streamnet_tv_not_configured` when the
 account (or selected profile) has no `streamnet_tv` entry, and with
 `streamnet_tv_host_unchanged` when the host is already set.

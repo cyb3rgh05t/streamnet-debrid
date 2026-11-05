@@ -133,6 +133,44 @@ test("global apply rejects stale previews without writes or automatic retry", as
   assert.equal(queries.at(-1).sql, "rollback");
 });
 
+test("global host preview and apply handle blank StreamNet presets alongside configured profiles", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  const preset = { id: "streamnet_tv", name: "StreamNet TV", m3uUrl: "", enabled: false };
+  rows[0].payload.iptvByProfile.main.playlists = [structuredClone(preset)];
+  rows[0].payload.iptvByProfile.kids.playlists = [{
+    ...preset, m3uUrl: "https://old.test user pass", enabled: true,
+  }];
+  rows[1].payload.iptvByProfile.main.playlists = [structuredClone(preset)];
+  const request = {
+    operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: "https://new.test" },
+  };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.json().changed, 2);
+  assert.equal(preview.json().skipped, 2);
+  assert.equal(queries.some(({ sql }) => sql.includes("update account_sync_snapshots")), false);
+  assert.deepEqual(rows[0].payload.iptvByProfile.main.playlists[0], preset);
+  const response = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.json().changed, 2);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 2);
+  for (const { values } of updates) {
+    const next = JSON.parse(values[1]);
+    assert.deepEqual(next.iptvByProfile.main.playlists[0], {
+      ...preset, streamNetHostOverride: "https://new.test",
+    });
+    assert.equal(next.streamNetHostOverridesByProfile.main, "https://new.test");
+  }
+  const configured = JSON.parse(updates[0].values[1]).iptvByProfile.kids.playlists[0];
+  assert.equal(new URL(configured.m3uUrl).origin, "https://new.test");
+  assert.equal(new URL(configured.m3uUrl).searchParams.get("username"), "user");
+  assert.equal(new URL(configured.m3uUrl).searchParams.get("password"), "pass");
+  assert.equal(configured.enabled, true);
+});
+
 test("global apply requires explicit confirmation and rejects invalid operations", async (t) => {
   const { send, queries } = await fixture(t);
   assert.equal((await send("PATCH", "/admin-api/global/snapshot", addPlaylist)).statusCode, 400);

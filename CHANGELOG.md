@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.041] - 2026-11-05
+
+- Adminpanel: Leere StreamNet-TV-Platzhalter blockieren globale und einzelne Host-Änderungen nicht mehr mit HTTP 400. Sie erhalten nur den Host-Override für die spätere Anmeldung; Zugangsdaten, Aktivierung und Optionen bleiben unverändert.
+- Der Override bleibt bei späteren Geräte-Pushes erhalten und wird bei der Anmeldung auf die neuen Zugangsdaten angewendet. Fehlerhafte, nichtleere Xtream-Einträge brechen die Aktion weiterhin ausdrücklich ab.
+- 81 gezielte Backend-Tests erfolgreich, einschließlich Vorschau, Speichern und Synchronisierung. Keine neue Datenbankmigration.
+
+## [2.5.096] - 2026-11-05
+
+- Android-Version: `2.5.096` / Code `497`.
+- Streamnet TV HOST override.
+
 ## [2.5.095] - 2026-11-03
 
 - Android-Version: `2.5.095` / Code `496`.

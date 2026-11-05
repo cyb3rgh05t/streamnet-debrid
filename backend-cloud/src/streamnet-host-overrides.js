@@ -58,6 +58,9 @@ function existingXtreamCredentials(value) {
 }
 
 export function rewriteXtreamPlaylistHost(playlist, host) {
+  if (playlist.id === "streamnet_tv" && !String(playlist.m3uUrl ?? "").trim()) {
+    return { ...playlist, streamNetHostOverride: host };
+  }
   const credentials = existingXtreamCredentials(playlist.m3uUrl);
   const urls = xtreamUrls(host, credentials.username, credentials.password);
   const m3u = new URL(urls.m3uUrl);
@@ -125,7 +128,7 @@ export function preserveStreamNetHostOverrides(incoming, current) {
     if (!host) {
       const { streamNetHostOverride: _removed, ...cleared } = playlist;
       replacement = cleared;
-    } else if (!playlist.m3uUrl) {
+    } else if (!String(playlist.m3uUrl ?? "").trim()) {
       replacement = { ...playlist, streamNetHostOverride: host };
     } else {
       replacement = rewriteXtreamPlaylistHost(playlist, host);
