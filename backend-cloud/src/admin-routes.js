@@ -224,18 +224,45 @@ function setAdminSecurityHeaders(reply) {
     );
 }
 
-function globalState(rows) {
+function globalState(rows, mutation) {
+  const hostChange = mutation?.operation === "change_xtream_host";
+  const state = hostChange
+    ? {
+        mutation,
+        accounts: rows.map((row) => ({
+          id: row.account_id,
+          hasSnapshot: Boolean(row.payload),
+          profiles: [...new Set(
+            (Array.isArray(row.payload?.profiles) ? row.payload.profiles : [])
+              .map((profile) => String(profile?.id || "").trim())
+              .filter(Boolean),
+          )].sort().map((id) => {
+            const playlists = row.payload.iptvByProfile?.[id]?.playlists;
+            return {
+              id,
+              override: mutation.targetId === "streamnet_tv"
+                ? row.payload.streamNetHostOverridesByProfile?.[id] ?? null
+                : null,
+              playlists: (Array.isArray(playlists) ? playlists : [])
+                .filter((playlist) => playlist?.id === mutation.targetId)
+                .map(({ expiresAtEpochSeconds, expirationCheckedAtMillis, ...playlist }) => playlist),
+            };
+          }),
+        })),
+      }
+    : rows.map((row) => [row.account_id, row.revision, row.updated_at]);
   return crypto
     .createHash("sha256")
     .update(
-      JSON.stringify(
-        rows.map((row) => [row.account_id, row.revision, row.updated_at]),
-      ),
+      JSON.stringify(state, hostChange ? (_key, value) =>
+        value && typeof value === "object" && !Array.isArray(value)
+          ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))
+          : value : undefined),
     )
     .digest("hex");
 }
 
-function globalSummary(rows) {
+function globalSummary(rows, mutation) {
   const addons = new Map();
   const playlists = new Map();
   const catalogs = new Map();
@@ -261,7 +288,7 @@ function globalSummary(rows) {
     total: rows.length,
     configurable,
     skipped: rows.length - configurable,
-    state: globalState(rows),
+    state: globalState(rows, mutation),
     addons: [...addons.values()].sort((a, b) => a.name.localeCompare(b.name)),
     playlists: [...playlists.values()].sort((a, b) =>
       a.name.localeCompare(b.name),
@@ -318,7 +345,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         );
       }
       const rows = (await client.query(globalAccountsQuery)).rows;
-      const summary = globalSummary(rows);
+      const summary = globalSummary(rows, mutation);
       if (!preview && summary.state !== request.body.expectedState) {
         await client.query("rollback");
         request.backendFailureReason = "global_revision_conflict";

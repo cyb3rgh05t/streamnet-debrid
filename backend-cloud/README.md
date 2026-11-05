@@ -265,6 +265,12 @@ A preview reports changed, unchanged, and skipped accounts. Applying requires
 typing **ALLE ACCOUNTS**. Removal is irreversible. If account membership or any
 snapshot changes after preview, the server rejects the action with HTTP 409;
 load a new preview rather than automatically retrying a global change.
+For `change_xtream_host`, the preview instead binds the requested host and target
+to account/snapshot membership, profile IDs, matching playlist data and the
+server-owned host policy. Unrelated sync pushes and cached expiry checks do not
+invalidate it. Credentials, activation, import options or other matching playlist
+changes still return HTTP 409. Applying uses the latest locked snapshots and
+revisions, preserving unrelated sync data; there is no automatic retry.
 
 Changes and per-account audits run in one PostgreSQL transaction. Each changed
 snapshot receives a new revision, sync timestamps, and `source = 'admin'`.

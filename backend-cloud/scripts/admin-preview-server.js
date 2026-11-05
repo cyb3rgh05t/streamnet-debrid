@@ -286,7 +286,7 @@ const server = createServer(async (request, reply) => {
           platform: "linux / x64 (Demo)",
           schema_version: "012_device_presence.sql (Demo)",
         },
-        versions: { backend: "1.0.041" },
+        versions: { backend: "1.0.042" },
         recent_accounts: accounts,
         recent_audits: [
           {
@@ -314,7 +314,7 @@ const server = createServer(async (request, reply) => {
         checked_at: new Date().toISOString(),
         source: "Demo-Versionsdaten (keine Live-Abfrage)",
         components: [
-          { component: "backend", version: "1.0.041", source: "Demo-Backend" },
+          { component: "backend", version: "1.0.042", source: "Demo-Backend" },
           {
             component: "web",
             version: "1.0.072",

@@ -248,6 +248,78 @@ test("Remote Config host migration retains individual credentials across account
   }
 });
 
+test("host changes tolerate unrelated sync pushes and preserve their latest data", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  const playlist = {
+    id: "streamnet_tv", name: "StreamNet TV", m3uUrl: "https://old.test user pass",
+    enabled: true, expiresAtEpochSeconds: 100, expirationCheckedAtMillis: 1000,
+  };
+  rows[0].payload.iptvByProfile.main.playlists = [playlist];
+  const request = {
+    operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: "https://new.test" },
+  };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  rows[0].revision = "10";
+  rows[0].updated_at = "2026-11-05";
+  rows[0].payload.watchStateByProfile = { main: { movie: { position: 123 } } };
+  rows[0].payload.fieldUpdatedAt = { "w:main:movie": 5000 };
+  playlist.expiresAtEpochSeconds = 200;
+  playlist.expirationCheckedAtMillis = 5000;
+  // JSON object key order is not meaningful and can change on a database round trip.
+  rows[0].payload.iptvByProfile.main.playlists[0] = Object.fromEntries(Object.entries(playlist).reverse());
+  rows[0].payload.iptvByProfile.main.playlists.push({ id: "custom", m3uUrl: "https://custom.test/list" });
+  rows[1].revision = "8";
+  const applied = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(applied.statusCode, 200);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].values[2], 11);
+  const next = JSON.parse(updates[0].values[1]);
+  assert.deepEqual(next.watchStateByProfile, rows[0].payload.watchStateByProfile);
+  assert.equal(next.fieldUpdatedAt["w:main:movie"], 5000);
+  assert.deepEqual(next.iptvByProfile.main.playlists[1], rows[0].payload.iptvByProfile.main.playlists[1]);
+  assert.equal(next.iptvByProfile.main.playlists[0].streamNetHostOverride, "https://new.test");
+});
+
+test("host changes reject relevant changes and modified requests without writes", async (t) => {
+  const changes = {
+    credentials: (rows) => { rows[0].payload.iptvByProfile.main.playlists[0].m3uUrl = "https://old.test other pass"; },
+    activation: (rows) => { rows[0].payload.iptvByProfile.main.playlists[0].enabled = false; },
+    options: (rows) => { rows[0].payload.iptvByProfile.main.playlists[0].importVod = false; },
+    override: (rows) => { rows[0].payload.iptvByProfile.main.playlists[0].streamNetHostOverride = "https://other.test"; },
+    policy: (rows) => { rows[0].payload.streamNetHostOverridesByProfile = { main: "https://other.test" }; },
+    removal: (rows) => { rows[0].payload.iptvByProfile.main.playlists = []; },
+    profile: (rows) => { rows[0].payload.profiles.push({ id: "new" }); },
+    account: (rows) => { rows.push({ account_id: "new", payload: null }); },
+    snapshot: (rows) => { rows[2].payload = payload(); },
+    host: (_rows, request) => { request.data = { host: "https://other.test" }; },
+    target: (_rows, request) => { request.targetId = "other"; },
+  };
+  for (const [name, change] of Object.entries(changes)) {
+    await t.test(name, async (t) => {
+      const { send, rows, queries } = await fixture(t);
+      rows[0].payload.iptvByProfile.main.playlists = [{
+        id: "streamnet_tv", m3uUrl: "https://old.test user pass", enabled: true,
+      }];
+      const request = {
+        operation: "change_xtream_host", targetId: "streamnet_tv", data: { host: "https://new.test" },
+      };
+      const preview = await send("POST", "/admin-api/global/preview", request);
+      assert.equal(preview.statusCode, 200);
+      change(rows, request);
+      const applied = await send("PATCH", "/admin-api/global/snapshot", {
+        ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+      });
+      assert.equal(applied.statusCode, 409);
+      assert.equal(queries.some(({ sql }) => /update account_sync|insert into admin_audit/.test(sql)), false);
+      assert.equal(queries.at(-1).sql, "rollback");
+    });
+  }
+});
+
 test("catalog templates preview and apply account-wide with preserved metadata and audit", async (t) => {
   const { send, rows, queries } = await fixture(t);
   rows[0].payload.catalogsByProfile = { main: [{

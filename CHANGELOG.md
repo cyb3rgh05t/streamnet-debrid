@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.042] - 2026-11-05
+
+- Adminpanel: Globale Host-Änderungen werden nicht mehr durch unbeteiligte Cloud-Pushes oder Ablaufprüfungen zwischen Vorschau und Bestätigung mit HTTP 409 blockiert.
+- Die Vorschau bindet Host und Playlist-ID an den Account-/Profilbestand, die betroffenen Playlists und die serverseitige Host-Vorgabe. Relevante Änderungen erfordern weiterhin eine neue Vorschau; kein automatisches Wiederholen. Andere globale Aktionen behalten ihre bisherige Konfliktprüfung.
+- Speichern verwendet die neuesten gesperrten Snapshots und Revisionen; andere synchronisierte Daten bleiben erhalten. 94 gezielte Backend-Tests erfolgreich. Keine neue Datenbankmigration; Android und Web unverändert.
+
 ## [Backend 1.0.041] - 2026-11-05
 
 - Adminpanel: Leere StreamNet-TV-Platzhalter blockieren globale und einzelne Host-Änderungen nicht mehr mit HTTP 400. Sie erhalten nur den Host-Override für die spätere Anmeldung; Zugangsdaten, Aktivierung und Optionen bleiben unverändert.
