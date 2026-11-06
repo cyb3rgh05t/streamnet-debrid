@@ -177,7 +177,7 @@
     <string name="ui_mode">UI Mode</string>
     <string name="tv_ui_scale">TV UI size</string>
     <string name="tv_navigation_sound">TV navigation sound</string>
-    <string name="tv_navigation_sound_desc">Android system sound for D-pad navigation. TV mode only; disabled during playback. Requires device sound effects.</string>
+    <string name="tv_navigation_sound_desc">Android system sound for D-pad navigation and OK/Enter. TV mode only; in the player only OK clicks, while its menus (e.g. sources) also sound on navigation. Requires device sound effects.</string>
     <string name="tv_ui_scale_desc">Device-local display size</string>
     <string name="skip_profile">Skip Profile Selection</string>
     <string name="oled_black_background">OLED Black Background</string>

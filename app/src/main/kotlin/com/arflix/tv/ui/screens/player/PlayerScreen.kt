@@ -623,6 +623,13 @@ fun PlayerScreen(
     var subtitlePanelFocus by remember { mutableIntStateOf(0) } // 0=lang panel, 1=track panel
     // In-player subtitle settings panel state
     var showSubtitleSettings by remember { mutableStateOf(false) }
+    val navigationSoundOverlay = com.arflix.tv.util.LocalNavigationSoundOverlay.current
+    val playerMenuOpen = showSourceMenu || showSubtitleMenu || showQuickSettings ||
+        showSubtitleSettings || showNextEpisodePrompt
+    DisposableEffect(playerMenuOpen) {
+        navigationSoundOverlay?.value = playerMenuOpen
+        onDispose { navigationSoundOverlay?.value = false }
+    }
     var subtitleSettingsRow by remember { mutableIntStateOf(0) }  // 0=Delay, 1=Size, 2=Vertical
     var subtitleSyncOffsetMs by remember { mutableLongStateOf(0L) }
     var subtitleSizePct by remember { mutableIntStateOf(100) }

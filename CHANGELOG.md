@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.098] - 2026-11-06
+
+- Android-Version: `2.5.098` / Code `499`.
+- Android TV-Klickton: OK/Enter spielen jetzt den Systemklick (einmal pro Druck). Im Player und im Live-TV-Vollbild klickt nur OK; sobald dort ein Menü (Quellen, Untertitel/Audio, Schnelleinstellungen, Nächste Episode; im Live-TV Guide, Quick-Zap, Einstellungen) offen ist, klingt auch die Navigation. Beschreibung der Einstellung angepasst.
+- Android Live-TV (Netflix-Layout): Senderleiste und Kategorie-Pills verhalten sich wie die Home-Rails. Die fokussierte Karte sitzt im ersten Slot, die vorige lugt links aus dem Rand heraus, rechts laufen weitere Karten bis zum Bildschirmrand. Zuvor wurde die Leiste hart an 16 dp beschnitten und nur minimal gescrollt.
+- Android-Validierung: 906 Unit-Tests ohne Fehler, davon einer übersprungen; Debug-APK gebaut. Rail-Verhalten nur auf dem Emulator geprüft, nicht auf echter TV-Hardware; der Klickton ist nicht hörbar geprüft.
+- Backend und Web unverändert.
+
 ## [2.5.097] - 2026-11-05
 
 - Android-Version: `2.5.097` / Code `498`.

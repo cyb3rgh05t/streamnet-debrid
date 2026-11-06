@@ -12,6 +12,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -83,9 +84,12 @@ import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
 import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.ui.components.SkeletonBox
+import com.arflix.tv.ui.focus.arvioManualBringIntoViewBoundary
+import com.arflix.tv.ui.screens.home.animateHomeScrollDelta
 import kotlinx.coroutines.delay
 import java.text.DateFormat
 import java.util.Date
+import kotlin.math.abs
 
 // Netflix-style Live TV layout for TV mode only. Touch layout stays in LiveTvScreen.
 
@@ -95,6 +99,8 @@ private val CategoryRowHeight = 48.dp
 // value is scaled by that factor to end up exactly as wide on screen as a Home card.
 private const val HomeCardWidthDp = 210f
 private const val HomeCardSpacingDp = 14f
+// Wie die Home-Rail: die fokussierte Karte sitzt im ersten Slot, die vorige lugt links im Rand heraus.
+private val ChannelRailStartPadding = 40.dp
 
 @Composable
 private fun channelCardWidth() =
@@ -348,8 +354,7 @@ internal fun LiveTvNetflixLayout(
             chipEntrySignal = chipEntrySignal,
             modifier = Modifier
                 .fillMaxWidth()
-                .height(CategoryRowHeight)
-                .padding(horizontal = 24.dp),
+                .height(CategoryRowHeight),
         )
 
         NetflixChannelRail(
@@ -380,7 +385,7 @@ internal fun LiveTvNetflixLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
-                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 4.dp),
+                .padding(top = 8.dp, bottom = 4.dp),
         )
     }
     }
@@ -761,14 +766,38 @@ private fun NetflixCategoryChipRow(
     val selectedCategoryIndex = remember(items, selectedId) {
         items.indexOfFirst { it.id == selectedId }
     }
+    // Nur Chips ab dem ersten Slot zählen als sichtbar; der im Rand herauslugende Nachbar nicht.
+    fun chipInView(target: Int): Boolean {
+        val info = listState.layoutInfo
+        return info.visibleItemsInfo.any {
+            it.index == target && it.offset >= info.beforeContentPadding - 1 &&
+                it.offset + it.size <= info.viewportEndOffset
+        }
+    }
+    // Index des fokussierten Chips (0 = Suche); beim Verlassen der Leiste wieder offen.
+    var focusedChipIndex by remember { mutableIntStateOf(-1) }
+    // Fokussierten Chip in den ersten Slot schieben, damit links und rechts sichtbar weitergeht.
+    LaunchedEffect(focusedChipIndex) {
+        val target = focusedChipIndex
+        if (target < 0) return@LaunchedEffect
+        val info = listState.layoutInfo
+        val item = info.visibleItemsInfo.firstOrNull { it.index == target }
+        if (item == null) {
+            runCatching { listState.scrollToItem(target) }
+            return@LaunchedEffect
+        }
+        listState.animateHomeScrollDelta(
+            deltaPx = (item.offset - info.beforeContentPadding).toFloat(),
+            durationMillis = 150,
+        )
+    }
     // Keep the active chip in view whenever the layout appears (home, fullscreen return, settings)
     // or the selection changes. Only scroll when it is not visible, so choosing a visible chip
     // does not make the row jump.
     LaunchedEffect(selectedCategoryIndex, items.size) {
         if (selectedCategoryIndex < 0) return@LaunchedEffect
         val target = selectedCategoryIndex + 1 // +1: the search chip comes first
-        val visible = listState.layoutInfo.visibleItemsInfo.any { it.index == target }
-        if (!visible) runCatching { listState.scrollToItem(target) }
+        if (!chipInView(target)) runCatching { listState.scrollToItem(target) }
     }
     // Focus the chip only for a signal raised after this row appeared. A leftover signal from an
     // earlier visit used to pull focus off the channel rail when coming back from fullscreen.
@@ -811,48 +840,56 @@ private fun NetflixCategoryChipRow(
             rowWasFocused = false
             if (selectedCategoryIndex < 0) return@LaunchedEffect
             val target = selectedCategoryIndex + 1
-            val info = listState.layoutInfo
-            val fullyVisible = info.visibleItemsInfo.any {
-                it.index == target && it.offset >= 0 && it.offset + it.size <= info.viewportEndOffset
-            }
-            if (!fullyVisible) runCatching { listState.animateScrollToItem(target) }
+            if (!chipInView(target)) runCatching { listState.animateScrollToItem(target) }
         }
     }
-    LazyRow(
-        state = listState,
-        modifier = modifier
-            .padding(horizontal = 4.dp)
-            .onFocusChanged { rowFocused = it.hasFocus },
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        item(key = "search") {
-            NetflixChip(
-                label = stringResource(R.string.live_label_search_channels),
-                count = null, isSelected = false, onFocused = onFocused, onClick = onOpenSearch,
-                onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
-                focusRequester = if (selectedCategoryIndex < 0) focusRequester else null,
-                iconContent = {
-                    Icon(imageVector = Icons.Filled.Search, contentDescription = null,
-                        tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+    BoxWithConstraints(modifier = modifier.arvioManualBringIntoViewBoundary()) {
+        LazyRow(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .onFocusChanged {
+                    rowFocused = it.hasFocus
+                    if (!it.hasFocus) focusedChipIndex = -1
                 },
-            )
-        }
-        itemsIndexed(items, key = { _, item -> item.id }) { _, item ->
-            NetflixChip(
-                label = item.label, count = item.count, isSelected = item.id == selectedId,
-                onFocused = onFocused, onClick = { onSelect(item.id) },
-                onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
-                focusRequester = if (item.id == selectedId) focusRequester else null,
-                iconContent = if (item.id == "fav") {
-                    {
-                        Icon(imageVector = Icons.Filled.Star, contentDescription = null,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(
+                start = ChannelRailStartPadding,
+                end = (maxWidth - ChannelRailStartPadding - 120.dp).coerceAtLeast(0.dp),
+            ),
+            verticalAlignment = Alignment.CenterVertically,
+            userScrollEnabled = false,
+        ) {
+            item(key = "search") {
+                NetflixChip(
+                    label = stringResource(R.string.live_label_search_channels),
+                    count = null, isSelected = false,
+                    onFocused = { focusedChipIndex = 0; onFocused() }, onClick = onOpenSearch,
+                    onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
+                    focusRequester = if (selectedCategoryIndex < 0) focusRequester else null,
+                    iconContent = {
+                        Icon(imageVector = Icons.Filled.Search, contentDescription = null,
                             tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
-                    }
-                } else {
-                    null
-                },
-            )
+                    },
+                )
+            }
+            itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
+                NetflixChip(
+                    label = item.label, count = item.count, isSelected = item.id == selectedId,
+                    onFocused = { focusedChipIndex = index + 1; onFocused() },
+                    onClick = { onSelect(item.id) },
+                    onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
+                    focusRequester = if (item.id == selectedId) focusRequester else null,
+                    iconContent = if (item.id == "fav") {
+                        {
+                            Icon(imageVector = Icons.Filled.Star, contentDescription = null,
+                                tint = LiveColors.FgDim, modifier = Modifier.size(13.dp))
+                        }
+                    } else {
+                        null
+                    },
+                )
+            }
         }
     }
 }
@@ -985,7 +1022,7 @@ private fun NetflixChannelRail(
         Box(modifier = modifier, contentAlignment = Alignment.CenterStart) {
             Text(text = emptyMessage ?: stringResource(R.string.live_empty_no_channels_category),
                 style = LiveType.CatLabel.copy(color = LiveColors.FgMute),
-                modifier = Modifier.padding(horizontal = 16.dp))
+                modifier = Modifier.padding(horizontal = 32.dp))
         }
         return
     }
@@ -1000,8 +1037,31 @@ private fun NetflixChannelRail(
     val channelWindowKey = remember(channels) {
         "${channels.size}:${channels.firstOrNull()?.id.orEmpty()}:${channels.lastOrNull()?.id.orEmpty()}"
     }
+    // Index der zuletzt fokussierten Karte; nach einem Kategoriewechsel wieder offen.
+    var focusedIndex by remember(channelWindowKey) { mutableIntStateOf(-1) }
+    val density = LocalDensity.current
+    val cardSpanPx = with(density) { (channelCardWidth() + channelCardSpacing()).toPx().coerceAtLeast(1f) }
     LaunchedEffect(channelWindowKey) {
         runCatching { listState.scrollToItem(latestAnchorIndex.coerceAtLeast(0)) }
+    }
+    // Fokussierte Karte immer in den ersten Slot schieben, damit links und rechts sichtbar weitergeht.
+    LaunchedEffect(focusedIndex) {
+        val target = focusedIndex
+        if (target < 0 || target >= channels.size) return@LaunchedEffect
+        val first = listState.firstVisibleItemIndex
+        val offset = listState.firstVisibleItemScrollOffset
+        if (target == first && offset <= 1) return@LaunchedEffect
+        if (abs(target - first) > 7) {
+            listState.scrollToItem(target)
+            return@LaunchedEffect
+        }
+        listState.animateHomeScrollDelta(
+            deltaPx = (target - first) * cardSpanPx - offset,
+            durationMillis = 150,
+        )
+        if (listState.firstVisibleItemIndex != target || abs(listState.firstVisibleItemScrollOffset) > 6) {
+            listState.scrollToItem(target)
+        }
     }
     suspend fun requestAnchorFocus(): Boolean {
         val index = latestAnchorIndex.coerceAtLeast(0)
@@ -1025,33 +1085,42 @@ private fun NetflixChannelRail(
         }
     }
 
-    LazyRow(
-        state = listState, modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(channelCardSpacing()),
-        contentPadding = PaddingValues(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        itemsIndexed(channels, key = { _, ch -> ch.id }) { _, ch ->
-            val requester = remember(ch.id) { FocusRequester() }
-            DisposableEffect(ch.id, requester) {
-                focusRequesters[ch.id] = requester
-                onDispose { if (focusRequesters[ch.id] === requester) focusRequesters.remove(ch.id) }
+    BoxWithConstraints(modifier = modifier.arvioManualBringIntoViewBoundary()) {
+        // Ende so breit, dass auch die letzte Karte in den ersten Slot rutschen kann.
+        val railEndPadding = (maxWidth - ChannelRailStartPadding - channelCardWidth())
+            .coerceAtLeast(channelCardWidth() + 30.dp)
+        LazyRow(
+            state = listState, modifier = Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(channelCardSpacing()),
+            contentPadding = PaddingValues(start = ChannelRailStartPadding, end = railEndPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            userScrollEnabled = false,
+        ) {
+            itemsIndexed(channels, key = { _, ch -> ch.id }) { index, ch ->
+                val requester = remember(ch.id) { FocusRequester() }
+                DisposableEffect(ch.id, requester) {
+                    focusRequesters[ch.id] = requester
+                    onDispose { if (focusRequesters[ch.id] === requester) focusRequesters.remove(ch.id) }
+                }
+                NetflixChannelCard(
+                    channel = ch,
+                    nowNext = nowNextMap[ch.id],
+                    clockTickMillis = clockTickMillis,
+                    isPlaying = ch.id == playingChannelId,
+                    isFavorite = ch.id in favoriteSet,
+                    selectedCountryCode = selectedCountryCode,
+                    selectedCategoryName = selectedCategoryName,
+                    lookupBackdrop = lookupBackdrop,
+                    onFocused = {
+                        focusedIndex = index
+                        onChannelFocused(ch)
+                    },
+                    onClick = { onChannelSelected(ch) },
+                    onLongPress = { if (variantCountFor(ch) > 1) onOpenVariants(ch) else onFavoriteToggle(ch.id) },
+                    onKeyMoveUp = onMoveUp,
+                    modifier = Modifier.focusRequester(requester),
+                )
             }
-            NetflixChannelCard(
-                channel = ch,
-                nowNext = nowNextMap[ch.id],
-                clockTickMillis = clockTickMillis,
-                isPlaying = ch.id == playingChannelId,
-                isFavorite = ch.id in favoriteSet,
-                selectedCountryCode = selectedCountryCode,
-                selectedCategoryName = selectedCategoryName,
-                lookupBackdrop = lookupBackdrop,
-                onFocused = { onChannelFocused(ch) },
-                onClick = { onChannelSelected(ch) },
-                onLongPress = { if (variantCountFor(ch) > 1) onOpenVariants(ch) else onFavoriteToggle(ch.id) },
-                onKeyMoveUp = onMoveUp,
-                modifier = Modifier.focusRequester(requester),
-            )
         }
     }
 }
@@ -1062,7 +1131,7 @@ private fun NetflixChannelSkeletonRail(modifier: Modifier = Modifier) {
         modifier = modifier,
         userScrollEnabled = false,
         horizontalArrangement = Arrangement.spacedBy(channelCardSpacing()),
-        contentPadding = PaddingValues(horizontal = 4.dp),
+        contentPadding = PaddingValues(start = ChannelRailStartPadding, end = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         items(count = 8, key = { "skeleton_$it" }) {

@@ -1808,6 +1808,12 @@ fun LiveTvScreen(
     var isHudVisible by overlayState.isHudVisible
     var guideOpenedFromQuickZap by overlayState.guideOpenedFromQuickZap
     var guideChannel by overlayState.guideChannel
+    val navigationSoundOverlay = com.arflix.tv.util.LocalNavigationSoundOverlay.current
+    val fullscreenMenuOpen = fullscreenGuideOpen || quickZapOpen || fullscreenSettingsOpen
+    DisposableEffect(fullscreenMenuOpen) {
+        navigationSoundOverlay?.value = fullscreenMenuOpen
+        onDispose { navigationSoundOverlay?.value = false }
+    }
 
     LaunchedEffect(
         visibleEnrichedState.value.tree,

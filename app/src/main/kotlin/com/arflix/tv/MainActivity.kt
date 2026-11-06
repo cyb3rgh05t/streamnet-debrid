@@ -794,6 +794,7 @@ fun ArflixApp(
         onDispose { navigationSound?.close() }
     }
     var iptvFullscreen by remember { mutableStateOf(false) }
+    val navigationSoundOverlay = remember { mutableStateOf(false) }
     LaunchedEffect(offlineDownloadRepository) {
         offlineDownloadRepository.completionEvents.collect { event ->
             AppToastBus.show(
@@ -821,7 +822,8 @@ fun ArflixApp(
 
     CompositionLocalProvider(
         com.arflix.tv.ui.components.LocalAppBottomBarVisible provides showBottomBar,
-        com.arflix.tv.ui.components.LocalHasOfflineDownloads provides hasOfflineDownloads
+        com.arflix.tv.ui.components.LocalHasOfflineDownloads provides hasOfflineDownloads,
+        com.arflix.tv.util.LocalNavigationSoundOverlay provides navigationSoundOverlay,
     ) {
         Column(
             modifier = Modifier
@@ -846,14 +848,15 @@ fun ArflixApp(
             // becomes 0 when the player hides the bars.
             .then(if (isMobile) Modifier.systemBarsPadding() else Modifier)
             .onPreviewKeyEvent { event ->
-                if (com.arflix.tv.util.isNavigationSoundAllowed(
-                        isTv = !isMobile,
-                        enabled = navigationSoundEnabled,
-                        route = currentRoute,
-                        isFullscreen = iptvFullscreen,
-                    )
-                ) {
-                    navigationSound?.onKeyEvent(event.nativeKeyEvent)
+                val soundMode = com.arflix.tv.util.navigationSoundMode(
+                    isTv = !isMobile,
+                    enabled = navigationSoundEnabled,
+                    route = currentRoute,
+                    isFullscreen = iptvFullscreen,
+                    overlayOpen = navigationSoundOverlay.value,
+                )
+                if (soundMode != com.arflix.tv.util.NavigationSoundMode.OFF) {
+                    navigationSound?.onKeyEvent(event.nativeKeyEvent, soundMode)
                 }
                 false
             }
