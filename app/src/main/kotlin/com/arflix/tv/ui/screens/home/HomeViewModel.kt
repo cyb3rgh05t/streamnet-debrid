@@ -1659,13 +1659,23 @@ class HomeViewModel @Inject constructor(
     }
 
     private suspend fun refreshIptvVodAvailability(allowNetwork: Boolean) {
+        val startedAtMs = SystemClock.elapsedRealtime()
         val availability = runCatching {
             iptvRepository.getXtreamVodAvailability(allowNetwork = allowNetwork)
         }.getOrElse { error ->
             if (error is CancellationException) throw error
+            System.err.println("[IPTV-VOD] availability load failed allowNetwork=$allowNetwork reason=${error.message}")
             AppLogger.e("HomeVM", "Failed to load IPTV VOD availability: ${error.message}", error)
             return
         }
+        System.err.println(
+            "[IPTV-VOD] availability loaded keys=${availability.keys.size} allowNetwork=$allowNetwork " +
+                "ms=${SystemClock.elapsedRealtime() - startedAtMs}"
+        )
+        // A cache-only or failed refresh yields an empty set; it must not wipe out a previously
+        // loaded provider library, otherwise every rail is filtered away.
+        val previous = _iptvVodAvailability.value
+        if (availability.keys.isEmpty() && previous != null && previous.keys.isNotEmpty()) return
         _iptvVodAvailability.value = availability
         prioritizeIptvOnlyInitialHero(availability)
         refreshIptvCollectionRows(availability)

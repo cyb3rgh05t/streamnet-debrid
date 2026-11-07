@@ -134,11 +134,16 @@
 -dontwarn com.fasterxml.jackson.**
 
 # ============================================
-# Hilt / Dagger
+# Reflection, JNI and persisted names
 # ============================================
 # App code is shrunk and optimized by R8. Only what is reached via reflection,
 # JNI or persisted class names is kept below. The old blanket
 # "-keep class com.arflix.tv.** { *; }" disabled optimization for all app code.
+
+# Gson TypeToken.getParameterized(XtreamDiskCache::class.java, ...) needs the class's type
+# parameter; without this R8 strips it ("requires 0 type arguments, but got 1") and the IPTV VOD
+# library never loads.
+-keep,allowobfuscation class **XtreamDiskCache { <fields>; }
 
 # Gson/org.json reflect on field names and no-arg constructors of any app class
 # (cache payloads, DataStore blobs, cloud sync). Keep them; everything else may shrink.

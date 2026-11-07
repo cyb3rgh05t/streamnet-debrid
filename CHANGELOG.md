@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.001] - 2026-11-07
+
+- Android-Version: `2.6.001` / Code `502`.
+- Android Home: Fix für 2.6.000. Im IPTV-only-Modus fehlten alle Reihen außer den Live-TV-Reihen, weil die R8-Regeln aus 2.6.000 bei `XtreamDiskCache<T>` den Typparameter entfernten. Gson warf `requires 0 type arguments, but got 1`, die VOD-Bibliothek des Anbieters (rund 23.400 Titel) wurde nie geladen, und der Filter blendete alles aus. Eine gezielte Keep-Regel stellt das wieder her; der Bestand lädt wieder und Home, Collection-Reihen und Collection-Grid erscheinen wie zuvor, gefiltert auf den IPTV-VOD-Bestand.
+- Android Home: Schlägt das Laden des IPTV-VOD-Bestands fehl oder liefert es leer, bleibt ein bereits geladener Bestand erhalten, statt alle Reihen auszublenden. Fehler und Anzahl werden mit `[IPTV-VOD]` geloggt.
+- Android Live TV (Netflix-Layout): Fix für 2.6.000. Der erste OK-Klick auf eine andere Senderkarte startete den Stream nicht, erst der zweite. Die Karte hatte zusätzlich zu `combinedClickable` ein eigenes `focusable()`; mit dem neuen Compose-BOM fing dieses zweite Fokusziel den ersten Klick ab. Das überflüssige `focusable()` ist entfernt.
+- Android-Validierung: Staging-Build auf dem Emulator geprüft: VOD-Bestand lädt (23.426 Einträge), Home-Reihen und Streamingdienste-Reihe erscheinen, Collection-Grid öffnet, ein Klick auf eine Senderkarte startet den Stream sofort. Nicht geprüft: Zweitklick-Verhalten auf echter TV-Hardware, VOD-Wiedergabe, Trakt/Cloud-Sync, Plugins, Discord, Telegram. Ähnliche Muster (`focusable()` plus `clickable`) in Collection-Kacheln, Skip-Intro und Varianten-Auswahl sind unverändert.
+- Backend und Web unverändert.
+
 ## [2.6.000] - 2026-11-07
 
 - Android-Version: `2.6.000` / Code `501`.

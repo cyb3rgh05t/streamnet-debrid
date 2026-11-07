@@ -1212,7 +1212,8 @@ private fun NetflixChannelCard(
                 shape = shape,
             )
             .onFocusChanged { focused = it.hasFocus; if (it.hasFocus) onFocused() }
-            .focusable()
+            // No separate .focusable(): combinedClickable is already focusable. A second focus
+            // target made the first OK press only move focus instead of clicking.
             .onPreviewKeyEvent { ev ->
                 if (ev.type == KeyEventType.KeyDown && ev.key == Key.DirectionUp) {
                     onKeyMoveUp(); return@onPreviewKeyEvent true
