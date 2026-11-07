@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+- Android TV-Profilerstellung: Das Namensfeld zeigt den D-Pad-Fokus jetzt in Akzentfarbe (2 dp Rahmen und leichte Tönung). Zuvor lag der Fokus auf dem umschließenden Rahmen, dessen Zustand nie ausgewertet wurde, sodass das Feld unverändert grau blieb.
+- Android TV-Profilerstellung: Öffnet OK die Tastatur nicht sofort, wird sie nach 350 ms erzwungen angefordert. Auf dem Emulator erschien die Tastatur bereits vorher; ob das Problem auf echter TV-Hardware behoben ist, ist nicht geprüft.
+- Android TV-Avatarwahl: Die vergrößerte fokussierte Kachel ganz links in jeder Reihe wird nicht mehr am Rand angeschnitten (mehr Innenabstand der Reihen).
+
+## [Web 1.0.074] - 2026-11-07
+
+- Web-Version: `1.0.074`.
+- Webplayer-Proxy: Ein 502 enthält jetzt einen unkritischen Grund (`blocked`, `redirect`, `upstream`, `unknown`) und ggf. den Netzwerkcode (z. B. `ECONNREFUSED`). Serverseitig steht eine Zeile `[proxy] <Grund> host=<Hostname>` im Log, nie Pfad, Token oder Zugangsdaten. Hintergrund: Bei Live-Streams scheitern App-Relay und Resolver mit 502, ohne dass die Ursache erkennbar war. Das Verhalten der Anfragen ändert sich nicht.
+- Backend und Android unverändert.
+
 ## [2.5.098] - 2026-11-06
 
 - Android-Version: `2.5.098` / Code `499`.

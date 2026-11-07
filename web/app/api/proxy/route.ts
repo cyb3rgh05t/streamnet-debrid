@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
           { error: error.message },
           { status: 502, headers: { "cache-control": "no-store" } },
         );
-      return proxyFailure(error);
+      return proxyFailure(error, target);
     }
     const hls = /^#EXT-X-/m.test(text);
     if (hls && Buffer.byteLength(text) > 2 * 1024 * 1024) {
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
                     request,
                   );
     } catch (error) {
-      return proxyFailure(error);
+      return proxyFailure(error, target);
     }
     const headers = new Headers();
     headers.set(
@@ -534,11 +534,11 @@ async function fetchWithTimeout(
         : undefined,
     );
   } catch (error) {
-    return proxyFailure(error);
+    return proxyFailure(error, target);
   }
 }
 
-function proxyFailure(error: unknown) {
+function proxyFailure(error: unknown, target?: URL) {
   if (
     error instanceof Error &&
     ["AbortError", "TimeoutError"].includes(error.name)
@@ -548,8 +548,32 @@ function proxyFailure(error: unknown) {
       { status: 504, headers: { "cache-control": "no-store" } },
     );
   }
+  const message = error instanceof Error ? error.message : "";
+  const cause =
+    error instanceof Error
+      ? (error.cause as { code?: unknown } | undefined)?.code
+      : undefined;
+  const code =
+    typeof cause === "string" && /^[A-Z0-9_]{2,40}$/.test(cause)
+      ? cause
+      : undefined;
+  const reason = message.startsWith("Blocked proxy target")
+    ? "blocked"
+    : /redirect/i.test(message)
+      ? "redirect"
+      : code
+        ? "upstream"
+        : "unknown";
+  // Nur Host und Grund, nie Pfad oder Zugangsdaten der Quell-URL.
+  console.warn(
+    `[proxy] ${reason}${code ? ` ${code}` : ""} host=${target?.hostname ?? "?"} ${message.slice(0, 160)}`,
+  );
   return NextResponse.json(
-    { error: "Proxy target unavailable or blocked" },
+    {
+      error: "Proxy target unavailable or blocked",
+      reason,
+      ...(code ? { code } : {}),
+    },
     { status: 502, headers: { "cache-control": "no-store" } },
   );
 }

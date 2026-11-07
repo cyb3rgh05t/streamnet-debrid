@@ -134,7 +134,7 @@ export async function safeProxyFetch(
       options.allowedHosts &&
       !options.allowedHosts.has(hostname.toLowerCase())
     )
-      throw new Error("Blocked proxy target");
+      throw new Error(`Blocked proxy target: host not allowed (${hostname})`);
     const addresses = await lookup(hostname, { all: true, verbatim: true });
     signal.throwIfAborted();
     const privateAllowed =
@@ -144,7 +144,7 @@ export async function safeProxyFetch(
       (!privateAllowed &&
         addresses.some((entry) => !isPublicAddress(entry.address)))
     )
-      throw new Error("Blocked proxy target");
+      throw new Error(`Blocked proxy target: non-public address (${hostname})`);
     const address = addresses[0];
     const agent = new Agent({
       connect: {
