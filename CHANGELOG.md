@@ -8,6 +8,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - Android TV-Profilerstellung: Öffnet OK die Tastatur nicht sofort, wird sie nach 350 ms erzwungen angefordert. Auf dem Emulator erschien die Tastatur bereits vorher; ob das Problem auf echter TV-Hardware behoben ist, ist nicht geprüft.
 - Android TV-Avatarwahl: Die vergrößerte fokussierte Kachel ganz links in jeder Reihe wird nicht mehr am Rand angeschnitten (mehr Innenabstand der Reihen).
 
+## [Web 1.0.075] - 2026-11-07
+
+- Web-Version: `1.0.075`.
+- Webplayer Live-TV: Der Provider leitet `xyzxyz.streamnet.live` auf `216.152.154.146` um; der Proxy lehnte diesen Redirect-Host ab (`blocked ... host not allowed`), daher 502 bei App-Relay und Resolver. Die IP steht jetzt auf der Relay-Liste von Web, Resolver-Worker (`ALLOWED_MEDIA_HOSTS`, wirkt erst nach dessen Deployment) und Audio-Transcode-Standard. Wer `STREAMNET_AUDIO_TRANSCODE_HOSTS` selbst setzt, muss die IP dort ebenfalls ergänzen. Die Prüfung auf öffentliche Adressen bleibt unverändert.
+- Tests: 115 Web- und 8 Worker-Tests ohne Fehler. Kein Test gegen echte Kanäle.
+- Backend und Android unverändert.
+
 ## [Web 1.0.074] - 2026-11-07
 
 - Web-Version: `1.0.074`.

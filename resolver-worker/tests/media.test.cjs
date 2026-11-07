@@ -143,6 +143,7 @@ for (const [name, env] of [
       "50.7.184.250",
       "85.209.176.85",
       "193.108.118.53",
+      "216.152.154.146",
     ]) {
       const response = await worker.fetch(
         mediaRequest(`http://${host}/hls/test`),
@@ -151,7 +152,7 @@ for (const [name, env] of [
       assert.equal(response.status, 200, host);
       assert.equal(await response.text(), "segment");
     }
-    assert.equal(upstreamFetch.mock.callCount(), 5);
+    assert.equal(upstreamFetch.mock.callCount(), 6);
   });
 }
 

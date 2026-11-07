@@ -3,6 +3,7 @@ export const STREAMNET_RELAY_HOSTS: ReadonlySet<string> = new Set([
   "85.209.176.85",
   "193.200.221.81",
   "193.108.118.53",
+  "216.152.154.146",
   "50.7.184.250",
 ]);
 

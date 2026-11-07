@@ -114,6 +114,7 @@ test("App segment relay keeps other hosts and unsupported protocols excluded", a
     "85.209.176.85",
     "193.200.221.81",
     "193.108.118.53",
+    "216.152.154.146",
   ]) {
     assert.ok(STREAMNET_RELAY_HOSTS.has(host));
   }

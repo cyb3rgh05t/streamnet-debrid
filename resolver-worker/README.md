@@ -12,7 +12,7 @@ Required GitHub Actions secrets:
 The deployment creates the `resolve.streamnet.live` Worker custom domain. Keep `ALLOWED_MEDIA_HOSTS` in `wrangler.toml` synchronized with provider redirect hosts.
 
 The Live TV relay allows `xui.streamnet.live`, `193.200.221.81`,
-`50.7.184.250`, `85.209.176.85`, and `193.108.118.53` (including extensionless
+`50.7.184.250`, `85.209.176.85`, `193.108.118.53`, and `216.152.154.146` (including extensionless
 `/hls/` URLs). These match the app relay's built-in hosts. An unlisted host returns
 HTTP 400 with `Media host not allowed` before any upstream request. When adding
 a provider host, update both `wrangler.toml` and the defaults in `src/index.ts`.

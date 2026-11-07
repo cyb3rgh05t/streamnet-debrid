@@ -10,6 +10,7 @@ const DEFAULT_ALLOWED_MEDIA_HOSTS = [
   "50.7.184.250",
   "85.209.176.85",
   "193.108.118.53",
+  "216.152.154.146",
 ];
 const FORWARDED_HEADERS =
   /^(accept|authorization|cookie|icy-metadata|origin|referer|user-agent)$/i;
