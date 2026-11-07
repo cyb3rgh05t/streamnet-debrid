@@ -206,18 +206,28 @@ private fun ProfileDialogContent(
     val accentColor = resolveAccentColor(fallback = Color.White)
     var editTextRef by remember { mutableStateOf<EditText?>(null) }
     var isNameInputFocused by remember { mutableStateOf(false) }
+    // Per D-Pad fokussiert der umschließende Rahmen, nicht das EditText selbst.
+    var isNameBoxFocused by remember { mutableStateOf(false) }
+    val nameFieldFocused = isNameInputFocused || isNameBoxFocused
     val confirmButtonFocusRequester = remember { FocusRequester() }
     val avatarInitialFocusRequester = remember { FocusRequester() }
 
     fun showKeyboard(editText: EditText) {
+        val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
         editText.post {
-            val imm = context.getSystemService(android.content.Context.INPUT_METHOD_SERVICE) as? InputMethodManager
             val shown = imm?.showSoftInput(editText, InputMethodManager.SHOW_IMPLICIT) ?: false
             if (!shown) {
                 @Suppress("DEPRECATION")
                 imm?.showSoftInput(editText, InputMethodManager.SHOW_FORCED)
             }
         }
+        // Manche TV-Tastaturen ignorieren die erste implizite Anfrage; dann erzwingen.
+        editText.postDelayed({
+            if (editText.hasFocus() && imm?.isAcceptingText != true) {
+                @Suppress("DEPRECATION")
+                imm?.showSoftInput(editText, InputMethodManager.SHOW_FORCED)
+            }
+        }, 350)
     }
 
     fun hideKeyboard(editText: EditText? = editTextRef) {
@@ -359,12 +369,13 @@ private fun ProfileDialogContent(
                         modifier = Modifier
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
-                            .background(if (isNameInputFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
+                            .background(if (nameFieldFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
                             .border(
-                                if (isNameInputFocused) 2.dp else 1.dp,
-                                if (isNameInputFocused) accentColor else Color.White.copy(alpha = 0.2f),
+                                if (nameFieldFocused) 2.dp else 1.dp,
+                                if (nameFieldFocused) accentColor else Color.White.copy(alpha = 0.2f),
                                 RoundedCornerShape(8.dp)
                             )
+                            .onFocusChanged { isNameBoxFocused = it.isFocused }
                             .clickable {
                                 editTextRef?.let { et ->
                                     et.requestFocus()
@@ -617,12 +628,13 @@ private fun ProfileDialogContent(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(if (isNameInputFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
+                                .background(if (nameFieldFocused) accentColor.copy(alpha = 0.12f) else Color(0xFF222222))
                                 .border(
-                                    if (isNameInputFocused) 2.dp else 1.dp,
-                                    if (isNameInputFocused) accentColor else Color.White.copy(alpha = 0.2f),
+                                    if (nameFieldFocused) 2.dp else 1.dp,
+                                    if (nameFieldFocused) accentColor else Color.White.copy(alpha = 0.2f),
                                     RoundedCornerShape(8.dp)
                                 )
+                                .onFocusChanged { isNameBoxFocused = it.isFocused }
                                 .clickable {
                                     editTextRef?.let { et ->
                                         et.requestFocus()
@@ -797,12 +809,12 @@ private fun ProfileDialogContent(
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = Color.White.copy(alpha = 0.5f),
-                                modifier = Modifier.padding(start = 8.dp, bottom = 6.dp)
+                                modifier = Modifier.padding(start = 12.dp, bottom = 6.dp)
                             )
 
                             LazyRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                contentPadding = PaddingValues(horizontal = 6.dp, vertical = 4.dp)
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 5.dp)
                             ) {
                                 // "None" option only in first row
                                 if (rowIdx == 0) {

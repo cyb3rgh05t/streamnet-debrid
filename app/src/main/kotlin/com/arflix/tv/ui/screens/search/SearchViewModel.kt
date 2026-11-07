@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 data class Genre(val id: Int, val name: String)
@@ -129,7 +130,10 @@ class SearchViewModel @Inject constructor(
     private var cachedPeopleQuery = ""
     private var cachedPeopleResults: List<Category> = EMPTY_CATEGORIES
 
-    init { loadDiscoverRows() }
+    init {
+        loadDiscoverRows()
+        viewModelScope.launch(Dispatchers.IO) { mediaRepository.warmPopularTitlePool() }
+    }
 
     // ── Discover Rows (5 dynamic rows based on filters) ─────────────────
 
@@ -308,8 +312,25 @@ class SearchViewModel @Inject constructor(
                             val results = if (cachedSuggestionQuery.equals(query, true) && cachedSuggestionResults.isNotEmpty()) {
                                 cachedSuggestionResults
                             } else {
-                                val found = mediaRepository.search(query)
-                                val sortedResults = sortResults(query, found)
+                                val (found, typeahead) = coroutineScope {
+                                    val remote = async { mediaRepository.search(query) }
+                                    // TMDB findet nur ganze Wörter; Wortanfänge ("rea") kommen aus dem lokalen Titelpool.
+                                    val prefix = async {
+                                        try {
+                                            withTimeoutOrNull(4_000L) { mediaRepository.searchTitlesByPrefix(query) }
+                                                ?: EMPTY_MEDIA_ITEMS
+                                        } catch (e: kotlinx.coroutines.CancellationException) {
+                                            throw e
+                                        } catch (_: Exception) {
+                                            EMPTY_MEDIA_ITEMS
+                                        }
+                                    }
+                                    remote.await() to prefix.await()
+                                }
+                                val sortedResults = sortResults(
+                                    query,
+                                    (found + typeahead).distinctBy { "${it.mediaType}_${it.id}" },
+                                )
                                 cachedSuggestionQuery = query
                                 cachedSuggestionResults = sortedResults
                                 sortedResults
@@ -342,7 +363,7 @@ class SearchViewModel @Inject constructor(
                 }
                 val movies = sorted.filter { it.mediaType == MediaType.MOVIE }; val tv = sorted.filter { it.mediaType == MediaType.TV }
                 val personItems = peopleRows.flatMap { it.items }
-                val top = (personItems.take(24) + movies.take(16) + tv.take(16)).distinctBy { "${it.mediaType}_${it.id}" }
+                val top = (movies.take(16) + tv.take(16) + personItems.take(24)).distinctBy { "${it.mediaType}_${it.id}" }
                 sorted.forEach { mediaRepository.cacheItem(it) }
                 personItems.forEach { mediaRepository.cacheItem(it) }
                 val logos = withContext(Dispatchers.IO) {

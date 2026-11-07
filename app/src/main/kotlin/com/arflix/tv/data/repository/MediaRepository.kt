@@ -54,6 +54,8 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -1056,6 +1058,8 @@ class MediaRepository @Inject constructor(
     fun getDefaultCatalogConfigs(): List<CatalogConfig> = buildPreinstalledDefaults()
 
     companion object {
+        private const val POPULAR_TITLE_POOL_PAGES = 10
+        private const val POPULAR_TITLE_POOL_TTL_MS = 30 * 60_000L
         const val STREAMING_COLLECTION_ADDON_URL = "https://pastebin.com/raw/P4gfd98n"
         private val UPLOADED_COVER_BASE = "https://" + "nu" + "vioapp.space/uploads/covers/"
 
@@ -4436,6 +4440,64 @@ class MediaRepository @Inject constructor(
             }
         cacheItems(items)
         return items
+    }
+
+    private val popularTitlePoolMutex = Mutex()
+    private var popularTitlePool: List<MediaItem> = emptyList()
+    private var popularTitlePoolLoadedAt = 0L
+    private var popularTitlePoolLanguage = ""
+
+    /**
+     * TMDB multi-search only matches whole words, so "rea" never finds "Reacher".
+     * Typeahead therefore also matches word prefixes against popular titles and
+     * every title this session has already loaded.
+     */
+    suspend fun searchTitlesByPrefix(query: String, limit: Int = 30): List<MediaItem> {
+        if (normalizeSearchText(query).length < 2) return emptyList()
+        val pool = loadPopularTitlePool()
+        val seen = detailsCache.values.map { it.data }
+        return (pool + seen)
+            .asSequence()
+            .filter { (it.mediaType == MediaType.MOVIE || it.mediaType == MediaType.TV) && !it.isPlaceholder }
+            .filter { titleMatchesSearchPrefix(it.title, query) }
+            .distinctBy { "${it.mediaType}_${it.id}" }
+            .sortedByDescending { it.popularity }
+            .take(limit)
+            .toList()
+    }
+
+    /** Starts loading the popular-title pool so the first typeahead query does not wait for it. */
+    suspend fun warmPopularTitlePool() {
+        runCatching { loadPopularTitlePool() }
+    }
+
+    private suspend fun loadPopularTitlePool(): List<MediaItem> = popularTitlePoolMutex.withLock {
+        val language = contentLanguage.lowercase(Locale.ROOT)
+        val fresh = popularTitlePool.isNotEmpty() &&
+            popularTitlePoolLanguage == language &&
+            System.currentTimeMillis() - popularTitlePoolLoadedAt < POPULAR_TITLE_POOL_TTL_MS
+        if (fresh) return@withLock popularTitlePool
+        val loaded = coroutineScope {
+            (1..POPULAR_TITLE_POOL_PAGES).flatMap { page ->
+                listOf(
+                    async {
+                        runCatching { discoverMovies(sortBy = "popularity.desc", minVoteCount = 10, page = page) }
+                            .getOrDefault(emptyList())
+                    },
+                    async {
+                        runCatching { discoverTv(sortBy = "popularity.desc", minVoteCount = 10, page = page) }
+                            .getOrDefault(emptyList())
+                    },
+                )
+            }.awaitAll().flatten()
+        }.distinctBy { "${it.mediaType}_${it.id}" }
+        // Ein leeres Ergebnis (Offline) wird nicht gemerkt, damit der nächste Versuch neu lädt.
+        if (loaded.isNotEmpty()) {
+            popularTitlePool = loaded
+            popularTitlePoolLoadedAt = System.currentTimeMillis()
+            popularTitlePoolLanguage = language
+        }
+        loaded.ifEmpty { popularTitlePool }
     }
 
     /**

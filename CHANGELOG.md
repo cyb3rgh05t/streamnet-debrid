@@ -4,9 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.5.099] - 2026-11-07
+
+- Android-Version: `2.5.099` / Code `500`.
+- Android-Suche: Teilbegriffe werden gefunden (`rea` → `Reacher`). TMDB matcht nur ganze Wörter, daher gleicht die Suche zusätzlich Wortanfänge (in Reihenfolge, ohne Akzente/Satzzeichen) mit einem Titelpool ab: die rund 200 beliebtesten Filme und 200 beliebtesten Serien (beim Öffnen der Suche vorgeladen, 30 Minuten gecacht) plus alle in der Sitzung geladenen Titel. Seltene Titel brauchen weiter das ganze Wort.
+- Android-Suche: Reihenfolge der Ergebnisse jetzt Filme, Serien, `Suche (N)`, danach die Personenzeilen (vorher zuerst Personen).
 - Android TV-Profilerstellung: Das Namensfeld zeigt den D-Pad-Fokus jetzt in Akzentfarbe (2 dp Rahmen und leichte Tönung). Zuvor lag der Fokus auf dem umschließenden Rahmen, dessen Zustand nie ausgewertet wurde, sodass das Feld unverändert grau blieb.
 - Android TV-Profilerstellung: Öffnet OK die Tastatur nicht sofort, wird sie nach 350 ms erzwungen angefordert. Auf dem Emulator erschien die Tastatur bereits vorher; ob das Problem auf echter TV-Hardware behoben ist, ist nicht geprüft.
 - Android TV-Avatarwahl: Die vergrößerte fokussierte Kachel ganz links in jeder Reihe wird nicht mehr am Rand angeschnitten (mehr Innenabstand der Reihen).
+- Android-Validierung: 911 Unit-Tests ohne Fehler, davon einer übersprungen; Fokusdarstellung und Avatar-Beschnitt auf dem Emulator geprüft. Die Präfix-Suche ist nur per Unit-Test des Matchings und einer TMDB-Abfrage belegt, nicht in der laufenden App; Tastatur nicht auf echter TV-Hardware geprüft.
+- Backend und Web unverändert.
 
 ## [Web 1.0.075] - 2026-11-07
 
