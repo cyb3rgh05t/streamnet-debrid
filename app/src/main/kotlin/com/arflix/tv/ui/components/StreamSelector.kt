@@ -90,9 +90,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.TvLazyListState
-import androidx.tv.foundation.lazy.list.rememberTvLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import com.arflix.tv.data.model.StreamSource
@@ -184,11 +182,11 @@ internal fun sourceStreamRowKey(stream: StreamSource, index: Int): String =
     "source_stream:${sourceTabId(stream)}:$index"
 
 /**
- * Scrolls a TvLazyColumn so the focused item stays visible, leaving a one-item
+ * Scrolls a LazyColumn so the focused item stays visible, leaving a one-item
  * buffer on the approaching edge so its focus border isn't clipped by the
  * viewport or a scroll-indicator overlay.
  */
-private suspend fun TvLazyListState.scrollToKeepFocusVisible(focusedIndex: Int, itemCount: Int) {
+private suspend fun LazyListState.scrollToKeepFocusVisible(focusedIndex: Int, itemCount: Int) {
     if (itemCount == 0) return
     val target = focusedIndex.coerceIn(0, itemCount - 1)
     val visibleItems = layoutInfo.visibleItemsInfo
@@ -254,8 +252,8 @@ fun StreamSelector(
     var focusedEmptyActionIndex by remember { mutableIntStateOf(0) }
     var focusedStreamActionIndex by remember { mutableIntStateOf(0) } // 0 = play, 1 = download
     var focusZone by remember { mutableStateOf("streams") } // "streams" or "addons"
-    val listState = rememberTvLazyListState()
-    val addonListState = rememberTvLazyListState()
+    val listState = rememberLazyListState()
+    val addonListState = rememberLazyListState()
     val focusRequester = remember { FocusRequester() }
     val isMobile = LocalDeviceType.current.isTouchDevice()
     val pluginPrefix = stringResource(R.string.plugin_prefix)
@@ -830,8 +828,8 @@ private fun OledSourceSelectorTv(
     selectedTabIndex: Int,
     focusedTabIndex: Int,
     addonRailFocused: Boolean,
-    listState: TvLazyListState,
-    addonListState: TvLazyListState,
+    listState: LazyListState,
+    addonListState: LazyListState,
     focusedIndex: Int,
     focusedEmptyActionIndex: Int,
     focusedActionIndex: Int,
@@ -989,7 +987,7 @@ private fun OledSourceSelectorTv(
                     onRequest = onRequest
                 )
                 else -> Box(modifier = Modifier.fillMaxSize()) {
-                    TvLazyColumn(
+                    LazyColumn(
                         state = listState,
                         contentPadding = PaddingValues(bottom = 10.dp),
                         verticalArrangement = Arrangement.spacedBy(5.dp),
@@ -1854,7 +1852,7 @@ private fun SourceAddonRail(
     selectedTabIndex: Int,
     focusedTabIndex: Int,
     isFocused: Boolean,
-    listState: TvLazyListState,
+    listState: LazyListState,
     totalSources: Int,
     count4K: Int,
     count1080: Int,
@@ -1879,7 +1877,7 @@ private fun SourceAddonRail(
         )
         Spacer(modifier = Modifier.height(10.dp))
         Box(modifier = Modifier.weight(1f)) {
-            TvLazyColumn(
+            LazyColumn(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(5.dp),
                 modifier = Modifier.fillMaxSize()

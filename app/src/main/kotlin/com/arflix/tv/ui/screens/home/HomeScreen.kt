@@ -496,6 +496,9 @@ private data class HomeFocusedHeroSnapshot(
     val sidebarFocused: Boolean
 )
 
+private const val HOME_BACKDROP_MAX_WIDTH_PX = 1920
+private const val HOME_BACKDROP_MAX_HEIGHT_PX = 1080
+
 @Composable
 private inline fun TraceHomeComposition(name: String, content: @Composable () -> Unit) {
     androidx.tracing.Trace.beginSection(name)
@@ -963,9 +966,16 @@ fun HomeScreen(
     val density = LocalDensity.current
     val configuration = LocalConfiguration.current
     val backdropSize = remember(configuration, density) {
-        val widthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }
-        val heightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }
-        widthPx.coerceAtLeast(1) to heightPx.coerceAtLeast(1)
+        val widthPx = with(density) { configuration.screenWidthDp.dp.roundToPx() }.coerceAtLeast(1)
+        val heightPx = with(density) { configuration.screenHeightDp.dp.roundToPx() }.coerceAtLeast(1)
+        // Cap the decode size so 4K TVs don't decode ~33 MB backdrops that overflow
+        // the TV image memory cache; the scrimmed backdrop looks identical at 1080p.
+        val scale = minOf(
+            1f,
+            HOME_BACKDROP_MAX_WIDTH_PX.toFloat() / widthPx,
+            HOME_BACKDROP_MAX_HEIGHT_PX.toFloat() / heightPx
+        )
+        (widthPx * scale).toInt().coerceAtLeast(1) to (heightPx * scale).toInt().coerceAtLeast(1)
     }
     val backdropGradient = remember {
         Brush.linearGradient(
@@ -3043,7 +3053,7 @@ private fun MobileHeroCarousel(
             state = pagerState,
             contentPadding = PaddingValues(horizontal = pagerHorizontalPadding),
             pageSpacing = pagerPageSpacing,
-            beyondBoundsPageCount = 1,
+            beyondViewportPageCount = 1,
             modifier = Modifier.fillMaxWidth()
         ) { page ->
             val item = heroItems[page % heroItems.size]
@@ -4540,11 +4550,18 @@ private fun ContentRow(
             featuredExpandedForIndex = focusedItemIndex
         }
     }
-    val railFocusOverlayActive = !isIptvCategory && isCurrentRow && isScrollable && focusedItemIndex >= 0 && totalItems > 0 &&
+    val railFocusOverlayEligible = !isIptvCategory && isCurrentRow && isScrollable && focusedItemIndex >= 0 && totalItems > 0 &&
         !hasFeaturedCard &&
-        focusedItemIndex <= maxFirstIndex &&
-        focusedItemIndex == rowState.firstVisibleItemIndex &&
-        rowState.firstVisibleItemScrollOffset == 0
+        focusedItemIndex <= maxFirstIndex
+    // Scroll position changes every frame while the rail animates; derivedStateOf
+    // limits recomposition to the moments this boolean actually flips.
+    val focusedItemAtRailStart by remember(rowState, focusedItemIndex) {
+        derivedStateOf {
+            focusedItemIndex == rowState.firstVisibleItemIndex &&
+                rowState.firstVisibleItemScrollOffset == 0
+        }
+    }
+    val railFocusOverlayActive = railFocusOverlayEligible && focusedItemAtRailStart
     val focusedCardIndex = if (railFocusOverlayActive) {
         -1
     } else {

@@ -134,11 +134,37 @@
 -dontwarn com.fasterxml.jackson.**
 
 # ============================================
-# Hilt / Dagger - KEEP EVERYTHING
+# Hilt / Dagger
 # ============================================
-# Keep ALL app classes to prevent Hilt/Dagger issues
--keep class com.arflix.tv.** { *; }
--keep interface com.arflix.tv.** { *; }
+# App code is shrunk and optimized by R8. Only what is reached via reflection,
+# JNI or persisted class names is kept below. The old blanket
+# "-keep class com.arflix.tv.** { *; }" disabled optimization for all app code.
+
+# Gson/org.json reflect on field names and no-arg constructors of any app class
+# (cache payloads, DataStore blobs, cloud sync). Keep them; everything else may shrink.
+-keepclassmembers class com.arflix.tv.** { <fields>; }
+-keepclassmembers class com.arflix.tv.** { <init>(); }
+-keepclassmembers enum com.arflix.tv.** { <fields>; public static **[] values(); public static ** valueOf(java.lang.String); }
+
+# Moshi KotlinJsonAdapterFactory (reflection) serializes these without generated adapters.
+-keep class com.arflix.tv.domain.model.** { *; }
+
+# WorkManager persists worker class names in its database; they must be stable across releases.
+-keep class * extends androidx.work.ListenableWorker { *; }
+
+# JNI: native symbols are bound by class/method name and call back into Callback.onStatusChanged.
+-keep class com.arflix.tv.ui.screens.details.discord.DiscordBridge { *; }
+-keep interface com.arflix.tv.ui.screens.details.discord.DiscordBridge$Callback { *; }
+-keepclassmembers class * implements com.arflix.tv.ui.screens.details.discord.DiscordBridge$Callback { *; }
+
+# Hilt entry points are looked up by interface class.
+-keep @dagger.hilt.EntryPoint class * { *; }
+-keep @dagger.hilt.android.EarlyEntryPoint class * { *; }
+
+# Retrofit under R8 full mode: keep generic return types of suspend/Call methods.
+-keep,allowobfuscation,allowshrinking interface retrofit2.Call
+-keep,allowobfuscation,allowshrinking class retrofit2.Response
+-keep,allowobfuscation,allowshrinking class kotlin.coroutines.Continuation
 
 # Keep ALL Dagger/Hilt classes and generated code
 -keep class dagger.** { *; }
@@ -160,13 +186,9 @@
 # ============================================
 # Jetpack Compose
 # ============================================
--keep class androidx.compose.** { *; }
+# Compose ships its own consumer rules. Keeping all of androidx.compose and every
+# class with @Composable methods stopped R8 from shrinking/optimizing UI code.
 -dontwarn androidx.compose.**
-
-# Keep composable functions for proper rendering
--keepclasseswithmembers class * {
-    @androidx.compose.runtime.Composable <methods>;
-}
 
 # ============================================
 # AndroidX / Lifecycle

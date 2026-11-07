@@ -60,10 +60,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.tv.foundation.lazy.grid.TvGridCells
-import androidx.tv.foundation.lazy.grid.TvLazyVerticalGrid
-import androidx.tv.foundation.lazy.grid.itemsIndexed
-import androidx.tv.foundation.lazy.grid.rememberTvLazyGridState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import coil.compose.AsyncImage
 import com.arflix.tv.R
 import com.arflix.tv.data.model.CatalogConfig
@@ -649,8 +651,8 @@ fun CollectionDetailsScreen(
         else -> CollectionTab.MOVIES
     }
     var selectedTab by rememberSaveable(uiState.catalog?.id) { mutableStateOf(initialTab) }
-    val moviesGridState = rememberTvLazyGridState()
-    val seriesGridState = rememberTvLazyGridState()
+    val moviesGridState = rememberLazyGridState()
+    val seriesGridState = rememberLazyGridState()
     val moviesTabFocusRequester = remember { FocusRequester() }
     val seriesTabFocusRequester = remember { FocusRequester() }
     val timelineTabFocusRequester = remember { FocusRequester() }
@@ -1096,7 +1098,7 @@ private fun CollectionItemsGrid(
     gridColumns: Int,
     cardWidth: androidx.compose.ui.unit.Dp,
     usePosterCards: Boolean,
-    gridState: androidx.tv.foundation.lazy.grid.TvLazyGridState,
+    gridState: LazyGridState,
     pendingFocusIndex: Int,
     onClearPendingFocus: () -> Unit,
     hasMovies: Boolean,
@@ -1159,8 +1161,8 @@ private fun CollectionItemsGrid(
         }
     }
 
-    TvLazyVerticalGrid(
-        columns = TvGridCells.Fixed(gridColumns),
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(gridColumns),
         state = gridState,
         modifier = Modifier
             .fillMaxSize()
@@ -1188,7 +1190,7 @@ private fun CollectionItemsGrid(
         horizontalArrangement = Arrangement.spacedBy(if (usePosterCards) 18.dp else 14.dp)
     ) {
         item(
-            span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+            span = { GridItemSpan(maxLineSpan) },
             contentType = "tabs"
         ) {
             CollectionTabBar(
@@ -1203,7 +1205,7 @@ private fun CollectionItemsGrid(
             )
         }
         item(
-            span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+            span = { GridItemSpan(maxLineSpan) },
             contentType = "tabs_gap"
         ) {
             Box(modifier = Modifier.height(6.dp))
@@ -1211,7 +1213,7 @@ private fun CollectionItemsGrid(
 
         if (isLoading) {
             item(
-                span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+                span = { GridItemSpan(maxLineSpan) },
                 contentType = "loading_indicator"
             ) {
                 Box(
@@ -1238,7 +1240,7 @@ private fun CollectionItemsGrid(
             }
         } else if (items.isEmpty() && !isLoadingMore) {
             item(
-                span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+                span = { GridItemSpan(maxLineSpan) },
                 contentType = "empty"
             ) {
                 CollectionEmptyState(message = emptyMessage)
@@ -1248,7 +1250,7 @@ private fun CollectionItemsGrid(
                 gridEntries,
                 key = { _, entry -> entry.key },
                 span = { _, entry ->
-                    androidx.tv.foundation.lazy.grid.TvGridItemSpan(
+                    GridItemSpan(
                         if (entry is CollectionGridEntry.Heading) maxLineSpan else 1
                     )
                 },
@@ -1303,7 +1305,7 @@ private fun CollectionItemsGrid(
 
         if (isLoadingMore) {
             item(
-                span = { androidx.tv.foundation.lazy.grid.TvGridItemSpan(maxLineSpan) },
+                span = { GridItemSpan(maxLineSpan) },
                 contentType = "loading_more"
             ) {
                 Box(

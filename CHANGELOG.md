@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.000] - 2026-11-07
+
+- Android-Version: `2.6.000` / Code `501`.
+- Android-Performance (TV): Die R8-Keep-Regeln sind eingegrenzt. Die pauschalen Regeln für `androidx.compose.**` und `com.arflix.tv.**` entfallen; erhalten bleiben nur Felder und No-Arg-Konstruktoren für Gson, `domain.model` für Moshi-Reflection, WorkManager-Worker, die Discord-JNI-Bridge, Hilt-EntryPoints und die Retrofit-Regeln für R8 Full Mode. Media3 und TDLib bleiben vollständig erhalten (Reflection/JNI). Die Release-DEX schrumpft von rund 49,6 MB auf rund 27 MB.
+- Android-Performance (TV): Die TV-Listen (`TvLazyRow`, `TvLazyColumn`, `TvLazyVerticalGrid`) sind durch die Standard-Lazy-Listen ersetzt, `tv-foundation` ist entfernt. Beim Fokuswechsel scrollen diese Listen jetzt minimal statt mit dem TV-Pivot; Details-Seite, Stream-Auswahl, Personen-Dialog und Collection-Grid sind betroffen.
+- Android-Abhängigkeiten: Compose-BOM von `2024.06.00` auf `2026.06.01`. Neuere Versionen (`2026.08.00` und höher, Compose 1.12) verlangen AGP 9.1 und sind mit dem aktuellen AGP 8.13.2 nicht baubar. Anpassungen: `basicMarquee(repeatDelayMillis)` und `HorizontalPager(beyondViewportPageCount)`.
+- Android-Home (TV): Die Scrollposition der Karten-Reihen wird über `derivedStateOf` gelesen, damit die Reihe nicht mehr bei jedem Frame der Scroll-Animation neu komponiert wird. Der Home-Hintergrund wird höchstens in 1920×1080 dekodiert (vorher volle Bildschirmgröße, auf 4K-TVs rund 33 MB pro Bild).
+- Android-Validierung: 911 Unit-Tests ohne Fehler, davon einer übersprungen; Release- und Staging-Build erfolgreich. Auf dem Emulator geprüft: Start, Home-Reihen, Details-Seite, Live TV mit Video und EPG, Settings. Nicht geprüft: Collection-Grid, Suche, Mediathek, VOD-Wiedergabe, Trakt/Cloud-Sync, Plugins, Discord, Telegram. Es wurde weder Frame-Timing noch Startzeit auf echter TV-Hardware gemessen; eine Beschleunigung ist nicht belegt.
+- Backend und Web unverändert.
+
 ## [2.5.099] - 2026-11-07
 
 - Android-Version: `2.5.099` / Code `500`.

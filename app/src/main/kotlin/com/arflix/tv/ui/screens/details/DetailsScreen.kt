@@ -120,11 +120,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.tv.foundation.lazy.list.TvLazyColumn
-import androidx.tv.foundation.lazy.list.TvLazyListState
-import androidx.tv.foundation.lazy.list.TvLazyRow
-import androidx.tv.foundation.lazy.list.itemsIndexed
-import androidx.tv.foundation.lazy.list.rememberTvLazyListState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
 import androidx.lifecycle.Lifecycle
@@ -2300,7 +2298,7 @@ private fun DetailsTvRows(
     onSimilarClick: (Int) -> Unit,
     onCollectionClick: (Int) -> Unit = {}
 ) {
-    val contentScrollState = rememberTvLazyListState()
+    val contentScrollState = rememberLazyListState()
     val detailsStackOffsetPx = remember { Animatable(0f) }
     val density = LocalDensity.current
     val isTV = item.mediaType == MediaType.TV
@@ -2415,7 +2413,7 @@ private fun DetailsTvRows(
     val contentStartPadding = 12.dp
     val contentOuterStartPadding = 24.dp
 
-    TvLazyColumn(
+    LazyColumn(
         state = contentScrollState,
         modifier = modifier
             .fillMaxWidth()
@@ -2888,7 +2886,7 @@ private fun DetailsEpisodeRail(
     onEpisodeClick: (Int) -> Unit
 ) {
     val episodeCardWidth = if (configuration.screenWidthDp < 1400) 292.dp else 300.dp
-    val episodeRowState = rememberTvLazyListState()
+    val episodeRowState = rememberLazyListState()
     val episodeFixedFocus = focusSectionForUi == FocusSection.EPISODES &&
         detailsRailUsesFixedFirstSlotFocus(
             totalItems = episodes.size,
@@ -2909,7 +2907,7 @@ private fun DetailsEpisodeRail(
     val currentOnEpisodeClick = rememberUpdatedState(onEpisodeClick)
 
     Box(modifier = Modifier.fillMaxWidth()) {
-        TvLazyRow(
+        LazyRow(
             state = episodeRowState,
             modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
             contentPadding = PaddingValues(
@@ -2962,7 +2960,7 @@ private fun DetailsCastRail(
     contentOuterStartPadding: Dp,
     onCastClick: (Int) -> Unit
 ) {
-    val castRowState = rememberTvLazyListState()
+    val castRowState = rememberLazyListState()
     HomeStyleRowAutoScroll(
         rowState = castRowState,
         isCurrentRow = focusSectionForUi == FocusSection.CAST,
@@ -2985,7 +2983,7 @@ private fun DetailsCastRail(
             modifier = Modifier.padding(start = contentStartPadding, bottom = 10.dp)
         )
 
-        TvLazyRow(
+        LazyRow(
             state = castRowState,
             modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
             contentPadding = PaddingValues(
@@ -3026,7 +3024,7 @@ private fun DetailsReviewRail(
     contentStartPadding: Dp,
     contentOuterStartPadding: Dp
 ) {
-    val reviewRowState = rememberTvLazyListState()
+    val reviewRowState = rememberLazyListState()
     HomeStyleRowAutoScroll(
         rowState = reviewRowState,
         isCurrentRow = focusSectionForUi == FocusSection.REVIEWS,
@@ -3047,7 +3045,7 @@ private fun DetailsReviewRail(
             modifier = Modifier.padding(start = contentStartPadding, bottom = 10.dp)
         )
 
-        TvLazyRow(
+        LazyRow(
             state = reviewRowState,
             modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
             contentPadding = PaddingValues(
@@ -3087,7 +3085,7 @@ private fun DetailsSimilarRail(
     contentOuterStartPadding: Dp,
     onSimilarClick: (Int) -> Unit
 ) {
-    val similarRowState = rememberTvLazyListState()
+    val similarRowState = rememberLazyListState()
     val similarCardWidth = if (usePosterCards) 126.dp else 210.dp
     val similarFocusBleed = if (usePosterCards) 18.dp else 14.dp
     val similarFixedFocus = focusSectionForUi == FocusSection.SIMILAR &&
@@ -3118,7 +3116,7 @@ private fun DetailsSimilarRail(
         )
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            TvLazyRow(
+            LazyRow(
                 state = similarRowState,
                 modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
                 contentPadding = PaddingValues(
@@ -3173,7 +3171,7 @@ private fun DetailsCollectionRail(
     contentOuterStartPadding: Dp,
     onCollectionClick: (Int) -> Unit
 ) {
-    val collectionRowState = rememberTvLazyListState()
+    val collectionRowState = rememberLazyListState()
     val collectionCardWidth = if (usePosterCards) 126.dp else 210.dp
     val collectionFocusBleed = if (usePosterCards) 18.dp else 14.dp
     val collectionFixedFocus = focusSectionForUi == FocusSection.COLLECTION &&
@@ -3205,7 +3203,7 @@ private fun DetailsCollectionRail(
         )
 
         Box(modifier = Modifier.fillMaxWidth()) {
-            TvLazyRow(
+            LazyRow(
                 state = collectionRowState,
                 modifier = Modifier.arvioDpadFocusGroup(enableFocusRestorer = false),
                 contentPadding = PaddingValues(
@@ -3287,7 +3285,7 @@ private fun lockedDetailsRailEndPadding(
         .coerceAtLeast(minimum)
 }
 
-private suspend fun TvLazyListState.animateDetailsScrollDelta(
+private suspend fun LazyListState.animateDetailsScrollDelta(
     deltaPx: Float,
     durationMillis: Int
 ) {
@@ -3337,7 +3335,7 @@ private fun FixedDetailsRailFocusOverlay(
 
 @Composable
 private fun HomeStyleRowAutoScroll(
-    rowState: TvLazyListState,
+    rowState: LazyListState,
     isCurrentRow: Boolean,
     focusedItemIndex: Int,
     totalItems: Int,

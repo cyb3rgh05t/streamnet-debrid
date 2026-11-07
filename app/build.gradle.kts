@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 500
-        versionName = "2.5.099"
+        versionCode = 501
+        versionName = "2.6.000"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -336,10 +336,9 @@ ksp {
     implementation("androidx.activity:activity-ktx:1.10.0")
     implementation("androidx.activity:activity-compose:1.10.0")
 
-    // Compose BOM — bumped alongside Kotlin 2.1. Staying on the 2024.06
-    // line keeps tv-foundation 1.0.0-alpha11 happy; newer BOMs drift the
-    // runtime off alpha11 and cause invalid-slot-table crashes on D-pad.
-    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    // Compose BOM. The former pin to the 2024.06 line existed only for tv-foundation
+    // alpha11 (slot-table crashes on D-pad with newer runtimes); that dependency is gone.
+    implementation(platform("androidx.compose:compose-bom:2026.06.01"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
@@ -347,9 +346,8 @@ ksp {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.animation:animation")
 
-    // Compose for TV - Core TV components
-    // tv-foundation stays alpha (no beta/stable releases exist); tv-material bumped to stable
-    implementation("androidx.tv:tv-foundation:1.0.0-alpha11")
+    // Compose for TV - Material components. The TV lazy lists (tv-foundation alpha) were
+    // replaced by the standard foundation lazy layouts so the Compose BOM can move forward.
     implementation("androidx.tv:tv-material:1.0.0")
 
     // Navigation
@@ -471,7 +469,7 @@ ksp {
     testImplementation("org.robolectric:robolectric:4.11.1")  // Android mocking
 
     // Android Instrumented Testing
-    androidTestImplementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    androidTestImplementation(platform("androidx.compose:compose-bom:2026.06.01"))
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test:core-ktx:1.5.0")
     androidTestImplementation("androidx.test:runner:1.5.2")

@@ -38,7 +38,6 @@ import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LocalDeviceType
 import com.arflix.tv.ui.skin.ArvioSkin
 import com.arflix.tv.ui.skin.resolveAccentColor
-import androidx.tv.foundation.lazy.list.TvLazyRow
 
 /**
  * Shimmer brush used by skeleton loaders.
@@ -253,7 +252,7 @@ fun SkeletonCategoryRow(
                 }
             }
         } else {
-            TvLazyRow(
+            androidx.compose.foundation.lazy.LazyRow(
                 contentPadding = PaddingValues(end = 48.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {

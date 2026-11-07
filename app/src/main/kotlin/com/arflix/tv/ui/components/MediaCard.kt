@@ -568,7 +568,7 @@ fun MediaCard(
                     Modifier.basicMarquee(
                         iterations = Int.MAX_VALUE,
                         initialDelayMillis = 900,
-                        delayMillis = 1_200,
+                        repeatDelayMillis = 1_200,
                         velocity = 32.dp
                     )
                 } else {
