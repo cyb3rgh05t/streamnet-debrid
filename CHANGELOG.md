@@ -4,6 +4,14 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.003] - 2026-11-08
+
+- Android-Version: `2.6.003` / Code `504`.
+- Android-Abhängigkeiten: Bibliotheken auf die neuesten mit AGP 8.13.2 und compileSdk 36 kompatiblen Versionen angehoben: Coil `2.5.0` → `2.7.0`, Lifecycle `2.7.0` → `2.10.0`, Activity `1.10.0` → `1.12.4`, Core KTX `1.12.0` → `1.17.0`, DataStore `1.0.0` → `1.2.1`, WorkManager `2.9.0` → `2.11.2`, ProfileInstaller `1.3.1` → `1.4.1`. Unverändert bleiben Coroutines (`1.7.3`, per `force` festgehalten, Grund undokumentiert), Navigation Compose, Hilt Navigation Compose, Media3, Ktor, Retrofit, OkHttp, jsoup und Sentry.
+- Dokumentation: `PERFORMANCE.md` um die TV-Performance-Arbeiten ab 2.6.000, die drei behobenen Regressionen und eine Liste der offenen Punkte ergänzt.
+- Android-Validierung: 911 Unit-Tests ohne Fehler, davon einer übersprungen; beide Flavors kompilieren, der Staging-Build mit R8 baut. Auf dem Emulator geprüft: Start, Home-Reihen, Collection-Tab-Wechsel mit einem Klick, Live-TV-Sender startet mit einem Klick. Nicht geprüft: VOD-Wiedergabe, Trakt und Cloud-Sync, Plugins, Discord, Telegram und Verhaltensänderungen von Coil 2.7 über diese Bildschirme hinaus. Auf echter TV-Hardware nicht geprüft.
+- Backend und Web unverändert.
+
 ## [2.6.002] - 2026-11-08
 
 - Android-Version: `2.6.002` / Code `503`.

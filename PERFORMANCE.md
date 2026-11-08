@@ -99,3 +99,62 @@ The Android changes are included in version 2.5.094 / code 495. Backend and Web 
 - Dotted initialisms are compacted before article removal, so S.W.A.T./SWAT, N.C.I.S./NCIS and A.I./AI match consistently. Regression tests preserve movie/series, explicit-year and spin-off distinctions. The user's specific remaining S.W.A.T. misidentification was not available in the retained runtime log; no claim is made that every ambiguous programme can be resolved correctly.
 - The Netflix Live-TV video preview uses a black first-frame cover with the existing centered channel logo instead of a gradient. Buffering and first-frame transitions are retained.
 - Final full Android suite: 903 tests, 0 failures/errors, 1 skipped. Debug build passed. Existing Windows Robolectric cleanup warnings are not test failures. No new FPS or production latency benchmark is claimed.
+
+## Android 2.6.x TV Performance Work
+
+Date: 2026-11-08. Releases 2.6.000 to 2.6.002 and the follow-up library update below. These changes target slow behaviour reported on Android TV, where phones and tablets feel fluid. The cause was not measured on TV hardware; the changes follow code-level findings, and no device FPS, startup time or percentage speedup is claimed.
+
+### Hypotheses From Code Review
+
+Android TV boxes typically combine weak CPUs, 1.5 to 2 GB RAM, slow storage and 1080p/4K output with heavy overdraw. The app already had a TV-sized Coil cache, RGB_565 decoding, target-size image requests, a baseline profile, trailer autoplay off by default, SQLite-backed channel lists and fast-scroll detection. The candidates found were:
+
+- R8 could barely optimise or shrink the app: blanket keep rules for `androidx.compose.**` and `com.arflix.tv.**`, plus broad keeps for Media3, Coil, Ktor, Jackson, Supabase and TDLib.
+- Compose BOM `2024.06.00`, pinned there only because of `tv-foundation` alpha11.
+- Home rows recomposed on every frame of the scroll animation, because `firstVisibleItemIndex` and `firstVisibleItemScrollOffset` were read directly in composition.
+- The Home backdrop was decoded at full screen resolution, which is roughly 33 MB per 4K bitmap against a 48 MB TV image cache.
+
+### Implemented Changes
+
+| Change | Measured result |
+| --- | --- |
+| Removed the blanket Compose keep rules | Release DEX 49.6 MB to 30.4 MB |
+| Replaced the blanket `com.arflix.tv.**` keep with targeted rules (Gson fields and no-arg constructors, `domain.model` for Moshi reflection, WorkManager workers, Discord JNI bridge, Hilt entry points, Retrofit R8 full-mode rules, `XtreamDiskCache`) | Release DEX about 27 MB |
+| Replaced `TvLazyRow`, `TvLazyColumn`, `TvLazyVerticalGrid` with the standard Lazy layouts and removed `tv-foundation` | Build and emulator checks only |
+| Compose BOM `2024.06.00` to `2026.06.01` | See the AGP limit below |
+| Home rail scroll position read through `derivedStateOf` | Not measured |
+| Home backdrop decode size capped at 1920x1080 | Not measured |
+
+The Compose BOM stops at `2026.06.01`. `2026.08.00` and newer (Compose 1.12) require AGP 9.1, while the project stays on AGP 8.13.2 because Hilt 2.59 does not work with AGP 9 yet.
+
+### Regressions Introduced And Fixed
+
+The change set caused three regressions that unit tests did not catch. They are fixed in 2.6.001 and 2.6.002:
+
+- IPTV-only Home showed only the Live-TV rows. R8 removed the type parameter of the generic `XtreamDiskCache<T>`, Gson threw `requires 0 type arguments, but got 1`, the provider VOD library never loaded and the filter hid every other row. Fixed with a keep rule. A loaded availability set now also survives an empty refresh, and failures are logged with the `[IPTV-VOD]` tag.
+- Netflix Live-TV channel cards needed two OK presses. The card had a redundant `focusable()` next to `combinedClickable`; with the new Compose version the second focus target swallowed the first press. An A/B build confirmed it: the pure 2.5.099 build starts the stream on one press. The redundant `focusable()` was removed.
+- The collection tabs (Timeline, Movies, Series) needed two OK presses for the same reason, with a redundant `focusable()` next to `clickable`. Removed in 2.6.002.
+
+Lessons: a minified build needs a smoke test that loads every Gson cache type, and focus behaviour needs a one-press check after any Compose upgrade.
+
+### Library Update
+
+Updated to the newest versions compatible with AGP 8.13.2 and compileSdk 36: Coil 2.5.0 to 2.7.0, Lifecycle 2.7.0 to 2.10.0, Activity 1.10.0 to 1.12.4, Core KTX 1.12.0 to 1.17.0, DataStore 1.0.0 to 1.2.1, WorkManager 2.9.0 to 2.11.2 and ProfileInstaller 1.3.1 to 1.4.1.
+
+- Not updated: `kotlinx-coroutines` stays at 1.7.3 because `configurations.all` forces it, added in 6d1121a2 ("fix build failed by plugins feature"). The reason for the pin is not documented. Navigation Compose (2.7.6), Hilt Navigation Compose (1.1.0), Media3, Ktor (2.3.7), Retrofit, OkHttp, jsoup and Sentry were not changed in this round.
+- Checked: both flavours compile, 911 unit tests pass (0 failures/errors, 1 skipped), the Sideload Staging build with R8 succeeds with the same DEX size class (9.1, 11.4 and 6.7 MB). On the emulator Home rows, a collection tab switch and a Live-TV channel start on one press work.
+- Not checked: VOD playback, Trakt and cloud sync, plugins, Discord, Telegram, and every Coil 2.7 behaviour change beyond what the screens above show.
+
+### Open Work
+
+Work through these over time, measuring each step where it claims an effect:
+
+1. Smoke-test the minified build in the areas not yet exercised (VOD playback, Trakt, cloud sync, plugins, Discord, Telegram).
+2. Add a test that loads every Gson cache and persisted type on a minified build.
+3. Measure cold start, focus-change latency and frame timing on a real low-end TV, before and after, for example with Perfetto and `dumpsys gfxinfo`.
+4. Regenerate the baseline profile; `baseline-prof.txt` dates from 2026-10-28, before the Compose and R8 changes.
+5. Add a low-end TV mode that reduces hero video, trailers in cards, crossfades and prefetch volume. Today `isLowRamDevice` only sizes the caches.
+6. Split the very large `HomeScreen` and `HomeViewModel` and collect narrower state flows, so one field no longer recomposes the whole Home.
+7. Narrow the remaining blanket keep rules (Media3, Coil, Ktor, Jackson, Supabase, TDLib), one package at a time with a device test.
+8. Update the remaining libraries individually: Navigation Compose, Hilt Navigation Compose, Media3, Ktor, Retrofit, OkHttp, jsoup, Sentry, and find out why coroutines is pinned.
+9. Compose 1.12 and newer: blocked until AGP 9.1 and a working Hilt are available.
+10. Review the remaining `focusable()` plus click patterns (skip-intro button, variant picker, Live-TV category chip). They also handle OK in `onKeyEvent` and are probably unaffected, but this was only read, not run.

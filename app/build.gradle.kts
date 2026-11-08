@@ -36,8 +36,8 @@ android {
         // Fire TV devices can be as low as Android 7.1 (API 25) or lower depending on model/OS.
         minSdk = 23
         targetSdk = 36
-        versionCode = 503
-        versionName = "2.6.002"
+        versionCode = 504
+        versionName = "2.6.003"
         buildConfigField("String", "GITHUB_OWNER", "\"cyb3rgh05t\"")
         buildConfigField("String", "GITHUB_REPO", "\"streamnet-debrid\"")
         buildConfigField("Boolean", "FEATURE_PLUGINS_ENABLED", "false")
@@ -325,16 +325,16 @@ ksp {
     compileOnly("org.checkerframework:checker-qual:3.43.0")
 
     // Core Android
-    implementation("androidx.core:core-ktx:1.12.0")
+    implementation("androidx.core:core-ktx:1.17.0")
     implementation("androidx.core:core-splashscreen:1.0.1")  // Android 12+ Splash Screen
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     // Provides collectAsStateWithLifecycle — pauses Flow collection while the
     // screen is off so we don't drive recompositions on invisible UI.
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.activity:activity:1.10.0")
-    implementation("androidx.activity:activity-ktx:1.10.0")
-    implementation("androidx.activity:activity-compose:1.10.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+    implementation("androidx.activity:activity:1.12.4")
+    implementation("androidx.activity:activity-ktx:1.12.4")
+    implementation("androidx.activity:activity-compose:1.12.4")
 
     // Compose BOM. The former pin to the 2024.06 line existed only for tv-foundation
     // alpha11 (slot-table crashes on D-pad with newer runtimes); that dependency is gone.
@@ -398,9 +398,9 @@ ksp {
     implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.7.1")
 
     // Image loading - Coil
-    implementation("io.coil-kt:coil-compose:2.5.0")
-    implementation("io.coil-kt:coil-gif:2.5.0")
-    implementation("io.coil-kt:coil-svg:2.5.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("io.coil-kt:coil-gif:2.7.0")
+    implementation("io.coil-kt:coil-svg:2.7.0")
     implementation("com.google.zxing:core:3.5.3")
 
     implementation("io.ktor:ktor-client-android:2.3.7")
@@ -411,17 +411,17 @@ ksp {
     implementation("io.ktor:ktor-server-host-common:2.3.7")
 
     // DataStore for preferences
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
+    implementation("androidx.datastore:datastore-preferences:1.2.1")
 
     // WorkManager for background sync
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Stable 1.2.0: the 1.4.0-rc01 RC depends on dagger Hilt 2.59 and forces the whole
     // graph onto the AGP-9-only (and currently broken) 2.59. 1.2.0 works with Hilt 2.57.
     implementation("androidx.hilt:hilt-work:1.2.0")
     ksp("androidx.hilt:hilt-compiler:1.2.0")
 
     // Profile installer for baseline profiles
-    implementation("androidx.profileinstaller:profileinstaller:1.3.1")
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     // Performance instrumentation
     implementation("androidx.metrics:metrics-performance:1.0.0-alpha04")
