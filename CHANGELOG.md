@@ -4,6 +4,15 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.004] - 2026-11-08
+
+- Android-Version: `2.6.004` / Code `505`.
+- Android-Tests: Neuer Wächtertest `R8KeepRulesGuardTest`. Er scheitert, wenn eine App-Klasse mit Typparameter an Gsons `getParameterized` oder `TypeToken` übergeben wird, ohne dass `proguard-rules.pro` eine passende Keep-Regel hat (der Fehler aus 2.6.000), wenn die `XtreamDiskCache`-Regel abgeschwächt wird oder wenn ein pauschales Keep für `com.arflix.tv.**` oder `androidx.compose.**` zurückkehrt. In beide Richtungen geprüft: grün mit der Regel, rot ohne sie. Der Test liest nur Text und führt R8 nicht aus; er beweist nicht, dass jeder andere gespeicherte Typ die Minifizierung übersteht.
+- Android-Build: Die Test-Tasks deklarieren `proguard-rules.pro` und `src` als Eingaben, damit der Wächter nach einer reinen Regeländerung nicht als aktuell übersprungen wird.
+- Dokumentation: `PERFORMANCE.md`, Punkte 1 und 2 der offenen Liste aktualisiert.
+- Android-Validierung: 915 Unit-Tests ohne Fehler, davon einer übersprungen. Auf dem Emulator mit dem minifizierten Staging-Build geprüft: Wiedergabe über ein Stremio-Addon (1080p HEVC, Start in 2,5 s) und Cloud-Sync (Push und Pull erfolgreich). Nicht geprüft: Trakt, Plugins (CloudStream, QuickJS), Discord, Telegram, die Xtream-VOD-Wiedergabe und echte TV-Hardware.
+- Backend und Web unverändert.
+
 ## [2.6.003] - 2026-11-08
 
 - Android-Version: `2.6.003` / Code `504`.

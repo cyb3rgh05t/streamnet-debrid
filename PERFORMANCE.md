@@ -148,8 +148,8 @@ Updated to the newest versions compatible with AGP 8.13.2 and compileSdk 36: Coi
 
 Work through these over time, measuring each step where it claims an effect:
 
-1. Smoke-test the minified build in the areas not yet exercised (VOD playback, Trakt, cloud sync, plugins, Discord, Telegram).
-2. Add a test that loads every Gson cache and persisted type on a minified build.
+1. Finish the smoke test of the minified build. Done on the Sideload Staging build on an emulator: VOD playback through a Stremio-type addon (1080p HEVC started in 2.5 s), cloud sync (push and pull succeeded) and the Gson-backed Home, collection and Live-TV screens. Still open: Trakt, plugins (CloudStream, QuickJS), Discord Rich Presence, Telegram and the Xtream VOD playback path itself, because they need accounts or sources that are not set up on the emulator.
+2. Done in part: `R8KeepRulesGuardTest` (package `com.arflix.tv.shrinker`) fails when an app class declared with a type parameter is passed to Gson's `getParameterized` or `TypeToken` without a matching keep rule, when the `XtreamDiskCache` rule is weakened, or when a blanket keep for `com.arflix.tv.**` or `androidx.compose.**` returns. It was checked in both directions: green with the rule, and red when the rule is removed, also without `--rerun`, because the test task now declares `proguard-rules.pro` and `src` as inputs. It reads text only and cannot run R8, so it does not prove that every other persisted type survives minification. A test that runs against a minified build is still open.
 3. Measure cold start, focus-change latency and frame timing on a real low-end TV, before and after, for example with Perfetto and `dumpsys gfxinfo`.
 4. Regenerate the baseline profile; `baseline-prof.txt` dates from 2026-10-28, before the Compose and R8 changes.
 5. Add a low-end TV mode that reduces hero video, trailers in cards, crossfades and prefetch volume. Today `isLowRamDevice` only sizes the caches.
