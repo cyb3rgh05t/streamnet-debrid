@@ -360,9 +360,9 @@ ksp {
     // Navigation
     implementation("androidx.navigation:navigation-compose:2.7.6")
 
-    // Hilt for DI — 2.57 (last stable for AGP 8.x). 2.59's Gradle plugin demands
-    // AGP 9 + Gradle 9.1 and is broken there (dagger#5099). androidx.hilt is held at
-    // stable 1.2.0 below so hilt-work doesn't drag dagger back up to 2.59.
+    // Hilt for DI — 2.57. Hilt 2.59+ needs AGP 9 + Gradle 9.1 for its Gradle plugin; the earlier
+    // dagger#5099 bug is fixed in 2.59.1/2.59.2. androidx.hilt is held at stable 1.2.0 below so
+    // hilt-work doesn't drag dagger up to 2.59+ while the project is on AGP 8.
     implementation("com.google.dagger:hilt-android:2.57")
     ksp("com.google.dagger:hilt-compiler:2.57")
     implementation("androidx.hilt:hilt-navigation-compose:1.1.0")
@@ -423,7 +423,7 @@ ksp {
     // WorkManager for background sync
     implementation("androidx.work:work-runtime-ktx:2.11.2")
     // Stable 1.2.0: the 1.4.0-rc01 RC depends on dagger Hilt 2.59 and forces the whole
-    // graph onto the AGP-9-only (and currently broken) 2.59. 1.2.0 works with Hilt 2.57.
+    // graph onto the AGP-9-only 2.59. 1.2.0 works with Hilt 2.57.
     implementation("androidx.hilt:hilt-work:1.2.0")
     ksp("androidx.hilt:hilt-compiler:1.2.0")
 

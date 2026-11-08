@@ -120,11 +120,13 @@ Android TV boxes typically combine weak CPUs, 1.5 to 2 GB RAM, slow storage and 
 | Removed the blanket Compose keep rules | Release DEX 49.6 MB to 30.4 MB |
 | Replaced the blanket `com.arflix.tv.**` keep with targeted rules (Gson fields and no-arg constructors, `domain.model` for Moshi reflection, WorkManager workers, Discord JNI bridge, Hilt entry points, Retrofit R8 full-mode rules, `XtreamDiskCache`) | Release DEX about 27 MB |
 | Replaced `TvLazyRow`, `TvLazyColumn`, `TvLazyVerticalGrid` with the standard Lazy layouts and removed `tv-foundation` | Build and emulator checks only |
-| Compose BOM `2024.06.00` to `2026.06.01` | See the AGP limit below |
+| Compose BOM `2024.06.00` to `2026.06.01` (Compose 1.11.4) | Build and emulator checks only |
 | Home rail scroll position read through `derivedStateOf` | Not measured |
 | Home backdrop decode size capped at 1920x1080 | Not measured |
 
-The Compose BOM stops at `2026.06.01`. `2026.08.00` and newer (Compose 1.12) require AGP 9.1, while the project stays on AGP 8.13.2 because Hilt 2.59 does not work with AGP 9 yet.
+The Compose BOM stops at `2026.06.01` (Compose 1.11.4). `2026.08.00` and newer (Compose 1.12) require AGP 9.1, and the project is on AGP 8.13.2. An earlier version of this section said Hilt 2.59 does not work on AGP 9; that is outdated. dagger#5099 is fixed in Hilt 2.59.1 and 2.59.2, and Hilt 2.60.1 exists. What remains is the AGP 9 migration itself (Gradle 9.1 or newer, Hilt 2.59+ which requires AGP 9, Kotlin handling, plugin compatibility), which is not done and not tried.
+
+Expected value of Compose 1.12: the release notes between 1.10 and 1.12 mention a rewritten SlotTable and a LinkTable meant to speed up recomposition, a `combinedClickable` rewrite and a `derivedStateOf` leak fix. They give no measurements, and it was not determined which of these were already in 1.11. The gain from 1.11.4 to 1.12 is therefore unknown and possibly small. The decision is deferred until the TV measurement below shows recomposition is a bottleneck.
 
 ### Regressions Introduced And Fixed
 
@@ -156,5 +158,72 @@ Work through these over time, measuring each step where it claims an effect:
 6. Split the very large `HomeScreen` and `HomeViewModel` and collect narrower state flows, so one field no longer recomposes the whole Home.
 7. Narrow the remaining blanket keep rules (Media3, Coil, Ktor, Jackson, Supabase, TDLib), one package at a time with a device test.
 8. Update the remaining libraries individually: Navigation Compose, Hilt Navigation Compose, Media3, Ktor, Retrofit, OkHttp, jsoup, Sentry, and find out why coroutines is pinned.
-9. Compose 1.12 and newer: blocked until AGP 9.1 and a working Hilt are available.
+9. Compose 1.12 and newer, Hilt 2.59+: not blocked by a Hilt bug any more, but requires the AGP 9 migration. Low priority until the TV measurement (item 3, see the guide below) shows a recomposition bottleneck. If it is done, use a separate branch, then repeat the smoke tests and the one-press focus checks.
 10. Review the remaining `focusable()` plus click patterns (skip-intro button, variant picker, Live-TV category chip). They also handle OK in `onKeyEvent` and are probably unaffected, but this was only read, not run.
+
+## TV Measurement Guide
+
+Purpose: find out whether 2.6.x is faster than 2.5.099 on a real, weak Android TV, and where the time goes. Nothing below has been run on a TV yet. The cold-start and `gfxinfo` commands of sections 1 and 2 were run once on the emulator and return the fields named there (emulator numbers are not meaningful); the Live-TV pattern, `meminfo`, `exit-info` and Perfetto steps were not run. Run everything from a PC with `adb`.
+
+### 0. Setup and fair conditions
+
+- Enable developer options and network debugging on the TV, then `adb connect <tv-ip>:5555`. Use `adb -s <tv-ip>:5555 ...` if more than one device is attached.
+- Package names: release `com.arvio.tv`, staging `com.arvio.tv.beta`. Launch activity `com.arflix.tv.MainActivity`. The manifest sets `profileable android:shell="true"`, so Perfetto can see the app's trace sections on release builds.
+- Record the device once: `adb shell getprop ro.product.model`, `adb shell getprop ro.build.version.release`, `adb shell wm size`, `adb shell wm density`, `adb shell cat /proc/meminfo` (first lines) and `adb shell cat /proc/cpuinfo`.
+- Compare builds one after the other on the same TV: install A, measure, uninstall, install B, measure. A downgrade usually needs an uninstall on a retail TV; local data is lost, the profile comes back through cloud sync. Take A from the 2.5.099 release APK if the release page has it, otherwise build it from commit `13950a05`.
+- Same account, same Wi-Fi, same Home rails, same app settings. Let the TV idle for about 5 minutes between series so thermal throttling does not skew the second series.
+- After installing, start the app once, wait 2 minutes, then force the profile-guided compile so both builds run with their own baseline profile: `adb shell cmd package compile -f -m speed-profile <package>`.
+- The app must be on Home with focus on the first rail before each Home run (a profile picker can appear first).
+
+### 1. Cold start
+
+```powershell
+$pkg = "com.arvio.tv"
+1..10 | ForEach-Object {
+  adb shell am force-stop $pkg; Start-Sleep 4
+  adb shell am start -W -n "$pkg/com.arflix.tv.MainActivity" | Select-String "TotalTime|WaitTime"
+}
+```
+
+Take the median of `TotalTime`. This is the time to the first displayed frame, not to visible Home rails: the app does not call `reportFullyDrawn`. For the time until the rails appear, use the Perfetto trace below or a screen recording.
+
+### 2. Home navigation: frame statistics
+
+```powershell
+$pkg = "com.arvio.tv"
+adb shell dumpsys gfxinfo $pkg reset
+adb shell 'for i in 1 2 3 4 5 6 7 8; do input keyevent KEYCODE_DPAD_RIGHT; sleep 0.35; done; for i in 1 2 3 4 5 6; do input keyevent KEYCODE_DPAD_DOWN; sleep 0.5; done; for i in 1 2 3 4 5 6; do input keyevent KEYCODE_DPAD_UP; sleep 0.5; done; for i in 1 2 3 4 5 6 7 8; do input keyevent KEYCODE_DPAD_LEFT; sleep 0.35; done'
+adb shell dumpsys gfxinfo $pkg | Select-String "Total frames|Janky|percentile|Missed|High input|Slow"
+```
+
+Repeat 3 times per build and use the median. Each `input keyevent` starts a process, so the real key rate is lower on a weak TV; that is the same for both builds and keeps the comparison fair, but it is not a held-key test. For a held key, press and hold a physical remote key for about 5 seconds instead.
+
+The numbers to compare: `Total frames rendered`, `Janky frames`, and the 90th, 95th and 99th percentile frame times. At 60 Hz the frame budget is 16.7 ms.
+
+### 3. Live TV: channel rail
+
+Open Live TV, put focus on the channel rail, then run the same pattern with `DPAD_RIGHT` and `DPAD_LEFT` along the rail and `DPAD_UP` and `DPAD_DOWN` between the chips and the rail, with `dumpsys gfxinfo ... reset` before and the dump after. Also check by hand that one OK press on another channel card starts that channel (this was broken in 2.6.000).
+
+### 4. Memory and low-memory kills
+
+After about 5 minutes of normal use: `adb shell dumpsys meminfo <package>` (look at `TOTAL PSS`, `Native Heap`, `Graphics`), `adb shell dumpsys meminfo | Select-String "Total RAM|Free RAM"` and `adb shell dumpsys activity exit-info <package>` (a `LOW_MEMORY` or `Native crash` reason means the TV killed the app).
+
+### 5. Perfetto trace: why it is slow
+
+Easiest path is the web UI: open `ui.perfetto.dev`, choose Record new trace, Android, connect to the TV over ADB, tick the atrace categories `gfx`, `view`, `input`, `dalvik`, `am` and `wm` plus CPU scheduling and frequency, and put the package name into the atrace apps field. Record 30 seconds while running the Home workload from section 2. If the TV's `perfetto` binary accepts light-mode flags, `adb shell perfetto -o /data/misc/perfetto-traces/home.pftrace -t 30s -a <package> sched freq idle am wm gfx view input dalvik` does the same; pull it with `adb pull /data/misc/perfetto-traces/home.pftrace`. This command was not run here.
+
+In the trace look for: frames in the Actual Timeline that miss their deadline, the long slices on the main thread and `RenderThread` during them, GC pauses (`dalvik` category), CPU frequency and whether the little cores run the main thread, and the app's own slices `StreamNet.Home.compose`, `StreamNet.Home.TVRows.compose` and `StreamNet.Home.ContentRow.compose`. Many or long `ContentRow` slices per scroll step point to recomposition as the bottleneck, which is the case for the Compose 1.12 question in item 9.
+
+### 6. What to report back
+
+| Measure | 2.5.099 | 2.6.x |
+| --- | --- | --- |
+| Device, Android version, resolution | | |
+| Cold start `TotalTime`, median of 10 (ms) | | |
+| Home run: total frames, janky frames, 90th / 95th / 99th percentile (ms) | | |
+| Live TV rail run: same values | | |
+| `TOTAL PSS`, `Native Heap`, `Graphics` after 5 minutes (MB) | | |
+| Low-memory kill seen | | |
+| One OK press starts a channel | | |
+
+Also note what felt slow by hand: which screen, which action, and whether it was the first or every time. A trace of the slow action is worth more than any single number.
