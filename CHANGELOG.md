@@ -4,6 +4,19 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.005] - 2026-11-08
+
+- Android-Version: `2.6.005` / Code `506`.
+- Android Live TV Fanart: Mehrere belegte Ursachen für falsche Serien- und Filmbilder behoben, jeweils mit echten TMDB-Daten nachgestellt.
+  - Serien, die TMDB inzwischen anders nennt (`Hubert und Staller` heißt dort `Hubert ohne Staller`), wurden verworfen, und stattdessen erschien ein TV-Film mit passendem Titelanfang. Jetzt wird für bis zu drei Serien-Treffer, die ein Wort mit dem Titel teilen, die Aliasliste von TMDB geprüft und der Alias bei exakter Übereinstimmung akzeptiert. Der Aufruf läuft nur, wenn keine Serie zum Titel passt und die Sendung kein Film ist.
+  - Die Beschreibung der Sendung konnte ein Reboot auf die Originalserie zurückziehen: Die S.W.A.T.-Folge `Entführt` (2017) nennt `Luca` und `Hondo`, beide Figuren stehen in der Übersicht der Serie von 1975. Zwei Treffer bei zwölf Wörtern gaben 58 Punkte und schlugen die Reihenfolge nach Neuheit. Schwache Beschreibungs-Treffer (unter 100 Punkten) werden jetzt ignoriert; starke entscheiden weiter zwischen Neuauflagen (Ghosts, Equalizer).
+  - `Live` wurde überall im Titel gelöscht (`Live and Let Die` → `and Let Die`). Format-Tags (`Live`, `HD`, `4K`) gelten jetzt nur noch vor einem Trenner oder am Ende.
+  - Zahlen, die kein Erscheinungsjahr sein können, bleiben im Titel (`Blade Runner 2049` wurde als Jahr 2049 gelesen und schloss jeden Treffer aus).
+  - `Die Simpsons (Staffel 36)` hinterließ einen offenen Klammerrest `Die Simpsons (`.
+  - Die Log-Zeile `Ranked ...` nennt zusätzlich die ersten drei Kandidaten und den Anfang der Beschreibung; neue Zeile `Alias match ...`.
+- Android-Validierung: 920 Unit-Tests ohne Fehler, davon einer übersprungen. Der S.W.A.T.-Test scheitert ohne die Schwelle und läuft mit ihr durch. Auf dem Emulator geprüft: `Hubert und Staller` wählt jetzt die Serie statt des TV-Films, S.W.A.T. wählt die Serie von 2017 (eine andere Folge als die nachgestellte). Nicht geprüft: auf echter TV-Hardware, und wie viele weitere falsche Treffer es noch gibt. Nicht behoben: `Terra X: Die Macht der Götter` wählt die Serie `Terra X` von 1982.
+- Backend und Web unverändert.
+
 ## [2.6.004] - 2026-11-08
 
 - Android-Version: `2.6.004` / Code `505`.

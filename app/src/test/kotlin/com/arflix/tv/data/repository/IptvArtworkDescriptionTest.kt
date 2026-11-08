@@ -147,4 +147,50 @@ class IptvArtworkDescriptionTest {
             description = "Sam und Jay in Woodstone.",
         ).single().id)
     }
+
+    @Test
+    fun `two shared character names do not pull a reboot back to its original`() {
+        // Real TMDB data: S.W.A.T. (2017) s02e07 names Luca and Hondo, which are also characters of the
+        // 1975 series. Two of twelve words used to give the old series 58 points and win.
+        val current = MediaItem(
+            71790, "S.W.A.T.", year = "2017", mediaType = MediaType.TV, popularity = 115f,
+            overview = "Die Serie dreht sich um einen lokal verwurzelten Seargent, der im Spannungsfeld zwischen " +
+                "der Loyalität zur Straße und seinen polizeilichen Pflichten mit seinem Team die letzte Bastion " +
+                "der Verbrechensbekämpfung führt.",
+        )
+        val original = MediaItem(
+            11129, "S.W.A.T.", year = "1975", mediaType = MediaType.TV, popularity = 6f,
+            overview = "Lieutenant Dan Hondo Harrelson leitet die Spezialeinheit, zu der auch Dominic Luca " +
+                "gehört, bestehend aus ehemaligen Soldaten für besonders gefährliche Aufträge.",
+        )
+        val description = "Luca und sein Vater helfen mit ihrer Erfahrung aus einem alten Entführungsfall, nach " +
+            "einem Nachahmungstäter zu fahnden. Hondo muss sich bei einer rassistischen Verkehrskontrolle " +
+            "zusammenreißen."
+        listOf(listOf(current, original), listOf(original, current)).forEach { items ->
+            assertEquals(current.id, rankIptvArtworkCandidates(
+                "S.W.A.T.", items, 45 * 60_000L, null, description = description,
+            ).first().id)
+        }
+        assertTrue(iptvArtworkDescriptionScores(description, listOf(current, original)).values.all { it == 0.0 })
+    }
+
+    @Test
+    fun `a renamed series is found through its old title as alias`() {
+        // Real TMDB data: the series is now "Hubert ohne Staller", the guide still says "Hubert und Staller".
+        val renamed = MediaItem(53193, "Hubert ohne Staller", year = "2011", mediaType = MediaType.TV, popularity = 20f)
+        val tvMovie = MediaItem(
+            378782, "Hubert und Staller - Unter Wölfen", year = "2016", mediaType = MediaType.MOVIE, popularity = 3f,
+        )
+        assertTrue(iptvArtworkAliasLookupWorthTrying("Hubert und Staller", renamed.title))
+        assertTrue(!iptvArtworkAliasLookupWorthTrying("Live NFL Cincinnati Bengals", renamed.title))
+        assertEquals(
+            "Hubert und Staller",
+            iptvArtworkAliasMatch("Hubert und Staller", listOf("Hubert & Staller", "Heiter bis tödlich - Hubert und Staller", "Hubert und Staller")),
+        )
+        assertEquals(null, iptvArtworkAliasMatch("Hubert und Staller", listOf("Hubert & Staller", "Heiter bis tödlich - Hubert und Staller")))
+        // Without the alias the TV movie wins; with it the series does, for an episode-length programme.
+        assertEquals(tvMovie.id, rankIptvArtworkCandidates("Hubert und Staller", listOf(renamed, tvMovie), 45 * 60_000L, null).single().id)
+        val aliased = renamed.copy(title = "Hubert und Staller")
+        assertEquals(renamed.id, rankIptvArtworkCandidates("Hubert und Staller", listOf(aliased, tvMovie), 45 * 60_000L, null).first().id)
+    }
 }

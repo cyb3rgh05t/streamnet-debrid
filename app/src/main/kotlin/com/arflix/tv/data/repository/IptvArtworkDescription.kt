@@ -32,6 +32,16 @@ internal fun iptvArtworkDescriptionScores(
             populated.count { token in it } * 2 <= populated.size
         }
         // A single shared word is not enough to override the existing title/type ranking.
-        if (distinctiveMatches < 2) 0.0 else 350.0 * distinctiveMatches / requested.size
+        if (distinctiveMatches < 2) {
+            0.0
+        } else {
+            // A TMDB overview describes the whole series, not the episode on air, and a reboot shares its
+            // characters with the original: the S.W.A.T. episode "Hondo ... Luca ..." (2017) shares exactly
+            // those two names with the 1975 overview (2 of 12 words, 58 points) and used to pull the old series
+            // above the current one. Weak overlap is ignored; strong overlap still decides between versions.
+            (350.0 * distinctiveMatches / requested.size).takeIf { it >= MIN_DESCRIPTION_SCORE } ?: 0.0
+        }
     }
 }
+
+private const val MIN_DESCRIPTION_SCORE = 100.0

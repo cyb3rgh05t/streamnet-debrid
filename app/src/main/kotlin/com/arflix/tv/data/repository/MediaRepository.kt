@@ -125,7 +125,13 @@ private val IPTV_ARTWORK_EPISODE_SUFFIX_REGEX = Regex(
     """(?i)\s*(?:[-–—|:]\s*)?(?:s(?:eason)?\s*\d{1,2}\s*e(?:pisode)?\s*\d{1,4}|staffel\s*\d{1,2}(?:\s*folge\s*\d{1,4})?|episode\s*\d{1,4}|folge\s*\d{1,4})\b.*$"""
 )
 private val IPTV_ARTWORK_QUALIFIER_REGEX = Regex("""\([^)]*\)|\[[^]]*]""")
-private val IPTV_ARTWORK_FORMAT_REGEX = Regex("""(?i)\b(live|hd|uhd|4k)\b""")
+// Format tags only count as tags in front of a separator ("LIVE: Show") or at the end ("Show - HD").
+// Matching them anywhere deleted real title words, e.g. "Live and Let Die" became "and Let Die".
+private val IPTV_ARTWORK_FORMAT_REGEX = Regex(
+    """(?i)^\s*(?:live|hd|uhd|4k)\s*[:|–—-]\s*|\s+(?:[:|–—-]\s*)?(?:live|hd|uhd|4k)\s*$"""
+)
+// A bracket left open after the episode suffix cut, e.g. "Die Simpsons (Staffel 36)" -> "Die Simpsons (".
+private val IPTV_ARTWORK_DANGLING_BRACKET_REGEX = Regex("""\s*[(\[]\s*$""")
 private val IPTV_ARTWORK_DIACRITICS_REGEX = Regex("""\p{M}+""")
 private val IPTV_ARTWORK_INITIALISM_REGEX = Regex("""\b[a-z](?:\.[a-z])+\b\.?""")
 private val IPTV_ARTWORK_NON_ALPHANUMERIC_REGEX = Regex("""[^a-z0-9\s]""")
@@ -138,14 +144,27 @@ private val IPTV_ARTWORK_YEAR_REGEX = Regex("""(?:[(\[]\s*|\s+)((?:19|20)\d{2})(
 internal fun iptvArtworkHasEpisodeHint(rawTitle: String): Boolean =
     IPTV_ARTWORK_EPISODE_SUFFIX_REGEX.containsMatchIn(rawTitle)
 
+/**
+ * A trailing number is only a release year when it can be one. "Blade Runner 2049" is a title: read as
+ * year 2049 it removed the number from the search and then excluded every candidate.
+ */
+internal fun iptvArtworkPlausibleYear(
+    year: Int,
+    currentYear: Int = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR),
+): Boolean = year <= currentYear + 1
+
 internal fun iptvArtworkYear(rawTitle: String): Int? =
     IPTV_ARTWORK_YEAR_REGEX.find(rawTitle)?.groupValues?.get(1)?.toIntOrNull()
+        ?.takeIf { iptvArtworkPlausibleYear(it) }
 
 internal fun cleanIptvArtworkTitle(rawTitle: String): String = rawTitle
     .replace(IPTV_ARTWORK_EPISODE_SUFFIX_REGEX, " ")
     .replace(IPTV_ARTWORK_QUALIFIER_REGEX, " ")
-    .replace(IPTV_ARTWORK_YEAR_REGEX, " ")
+    .replace(IPTV_ARTWORK_YEAR_REGEX) { match ->
+        if (iptvArtworkPlausibleYear(match.groupValues[1].toInt())) " " else match.value
+    }
     .replace(IPTV_ARTWORK_FORMAT_REGEX, " ")
+    .replace(IPTV_ARTWORK_DANGLING_BRACKET_REGEX, " ")
     .replace(IPTV_ARTWORK_WHITESPACE_REGEX, " ")
     .trim()
 
@@ -211,6 +230,18 @@ internal fun iptvArtworkTitlesCompatible(requestedTitle: String, candidateTitle:
     return iptvArtworkSearchQueries(requestedTitle).any { normalizeIptvArtworkTitle(it) == candidate } ||
         iptvArtworkSearchQueries(candidateTitle).any { normalizeIptvArtworkTitle(it) == requested }
 }
+
+/**
+ * A series is renamed on TMDB (Hubert und Staller is now "Hubert ohne Staller") while the programme
+ * guide keeps the old name. Only a result that shares a word with the title is worth an alias lookup,
+ * so unrelated search results cost no extra request.
+ */
+internal fun iptvArtworkAliasLookupWorthTrying(requestedTitle: String, candidateTitle: String): Boolean =
+    iptvArtworkTitleScore(requestedTitle, candidateTitle) > 0.0
+
+/** The alias that equals the requested title once normalized, if the title list has one. */
+internal fun iptvArtworkAliasMatch(requestedTitle: String, aliases: List<String>): String? =
+    aliases.firstOrNull { iptvArtworkTitleScore(requestedTitle, it) >= 1_000.0 }
 
 internal fun rankIptvArtworkCandidates(
     title: String,
@@ -3938,6 +3969,10 @@ class MediaRepository @Inject constructor(
                     .any { iptvArtworkTitleScore(title, it.title) >= 500.0 }
             ) break
         }
+        // Series renamed on TMDB only match through an alias, so add those before ranking.
+        if (preferredMediaType != MediaType.MOVIE) {
+            searchResults += aliasMatchedTvCandidates(title, searchResults, requests)
+        }
         val candidates = trace("StreamNet.IPTV.rankArtworkCandidates") {
             rankIptvArtworkCandidates(title, searchResults, durationMs, year, originalTitles,
                 originalLanguages, preferredMediaType, description)
@@ -3949,9 +3984,38 @@ class MediaRepository @Inject constructor(
             "IptvArtwork",
             "Ranked title=$title year=$year selected=${selected?.id} type=${selected?.mediaType} " +
                 "candidateTitle=${selected?.title} originalTitle=${selected?.let { originalTitles[it.mediaType to it.id] }} " +
-                "candidateYear=${selected?.year} candidates=${candidates.size}",
+                "candidateYear=${selected?.year} candidates=${candidates.size} " +
+                "top=${candidates.take(3).joinToString { "${it.mediaType.name.first()}${it.id}:${it.year}" }} " +
+                "descStart=${description?.take(60)?.replace('\n', ' ')}",
         )
         return candidates
+    }
+
+    /**
+     * TV results that TMDB lists under a newer name but also knows by the requested title. Runs only when
+     * no TV result fits the title, for the three most popular TV results that share a word with it, and
+     * accepts an alias only on an exact normalized match.
+     */
+    private suspend fun aliasMatchedTvCandidates(
+        title: String,
+        searchResults: List<MediaItem>,
+        requests: IptvArtworkRequests,
+    ): List<MediaItem> {
+        val tvResults = searchResults.filter { it.mediaType == MediaType.TV }
+        if (tvResults.isEmpty() || tvResults.any { iptvArtworkTitlesCompatible(title, it.title) }) return emptyList()
+        return tvResults
+            .distinctBy { it.id }
+            .filter { iptvArtworkAliasLookupWorthTrying(title, it.title) }
+            .sortedByDescending { it.popularity }
+            .take(3)
+            .mapNotNull { candidate ->
+                val aliases = requests.load { tmdbApi.getTvAlternativeTitles(candidate.id, apiKey).results }
+                    .orEmpty().mapNotNull { it.title?.takeIf(String::isNotBlank) }
+                iptvArtworkAliasMatch(title, aliases)?.let { alias ->
+                    Log.d("IptvArtwork", "Alias match title=$title tv=${candidate.id} current=${candidate.title} alias=$alias")
+                    candidate.copy(title = alias)
+                }
+            }
     }
 
     private suspend fun lookupFanartArtwork(

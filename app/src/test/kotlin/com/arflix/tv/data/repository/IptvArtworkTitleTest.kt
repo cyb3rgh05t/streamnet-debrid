@@ -331,4 +331,33 @@ class IptvArtworkTitleTest {
         assertEquals("/de.jpg", merged.posterPath)
         assertEquals("/neutral.jpg", merged.backdropPath)
     }
+
+    @Test
+    fun `format words are stripped as tags but kept inside real titles`() {
+        assertEquals("Live and Let Die", cleanIptvArtworkTitle("Live and Let Die"))
+        assertEquals("Live Free or Die Hard", cleanIptvArtworkTitle("Live Free or Die Hard"))
+        assertEquals("Bundesliga", cleanIptvArtworkTitle("LIVE: Bundesliga"))
+        assertEquals("Bundesliga", cleanIptvArtworkTitle("Bundesliga - Live"))
+        assertEquals("Bundesliga", cleanIptvArtworkTitle("Bundesliga HD"))
+        assertEquals("Bundesliga", cleanIptvArtworkTitle("Bundesliga (Live)"))
+        assertEquals("Das Boot", cleanIptvArtworkTitle("Das Boot (1981)"))
+    }
+
+    @Test
+    fun `a number that cannot be a release year stays part of the title`() {
+        assertEquals(null, iptvArtworkYear("Blade Runner 2049"))
+        assertEquals("Blade Runner 2049", cleanIptvArtworkTitle("Blade Runner 2049"))
+        // Plausible years keep working.
+        assertEquals(2021, iptvArtworkYear("The Equalizer 2021"))
+        assertTrue(iptvArtworkPlausibleYear(2026, currentYear = 2026))
+        assertTrue(iptvArtworkPlausibleYear(2027, currentYear = 2026))
+        assertTrue(!iptvArtworkPlausibleYear(2028, currentYear = 2026))
+    }
+
+    @Test
+    fun `an episode suffix inside brackets leaves no dangling bracket`() {
+        assertEquals("Die Simpsons", cleanIptvArtworkTitle("Die Simpsons (Staffel 36)"))
+        assertEquals("Tatort", cleanIptvArtworkTitle("Tatort (Folge 1275) - Borowski"))
+        assertEquals("Die Simpsons", cleanIptvArtworkTitle("Die Simpsons [Staffel 36]"))
+    }
 }
