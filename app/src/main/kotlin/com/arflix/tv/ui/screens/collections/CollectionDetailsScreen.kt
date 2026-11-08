@@ -6,7 +6,6 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -1072,7 +1071,8 @@ private fun CollectionTabChip(
                     else -> false
                 }
             }
-            .focusable()
+            // No separate .focusable(): clickable is already focusable. A second focus target
+            // made the first OK press only move focus instead of selecting the tab.
             .clickable(onClick = onClick)
             .padding(horizontal = horizontalPadding, vertical = 10.dp)
     ) {

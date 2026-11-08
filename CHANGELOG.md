@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.002] - 2026-11-08
+
+- Android-Version: `2.6.002` / Code `503`.
+- Android Collections (Franchise, Studios, Streamingdienste): Fix für 2.6.000. Die Tabs `Timeline`, `Filme` und `Serien` brauchten zwei OK-Klicks, bis die Liste wechselte. Der Tab-Chip hatte zusätzlich zu `clickable` ein eigenes `focusable()`; mit dem neuen Compose-BOM fing dieses zweite Fokusziel den ersten Klick ab. Das überflüssige `focusable()` ist entfernt.
+- Android-Validierung: Staging-Build auf dem Emulator geprüft: In der Netflix-Collection wechselt ein einziger OK-Druck auf `Serie` sofort die Liste von Filmen auf Serien. Die Unit-Tests wurden für diese Änderung nicht erneut ausgeführt (letzter Lauf mit 2.6.001: 911 Tests ohne Fehler). Der Timeline-Tab ist nicht geprüft (die Netflix-Collection hat keinen). Echte TV-Hardware nicht geprüft.
+- Backend und Web unverändert.
+
 ## [2.6.001] - 2026-11-07
 
 - Android-Version: `2.6.001` / Code `502`.
