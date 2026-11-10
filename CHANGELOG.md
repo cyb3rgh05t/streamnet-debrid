@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.007] - 2026-11-10
+
+- Android-Version: `2.6.007` / Code `508`.
+- Android Quellensuche: IPTV-VOD-Streams fehlten manchmal in der Quellenliste, obwohl die Suche als abgeschlossen galt; erst Verlassen und erneutes Öffnen zeigte sie. Ursache: Jede Zwischenmeldung der Addons las zuerst die vorhandenen VOD-/Home-Server-Streams, wartete dann auf einen DataStore-Zugriff (`installedAddons.first()`) und schrieb danach die Liste zurück. Wurde der VOD-Lookup in diesem Fenster fertig, überschrieb die veraltete Liste seinen Stream, während der Zähler ihn schon als erledigt führte. Der DataStore-Zugriff läuft jetzt vor dem Lesen der Streams, sodass zwischen Lesen und Schreiben nichts mehr dazwischenkommt. Gilt für Filme und Serien.
+- Android-Validierung: 920 Unit-Tests ohne Fehler, davon einer übersprungen. Nicht geprüft: Der Fehler ließ sich nicht gezielt nachstellen (reiner Timing-Fehler), die Behebung ist nur durch Code-Analyse und Kompilierung abgesichert. Möglich bleibt ein zweiter Auslöser: ein fehlgeschlagener oder leerer Katalog-Download ergibt still kein VOD-Ergebnis (Log: `[VOD-Cache] Downloaded 0 VOD streams`). Ebenfalls nicht geprüft: ob Streams der Plugin-Scraper durch spätere Addon-Zwischenmeldungen verworfen werden.
+- Backend und Web unverändert.
+
 ## [2.6.006] - 2026-11-10
 
 - Android-Version: `2.6.006` / Code `507`.

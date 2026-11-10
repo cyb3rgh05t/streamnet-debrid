@@ -2096,6 +2096,11 @@ class DetailsViewModel @Inject constructor(
                         year = item?.year?.toIntOrNull()
                     ).collect { progressive ->
                         if (!isCurrentRequest()) return@collect
+                        // Suspends (DataStore read), so it must run before the supplemental streams are
+                        // read: an IPTV-VOD/home-server result appended meanwhile would be overwritten.
+                        val addonCount = streamRepository.installedAddons.first()
+                            .count { it.isVodStreamingAddon() }
+                        if (!isCurrentRequest()) return@collect
                         val existingVod = _uiState.value.streams.filter(::isSupplementalStream)
                         val mergedStreams = sortPlayableStreamsFirst(
                             (progressive.streams + existingVod)
@@ -2106,8 +2111,6 @@ class DetailsViewModel @Inject constructor(
                             "[MovieSources] progressive requestId=$requestId final=${progressive.isFinal} " +
                                 "incoming=${progressive.streams.size} merged=${mergedStreams.size} subtitles=${progressive.subtitles.size}"
                         )
-                        val addonCount = streamRepository.installedAddons.first()
-                            .count { it.isVodStreamingAddon() }
                         if (progressive.isFinal) addonSearchFinishedRequestId = requestId
                         _uiState.value = _uiState.value.copy(
                             isLoadingStreams = emptySourceSearchStillLoading(
@@ -2165,13 +2168,16 @@ class DetailsViewModel @Inject constructor(
                         airDate = episodeAirDate
                     ).collect { progressive ->
                         if (!isCurrentRequest()) return@collect
+                        // Suspends (DataStore read), so it must run before the supplemental streams are
+                        // read: an IPTV-VOD/home-server result appended meanwhile would be overwritten.
+                        val addonCount = streamRepository.installedAddons.first()
+                            .count { it.isVodStreamingAddon() }
+                        if (!isCurrentRequest()) return@collect
                         val existingVod = _uiState.value.streams.filter(::isSupplementalStream)
                         val mergedStreams = sortPlayableStreamsFirst(
                             (progressive.streams + existingVod)
                                 .distinctBy(::providerScopedStreamIdentity)
                         )
-                        val addonCount = streamRepository.installedAddons.first()
-                            .count { it.isVodStreamingAddon() }
                         if (progressive.isFinal) addonSearchFinishedRequestId = requestId
                         _uiState.value = _uiState.value.copy(
                             isLoadingStreams = emptySourceSearchStillLoading(
