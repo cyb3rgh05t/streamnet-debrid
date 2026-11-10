@@ -2578,7 +2578,8 @@ class StreamRepository @Inject constructor(
         tmdbId: Int? = null,
         timeoutMs: Long = 15_000L
     ): List<StreamSource> = withContext(Dispatchers.IO) {
-        withTimeoutOrNull(timeoutMs.coerceIn(500L, 90_000L)) {
+        val startedAt = System.currentTimeMillis()
+        val result = withTimeoutOrNull(timeoutMs.coerceIn(500L, 90_000L)) {
             runCatching {
                 iptvRepository.findMovieVodSources(
                     title = title,
@@ -2597,7 +2598,13 @@ class StreamRepository @Inject constructor(
                     )
                 )
             }.getOrDefault(emptyList())
-        }.orEmpty()
+        }
+        System.err.println(
+            "[VOD] movie lookup title='$title' year=$year imdb=$imdbId tmdb=$tmdbId -> " +
+                (result?.let { "${it.size} sources" } ?: "TIMEOUT after ${timeoutMs}ms") +
+                " in ${System.currentTimeMillis() - startedAt}ms"
+        )
+        result.orEmpty()
     }
 
     suspend fun isIptvVodSearchEnabled(): Boolean = iptvRepository.isVodSearchEnabled()
@@ -3051,7 +3058,8 @@ class StreamRepository @Inject constructor(
         timeoutMs: Long = 45_000L,
         year: Int? = null,
     ): List<StreamSource> = withContext(Dispatchers.IO) {
-        withTimeoutOrNull(timeoutMs.coerceIn(500L, 90_000L)) {
+        val startedAt = System.currentTimeMillis()
+        val result = withTimeoutOrNull(timeoutMs.coerceIn(500L, 90_000L)) {
             runCatching {
                 iptvRepository.findEpisodeVodSources(
                     title = title,
@@ -3074,7 +3082,13 @@ class StreamRepository @Inject constructor(
                     )
                 )
             }.getOrDefault(emptyList())
-        }.orEmpty()
+        }
+        System.err.println(
+            "[VOD] episode lookup title='$title' S${season}E$episode imdb=$imdbId tmdb=$tmdbId -> " +
+                (result?.let { "${it.size} sources" } ?: "TIMEOUT after ${timeoutMs}ms") +
+                " in ${System.currentTimeMillis() - startedAt}ms"
+        )
+        result.orEmpty()
     }
 
     suspend fun prefetchEpisodeVod(

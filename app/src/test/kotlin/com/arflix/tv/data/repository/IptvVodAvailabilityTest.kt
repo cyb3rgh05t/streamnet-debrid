@@ -169,6 +169,18 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `movie title matching tolerates an inner sequel number on one side only`() {
+        assertEquals(true, iptvVodMovieTitlesMatch("Pacific Rim 2: Uprising (2018)", "Pacific Rim: Uprising"))
+        assertEquals(true, iptvVodMovieTitlesMatch("Pacific Rim: Uprising", "Pacific Rim 2: Uprising"))
+        assertEquals(false, iptvVodMovieTitlesMatch("Pacific Rim (2013)", "Pacific Rim: Uprising"))
+        assertEquals(false, iptvVodMovieTitlesMatch("The Equalizer 2", "The Equalizer"))
+        assertEquals(false, iptvVodMovieTitlesMatch("Rocky 2 Rematch", "Rocky 3 Rematch"))
+        assertEquals(false, iptvVodMovieTitlesMatch("Dog Bites Man", "Man Bites Dog"))
+        assertEquals(true, iptvVodMovieTitlesMatch("1917", "1917"))
+        assertEquals(false, iptvVodTitlesMatchExactly("Pacific Rim 2: Uprising", "Pacific Rim: Uprising"))
+    }
+
+    @Test
     fun `series binding keys never mix ids with same title remakes`() {
         val old = iptvSeriesBindingKeys("provider", "1", "tt0000001", "The Equalizer", 1985)
         val current = iptvSeriesBindingKeys("provider", "2", "tt0000002", "The Equalizer", 2021)

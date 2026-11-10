@@ -4,6 +4,18 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.008] - 2026-11-10
+
+- Android-Version: `2.6.008` / Code `509`.
+- Android IPTV-VOD, Filmsuche: Filme, bei denen der Anbieter eine Sequel-Nummer im Titel führt, wurden nicht gefunden (Anbieter `Pacific Rim 2: Uprising`, TMDB `Pacific Rim: Uprising`). Der Titelvergleich akzeptiert jetzt eine Zahl mitten im Titel, die auf genau einer Seite fehlt. `The Equalizer 2` passt weiter nicht auf `The Equalizer`, `Rocky 2 Rematch` nicht auf `Rocky 3 Rematch`, `Pacific Rim (2013)` nicht auf Uprising. Gilt nur für Filme, nicht für Serien.
+- Android IPTV-Cache: Der Cloud-Abgleich (lief im Log etwa alle 3 Sekunden) verwarf bei jedem Durchlauf den VOD-Katalog im Speicher, den Titelindex und den Treffer-Cache, auch wenn sich nichts geändert hatte. Die nächste Suche musste den Katalog (4,5 MB) neu lesen und den Index neu aufbauen (4 bis 5 Sekunden, auf schwachen TVs vermutlich mehr). Der Import vergleicht jetzt die Einstellungen vor und nach dem Abgleich (Playlists, URLs, Favoriten, versteckte Gruppen, Reihenfolge, Kategorie-Ausschlüsse, Zugang) und verwirft die Caches nur bei einer echten Änderung. Verschlüsselte Werte werden entschlüsselt verglichen. Bei einer Änderung verhält sich alles wie bisher.
+- Android IPTV-Aktualität: Treffer-Cache, Serien-Katalog im Resolver, gefundene Episoden und Episodenlisten laufen nach 6 statt 24 Stunden ab, wie der VOD-Katalog. Live TV wird unverändert alle 4 Stunden im Hintergrund aktualisiert, der EPG-Cache bleibt bei 24 Stunden.
+- Android IPTV-Aktualität: Der Zwischenspeicher der Episodenlisten im Arbeitsspeicher hatte keine Ablaufzeit (zusätzlich eine zweite Ebene darunter), eine neue Folge wäre in einer dauerhaft laufenden App erst nach einem Neustart aufgetaucht. Beide laufen jetzt ab.
+- Android IPTV-Aktualität: Findet die Suche einen Film oder eine Serie nicht und ist der Katalog älter als 30 Minuten, wird er im Hintergrund neu geladen (höchstens einmal pro 30 Minuten, die laufende Suche wartet nicht). Fehlt eine Episode in einer bekannten Serie und ist deren Folgenliste älter als 30 Minuten, wird sie einmal neu geholt. Gilt nur bei eingeschaltetem IPTV-VOD, unabhängig von Streaming-Addons.
+- Android Diagnose: Neue Logzeilen `[VOD] movie lookup …`, `[VOD] episode lookup …` (Ergebnis und Dauer, auch Timeouts), `[VOD] movie no match …` (mit den nächstliegenden Katalognamen), `[VOD-Cache] Lookup missed …`, `[VOD-Resolver] S…E… missing in series …` und `[IPTV] cloud import changed …`.
+- Android-Validierung: 921 Unit-Tests ohne Fehler, davon einer übersprungen. Auf einem Gerät geprüft (Debug-Build, Log): Pacific Rim: Uprising wird gefunden (1 Treffer in 16 ms, vorher 0 nach 4 bis 5,5 s); bei mehreren Cloud-Abgleichen bleibt der Katalog im Speicher; ein Nicht-Treffer löst das Neuladen aus (`Primetime`, Download 3 s im Hintergrund). Nicht geprüft: dass ein neu beim Anbieter hinzugekommener Film oder eine neue Folge nach dem Neuladen auftaucht (der Katalog hatte vorher und nachher dieselbe Größe), der Pfad `S…E… missing in series` kam im Test nicht vor, und die Auswirkung des Neuladens auf schwachen TV-Geräten ist nicht gemessen.
+- Backend und Web unverändert.
+
 ## [2.6.007] - 2026-11-10
 
 - Android-Version: `2.6.007` / Code `508`.

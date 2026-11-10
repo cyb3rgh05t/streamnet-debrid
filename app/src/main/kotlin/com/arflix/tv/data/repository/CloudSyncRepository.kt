@@ -2591,13 +2591,15 @@ class CloudSyncRepository @Inject constructor(
         // ── IPTV config + favorites ──
         runCatching {
             var importedActiveProfileIptv = false
+            var activeProfileIptvChanged = false
             root.optJSONObject("iptvByProfile")?.toString()?.takeIf { it.isNotBlank() }?.let { json ->
                 val type = TypeToken.getParameterized(Map::class.java, String::class.java, IptvCloudProfileState::class.java).type
                 val map: Map<String, IptvCloudProfileState> = gson.fromJson(json, type) ?: emptyMap()
                 map.forEach { (profileId, state) ->
-                    iptvRepository.importCloudConfigForProfile(profileId, state)
+                    val changed = iptvRepository.importCloudConfigForProfile(profileId, state)
                     if (profileId == activeProfileId) {
                         importedActiveProfileIptv = true
+                        activeProfileIptvChanged = changed
                     }
                 }
             }
@@ -2629,8 +2631,10 @@ class CloudSyncRepository @Inject constructor(
             }
 
             if (importedActiveProfileIptv || importedLegacyIptv) {
-                runCatching {
-                    iptvRepository.invalidateCache()
+                if (activeProfileIptvChanged || importedLegacyIptv) {
+                    runCatching {
+                        iptvRepository.invalidateCache()
+                    }
                 }
                 iptvRepository.reconcileIptvOnlyModeWithVodAddons(
                     hasVodAddon = streamRepository.installedAddons.first().any(::isEnabledVodStreamingAddon)
