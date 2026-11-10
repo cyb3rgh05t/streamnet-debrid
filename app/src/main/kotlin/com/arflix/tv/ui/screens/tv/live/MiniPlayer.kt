@@ -55,6 +55,7 @@ import coil.compose.AsyncImage
 import com.arflix.tv.R
 import com.arflix.tv.data.model.IptvNowNext
 import com.arflix.tv.data.model.IptvProgram
+import com.arflix.tv.ui.components.LoadingIndicator
 import com.arflix.tv.util.formatGenreName
 import com.arflix.tv.util.DeviceType
 import com.arflix.tv.util.LocalDeviceType
@@ -119,6 +120,7 @@ fun MiniPlayerRow(
     compact: Boolean = false,
     landscapeCompact: Boolean = false,
     tabletLandscape: Boolean = false,
+    isBuffering: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isTouchDevice = LocalDeviceType.current.isTouchDevice()
@@ -134,6 +136,7 @@ fun MiniPlayerRow(
                 exoPlayer = exoPlayer,
                 channel = channel,
                 landscapeCompact = true,
+                isBuffering = isBuffering,
                 onFullscreenClick = onFullscreenClick,
             )
             InfoColumn(
@@ -163,6 +166,7 @@ fun MiniPlayerRow(
                 exoPlayer = exoPlayer,
                 channel = channel,
                 compact = true,
+                isBuffering = isBuffering,
                 onFullscreenClick = onFullscreenClick,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -200,6 +204,7 @@ fun MiniPlayerRow(
                 channel = channel,
                 tabletLandscape = tabletLandscape,
                 tvHeroLayout = useTvHeroLayout,
+                isBuffering = isBuffering,
                 onFullscreenClick = onFullscreenClick,
                 modifier = if (useTvHeroLayout) {
                     Modifier.fillMaxHeight().aspectRatio(16f / 9f, matchHeightConstraintsFirst = true)
@@ -242,6 +247,7 @@ private fun VideoCard(
     landscapeCompact: Boolean = false,
     tabletLandscape: Boolean = false,
     tvHeroLayout: Boolean = false,
+    isBuffering: Boolean = false,
     onFullscreenClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -303,6 +309,19 @@ private fun VideoCard(
                 },
                 modifier = Modifier.fillMaxSize(),
             )
+        }
+
+        // Touch layouts have no hero preview, so this card is the only place that shows the stream is
+        // starting or rebuffering. The TV hero layout draws its own indicator.
+        if (channel != null && isBuffering) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                LoadingIndicator(size = if (landscapeCompact) 28.dp else 40.dp, color = LiveColors.Accent, strokeWidth = 3.dp)
+            }
         }
 
         if (isTouchDevice && onFullscreenClick != null) {

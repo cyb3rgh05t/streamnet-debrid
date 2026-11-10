@@ -3297,6 +3297,7 @@ fun LiveTvScreen(
                         compact = compactTouchLayout,
                         landscapeCompact = landscapeCompactMiniPlayer,
                         tabletLandscape = tabletLandscapeMiniPlayer,
+                        isBuffering = playerIsBuffering,
                         modifier = Modifier.fillMaxWidth(),
                     )
                     TouchCategoryRail(

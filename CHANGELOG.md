@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.006] - 2026-11-10
+
+- Android-Version: `2.6.006` / Code `507`.
+- Android Live TV (Mobile und Tablet): Der Miniplayer zeigte beim Streamstart und bei Zwischenpuffern keinen Ladekreis, nur Gradient und schwarzes Bild. `LiveTvScreen` kannte den Puffer-Zustand, reichte ihn aber nur an die TV-Layouts und den Vollbild-HUD weiter. `MiniPlayerRow` und `VideoCard` bekommen jetzt `isBuffering` und legen in allen drei Touch-Layouts (Phone kompakt, Phone quer, Tablet) einen Ladekreis über das Video. Das TV-Hero-Layout ist unverändert. Der Vollbild-Player für Filme und Serien (`PlayerScreen`) hat sein Lade-Overlay unabhängig vom Gerätetyp und wurde nicht angefasst.
+- Android-Validierung: 920 Unit-Tests ohne Fehler, davon einer übersprungen; Staging-Build gebaut und auf dem Emulator installiert. Nicht geprüft: der Ladekreis selbst im Phone-/Tablet-Modus (kein UI-Test, nur Kompilierung), und auf echten Touch-Geräten.
+- Backend und Web unverändert.
+
 ## [2.6.005] - 2026-11-08
 
 - Android-Version: `2.6.005` / Code `506`.
