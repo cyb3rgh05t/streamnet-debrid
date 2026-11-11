@@ -395,6 +395,18 @@ class AuthRepository @Inject constructor(
     private val tokenRefreshMutex = Mutex()
     @Volatile private var accountSyncRevision: Long? = null
     @Volatile private var accountSyncRevisionUserId: String? = null
+
+    /**
+     * Random id of this installation. It is sent with every account-sync push so the server can tag the
+     * realtime event with its origin, and the origin device can ignore the echo of its own change.
+     */
+    val syncSourceDeviceId: String by lazy {
+        val prefs = context.getSharedPreferences("cloud_sync_device", Context.MODE_PRIVATE)
+        prefs.getString("source_device_id", null)?.takeIf { it.isNotBlank() }
+            ?: java.util.UUID.randomUUID().toString().also {
+                prefs.edit().putString("source_device_id", it).apply()
+            }
+    }
     private val ACCOUNT_SYNC_PAYLOAD_KEY = "accountSyncPayload"
     private val ACCOUNT_SYNC_UPDATED_AT_KEY = "accountSyncUpdatedAt"
     private val PROFILE_SYNC_PAYLOAD_KEY = "__arvioAccountSyncPayload"
@@ -1084,7 +1096,7 @@ class AuthRepository @Inject constructor(
         return try {
             val payloadValue = try { JSONObject(payload) } catch (e: org.json.JSONException) { null } ?: payload
             val userId = getCurrentUserIdForSync()
-            val body = JSONObject().put("payload", payloadValue).apply {
+            val body = JSONObject().put("payload", payloadValue).put("sourceDeviceId", syncSourceDeviceId).apply {
                 expectedRevision?.let { put("expectedRevision", it) }
             }.toString()
             val responseBody = callCloudBackend(

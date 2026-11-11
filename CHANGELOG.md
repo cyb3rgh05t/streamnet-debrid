@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.009] - 2026-11-11
+
+- Android-Version: `2.6.009` / Code `510`.
+- Android Cloud-Abgleich, zwei Geräte mit demselben Konto: Der Live-TV-Stand (letzter Kanal, Kategorie, Fokus-Zone, zuletzt gesehene Kanäle) wurde bei jeder Änderung hochgeladen, auch beim reinen Blättern durch die Senderliste. Jeder Upload löste auf dem anderen Gerät einen Abruf des gesamten Account-Stands aus (bis 1 MB), bei zwei aktiven Geräten also einen ständigen Austausch in beide Richtungen. Das Ruckeln, das ein Nutzer mit zwei Geräten gemeldet hat, passt dazu; die Ursache ist aber nicht bewiesen.
+  - Kategorie- und Fokus-Zonen-Wechsel bleiben jetzt lokal (der Neustart-Wiederherstellung dient die lokale Speicherung) und gehen beim nächsten Upload aus anderem Anlass mit.
+  - Ändert sich der abgespielte Kanal oder die Liste der zuletzt gesehenen Kanäle, wird nach 5 Sekunden Ruhe einmal hochgeladen. Schnelles Zappen ergibt einen Upload statt einen pro Kanal.
+  - Jede Installation sendet beim Upload eine zufällige Geräte-ID (`sourceDeviceId`, das Backend lieferte das Feld schon aus, die App hat nie eine gesendet). Meldungen des Servers mit der eigenen ID werden ignoriert, die App ruft den eigenen Stand nicht erneut ab. Der 60-Sekunden-Abgleich bleibt als Auffangnetz. Im Build-Typ `selfHosted` ist der Echtzeit-Abgleich ohnehin aus.
+- Android-Validierung: 922 Unit-Tests ohne Fehler, davon einer übersprungen (neu: `tvSessionNeedsCloudSync`). Auf dem Emulator (ein Gerät, Debug-Build, rund 22 Sekunden Log) geprüft: Die Geräte-ID wird gesendet und vom Server zurückgemeldet, die eigene Meldung wird erkannt (`Ignoring echo of own push`), danach folgt kein Abruf mehr. Nicht geprüft: Verhalten mit zwei Geräten, ob das gemeldete Ruckeln dadurch verschwindet, ob in dem Log durch die Senderliste geblättert wurde und die Wartezeit von 5 Sekunden.
+- Bekannte Nebenwirkungen: Wird die App binnen 5 Sekunden nach einem Kanalwechsel beendet, geht diese Änderung erst mit dem nächsten Upload in die Cloud (lokal ist sie gespeichert). Ein Upload aus anderem Anlass kann auf einem anderen Gerät einen älteren Kategorie-Stand in die lokale Speicherung schreiben; die laufende Oberfläche bleibt laut Code unberührt, der Neustart könnte aber die zuvor benutzte Kategorie öffnen. Beides nicht auf einem Gerät geprüft.
+- Backend und Web unverändert.
+
 ## [2.6.008] - 2026-11-10
 
 - Android-Version: `2.6.008` / Code `509`.

@@ -163,6 +163,7 @@ private object IptvIdSentinels {
 
 private const val LargeIptvListChannelCount = 10_000
 private const val LoadLockMemoryWaitMs = 10_000L
+private const val TV_SESSION_CLOUD_SYNC_DELAY_MS = 5_000L
 internal const val IPTV_GROUP_ORDER_SCHEMA = 3
 
 internal enum class IptvGroupOrderMove { UP, DOWN, TOP }
@@ -735,6 +736,15 @@ data class IptvTvSessionState(
     val recentChannelIds: List<String> = emptyList()
 )
 
+/**
+ * Whether a session change deserves a cloud upload. Category and focus-zone moves happen on every
+ * D-pad press while browsing; they stay local and ride along with the next push.
+ */
+internal fun tvSessionNeedsCloudSync(previous: IptvTvSessionState, next: IptvTvSessionState): Boolean =
+    previous.lastChannelId != next.lastChannelId ||
+        previous.lastOpenedAt != next.lastOpenedAt ||
+        previous.recentChannelIds != next.recentChannelIds
+
 @Singleton
 class IptvRepository @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -1118,19 +1128,36 @@ class IptvRepository @Inject constructor(
                 .takeLast(40)
         )
         var changed = false
+        var playbackChanged = false
         context.settingsDataStore.edit { prefs ->
-            if (decodeTvSessionState(prefs[tvSessionKey()].orEmpty()) == normalizedState) {
+            val previous = decodeTvSessionState(prefs[tvSessionKey()].orEmpty())
+            if (previous == normalizedState) {
                 return@edit
             }
             changed = true
+            playbackChanged = tvSessionNeedsCloudSync(previous, normalizedState)
             if (normalizedState == IptvTvSessionState()) {
                 prefs.remove(tvSessionKey())
             } else {
                 prefs[tvSessionKey()] = gson.toJson(normalizedState)
             }
         }
-        if (changed) {
-            invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "save tv session")
+        // Category and focus-zone changes happen on every D-pad move or tap while browsing. They are
+        // stored locally (restart restore) and ride along with the next push, but only a changed
+        // playing channel is worth a cloud upload, and that one is delayed so a quick zap sequence
+        // causes a single upload instead of a push/pull round trip on every other device per channel.
+        if (changed && playbackChanged) {
+            scheduleTvSessionCloudSync(profileManager.getProfileIdSync())
+        }
+    }
+
+    private var tvSessionCloudSyncJob: kotlinx.coroutines.Job? = null
+
+    private fun scheduleTvSessionCloudSync(profileId: String) {
+        tvSessionCloudSyncJob?.cancel()
+        tvSessionCloudSyncJob = iptvCacheScope.launch {
+            delay(TV_SESSION_CLOUD_SYNC_DELAY_MS)
+            invalidationBus.markDirty(CloudSyncScope.IPTV, profileId, "save tv session")
         }
     }
 

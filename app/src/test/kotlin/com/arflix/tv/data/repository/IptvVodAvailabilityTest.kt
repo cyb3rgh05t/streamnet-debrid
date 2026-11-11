@@ -181,6 +181,22 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `tv session browsing stays local while a played channel syncs`() {
+        val base = IptvTvSessionState(
+            lastChannelId = "a:1",
+            lastGroupName = "all",
+            lastFocusedZone = "GUIDE",
+            lastOpenedAt = 10L,
+            recentChannelIds = listOf("a:1"),
+        )
+        assertEquals(false, tvSessionNeedsCloudSync(base, base.copy(lastGroupName = "sports")))
+        assertEquals(false, tvSessionNeedsCloudSync(base, base.copy(lastFocusedZone = "CHANNEL_LIST")))
+        assertEquals(true, tvSessionNeedsCloudSync(base, base.copy(lastChannelId = "a:2")))
+        assertEquals(true, tvSessionNeedsCloudSync(base, base.copy(recentChannelIds = listOf("a:1", "a:2"))))
+        assertEquals(true, tvSessionNeedsCloudSync(base, base.copy(lastOpenedAt = 20L)))
+    }
+
+    @Test
     fun `series binding keys never mix ids with same title remakes`() {
         val old = iptvSeriesBindingKeys("provider", "1", "tt0000001", "The Equalizer", 1985)
         val current = iptvSeriesBindingKeys("provider", "2", "tt0000002", "The Equalizer", 2021)

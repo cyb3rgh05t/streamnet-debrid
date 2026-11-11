@@ -206,6 +206,12 @@ class RealtimeSyncManager @Inject constructor(
                 val revision = obj.optInt("revision", 0)
                 val sourceDeviceId = obj.optString("sourceDeviceId", "")
                 Log.i(TAG, "Received account_sync_revision=$revision sourceDeviceId=$sourceDeviceId")
+                // Our own push echoes back with our id; the state is already local. Pulls for
+                // the echo only re-download and re-apply what this device just wrote.
+                if (sourceDeviceId.isNotBlank() && sourceDeviceId == authRepository.syncSourceDeviceId) {
+                    Log.d(TAG, "Ignoring echo of own push")
+                    return
+                }
                 debouncedPull()
             }
         } catch (e: Exception) {
