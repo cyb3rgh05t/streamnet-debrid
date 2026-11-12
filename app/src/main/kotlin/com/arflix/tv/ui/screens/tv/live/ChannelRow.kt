@@ -93,10 +93,20 @@ fun ChannelRow(
 ) {
     var focused by remember { mutableStateOf(false) }
     val visuallyFocused = focused || forceFocused
-    val shape = RoundedCornerShape(14.dp)
+    // Left corners stay round, the right end uses the programme cells' radius so the tile meets the
+    // guide grid without a big notch.
+    val shape = RoundedCornerShape(
+        topStart = 14.dp,
+        bottomStart = 14.dp,
+        topEnd = LiveDims.CellRadius,
+        bottomEnd = LiveDims.CellRadius,
+    )
     val accent = LiveColors.Accent
     val rowBrush: Brush = when {
-        visuallyFocused -> Brush.horizontalGradient(listOf(accent.copy(alpha = 0.28f), LiveColors.PanelRaised))
+        visuallyFocused -> Brush.horizontalGradient(
+            listOf(accent.copy(alpha = if (isPlaying) 0.40f else 0.28f), LiveColors.PanelRaised)
+        )
+        isPlaying -> Brush.horizontalGradient(listOf(accent.copy(alpha = 0.42f), accent.copy(alpha = 0.14f)))
         isActive -> Brush.horizontalGradient(listOf(accent.copy(alpha = 0.20f), accent.copy(alpha = 0.04f)))
         else -> SolidColor(LiveColors.Panel.copy(alpha = 0.42f))
     }
