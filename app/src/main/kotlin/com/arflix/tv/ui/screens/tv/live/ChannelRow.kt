@@ -23,6 +23,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
@@ -33,6 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -70,6 +73,9 @@ fun ChannelRow(
     nowNext: IptvNowNext?,
     isActive: Boolean,
     isFavorite: Boolean,
+    // The channel that is playing right now. Unlike [isActive] (which follows the focused channel
+    // while browsing) this stays put, so the running channel remains recognisable.
+    isPlaying: Boolean = false,
     stripe: Boolean = false,
     onClick: () -> Unit,
     onFavoriteToggle: () -> Unit,
@@ -126,7 +132,18 @@ fun ChannelRow(
             )
             .clip(shape)
             .background(rowBrush)
-            .focusable()
+            .then(
+                if (isPlaying) {
+                    Modifier.drawBehind {
+                        drawRect(color = accent, size = Size(3.dp.toPx(), size.height))
+                    }
+                } else {
+                    Modifier
+                }
+            )
+            // No separate .focusable(): combinedClickable below is already focusable. A second focus
+            // target in front of it made the first OK press only move focus instead of clicking, and
+            // gave every row two focus stops.
             .onPreviewKeyEvent { ev ->
                 if (ev.type == KeyEventType.KeyDown) {
                     when (ev.key) {
@@ -174,11 +191,20 @@ fun ChannelRow(
             verticalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isPlaying) {
+                    Icon(
+                        imageVector = Icons.Filled.PlayArrow,
+                        contentDescription = null,
+                        tint = accent,
+                        modifier = Modifier.size(13.dp),
+                    )
+                    Spacer(Modifier.width(2.dp))
+                }
                 Text(
                     text = channel.name,
                     style = LiveType.CellTitle.copy(
-                        color = if (isActive || visuallyFocused) accent else LiveColors.Fg,
-                        fontWeight = if (isActive || visuallyFocused) FontWeight.SemiBold else FontWeight.W500,
+                        color = if (isActive || visuallyFocused || isPlaying) accent else LiveColors.Fg,
+                        fontWeight = if (isActive || visuallyFocused || isPlaying) FontWeight.SemiBold else FontWeight.W500,
                     ),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

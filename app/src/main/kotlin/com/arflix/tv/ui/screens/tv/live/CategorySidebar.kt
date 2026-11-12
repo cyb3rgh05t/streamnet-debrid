@@ -1,8 +1,6 @@
 package com.arflix.tv.ui.screens.tv.live
 
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -57,6 +55,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
@@ -102,12 +101,15 @@ fun CategorySidebar(
     focusRequester: FocusRequester? = null,
     onSelect: (String) -> Unit,
     onOpenSearch: () -> Unit,
+    // Called after a leaf category (one that does not just open a group) was chosen with OK.
+    onCategoryChosen: () -> Unit = {},
     onHideCategory: (String?, String) -> Unit = { _, _ -> },
     onUnhideCategory: (String?, String) -> Unit = { _, _ -> },
     onMoveCategoryUp: (String?, String) -> Unit = { _, _ -> },
     onMoveCategoryToTop: (String?, String) -> Unit = { _, _ -> },
     onMoveCategoryDown: (String?, String) -> Unit = { _, _ -> },
     onFocusEnter: () -> Unit = {},
+    onFocusStateChanged: (Boolean) -> Unit = {},
     onMoveRight: () -> Unit = {},
     onMoveUpFromSearch: () -> Unit = {},
     onTopBoundaryFocusChanged: (Boolean) -> Unit = {},
@@ -117,12 +119,11 @@ fun CategorySidebar(
     active: Boolean = true,
     modifier: Modifier = Modifier,
 ) {
-    val targetWidth = if (expanded) LiveDims.SidebarExpanded else LiveDims.SidebarCollapsed
-    val animatedWidth by animateDpAsState(
-        targetValue = targetWidth,
-        animationSpec = tween(durationMillis = 240),
-        label = "sidebar-width",
-    )
+    // Width switches instantly: animating it re-lays out the whole EPG grid on every frame.
+    // Collapsed hides the sidebar completely so the guide gets the full width. The 52 dp icon strip
+    // it used before did not fit its own row padding and showed only the active row's background.
+    val targetWidth = if (expanded) LiveDims.SidebarExpanded else 0.dp
+    val animatedWidth = targetWidth
     var expandedCountry by rememberSaveable { mutableStateOf<String?>(null) }
     var expandedAll by rememberSaveable { mutableStateOf(false) }
     var activeMenu by remember { mutableStateOf<CategoryMenuState?>(null) }
@@ -259,6 +260,9 @@ fun CategorySidebar(
 
     LaunchedEffect(focusSelectedCategorySignal, selectedId, tree, expandedAll, expandedCountry, expanded) {
         if (focusSelectedCategorySignal <= 0) return@LaunchedEffect
+        // Collapsed means the channel list owns the focus. Re-requesting it here pulled focus straight
+        // back into the sidebar (which then re-expanded). Expanding again reruns this effect.
+        if (!expanded) return@LaunchedEffect
         selectedCategoryLazyIndex()?.let { rowIndex ->
             runCatching { listState.scrollToItem(rowIndex) }
         }
@@ -284,10 +288,12 @@ fun CategorySidebar(
             .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
             .width(animatedWidth)
             .fillMaxHeight()
+            .clipToBounds()
             .background(LiveColors.PanelDeep)
             .focusGroup()
             .onFocusChanged { focusState ->
                 sidebarHasFocus = focusState.hasFocus
+                onFocusStateChanged(focusState.hasFocus)
                 if (focusState.hasFocus) {
                     onFocusEnter()
                 }
@@ -372,8 +378,11 @@ fun CategorySidebar(
                     onClick = {
                         if (isAllGroup) {
                             expandedAll = !expandedAll
+                            onSelect(cat.id)
+                        } else {
+                            onSelect(cat.id)
+                            onCategoryChosen()
                         }
-                        onSelect(cat.id)
                     },
                 )
                 if (isOpen && expanded) {
@@ -391,7 +400,10 @@ fun CategorySidebar(
                             isOpenGroup = child.containsId(selectedId),
                             focusRequester = if (selectedId == child.id) selectedCategoryFocusRequester else null,
                             onFocused = { onTopBoundaryFocusChanged(false) },
-                            onClick = { onSelect(child.id) },
+                            onClick = {
+                                onSelect(child.id)
+                                if (child.children.isEmpty()) onCategoryChosen()
+                            },
                         )
                         if (child.containsId(selectedId)) {
                             child.children.forEach { grandchild ->
@@ -405,7 +417,10 @@ fun CategorySidebar(
                                     labelSize = 9.5.sp,
                                     focusRequester = if (selectedId == grandchild.id) selectedCategoryFocusRequester else null,
                                     onFocused = { onTopBoundaryFocusChanged(false) },
-                                    onClick = { onSelect(grandchild.id) },
+                                    onClick = {
+                                        onSelect(grandchild.id)
+                                        onCategoryChosen()
+                                    },
                                 )
                             }
                         }
@@ -426,7 +441,10 @@ fun CategorySidebar(
                         onLongClick = {
                             openCategoryMenu(cat, hidden = false)
                         },
-                        onClick = { onSelect(cat.id) },
+                        onClick = {
+                            onSelect(cat.id)
+                            onCategoryChosen()
+                        },
                     )
                 }
             }
@@ -491,7 +509,10 @@ fun CategorySidebar(
                                 labelSize = 10.5.sp,
                                 focusRequester = if (selectedId == child.id) selectedCategoryFocusRequester else null,
                                 onFocused = { onTopBoundaryFocusChanged(false) },
-                                onClick = { onSelect(child.id) },
+                                onClick = {
+                                    onSelect(child.id)
+                                    onCategoryChosen()
+                                },
                             )
                         }
                     }
@@ -508,7 +529,10 @@ fun CategorySidebar(
                         expanded = expanded,
                         focusRequester = if (selectedId == cat.id) selectedCategoryFocusRequester else null,
                         onFocused = { onTopBoundaryFocusChanged(false) },
-                        onClick = { onSelect(cat.id) },
+                        onClick = {
+                            onSelect(cat.id)
+                            onCategoryChosen()
+                        },
                     )
                 }
             }

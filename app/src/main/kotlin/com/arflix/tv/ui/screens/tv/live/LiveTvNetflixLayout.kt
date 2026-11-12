@@ -830,14 +830,25 @@ private fun NetflixCategoryChipRow(
         }
     }
     // When focus leaves the chip row, bring the active chip back into view so the row does not
-    // stay scrolled to wherever the user browsed.
+    // stay scrolled to wherever the user browsed. Not when leaving downwards into the channel rail:
+    // that animation ran at the same moment the rail snapped and made the pills jump on every
+    // Down press. Coming back up, focusSelectedChip() scrolls the active chip into view itself.
     var rowFocused by remember { mutableStateOf(false) }
     var rowWasFocused by remember { mutableStateOf(false) }
+    var leavingDownward by remember { mutableStateOf(false) }
+    LaunchedEffect(focusedChipIndex) {
+        // Any focus move inside the row means the Down press did not hand focus to the rail.
+        if (focusedChipIndex >= 0) leavingDownward = false
+    }
     LaunchedEffect(rowFocused) {
         if (rowFocused) {
             rowWasFocused = true
         } else if (rowWasFocused) {
             rowWasFocused = false
+            if (leavingDownward) {
+                leavingDownward = false
+                return@LaunchedEffect
+            }
             if (selectedCategoryIndex < 0) return@LaunchedEffect
             val target = selectedCategoryIndex + 1
             if (!chipInView(target)) runCatching { listState.animateScrollToItem(target) }
@@ -865,7 +876,8 @@ private fun NetflixCategoryChipRow(
                     label = stringResource(R.string.live_label_search_channels),
                     count = null, isSelected = false,
                     onFocused = { focusedChipIndex = 0; onFocused() }, onClick = onOpenSearch,
-                    onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
+                    onKeyMoveUp = { leavingDownward = false; onMoveUp() },
+                    onKeyMoveDown = { leavingDownward = true; onMoveDown() },
                     focusRequester = if (selectedCategoryIndex < 0) focusRequester else null,
                     iconContent = {
                         Icon(imageVector = Icons.Filled.Search, contentDescription = null,
@@ -878,7 +890,8 @@ private fun NetflixCategoryChipRow(
                     label = item.label, count = item.count, isSelected = item.id == selectedId,
                     onFocused = { focusedChipIndex = index + 1; onFocused() },
                     onClick = { onSelect(item.id) },
-                    onKeyMoveUp = onMoveUp, onKeyMoveDown = onMoveDown,
+                    onKeyMoveUp = { leavingDownward = false; onMoveUp() },
+                    onKeyMoveDown = { leavingDownward = true; onMoveDown() },
                     focusRequester = if (item.id == selectedId) focusRequester else null,
                     iconContent = if (item.id == "fav") {
                         {

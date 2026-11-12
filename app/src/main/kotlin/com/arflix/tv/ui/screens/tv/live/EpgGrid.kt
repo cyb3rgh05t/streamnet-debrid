@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -95,6 +98,8 @@ fun EpgGrid(
     isGuideBackfillLoading: Boolean = false,
     hasGuideSource: Boolean = true,
     selectedChannelId: String?,
+    // Channel that is currently playing, as a grid (display) id. Gets a persistent marker.
+    playingChannelId: String? = null,
     focusSelectedChannelSignal: Int,
     focusEpgSignal: Int = 0,
     focusMode: EpgGridFocusMode = EpgGridFocusMode.ChannelList,
@@ -193,9 +198,36 @@ fun EpgGrid(
     val scope = rememberCoroutineScope()
     suspend fun revealRow(rowIdx: Int) {
         val layout = channelListState.layoutInfo
-        val row = layout.visibleItemsInfo.firstOrNull { it.index == rowIdx }
-        if (row == null || row.offset < layout.viewportStartOffset || row.offset + row.size > layout.viewportEndOffset) {
-            channelListState.scrollToItem(rowIdx)
+        val visible = layout.visibleItemsInfo
+        val row = visible.firstOrNull { it.index == rowIdx }
+        // Scroll only by the part that is missing, animated: a snap to the row's top edge made every
+        // step past the viewport edge look like the whole list jumping by one row.
+        val delta: Float? = when {
+            row != null -> {
+                val hiddenAbove = layout.viewportStartOffset - row.offset
+                val hiddenBelow = row.offset + row.size - layout.viewportEndOffset
+                when {
+                    hiddenAbove > 0 -> -hiddenAbove.toFloat()
+                    hiddenBelow > 0 -> hiddenBelow.toFloat()
+                    else -> 0f
+                }
+            }
+            visible.isNotEmpty() && rowIdx == visible.first().index - 1 -> {
+                val first = visible.first()
+                (first.offset - first.size - layout.viewportStartOffset).toFloat()
+            }
+            visible.isNotEmpty() && rowIdx == visible.last().index + 1 -> {
+                val last = visible.last()
+                (last.offset + last.size * 2 - layout.viewportEndOffset).toFloat()
+            }
+            else -> null
+        }
+        when {
+            delta == null -> channelListState.scrollToItem(rowIdx)
+            delta != 0f -> channelListState.animateScrollBy(
+                value = delta,
+                animationSpec = tween(durationMillis = 110, easing = FastOutSlowInEasing),
+            )
         }
     }
 
@@ -204,14 +236,16 @@ fun EpgGrid(
         requestMoreRowsIfNeeded(rowIdx)
         focusJob?.cancel()
         focusJob = scope.launch {
-            revealRow(rowIdx)
-            repeat(8) { attempt ->
+            // Scroll runs alongside the focus request; waiting for it would delay focus by the whole
+            // animation and let a quick OK press land on the previous row.
+            launch { revealRow(rowIdx) }
+            repeat(10) { attempt ->
                 val requesters = programFocusRequesters[channel.id].orEmpty()
                 val requester = requesters.getOrNull(targetIdx.coerceIn(0, (requesters.size - 1).coerceAtLeast(0)))
                 if (requester != null && runCatching { requester.requestFocus() }.isSuccess) {
                     return@launch
                 }
-                if (attempt < 7) delay(16L)
+                if (attempt < 9) delay(16L)
             }
         }
         return true
@@ -241,9 +275,9 @@ fun EpgGrid(
         onChannelFocused(channel)
         focusJob?.cancel()
         focusJob = scope.launch {
-            revealRow(rowIdx)
+            launch { revealRow(rowIdx) }
             delay(16L)
-            repeat(4) { attempt ->
+            repeat(10) { attempt ->
                 val requester = channelFocusRequesters[channel.id] ?: when {
                     rowIdx == 0 -> firstChannelFocusRequester
                     channel.id == selectedChannelId -> selectedChannelFocusRequester
@@ -253,7 +287,7 @@ fun EpgGrid(
                     pendingChannelFocusId = null
                     return@launch
                 }
-                if (attempt < 3) delay(16L)
+                if (attempt < 9) delay(16L)
             }
             pendingChannelFocusId = null
         }
@@ -521,6 +555,7 @@ fun EpgGrid(
                             ChannelRow(
                                 channel = ch,
                                 isActive = ch.id == selectedChannelId || (gridFocused && locallyFocused),
+                                isPlaying = ch.id == playingChannelId,
                                 clockTickMillis = clockTickMillis,
                                 nowNext = nowNext[ch.id],
                                 isFavorite = ch.id in favorites,

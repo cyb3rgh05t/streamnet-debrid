@@ -1303,6 +1303,9 @@ fun LiveTvScreen(
     val selectedDisplayChannelId = remember(focusedChannelId, playingChannelId, visibleChannelsById, variantGroups) {
         displayChannelIdFor(focusedChannelId ?: playingChannelId, visibleChannelsById, variantGroups)
     }
+    val playingDisplayChannelId = remember(playingChannelId, visibleChannelsById, variantGroups) {
+        displayChannelIdFor(playingChannelId, visibleChannelsById, variantGroups)
+    }
     val indexedPlayingChannel = remember(playingChannelId, visibleEnrichedState.value, filteredChannels) {
         playingChannelId?.let { visibleEnrichedState.value.index.byId[it] }
             ?: filteredChannels.firstOrNull { it.id == playingChannelId }
@@ -1758,7 +1761,10 @@ fun LiveTvScreen(
     }
 
     val liveTvInteractionContent: @Composable () -> Unit = {
-    val sidebarExpanded = !useTouchRail
+    var classicSidebarHasFocus by remember { mutableStateOf(false) }
+    val sidebarExpanded = !useTouchRail &&
+        focusZone != LiveTvFocusZone.CHANNEL_LIST &&
+        focusZone != LiveTvFocusZone.EPG
     var searchOpen by rememberSaveable { mutableStateOf(false) }
     var focusSelectedChannelSignal by remember { mutableIntStateOf(0) }
     var focusEpgSignal by remember { mutableIntStateOf(0) }
@@ -2120,6 +2126,48 @@ fun LiveTvScreen(
         focusZone = LiveTvFocusZone.CHANNEL_LIST
         focusSelectedChannelSignal += 1
         runCatching { epgFocus.requestFocus() }
+    }
+
+    // OK on a leaf category in the classic sidebar hands focus to the channel list (which collapses
+    // the sidebar) as soon as that category's channels exist. Until then the sidebar keeps focus, and
+    // it keeps it for good when the category is empty or never loads.
+    var classicChannelFocusPending by remember { mutableStateOf(false) }
+    var classicChannelFocusJob by remember { mutableStateOf<Job?>(null) }
+    LaunchedEffect(classicChannelFocusPending, focusZone, selectedCategoryId, filteredChannelsCategoryKey, filteredChannelIndexById) {
+        if (!classicChannelFocusPending) return@LaunchedEffect
+        if (focusZone != LiveTvFocusZone.CATEGORY_LIST) {
+            classicChannelFocusPending = false
+            return@LaunchedEffect
+        }
+        if (!LiveTvStartup.channelWindowMatchesCategory(selectedCategoryId, filteredChannelsCategoryKey)) {
+            return@LaunchedEffect
+        }
+        val target = sequenceOf(
+            rememberedChannelByCategory[selectedCategoryId],
+            displayChannelIdFor(playingChannelId, visibleEnrichedState.value.index.byId, variantGroups),
+            filteredChannels.firstOrNull()?.id,
+        ).firstOrNull { id -> id != null && id in filteredChannelIndexById } ?: return@LaunchedEffect
+        classicChannelFocusPending = false
+        classicChannelFocusJob?.cancel()
+        classicChannelFocusJob = focusCommitScope.launch {
+            // The grid still resets its scroll and rebuilds its rows for the new category right now.
+            // Asking for focus too early left it in the sidebar while the zone already said "channel
+            // list", so the next OK hit the sidebar and only the one after that reached the channel.
+            delay(150L)
+            repeat(6) {
+                focusChannelList(target)
+                delay(200L)
+                if (!classicSidebarHasFocus || focusZone != LiveTvFocusZone.CHANNEL_LIST) return@launch
+            }
+            // Focus never left the sidebar: give it its zone back so it is expanded again.
+            focusZone = LiveTvFocusZone.CATEGORY_LIST
+        }
+    }
+    LaunchedEffect(classicChannelFocusPending) {
+        if (classicChannelFocusPending) {
+            delay(4_000L)
+            classicChannelFocusPending = false
+        }
     }
 
     fun focusEpg(channelId: String) {
@@ -3211,9 +3259,12 @@ fun LiveTvScreen(
                                         val targetIndex = anchorIndex - 1
                                         if (targetIndex >= 0) {
                                             focusChannelList(guideDisplayChannels[targetIndex].id)
-                                        } else {
-                                            focusClassicCategoryRail()
+                                        } else if (normalizedGuideStart > 0) {
+                                            // More channels exist before this window: load them instead of leaving the list.
+                                            requestGuideWindowBefore()
                                         }
+                                        // First channel of the category: stay. Hoch used to jump into the
+                                        // category sidebar here; Left/Back still goes there on purpose.
                                         true
                                     }
                                     Key.DirectionDown -> {
@@ -3321,6 +3372,7 @@ fun LiveTvScreen(
                         isGuideBackfillLoading = false,
                         hasGuideSource = state.hasPotentialGuideSource,
                         selectedChannelId = selectedDisplayChannelId,
+                        playingChannelId = playingDisplayChannelId,
                         focusSelectedChannelSignal = focusSelectedChannelSignal,
                         focusEpgSignal = focusEpgSignal,
                         focusMode = if (focusZone == LiveTvFocusZone.EPG) EpgGridFocusMode.Epg else EpgGridFocusMode.ChannelList,
@@ -3397,6 +3449,7 @@ fun LiveTvScreen(
                         noteGuideUserNavigation()
                         selectedCategoryId = id
                     },
+                    onCategoryChosen = { classicChannelFocusPending = true },
                     onOpenSearch = { searchOpen = true },
                     onHideCategory = { playlistId, groupName ->
                         noteGuideUserNavigation()
@@ -3411,6 +3464,7 @@ fun LiveTvScreen(
                     onMoveCategoryToTop = { playlistId, groupName -> viewModel.moveGroupToTop(playlistId, groupName) },
                     onMoveCategoryDown = { playlistId, groupName -> viewModel.moveGroupDown(playlistId, groupName) },
                     onCategoryFocusEnter = { focusZone = LiveTvFocusZone.CATEGORY_LIST },
+                    onSidebarFocusChanged = { classicSidebarHasFocus = it },
                     onMoveCategoryRight = {
                         focusChannelList(focusedChannelId ?: playingChannelId ?: guideDisplayChannels.firstOrNull()?.id)
                     },
@@ -3422,6 +3476,7 @@ fun LiveTvScreen(
                     },
                     focusSelectedCategorySignal = focusSelectedCategorySignal,
                     focusSearchCategorySignal = focusSearchCategorySignal,
+                    isBuffering = playerIsBuffering,
                     categoryZoneActive = focusZone != LiveTvFocusZone.TOPBAR,
                     guideDisplayChannels = guideDisplayChannels,
                     channelWindowOffset = normalizedGuideStart,
@@ -3431,6 +3486,7 @@ fun LiveTvScreen(
                     epgAttemptedChannelIds = state.epgAttemptedChannelIds,
                     hasGuideSource = state.hasPotentialGuideSource,
                     selectedDisplayChannelId = selectedDisplayChannelId,
+                    playingDisplayChannelId = playingDisplayChannelId,
                     focusSelectedChannelSignal = focusSelectedChannelSignal,
                     focusEpgSignal = focusEpgSignal,
                     focusMode = if (focusZone == LiveTvFocusZone.EPG) EpgGridFocusMode.Epg else EpgGridFocusMode.ChannelList,

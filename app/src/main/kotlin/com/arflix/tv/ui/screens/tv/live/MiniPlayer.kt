@@ -312,15 +312,23 @@ private fun VideoCard(
         }
 
         // Touch layouts have no hero preview, so this card is the only place that shows the stream is
-        // starting or rebuffering. The TV hero layout draws its own indicator.
+        // starting or rebuffering. The TV hero card matches the Netflix layout's preview spinner.
         if (channel != null && isBuffering) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f)),
+                    .background(Color.Black.copy(alpha = if (tvHeroLayout) 0.72f else 0.45f)),
                 contentAlignment = Alignment.Center,
             ) {
-                LoadingIndicator(size = if (landscapeCompact) 28.dp else 40.dp, color = LiveColors.Accent, strokeWidth = 3.dp)
+                LoadingIndicator(
+                    size = when {
+                        tvHeroLayout -> 44.dp
+                        landscapeCompact -> 28.dp
+                        else -> 40.dp
+                    },
+                    color = LiveColors.Accent,
+                    strokeWidth = 3.dp,
+                )
             }
         }
 
