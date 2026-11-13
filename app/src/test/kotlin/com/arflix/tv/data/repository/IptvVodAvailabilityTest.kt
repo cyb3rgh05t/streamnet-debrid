@@ -181,6 +181,68 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `indexed availability gives the same answer as the per-key reference on mixed data`() {
+        val rnd = java.util.Random(42)
+        val titles = listOf("alpha", "beta", "gamma", "delta", "the matrix", "heat", "ronin", "up")
+        fun key(i: Int): IptvRepository.XtreamVodAvailabilityKey {
+            val withTmdb = rnd.nextInt(3) != 0
+            val withImdb = rnd.nextInt(3) != 0
+            return IptvRepository.XtreamVodAvailabilityKey(
+                mediaType = if (rnd.nextBoolean()) MediaType.MOVIE else MediaType.TV,
+                normalizedTitle = titles[rnd.nextInt(titles.size)],
+                tmdbId = if (withTmdb) (1 + rnd.nextInt(40)).toString() else null,
+                imdbId = if (withImdb) "tt${1 + rnd.nextInt(40)}" else null,
+                year = if (rnd.nextInt(4) == 0) null else 1995 + rnd.nextInt(6),
+            )
+        }
+        val keys = (0 until 120).map(::key).toSet()
+        val availability = IptvRepository.XtreamVodAvailability(keys)
+
+        fun reference(item: MediaItem): Boolean {
+            if (item.mediaType != MediaType.MOVIE && item.mediaType != MediaType.TV) return false
+            val titleKey = iptvVodTitleKey(item.title)
+            val tmdb = item.id.takeIf { it > 0 }?.toString()
+            val imdb = item.homeServerImdbId?.trim()?.lowercase()?.takeIf { it.matches(Regex("tt\\d+")) }
+            val year = sequenceOf(item.year, item.releaseDate.orEmpty())
+                .mapNotNull { Regex("(?:19|20)\\d{2}").find(it)?.value?.toIntOrNull() }
+                .firstOrNull()
+            return keys.any { k ->
+                k.mediaType == item.mediaType &&
+                    (iptvVodIdentityMatch(tmdb, imdb, k.tmdbId, k.imdbId)
+                        ?: (titleKey.isNotBlank() && k.normalizedTitle == titleKey &&
+                            iptvVodYearsCompatible(year, k.year)))
+            }
+        }
+
+        var trueCount = 0
+        repeat(4_000) {
+            val titleSource = titles[rnd.nextInt(titles.size)] + if (rnd.nextInt(5) == 0) " (2001)" else ""
+            val item = MediaItem(
+                id = if (rnd.nextInt(5) == 0) 0 else 1 + rnd.nextInt(45),
+                title = if (rnd.nextInt(8) == 0) "" else titleSource,
+                mediaType = if (rnd.nextBoolean()) MediaType.MOVIE else MediaType.TV,
+                year = if (rnd.nextBoolean()) (1993 + rnd.nextInt(10)).toString() else "",
+                homeServerImdbId = when (rnd.nextInt(4)) {
+                    0 -> "tt${1 + rnd.nextInt(45)}"
+                    1 -> " TT${1 + rnd.nextInt(45)} "
+                    2 -> "not-an-id"
+                    else -> null
+                },
+            )
+            val expected = reference(item)
+            if (expected) trueCount++
+            assertEquals(
+                "item=${item.id}/${item.title}/${item.mediaType}/${item.homeServerImdbId} " +
+                    "candidates=${keys.filter { it.mediaType == item.mediaType && (it.imdbId == item.homeServerImdbId?.trim()?.lowercase() || it.tmdbId == item.id.toString()) }}",
+                expected,
+                availability.contains(item),
+            )
+        }
+        // The data must exercise both answers, otherwise the comparison proves nothing.
+        assert(trueCount in 200..3_800) { "trueCount=$trueCount" }
+    }
+
+    @Test
     fun `tv session browsing stays local while a played channel syncs`() {
         val base = IptvTvSessionState(
             lastChannelId = "a:1",

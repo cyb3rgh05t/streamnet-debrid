@@ -74,10 +74,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -1676,26 +1678,43 @@ class HomeViewModel @Inject constructor(
         // loaded provider library, otherwise every rail is filtered away.
         val previous = _iptvVodAvailability.value
         if (availability.keys.isEmpty() && previous != null && previous.keys.isNotEmpty()) return
-        _iptvVodAvailability.value = availability
-        prioritizeIptvOnlyInitialHero(availability)
-        refreshIptvCollectionRows(availability)
+        // Reuse the already indexed instance when the library did not change.
+        val effective = previous?.takeIf { it == availability } ?: availability
+        _iptvVodAvailability.value = effective
+        prioritizeIptvOnlyInitialHero(effective)
+        refreshIptvCollectionRows(effective)
     }
 
     private fun refreshIptvCollectionRows(availability: IptvRepository.XtreamVodAvailability) {
-        iptvCollectionFilterJob?.cancel()
-        _iptvCollectionRows.value = null
         val sourceRows = _uiState.value.collectionRows.filter { row ->
             row.id == "collection_row_service" || row.id == "collection_row_franchise"
         }
+        // The same inputs again (this runs after every Home load and every availability refresh) must not
+        // throw away a finished or running scan: restarting it cancelled the in-flight TMDB requests,
+        // re-fetched the same pages and briefly un-filtered the rows.
+        val scanKey = availability to sourceRows.flatMap { row -> listOf(row.id) + row.items.map(CatalogConfig::id) }
+        if (scanKey == lastIptvCollectionScanKey &&
+            (iptvCollectionFilterJob?.isActive == true || _iptvCollectionRows.value != null)
+        ) {
+            return
+        }
+        lastIptvCollectionScanKey = scanKey
+        iptvCollectionFilterJob?.cancel()
+        _iptvCollectionRows.value = null
         if (sourceRows.isEmpty()) return
 
+        val availabilityHash = availability.keys.hashCode()
         iptvCollectionFilterJob = viewModelScope.launch(networkDispatcher) {
             val semaphore = Semaphore(4)
             val filteredRows = sourceRows.map { row ->
                 val retained = row.items.map { catalog ->
                     async {
                         semaphore.withPermit {
-                            catalog.takeIf { collectionHasIptvContent(it, availability) }
+                            val cacheKey = catalog.id to availabilityHash
+                            val known = iptvCollectionContentCache[cacheKey]
+                            val has = known ?: collectionHasIptvContent(catalog, availability)
+                                ?.also { iptvCollectionContentCache[cacheKey] = it }
+                            catalog.takeIf { has == true }
                         }
                     }
                 }.awaitAll().filterNotNull()
@@ -1707,17 +1726,18 @@ class HomeViewModel @Inject constructor(
         }
     }
 
+    /** True/false once the catalog was scanned; null when a page failed to load (not cached, retried later). */
     private suspend fun collectionHasIptvContent(
         catalog: CatalogConfig,
         availability: IptvRepository.XtreamVodAvailability,
-    ): Boolean {
+    ): Boolean? {
         var offset = 0
         var hasMore = true
         var pagesScanned = 0
         while (hasMore && pagesScanned < 20) {
             val page = runCatching {
                 mediaRepository.loadCollectionCatalogPage(catalog, offset = offset, limit = 48)
-            }.getOrNull() ?: return false
+            }.getOrNull() ?: return null
             if (page.items.any(availability::contains)) return true
             if (page.items.isEmpty()) return false
             offset += page.items.size
@@ -2132,6 +2152,8 @@ class HomeViewModel @Inject constructor(
     private var activeEpgRefreshJob: Job? = null
     private var iptvHomeArtworkWarmupJob: Job? = null
     private var iptvCollectionFilterJob: Job? = null
+    private var lastIptvCollectionScanKey: Pair<IptvRepository.XtreamVodAvailability, List<String>>? = null
+    private val iptvCollectionContentCache = ConcurrentHashMap<Pair<String, Int>, Boolean>()
     private var lastEpgNetworkRefreshMs: Long = 0L
 
     private val _uiState = MutableStateFlow(HomeUiState())
@@ -2144,7 +2166,13 @@ class HomeViewModel @Inject constructor(
         _iptvCollectionRows,
     ) { state, iptvOnlyMode, availability, filteredCollectionRows ->
         projectHomeForIptvOnlyMode(state, iptvOnlyMode, availability, filteredCollectionRows)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
+    }
+        // The IPTV-only projection walks every Home rail against the provider library. Running it on
+        // the main thread for each of the ~15 row publishes while Home loads froze the UI; conflate so
+        // only the latest state is projected.
+        .conflate()
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.Eagerly, HomeUiState())
     val cardLogoUrls = mutableStateMapOf<String, String>()
 
     // Debounce job for hero updates (Phase 6.1)
@@ -2371,6 +2399,8 @@ class HomeViewModel @Inject constructor(
         iptvRepository.invalidateCache()
         _iptvVodAvailability.value = null
         _iptvCollectionRows.value = null
+        lastIptvCollectionScanKey = null
+        iptvCollectionContentCache.clear()
         _uiState.value = HomeUiState(syncStatus = _uiState.value.syncStatus)
         activeRuntimeProfileId = profileId
     }
@@ -2597,6 +2627,7 @@ class HomeViewModel @Inject constructor(
                         _iptvVodAvailability.value = null
                         iptvCollectionFilterJob?.cancel()
                         _iptvCollectionRows.value = null
+                        lastIptvCollectionScanKey = null
                     }
                 }
         }

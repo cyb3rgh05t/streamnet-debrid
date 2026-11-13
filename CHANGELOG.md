@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.012] - 2026-11-13
+
+- Android-Version: `2.6.012` / Code `513`.
+- Android IPTV-only-Modus, Verfügbarkeitsprüfung: `XtreamVodAvailability.contains()` durchsuchte bei jeder Anfrage alle ~23.500 Schlüssel linear und kompilierte dabei pro Aufruf zwei Regex. Das lief für die Home-Reihen hunderte Male auf dem Haupt-Thread. Jetzt baut die Klasse einmal einen Hash-Index (TMDB-ID, IMDb-ID, Titel je Medientyp) und die Regex sind vorkompiliert. Ein Zufalls-Äquivalenztest (4.000 Titel gegen die alte Einzelprüfung) sichert, dass der Index dieselben Treffer liefert.
+- Android IPTV-only-Modus, Aufbau der Schlüssel: `getXtreamVodAvailability` läuft auf `Dispatchers.Default` statt auf dem Haupt-Thread, merkt sich das Ergebnis pro Katalog und ausgeschlossene Kategorien und baut es per Mutex nur einmal, auch wenn mehrere Aufrufer gleichzeitig kommen (ohne Mutex liefen zwei Aufbauten parallel und dauerten je ~3 s).
+- Android IPTV-only-Modus, Startseite: Die Zusammenführung des `uiState` (inklusive der IPTV-only-Projektion) läuft mit `conflate()` und `flowOn(Dispatchers.Default)` im Hintergrund. Die Collection-Suche startet nicht mehr neu, wenn sich Katalog und Verfügbarkeit nicht geändert haben, und merkt sich das Ergebnis pro Katalog und Verfügbarkeit; fehlgeschlagene Seiten werden nicht zwischengespeichert. Dieser Teil gilt für alle Modi, nicht nur IPTV-only.
+- Android IPTV-Laden: Wurde ein Ladevorgang abgebrochen (z. B. weil die Zugangsdaten gespeichert wurden), fing `runCatching` die Abbruch-Exception ab, und der abgebrochene Vorgang fiel auf den M3U-Download zurück. Der echte Xtream-Ladevorgang musste dann auf das Parsen der kompletten M3U (inklusive ~23.000 VOD-Einträgen) warten. Die Kanalliste kam dadurch erst nach ~38 s statt nach unter einer Sekunde. Die Abbruch-Exception wird jetzt weitergeworfen; der M3U-Fallback bleibt für echte Xtream-Fehler erhalten.
+- Android IPTV-EPG, doppelter Ladevorgang: Der Hintergrund-Worker `IptvRefreshWorker` (20 s nach dem App-Start) hielt das EPG für veraltet, weil gerade ein Ladevorgang aus den Einstellungen lief, und startete nach dessen Ende einen kompletten zweiten (Kurz-EPG-Sweep mit 18-s-Limit, `xmltv.php`, ~25 s). Der Worker wartet jetzt auf einen laufenden Ladevorgang (`awaitRunningLoad`) und prüft danach die Frische. Der 4-Stunden-Refresh ist unverändert. Der Abbruch- und der Worker-Fix liegen im allgemeinen Ladepfad und gelten auch ohne IPTV-only-Modus.
+- Android-Validierung: 923 Unit-Tests ohne Fehler, davon einer übersprungen (letzter Lauf vor dem Worker-Fix). Auf dem Emulator geprüft (Debug-Build, Logs): 0 Haupt-Thread-Stalls statt 6, abgebrochene Requests 63 → 26, Kanalliste nach dem Speichern der Zugangsdaten nach ~0,3 s statt ~38 s, nur noch ein `loadSnapshot`, ein `xmltv.php` und ein VOD-Download, Worker beendet sich nach laufendem Ladevorgang ohne Neuladen. Nicht geprüft: echte TV-Hardware (der Emulator ist schneller), Verhalten im normalen Modus ohne IPTV-only und mit reiner M3U-Playlist (Abbruch-Fix greift dort nicht, es gibt keinen Xtream-Umweg), und warum `custom_rows_ready` in einem Lauf 19 s statt 8 s brauchte (Netz oder Collection-Suche unklar). Das EPG selbst braucht weiter ~26 s im Hintergrund (18-s-Limit des Kurz-EPG, danach XMLTV); die Kanalliste ist davon unabhängig sofort da.
+- Backend und Web unverändert.
+
 ## [2.6.011] - 2026-11-12
 
 - Android-Version: `2.6.011` / Code `512`.

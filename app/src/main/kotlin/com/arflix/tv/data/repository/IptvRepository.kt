@@ -163,6 +163,8 @@ private object IptvIdSentinels {
 
 private const val LargeIptvListChannelCount = 10_000
 private const val LoadLockMemoryWaitMs = 10_000L
+private val AVAILABILITY_IMDB_ID_REGEX = Regex("tt\\d+")
+private val AVAILABILITY_YEAR_REGEX = Regex("(?:19|20)\\d{2}")
 private const val TV_SESSION_CLOUD_SYNC_DELAY_MS = 5_000L
 internal const val IPTV_GROUP_ORDER_SCHEMA = 3
 
@@ -2941,6 +2943,11 @@ class IptvRepository @Inject constructor(
         return ageMs > staleAfterMs
     }
 
+    /** Suspends until a running [loadSnapshot] has finished, so callers can re-check cache freshness. */
+    suspend fun awaitRunningLoad() {
+        if (loadMutex.isLocked) loadMutex.withLock { }
+    }
+
     /** Age of cached EPG data in milliseconds, or Long.MAX_VALUE if no cache. */
     fun cachedEpgAgeMs(): Long {
         val at = cachedEpgAt
@@ -4188,6 +4195,8 @@ class IptvRepository @Inject constructor(
                 return providerOrdered
             }
             apiResult.exceptionOrNull()?.let { error ->
+                // runCatching swallows cancellation; without this a cancelled load still downloads the full M3U.
+                if (error is CancellationException) throw error
                 System.err.println("IptvRepository: Xtream catalog unavailable; falling back to M3U: ${error.message}")
             }
         }
@@ -9421,6 +9430,12 @@ class IptvRepository @Inject constructor(
     data class XtreamVodAvailability(
         val keys: Set<XtreamVodAvailabilityKey>,
     ) {
+        // Built on first use, not part of equality. A linear scan over every key per item (plus two
+        // Regex compilations) made filtering a Home rail cost milliseconds per title on the main thread.
+        private val index: VodAvailabilityIndex by lazy(LazyThreadSafetyMode.PUBLICATION) {
+            VodAvailabilityIndex(keys)
+        }
+
         fun contains(item: MediaItem): Boolean {
             if (item.mediaType != MediaType.MOVIE && item.mediaType != MediaType.TV) return false
             val itemTitleKey = iptvVodTitleKey(item.title)
@@ -9428,19 +9443,54 @@ class IptvRepository @Inject constructor(
             val itemImdbId = item.homeServerImdbId
                 ?.trim()
                 ?.lowercase(Locale.US)
-                ?.takeIf { it.matches(Regex("tt\\d+")) }
+                ?.takeIf { it.matches(AVAILABILITY_IMDB_ID_REGEX) }
             val itemYear = sequenceOf(item.year, item.releaseDate.orEmpty())
-                .mapNotNull { value -> Regex("(?:19|20)\\d{2}").find(value)?.value?.toIntOrNull() }
+                .mapNotNull { value -> AVAILABILITY_YEAR_REGEX.find(value)?.value?.toIntOrNull() }
                 .firstOrNull()
+            val type = item.mediaType
 
-            return keys.asSequence()
-                .filter { key -> key.mediaType == item.mediaType }
-                .any { key ->
-                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId)
-                        ?: (itemTitleKey.isNotBlank() && key.normalizedTitle == itemTitleKey &&
-                            iptvVodYearsCompatible(itemYear, key.year))
+            // Same decision per key as before: ids decide when both sides have them, otherwise the
+            // title (and a compatible year) decides. Each lookup below only visits keys that can win.
+            if (itemTmdbId != null) {
+                val hit = index.byTmdb(type, itemTmdbId).any { key ->
+                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId) == true
                 }
+                if (hit) return true
+            }
+            if (itemImdbId != null) {
+                val hit = index.byImdb(type, itemImdbId).any { key ->
+                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId) == true
+                }
+                if (hit) return true
+            }
+            if (itemTitleKey.isBlank()) return false
+            return index.byTitle(type, itemTitleKey).any { key ->
+                iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId)
+                    ?: iptvVodYearsCompatible(itemYear, key.year)
+            }
         }
+    }
+
+    private class VodAvailabilityIndex(keys: Set<XtreamVodAvailabilityKey>) {
+        private val tmdb = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
+        private val imdb = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
+        private val title = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
+
+        init {
+            keys.forEach { key ->
+                key.tmdbId?.let { tmdb.getOrPut(slot(key.mediaType, it)) { mutableListOf() }.add(key) }
+                key.imdbId?.let { imdb.getOrPut(slot(key.mediaType, it)) { mutableListOf() }.add(key) }
+                if (key.normalizedTitle.isNotBlank()) {
+                    title.getOrPut(slot(key.mediaType, key.normalizedTitle)) { mutableListOf() }.add(key)
+                }
+            }
+        }
+
+        private fun slot(type: MediaType, value: String) = "${type.ordinal}|$value"
+
+        fun byTmdb(type: MediaType, id: String): List<XtreamVodAvailabilityKey> = tmdb[slot(type, id)].orEmpty()
+        fun byImdb(type: MediaType, id: String): List<XtreamVodAvailabilityKey> = imdb[slot(type, id)].orEmpty()
+        fun byTitle(type: MediaType, key: String): List<XtreamVodAvailabilityKey> = title[slot(type, key)].orEmpty()
     }
 
     // ── Private wire models for categories ──────────────────────────────────
@@ -9594,9 +9644,26 @@ class IptvRepository @Inject constructor(
         invalidationBus.markDirty(CloudSyncScope.IPTV, profileManager.getProfileIdSync(), "reset VOD category visibility")
     }
 
+    private class AvailabilityKeysMemo(
+        val source: List<*>,
+        val excluded: Set<String>,
+        val keys: Set<XtreamVodAvailabilityKey>,
+    )
+
+    // The provider catalogs are held in memory as one list instance until they expire, so identity
+    // plus the category exclusions identify the previous result. Home asks for availability several
+    // times per load; every call used to renormalise all ~23k titles.
+    @Volatile private var movieAvailabilityMemo: AvailabilityKeysMemo? = null
+    @Volatile private var seriesAvailabilityMemo: AvailabilityKeysMemo? = null
+    // Home triggers two availability loads within a second at startup. Without the lock both built the
+    // same 23k keys in parallel (each slower for it); now the second waits and takes the memo.
+    private val movieAvailabilityLock = Mutex()
+    private val seriesAvailabilityLock = Mutex()
+
     suspend fun getXtreamVodAvailability(
         allowNetwork: Boolean = true,
-    ): XtreamVodAvailability = coroutineScope {
+    ): XtreamVodAvailability = withContext(Dispatchers.Default) {
+        coroutineScope {
         val config = observeConfig().first()
         val movieSourceIsStreamNet = activeVodPlaylists(config)
             .firstOrNull { resolveXtreamCredentials(it) != null }
@@ -9608,33 +9675,50 @@ class IptvRepository @Inject constructor(
         val excludedSeriesCategories = config.excludedSeriesCategoryIds.takeIf { seriesSourceIsStreamNet }.orEmpty().toSet()
         val movieKeys = async {
             val creds = xtreamCredentialsForVodImport(config) ?: return@async emptySet()
-            getXtreamVodStreams(creds, allowNetwork, fast = true)
-                .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedMovieCategories) }
-                .mapNotNullTo(mutableSetOf()) { item ->
-                xtreamVodAvailabilityKey(
-                    rawTitle = item.name,
-                    mediaType = MediaType.MOVIE,
-                    tmdbId = item.tmdb,
-                    imdbId = item.imdb,
-                    year = item.year?.toIntOrNull() ?: parseYear(item.name.orEmpty()),
-                )
+            val movies = getXtreamVodStreams(creds, allowNetwork, fast = true)
+            movieAvailabilityLock.withLock {
+                movieAvailabilityMemo
+                    ?.takeIf { it.source === movies && it.excluded == excludedMovieCategories }
+                    ?.let { return@withLock it.keys }
+                movies
+                    .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedMovieCategories) }
+                    .mapNotNullTo(mutableSetOf<XtreamVodAvailabilityKey>()) { item ->
+                        xtreamVodAvailabilityKey(
+                            rawTitle = item.name,
+                            mediaType = MediaType.MOVIE,
+                            tmdbId = item.tmdb,
+                            imdbId = item.imdb,
+                            year = item.year?.toIntOrNull() ?: parseYear(item.name.orEmpty()),
+                        )
+                    }.also { built ->
+                        if (movies.isNotEmpty()) movieAvailabilityMemo = AvailabilityKeysMemo(movies, excludedMovieCategories, built)
+                    }
             }
         }
         val seriesKeys = async {
             val creds = xtreamCredentialsForSeriesImport(config) ?: return@async emptySet()
-            getXtreamSeriesList(creds, allowNetwork, fast = true)
-                .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedSeriesCategories) }
-                .mapNotNullTo(mutableSetOf()) { item ->
-                xtreamVodAvailabilityKey(
-                    rawTitle = item.name,
-                    mediaType = MediaType.TV,
-                    tmdbId = item.tmdb,
-                    imdbId = item.imdb,
-                    year = item.year?.toIntOrNull() ?: parseYear(item.releaseDate.orEmpty()) ?: parseYear(item.name.orEmpty()),
-                )
+            val series = getXtreamSeriesList(creds, allowNetwork, fast = true)
+            seriesAvailabilityLock.withLock {
+                seriesAvailabilityMemo
+                    ?.takeIf { it.source === series && it.excluded == excludedSeriesCategories }
+                    ?.let { return@withLock it.keys }
+                series
+                    .filter { isXtreamVodCategoryIncluded(it.categoryId, excludedSeriesCategories) }
+                    .mapNotNullTo(mutableSetOf<XtreamVodAvailabilityKey>()) { item ->
+                        xtreamVodAvailabilityKey(
+                            rawTitle = item.name,
+                            mediaType = MediaType.TV,
+                            tmdbId = item.tmdb,
+                            imdbId = item.imdb,
+                            year = item.year?.toIntOrNull() ?: parseYear(item.releaseDate.orEmpty()) ?: parseYear(item.name.orEmpty()),
+                        )
+                    }.also { built ->
+                        if (series.isNotEmpty()) seriesAvailabilityMemo = AvailabilityKeysMemo(series, excludedSeriesCategories, built)
+                    }
             }
         }
         XtreamVodAvailability(movieKeys.await() + seriesKeys.await())
+        }
     }
 
     internal fun xtreamVodAvailabilityKey(

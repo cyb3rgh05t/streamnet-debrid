@@ -31,6 +31,8 @@ class IptvRefreshWorker @AssistedInject constructor(
             val bootstrapIfStale = inputData.getBoolean(KEY_BOOTSTRAP_IF_STALE, false)
             if (bootstrapIfStale) {
                 iptvRepository.warmupFromCacheOnly()
+                // A load started by the UI (e.g. right after entering credentials) would otherwise be repeated in full.
+                iptvRepository.awaitRunningLoad()
                 if (iptvRepository.cachedEpgAgeMs() < BOOTSTRAP_STALE_AFTER_MS) {
                     return Result.success()
                 }
