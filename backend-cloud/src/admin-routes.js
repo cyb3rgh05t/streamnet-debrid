@@ -12,6 +12,7 @@ import {
   applyAdminSnapshotMutation,
   adminGlobalInventory,
   applyAdminGlobalMutation,
+  adminCatalogFingerprint,
   prepareAdminGlobalMutation,
   resolveAdminCatalogTemplate,
   hydrateAdminStremioAddon,
@@ -226,7 +227,19 @@ function setAdminSecurityHeaders(reply) {
 
 function globalState(rows, mutation) {
   const hostChange = mutation?.operation === "change_xtream_host";
-  const state = hostChange
+  // Catalog actions only depend on the catalogs they touch, not on every account revision.
+  const catalogChange = !hostChange && typeof mutation?.operation === "string" &&
+    mutation.operation.includes("catalog");
+  const state = catalogChange
+    ? {
+        mutation,
+        accounts: rows.map((row) => ({
+          id: row.account_id,
+          hasSnapshot: Boolean(row.payload),
+          catalogs: row.payload ? adminCatalogFingerprint(row.payload, mutation) : null,
+        })),
+      }
+    : hostChange
     ? {
         mutation,
         accounts: rows.map((row) => ({
@@ -250,11 +263,15 @@ function globalState(rows, mutation) {
           }),
         })),
       }
-    : rows.map((row) => [row.account_id, row.revision, row.updated_at]);
+    : rows.map((row) => [
+        row.account_id,
+        // Content, not revision: any device sync push bumps the revision and made previews stale.
+        row.payload ? adminGlobalInventory(row.payload) : null,
+      ]);
   return crypto
     .createHash("sha256")
     .update(
-      JSON.stringify(state, hostChange ? (_key, value) =>
+      JSON.stringify(state, hostChange || catalogChange ? (_key, value) =>
         value && typeof value === "object" && !Array.isArray(value)
           ? Object.fromEntries(Object.keys(value).sort().map((key) => [key, value[key]]))
           : value : undefined),

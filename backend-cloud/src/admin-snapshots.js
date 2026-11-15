@@ -847,6 +847,30 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
   return changed;
 }
 
+/**
+ * The part of an account snapshot a global catalog mutation reads or writes. Used as the preview
+ * fingerprint so unrelated sync pushes (watch state, TV session, ...) do not invalidate a preview.
+ */
+export function adminCatalogFingerprint(payload, mutation) {
+  if (!isPlainObject(payload)) return null;
+  const ids = new Set(
+    [mutation.targetId, mutation.data?.id, mutation.data?.templateId].filter(Boolean).map(String),
+  );
+  const hiddenRoots = [
+    "hiddenPreinstalledByProfile", "hiddenAddonByProfile", "hiddenHomeServerByProfile", "hiddenCustomByProfile",
+  ];
+  return {
+    profiles: [...profileIds(payload)].sort().map((profileId) => ({
+      profileId,
+      catalogs: catalogsForProfile(payload, profileId).filter((catalog) => ids.has(String(catalog?.id))),
+      hidden: hiddenRoots.map((root) =>
+        (Array.isArray(payload[root]?.[profileId]) ? payload[root][profileId] : [])
+          .map(String).filter((id) => ids.has(id)).sort()),
+    })),
+    resolvable: [...ids].sort().map((id) => [id, Boolean(resolveAdminCatalogTemplate(payload, id))]),
+  };
+}
+
 export function adminGlobalInventory(payload) {
   if (!isPlainObject(payload)) throw new Error("Snapshot payload is invalid");
   const playlists = new Map();

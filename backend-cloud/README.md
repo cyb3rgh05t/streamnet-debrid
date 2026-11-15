@@ -262,9 +262,13 @@ for future accounts or profiles. Existing application playlist limits remain
 unchanged.
 
 A preview reports changed, unchanged, and skipped accounts. Applying requires
-typing **ALLE ACCOUNTS**. Removal is irreversible. If account membership or any
-snapshot changes after preview, the server rejects the action with HTTP 409;
+typing **ALLE ACCOUNTS**. Removal is irreversible. If account membership or the
+relevant snapshot data changes after preview, the server rejects the action with HTTP 409;
 load a new preview rather than automatically retrying a global change.
+Catalog actions bind the preview to account membership, the affected catalog IDs
+per profile, their hidden flags and template availability; add-on and playlist
+actions bind it to each account's add-on, playlist and catalog IDs. Unrelated
+sync pushes that only bump revisions do not invalidate the preview.
 For `change_xtream_host`, the preview instead binds the requested host and target
 to account/snapshot membership, profile IDs, matching playlist data and the
 server-owned host policy. Unrelated sync pushes and cached expiry checks do not

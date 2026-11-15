@@ -124,13 +124,29 @@ test("global preview performs no writes and applying advances every changed revi
 test("global apply rejects stale previews without writes or automatic retry", async (t) => {
   const { send, rows, queries } = await fixture(t);
   const preview = await send("POST", "/admin-api/global/preview", addPlaylist);
-  rows[0].revision = "4";
+  rows[0].payload.iptvByProfile.main.playlists.push({ id: "other", name: "Other" });
   const response = await send("PATCH", "/admin-api/global/snapshot", {
     ...addPlaylist, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
   });
   assert.equal(response.statusCode, 409);
   assert.equal(queries.some(({ sql }) => sql.includes("update account_sync_snapshots")), false);
   assert.equal(queries.at(-1).sql, "rollback");
+});
+
+test("global actions tolerate unrelated sync pushes that only bump revisions", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  const preview = await send("POST", "/admin-api/global/preview", addPlaylist);
+  rows[0].revision = "4";
+  rows[0].updated_at = "2026-11-15";
+  rows[0].payload.watchStateByProfile = { main: { movie: { position: 1 } } };
+  rows[1].revision = "9";
+  const response = await send("PATCH", "/admin-api/global/snapshot", {
+    ...addPlaylist, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(response.statusCode, 200);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.deepEqual(updates.map(({ values }) => values[2]), [5, 10]);
+  assert.deepEqual(JSON.parse(updates[0].values[1]).watchStateByProfile, { main: { movie: { position: 1 } } });
 });
 
 test("global host preview and apply handle blank StreamNet presets alongside configured profiles", async (t) => {
@@ -352,6 +368,35 @@ test("catalog templates preview and apply account-wide with preserved metadata a
   const audits = queries.filter(({ sql }) => sql.includes("insert into admin_audit_logs"));
   assert.equal(audits.length, 2);
   assert.ok(audits.every(({ values }) => values[3] === "global_add_catalog"));
+});
+
+test("catalog removal tolerates unrelated sync pushes but rejects changes to that catalog", async (t) => {
+  const custom = { id: "custom-list", title: "Custom", sourceType: "MDBLIST", enabled: true };
+  const request = { operation: "delete_catalog", targetId: "custom-list" };
+  const apply = (send, preview) => send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+
+  const unrelated = await fixture(t);
+  for (const row of unrelated.rows.slice(0, 2)) row.payload.catalogsByProfile = { main: [{ ...custom }] };
+  const preview = await unrelated.send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.json().changed, 2);
+  unrelated.rows[0].revision = "4";
+  unrelated.rows[1].revision = "8";
+  unrelated.rows[0].payload.watchStateByProfile = { main: { movie: { position: 1 } } };
+  const applied = await apply(unrelated.send, preview);
+  assert.equal(applied.statusCode, 200);
+  assert.equal(unrelated.queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).length, 2);
+
+  const related = await fixture(t);
+  for (const row of related.rows.slice(0, 2)) row.payload.catalogsByProfile = { main: [{ ...custom }] };
+  const stale = await related.send("POST", "/admin-api/global/preview", request);
+  related.rows[0].payload.catalogsByProfile.main[0].enabled = false;
+  const rejected = await apply(related.send, stale);
+  assert.equal(rejected.statusCode, 409);
+  assert.equal(related.queries.some(({ sql }) => sql.includes("update account_sync_snapshots")), false);
+  assert.equal(related.queries.at(-1).sql, "rollback");
 });
 
 test("unavailable catalog templates are rejected without snapshot writes", async (t) => {
