@@ -87,6 +87,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -1876,17 +1877,18 @@ internal fun DetailsContent(
 
         // Layer 1: Strong left gradient for hero text area (Netflix-style)
         // Uses colorStops with percentages to work on any resolution
+        val bottomScrimBase = com.arflix.tv.ui.theme.scrimBaseColor()
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     brush = Brush.horizontalGradient(
                         colorStops = arrayOf(
-                            0.0f to Color.Black.copy(alpha = 0.85f),
-                            0.15f to Color.Black.copy(alpha = 0.75f),
-                            0.25f to Color.Black.copy(alpha = 0.55f),
-                            0.35f to Color.Black.copy(alpha = 0.35f),
-                            0.45f to Color.Black.copy(alpha = 0.15f),
+                            0.0f to bottomScrimBase.copy(alpha = 0.85f),
+                            0.15f to bottomScrimBase.copy(alpha = 0.75f),
+                            0.25f to bottomScrimBase.copy(alpha = 0.55f),
+                            0.35f to bottomScrimBase.copy(alpha = 0.35f),
+                            0.45f to bottomScrimBase.copy(alpha = 0.15f),
                             0.55f to Color.Transparent,
                             1.0f to Color.Transparent
                         )
@@ -1921,8 +1923,8 @@ internal fun DetailsContent(
                         colorStops = arrayOf(
                             0.0f to Color.Transparent,
                             0.85f to Color.Transparent,
-                            0.92f to Color.Black.copy(alpha = 0.5f),
-                            1.0f to Color.Black.copy(alpha = 0.85f)
+                            0.92f to bottomScrimBase.copy(alpha = 0.5f),
+                            1.0f to bottomScrimBase.copy(alpha = 0.85f)
                         )
                     )
                 )
@@ -2329,7 +2331,33 @@ private fun DetailsTvRows(
 
     var lastDescriptionScrollRequest by remember(item.id) { mutableIntStateOf(descriptionScrollRequest) }
     var lastFocusedSection by remember(item.id) { mutableStateOf<FocusSection?>(null) }
-    LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, contentRowHeight, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
+
+    // Last measured heights of the column rows. Rows scrolled out of the viewport are not composed,
+    // so the distance back up to them can only be derived from remembered sizes.
+    val itemSizeCache = remember(item.id, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
+        mutableMapOf<Int, Int>()
+    }
+    LaunchedEffect(contentScrollState, itemSizeCache) {
+        snapshotFlow { contentScrollState.layoutInfo.visibleItemsInfo.map { it.index to it.size } }
+            .collect { sizes -> sizes.forEach { (index, size) -> itemSizeCache[index] = size } }
+    }
+    val itemSpacingPx = with(density) { 4.dp.toPx() }
+    // Scroll distance (px, positive = content moves up) that puts the row at [index] on the first slot
+    // (item offset 0, the content padding is already outside the item offsets), or null when the
+    // rows in between have never been measured.
+    fun scrollDeltaTo(index: Int): Float? {
+        val layout = contentScrollState.layoutInfo
+        val visible = layout.visibleItemsInfo
+        visible.firstOrNull { it.index == index }?.let { return it.offset.toFloat() }
+        val first = visible.firstOrNull() ?: return null
+        if (index >= first.index) return null
+        var between = 0f
+        for (i in index until first.index) {
+            between += (itemSizeCache[i] ?: return null) + itemSpacingPx
+        }
+        return first.offset - between
+    }
+    LaunchedEffect(item.id, currentSeason, focusedSection, contentHasFocus, descriptionScrollRequest, seasonsIdx, episodesIdx, ratingsIdx, castIdx, reviewsIdx, collectionIdx, similarIdx) {
         if (!contentHasFocus) return@LaunchedEffect
         val delta = descriptionScrollRequest - lastDescriptionScrollRequest
         val wasDescriptionFocused = lastFocusedSection == FocusSection.DESCRIPTION
@@ -2368,11 +2396,34 @@ private fun DetailsTvRows(
         if (focusedSection == FocusSection.BUTTONS) {
             detailsStackOffsetPx.stop()
             detailsStackOffsetPx.snapTo(0f)
-            contentScrollState.scrollToItem(descriptionIdx, 0)
-            val measuredHero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
-            if (measuredHero != null) {
-                val overflow = measuredHero.offset + measuredHero.size - contentScrollState.layoutInfo.viewportEndOffset
-                if (overflow > 0) contentScrollState.scrollBy(overflow.toFloat())
+            // The header fades in at the same moment and changes the viewport height; measure after that layout pass.
+            withFrameNanos { }
+            val toHero = scrollDeltaTo(descriptionIdx)
+            val heroSize = itemSizeCache[descriptionIdx]
+            if (toHero != null && heroSize != null) {
+                val layout = contentScrollState.layoutInfo
+                val overflow = (heroSize - layout.viewportEndOffset).coerceAtLeast(0)
+                contentScrollState.animateDetailsScrollDelta(
+                    deltaPx = toHero + overflow,
+                    durationMillis = 220
+                )
+                // The header toggles the viewport height at the same time; fix the remainder.
+                val measuredHero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+                if (measuredHero != null) {
+                    val info = contentScrollState.layoutInfo
+                    val desiredOffset = -(measuredHero.size - info.viewportEndOffset).coerceAtLeast(0)
+                    contentScrollState.animateDetailsScrollDelta(
+                        deltaPx = (measuredHero.offset - desiredOffset).toFloat(),
+                        durationMillis = 120
+                    )
+                }
+            } else {
+                contentScrollState.scrollToItem(descriptionIdx, 0)
+                val measuredHero = contentScrollState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == descriptionIdx }
+                if (measuredHero != null) {
+                    val overflow = measuredHero.offset + measuredHero.size - contentScrollState.layoutInfo.viewportEndOffset
+                    if (overflow > 0) contentScrollState.scrollBy(overflow.toFloat())
+                }
             }
             return@LaunchedEffect
         }
@@ -2382,6 +2433,24 @@ private fun DetailsTvRows(
         if (targetAligned) {
             detailsStackOffsetPx.stop()
             detailsStackOffsetPx.snapTo(0f)
+            return@LaunchedEffect
+        }
+
+        val deltaToTarget = scrollDeltaTo(targetScrollIndex)
+        if (deltaToTarget != null) {
+            // Scroll the remaining distance (also upwards, using remembered row heights) instead of cutting to the row.
+            detailsStackOffsetPx.stop()
+            detailsStackOffsetPx.snapTo(0f)
+            contentScrollState.animateDetailsScrollDelta(
+                deltaPx = deltaToTarget,
+                durationMillis = 170
+            )
+            if (
+                contentScrollState.firstVisibleItemIndex != targetScrollIndex ||
+                contentScrollState.firstVisibleItemScrollOffset != 0
+            ) {
+                contentScrollState.scrollToItem(targetScrollIndex, 0)
+            }
             return@LaunchedEffect
         }
 

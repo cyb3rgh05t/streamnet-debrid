@@ -563,17 +563,18 @@ private fun rememberLiveTvPreferences(profileId: String?): LiveTvPreferences {
         val netflixDescriptionSize = stringPreferencesKey("${prefix}live_tv_netflix_description_size")
         val classicTitleSize = stringPreferencesKey("${prefix}live_tv_classic_title_size")
         val classicDescriptionSize = stringPreferencesKey("${prefix}live_tv_classic_description_size")
+        val defaultLayoutMode = com.arflix.tv.util.LiveTvLayoutDefault.get(context)
         context.settingsDataStore.data.map { preferences ->
             LiveTvPreferences(
                 clockFormat = preferences[clockFormat] ?: "24h",
-                layoutMode = preferences[layoutMode] ?: "streamnet",
+                layoutMode = preferences[layoutMode] ?: defaultLayoutMode,
                 netflixTitleSize = preferences[netflixTitleSize] ?: "Normal",
                 netflixDescriptionSize = preferences[netflixDescriptionSize] ?: "Normal",
                 classicTitleSize = preferences[classicTitleSize] ?: "Normal",
                 classicDescriptionSize = preferences[classicDescriptionSize] ?: "Normal",
             )
         }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(initialValue = LiveTvPreferences())
+    }.collectAsStateWithLifecycle(initialValue = LiveTvPreferences(layoutMode = com.arflix.tv.util.LiveTvLayoutDefault.get(context)))
     return value
 }
 

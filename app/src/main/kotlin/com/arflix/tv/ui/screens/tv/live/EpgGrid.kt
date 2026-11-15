@@ -79,6 +79,10 @@ enum class EpgGridFocusMode {
     Epg,
 }
 
+/** Soft separator lines of the classic guide (header, channel column); the shared tokens are too strong here. */
+@Composable
+private fun epgSeparatorColor(): Color = LiveColors.Divider.copy(alpha = 0.16f)
+
 /**
  * EPG grid per spec §3.4.
  * Window: (now - 1h rounded to :30) → +9h = 10h wide.
@@ -443,7 +447,7 @@ fun EpgGrid(
                 modifier = Modifier
                     .width(1.dp)
                     .fillMaxHeight()
-                    .background(LiveColors.DividerStrong)
+                    .background(epgSeparatorColor())
             )
             // Scrolling time ruler with NOW pill pinned to the current minute.
             Box(
@@ -492,7 +496,7 @@ fun EpgGrid(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(1.dp)
-                .background(LiveColors.Divider),
+                .background(epgSeparatorColor()),
         )
 
         // ─── Body ───────────────────────────────────────────────────
@@ -603,7 +607,7 @@ fun EpgGrid(
                                 modifier = Modifier
                                     .width(1.dp)
                                     .fillMaxHeight()
-                                    .background(LiveColors.Divider)
+                                    .background(epgSeparatorColor())
                             )
 
                             // 3. EPG programs row (scrolls horizontally using the shared hScroll)

@@ -240,6 +240,8 @@
     <string name="ui_mode_desc">Force TV, Tablet, or Phone</string>
     <string name="skip_profile_desc">Auto-load last used profile after restart</string>
     <string name="oled_black_background_desc">Use pure black app backgrounds for OLED screens</string>
+    <string name="accent_gradient_background">Accent gradient background (TV)</string>
+    <string name="accent_gradient_background_desc">Tints the bottom fade and the background with the accent colour instead of black. Not used while OLED black is on.</string>
     <string name="clock_format_desc">Choose 12-hour or 24-hour time</string>
     <string name="show_budget_desc">Display the movie budget in large Home heroes and Details</string>
     <string name="show_certification_desc">Display German age ratings in large Home heroes and Details when available</string>

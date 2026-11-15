@@ -259,6 +259,8 @@
     <string name="dns_desc">API- und Stream-Anfragen auflösen</string>
     <string name="frame_rate_desc">Aus, Nahtlos oder Immer</string>
     <string name="oled_black_background_desc">Nutze reines Schwarz für OLED-Displays</string>
+    <string name="accent_gradient_background">Akzent-Verlauf im Hintergrund (TV)</string>
+    <string name="accent_gradient_background_desc">Färbt den Verlauf am unteren Rand und den Hintergrund mit der Akzentfarbe statt Schwarz. Wirkungslos, solange OLED-Schwarz aktiv ist.</string>
     <string name="quality_filters_desc">Qualitätsstufen auf diesem Gerät ausblenden</string>
 
     <string name="settings_value_any">Beliebig</string>

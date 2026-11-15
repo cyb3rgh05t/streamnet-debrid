@@ -306,7 +306,7 @@ internal fun tvGeneralRowsForSection(section: String): List<Int> {
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
-        "appearance" -> listOf(18, 53, 54, 17, 47, 48, 49, 50, 51, 42, 21, 22, 23, 46, 52, 24, 41, 36)
+        "appearance" -> listOf(18, 53, 54, 17, 47, 48, 49, 50, 51, 42, 21, 55, 22, 23, 46, 52, 24, 41, 36)
         "profiles" -> listOf(44, 45, 19)
         "network" -> listOf(25, 26, 35)
         else -> emptyList()
@@ -1154,6 +1154,7 @@ fun SettingsScreen(
                                                 }
                                                 45 -> showSettingsPinSetup = true
                                                 21 -> viewModel.setOledBlackBackground(!uiState.oledBlackBackground)
+                                                55 -> viewModel.setAccentGradientBackground(!uiState.accentGradientBackground)
                                                 22 -> viewModel.cycleClockFormat()
                                                 23 -> viewModel.setShowBudget(!uiState.showBudget)
                                                 46 -> viewModel.setShowCertification(!uiState.showCertification)
@@ -6049,6 +6050,7 @@ private fun TvGeneralSettingsSection(
         settingsLockEnabled = uiState.settingsLockEnabled,
         hasSettingsPin = uiState.hasSettingsPin,
         oledBlackBackground = uiState.oledBlackBackground,
+        accentGradientBackground = uiState.accentGradientBackground,
         clockFormat = uiState.clockFormat,
         showBudget = uiState.showBudget,
         showCertification = uiState.showCertification,
@@ -6089,6 +6091,7 @@ private fun TvGeneralSettingsSection(
         },
         onSetupSettingsPin = onShowSettingsPinSetup,
         onOledBlackBackgroundToggle = { viewModel.setOledBlackBackground(it) },
+        onAccentGradientBackgroundToggle = { viewModel.setAccentGradientBackground(it) },
         onClockFormatClick = { viewModel.cycleClockFormat() },
         onShowBudgetToggle = { viewModel.setShowBudget(it) },
         onShowCertificationToggle = { viewModel.setShowCertification(it) },
@@ -6747,6 +6750,7 @@ private fun TvGeneralSettingsRows(
     settingsLockEnabled: Boolean = false,
     hasSettingsPin: Boolean = false,
     oledBlackBackground: Boolean = false,
+    accentGradientBackground: Boolean = false,
     clockFormat: String = "24h",
     showBudget: Boolean = true,
     showCertification: Boolean = true,
@@ -6779,6 +6783,7 @@ private fun TvGeneralSettingsRows(
     onSettingsLockToggle: (Boolean) -> Unit = {},
     onSetupSettingsPin: () -> Unit = {},
     onOledBlackBackgroundToggle: (Boolean) -> Unit = {},
+    onAccentGradientBackgroundToggle: (Boolean) -> Unit = {},
     onClockFormatClick: () -> Unit = {},
     onShowBudgetToggle: (Boolean) -> Unit = {},
     onShowCertificationToggle: (Boolean) -> Unit = {},
@@ -6951,6 +6956,7 @@ private fun TvGeneralSettingsRows(
                     Modifier.settingsFocusSlot(localIndex)
                 )
                 21 -> SettingsToggleRow(Icons.Default.Palette, stringResource(R.string.oled_black_background), stringResource(R.string.oled_black_background_desc), oledBlackBackground, focusedIndex == localIndex, onOledBlackBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
+                55 -> SettingsToggleRow(Icons.Default.Palette, stringResource(R.string.accent_gradient_background), stringResource(R.string.accent_gradient_background_desc), accentGradientBackground, focusedIndex == localIndex, onAccentGradientBackgroundToggle, Modifier.settingsFocusSlot(localIndex))
                 22 -> SettingsRow(Icons.Default.Schedule, stringResource(R.string.clock_format), stringResource(R.string.clock_format_desc), if (clockFormat == "12h") "12-hour" else "24-hour", focusedIndex == localIndex, onClockFormatClick, Modifier.settingsFocusSlot(localIndex))
                 23 -> SettingsToggleRow(Icons.Default.Movie, stringResource(R.string.show_budget), stringResource(R.string.show_budget_desc), showBudget, focusedIndex == localIndex, onShowBudgetToggle, Modifier.settingsFocusSlot(localIndex))
                 46 -> SettingsToggleRow(Icons.Default.Security, stringResource(R.string.show_certification), stringResource(R.string.show_certification_desc), showCertification, focusedIndex == localIndex, onShowCertificationToggle, Modifier.settingsFocusSlot(localIndex))

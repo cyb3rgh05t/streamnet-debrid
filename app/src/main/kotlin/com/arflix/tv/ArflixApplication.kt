@@ -89,6 +89,8 @@ class ArflixApplication : Application(), Configuration.Provider, ImageLoaderFact
     override fun onCreate() {
         super.onCreate()
         instance = this
+        // Must run on the first launch of this version so updated installs keep the old default layout.
+        com.arflix.tv.util.LiveTvLayoutDefault.get(this)
         registerActivityLifecycleCallbacks(devicePresenceRepository)
 
         // Initialize global DNS provider and user agent from DataStore before network calls.

@@ -10,6 +10,7 @@ import androidx.tv.material3.darkColorScheme
 import com.arflix.tv.ui.skin.LocalAccentColorOverride
 import com.arflix.tv.ui.skin.ProvideArvioSkin
 import com.arflix.tv.ui.skin.accentColorFromName
+import com.arflix.tv.ui.skin.resolveAccentColor
 
 /**
  * StreamNet Color scheme holder - Arctic Fuse 2 inspired
@@ -72,10 +73,21 @@ data class ArvioColors(
 
 val LocalArvioColors = staticCompositionLocalOf { ArvioColors() }
 val LocalOledBlackBackground = staticCompositionLocalOf { false }
+val LocalAccentGradientBackground = staticCompositionLocalOf { false }
 
 @Composable
 fun appBackgroundDark(): Color {
     return if (LocalOledBlackBackground.current) Color.Black else BackgroundDark
+}
+
+/**
+ * Colour of the dark bottom scrims. Black by default; with the accent gradient setting a dark shade
+ * of the accent colour, so the fade keeps the same depth but is tinted.
+ */
+@Composable
+fun scrimBaseColor(): Color {
+    if (!LocalAccentGradientBackground.current || LocalOledBlackBackground.current) return Color.Black
+    return androidx.compose.ui.graphics.lerp(Color.Black, resolveAccentColor(Color.Black), 0.5f)
 }
 
 // Keep legacy aliases for compatibility
@@ -89,6 +101,7 @@ val LocalArflixColors = LocalArvioColors
 @Composable
 fun ArvioTvTheme(
     oledBlackBackground: Boolean = false,
+    accentGradientBackground: Boolean = false,
     accentColorName: String? = null,
     content: @Composable () -> Unit
 ) {
@@ -123,6 +136,7 @@ fun ArvioTvTheme(
     CompositionLocalProvider(
         LocalArvioColors provides arvioColors,
         LocalOledBlackBackground provides oledBlackBackground,
+        LocalAccentGradientBackground provides accentGradientBackground,
         LocalAccentColorOverride provides accentColor
     ) {
         ProvideArvioSkin {
@@ -139,10 +153,12 @@ fun ArvioTvTheme(
 @Composable
 fun ArflixTvTheme(
     oledBlackBackground: Boolean = false,
+    accentGradientBackground: Boolean = false,
     accentColorName: String? = null,
     content: @Composable () -> Unit
 ) = ArvioTvTheme(
     oledBlackBackground = oledBlackBackground,
+    accentGradientBackground = accentGradientBackground,
     accentColorName = accentColorName,
     content = content
 )

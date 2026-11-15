@@ -791,13 +791,29 @@ private fun NetflixCategoryChipRow(
             durationMillis = 150,
         )
     }
-    // Keep the active chip in view whenever the layout appears (home, fullscreen return, settings)
-    // or the selection changes. Only scroll when it is not visible, so choosing a visible chip
-    // does not make the row jump.
+    // The active chip always sits in the first slot when the layout appears (home, fullscreen
+    // return, settings) or the selection changes. While the user browses the row (a chip has
+    // focus) the focus effect above owns the scroll position, so item-count updates must not
+    // pull it back.
+    var activeChipAligned by remember { mutableStateOf(false) }
     LaunchedEffect(selectedCategoryIndex, items.size) {
         if (selectedCategoryIndex < 0) return@LaunchedEffect
+        if (focusedChipIndex >= 0) return@LaunchedEffect
         val target = selectedCategoryIndex + 1 // +1: the search chip comes first
-        if (!chipInView(target)) runCatching { listState.scrollToItem(target) }
+        if (!activeChipAligned) {
+            activeChipAligned = true
+            runCatching { listState.scrollToItem(target) }
+        } else {
+            val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target }
+            if (item == null) {
+                runCatching { listState.scrollToItem(target) }
+            } else {
+                listState.animateHomeScrollDelta(
+                    deltaPx = (item.offset - listState.layoutInfo.beforeContentPadding).toFloat(),
+                    durationMillis = 150,
+                )
+            }
+        }
     }
     // Focus the chip only for a signal raised after this row appeared. A leftover signal from an
     // earlier visit used to pull focus off the channel rail when coming back from fullscreen.
@@ -845,13 +861,22 @@ private fun NetflixCategoryChipRow(
             rowWasFocused = true
         } else if (rowWasFocused) {
             rowWasFocused = false
+            if (selectedCategoryIndex < 0) return@LaunchedEffect
             if (leavingDownward) {
                 leavingDownward = false
-                return@LaunchedEffect
+                // Realign only after the rail has settled; running both at once made the pills jump.
+                delay(450L)
             }
-            if (selectedCategoryIndex < 0) return@LaunchedEffect
             val target = selectedCategoryIndex + 1
-            if (!chipInView(target)) runCatching { listState.animateScrollToItem(target) }
+            val item = listState.layoutInfo.visibleItemsInfo.firstOrNull { it.index == target }
+            if (item == null) {
+                runCatching { listState.animateScrollToItem(target) }
+            } else {
+                listState.animateHomeScrollDelta(
+                    deltaPx = (item.offset - listState.layoutInfo.beforeContentPadding).toFloat(),
+                    durationMillis = 150,
+                )
+            }
         }
     }
     BoxWithConstraints(modifier = modifier.arvioManualBringIntoViewBoundary()) {

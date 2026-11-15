@@ -45,6 +45,9 @@ fun tvSetupPromptedKey(profileId: String) = booleanPreferencesKey("tv_setup_prom
 /** Key for forcing pure-black (OLED) app background */
 val OLED_BLACK_BACKGROUND_KEY = booleanPreferencesKey("oled_black_background")
 
+/** Tints the TV background and bottom scrims with the accent colour instead of black. */
+val ACCENT_GRADIENT_BACKGROUND_KEY = booleanPreferencesKey("accent_gradient_background")
+
 /** Legacy fallback for profiles that do not have an accent colour yet. */
 val ACCENT_COLOR_KEY = stringPreferencesKey("accent_color")
 

@@ -1448,6 +1448,7 @@ fun HomeScreen(
                 }
 
                 // === SCRIM SYSTEM ===
+                val bottomScrimBase = com.arflix.tv.ui.theme.scrimBaseColor()
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -1456,12 +1457,12 @@ fun HomeScreen(
                             val height = size.height
                             val leftScrim = Brush.horizontalGradient(
                                 colorStops = arrayOf(
-                                    0.0f to Color.Black.copy(alpha = 0.95f),
-                                    0.12f to Color.Black.copy(alpha = 0.88f),
-                                    0.22f to Color.Black.copy(alpha = 0.72f),
-                                    0.32f to Color.Black.copy(alpha = 0.50f),
-                                    0.42f to Color.Black.copy(alpha = 0.30f),
-                                    0.55f to Color.Black.copy(alpha = 0.10f),
+                                    0.0f to bottomScrimBase.copy(alpha = 0.95f),
+                                    0.12f to bottomScrimBase.copy(alpha = 0.88f),
+                                    0.22f to bottomScrimBase.copy(alpha = 0.72f),
+                                    0.32f to bottomScrimBase.copy(alpha = 0.50f),
+                                    0.42f to bottomScrimBase.copy(alpha = 0.30f),
+                                    0.55f to bottomScrimBase.copy(alpha = 0.10f),
                                     0.65f to Color.Transparent,
                                     1.0f to Color.Transparent
                                 ),
@@ -1483,8 +1484,8 @@ fun HomeScreen(
                                 colorStops = arrayOf(
                                     0.0f to Color.Transparent,
                                     0.85f to Color.Transparent,
-                                    0.92f to Color.Black.copy(alpha = 0.5f),
-                                    1.0f to Color.Black.copy(alpha = 0.85f)
+                                    0.92f to bottomScrimBase.copy(alpha = 0.5f),
+                                    1.0f to bottomScrimBase.copy(alpha = 0.85f)
                                 ),
                                 startY = 0f,
                                 endY = height
@@ -1850,21 +1851,22 @@ private fun IptvProgramDetailsDialog(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.matchParentSize(),
                     )
+                    val iptvHeroScrimBase = com.arflix.tv.ui.theme.scrimBaseColor()
                     Box(
                         modifier = Modifier
                             .matchParentSize()
                             .background(
                                 Brush.horizontalGradient(
-                                    0f to Color.Black.copy(alpha = 0.9f),
-                                    0.68f to Color.Black.copy(alpha = 0.62f),
-                                    1f to Color.Black.copy(alpha = 0.34f),
+                                    0f to iptvHeroScrimBase.copy(alpha = 0.9f),
+                                    0.68f to iptvHeroScrimBase.copy(alpha = 0.62f),
+                                    1f to iptvHeroScrimBase.copy(alpha = 0.34f),
                                 )
                             )
                             .background(
                                 Brush.verticalGradient(
-                                    0f to Color.Black.copy(alpha = 0.18f),
-                                    0.72f to Color.Black.copy(alpha = 0.55f),
-                                    1f to Color.Black.copy(alpha = 0.9f),
+                                    0f to iptvHeroScrimBase.copy(alpha = 0.18f),
+                                    0.72f to iptvHeroScrimBase.copy(alpha = 0.55f),
+                                    1f to iptvHeroScrimBase.copy(alpha = 0.9f),
                                 )
                             ),
                     )

@@ -261,6 +261,7 @@ data class SettingsUiState(
     val settingsLockEnabled: Boolean = false,
     val hasSettingsPin: Boolean = false,
     val oledBlackBackground: Boolean = false,
+    val accentGradientBackground: Boolean = false,
     val clockFormat: String = "24h",
     val qualityFilters: List<QualityFilterConfig> = emptyList(),
     // Spoiler blur â€” blur unwatched episode card images and hide synopsis
@@ -665,6 +666,7 @@ class SettingsViewModel @Inject constructor(
             val deviceModeOverride = prefs[com.arflix.tv.util.DEVICE_MODE_OVERRIDE_KEY] ?: "auto"
             val skipProfileSelection = prefs[com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY] ?: false
             val oledBlackBackground = prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] ?: false
+            val accentGradientBackground = prefs[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] ?: false
             val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
             mediaRepository.contentLanguage = contentLang
@@ -844,6 +846,7 @@ class SettingsViewModel @Inject constructor(
                 deviceModeOverride = deviceModeOverride,
                 skipProfileSelection = skipProfileSelection,
                 oledBlackBackground = oledBlackBackground,
+                accentGradientBackground = accentGradientBackground,
                 clockFormat = clockFormat,
                 accentColor = accentColor,
                 qualityFilters = qualityFilters,
@@ -1504,6 +1507,7 @@ class SettingsViewModel @Inject constructor(
     private fun normalizeLiveTvLayoutMode(value: String?): String {
         return when (value?.lowercase()) {
             "classic" -> "classic"
+            null -> com.arflix.tv.util.LiveTvLayoutDefault.get(context)
             else -> "streamnet"
         }
     }
@@ -1616,6 +1620,16 @@ class SettingsViewModel @Inject constructor(
                 prefs[com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY] = enabled
             }
             _uiState.value = _uiState.value.copy(oledBlackBackground = enabled)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    fun setAccentGradientBackground(enabled: Boolean) {
+        viewModelScope.launch {
+            context.settingsDataStore.edit { prefs ->
+                prefs[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] = enabled
+            }
+            _uiState.value = _uiState.value.copy(accentGradientBackground = enabled)
             syncLocalStateToCloud(silent = true)
         }
     }

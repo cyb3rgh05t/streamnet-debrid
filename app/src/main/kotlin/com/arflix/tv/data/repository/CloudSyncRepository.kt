@@ -22,6 +22,7 @@ import com.arflix.tv.util.LAST_APP_LANGUAGE_KEY
 import com.arflix.tv.util.AppLogger
 import com.arflix.tv.util.ACCENT_COLOR_KEY
 import com.arflix.tv.util.OLED_BLACK_BACKGROUND_KEY
+import com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY
 import com.arflix.tv.util.SKIP_PROFILE_SELECTION_KEY
 import com.arflix.tv.util.Constants
 import com.arflix.tv.util.profileAccentColorKey
@@ -1000,6 +1001,7 @@ class CloudSyncRepository @Inject constructor(
     private fun normalizeLiveTvLayoutMode(raw: String?): String {
         return when (raw?.trim()?.lowercase()) {
             "classic" -> "classic"
+            null -> com.arflix.tv.util.LiveTvLayoutDefault.get(context)
             else -> "streamnet"
         }
     }
@@ -1044,7 +1046,7 @@ class CloudSyncRepository @Inject constructor(
     // existing merges; `defaultSubtitle` keeps its own `subtitleSettingsUpdatedAt` logic.
 
     private val globalMergeKeys = listOf(
-        "accentColor", "oledBlackBackground", "skipProfileSelection", "customUserAgent",
+        "accentColor", "oledBlackBackground", "accentGradientBackground", "skipProfileSelection", "customUserAgent",
         "dnsProvider", "subtitleAiEnabled", "subtitleAiAutoSelect", "subtitleAiFindBestMatch",
         "subtitlePreloadEnabled", "dolbyVisionCompatEnabled", "subtitleAiApiKey",
         "subtitleAiModel", "subtitleRemoveHearingImpaired"
@@ -1324,6 +1326,7 @@ class CloudSyncRepository @Inject constructor(
         root.put("dnsProvider", globalDnsProvider)
         root.put("customUserAgent", prefs[customUserAgentKey] ?: "")
         root.put("oledBlackBackground", prefs[OLED_BLACK_BACKGROUND_KEY] ?: false)
+        root.put("accentGradientBackground", prefs[ACCENT_GRADIENT_BACKGROUND_KEY] ?: false)
         val accentColor = prefs[ACCENT_COLOR_KEY] ?: "Orange"
         root.put("accentColor", accentColor)
         root.put("focusBorderColor", accentColor)
@@ -2159,7 +2162,7 @@ class CloudSyncRepository @Inject constructor(
         val fallbackDefaultSubtitle = root.optString("defaultSubtitle", "Off")
         val fallbackDefaultAudioLanguage = root.optString("defaultAudioLanguage", "Auto (Original)")
         val fallbackCardLayoutMode = normalizeCardLayoutMode(root.optString("cardLayoutMode", CARD_LAYOUT_MODE_LANDSCAPE))
-        val fallbackLiveTvLayoutMode = normalizeLiveTvLayoutMode(root.optString("liveTvLayoutMode", "streamnet"))
+        val fallbackLiveTvLayoutMode = normalizeLiveTvLayoutMode(root.optString("liveTvLayoutMode", "").takeIf { it.isNotBlank() })
         val fallbackLiveTvNetflixTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixTitleSize", "Normal"))
         val fallbackLiveTvNetflixDescriptionSize = normalizeLiveTvInfoTextSize(root.optString("liveTvNetflixDescriptionSize", "Normal"))
         val fallbackLiveTvClassicTitleSize = normalizeLiveTvInfoTextSize(root.optString("liveTvClassicTitleSize", "Normal"))
@@ -2327,6 +2330,7 @@ class CloudSyncRepository @Inject constructor(
             root.has("dnsProvider") ||
             root.has("customUserAgent") ||
             root.has("oledBlackBackground") ||
+            root.has("accentGradientBackground") ||
             root.has("accentColor") ||
             root.has("focusBorderColor")
         ) {
@@ -2348,6 +2352,9 @@ class CloudSyncRepository @Inject constructor(
                 }
                 if (root.has("oledBlackBackground")) {
                     prefs[OLED_BLACK_BACKGROUND_KEY] = root.optBoolean("oledBlackBackground", false)
+                }
+                if (root.has("accentGradientBackground")) {
+                    prefs[ACCENT_GRADIENT_BACKGROUND_KEY] = root.optBoolean("accentGradientBackground", false)
                 }
                 if ((root.has("accentColor") || root.has("focusBorderColor")) &&
                     root.optJSONObject("profileSettingsById")?.has(activeProfileId) != true

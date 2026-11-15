@@ -342,6 +342,9 @@ class MainActivity : ComponentActivity() {
             val oledBlackBackground by remember {
                 this@MainActivity.settingsDataStore.data.map { it[OLED_BLACK_BACKGROUND_KEY] ?: false }
             }.collectAsStateWithLifecycle(initialValue = false)
+            val accentGradientBackground by remember {
+                this@MainActivity.settingsDataStore.data.map { it[com.arflix.tv.util.ACCENT_GRADIENT_BACKGROUND_KEY] ?: false }
+            }.collectAsStateWithLifecycle(initialValue = false)
             val activeProfileId by remember {
                 profileRepository.get().activeProfileId
             }.collectAsStateWithLifecycle(initialValue = null)
@@ -433,6 +436,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 ArflixTvTheme(
                     oledBlackBackground = oledBlackBackground,
+                    accentGradientBackground = accentGradientBackground,
                     accentColorName = accentColorName
                 ) {
                     val startupState by startupViewModel.state.collectAsStateWithLifecycle()
@@ -778,6 +782,9 @@ fun ArflixApp(
 
     val deviceType = LocalDeviceType.current
     val isMobile = deviceType.isTouchDevice()
+    val accentGradientBackground = !isMobile &&
+        com.arflix.tv.ui.theme.LocalAccentGradientBackground.current
+    val appAccent = com.arflix.tv.ui.skin.resolveAccentColor(fallback = Color.Black)
     val currentBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = currentBackStackEntry?.destination?.route
     val navigationSoundEnabled by remember(context) {
@@ -832,6 +839,16 @@ fun ArflixApp(
             .background(
                 brush = if (oledBlackBackground) {
                     Brush.linearGradient(colors = listOf(Color.Black, Color.Black))
+                } else if (accentGradientBackground) {
+                    // Accent tint rising from the bottom edge, fading out towards the upper half.
+                    val base = appBackgroundDark()
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0f to base,
+                            0.45f to base,
+                            1f to androidx.compose.ui.graphics.lerp(base, appAccent, 0.32f)
+                        )
+                    )
                 } else {
                     Brush.linearGradient(
                         colors = listOf(
