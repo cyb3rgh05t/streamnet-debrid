@@ -144,6 +144,8 @@ private const val CatchupUrlAnchorGranularityMs = 60_000L
 private const val IptvPlaybackUserAgent = com.arflix.tv.network.IPTV_USER_AGENT
 private const val LiveBufferRecoveryTimeoutMs = 12_000L
 private const val LiveBufferRecoveryMaxAttempts = 3
+private const val LiveVideoFreezeTimeoutMs = 6_000L
+private const val LiveVideoFreezeMaxRecoveries = 2
 private const val VisibleGuidePastWindowMs = 48L * 60L * 60_000L
 private const val VisibleGuideFutureWindowMs = 48L * 60L * 60_000L
 
@@ -2514,6 +2516,34 @@ fun LiveTvScreen(
     var lastPreparedDrmInfo by remember { mutableStateOf<com.arflix.tv.data.model.DrmInfo?>(null) }
     var lastPreparedCatchupOffsetMs by remember { mutableLongStateOf(-1L) }
     var playerRetryCount by remember { mutableIntStateOf(0) }
+    var zapPreparedAtMs by remember { mutableLongStateOf(0L) }
+    var zapReadyAtMs by remember { mutableLongStateOf(0L) }
+    // Timing of a channel switch, to tell slow stream start (prepare -> READY) from slow video
+    // start (READY -> first frame) in user logs.
+    DisposableEffect(exoPlayer) {
+        val timing = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY && zapPreparedAtMs > 0L && zapReadyAtMs == 0L) {
+                    zapReadyAtMs = android.os.SystemClock.elapsedRealtime()
+                }
+            }
+
+            override fun onRenderedFirstFrame() {
+                if (zapPreparedAtMs == 0L) return
+                val now = android.os.SystemClock.elapsedRealtime()
+                val readyAfter = if (zapReadyAtMs > 0L) zapReadyAtMs - zapPreparedAtMs else -1L
+                System.err.println(
+                    "[IPTV-Zap] first frame ${now - zapPreparedAtMs} ms after prepare " +
+                        "(ready after $readyAfter ms) mime=${exoPlayer.videoFormat?.sampleMimeType} " +
+                        "size=${exoPlayer.videoFormat?.width}x${exoPlayer.videoFormat?.height}"
+                )
+                zapPreparedAtMs = 0L
+                zapReadyAtMs = 0L
+            }
+        }
+        exoPlayer.addListener(timing)
+        onDispose { exoPlayer.removeListener(timing) }
+    }
     var playbackDiagnostic by remember { mutableStateOf<PlaybackDiagnostic?>(null) }
 
     LaunchedEffect(playingChannel?.id, playbackDiagnostic?.title, playbackDiagnostic?.channel?.id) {
@@ -2550,6 +2580,8 @@ fun LiveTvScreen(
         }
 
         playerIsBuffering = true
+        zapPreparedAtMs = android.os.SystemClock.elapsedRealtime()
+        zapReadyAtMs = 0L
         exoPlayer.stop()
         exoPlayer.clearMediaItems()
         val mediaItem = MediaItem.Builder()
@@ -2702,6 +2734,53 @@ fun LiveTvScreen(
             }
 
             liveBufferRecoveryAttempt += 1
+            liveBufferRecoveryInFlight = true
+            reloadCurrentLiveStream()
+        }
+    }
+
+    // Frozen picture with running audio: playback stays READY, so the buffer watchdog above never
+    // fires, but the video decoder stopped delivering frames. Reloading the stream is what the
+    // user otherwise does by zapping away and back.
+    LaunchedEffect(exoPlayer, playingChannelId, playingCatchupProgram, lastPreparedStreamUrl) {
+        if (playingCatchupProgram != null) return@LaunchedEffect
+        var counters: androidx.media3.exoplayer.DecoderCounters? = null
+        var lastRendered = -1
+        var lastProgressAtMs = android.os.SystemClock.elapsedRealtime()
+        var recoveries = 0
+        while (true) {
+            delay(1_000L)
+            val now = android.os.SystemClock.elapsedRealtime()
+            val videoFormat = exoPlayer.videoFormat
+            // Streams that are a still cover image (radio) legitimately render very few frames.
+            val moving = videoFormat != null &&
+                (videoFormat.frameRate == Format.NO_VALUE.toFloat() || videoFormat.frameRate >= 5f)
+            val current = exoPlayer.videoDecoderCounters
+            if (playingChannelId == null || lastPreparedStreamUrl == null || !exoPlayer.isPlaying ||
+                exoPlayer.audioFormat == null || !moving || current == null
+            ) {
+                counters = null
+                lastRendered = -1
+                lastProgressAtMs = now
+                continue
+            }
+            current.ensureUpdated()
+            if (current !== counters || current.renderedOutputBufferCount != lastRendered) {
+                counters = current
+                lastRendered = current.renderedOutputBufferCount
+                lastProgressAtMs = now
+                continue
+            }
+            if (now - lastProgressAtMs < LiveVideoFreezeTimeoutMs || liveBufferRecoveryInFlight) continue
+            lastProgressAtMs = now
+            if (recoveries >= LiveVideoFreezeMaxRecoveries) continue
+            recoveries += 1
+            System.err.println(
+                "[IPTV] Video frozen while audio plays rendered=$lastRendered " +
+                    "dropped=${current.droppedBufferCount} skipped=${current.skippedOutputBufferCount} " +
+                    "mime=${videoFormat?.sampleMimeType} size=${videoFormat?.width}x${videoFormat?.height} " +
+                    "recovery=$recoveries"
+            )
             liveBufferRecoveryInFlight = true
             reloadCurrentLiveStream()
         }

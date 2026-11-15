@@ -4,6 +4,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.014] - 2026-11-15
+
+- Android-Version: `2.6.014` / Code `515`.
+- Android Live TV, Standbild bei laufendem Ton (Meldung eines Nutzers im Vollbild, kann auch im Mini-Player auftreten, weil beide denselben Player nutzen): Der bestehende Wächter prüfte nur den Zustand „Puffern“; im Zustand „Bereit“ mit stehendem Bild griff nichts. Neu prüft die App einmal pro Sekunde, ob die Zahl der gerenderten Bilder steigt, solange Ton und Video laufen. Steht sie 6 Sekunden still, lädt die App den Sender neu (wie das Zappen weg und zurück), höchstens zweimal pro Sender. Ausgenommen sind Pause, Puffern, Catchup, Streams ohne Ton oder Video und Streams mit unter 5 Bildern pro Sekunde (Radio mit Standbild). Beim Auslösen schreibt die App `[IPTV] Video frozen while audio plays` mit Zähler, Codec und Auflösung ins Log. Das behebt das Symptom, nicht die Ursache: Ist die Bildfläche beim Wechsel zwischen Mini-Player und Vollbild schuld, reicht ein Neuladen möglicherweise nicht.
+- Android Live TV, Messung beim Kanalwechsel: Nach jedem Wechsel schreibt die App `[IPTV-Zap] first frame … ms after prepare (ready after … ms)` mit Codec und Auflösung ins Log, um langsamen Stream-Start von langsamem Video-Start zu unterscheiden. Nur Logging, kein geändertes Verhalten. Eine Ursache für „Kanäle laden nach“ wurde noch nicht gefunden, es liegt kein Log vor; geprüft wurde, dass bei StreamNet-TV-URLs vor dem Start keine Netzwerkabfrage läuft und der Puffer nach 1 Sekunde startet. Vermutung ohne Beleg: Konten mit nur einer erlaubten Verbindung blockieren beim schnellen Zappen kurz, solange die alte Verbindung noch offen ist.
+- Android-Validierung: 925 Unit-Tests ohne Fehler, davon einer übersprungen. Das Kompilieren und der Debug-Build laufen durch. Nicht geprüft: der Video-Wächter auf echter TV-Hardware (der Fehler ließ sich nicht am Emulator nachstellen; Fehlalarme sind möglich und kosten einen Neustart des Streams mit kurzem Ladekreis) und die Zap-Messung auf einem Gerät.
+- Backend und Web unverändert.
 ## [2.6.013] - 2026-11-15
 
 - Android-Version: `2.6.013` / Code `514`.
