@@ -399,6 +399,108 @@ test("catalog removal tolerates unrelated sync pushes but rejects changes to tha
   assert.equal(related.queries.at(-1).sql, "rollback");
 });
 
+test("bundled catalog lists can be redirected, listed and reset across accounts", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  const homeRow = () => ({
+    id: "trending_movies", title: "Trending", sourceType: "MDBLIST", isPreinstalled: true, enabled: true,
+    sourceUrl: "https://mdblist.com/lists/snoak/trending-movies",
+    sourceRef: "mdblist:https://mdblist.com/lists/snoak/trending-movies",
+  });
+  const decade = () => ({
+    id: "decade_2020s", title: "2020s", sourceType: "PREINSTALLED", isPreinstalled: true, kind: "COLLECTION",
+    collectionSources: [
+      { kind: "TMDB_GENRE", tmdbGenreId: 28 },
+      { kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/top-2020s-movies" },
+    ],
+  });
+  for (const row of rows.slice(0, 2)) row.payload.catalogsByProfile = { main: [homeRow(), decade()], kids: [homeRow()] };
+
+  const list = await send("GET", "/admin-api/global/default-catalogs");
+  assert.equal(list.statusCode, 200);
+  const byId = Object.fromEntries(list.json().catalogs.map((item) => [item.id, item]));
+  assert.equal(byId.trending_movies.kind, "home");
+  assert.deepEqual(byId.trending_movies.sources[0].variants, [
+    { value: "https://mdblist.com/lists/snoak/trending-movies", accounts: 2 },
+  ]);
+  assert.equal(byId.decade_2020s.sources.length, 1);
+  assert.equal(byId.decade_2020s.sources[0].index, 1);
+
+  const request = {
+    operation: "set_catalog_source", targetId: "trending_movies",
+    data: { sourceUrl: "http://www.mdblist.com/lists/me/new-list?x=1" },
+  };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.statusCode, 200);
+  assert.equal(preview.json().changed, 2);
+  const applied = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(applied.statusCode, 200);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 2);
+  for (const { values } of updates) {
+    const next = JSON.parse(values[1]);
+    for (const profile of ["main", "kids"]) {
+      const row = next.catalogsByProfile[profile].find((item) => item.id === "trending_movies");
+      assert.equal(row.sourceUrl, "https://www.mdblist.com/lists/me/new-list");
+      assert.equal(row.sourceRef, "mdblist:https://www.mdblist.com/lists/me/new-list");
+      assert.equal(row.remoteSourceUrl, "https://www.mdblist.com/lists/me/new-list");
+      assert.equal(row.remoteManaged, true);
+    }
+    assert.ok(next.catalogsUpdatedAtByProfile.main > 0);
+  }
+});
+
+test("collection MDBList slugs change only on matching sources and inputs are validated", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  rows[0].payload.catalogsByProfile = { main: [{
+    id: "decade_2020s", title: "2020s", isPreinstalled: true, kind: "COLLECTION",
+    collectionSources: [{ kind: "TMDB_GENRE", tmdbGenreId: 28 }, { kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/old" }],
+  }] };
+  const request = { operation: "set_catalog_slug", targetId: "decade_2020s", data: { sourceIndex: 1, mdblistSlug: "me/new" } };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  assert.equal(preview.json().changed, 1);
+  const applied = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(applied.statusCode, 200);
+  const row = JSON.parse(queries.find(({ sql }) => sql.includes("update account_sync_snapshots")).values[1])
+    .catalogsByProfile.main[0];
+  assert.equal(row.collectionSources[1].mdblistSlug, "me/new");
+  assert.deepEqual(row.remoteCollectionSources, row.collectionSources);
+  assert.equal(row.collectionSources[0].tmdbGenreId, 28);
+
+  const onWrongSource = await send("POST", "/admin-api/global/preview", { ...request, data: { sourceIndex: 0, mdblistSlug: "me/new" } });
+  assert.equal(onWrongSource.json().changed, 0);
+  for (const data of [{ sourceIndex: 1, mdblistSlug: "no slug" }, { sourceIndex: -1, mdblistSlug: "a/b" }]) {
+    assert.equal((await send("POST", "/admin-api/global/preview", { ...request, data })).statusCode, 400);
+  }
+  for (const sourceUrl of ["https://evil.example/lists/a/b", "https://mdblist.com/lists/a"]) {
+    const bad = await send("POST", "/admin-api/global/preview", {
+      operation: "set_catalog_source", targetId: "trending_movies", data: { sourceUrl },
+    });
+    assert.equal(bad.statusCode, 400);
+  }
+});
+
+test("clearing a catalog source override removes only the override fields", async (t) => {
+  const { send, rows, queries } = await fixture(t);
+  rows[0].payload.catalogsByProfile = { main: [{
+    id: "trending_movies", title: "Trending", sourceType: "MDBLIST", isPreinstalled: true, remoteManaged: true,
+    sourceUrl: "https://mdblist.com/lists/me/new", remoteSourceUrl: "https://mdblist.com/lists/me/new",
+  }] };
+  const request = { operation: "clear_catalog_source", targetId: "trending_movies" };
+  const preview = await send("POST", "/admin-api/global/preview", request);
+  const applied = await send("PATCH", "/admin-api/global/snapshot", {
+    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  assert.equal(applied.statusCode, 200);
+  const row = JSON.parse(queries.find(({ sql }) => sql.includes("update account_sync_snapshots")).values[1])
+    .catalogsByProfile.main[0];
+  assert.equal("remoteSourceUrl" in row, false);
+  assert.equal(row.title, "Trending");
+});
+
 test("unavailable catalog templates are rejected without snapshot writes", async (t) => {
   const { send, queries } = await fixture(t);
   const result = await send("POST", "/admin-api/global/preview", {

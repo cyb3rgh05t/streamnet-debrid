@@ -628,14 +628,29 @@ export function prepareAdminGlobalMutation(request) {
     "add_playlist", "edit_playlist", "delete_playlist", "clear_playlists",
     "change_xtream_host", "clear_streamnet_host_override",
     "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
+    "set_catalog_source", "clear_catalog_source", "set_catalog_slug",
   ]);
   if (!allowed.has(operation)) throw new Error("Unsupported operation");
   const targetId = operation === "clear_streamnet_host_override"
     ? "streamnet_tv"
-    : /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host"
+    : /^(edit|delete|rename|set)_/.test(operation) || operation === "clear_catalog_source" || operation === "change_xtream_host"
     ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : operation.includes("catalog") ? "Catalog id" : "Playlist id")
     : null;
   let data = null;
+  if (operation === "set_catalog_source") {
+    data = { sourceUrl: normalizeAdminListUrl("MDBLIST", request.data?.sourceUrl).sourceUrl.replace(/^http:/i, "https:") };
+  }
+  if (operation === "set_catalog_slug") {
+    const sourceIndex = Number(request.data?.sourceIndex);
+    const slug = String(request.data?.mdblistSlug || "").trim();
+    if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex > 100) {
+      throw new Error("Collection source index is invalid");
+    }
+    if (!/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(slug)) {
+      throw new Error("MDBList slug is invalid");
+    }
+    data = { sourceIndex, mdblistSlug: slug };
+  }
   if (operation === "rename_catalog") {
     data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
   }
@@ -699,12 +714,11 @@ export function prepareAdminGlobalMutation(request) {
   return { operation, targetId, data };
 }
 
-function normalizeAdminListCatalog(data) {
-  const sourceType = String(data.sourceType || "").toUpperCase();
+function normalizeAdminListUrl(sourceType, rawValue) {
   if (!["TRAKT", "MDBLIST"].includes(sourceType)) throw new Error("Catalog source type is invalid");
   let url;
   try {
-    const raw = String(data.sourceUrl || "").trim();
+    const raw = String(rawValue || "").trim();
     url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   } catch {
     throw new Error("Catalog list URL is invalid");
@@ -723,7 +737,12 @@ function normalizeAdminListCatalog(data) {
   url.search = "";
   url.hash = "";
   url.pathname = `/${parts.join("/")}`;
-  const sourceUrl = url.toString();
+  return { sourceUrl: url.toString(), parts };
+}
+
+function normalizeAdminListCatalog(data) {
+  const sourceType = String(data.sourceType || "").toUpperCase();
+  const { sourceUrl, parts } = normalizeAdminListUrl(sourceType, data.sourceUrl);
   const title = cleanIdentifier(data.title, "Catalog title");
   return {
     id: `custom_${crypto.createHash("sha256").update(`${sourceType}|${sourceUrl}`).digest("hex").slice(0, 16)}`,
@@ -829,6 +848,25 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
       const catalog = { ...target, enabled: data.enabled, remoteManaged: true };
       next = upsertById(current, catalog);
       setCatalogHidden(payload, profileId, catalog, !data.enabled);
+    } else if (operation === "set_catalog_source") {
+      // Only list-backed bundled rows carry a list URL; anything else is skipped for this account.
+      if (catalogType(target) !== "MDBLIST" || !target.sourceUrl) continue;
+      next = upsertById(current, {
+        ...target, sourceUrl: data.sourceUrl, sourceRef: `mdblist:${data.sourceUrl}`,
+        remoteSourceUrl: data.sourceUrl, remoteManaged: true,
+      });
+    } else if (operation === "set_catalog_slug") {
+      const sources = Array.isArray(target.collectionSources) ? target.collectionSources : [];
+      if (sources[data.sourceIndex]?.kind !== "MDBLIST_PUBLIC") continue;
+      const nextSources = sources.map((source, index) =>
+        index === data.sourceIndex ? { ...source, mdblistSlug: data.mdblistSlug } : source);
+      next = upsertById(current, {
+        ...target, collectionSources: nextSources, remoteCollectionSources: nextSources, remoteManaged: true,
+      });
+    } else if (operation === "clear_catalog_source") {
+      const { remoteSourceUrl: _url, remoteCollectionSources: _sources, ...rest } = target;
+      // The app restores the bundled list on its next sync; the stored values stay until then.
+      next = upsertById(current, rest);
     } else if (operation === "delete_catalog") {
       setCatalogHidden(payload, profileId, target, true);
       // Defaults and manifest catalogs regenerate; keep a disabled record as a tombstone.
@@ -898,6 +936,37 @@ export function adminGlobalInventory(payload) {
     playlists: [...playlists.values()],
     catalogs: [...catalogs.values()],
   };
+}
+
+/**
+ * Bundled (preinstalled) catalogs of one snapshot whose list can be redirected by the admin:
+ * MDBList home rows (list URL) and collection sources backed by an MDBList slug.
+ */
+export function adminEditableDefaultCatalogs(payload) {
+  if (!isPlainObject(payload)) return [];
+  const found = new Map();
+  for (const profileId of profileIds(payload)) {
+    for (const catalog of catalogsForProfile(payload, profileId)) {
+      if (!catalog?.id || catalog.isPreinstalled !== true) continue;
+      const entry = found.get(String(catalog.id)) || {
+        id: String(catalog.id), title: String(catalog.title || catalog.name || catalog.id), sources: new Map(),
+      };
+      if (catalogType(catalog) === "MDBLIST" && typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
+        entry.kind = "home";
+        entry.sources.set("url", { key: "url", index: null, label: "Listen-URL", value: catalog.sourceUrl });
+      }
+      (Array.isArray(catalog.collectionSources) ? catalog.collectionSources : []).forEach((source, index) => {
+        if (source?.kind === "MDBLIST_PUBLIC" && typeof source.mdblistSlug === "string" && source.mdblistSlug) {
+          entry.kind = "collection";
+          entry.sources.set(`slug:${index}`, {
+            key: `slug:${index}`, index, label: `MDBList-Slug ${index + 1}`, value: source.mdblistSlug,
+          });
+        }
+      });
+      if (entry.sources.size) found.set(entry.id, entry);
+    }
+  }
+  return [...found.values()].map((entry) => ({ ...entry, sources: [...entry.sources.values()] }));
 }
 
 export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(), onlyProfileId = null) {

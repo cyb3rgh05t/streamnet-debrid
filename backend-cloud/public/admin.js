@@ -792,11 +792,12 @@ async function loadDeviceActivity() {
   const token = state.token;
   const chart = byId("device-activity-chart");
   const status = byId("device-activity-status");
-  chart.replaceChildren();
-  status.textContent = "Geräteaktivität wird geladen…";
+  // The previous chart stays until the new data is ready, so a refresh does not collapse the panel.
+  if (!chart.hasChildNodes()) status.textContent = "Geräteaktivität wird geladen…";
   try {
     const result = await api(`/admin-api/device-activity?days=${deviceActivityDays}`);
     if (request !== deviceActivityRequest || token !== state.token) return;
+    const columns = [];
     const peak = Math.max(1, ...result.days.map(day => day.devices));
     const total = result.days.reduce((sum, day) => sum + day.devices, 0);
     status.textContent = result.demo ? "Demo-Daten · simulierte Geräteaktivität" :
@@ -823,8 +824,9 @@ async function loadDeviceActivity() {
       caption.className = "device-activity-date";
       caption.textContent = label;
       column.append(value, track, caption);
-      chart.append(column);
+      columns.push(column);
     });
+    chart.replaceChildren(...columns);
   } catch (error) {
     if (request !== deviceActivityRequest || token !== state.token) return;
     chart.replaceChildren();
@@ -888,14 +890,19 @@ function versionReleaseUrl(component, version) {
 }
 
 async function loadLiveVersions() {
+  // Keep the last known versions visible while the check runs; only a first load shows placeholders.
   for (const component of ["web", "android"]) {
-    byId(`dashboard-${component}-version`).textContent = "—";
-    byId(`dashboard-${component}-release`).href = component === "android"
-      ? "https://github.com/cyb3rgh05t/streamnet-debrid/releases"
-      : "https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md";
+    const versionNode = byId(`dashboard-${component}-version`);
+    if (!versionNode.textContent.trim()) versionNode.textContent = "—";
+    const link = byId(`dashboard-${component}-release`);
+    if (!link.getAttribute("href")) {
+      link.href = component === "android"
+        ? "https://github.com/cyb3rgh05t/streamnet-debrid/releases"
+        : "https://github.com/cyb3rgh05t/streamnet-debrid/blob/main/CHANGELOG.md";
+    }
   }
-  byId("dashboard-web-source").textContent = "web.streamnet.live · Wird geprüft...";
-  byId("dashboard-android-build").textContent = "Veröffentlichtes APK-Release · Wird geprüft...";
+  if (!byId("dashboard-web-source").textContent.trim()) byId("dashboard-web-source").textContent = "web.streamnet.live · Wird geprüft...";
+  if (!byId("dashboard-android-build").textContent.trim()) byId("dashboard-android-build").textContent = "Veröffentlichtes APK-Release · Wird geprüft...";
   try {
     const result = await api("/admin-api/versions");
     for (const component of result.components) {
@@ -1668,6 +1675,12 @@ function selectGlobalCategory(category) {
 
 async function loadGlobal() {
   state.global = await api("/admin-api/global");
+  try {
+    state.defaultCatalogs = (await api("/admin-api/global/default-catalogs")).catalogs;
+  } catch (error) {
+    state.defaultCatalogs = [];
+    showToast(`Standard-Kataloge konnten nicht geladen werden: ${error.message}`, true);
+  }
   byId("global-summary").textContent =
     `${state.global.total} registrierte Accounts · ${state.global.configurable} konfigurierbar · ` +
     `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
@@ -1689,7 +1702,8 @@ function updateGlobalFields() {
   byId("global-category-description").textContent = descriptions[category][1];
   byId("global-action-summary").textContent = byId("global-operation").selectedOptions[0].textContent;
   byId("global-action-summary").classList.toggle("is-destructive", /^(delete|clear)_/.test(operation));
-  const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host";
+  const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host" ||
+    operation === "clear_catalog_source";
   const editsData = /^(add|edit)_/.test(operation);
   const isAddon = operation.endsWith("addon") || operation === "clear_addons";
   const isCatalog = operation.includes("catalog");
@@ -1703,7 +1717,8 @@ function updateGlobalFields() {
   }
   const hostOnly = operation === "change_xtream_host";
   byId("global-no-settings").classList.toggle("hidden",
-    editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled");
+    editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled" ||
+      operation === "set_catalog_source" || operation === "set_catalog_slug");
   byId("global-host-fields").classList.toggle("hidden", !hostOnly);
   byId("global-host-url").disabled = !hostOnly;
   byId("global-host-url").required = hostOnly;
@@ -1714,17 +1729,41 @@ function updateGlobalFields() {
   const previous = select.value;
   select.replaceChildren();
   const items = state.global?.[isCatalog ? "catalogs" : isAddon ? "addons" : "playlists"] || [];
+  const defaultItems = defaultCatalogTargets(operation);
   const placeholder = document.createElement("option");
   placeholder.value = "";
-  placeholder.textContent = items.length ? "Eintrag auswählen" : "Keine Einträge vorhanden";
+  placeholder.textContent = (defaultItems || items).length ? "Eintrag auswählen" : "Keine Einträge vorhanden";
   select.append(placeholder);
-  for (const item of items) {
+  for (const item of defaultItems || items) {
     const option = document.createElement("option");
     option.value = item.id;
-    option.textContent = `${item.name} · ${item.accountCount} Account(s) · ${item.id}`;
+    option.textContent = item.label || `${item.name} · ${item.accountCount} Account(s) · ${item.id}`;
     select.append(option);
   }
-  if (items.some((item) => item.id === previous)) select.value = previous;
+  if ((defaultItems || items).some((item) => item.id === previous)) select.value = previous;
+}
+
+// Targets of the bundled-list operations: one entry per editable list (home row URL or collection slug).
+function defaultCatalogTargets(operation) {
+  if (!["set_catalog_source", "set_catalog_slug", "clear_catalog_source"].includes(operation)) return null;
+  const wanted = operation === "set_catalog_source" ? "home" : operation === "set_catalog_slug" ? "collection" : null;
+  const targets = [];
+  for (const catalog of state.defaultCatalogs || []) {
+    if (wanted && catalog.kind !== wanted) continue;
+    for (const source of catalog.sources) {
+      if (operation === "clear_catalog_source" && source !== catalog.sources[0]) continue;
+      const current = source.variants[0]?.value || "";
+      const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
+      const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
+      targets.push({
+        id: operation === "set_catalog_slug" ? `${catalog.id}#${source.index}` : catalog.id,
+        label: operation === "clear_catalog_source"
+          ? `${catalog.title} · ${catalog.id}`
+          : `${catalog.title} · ${source.label}: ${current}${mixed} · ${accounts} Account(s)`,
+      });
+    }
+  }
+  return targets;
 }
 
 function updateGlobalCatalogFields() {
@@ -1732,16 +1771,24 @@ function updateGlobalCatalogFields() {
   const adding = operation === "add_catalog";
   const renaming = operation === "rename_catalog";
   const settingEnabled = operation === "set_catalog_enabled";
-  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled);
+  const settingSource = operation === "set_catalog_source" || operation === "set_catalog_slug";
+  const sourceOperation = settingSource || operation === "clear_catalog_source";
+  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !sourceOperation);
+  byId("global-catalog-source-note").classList.toggle("hidden", !sourceOperation);
+  byId("global-catalog-value-label").textContent = operation === "set_catalog_slug"
+    ? "Neuer MDBList-Slug (Benutzer/Liste)" : "Neue MDBList-URL";
+  byId("global-catalog-value").placeholder = operation === "set_catalog_slug"
+    ? "snoak/top-2020s-movies" : "https://mdblist.com/lists/snoak/trending-movies";
   const type = byId("global-catalog-type").value;
   const template = type === "PREINSTALLED" || type === "ADDON";
   for (const [id, visible] of [
     ["type", adding], ["template", adding && template], ["url", adding && !template],
-    ["title", adding || renaming], ["enabled", adding || settingEnabled],
+    ["title", adding || renaming], ["enabled", adding || settingEnabled], ["value", settingSource],
   ]) {
     byId(`global-catalog-${id}-field`).classList.toggle("hidden", !visible);
     byId(`global-catalog-${id}`).disabled = !visible;
   }
+  byId("global-catalog-value").required = settingSource;
   byId("global-catalog-title").required = renaming || (adding && !template);
   byId("global-catalog-url").required = adding && !template;
   byId("global-catalog-template").required = adding && template;
@@ -1793,7 +1840,13 @@ async function submitGlobalMutation(event) {
       targetId: byId("global-target").value,
       reason: byId("global-reason").value,
     };
-    if (operation === "add_catalog") {
+    if (operation === "set_catalog_slug") {
+      const [catalogId, sourceIndex] = request.targetId.split("#");
+      request.targetId = catalogId;
+      request.data = { sourceIndex: Number(sourceIndex), mdblistSlug: byId("global-catalog-value").value.trim() };
+    } else if (operation === "set_catalog_source") {
+      request.data = { sourceUrl: byId("global-catalog-value").value.trim() };
+    } else if (operation === "add_catalog") {
       request.data = {
         sourceType: byId("global-catalog-type").value,
         templateId: byId("global-catalog-template").value,

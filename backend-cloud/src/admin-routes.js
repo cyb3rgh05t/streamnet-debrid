@@ -13,6 +13,7 @@ import {
   adminGlobalInventory,
   applyAdminGlobalMutation,
   adminCatalogFingerprint,
+  adminEditableDefaultCatalogs,
   prepareAdminGlobalMutation,
   resolveAdminCatalogTemplate,
   hydrateAdminStremioAddon,
@@ -325,6 +326,43 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     return globalSummary((await pool.query(globalAccountsQuery)).rows);
+  });
+
+  app.get("/admin-api/global/default-catalogs", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const rows = (await pool.query(globalAccountsQuery)).rows;
+    const catalogs = new Map();
+    for (const row of rows) {
+      if (!row.payload) continue;
+      // Count each account once per catalog and value, however many profiles carry it.
+      const seen = new Set();
+      for (const item of adminEditableDefaultCatalogs(row.payload)) {
+        const entry = catalogs.get(item.id) || { id: item.id, title: item.title, kind: item.kind, sources: new Map() };
+        catalogs.set(item.id, entry);
+        for (const source of item.sources) {
+          const slot = entry.sources.get(source.key) ||
+            { key: source.key, index: source.index, label: source.label, variants: new Map() };
+          entry.sources.set(source.key, slot);
+          const token = `${item.id}|${source.key}|${source.value}`;
+          const count = slot.variants.get(source.value) || 0;
+          slot.variants.set(source.value, seen.has(token) ? count : count + 1);
+          seen.add(token);
+        }
+      }
+    }
+    return {
+      catalogs: [...catalogs.values()]
+        .map((entry) => ({
+          ...entry,
+          sources: [...entry.sources.values()].map((slot) => ({
+            ...slot,
+            variants: [...slot.variants].map(([value, accounts]) => ({ value, accounts }))
+              .sort((a, b) => b.accounts - a.accounts),
+          })),
+        }))
+        .sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)),
+    };
   });
 
   async function globalMutation(request, reply, preview) {

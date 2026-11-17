@@ -79,7 +79,10 @@ test("Remote Config assigns every existing action to exactly one area", async ()
   assert.deepEqual(groups, {
     playlists: ["add_playlist", "edit_playlist", "change_xtream_host", "clear_streamnet_host_override", "delete_playlist", "clear_playlists"],
     addons: ["add_addon", "edit_addon", "delete_addon", "clear_addons"],
-    catalogs: ["add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog"],
+    catalogs: [
+      "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
+      "set_catalog_source", "set_catalog_slug", "clear_catalog_source",
+    ],
   });
   for (const group of Object.keys(groups)) {
     assert.ok(html.includes(`data-global-category="${group}"`));

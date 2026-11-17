@@ -635,6 +635,15 @@
                       <option value="delete_catalog">
                         Katalog global entfernen / ausblenden
                       </option>
+                      <option value="set_catalog_source">
+                        Standard-Reihe: MDBList-URL ändern (Home)
+                      </option>
+                      <option value="set_catalog_slug">
+                        Standard-Collection: MDBList-Slug ändern
+                      </option>
+                      <option value="clear_catalog_source">
+                        Standard-Liste: Überschreibung entfernen
+                      </option>
                     </select></label
                   >
                   <label id="global-target-field" class="hidden"
@@ -812,6 +821,18 @@
                     <label id="global-catalog-title-field"
                       >Name<input id="global-catalog-title" maxlength="200"
                     /></label>
+                    <label id="global-catalog-value-field" class="hidden"
+                      ><span id="global-catalog-value-label">Neuer Wert</span
+                      ><input
+                        id="global-catalog-value"
+                        maxlength="300"
+                        placeholder="https://mdblist.com/lists/…"
+                    /></label>
+                    <div id="global-catalog-source-note" class="quick-panel hidden">
+                      Gilt nur für Accounts mit Cloud-Konto. Die App übernimmt die neue
+                      Liste beim nächsten Abgleich. „Überschreibung entfernen“ stellt die
+                      eingebaute Liste der App wieder her.
+                    </div>
                     <label
                       id="global-catalog-enabled-field"
                       class="checkbox-field"

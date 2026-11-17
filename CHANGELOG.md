@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.044] - 2026-11-17
+
+- Adminpanel, Dashboard: Beim Klick auf „Aktualisieren“ verschwanden kurz alle Karten. Die Versionskarten für Web und Android wurden auf „—“ zurückgesetzt, und das Geräteaktivitäts-Diagramm wurde geleert, bevor die neuen Daten da waren. Beides bleibt jetzt stehen, bis die Antwort eintrifft; das Diagramm wird in einem Schritt ersetzt (auch beim Wechsel zwischen 7 und 30 Tagen). Platzhalter erscheinen nur noch beim ersten Laden. Im Browser nicht angesehen.
+- Adminpanel, Remote Config → Kataloge: Drei neue Aktionen für die in der App eingebauten MDBList-Kataloge: „Standard-Reihe: MDBList-URL ändern“ (die 11 Home-Reihen), „Standard-Collection: MDBList-Slug ändern“ (Collection-Quellen mit MDBList-Slug, z. B. die Jahrzehnte-Listen) und „Standard-Liste: Überschreibung entfernen“. Die Auswahl zeigt den aktuellen Wert und die Anzahl der Accounts, bei abweichenden Werten auch das. Neuer Endpunkt `GET /admin-api/global/default-catalogs` liest die Liste aus den vorhandenen Account-Daten (kein eigenes Verzeichnis im Backend). Vorschau, Bestätigung mit „ALLE ACCOUNTS“ und Audit pro Account wie bei den anderen globalen Aktionen. URL muss `https://mdblist.com/lists/{user}/{liste}` sein, Slug `user/liste`.
+- Die Änderung steht als `remoteSourceUrl` bzw. `remoteCollectionSources` im Katalog-Eintrag des Accounts (mit `remoteManaged`). Eine App-Version, die diese Felder auswertet, ist noch nicht veröffentlicht (kommt mit einer der nächsten Android-Versionen); bis dahin bleibt die Änderung für Nutzer wirkungslos, ältere Apps ignorieren die Felder. Die Web-App wertet sie noch nicht aus. Wirkt nur für Accounts mit Cloud-Konto. „Überschreibung entfernen“ wirkt in der App erst beim nächsten Abgleich; bis dahin zeigt das Admin noch den geänderten Wert. Eine Überschreibung setzt `remoteManaged`, dadurch behält die App Titel und Sichtbarkeit dieses Katalogs.
+- Nicht geprüft: ob die App `isPreinstalled` für die eingebauten Kataloge in den Cloud-Daten tatsächlich als `true` hochlädt (davon hängt ab, ob die Liste gefüllt ist), und die neue Oberfläche im Browser. 3 neue Backend-Tests (Ändern, Auflisten, Zurücksetzen, Eingabeprüfung), 160 von 161 Tests erfolgreich; der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Keine neue Datenbankmigration; Android und Web unverändert.
 ## [2.6.014] - 2026-11-15
 
 - Android-Version: `2.6.014` / Code `515`.
