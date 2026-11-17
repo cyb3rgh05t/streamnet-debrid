@@ -641,15 +641,12 @@ export function prepareAdminGlobalMutation(request) {
     data = { sourceUrl: normalizeAdminListUrl("MDBLIST", request.data?.sourceUrl).sourceUrl.replace(/^http:/i, "https:") };
   }
   if (operation === "set_catalog_slug") {
-    const sourceIndex = Number(request.data?.sourceIndex);
+    const slugPattern = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
+    const fromSlug = String(request.data?.fromSlug || "").trim();
     const slug = String(request.data?.mdblistSlug || "").trim();
-    if (!Number.isInteger(sourceIndex) || sourceIndex < 0 || sourceIndex > 100) {
-      throw new Error("Collection source index is invalid");
-    }
-    if (!/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/.test(slug)) {
-      throw new Error("MDBList slug is invalid");
-    }
-    data = { sourceIndex, mdblistSlug: slug };
+    if (!slugPattern.test(fromSlug)) throw new Error("Current MDBList slug is invalid");
+    if (!slugPattern.test(slug)) throw new Error("MDBList slug is invalid");
+    data = { fromSlug, mdblistSlug: slug };
   }
   if (operation === "rename_catalog") {
     data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
@@ -850,21 +847,29 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
       setCatalogHidden(payload, profileId, catalog, !data.enabled);
     } else if (operation === "set_catalog_source") {
       // Only list-backed bundled rows carry a list URL; anything else is skipped for this account.
-      if (catalogType(target) !== "MDBLIST" || !target.sourceUrl) continue;
+      if (!bundledMdblistHomeIds.has(String(targetId)) || catalogType(target) !== "MDBLIST" || !target.sourceUrl) continue;
       next = upsertById(current, {
         ...target, sourceUrl: data.sourceUrl, sourceRef: `mdblist:${data.sourceUrl}`,
         remoteSourceUrl: data.sourceUrl, remoteManaged: true,
       });
     } else if (operation === "set_catalog_slug") {
       const sources = Array.isArray(target.collectionSources) ? target.collectionSources : [];
-      if (sources[data.sourceIndex]?.kind !== "MDBLIST_PUBLIC") continue;
-      const nextSources = sources.map((source, index) =>
-        index === data.sourceIndex ? { ...source, mdblistSlug: data.mdblistSlug } : source);
+      const matches = (source) => source?.kind === "MDBLIST_PUBLIC" && source.mdblistSlug === data.fromSlug;
+      if (!sources.some(matches)) continue;
+      const nextSources = sources.map((source) =>
+        matches(source) ? { ...source, mdblistSlug: data.mdblistSlug } : source);
+      // Overrides map the app's bundled slug to the new one. A chained change (A->B, then B->C)
+      // updates the existing entry instead of adding B->C, which the app could never match.
+      const overrides = { ...(isPlainObject(target.remoteSlugOverrides) ? target.remoteSlugOverrides : {}) };
+      const chained = Object.keys(overrides).filter((key) => overrides[key] === data.fromSlug);
+      for (const key of chained.length ? chained : [data.fromSlug]) overrides[key] = data.mdblistSlug;
+      for (const key of Object.keys(overrides)) if (key === overrides[key]) delete overrides[key];
+      const { remoteCollectionSources: _legacy, ...rest } = target;
       next = upsertById(current, {
-        ...target, collectionSources: nextSources, remoteCollectionSources: nextSources, remoteManaged: true,
+        ...rest, collectionSources: nextSources, remoteSlugOverrides: overrides, remoteManaged: true,
       });
     } else if (operation === "clear_catalog_source") {
-      const { remoteSourceUrl: _url, remoteCollectionSources: _sources, ...rest } = target;
+      const { remoteSourceUrl: _url, remoteSlugOverrides: _slugs, remoteCollectionSources: _legacy, ...rest } = target;
       // The app restores the bundled list on its next sync; the stored values stay until then.
       next = upsertById(current, rest);
     } else if (operation === "delete_catalog") {
@@ -940,30 +945,39 @@ export function adminGlobalInventory(payload) {
 
 /**
  * Bundled (preinstalled) catalogs of one snapshot whose list can be redirected by the admin:
- * MDBList home rows (list URL) and collection sources backed by an MDBList slug.
+ * MDBList home rows (list URL) and collection sources backed by an MDBList slug. Sources are
+ * identified by their current slug, not their position: the order differs between app versions.
+ * Home rows are limited to the ids the app ships; older builds stored other preinstalled rows
+ * that the current app no longer knows.
  */
+const bundledMdblistHomeIds = new Set([
+  "trending_movies", "top10_movies_today", "top_movies_week", "trending_tv", "top10_shows_today",
+  "trending_anime", "coming_soon", "upcoming_series", "just_added", "new_kdramas",
+]);
+
 export function adminEditableDefaultCatalogs(payload) {
   if (!isPlainObject(payload)) return [];
   const found = new Map();
   for (const profileId of profileIds(payload)) {
     for (const catalog of catalogsForProfile(payload, profileId)) {
       if (!catalog?.id || catalog.isPreinstalled !== true) continue;
-      const entry = found.get(String(catalog.id)) || {
-        id: String(catalog.id), title: String(catalog.title || catalog.name || catalog.id), sources: new Map(),
-      };
-      if (catalogType(catalog) === "MDBLIST" && typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
+      const id = String(catalog.id);
+      const entry = found.get(id) || { id, title: String(catalog.title || catalog.name || id), sources: new Map() };
+      if (bundledMdblistHomeIds.has(id) && catalogType(catalog) === "MDBLIST" &&
+          typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
         entry.kind = "home";
-        entry.sources.set("url", { key: "url", index: null, label: "Listen-URL", value: catalog.sourceUrl });
+        entry.sources.set("url", { key: "url", label: "Listen-URL", value: catalog.sourceUrl });
       }
-      (Array.isArray(catalog.collectionSources) ? catalog.collectionSources : []).forEach((source, index) => {
-        if (source?.kind === "MDBLIST_PUBLIC" && typeof source.mdblistSlug === "string" && source.mdblistSlug) {
+      if (id.startsWith("collection_")) {
+        for (const source of Array.isArray(catalog.collectionSources) ? catalog.collectionSources : []) {
+          if (source?.kind !== "MDBLIST_PUBLIC" || typeof source.mdblistSlug !== "string" || !source.mdblistSlug) continue;
           entry.kind = "collection";
-          entry.sources.set(`slug:${index}`, {
-            key: `slug:${index}`, index, label: `MDBList-Slug ${index + 1}`, value: source.mdblistSlug,
+          entry.sources.set(`slug:${source.mdblistSlug}`, {
+            key: `slug:${source.mdblistSlug}`, label: "MDBList-Slug", value: source.mdblistSlug,
           });
         }
-      });
-      if (entry.sources.size) found.set(entry.id, entry);
+      }
+      if (entry.sources.size) found.set(id, entry);
     }
   }
   return [...found.values()].map((entry) => ({ ...entry, sources: [...entry.sources.values()] }));

@@ -342,7 +342,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
         catalogs.set(item.id, entry);
         for (const source of item.sources) {
           const slot = entry.sources.get(source.key) ||
-            { key: source.key, index: source.index, label: source.label, variants: new Map() };
+            { key: source.key, label: source.label, variants: new Map() };
           entry.sources.set(source.key, slot);
           const token = `${item.id}|${source.key}|${source.value}`;
           const count = slot.variants.get(source.value) || 0;

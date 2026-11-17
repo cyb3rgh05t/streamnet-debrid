@@ -414,16 +414,27 @@ test("bundled catalog lists can be redirected, listed and reset across accounts"
     ],
   });
   for (const row of rows.slice(0, 2)) row.payload.catalogsByProfile = { main: [homeRow(), decade()], kids: [homeRow()] };
+  // An older build stored a differently ordered source list and extra rows the app no longer ships.
+  rows[1].payload.catalogsByProfile.main[1].id = "collection_decade_2020s";
+  rows[1].payload.catalogsByProfile.main[1].collectionSources.unshift({ kind: "ADDON_CATALOG" });
+  rows[1].payload.catalogsByProfile.main.push({
+    id: "legacy_row", title: "Legacy", sourceType: "MDBLIST", isPreinstalled: true,
+    sourceUrl: "https://mdblist.com/lists/old/legacy",
+  });
+  rows[0].payload.catalogsByProfile.main[1].id = "collection_decade_2020s";
 
   const list = await send("GET", "/admin-api/global/default-catalogs");
   assert.equal(list.statusCode, 200);
   const byId = Object.fromEntries(list.json().catalogs.map((item) => [item.id, item]));
+  assert.equal(byId.legacy_row, undefined);
   assert.equal(byId.trending_movies.kind, "home");
   assert.deepEqual(byId.trending_movies.sources[0].variants, [
     { value: "https://mdblist.com/lists/snoak/trending-movies", accounts: 2 },
   ]);
-  assert.equal(byId.decade_2020s.sources.length, 1);
-  assert.equal(byId.decade_2020s.sources[0].index, 1);
+  assert.equal(byId.collection_decade_2020s.sources.length, 1);
+  assert.deepEqual(byId.collection_decade_2020s.sources[0].variants, [
+    { value: "snoak/top-2020s-movies", accounts: 2 },
+  ]);
 
   const request = {
     operation: "set_catalog_source", targetId: "trending_movies",
@@ -451,28 +462,48 @@ test("bundled catalog lists can be redirected, listed and reset across accounts"
   }
 });
 
-test("collection MDBList slugs change only on matching sources and inputs are validated", async (t) => {
+test("collection MDBList slugs are replaced by slug, whatever the source order, and chain correctly", async (t) => {
   const { send, rows, queries } = await fixture(t);
-  rows[0].payload.catalogsByProfile = { main: [{
-    id: "decade_2020s", title: "2020s", isPreinstalled: true, kind: "COLLECTION",
-    collectionSources: [{ kind: "TMDB_GENRE", tmdbGenreId: 28 }, { kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/old" }],
-  }] };
-  const request = { operation: "set_catalog_slug", targetId: "decade_2020s", data: { sourceIndex: 1, mdblistSlug: "me/new" } };
+  const catalog = (sources) => ({
+    id: "collection_decade_2020s", title: "2020s", isPreinstalled: true, kind: "COLLECTION", collectionSources: sources,
+  });
+  const genre = { kind: "TMDB_GENRE", tmdbGenreId: 28 };
+  const mdb = (slug) => ({ kind: "MDBLIST_PUBLIC", mdblistSlug: slug });
+  rows[0].payload.catalogsByProfile = { main: [catalog([genre, mdb("snoak/old"), mdb("snoak/other")])] };
+  // Same list at another position in an account written by another app version.
+  rows[1].payload.catalogsByProfile = { main: [catalog([mdb("snoak/old"), genre, mdb("snoak/old")])] };
+  const request = {
+    operation: "set_catalog_slug", targetId: "collection_decade_2020s",
+    data: { fromSlug: "snoak/old", mdblistSlug: "me/new" },
+  };
   const preview = await send("POST", "/admin-api/global/preview", request);
-  assert.equal(preview.json().changed, 1);
+  assert.equal(preview.json().changed, 2);
   const applied = await send("PATCH", "/admin-api/global/snapshot", {
     ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
   });
   assert.equal(applied.statusCode, 200);
-  const row = JSON.parse(queries.find(({ sql }) => sql.includes("update account_sync_snapshots")).values[1])
-    .catalogsByProfile.main[0];
-  assert.equal(row.collectionSources[1].mdblistSlug, "me/new");
-  assert.deepEqual(row.remoteCollectionSources, row.collectionSources);
-  assert.equal(row.collectionSources[0].tmdbGenreId, 28);
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"))
+    .map(({ values }) => JSON.parse(values[1]).catalogsByProfile.main[0]);
+  assert.deepEqual(updates[0].collectionSources.map((s) => s.mdblistSlug), [undefined, "me/new", "snoak/other"]);
+  assert.deepEqual(updates[1].collectionSources.map((s) => s.mdblistSlug), ["me/new", undefined, "me/new"]);
+  assert.deepEqual(updates[0].remoteSlugOverrides, { "snoak/old": "me/new" });
+  assert.equal(updates[0].collectionSources[0].tmdbGenreId, 28);
 
-  const onWrongSource = await send("POST", "/admin-api/global/preview", { ...request, data: { sourceIndex: 0, mdblistSlug: "me/new" } });
-  assert.equal(onWrongSource.json().changed, 0);
-  for (const data of [{ sourceIndex: 1, mdblistSlug: "no slug" }, { sourceIndex: -1, mdblistSlug: "a/b" }]) {
+  // A second change of the already changed list updates the override instead of adding one the app cannot match.
+  rows[0].payload.catalogsByProfile = { main: [updates[0]] };
+  const chain = { ...request, data: { fromSlug: "me/new", mdblistSlug: "me/newer" } };
+  const chainPreview = await send("POST", "/admin-api/global/preview", chain);
+  assert.equal(chainPreview.json().changed, 2 - 1);
+  await send("PATCH", "/admin-api/global/snapshot", {
+    ...chain, expectedState: chainPreview.json().state, confirmation: "ALLE ACCOUNTS",
+  });
+  const chained = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).at(-1).values[1])
+    .catalogsByProfile.main[0];
+  assert.deepEqual(chained.remoteSlugOverrides, { "snoak/old": "me/newer" });
+
+  const unknown = await send("POST", "/admin-api/global/preview", { ...request, data: { fromSlug: "x/none", mdblistSlug: "a/b" } });
+  assert.equal(unknown.json().changed, 0);
+  for (const data of [{ fromSlug: "snoak/old", mdblistSlug: "no slug" }, { fromSlug: "bad", mdblistSlug: "a/b" }]) {
     assert.equal((await send("POST", "/admin-api/global/preview", { ...request, data })).statusCode, 400);
   }
   for (const sourceUrl of ["https://evil.example/lists/a/b", "https://mdblist.com/lists/a"]) {

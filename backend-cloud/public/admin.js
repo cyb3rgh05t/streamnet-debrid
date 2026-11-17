@@ -1756,10 +1756,10 @@ function defaultCatalogTargets(operation) {
       const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
       const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
       targets.push({
-        id: operation === "set_catalog_slug" ? `${catalog.id}#${source.index}` : catalog.id,
+        id: operation === "set_catalog_slug" ? `${catalog.id}#${current}` : catalog.id,
         label: operation === "clear_catalog_source"
           ? `${catalog.title} · ${catalog.id}`
-          : `${catalog.title} · ${source.label}: ${current}${mixed} · ${accounts} Account(s)`,
+          : `${catalog.title} · ${catalog.id} · ${source.label}: ${current}${mixed} · ${accounts} Account(s)`,
       });
     }
   }
@@ -1841,9 +1841,10 @@ async function submitGlobalMutation(event) {
       reason: byId("global-reason").value,
     };
     if (operation === "set_catalog_slug") {
-      const [catalogId, sourceIndex] = request.targetId.split("#");
-      request.targetId = catalogId;
-      request.data = { sourceIndex: Number(sourceIndex), mdblistSlug: byId("global-catalog-value").value.trim() };
+      const separator = request.targetId.indexOf("#");
+      const fromSlug = request.targetId.slice(separator + 1);
+      request.targetId = request.targetId.slice(0, separator);
+      request.data = { fromSlug, mdblistSlug: byId("global-catalog-value").value.trim() };
     } else if (operation === "set_catalog_source") {
       request.data = { sourceUrl: byId("global-catalog-value").value.trim() };
     } else if (operation === "add_catalog") {

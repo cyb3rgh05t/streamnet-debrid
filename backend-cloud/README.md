@@ -271,10 +271,10 @@ actions bind it to each account's add-on, playlist and catalog IDs. Unrelated
 sync pushes that only bump revisions do not invalidate the preview.
 
 Bundled catalogs can be redirected with `set_catalog_source` (MDBList home rows,
-`sourceUrl`), `set_catalog_slug` (collection sources of kind `MDBLIST_PUBLIC`,
-`mdblistSlug` by source index) and `clear_catalog_source`. The overrides are stored as
-`remoteSourceUrl` / `remoteCollectionSources` with `remoteManaged` in each profile's
-catalog entry. `GET /admin-api/global/default-catalogs` lists the editable catalogs
+`sourceUrl`), `set_catalog_slug` (collection sources of kind `MDBLIST_PUBLIC`, matched by
+their current `mdblistSlug`, not by position) and `clear_catalog_source`. The overrides are
+stored as `remoteSourceUrl` / `remoteSlugOverrides` (bundled slug to new slug) with
+`remoteManaged` in each profile's catalog entry. `GET /admin-api/global/default-catalogs` lists the editable catalogs
 from the stored snapshots (entries with `isPreinstalled: true`).
 For `change_xtream_host`, the preview instead binds the requested host and target
 to account/snapshot membership, profile IDs, matching playlist data and the
