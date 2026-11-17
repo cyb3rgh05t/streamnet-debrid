@@ -555,6 +555,18 @@ class CollectionDetailsViewModel @Inject constructor(
     }
 
     private fun sourceMatchesTab(source: com.arflix.tv.data.model.CollectionSourceConfig, tab: CollectionTab): Boolean {
+        // A mixed curated list (e.g. admin-added titles) only counts for the tabs it has titles for.
+        if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank() &&
+            source.collectionTab.isNullOrBlank()
+        ) {
+            return source.curatedRefs.orEmpty().any { ref ->
+                when (ref.substringBefore(':').lowercase()) {
+                    "movie" -> tab == CollectionTab.MOVIES
+                    "tv", "series", "show" -> tab == CollectionTab.SERIES
+                    else -> false
+                }
+            }
+        }
         source.collectionTab?.trim()?.lowercase()?.let { configuredTab ->
             return when (tab) {
                 CollectionTab.MOVIES -> configuredTab == "movie"

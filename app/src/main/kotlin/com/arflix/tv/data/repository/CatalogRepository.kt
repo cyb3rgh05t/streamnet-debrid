@@ -17,6 +17,7 @@ import com.arflix.tv.data.model.CatalogPackItem
 import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.CollectionSourceConfig
 import com.arflix.tv.data.model.CollectionTileShape
+import com.arflix.tv.data.model.RemoteAddonOverride
 import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.CatalogValidationResult
 import com.arflix.tv.data.model.Category
@@ -352,13 +353,15 @@ class CatalogRepository @Inject constructor(
             config.sourceType == CatalogSourceType.PREINSTALLED ||
             config.kind == CatalogKind.COLLECTION ||
             config.kind == CatalogKind.COLLECTION_RAIL
-        return if (shouldRefresh) bundled.copy(
-            title = config.remoteTitle?.takeIf { it.isNotBlank() }
-                ?: if (config.remoteManaged) config.title else bundled.title,
-            remoteTitle = config.remoteTitle,
-            remoteManaged = config.remoteManaged,
-            enabled = if (config.remoteManaged) config.enabled else bundled.enabled
-        ) else config
+        return if (shouldRefresh) {
+            applyRemoteCatalogOverrides(bundled, config).copy(
+                title = config.remoteTitle?.takeIf { it.isNotBlank() }
+                    ?: if (config.remoteManaged) config.title else bundled.title,
+                remoteTitle = config.remoteTitle,
+                remoteManaged = config.remoteManaged,
+                enabled = if (config.remoteManaged) config.enabled else bundled.enabled
+            )
+        } else config
     }
 
     private fun sanitizeCollectionCatalogs(catalogs: List<CatalogConfig>): List<CatalogConfig> {
@@ -594,7 +597,7 @@ class CatalogRepository @Inject constructor(
                         title = config.title.takeIf { it.isNotBlank() } ?: defaultCfg.title,
                         remoteTitle = config.remoteTitle,
                         remoteManaged = config.remoteManaged
-                    )
+                    ).let { merged -> applyRemoteCatalogOverrides(merged, config).copy(title = merged.title) }
                 } else {
                     config
                 }
@@ -1511,7 +1514,26 @@ class CatalogRepository @Inject constructor(
                         collectionSources = collectionSources,
                         requiredAddonUrls = requiredAddonUrls,
                         remoteManaged = (row["remoteManaged"] as? Boolean) ?: false,
-                        remoteTitle = asTrimmedString(row["remoteTitle"])
+                        remoteTitle = asTrimmedString(row["remoteTitle"]),
+                        remoteSourceUrl = asTrimmedString(row["remoteSourceUrl"]),
+                        remoteSlugOverrides = (row["remoteSlugOverrides"] as? Map<*, *>)
+                            ?.mapNotNull { (key, value) ->
+                                val from = (key as? String)?.trim().orEmpty()
+                                val to = (value as? String)?.trim().orEmpty()
+                                if (from.isNotEmpty() && to.isNotEmpty()) from to to else null
+                            }?.toMap(),
+                        remoteExtraRefs = (row["remoteExtraRefs"] as? List<*>)
+                            ?.mapNotNull { (it as? String)?.trim()?.takeIf(String::isNotEmpty) },
+                        remoteAddonOverrides = runCatching {
+                            row["remoteAddonOverrides"]?.let { raw ->
+                                gson.fromJson<Map<String, RemoteAddonOverride>>(
+                                    gson.toJson(raw),
+                                    TypeToken.getParameterized(
+                                        Map::class.java, String::class.java, RemoteAddonOverride::class.java
+                                    ).type
+                                )
+                            }
+                        }.getOrNull()
                     )
                 )
             }

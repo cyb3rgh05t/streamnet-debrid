@@ -225,8 +225,17 @@ internal fun isAvailableInXtreamVod(
     availability: IptvRepository.XtreamVodAvailability,
 ): Boolean = availability.contains(item)
 
+/** Collection rails the IPTV-only Home keeps; each tile is filtered to what the provider library holds. */
+internal val IPTV_ONLY_COLLECTION_ROW_IDS = setOf(
+    "collection_row_service",
+    "collection_row_franchise",
+    "collection_row_decade",
+    "collection_row_movie_genre",
+    "collection_row_tv_genre",
+)
+
 private fun isIptvOnlyCollectionCategory(category: Category): Boolean =
-    category.id == "collection_row_service" || category.id == "collection_row_franchise"
+    category.id in IPTV_ONLY_COLLECTION_ROW_IDS
 
 /**
  * Rows that announce unreleased titles. They can never be part of the provider's VOD library, so the
@@ -398,6 +407,9 @@ internal fun resolveCachedCollectionCatalog(
 data class HomeUiState(
     val isLoading: Boolean = false,
     val isInitialLoad: Boolean = true,
+    // True while IPTV-only Home waits for the provider library index; nothing else can be shown yet.
+    val iptvOnlyLoading: Boolean = false,
+    val iptvOnlyMode: Boolean = false,
     val categories: List<Category> = emptyList(),
     val collectionRows: List<HomeCollectionRow> = emptyList(),
     val error: String? = null,
@@ -445,7 +457,7 @@ internal fun projectHomeForIptvOnlyMode(
 ): HomeUiState {
     if (!enabled) return state
     val iptvCollectionRows = filteredCollectionRows ?: state.collectionRows.filter { row ->
-        row.id == "collection_row_service" || row.id == "collection_row_franchise"
+        row.id in IPTV_ONLY_COLLECTION_ROW_IDS
     }
     val availableCollectionIds = iptvCollectionRows
         .flatMap { it.items }
@@ -491,6 +503,8 @@ internal fun projectHomeForIptvOnlyMode(
         previousHeroItem = null,
         previousHeroLogoUrl = null,
         isHeroTransitioning = false,
+        iptvOnlyLoading = availability == null,
+        iptvOnlyMode = true,
         categoryHasMoreMap = state.categoryHasMoreMap.filterKeys { categoryId ->
             categories.any { it.id == categoryId }
         },
@@ -1687,7 +1701,7 @@ class HomeViewModel @Inject constructor(
 
     private fun refreshIptvCollectionRows(availability: IptvRepository.XtreamVodAvailability) {
         val sourceRows = _uiState.value.collectionRows.filter { row ->
-            row.id == "collection_row_service" || row.id == "collection_row_franchise"
+            row.id in IPTV_ONLY_COLLECTION_ROW_IDS
         }
         // The same inputs again (this runs after every Home load and every availability refresh) must not
         // throw away a finished or running scan: restarting it cancelled the in-flight TMDB requests,
@@ -5713,7 +5727,8 @@ class HomeViewModel @Inject constructor(
         prefetchJob = viewModelScope.launch(networkDispatcher) {
             delay(FOCUS_PREFETCH_COALESCE_MS)
 
-            val categories = _uiState.value.categories
+            // Indices come from the displayed list, which differs from the stored one in IPTV-only mode.
+            val categories = uiState.value.categories
             if (rowIndex < 0 || rowIndex >= categories.size) return@launch
 
             val category = categories[rowIndex]
@@ -5797,7 +5812,8 @@ class HomeViewModel @Inject constructor(
                         if (isLowRamDevice) 200L else 100L
                     }
                 )
-                val categories = _uiState.value.categories
+                // Indices come from the displayed list, which differs from the stored one in IPTV-only mode.
+                val categories = uiState.value.categories
                 if (categoryIndex < 0 || categoryIndex >= categories.size) return@launch
                 val category = categories[categoryIndex]
                 if (category.id.startsWith("collection_row_")) return@launch

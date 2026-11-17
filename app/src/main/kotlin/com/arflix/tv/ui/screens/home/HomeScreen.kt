@@ -459,6 +459,22 @@ internal fun resolveHomeCategoryIndex(
     }
 }
 
+/**
+ * The row Home should focus after its rows changed. Until the user navigates, that is the start
+ * row: rows that appear above the initially shown one (IPTV-only Home loads in stages) must not pull
+ * focus along with the old row. Afterwards focus follows the row it was on.
+ */
+internal fun resolveHomeFocusRow(
+    categories: List<Category>,
+    userHasNavigated: Boolean,
+    preferredCategoryId: String?,
+    currentRowIndex: Int,
+): Int {
+    if (categories.isEmpty()) return 0
+    if (!userHasNavigated) return preferredHomeStartRowIndex(categories)
+    return resolveHomeCategoryIndex(categories.map { it.id }, preferredCategoryId, currentRowIndex)
+}
+
 internal fun resolveHomeItemIndex(
     itemKeys: List<String>,
     preferredItemKey: String?,
@@ -1524,6 +1540,8 @@ fun HomeScreen(
             trailerIsPlaying = isTrailerPlaying,
             onTrailerStop = { trailerSuppressed = true },
             isMobile = isMobile,
+            focusFirstRowWhenReady = uiState.iptvOnlyMode && !uiState.iptvOnlyLoading &&
+                displayCategories.any(::shouldDisplayHomeCategory),
             heroItem = displayHeroItem,
             heroOverviewOverride = displayHeroOverview,
             onPlay = {
@@ -1643,6 +1661,36 @@ fun HomeScreen(
                     ) {
                         Text(stringResource(R.string.retry))
                     }
+                }
+            }
+        }
+
+        if (uiState.iptvOnlyLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(50f),
+                contentAlignment = Alignment.Center
+            ) {
+                val accent = resolveAccentColor(ArvioSkin.colors.accent)
+                Row(
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(16.dp))
+                        .border(2.dp, accent, RoundedCornerShape(16.dp))
+                        .padding(horizontal = 28.dp, vertical = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    androidx.compose.material3.CircularProgressIndicator(
+                        modifier = Modifier.size(32.dp),
+                        color = accent,
+                        strokeWidth = 3.dp
+                    )
+                    Text(
+                        text = stringResource(R.string.home_iptv_loading_library),
+                        style = ArflixTypography.body,
+                        color = TextPrimary
+                    )
                 }
             }
         }
@@ -3160,6 +3208,7 @@ private fun HomeInputLayer(
     trailerIsPlaying: Boolean = false,
     onTrailerStop: () -> Unit = {},
     isMobile: Boolean = false,
+    focusFirstRowWhenReady: Boolean = false,
     heroItem: MediaItem? = null,
     heroOverviewOverride: String? = null,
     onPlay: () -> Unit = {},
@@ -3220,6 +3269,13 @@ private fun HomeInputLayer(
         }
         focusRequester.requestFocus()
     }
+    // IPTV-only Home starts on the top bar while it still loads; once rows exist, move to the first
+    // row unless the user already navigated.
+    LaunchedEffect(focusFirstRowWhenReady) {
+        if (focusFirstRowWhenReady && !isMobile && !focusState.userHasNavigated && focusState.isSidebarFocused) {
+            focusState.isSidebarFocused = false
+        }
+    }
     LaunchedEffect(rootHasFocus, isContextMenuOpen, isMobile) {
         if (isMobile || isContextMenuOpen || rootHasFocus) return@LaunchedEffect
         delay(focusRecoveryDelayMs)
@@ -3257,22 +3313,18 @@ private fun HomeInputLayer(
     LaunchedEffect(categoryIds, preferredStartRow) {
         if (categories.isEmpty()) return@LaunchedEffect
 
-        if (!focusState.userHasNavigated) {
-            if (focusState.currentRowIndex != preferredStartRow) {
-                focusState.currentRowIndex = preferredStartRow
-                focusState.currentItemIndex = 0
-                preferredCategoryId = categories.getOrNull(preferredStartRow)?.id
-            }
-        }
-
-        // If the preferred category still exists, restore the row index to it.
-        // Otherwise keep the current index but clamp to valid range.
-        focusState.currentRowIndex = resolveHomeCategoryIndex(
-            categoryIds = categoryIds,
+        val targetRow = resolveHomeFocusRow(
+            categories = categories,
+            userHasNavigated = focusState.userHasNavigated,
             preferredCategoryId = preferredCategoryId,
-            fallbackIndex = focusState.currentRowIndex
+            currentRowIndex = focusState.currentRowIndex,
         )
-        preferredCategoryId = categories.getOrNull(focusState.currentRowIndex)?.id
+        val targetId = categories.getOrNull(targetRow)?.id
+        if (!focusState.userHasNavigated && (targetRow != focusState.currentRowIndex || targetId != preferredCategoryId)) {
+            focusState.currentItemIndex = 0
+        }
+        focusState.currentRowIndex = targetRow
+        preferredCategoryId = targetId
     }
 
     BackHandler {
@@ -4153,6 +4205,15 @@ private fun TvHomeRowsLayer(
                 }
             }
             lastAppliedTargetIndex = targetIndex
+        }
+        // Rows that load above the initially shown one leave the list anchored on the old row
+        // (LazyColumn keeps the first visible key). Until the user navigates, keep the target row on top.
+        val renderedRowIds = remember(renderedCategories) { renderedCategories.map { it.id } }
+        LaunchedEffect(renderedRowIds, targetIndex) {
+            if (focusState.userHasNavigated || renderedRowIds.isEmpty()) return@LaunchedEffect
+            if (listState.firstVisibleItemIndex != targetIndex || listState.firstVisibleItemScrollOffset > 2) {
+                listState.scrollToItem(index = targetIndex, scrollOffset = 0)
+            }
         }
         // Keep rows in the lower portion of the screen so hero metadata has dedicated space,
         // matching the separation used on Details.

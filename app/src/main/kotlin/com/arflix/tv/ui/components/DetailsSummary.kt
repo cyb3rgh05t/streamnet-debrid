@@ -62,8 +62,13 @@ internal fun DetailsSummary(
     var expanded by remember(text) { mutableStateOf(false) }
     val overflowCallback by rememberUpdatedState(onOverflowChanged)
     LaunchedEffect(text, overflowing) { overflowCallback(overflowing) }
+    // The counter outlives this composable. A fresh composition (e.g. scrolling back to the hero)
+    // starts with the current value as handled, so an old request does not reopen the dialog.
+    var handledOpenRequest by remember { mutableIntStateOf(openRequest) }
     LaunchedEffect(openRequest) {
-        if (openRequest > 0 && overflowing) expanded = true
+        if (openRequest == handledOpenRequest) return@LaunchedEffect
+        handledOpenRequest = openRequest
+        if (overflowing) expanded = true
     }
     Column(
         modifier = modifier

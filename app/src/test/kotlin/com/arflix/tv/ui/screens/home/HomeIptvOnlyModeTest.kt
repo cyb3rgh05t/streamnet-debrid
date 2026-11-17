@@ -49,6 +49,8 @@ class HomeIptvOnlyModeTest {
         val projected = projectHomeForIptvOnlyMode(state, enabled = true, availability = null)
 
         assertEquals(listOf("continue_watching"), projected.categories.map { it.id })
+        assertEquals(true, projected.iptvOnlyLoading)
+        assertEquals(true, projected.iptvOnlyMode)
         assertEquals(listOf(continueWatching), projected.categories.single().items)
     }
 
@@ -73,11 +75,17 @@ class HomeIptvOnlyModeTest {
                 Category("collection_row_service", "Services", listOf(movie)),
                 Category("collection_row_studio", "Studios", listOf(movie)),
                 Category("collection_row_franchise", "Franchises", listOf(movie)),
+                Category("collection_row_decade", "Decades", listOf(movie)),
+                Category("collection_row_movie_genre", "Movie genres", listOf(movie)),
+                Category("collection_row_tv_genre", "TV genres", listOf(movie)),
             ),
             collectionRows = listOf(
                 HomeCollectionRow("collection_row_service", "Services", emptyList<CatalogConfig>()),
                 HomeCollectionRow("collection_row_studio", "Studios", emptyList<CatalogConfig>()),
                 HomeCollectionRow("collection_row_franchise", "Franchises", emptyList<CatalogConfig>()),
+                HomeCollectionRow("collection_row_decade", "Decades", emptyList<CatalogConfig>()),
+                HomeCollectionRow("collection_row_movie_genre", "Movie genres", emptyList<CatalogConfig>()),
+                HomeCollectionRow("collection_row_tv_genre", "TV genres", emptyList<CatalogConfig>()),
             ),
             categoryHasMoreMap = mapOf(
                 "movies" to true,
@@ -97,13 +105,23 @@ class HomeIptvOnlyModeTest {
                 "series",
                 "collection_row_service",
                 "collection_row_franchise",
+                "collection_row_decade",
+                "collection_row_movie_genre",
+                "collection_row_tv_genre",
             ),
             projected.categories.map { it.id },
         )
+        assertEquals(false, projected.iptvOnlyLoading)
         assertEquals(listOf(availableMovie), projected.categories[2].items)
         assertEquals(listOf(availableSeries), projected.categories[3].items)
         assertEquals(
-            listOf("collection_row_service", "collection_row_franchise"),
+            listOf(
+                "collection_row_service",
+                "collection_row_franchise",
+                "collection_row_decade",
+                "collection_row_movie_genre",
+                "collection_row_tv_genre",
+            ),
             projected.collectionRows.map { it.id },
         )
         assertEquals(

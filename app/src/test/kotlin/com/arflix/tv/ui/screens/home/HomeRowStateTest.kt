@@ -356,6 +356,40 @@ class HomeRowStateTest {
     }
 
     @Test
+    fun `before navigation rows loaded above the first rail take the focus`() {
+        val categories = listOf(
+            Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Channel"))),
+            Category("coming_soon", "Coming Soon", listOf(MediaItem(20, "Movie"))),
+        )
+
+        val row = resolveHomeFocusRow(
+            categories = categories,
+            userHasNavigated = false,
+            preferredCategoryId = "coming_soon",
+            currentRowIndex = 0,
+        )
+
+        assertThat(row).isEqualTo(0)
+    }
+
+    @Test
+    fun `after navigation focus keeps following its rail`() {
+        val categories = listOf(
+            Category("favorite_tv", "Favorite TV", listOf(MediaItem(10, "Channel"))),
+            Category("coming_soon", "Coming Soon", listOf(MediaItem(20, "Movie"))),
+        )
+
+        val row = resolveHomeFocusRow(
+            categories = categories,
+            userHasNavigated = true,
+            preferredCategoryId = "coming_soon",
+            currentRowIndex = 0,
+        )
+
+        assertThat(row).isEqualTo(1)
+    }
+
+    @Test
     fun `touch hero uses only continue watching items`() {
         val continueWatching = MediaItem(id = 1, title = "Continue")
         val recentlyWatchedTv = MediaItem(id = 2, title = "Recent TV")

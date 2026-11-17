@@ -116,7 +116,22 @@ data class CatalogConfig(
     val packId: String? = null,
     val packName: String? = null,
     val remoteManaged: Boolean = false,
-    val remoteTitle: String? = null
+    val remoteTitle: String? = null,
+    // Admin overrides for bundled catalogs (list URL of a home row, bundled MDBList slug -> new slug
+    // of collection sources). Only honoured together with remoteManaged; the bundled value is the fallback.
+    val remoteSourceUrl: String? = null,
+    val remoteSlugOverrides: Map<String, String>? = null,
+    // Admin-added TMDB titles ("tv:84773", "movie:120") appended to a franchise collection.
+    val remoteExtraRefs: List<String>? = null,
+    // Admin replacement of a bundled addon catalog source, keyed by "type|catalogId" of the bundled one.
+    val remoteAddonOverrides: Map<String, RemoteAddonOverride>? = null
+) : Serializable
+
+data class RemoteAddonOverride(
+    val addonId: String? = null,
+    val addonManifestUrl: String? = null,
+    val addonCatalogType: String? = null,
+    val addonCatalogId: String? = null
 ) : Serializable
 
 val CatalogConfig.effectivePackId: String

@@ -862,6 +862,7 @@
     <string name="settings_catalog_url_label">Catalog URL</string>
     <string name="catalog_delete_title">Delete catalog</string>
     <string name="home_loading_more">Loading more titles…</string>
+    <string name="home_iptv_loading_library">Checking your VOD library…</string>
     <string name="catalog_delete_message">Delete the catalog "%1$s"? To use it again, you will need to add its URL again. Hiding it with the eye icon keeps it saved.</string>
     <string name="settings_paste_from_clipboard">Paste from Clipboard</string>
     <string name="settings_hint_enter_dpad">Press Enter to select • Navigate with D-pad</string>
