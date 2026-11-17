@@ -1681,6 +1681,7 @@ async function loadGlobal() {
     state.defaultCatalogs = [];
     showToast(`Standard-Kataloge konnten nicht geladen werden: ${error.message}`, true);
   }
+  void loadMdblistTitles();
   byId("global-summary").textContent =
     `${state.global.total} registrierte Accounts · ${state.global.configurable} konfigurierbar · ` +
     `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
@@ -1760,6 +1761,35 @@ function shortMdblistValue(value) {
   return String(value).replace(/^https?:\/\/(www\.)?mdblist\.com\/lists\//i, "");
 }
 
+// "Popular 2020s Movies · snoak/top-2020s-movies" when the list name is known, else just the list.
+function mdblistListLabel(value) {
+  const slug = shortMdblistValue(value);
+  const title = state.mdblistTitles?.[slug];
+  return title ? `${title} · ${slug}` : slug;
+}
+
+async function loadMdblistTitles() {
+  const slugs = new Set();
+  for (const catalog of state.defaultCatalogs || []) {
+    for (const source of catalog.sources) {
+      for (const variant of source.variants) slugs.add(shortMdblistValue(variant.value));
+    }
+  }
+  state.mdblistTitles = state.mdblistTitles || {};
+  const missing = [...slugs].filter((slug) => !(slug in state.mdblistTitles));
+  if (!missing.length) return;
+  try {
+    for (let index = 0; index < missing.length; index += 30) {
+      const batch = missing.slice(index, index + 30);
+      const result = await api(`/admin-api/global/mdblist-titles?slugs=${encodeURIComponent(batch.join(","))}`);
+      Object.assign(state.mdblistTitles, result.titles);
+    }
+    updateGlobalFields();
+  } catch {
+    // Titles are a convenience; the lists stay usable without them.
+  }
+}
+
 function defaultCatalogTargets(operation) {
   if (!["set_catalog_source", "set_catalog_slug", "clear_catalog_source"].includes(operation)) return null;
   const wanted = operation === "set_catalog_source" ? "home" : operation === "set_catalog_slug" ? "collection" : null;
@@ -1774,8 +1804,8 @@ function defaultCatalogTargets(operation) {
       const current = shortMdblistValue(source.variants[0]?.value || "");
       let label;
       if (operation === "clear_catalog_source") label = `${catalog.title} · ${catalog.id}`;
-      else if (catalog.kind === "home") label = `${catalog.title} — ${current}${mixed} (${accounts} Accounts)`;
-      else label = `${current}${mixed} (${accounts} Accounts)`;
+      else if (catalog.kind === "home") label = `${catalog.title} — ${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
+      else label = `${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
       targets.push({
         id: operation === "set_catalog_slug" ? `${catalog.id}#${source.variants[0]?.value || ""}` : catalog.id,
         label,
@@ -1805,7 +1835,8 @@ function renderTargetDetails(targets) {
   for (const variant of details.variants) {
     const item = document.createElement("li");
     const value = document.createElement("code");
-    value.textContent = variant.value;
+    const slug = shortMdblistValue(variant.value);
+    value.textContent = state.mdblistTitles?.[slug] ? `${state.mdblistTitles[slug]} · ${variant.value}` : variant.value;
     const count = document.createElement("span");
     count.textContent = `${variant.accounts} Account${variant.accounts === 1 ? "" : "s"}`;
     item.append(value, count);
@@ -1823,10 +1854,8 @@ function updateGlobalCatalogFields() {
   const sourceOperation = settingSource || operation === "clear_catalog_source";
   byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !sourceOperation);
   byId("global-catalog-source-note").classList.toggle("hidden", !sourceOperation);
-  byId("global-catalog-value-label").textContent = operation === "set_catalog_slug"
-    ? "Neuer MDBList-Slug (Benutzer/Liste)" : "Neue MDBList-URL";
-  byId("global-catalog-value").placeholder = operation === "set_catalog_slug"
-    ? "snoak/top-2020s-movies" : "https://mdblist.com/lists/snoak/trending-movies";
+  byId("global-catalog-value-label").textContent = "Neue MDBList-Liste (URL oder Benutzer/Liste)";
+  byId("global-catalog-value").placeholder = "https://mdblist.com/lists/snoak/trending-movies oder snoak/trending-movies";
   const type = byId("global-catalog-type").value;
   const template = type === "PREINSTALLED" || type === "ADDON";
   for (const [id, visible] of [

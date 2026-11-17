@@ -638,15 +638,14 @@ export function prepareAdminGlobalMutation(request) {
     : null;
   let data = null;
   if (operation === "set_catalog_source") {
-    data = { sourceUrl: normalizeAdminListUrl("MDBLIST", request.data?.sourceUrl).sourceUrl.replace(/^http:/i, "https:") };
+    data = { sourceUrl: normalizeAdminListUrl("MDBLIST", mdblistUrlInput(request.data?.sourceUrl)).sourceUrl.replace(/^http:/i, "https:") };
   }
   if (operation === "set_catalog_slug") {
-    const slugPattern = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
     const fromSlug = String(request.data?.fromSlug || "").trim();
-    const slug = String(request.data?.mdblistSlug || "").trim();
-    if (!slugPattern.test(fromSlug)) throw new Error("Current MDBList slug is invalid");
-    if (!slugPattern.test(slug)) throw new Error("MDBList slug is invalid");
-    data = { fromSlug, mdblistSlug: slug };
+    if (!mdblistSlugPattern.test(fromSlug)) throw new Error("Current MDBList list is invalid");
+    // Accepts a full list URL or "user/list"; both name the same list.
+    const { parts } = normalizeAdminListUrl("MDBLIST", mdblistUrlInput(request.data?.mdblistSlug));
+    data = { fromSlug, mdblistSlug: `${parts[1]}/${parts[2]}` };
   }
   if (operation === "rename_catalog") {
     data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
@@ -709,6 +708,14 @@ export function prepareAdminGlobalMutation(request) {
     });
   }
   return { operation, targetId, data };
+}
+
+const mdblistSlugPattern = /^(?!\.+\/)[A-Za-z0-9_.-]{1,100}\/(?!\.+$)[A-Za-z0-9_.-]{1,100}$/;
+
+/** A MDBList list as the admin typed it: full URL or "user/list". */
+function mdblistUrlInput(value) {
+  const raw = String(value || "").trim();
+  return mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw;
 }
 
 function normalizeAdminListUrl(sourceType, rawValue) {
@@ -969,14 +976,14 @@ export function adminEditableDefaultCatalogs(payload) {
       if (bundledMdblistHomeIds.has(id) && catalogType(catalog) === "MDBLIST" &&
           typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
         entry.kind = "home";
-        entry.sources.set("url", { key: "url", label: "Listen-URL", value: catalog.sourceUrl });
+        entry.sources.set("url", { key: "url", label: "MDBList-Liste", value: catalog.sourceUrl });
       }
       if (id.startsWith("collection_")) {
         for (const source of Array.isArray(catalog.collectionSources) ? catalog.collectionSources : []) {
           if (source?.kind !== "MDBLIST_PUBLIC" || typeof source.mdblistSlug !== "string" || !source.mdblistSlug) continue;
           entry.kind = "collection";
           entry.sources.set(`slug:${source.mdblistSlug}`, {
-            key: `slug:${source.mdblistSlug}`, label: "MDBList-Slug", value: source.mdblistSlug,
+            key: `slug:${source.mdblistSlug}`, label: "MDBList-Liste", value: source.mdblistSlug,
           });
         }
       }

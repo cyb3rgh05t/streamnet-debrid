@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.047] - 2026-11-17
+
+- Adminpanel, Remote Config → Standard-Kataloge: Listen heißen jetzt einheitlich „MDBList-Liste“. Die Eingabe akzeptiert wahlweise die volle URL (`https://mdblist.com/lists/user/liste`) oder den Kurzslug `user/liste` und normalisiert beides auf `user/liste`; die Anzeige verwendet immer die Kurzform. Das Zielfeld ist dadurch für Home-Reihen und Collections gleich. Die gespeicherten Formate in der App bleiben unverändert (Home-Reihen mit URL, Collections mit Slug).
+- Neuer Endpunkt `GET /admin-api/global/mdblist-titles?slugs=…`: liest den Titel der MDBList-Seite (Ergebnis 24 Stunden zwischengespeichert, höchstens 5 parallele Abfragen) und zeigt in der Auswahl den Listennamen statt nur des Slugs. Nicht erreichbare Listen fallen auf den Slug zurück.
+- Der Slug wird strenger geprüft: Pfadsegmente wie `../evil` werden abgelehnt (Backend und Snapshot-Prüfung). Neue Tests dafür; Backend-Suite 162 von 163 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser nicht angesehen. Keine neue Datenbankmigration; Android und Web unverändert.
+
 ## [Backend 1.0.046] - 2026-11-17
 
 - Adminpanel, Remote Config → Standard-Kataloge, Darstellung: Die Auswahl ist nach „Home-Reihen“ und je Collection gruppiert und zeigt kurze Werte ohne `https://mdblist.com/lists/` mit der Anzahl der Accounts. Unter der Auswahl zeigt ein Panel den gewählten Katalog mit allen vorkommenden Werten und ihrer Account-Anzahl (z. B. bei „Top 10 Movies Today“ die aktuelle und die ältere URL) und weist darauf hin, dass die Änderung alle Werte ersetzt. Im Browser nicht angesehen.

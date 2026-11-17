@@ -399,6 +399,49 @@ test("catalog removal tolerates unrelated sync pushes but rejects changes to tha
   assert.equal(related.queries.at(-1).sql, "rollback");
 });
 
+test("MDBList list titles are read from the page title, cached, validated and tolerate failures", async (t) => {
+  const { send } = await fixture(t);
+  const requested = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    requested.push(String(url));
+    if (String(url).endsWith("/broken/list")) throw new Error("offline");
+    return new Response("<html><title>Popular 2020s &amp; More, a list by snoak - mdblist.com</title></html>", { status: 200 });
+  });
+  const first = await send("GET", "/admin-api/global/mdblist-titles?slugs=title-user/ok-list,title-user/broken/list,title-user/broken-list,../evil,a%20b/c,x/..");
+  assert.equal(first.statusCode, 200);
+  assert.deepEqual(first.json().titles, { "title-user/ok-list": "Popular 2020s & More", "title-user/broken-list": "Popular 2020s & More" });
+  assert.deepEqual(requested.sort(), [
+    "https://mdblist.com/lists/title-user/broken-list",
+    "https://mdblist.com/lists/title-user/ok-list",
+  ]);
+  await send("GET", "/admin-api/global/mdblist-titles?slugs=title-user/ok-list");
+  assert.equal(requested.length, 2);
+
+  t.mock.method(globalThis, "fetch", async () => { throw new Error("offline"); });
+  const failed = await send("GET", "/admin-api/global/mdblist-titles?slugs=title-user/down-list");
+  assert.deepEqual(failed.json().titles, { "title-user/down-list": null });
+});
+
+test("catalog list changes accept a MDBList URL or user/list and store the same list", async (t) => {
+  const { send, rows } = await fixture(t);
+  const catalog = {
+    id: "collection_decade_20s_movies", title: "20's", isPreinstalled: true, kind: "COLLECTION",
+    collectionSources: [{ kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/top-2020s-movies" }],
+  };
+  rows[0].payload.catalogsByProfile = { main: [catalog] };
+  for (const input of ["me/new-list", "https://mdblist.com/lists/me/new-list?x=1", "mdblist.com/lists/me/new-list"]) {
+    const preview = await send("POST", "/admin-api/global/preview", {
+      operation: "set_catalog_slug", targetId: catalog.id, data: { fromSlug: "snoak/top-2020s-movies", mdblistSlug: input },
+    });
+    assert.equal(preview.statusCode, 200, input);
+    assert.equal(preview.json().changed, 1, input);
+  }
+  const home = await send("POST", "/admin-api/global/preview", {
+    operation: "set_catalog_source", targetId: "trending_movies", data: { sourceUrl: "me/new-list" },
+  });
+  assert.equal(home.statusCode, 200);
+});
+
 test("bundled catalog lists can be redirected, listed and reset across accounts", async (t) => {
   const { send, rows, queries } = await fixture(t);
   const homeRow = () => ({

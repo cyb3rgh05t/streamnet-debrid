@@ -317,6 +317,45 @@ function globalSummary(rows, mutation) {
   };
 }
 
+const mdblistTitleCache = new Map();
+const mdblistTitleTtlMs = 24 * 60 * 60_000;
+const mdblistTitleFailureTtlMs = 10 * 60_000;
+const mdblistSlugPattern = /^(?!\.+\/)[A-Za-z0-9_.-]{1,100}\/(?!\.+$)[A-Za-z0-9_.-]{1,100}$/;
+
+function decodeHtmlText(value) {
+  return value
+    .replace(/&#(\d+);/g, (_m, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_m, code) => String.fromCodePoint(parseInt(code, 16)))
+    .replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&");
+}
+
+/** Public name of a MDBList list, read from the page title. Null when it cannot be determined. */
+async function mdblistListTitle(slug) {
+  const cached = mdblistTitleCache.get(slug);
+  if (cached && Date.now() - cached.at < (cached.title ? mdblistTitleTtlMs : mdblistTitleFailureTtlMs)) {
+    return cached.title;
+  }
+  let title = null;
+  try {
+    const response = await fetch(`https://mdblist.com/lists/${slug}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (StreamNet admin)", Accept: "text/html" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (response.ok) {
+      const html = (await response.text()).slice(0, 262144);
+      const match = /<title>([^<]{1,300})<\/title>/i.exec(html);
+      title = match
+        ? decodeHtmlText(match[1]).replace(/,?\s*a list by .*$/i, "").replace(/\s*-\s*mdblist\.com\s*$/i, "").trim() || null
+        : null;
+    }
+  } catch {
+    title = null;
+  }
+  mdblistTitleCache.set(slug, { title, at: Date.now() });
+  return title;
+}
+
 export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   const globalAccountsQuery = `select a.id as account_id, s.payload, s.revision, s.updated_at
     from accounts a left join account_sync_snapshots s on s.account_id = a.id
@@ -326,6 +365,22 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     reply.header("Cache-Control", "no-store");
     await authenticatedAdmin(request, pool, jwtKey);
     return globalSummary((await pool.query(globalAccountsQuery)).rows);
+  });
+
+  app.get("/admin-api/global/mdblist-titles", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticatedAdmin(request, pool, jwtKey);
+    const slugs = [...new Set(String(request.query?.slugs || "").split(",").map((value) => value.trim()))]
+      .filter((value) => mdblistSlugPattern.test(value))
+      .slice(0, 60);
+    const titles = {};
+    // Few parallel requests: the admin must not hammer a public site.
+    for (let index = 0; index < slugs.length; index += 5) {
+      const batch = slugs.slice(index, index + 5);
+      const resolved = await Promise.all(batch.map((slug) => mdblistListTitle(slug)));
+      batch.forEach((slug, position) => { titles[slug] = resolved[position]; });
+    }
+    return { titles };
   });
 
   app.get("/admin-api/global/default-catalogs", async (request, reply) => {
