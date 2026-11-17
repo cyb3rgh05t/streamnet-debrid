@@ -1850,7 +1850,7 @@ function defaultCatalogTargets(operation) {
         const [type, catalogId] = first.split("|");
         targets.push({
           id: `${catalog.id}#${type}|${catalogId}`,
-          label: `${addonVariantLabel(first)}${mixed} (${accounts} Accounts)`,
+          label: `${catalog.title} · ${addonVariantLabel(first)}${mixed} (${accounts} Accounts)`,
           group: `${catalog.title} · ${catalog.id}`,
           details: { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants },
         });
@@ -1873,7 +1873,7 @@ function defaultCatalogTargets(operation) {
       let label;
       if (operation === "clear_catalog_source") label = `${catalog.title} · ${catalog.id}`;
       else if (catalog.kind === "home") label = `${catalog.title} — ${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
-      else label = `${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
+      else label = `${catalog.title} · ${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
       targets.push({
         id: operation === "set_catalog_slug" ? `${catalog.id}#${source.variants[0]?.value || ""}` : catalog.id,
         label,

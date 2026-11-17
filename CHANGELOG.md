@@ -4,6 +4,28 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.049] - 2026-11-17
+
+- Adminpanel, Remote Config → Standard-Kataloge: Jeder Eintrag der Auswahl nennt jetzt die Collection (z. B. „Netflix · movie · mdblist.88328 · aio-metadata (94 Accounts)“ bzw. „Harry Potter · thebirdod/harry-potter-collection (125 Accounts)“), damit gleiche Katalog-IDs oder Listen in mehreren Collections eindeutig sind. Reine Anzeige im Admin (`admin.js`); keine Änderung an Daten, Endpunkten oder Prüfungen. Backend-Suite 165 von 166 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser nicht angesehen. Keine neue Datenbankmigration.
+
+## [Web 1.0.076] - 2026-11-17
+
+- Web-Version: `1.0.076`.
+- Katalog-Überschreibungen aus dem Admin (Remote Config) gelten jetzt auch im Web, mit denselben Regeln wie in der Android-App: MDBList-Listen-URL einer Home-Reihe, MDBList-Slugs und Addon-Kataloge (Katalog-ID, optional Addon-ID und Manifest-URL) einer Collection nur bei verwalteten Katalogen (`remoteManaged`), im Admin ergänzte Franchise-Titel (`remoteExtraRefs`, höchstens 30, Format `tv:ID`/`movie:ID`) immer. Ungültige Werte (falscher Host, kein `https`, ungültige Zeichen) fallen auf den eingebauten Standard zurück. Ergänzte Titel stehen als eigene Quelle hinter den eingebauten und ändern die Sortierung der Franchise nicht (Release-Datum bleibt). Die Felder bleiben beim Speichern in den Cloud-Daten erhalten.
+- Tests: 118 Web-Tests ohne Fehler, davon 3 neu (ergänzte Titel, Ersetzen und Rückfall bei ungültigen Werten, Erhalt nach dem Speichern); Typprüfung ohne Fehler. Nicht geprüft: Build und Darstellung im Browser, sowie ob ein ergänzter Titel im Web einen eigenen Tab erzeugt (der Tab-Mechanismus der Android-App wurde nicht übernommen).
+- Backend und Android unverändert.
+
+## [2.6.015] - 2026-11-17
+
+- Android-Version: `2.6.015` / Code `516`.
+- Android TV, Details: Die vollständige Beschreibung öffnete sich beim Zurückscrollen nach oben von selbst wieder, nachdem man sie einmal gelesen und geschlossen hatte. Ursache war der Öffnen-Zähler, der den Hero-Bereich überlebt; beim neuen Aufbau galt der alte Stand als neue Anfrage. Jetzt öffnet nur noch eine neue Anfrage den Dialog. Auf dem Emulator nachgestellt und geprüft.
+- Android Home, nur IPTV: Jahrzehnte sowie Film- und Serien-Genres werden jetzt auch im reinen IPTV-Modus gezeigt (bisher nur Streamingdienste und Filmreihen). Jede Kachel wird gegen die VOD-Bibliothek des Anbieters geprüft; Studios und Netzwerke bleiben ausgeblendet. Das erhöht die TMDB-Abfragen beim ersten Aufbau.
+- Android Home, nur IPTV: Solange die VOD-Bibliothek lädt, zeigt Home einen Hinweis „VOD-Bibliothek wird geprüft…“ (mittig, mit Akzentrahmen und Spinner; TV und Touch). Nach dem Laden springt der Fokus auf die erste Reihe (Continue Watching, TV-Favoriten oder die erste sichtbare Reihe), solange noch nicht navigiert wurde; die Reihenliste scrollt dorthin. Vorher blieb der Fokus auf „Kommende Filme“, weil beim Laden Reihen davor eingefügt wurden. Nicht auf einem TV geprüft; nur der Hinweis und das Hero waren auf dem Emulator zu sehen.
+- Android Home, nur IPTV: Logos in Karten und Hero wurden teils nicht vorgeladen, weil die Reihennummern in der gefilterten Anzeige nicht zur ungefilterten Liste im ViewModel passten. Das Vorladen nutzt jetzt die angezeigte Liste. Auf dem Emulator erschienen die Logos; ein vollständiges Ausbleiben ließ sich dort nicht nachstellen.
+- Android, Admin-Überschreibungen (Remote Config): Die App wertet jetzt aus, was das Adminpanel seit Backend 1.0.044 schreibt: MDBList-Listen-URL einer Home-Reihe (`remoteSourceUrl`), MDBList-Slugs (`remoteSlugOverrides`) und Addon-Kataloge einer Collection (`remoteAddonOverrides`) bei verwalteten Katalogen sowie im Admin ergänzte Franchise-Titel (`remoteExtraRefs`, höchstens 30). Werte werden streng geprüft (https, Host `mdblist.com`, Zeichen- und Formatprüfung); Ungültiges fällt auf die eingebaute Quelle zurück. Ergänzte Titel erzeugen den Filme- bzw. Serien-Tab nur, wenn es Titel dieses Typs gibt.
+- Android-Validierung: 932 Unit-Tests ohne Fehler, davon einer übersprungen. Das Kompilieren und der Debug-Build laufen durch. Nicht geprüft: Fokus und Logos auf echter TV-Hardware und eine Admin-Überschreibung Ende-zu-Ende mit einem Cloud-Konto.
+- Backend und Web unverändert.
+
 ## [Backend 1.0.048] - 2026-11-17
 
 - Adminpanel, Remote Config → Kataloge: Neue Aktion „Collection: Addon-Katalog ändern“. Sie ersetzt bei Collections (Streaming-Dienste, Genres, Franchises usw.) eine eingebaute Addon-Quelle, z. B. `aio-metadata` / `movie` / `mdblist.88328`. Gewählt wird die Quelle (Typ und Katalog-ID), geändert werden die Katalog-ID (Pflicht) sowie optional Addon-ID und eine Manifest-URL, mit der die App den Katalog direkt aus diesem Addon lädt. Eingaben werden streng geprüft (ID-Zeichen, Typ in Kleinbuchstaben, Manifest nur als `https`-Link ohne Zugangsdaten und mit `manifest.json` am Ende). Die Quelle wird über ihren eingebauten Schlüssel `Typ|Katalog-ID` erkannt, nicht über die Position; eine zweite Änderung derselben Quelle passt den vorhandenen Eintrag an (`remoteAddonOverrides`, setzt wie die Listen-Änderungen `remoteManaged`). „Standard-Liste: Überschreibung entfernen“ entfernt auch diese Überschreibung. Die Liste der MDBList-Änderungen zeigt weiterhin nur MDBList-Quellen. Das wirkt erst mit einer App-Version, die `remoteAddonOverrides` auswertet (noch nicht veröffentlicht). Nicht geprüft: ob eine neue Katalog-ID im Addon tatsächlich existiert (bei Nutzern ohne das Addon bleibt die Quelle wie bisher leer).
