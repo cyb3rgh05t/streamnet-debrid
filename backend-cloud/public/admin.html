@@ -641,8 +641,20 @@
                       <option value="set_catalog_slug">
                         Collection: MDBList-Liste ändern
                       </option>
+                      <option value="set_catalog_addon">
+                        Collection: Addon-Katalog ändern
+                      </option>
                       <option value="clear_catalog_source">
                         Standard-Liste: Überschreibung entfernen
+                      </option>
+                      <option value="remove_obsolete_catalogs">
+                        Veraltete Kataloge und Listen bereinigen
+                      </option>
+                      <option value="add_catalog_item">
+                        Franchise: Film oder Serie ergänzen
+                      </option>
+                      <option value="remove_catalog_item">
+                        Franchise: ergänzten Titel entfernen
                       </option>
                     </select></label
                   >
@@ -829,10 +841,25 @@
                         maxlength="300"
                         placeholder="https://mdblist.com/lists/…"
                     /></label>
+                    <label id="global-catalog-addon-id-field" class="hidden"
+                      >Addon-ID (optional, leer = bisherige beibehalten)<input
+                        id="global-catalog-addon-id"
+                        maxlength="100"
+                        placeholder="aio-metadata"
+                    /></label>
+                    <label id="global-catalog-manifest-field" class="hidden"
+                      >Addon-Manifest-URL (optional, https, endet auf manifest.json)<input
+                        id="global-catalog-manifest"
+                        maxlength="500"
+                        placeholder="https://…/manifest.json"
+                    /></label>
                     <div id="global-catalog-source-note" class="quick-panel hidden">
                       Gilt nur für Accounts mit Cloud-Konto. Die App übernimmt die neue
-                      Liste beim nächsten Abgleich. „Überschreibung entfernen“ stellt die
-                      eingebaute Liste der App wieder her.
+                      Liste bzw. den neuen Addon-Katalog beim nächsten Abgleich. Bei
+                      Addon-Katalogen muss die Katalog-ID im Addon existieren (bei
+                      Nutzern ohne dieses Addon bleibt die Quelle leer, wie bisher);
+                      eine Manifest-URL lädt den Katalog direkt aus diesem Addon.
+                      „Überschreibung entfernen“ stellt die eingebaute Quelle der App wieder her.
                     </div>
                     <label
                       id="global-catalog-enabled-field"

@@ -1702,9 +1702,17 @@ function updateGlobalFields() {
   byId("global-settings-title").textContent = descriptions[category][0];
   byId("global-category-description").textContent = descriptions[category][1];
   byId("global-action-summary").textContent = byId("global-operation").selectedOptions[0].textContent;
-  byId("global-action-summary").classList.toggle("is-destructive", /^(delete|clear)_/.test(operation));
+  byId("global-action-summary").classList.toggle("is-destructive", /^(delete|clear|remove)_/.test(operation));
+  const noSettings = byId("global-no-settings");
+  noSettings.dataset.defaultText ??= noSettings.textContent;
+  noSettings.textContent = operation === "remove_obsolete_catalogs"
+    ? "Entfernt aus allen Accounts Netzwerk- und Studio-Collections (collection_network_*, collection_studio_*) " +
+      "sowie die ersetzte Liste kingkearney/dc-universe aus Collections, die noch eine andere Liste haben. " +
+      "Die aktuelle App liefert diese Einträge nicht mehr aus und verwirft sie selbst; alle anderen Kataloge, " +
+      "Titel und Einstellungen bleiben unverändert. Prüfe die Anzahl in der Vorschau."
+    : noSettings.dataset.defaultText;
   const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host" ||
-    operation === "clear_catalog_source";
+    operation === "clear_catalog_source" || operation.endsWith("_catalog_item");
   const editsData = /^(add|edit)_/.test(operation);
   const isAddon = operation.endsWith("addon") || operation === "clear_addons";
   const isCatalog = operation.includes("catalog");
@@ -1719,7 +1727,8 @@ function updateGlobalFields() {
   const hostOnly = operation === "change_xtream_host";
   byId("global-no-settings").classList.toggle("hidden",
     editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled" ||
-      operation === "set_catalog_source" || operation === "set_catalog_slug");
+      operation === "set_catalog_source" || operation === "set_catalog_slug" || operation === "add_catalog_item" ||
+      operation === "set_catalog_addon");
   byId("global-host-fields").classList.toggle("hidden", !hostOnly);
   byId("global-host-url").disabled = !hostOnly;
   byId("global-host-url").required = hostOnly;
@@ -1772,6 +1781,7 @@ async function loadMdblistTitles() {
   const slugs = new Set();
   for (const catalog of state.defaultCatalogs || []) {
     for (const source of catalog.sources) {
+      if (source.key.startsWith("addon:")) continue;
       for (const variant of source.variants) slugs.add(shortMdblistValue(variant.value));
     }
   }
@@ -1790,7 +1800,64 @@ async function loadMdblistTitles() {
   }
 }
 
+// "movie · mdblist.88328 · aio-metadata" from the listing value "type|catalogId|addonId|manifestUrl".
+function addonVariantLabel(value) {
+  const [type, catalogId, addonId, ...manifest] = String(value).split("|");
+  const manifestUrl = manifest.join("|");
+  return [type, catalogId, addonId || null, manifestUrl ? `Manifest ${manifestUrl}` : null].filter(Boolean).join(" · ");
+}
+
+// The TMDB id as the admin typed it; TMDB blocks automatic title lookups, so there is no name.
+function tmdbRefLabel(ref) {
+  return ref;
+}
+
 function defaultCatalogTargets(operation) {
+  if (operation === "add_catalog_item" || operation === "remove_catalog_item") {
+    const targets = [];
+    for (const catalog of state.defaultCatalogs || []) {
+      if (!catalog.id.startsWith("collection_franchise_")) continue;
+      const extras = catalog.extraRefs || [];
+      const details = {
+        title: catalog.title, id: catalog.id, label: "Ergänzte Titel",
+        note: extras.length
+          ? "Von dir ergänzt (zusätzlich zu den fest eingebauten Quellen der App):"
+          : "Noch keine Titel ergänzt.",
+        variants: extras.map(({ ref, accounts }) => ({ value: ref, accounts })),
+      };
+      if (operation === "add_catalog_item") {
+        targets.push({ id: catalog.id, label: `${catalog.title} · ${catalog.id}`, group: "Franchises", details });
+      } else {
+        for (const { ref, accounts } of extras) {
+          targets.push({
+            id: `${catalog.id}#${ref}`,
+            label: `${catalog.title} — ${tmdbRefLabel(ref)} (${accounts} Accounts)`,
+            group: "Franchises", details,
+          });
+        }
+      }
+    }
+    return targets;
+  }
+  if (operation === "set_catalog_addon") {
+    const targets = [];
+    for (const catalog of state.defaultCatalogs || []) {
+      if (catalog.kind !== "collection") continue;
+      for (const source of catalog.sources.filter((item) => item.key.startsWith("addon:"))) {
+        const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
+        const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
+        const first = source.variants[0]?.value || "";
+        const [type, catalogId] = first.split("|");
+        targets.push({
+          id: `${catalog.id}#${type}|${catalogId}`,
+          label: `${addonVariantLabel(first)}${mixed} (${accounts} Accounts)`,
+          group: `${catalog.title} · ${catalog.id}`,
+          details: { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants },
+        });
+      }
+    }
+    return targets;
+  }
   if (!["set_catalog_source", "set_catalog_slug", "clear_catalog_source"].includes(operation)) return null;
   const wanted = operation === "set_catalog_source" ? "home" : operation === "set_catalog_slug" ? "collection" : null;
   const targets = [];
@@ -1798,6 +1865,7 @@ function defaultCatalogTargets(operation) {
     if (wanted && catalog.kind !== wanted) continue;
     const group = catalog.kind === "home" ? "Home-Reihen" : `${catalog.title} · ${catalog.id}`;
     for (const source of catalog.sources) {
+      if (operation === "set_catalog_slug" && !source.key.startsWith("slug:")) continue;
       if (operation === "clear_catalog_source" && source !== catalog.sources[0]) continue;
       const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
       const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
@@ -1827,16 +1895,19 @@ function renderTargetDetails(targets) {
   const heading = document.createElement("strong");
   heading.textContent = `${details.title} · ${details.id}`;
   const note = document.createElement("span");
-  note.textContent = details.variants.length > 1
+  note.textContent = details.note || (details.variants.length > 1
     ? `${details.label}: In den Accounts kommen ${details.variants.length} verschiedene Werte vor (meist ältere App-Versionen). Die Änderung ersetzt alle.`
-    : `${details.label}: In allen betroffenen Accounts gleich.`;
+    : `${details.label}: In allen betroffenen Accounts gleich.`);
   const list = document.createElement("ul");
   list.className = "target-detail-list";
   for (const variant of details.variants) {
     const item = document.createElement("li");
     const value = document.createElement("code");
     const slug = shortMdblistValue(variant.value);
-    value.textContent = state.mdblistTitles?.[slug] ? `${state.mdblistTitles[slug]} · ${variant.value}` : variant.value;
+    value.textContent = /^(movie|tv):\d+$/.test(variant.value)
+      ? tmdbRefLabel(variant.value)
+      : /^[a-z]+\|/.test(variant.value) && details.label === "Addon-Katalog" ? addonVariantLabel(variant.value)
+      : state.mdblistTitles?.[slug] ? `${state.mdblistTitles[slug]} · ${variant.value}` : variant.value;
     const count = document.createElement("span");
     count.textContent = `${variant.accounts} Account${variant.accounts === 1 ? "" : "s"}`;
     item.append(value, count);
@@ -1851,21 +1922,31 @@ function updateGlobalCatalogFields() {
   const renaming = operation === "rename_catalog";
   const settingEnabled = operation === "set_catalog_enabled";
   const settingSource = operation === "set_catalog_source" || operation === "set_catalog_slug";
-  const sourceOperation = settingSource || operation === "clear_catalog_source";
-  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !sourceOperation);
+  const addingItem = operation === "add_catalog_item";
+  const settingAddon = operation === "set_catalog_addon";
+  const sourceOperation = settingSource || settingAddon || operation === "clear_catalog_source";
+  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !sourceOperation && !addingItem);
   byId("global-catalog-source-note").classList.toggle("hidden", !sourceOperation);
-  byId("global-catalog-value-label").textContent = "Neue MDBList-Liste (URL oder Benutzer/Liste)";
-  byId("global-catalog-value").placeholder = "https://mdblist.com/lists/snoak/trending-movies oder snoak/trending-movies";
+  byId("global-catalog-value-label").textContent = addingItem
+    ? "Film oder Serie (TMDB-Link oder tv:ID / movie:ID)"
+    : settingAddon ? "Neue Katalog-ID im Addon (z. B. mdblist.88328)"
+    : "Neue MDBList-Liste (URL oder Benutzer/Liste)";
+  byId("global-catalog-value").placeholder = addingItem
+    ? "https://www.themoviedb.org/tv/84773 oder tv:84773"
+    : settingAddon ? "mdblist.88328"
+    : "https://mdblist.com/lists/snoak/trending-movies oder snoak/trending-movies";
   const type = byId("global-catalog-type").value;
   const template = type === "PREINSTALLED" || type === "ADDON";
   for (const [id, visible] of [
     ["type", adding], ["template", adding && template], ["url", adding && !template],
-    ["title", adding || renaming], ["enabled", adding || settingEnabled], ["value", settingSource],
+    ["title", adding || renaming], ["enabled", adding || settingEnabled],
+    ["value", settingSource || addingItem || settingAddon],
+    ["addon-id", settingAddon], ["manifest", settingAddon],
   ]) {
     byId(`global-catalog-${id}-field`).classList.toggle("hidden", !visible);
     byId(`global-catalog-${id}`).disabled = !visible;
   }
-  byId("global-catalog-value").required = settingSource;
+  byId("global-catalog-value").required = settingSource || addingItem || settingAddon;
   byId("global-catalog-title").required = renaming || (adding && !template);
   byId("global-catalog-url").required = adding && !template;
   byId("global-catalog-template").required = adding && template;
@@ -1922,6 +2003,22 @@ async function submitGlobalMutation(event) {
       const fromSlug = request.targetId.slice(separator + 1);
       request.targetId = request.targetId.slice(0, separator);
       request.data = { fromSlug, mdblistSlug: byId("global-catalog-value").value.trim() };
+    } else if (operation === "set_catalog_addon") {
+      const separator = request.targetId.indexOf("#");
+      const [fromType, fromCatalogId] = request.targetId.slice(separator + 1).split("|");
+      request.targetId = request.targetId.slice(0, separator);
+      request.data = {
+        fromType, fromCatalogId,
+        addonCatalogId: byId("global-catalog-value").value.trim(),
+        addonId: byId("global-catalog-addon-id").value.trim(),
+        addonManifestUrl: byId("global-catalog-manifest").value.trim(),
+      };
+    } else if (operation === "add_catalog_item") {
+      request.data = { ref: byId("global-catalog-value").value.trim() };
+    } else if (operation === "remove_catalog_item") {
+      const separator = request.targetId.indexOf("#");
+      request.data = { ref: request.targetId.slice(separator + 1) };
+      request.targetId = request.targetId.slice(0, separator);
     } else if (operation === "set_catalog_source") {
       request.data = { sourceUrl: byId("global-catalog-value").value.trim() };
     } else if (operation === "add_catalog") {

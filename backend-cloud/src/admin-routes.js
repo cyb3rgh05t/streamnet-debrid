@@ -393,8 +393,13 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
       // Count each account once per catalog and value, however many profiles carry it.
       const seen = new Set();
       for (const item of adminEditableDefaultCatalogs(row.payload)) {
-        const entry = catalogs.get(item.id) || { id: item.id, title: item.title, kind: item.kind, sources: new Map() };
+        const entry = catalogs.get(item.id) || { id: item.id, title: item.title, kind: item.kind, sources: new Map(), extras: new Map() };
         catalogs.set(item.id, entry);
+        for (const ref of item.extraRefs || []) {
+          const token = `${item.id}|extra|${ref}`;
+          if (!seen.has(token)) entry.extras.set(ref, (entry.extras.get(ref) || 0) + 1);
+          seen.add(token);
+        }
         for (const source of item.sources) {
           const slot = entry.sources.get(source.key) ||
             { key: source.key, label: source.label, variants: new Map() };
@@ -408,8 +413,9 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     }
     return {
       catalogs: [...catalogs.values()]
-        .map((entry) => ({
+        .map(({ extras, ...entry }) => ({
           ...entry,
+          extraRefs: [...extras].map(([ref, accounts]) => ({ ref, accounts })).sort((a, b) => b.accounts - a.accounts),
           sources: [...entry.sources.values()].map((slot) => ({
             ...slot,
             variants: [...slot.variants].map(([value, accounts]) => ({ value, accounts }))

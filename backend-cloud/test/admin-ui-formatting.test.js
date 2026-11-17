@@ -81,7 +81,8 @@ test("Remote Config assigns every existing action to exactly one area", async ()
     addons: ["add_addon", "edit_addon", "delete_addon", "clear_addons"],
     catalogs: [
       "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
-      "set_catalog_source", "set_catalog_slug", "clear_catalog_source",
+      "set_catalog_source", "set_catalog_slug", "set_catalog_addon", "clear_catalog_source", "remove_obsolete_catalogs",
+      "add_catalog_item", "remove_catalog_item",
     ],
   });
   for (const group of Object.keys(groups)) {
