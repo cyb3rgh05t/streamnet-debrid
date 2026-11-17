@@ -1734,36 +1734,84 @@ function updateGlobalFields() {
   placeholder.value = "";
   placeholder.textContent = (defaultItems || items).length ? "Eintrag auswählen" : "Keine Einträge vorhanden";
   select.append(placeholder);
+  const groups = new Map();
   for (const item of defaultItems || items) {
     const option = document.createElement("option");
     option.value = item.id;
     option.textContent = item.label || `${item.name} · ${item.accountCount} Account(s) · ${item.id}`;
-    select.append(option);
+    let parent = select;
+    if (item.group) {
+      if (!groups.has(item.group)) {
+        const optgroup = document.createElement("optgroup");
+        optgroup.label = item.group;
+        groups.set(item.group, optgroup);
+        select.append(optgroup);
+      }
+      parent = groups.get(item.group);
+    }
+    parent.append(option);
   }
   if ((defaultItems || items).some((item) => item.id === previous)) select.value = previous;
+  renderTargetDetails(defaultItems);
 }
 
 // Targets of the bundled-list operations: one entry per editable list (home row URL or collection slug).
+function shortMdblistValue(value) {
+  return String(value).replace(/^https?:\/\/(www\.)?mdblist\.com\/lists\//i, "");
+}
+
 function defaultCatalogTargets(operation) {
   if (!["set_catalog_source", "set_catalog_slug", "clear_catalog_source"].includes(operation)) return null;
   const wanted = operation === "set_catalog_source" ? "home" : operation === "set_catalog_slug" ? "collection" : null;
   const targets = [];
   for (const catalog of state.defaultCatalogs || []) {
     if (wanted && catalog.kind !== wanted) continue;
+    const group = catalog.kind === "home" ? "Home-Reihen" : `${catalog.title} · ${catalog.id}`;
     for (const source of catalog.sources) {
       if (operation === "clear_catalog_source" && source !== catalog.sources[0]) continue;
-      const current = source.variants[0]?.value || "";
-      const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
       const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
+      const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
+      const current = shortMdblistValue(source.variants[0]?.value || "");
+      let label;
+      if (operation === "clear_catalog_source") label = `${catalog.title} · ${catalog.id}`;
+      else if (catalog.kind === "home") label = `${catalog.title} — ${current}${mixed} (${accounts} Accounts)`;
+      else label = `${current}${mixed} (${accounts} Accounts)`;
       targets.push({
-        id: operation === "set_catalog_slug" ? `${catalog.id}#${current}` : catalog.id,
-        label: operation === "clear_catalog_source"
-          ? `${catalog.title} · ${catalog.id}`
-          : `${catalog.title} · ${catalog.id} · ${source.label}: ${current}${mixed} · ${accounts} Account(s)`,
+        id: operation === "set_catalog_slug" ? `${catalog.id}#${source.variants[0]?.value || ""}` : catalog.id,
+        label,
+        group: operation === "clear_catalog_source" ? "Standard-Listen" : group,
+        details: { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants },
       });
     }
   }
   return targets;
+}
+
+function renderTargetDetails(targets) {
+  const panel = byId("global-target-details");
+  panel.replaceChildren();
+  const selected = (targets || []).find((target) => target.id === byId("global-target").value);
+  panel.classList.toggle("hidden", !selected);
+  if (!selected) return;
+  const { details } = selected;
+  const heading = document.createElement("strong");
+  heading.textContent = `${details.title} · ${details.id}`;
+  const note = document.createElement("span");
+  note.textContent = details.variants.length > 1
+    ? `${details.label}: In den Accounts kommen ${details.variants.length} verschiedene Werte vor (meist ältere App-Versionen). Die Änderung ersetzt alle.`
+    : `${details.label}: In allen betroffenen Accounts gleich.`;
+  const list = document.createElement("ul");
+  list.className = "target-detail-list";
+  for (const variant of details.variants) {
+    const item = document.createElement("li");
+    const value = document.createElement("code");
+    value.textContent = variant.value;
+    const count = document.createElement("span");
+    count.textContent = `${variant.accounts} Account${variant.accounts === 1 ? "" : "s"}`;
+    item.append(value, count);
+    list.append(item);
+  }
+  panel.append(heading, note, list);
 }
 
 function updateGlobalCatalogFields() {
@@ -2008,6 +2056,7 @@ selectGlobalCategory("playlists");
 byId("global-playlist-type").addEventListener("change", updateGlobalPlaylistFields);
 byId("global-catalog-type").addEventListener("change", updateGlobalCatalogFields);
 byId("global-target").addEventListener("change", () => {
+  renderTargetDetails(defaultCatalogTargets(byId("global-operation").value));
   if (byId("global-target").value === "streamnet_tv") {
     byId("global-playlist-type").value = "streamnet_tv";
     byId("global-playlist-type").dispatchEvent(new Event("change"));

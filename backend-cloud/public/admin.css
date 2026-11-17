@@ -722,6 +722,42 @@ button.metric {
   font-size: 12px;
   line-height: 1.5;
 }
+.target-details {
+  display: grid;
+  gap: 6px;
+}
+.target-details strong {
+  color: var(--text);
+  font-size: 13px;
+}
+.target-detail-list {
+  display: grid;
+  gap: 4px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.target-detail-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(0, 0, 0, 0.18);
+}
+.target-detail-list code {
+  color: var(--text);
+  font-family: Consolas, monospace;
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+.target-detail-list span {
+  color: var(--accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
 label {
   display: grid;
   gap: 7px;

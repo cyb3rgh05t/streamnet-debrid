@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.046] - 2026-11-17
+
+- Adminpanel, Remote Config → Standard-Kataloge, Darstellung: Die Auswahl ist nach „Home-Reihen“ und je Collection gruppiert und zeigt kurze Werte ohne `https://mdblist.com/lists/` mit der Anzahl der Accounts. Unter der Auswahl zeigt ein Panel den gewählten Katalog mit allen vorkommenden Werten und ihrer Account-Anzahl (z. B. bei „Top 10 Movies Today“ die aktuelle und die ältere URL) und weist darauf hin, dass die Änderung alle Werte ersetzt. Im Browser nicht angesehen.
+- Die Auflistung blendet Netzwerk- und Studio-Collections (`collection_network_*`, `collection_studio_*`) aus. Die App liefert sie seit dem 02.09.2026 nicht mehr aus; Accounts, die noch eines halten (z. B. `collection_network_disneyplus`), wurden zuletzt von einer alten App-Version geschrieben. Ein Test deckt das ab. Backend-Suite: 160 von 161 Tests erfolgreich; der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Keine neue Datenbankmigration; Android und Web unverändert.
 ## [Backend 1.0.045] - 2026-11-17
 
 - Adminpanel, Remote Config → Standard-Kataloge (Korrektur zu 1.0.044): Collection-Quellen wurden nach ihrer Position in der Quellenliste unterschieden. Diese Reihenfolge ist je Account und App-Version verschieden, deshalb erschienen dieselben Listen mehrfach (z. B. Harry Potter an Position 4 und 5, DC dreimal), und eine Änderung hätte bei einem Account mit anderer Reihenfolge die falsche Quelle getroffen. Quellen werden jetzt über ihren aktuellen MDBList-Slug erkannt: `set_catalog_slug` nimmt `fromSlug` und den neuen Slug und ersetzt jede passende Quelle im Katalog; jede Liste erscheint nur einmal je Katalog. Die Überschreibung steht als `remoteSlugOverrides` (bisheriger Slug → neuer Slug, bei einer zweiten Änderung wird der vorhandene Eintrag angepasst) im Katalog; das Feld `remoteCollectionSources` aus 1.0.044 entfällt und wird beim Schreiben entfernt (es wurde noch von keiner App-Version gelesen).

@@ -422,11 +422,17 @@ test("bundled catalog lists can be redirected, listed and reset across accounts"
     sourceUrl: "https://mdblist.com/lists/old/legacy",
   });
   rows[0].payload.catalogsByProfile.main[1].id = "collection_decade_2020s";
+  // Network collections were dropped by the app; accounts that still hold one must not be listed.
+  rows[0].payload.catalogsByProfile.main.push({
+    id: "collection_network_disneyplus", title: "Disney+", isPreinstalled: true, kind: "COLLECTION",
+    collectionSources: [{ kind: "MDBLIST_PUBLIC", mdblistSlug: "garycrawfordgc/disney-shows" }],
+  });
 
   const list = await send("GET", "/admin-api/global/default-catalogs");
   assert.equal(list.statusCode, 200);
   const byId = Object.fromEntries(list.json().catalogs.map((item) => [item.id, item]));
   assert.equal(byId.legacy_row, undefined);
+  assert.equal(byId.collection_network_disneyplus, undefined);
   assert.equal(byId.trending_movies.kind, "home");
   assert.deepEqual(byId.trending_movies.sources[0].variants, [
     { value: "https://mdblist.com/lists/snoak/trending-movies", accounts: 2 },

@@ -962,6 +962,9 @@ export function adminEditableDefaultCatalogs(payload) {
     for (const catalog of catalogsForProfile(payload, profileId)) {
       if (!catalog?.id || catalog.isPreinstalled !== true) continue;
       const id = String(catalog.id);
+      // The app no longer ships studio or network collections; accounts that still hold them were
+      // last written by an old app version and drop them on their next update.
+      if (id.startsWith("collection_network_") || id.startsWith("collection_studio_")) continue;
       const entry = found.get(id) || { id, title: String(catalog.title || catalog.name || id), sources: new Map() };
       if (bundledMdblistHomeIds.has(id) && catalogType(catalog) === "MDBLIST" &&
           typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
