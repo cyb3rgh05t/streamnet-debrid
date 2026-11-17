@@ -562,7 +562,9 @@ async function loadCollectionCatalog(
       : { ...item, image: catalog.collectionCoverImageUrl },
   );
   const hasCuratedSource = sources.some(
-    (source) => String(source.kind ?? "").toUpperCase() === "CURATED_IDS",
+    (source) =>
+      String(source.kind ?? "").toUpperCase() === "CURATED_IDS" &&
+      !source.remoteExtra,
   );
   const hasTimelineSource = sources.some(
     (source) => source.collectionTab === "timeline",

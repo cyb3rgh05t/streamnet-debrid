@@ -157,6 +157,19 @@ export interface CatalogConfig {
   title?: string;
   remoteManaged?: boolean;
   remoteTitle?: string;
+  // Admin overrides written by the Remote Config panel; see lib/catalogRemoteOverrides.ts.
+  remoteSourceUrl?: string;
+  remoteSlugOverrides?: Record<string, string>;
+  remoteAddonOverrides?: Record<
+    string,
+    {
+      addonId?: string | null;
+      addonManifestUrl?: string | null;
+      addonCatalogType?: string | null;
+      addonCatalogId?: string | null;
+    }
+  >;
+  remoteExtraRefs?: string[];
   kind?:
     | "STANDARD"
     | "COLLECTION"
@@ -201,6 +214,8 @@ export interface CollectionSourceConfig {
   mdblistSlug?: string | null;
   homeServerId?: string | null;
   homeServerLibraryKey?: string | null;
+  // Set on the source the admin's added titles produce; it must not switch a franchise to popularity order.
+  remoteExtra?: boolean;
 }
 
 export interface StreamBehaviorHints {

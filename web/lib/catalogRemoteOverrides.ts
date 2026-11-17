@@ -1,0 +1,140 @@
+import type { CatalogConfig, CollectionSourceConfig } from "./types";
+
+const mdblistSlugPattern = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const addonTokenPattern = /^[A-Za-z0-9_.:-]{1,100}$/;
+const addonTypePattern = /^[a-z]{1,20}$/;
+const tmdbRefPattern = /^(movie|tv):[0-9]{1,9}$/;
+const maxExtraRefs = 30;
+
+/** https://mdblist.com/lists/{user}/{list}, as the admin writes it. */
+export function isValidRemoteMdblistUrl(value: unknown) {
+  try {
+    const url = new URL(String(value ?? "").trim());
+    const host = url.hostname.toLowerCase();
+    const parts = url.pathname.split("/").filter(Boolean);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      (host === "mdblist.com" || host.endsWith(".mdblist.com")) &&
+      parts.length === 3 &&
+      parts[0] === "lists"
+    );
+  } catch {
+    return false;
+  }
+}
+
+/** The app fetches the manifest itself, so only a plain https manifest link without credentials qualifies. */
+export function isValidRemoteManifestUrl(value: unknown) {
+  const text = String(value ?? "").trim();
+  if (!text || text.length > 500) return false;
+  try {
+    const url = new URL(text);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      Boolean(url.hostname) &&
+      url.pathname.endsWith("manifest.json")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function overrideMdblistSlugs(
+  sources: CollectionSourceConfig[],
+  overrides: Record<string, string> | undefined,
+) {
+  if (!overrides) return sources;
+  return sources.map((source) => {
+    const replacement = String(overrides[source.mdblistSlug ?? ""] ?? "").trim();
+    return String(source.kind).toUpperCase() === "MDBLIST_PUBLIC" &&
+      mdblistSlugPattern.test(replacement)
+      ? { ...source, mdblistSlug: replacement }
+      : source;
+  });
+}
+
+function overrideAddonSources(
+  sources: CollectionSourceConfig[],
+  overrides: CatalogConfig["remoteAddonOverrides"],
+) {
+  if (!overrides) return sources;
+  return sources.map((source) => {
+    if (String(source.kind).toUpperCase() !== "ADDON_CATALOG") return source;
+    const replacement =
+      overrides[`${source.addonCatalogType ?? ""}|${source.addonCatalogId ?? ""}`];
+    const catalogId = String(replacement?.addonCatalogId ?? "").trim();
+    if (!replacement || !addonTokenPattern.test(catalogId)) return source;
+    const type = String(replacement.addonCatalogType ?? "").trim();
+    const addonId = String(replacement.addonId ?? "").trim();
+    const manifest = String(replacement.addonManifestUrl ?? "").trim();
+    return {
+      ...source,
+      addonCatalogId: catalogId,
+      addonCatalogType: addonTypePattern.test(type)
+        ? type
+        : source.addonCatalogType,
+      addonId: addonTokenPattern.test(addonId) ? addonId : source.addonId,
+      addonManifestUrl: isValidRemoteManifestUrl(manifest)
+        ? manifest
+        : source.addonManifestUrl,
+    };
+  });
+}
+
+function appendExtraRefs(
+  sources: CollectionSourceConfig[],
+  refs: string[] | undefined,
+  group: unknown,
+) {
+  if (String(group ?? "").toUpperCase() !== "FRANCHISE") return sources;
+  const valid = [
+    ...new Set(
+      (refs ?? []).map((ref) => String(ref).trim().toLowerCase()),
+    ),
+  ]
+    .filter((ref) => tmdbRefPattern.test(ref))
+    .slice(0, maxExtraRefs);
+  return valid.length
+    ? [...sources, { kind: "CURATED_IDS", curatedRefs: valid, remoteExtra: true }]
+    : sources;
+}
+
+/**
+ * Applies the admin overrides stored on a saved catalog to its current default, with the same rules
+ * as the Android app: list URL, MDBList slugs and addon catalogs only for remote-managed catalogs,
+ * added franchise titles always. Anything malformed falls back to the default value.
+ */
+export function applyRemoteCatalogOverrides(
+  base: CatalogConfig,
+  saved: CatalogConfig,
+): CatalogConfig {
+  const sources = base.collectionSources ?? [];
+  const withExtras = appendExtraRefs(
+    sources,
+    saved.remoteExtraRefs,
+    base.collectionGroup,
+  );
+  const result: CatalogConfig = { ...base };
+  let nextSources = withExtras;
+  if (saved.remoteManaged) {
+    nextSources = overrideAddonSources(
+      overrideMdblistSlugs(withExtras, saved.remoteSlugOverrides),
+      saved.remoteAddonOverrides,
+    );
+    const remoteUrl = String(saved.remoteSourceUrl ?? "").trim();
+    if (
+      base.sourceType === "mdblist" &&
+      base.sourceUrl &&
+      isValidRemoteMdblistUrl(remoteUrl)
+    ) {
+      result.sourceUrl = remoteUrl;
+      if (base.sourceRef) result.sourceRef = `mdblist:${remoteUrl}`;
+    }
+  }
+  if (nextSources !== sources) result.collectionSources = nextSources;
+  return result;
+}

@@ -1,5 +1,6 @@
 import type { CatalogConfig } from "./types";
 import type { UiLanguage } from "./i18n";
+import { applyRemoteCatalogOverrides } from "./catalogRemoteOverrides.ts";
 
 const germanCatalogNames: Record<string, string> = {
   trending_movies: "Filmtrends",
@@ -1097,9 +1098,14 @@ export function mergeCatalogs(
     const currentDefault = defaultCatalogs.find(
       (candidate) => candidate.id === catalog.id,
     );
-    return {
+    const withDefault: CatalogConfig = {
       ...catalog,
       ...(currentDefault && catalog.isPreinstalled ? currentDefault : {}),
+    };
+    return {
+      ...(currentDefault && catalog.isPreinstalled
+        ? applyRemoteCatalogOverrides(withDefault, catalog)
+        : withDefault),
       ...(catalog.remoteManaged ? {
         remoteManaged: true,
         ...(catalog.remoteTitle ? { name: catalog.remoteTitle, title: catalog.remoteTitle, remoteTitle: catalog.remoteTitle } : {}),
