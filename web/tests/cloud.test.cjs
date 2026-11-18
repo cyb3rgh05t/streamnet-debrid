@@ -311,3 +311,13 @@ test("an Android home server value still maps to web settings", async () => {
     ],
   );
 });
+
+test("the streaming region syncs between Android and web and a missing value leaves the web choice alone", async () => {
+  const { settingsFromAndroidProfile } = await import(moduleUrl);
+
+  assert.equal(settingsFromAndroidProfile({ streamingRegion: "at" }).streamingRegion, "AT");
+  assert.equal(settingsFromAndroidProfile({ streamingRegion: "auto" }).streamingRegion, "auto");
+  assert.equal(settingsFromAndroidProfile({ streamingRegion: "ZZ" }).streamingRegion, "auto");
+  assert.equal("streamingRegion" in settingsFromAndroidProfile({ streamingRegion: null }), false);
+  assert.equal("streamingRegion" in settingsFromAndroidProfile({}), false);
+});

@@ -165,27 +165,19 @@ function providerSource(
   };
 }
 
-function serviceSources(
-  addonCatalogId: string,
-  providerId: number,
-  extraProviderIds: number[] = [],
-) {
-  return [
-    addonSource("aio-metadata", "series", addonCatalogId),
-    ...[providerId, ...extraProviderIds].flatMap((id) => [
-      providerSource("movie", id),
-      providerSource("series", id),
-    ]),
-  ];
+function serviceSources(providerId: number, extraProviderIds: number[] = []) {
+  return [providerId, ...extraProviderIds].flatMap((id) => [
+    providerSource("movie", id),
+    providerSource("series", id),
+  ]);
 }
 
-function mdblistAddonSource(
-  addonCatalogType: "movie" | "series" | "all",
-  addonCatalogId: string,
+// Only used while the collection's addon sources return nothing (see loadCollectionCatalog).
+function addonFallbackSource(
+  source: NonNullable<CatalogConfig["collectionSources"]>[number],
 ) {
-  return addonSource("aio-metadata", addonCatalogType, addonCatalogId);
+  return { ...source, addonFallback: true };
 }
-
 function mdblistPublicSource(
   mdblistSlug: string,
   collectionTab?: "movie" | "series" | "timeline",
@@ -496,17 +488,6 @@ const androidCollectionDefaults: CatalogConfig[] = [
   collectionRail("MOVIE_GENRE", "Movie Genres"),
   collectionRail("TV_GENRE", "TV Genres"),
   collectionRail("FRANCHISE", "Franchises"),
-  ...["Latest Movies", "Latest Shows", "Trending Movies", "Trending Shows"].map(
-    (title) => {
-      const sources = {
-        "Latest Movies": [mdblistAddonSource("movie", "mdblist.86934")],
-        "Latest Shows": [mdblistAddonSource("series", "mdblist.86710")],
-        "Trending Movies": [mdblistAddonSource("movie", "mdblist.87667")],
-        "Trending Shows": [mdblistAddonSource("series", "mdblist.88434")],
-      }[title];
-      return collectionDefault(title, "FEATURED", sources);
-    },
-  ),
   ...[
     "Netflix",
     "Disney+",
@@ -523,40 +504,24 @@ const androidCollectionDefaults: CatalogConfig[] = [
     "Crunchyroll",
   ].map((title) => {
     const sources = {
-      Netflix: serviceSources("streaming.nfx", 8),
-      "Disney+": serviceSources("streaming.dnp", 337),
-      "Apple TV+": serviceSources("streaming.atp", 350),
-      "Prime Video": serviceSources("streaming.amp", 9),
-      "HBO Max": serviceSources("streaming.hbm", 1899),
-      Hulu: serviceSources("streaming.hlu", 15),
-      "Paramount+": serviceSources("streaming.pmp", 2303, [2616]),
-      Peacock: serviceSources("streaming.pcp", 386, [387]),
-      Starz: serviceSources("streaming.sta", 43),
-      Shudder: [
-        mdblistAddonSource("movie", "mdblist.8862"),
-        mdblistAddonSource("series", "mdblist.8861"),
-        providerSource("movie", 99),
-        providerSource("series", 99),
+      Netflix: serviceSources(8),
+      "Disney+": [
+        ...serviceSources(337),
+        mdblistPublicSource("garycrawfordgc/disney-shows"),
       ],
-      "MGM+": [
-        mdblistAddonSource("movie", "mdblist.48305"),
-        mdblistAddonSource("series", "mdblist.48306"),
-        providerSource("movie", 34),
-        providerSource("series", 34),
-      ],
-      "Discovery+": serviceSources("streaming.dpe", 520),
-      Crunchyroll: serviceSources("streaming.cru_movie", 283),
+      "Apple TV+": serviceSources(350),
+      "Prime Video": serviceSources(9),
+      "HBO Max": serviceSources(1899),
+      Hulu: serviceSources(15),
+      "Paramount+": serviceSources(2303, [2616]),
+      Peacock: serviceSources(386, [387]),
+      Starz: serviceSources(43),
+      Shudder: serviceSources(99),
+      "MGM+": serviceSources(34),
+      "Discovery+": serviceSources(520),
+      Crunchyroll: serviceSources(283),
     }[title];
-    const normalizedSources =
-      title === "Crunchyroll"
-        ? [
-            addonSource("aio-metadata", "movie", "streaming.cru_movie"),
-            addonSource("aio-metadata", "series", "streaming.cru_series"),
-            providerSource("movie", 283),
-            providerSource("series", 283),
-          ]
-        : sources;
-    return collectionDefault(title, "SERVICE", normalizedSources);
+    return collectionDefault(title, "SERVICE", sources);
   }),
   ...[
     "20's Movies",
@@ -622,29 +587,23 @@ const androidCollectionDefaults: CatalogConfig[] = [
         ),
         addonSource(
           "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-          "all",
+          "Marvel",
           "marvel-mcu",
           "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
           "timeline",
         ),
-        curatedSource(
-          marvelCuratedRefs.filter((ref) => ref.startsWith("movie:")),
-          "movie",
+        addonFallbackSource(
+          curatedSource(
+            marvelCuratedRefs.filter((ref) => ref.startsWith("movie:")),
+            "movie",
+          ),
         ),
-        {
-          kind: "TMDB_COLLECTION",
-          tmdbCollectionId: 86311,
-          collectionTab: "movie" as const,
-        },
-        curatedSource(
-          marvelCuratedRefs.filter((ref) => ref.startsWith("tv:")),
-          "series",
+        addonFallbackSource(
+          curatedSource(
+            marvelCuratedRefs.filter((ref) => ref.startsWith("tv:")),
+            "series",
+          ),
         ),
-        mdblistPublicSource(
-          "lt3dave/marvel-cinematic-universe-mcu-collection",
-          "movie",
-        ),
-        mdblistPublicSource("at0microuton/mcu-tv-shows", "series"),
       ],
       "DC Universe": [
         addonSource(
@@ -663,7 +622,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
         ),
         addonSource(
           "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-          "all",
+          "DC",
           "dc-chronological",
           "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
           "timeline",
@@ -695,7 +654,7 @@ const androidCollectionDefaults: CatalogConfig[] = [
         ),
         addonSource(
           "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-          "all",
+          "StarWars",
           "sw-movies-series-chronological",
           "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
           "timeline",
@@ -713,47 +672,33 @@ const androidCollectionDefaults: CatalogConfig[] = [
           "timeline",
         ),
       ],
-      "James Bond": [
-        mdblistAddonSource("movie", "mdblist.7947"),
-        { kind: "TMDB_COLLECTION", tmdbCollectionId: 645 },
-      ],
+      "James Bond": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 645 }],
       "Fast & Furious": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 9485 }],
       "Harry Potter": [
-        mdblistAddonSource("movie", "mdblist.102972"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 1241 },
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 435259 },
         mdblistPublicSource("thebirdod/harry-potter-collection"),
+        curatedSource(["tv:224377"]),
       ],
       "Alien vs Predator": [
-        mdblistAddonSource("all", "mdblist.101434"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 8091 },
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 399 },
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 115762 },
       ],
       "Pirates of the Caribbean": [
-        mdblistAddonSource("movie", "mdblist.82145"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 295 },
       ],
-      Terminator: [
-        mdblistAddonSource("all", "mdblist.125458"),
-        { kind: "TMDB_COLLECTION", tmdbCollectionId: 528 },
-      ],
+      Terminator: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 528 }],
       "Mission Impossible": [
-        mdblistAddonSource("movie", "mdblist.42716"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 87359 },
       ],
-      "Jurassic Park": [
-        mdblistAddonSource("all", "mdblist.120197"),
-        { kind: "TMDB_COLLECTION", tmdbCollectionId: 328 },
-      ],
-      "The Matrix": [
-        mdblistAddonSource("movie", "mdblist.125142"),
-        { kind: "TMDB_COLLECTION", tmdbCollectionId: 2344 },
-      ],
+      "Jurassic Park": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 328 }],
+      "The Matrix": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 2344 }],
       "Lord of the Rings": [
-        mdblistAddonSource("movie", "mdblist.94304"),
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 119 },
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 121938 },
+        mdblistPublicSource("spudhead15/lord-of-the-rings-and-hobbit-collection"),
+        curatedSource(["tv:84773"]), // The Lord of the Rings: The Rings of Power
       ],
       "X-Men": [
         { kind: "TMDB_COLLECTION", tmdbCollectionId: 748 },
@@ -977,6 +922,11 @@ defaultCatalogs.sort(
 );
 
 const retiredWebCatalogIds = new Set([
+  // Featured collections: never shown on Home, replaced by the regular trending/latest rails.
+  "collection_featured_latest_movies",
+  "collection_featured_latest_shows",
+  "collection_featured_trending_movies",
+  "collection_featured_trending_shows",
   "latest_tv",
   "action",
   "comedy",

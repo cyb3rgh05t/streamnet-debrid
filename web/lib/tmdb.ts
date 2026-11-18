@@ -10,6 +10,11 @@ import type {
 } from "./metadata/types";
 import { tmdbImageUrl } from "./mediaImages";
 import { loadStored, saveStored } from "./storage";
+import {
+  STREAMING_REGION_AUTO,
+  effectiveStreamingRegion,
+  normalizeStreamingRegionSetting,
+} from "./streamingRegion";
 import { TraktClient } from "./trakt";
 import type {
   CatalogConfig,
@@ -117,9 +122,14 @@ const TMDB_CATALOG_PAGE_LIMIT = 10;
 const HYDRATE_BATCH_SIZE = 24;
 const CATALOG_FIRST_PAINT_LIMIT = 96;
 let activeTmdbLanguage = "de-DE";
+let activeStreamingRegionSetting: string = STREAMING_REGION_AUTO;
 
 export function setTmdbLanguage(language: "de-DE" | "en-US"): void {
   activeTmdbLanguage = language;
+}
+
+export function setTmdbStreamingRegion(setting: string): void {
+  activeStreamingRegionSetting = normalizeStreamingRegionSetting(setting);
 }
 
 type TmdbPersonResponse = {
@@ -549,29 +559,38 @@ async function loadCollectionCatalog(
       return loadMdblist(catalog, language);
     return [];
   }
+  const loadSource = (source: CollectionSourceConfig) =>
+    loadCollectionSource(source, language, addons, homeServers).catch(
+      () => [] as MediaItem[],
+    );
+  const primary = sources.map((source) =>
+    source.addonFallback ? null : loadSource(source),
+  );
+  const primaryBatches = await Promise.all(primary);
+  const addonAnswered = sources.some(
+    (source, index) =>
+      !source.addonFallback &&
+      String(source.kind ?? "").toUpperCase() === "ADDON_CATALOG" &&
+      (primaryBatches[index]?.length ?? 0) > 0,
+  );
   const batches = await Promise.all(
-    sources.map((source) =>
-      loadCollectionSource(source, language, addons, homeServers).catch(
-        () => [],
-      ),
-    ),
+    sources.map(async (source, index) => {
+      if (!source.addonFallback) return primaryBatches[index] ?? [];
+      return addonAnswered ? [] : loadSource(source);
+    }),
   );
   const items = dedupeItems(batches.flat()).map((item) =>
     item.image || !catalog.collectionCoverImageUrl
       ? item
       : { ...item, image: catalog.collectionCoverImageUrl },
   );
-  const hasCuratedSource = sources.some(
-    (source) =>
-      String(source.kind ?? "").toUpperCase() === "CURATED_IDS" &&
-      !source.remoteExtra,
-  );
+  // Franchises without a timeline list in release order, like the Android app (a curated title such as
+  // a spin-off series must not switch them to popularity order).
   const hasTimelineSource = sources.some(
     (source) => source.collectionTab === "timeline",
   );
   if (
     String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE" &&
-    !hasCuratedSource &&
     !hasTimelineSource
   ) {
     return items.sort((left, right) =>
@@ -703,27 +722,33 @@ async function loadCollectionSource(
     );
   }
   if (kind === "TMDB_WATCH_PROVIDER" && source.tmdbWatchProviderId) {
-    return loadTmdbCatalogPages(
-      {
-        id: `collection-provider-${source.tmdbWatchProviderId}`,
-        name: String(source.tmdbWatchProviderId),
-        sourceType: "tmdb",
-        mediaType,
-        endpoint: `discover/${mediaType === "tv" ? "tv" : "movie"}`,
-        enabled: true,
-        params: {
-          language,
-          watch_region: source.watchRegion || "US",
-          with_watch_providers: source.tmdbWatchProviderId,
-          sort_by: source.sortBy || "popularity.desc",
+    const providerId = source.tmdbWatchProviderId;
+    const loadForRegion = (region: string) =>
+      loadTmdbCatalogPages(
+        {
+          id: `collection-provider-${providerId}-${region}`,
+          name: String(providerId),
+          sourceType: "tmdb",
+          mediaType,
+          endpoint: `discover/${mediaType === "tv" ? "tv" : "movie"}`,
+          enabled: true,
+          params: {
+            language,
+            watch_region: region,
+            with_watch_providers: providerId,
+            sort_by: source.sortBy || "popularity.desc",
+          },
         },
-      },
-      language,
-    ).then((items) =>
-      items.map((item) =>
-        mapTmdbItem(item, mediaType === "tv" ? "tv" : "movie"),
-      ),
-    );
+        language,
+      ).then((items) =>
+        items.map((item) =>
+          mapTmdbItem(item, mediaType === "tv" ? "tv" : "movie"),
+        ),
+      );
+    const region = watchRegionForLanguage(language);
+    const items = await loadForRegion(region);
+    // Services not offered in the user's country fall back to the US catalog.
+    return items.length || region === "US" ? items : loadForRegion("US");
   }
   if (kind === "ADDON_CATALOG") {
     return loadAddonCatalog(
@@ -756,6 +781,14 @@ async function loadCollectionSource(
     return rows.flatMap((r) => r.items);
   }
   return [];
+}
+
+/** TMDB watch region for streaming-service collections: the user's choice, else the language's country. */
+export function watchRegionForLanguage(
+  language: string,
+  setting: string = activeStreamingRegionSetting,
+) {
+  return effectiveStreamingRegion(setting, language);
 }
 
 function sourceMediaType(source: CollectionSourceConfig): MediaType | "all" {

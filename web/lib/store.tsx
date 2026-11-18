@@ -105,6 +105,7 @@ import {
   searchMedia,
   resolveTmdbId,
   setTmdbLanguage,
+  setTmdbStreamingRegion,
 } from "./tmdb";
 import { verifyProfilePin } from "./profilePin";
 import { hydratedProfileId } from "./profiles";
@@ -319,6 +320,7 @@ export const defaultSettings: AppSettings = {
   defaultSubtitle: "en",
   secondarySubtitle: "",
   audioLanguage: "",
+  streamingRegion: "auto",
   subtitleSize: 100,
   subtitleColor: "#ffffff",
   subtitleColorName: "White",
@@ -2632,6 +2634,10 @@ export function AppProvider({
   useEffect(() => {
     setTmdbLanguage(settings.uiLanguage === "en" ? "en-US" : "de-DE");
   }, [settings.uiLanguage]);
+
+  useEffect(() => {
+    setTmdbStreamingRegion(settings.streamingRegion);
+  }, [settings.streamingRegion]);
 
   const isWatched = useCallback(
     (

@@ -1,0 +1,96 @@
+recent_tv | Recently Watched TV | STANDARD |  |  | 
+favorite_tv | Favorite TV | STANDARD |  |  | 
+collection_rail_service | Streaming Services | COLLECTION_RAIL | SERVICE |  | 
+collection_rail_franchise | Franchises | COLLECTION_RAIL | FRANCHISE |  | 
+collection_rail_decade | Decades | COLLECTION_RAIL | DECADE |  | 
+trending_movies | Trending in Movies | STANDARD |  | https://mdblist.com/lists/snoak/trending-movies | 
+top10_movies_today | Top 10 Movies Today | STANDARD |  | https://mdblist.com/lists/snoak/most-popular-movies-on-rotten-tomatoes | 
+top_movies_week | Top Movies This Week | STANDARD |  | https://mdblist.com/lists/linaspurinis/top-watched-movies-of-the-week | 
+collection_rail_movie_genre | Movie Genres | COLLECTION_RAIL | MOVIE_GENRE |  | 
+trending_tv | Trending in Shows | STANDARD |  | https://mdblist.com/lists/snoak/trakt-s-trending-shows | 
+top10_shows_today | Top 10 Shows Today | STANDARD |  | https://mdblist.com/lists/snoak/most-popular-shows-on-rotten-tomatoes | 
+collection_rail_tv_genre | TV Genres | COLLECTION_RAIL | TV_GENRE |  | 
+trending_anime | Trending in Anime | STANDARD |  | https://mdblist.com/lists/snoak/trending-anime-shows | 
+new_kdramas | New in K-Dramas | STANDARD |  | https://mdblist.com/lists/snoak/latest-kdrama-shows | 
+coming_soon | Upcoming Movies | STANDARD |  | https://mdblist.com/lists/snoak/upcoming-movies | 
+upcoming_series | Upcoming Series | STANDARD |  | https://mdblist.com/lists/snoak/latest-tv-shows | 
+just_added | Just Added | STANDARD |  | https://mdblist.com/lists/snoak/latest-movies-digital-release | 
+recently_watched_movies | Recently Watched Movies | STANDARD |  |  | 
+recently_watched_series | Recently Watched Series | STANDARD |  |  | 
+collection_service_netflix | Netflix | COLLECTION | SERVICE |  | provider:8:movie ; provider:8:series
+collection_service_disneyplus | Disney+ | COLLECTION | SERVICE |  | mdblist:garycrawfordgc/disney-shows ; provider:337:movie ; provider:337:series
+collection_service_apple_tvplus | Apple TV+ | COLLECTION | SERVICE |  | provider:350:movie ; provider:350:series
+collection_service_prime_video | Prime Video | COLLECTION | SERVICE |  | provider:9:movie ; provider:9:series
+collection_service_hbo_max | HBO Max | COLLECTION | SERVICE |  | provider:1899:movie ; provider:1899:series
+collection_service_hulu | Hulu | COLLECTION | SERVICE |  | provider:15:movie ; provider:15:series
+collection_service_paramountplus | Paramount+ | COLLECTION | SERVICE |  | provider:2303:movie ; provider:2303:series ; provider:2616:movie ; provider:2616:series
+collection_service_peacock | Peacock | COLLECTION | SERVICE |  | provider:386:movie ; provider:386:series ; provider:387:movie ; provider:387:series
+collection_service_starz | Starz | COLLECTION | SERVICE |  | provider:43:movie ; provider:43:series
+collection_service_shudder | Shudder | COLLECTION | SERVICE |  | provider:99:movie ; provider:99:series
+collection_service_mgmplus | MGM+ | COLLECTION | SERVICE |  | provider:34:movie ; provider:34:series
+collection_service_discoveryplus | Discovery+ | COLLECTION | SERVICE |  | provider:520:movie ; provider:520:series
+collection_service_crunchyroll | Crunchyroll | COLLECTION | SERVICE |  | provider:283:movie ; provider:283:series
+collection_decade_20s_movies | 20's Movies | COLLECTION | DECADE |  | mdblist:snoak/top-2020s-movies
+collection_decade_10s_movies | 10's Movies | COLLECTION | DECADE |  | mdblist:snoak/top-2010s-movies
+collection_decade_00s_movies | 00's Movies | COLLECTION | DECADE |  | mdblist:snoak/top-2000s-movies
+collection_decade_90s_movies | 90's Movies | COLLECTION | DECADE |  | mdblist:snoak/top-1990s-movies
+collection_decade_80s_movies | 80's Movies | COLLECTION | DECADE |  | mdblist:snoak/top-1980s-movies
+collection_decade_70s_movies | 70's Movies | COLLECTION | DECADE |  | mdblist:snoak/popular-1970s-movies
+collection_decade_60s_movies | 60's Movies | COLLECTION | DECADE |  | mdblist:snoak/popular-1960s-movies
+collection_franchise_marvel | Marvel | COLLECTION | FRANCHISE |  | addon:Marvel/marvel-mcu@timeline@https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json ; addon:movie/movies@movie@https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json ; addon:series/series@series@https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json ; curated+fallback:movie:100402,movie:10138,movie:10195,movie:102899,movie:118340,movie:1724,movie:1726,movie:1771,movie:24428,movie:271110,movie:283995,movie:284052,movie:284053,movie:284054,movie:299534,movie:299536,movie:299537,movie:315635,movie:363088,movie:429617,movie:447365,movie:453395,movie:497698,movie:505642,movie:524434,movie:533535,movie:566525,movie:609681,movie:616037,movie:617126,movie:634649,movie:640146,movie:68721,movie:76338,movie:822119,movie:986056,movie:99861,tv:114471,tv:114472,tv:138501,tv:202412,tv:202555,tv:84958,tv:85271,tv:88329,tv:88396,tv:92749,tv:92782,tv:92783,tv:92785
+collection_franchise_dc_universe | DC Universe | COLLECTION | FRANCHISE |  | addon:DC/dc-chronological@timeline@https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json ; addon:movie/dc-movies@movie@https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json ; addon:series/dc-series@series@https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json ; curated:movie:1287536,movie:141052,movie:209112,movie:287947,movie:297761,movie:297762,movie:297802,movie:298618,movie:414906,movie:436270,movie:464052,movie:475557,movie:49521,movie:495764,movie:565770,movie:572802,movie:594767,movie:698687,movie:791373,tv:105248,tv:116244,tv:1412,tv:1435,tv:60735,tv:62286,tv:62688 ; mdblist:kraftynic/dc-tv-shows1
+collection_franchise_star_wars | Star Wars | COLLECTION | FRANCHISE |  | addon:StarWars/sw-movies-series-chronological@timeline@https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json ; addon:movie/movies@movie@https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json ; addon:series/series@series@https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json ; curated:movie:11,movie:12180,movie:140607,movie:181808,movie:181812,movie:1891,movie:1892,movie:1893,movie:1894,movie:1895,movie:330459,movie:348350,tv:105971,tv:114410,tv:114461,tv:114479,tv:115036,tv:202879,tv:203085,tv:251091,tv:4194,tv:60554,tv:79093,tv:82856,tv:83867,tv:92830 ; mdblist:jxduffy/star-wars-chronological-order
+collection_franchise_james_bond | James Bond | COLLECTION | FRANCHISE |  | tmdbCollection:645
+collection_franchise_fast_and_furious | Fast & Furious | COLLECTION | FRANCHISE |  | tmdbCollection:9485
+collection_franchise_harry_potter | Harry Potter | COLLECTION | FRANCHISE |  | curated:tv:224377 ; mdblist:thebirdod/harry-potter-collection ; tmdbCollection:1241 ; tmdbCollection:435259
+collection_franchise_alien_vs_predator | Alien vs Predator | COLLECTION | FRANCHISE |  | tmdbCollection:115762 ; tmdbCollection:399 ; tmdbCollection:8091
+collection_franchise_pirates_of_the_caribbean | Pirates of the Caribbean | COLLECTION | FRANCHISE |  | tmdbCollection:295
+collection_franchise_terminator | Terminator | COLLECTION | FRANCHISE |  | tmdbCollection:528
+collection_franchise_mission_impossible | Mission Impossible | COLLECTION | FRANCHISE |  | tmdbCollection:87359
+collection_franchise_jurassic_park | Jurassic Park | COLLECTION | FRANCHISE |  | tmdbCollection:328
+collection_franchise_the_matrix | The Matrix | COLLECTION | FRANCHISE |  | tmdbCollection:2344
+collection_franchise_lord_of_the_rings | Lord of the Rings | COLLECTION | FRANCHISE |  | curated:tv:84773 ; mdblist:spudhead15/lord-of-the-rings-and-hobbit-collection ; tmdbCollection:119 ; tmdbCollection:121938
+collection_franchise_x_men | X-Men | COLLECTION | FRANCHISE |  | mdblist:jxduffy/x-men-chronological-order ; tmdbCollection:453993 ; tmdbCollection:556 ; tmdbCollection:748
+collection_franchise_hunger_games | Hunger Games | COLLECTION | FRANCHISE |  | tmdbCollection:131635
+collection_franchise_avatar | Avatar | COLLECTION | FRANCHISE |  | tmdbCollection:87096
+collection_franchise_dune | Dune | COLLECTION | FRANCHISE |  | tmdbCollection:726871
+collection_franchise_indiana_jones | Indiana Jones | COLLECTION | FRANCHISE |  | tmdbCollection:84
+collection_franchise_the_godfather | The Godfather | COLLECTION | FRANCHISE |  | tmdbCollection:230
+collection_franchise_john_wick | John Wick | COLLECTION | FRANCHISE |  | tmdbCollection:404609
+collection_franchise_transformers | Transformers | COLLECTION | FRANCHISE |  | tmdbCollection:8650
+collection_franchise_scream | Scream | COLLECTION | FRANCHISE |  | tmdbCollection:2602
+collection_movie_genre_action | Action | COLLECTION | MOVIE_GENRE |  | genre:28:movie
+collection_movie_genre_adventure | Adventure | COLLECTION | MOVIE_GENRE |  | genre:12:movie
+collection_movie_genre_animation | Animation | COLLECTION | MOVIE_GENRE |  | genre:16:movie
+collection_movie_genre_comedy | Comedy | COLLECTION | MOVIE_GENRE |  | genre:35:movie
+collection_movie_genre_crime | Crime | COLLECTION | MOVIE_GENRE |  | genre:80:movie
+collection_movie_genre_documentary | Documentary | COLLECTION | MOVIE_GENRE |  | genre:99:movie
+collection_movie_genre_drama | Drama | COLLECTION | MOVIE_GENRE |  | genre:18:movie
+collection_movie_genre_family | Family | COLLECTION | MOVIE_GENRE |  | genre:10751:movie
+collection_movie_genre_fantasy | Fantasy | COLLECTION | MOVIE_GENRE |  | genre:14:movie
+collection_movie_genre_history | History | COLLECTION | MOVIE_GENRE |  | genre:36:movie
+collection_movie_genre_horror | Horror | COLLECTION | MOVIE_GENRE |  | genre:27:movie
+collection_movie_genre_music | Music | COLLECTION | MOVIE_GENRE |  | genre:10402:movie
+collection_movie_genre_mystery | Mystery | COLLECTION | MOVIE_GENRE |  | genre:9648:movie
+collection_movie_genre_romance | Romance | COLLECTION | MOVIE_GENRE |  | genre:10749:movie
+collection_movie_genre_science_fiction | Science Fiction | COLLECTION | MOVIE_GENRE |  | genre:878:movie
+collection_movie_genre_tv_movie | TV Movie | COLLECTION | MOVIE_GENRE |  | genre:10770:movie
+collection_movie_genre_thriller | Thriller | COLLECTION | MOVIE_GENRE |  | genre:53:movie
+collection_movie_genre_war | War | COLLECTION | MOVIE_GENRE |  | genre:10752:movie
+collection_movie_genre_western | Western | COLLECTION | MOVIE_GENRE |  | genre:37:movie
+collection_tv_genre_action_and_adventure | Action & Adventure | COLLECTION | TV_GENRE |  | genre:10759:series
+collection_tv_genre_animation | Animation | COLLECTION | TV_GENRE |  | genre:16:series
+collection_tv_genre_comedy | Comedy | COLLECTION | TV_GENRE |  | genre:35:series
+collection_tv_genre_crime | Crime | COLLECTION | TV_GENRE |  | genre:80:series
+collection_tv_genre_documentary | Documentary | COLLECTION | TV_GENRE |  | genre:99:series
+collection_tv_genre_drama | Drama | COLLECTION | TV_GENRE |  | genre:18:series
+collection_tv_genre_family | Family | COLLECTION | TV_GENRE |  | genre:10751:series
+collection_tv_genre_kids | Kids | COLLECTION | TV_GENRE |  | genre:10762:series
+collection_tv_genre_mystery | Mystery | COLLECTION | TV_GENRE |  | genre:9648:series
+collection_tv_genre_news | News | COLLECTION | TV_GENRE |  | genre:10763:series
+collection_tv_genre_reality | Reality | COLLECTION | TV_GENRE |  | genre:10764:series
+collection_tv_genre_sci_fi_and_fantasy | Sci-Fi & Fantasy | COLLECTION | TV_GENRE |  | genre:10765:series
+collection_tv_genre_soap | Soap | COLLECTION | TV_GENRE |  | genre:10766:series
+collection_tv_genre_talk | Talk | COLLECTION | TV_GENRE |  | genre:10767:series
+collection_tv_genre_war_and_politics | War & Politics | COLLECTION | TV_GENRE |  | genre:10768:series
+collection_tv_genre_western | Western | COLLECTION | TV_GENRE |  | genre:37:series

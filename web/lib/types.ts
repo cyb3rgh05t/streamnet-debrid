@@ -216,6 +216,8 @@ export interface CollectionSourceConfig {
   homeServerLibraryKey?: string | null;
   // Set on the source the admin's added titles produce; it must not switch a franchise to popularity order.
   remoteExtra?: boolean;
+  // Only resolved while none of the collection's addon sources returned titles.
+  addonFallback?: boolean;
 }
 
 export interface StreamBehaviorHints {
@@ -520,6 +522,8 @@ export interface AppSettings {
   defaultSubtitle: string;
   secondarySubtitle: string;
   audioLanguage: string;
+  // "auto" (country of the language) or an ISO country code; synced with the Android app.
+  streamingRegion: string;
   // Subtitles
   subtitleSize: number;
   subtitleColor: string;

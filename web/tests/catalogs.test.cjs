@@ -103,7 +103,7 @@ test("catalog migration removes retired rows and adds current Android defaults",
   ]);
   const ids = catalogs.map((catalog) => catalog.id);
 
-  assert.equal(ids.includes("collection_featured_latest_movies"), true);
+  assert.equal(ids.includes("collection_featured_latest_movies"), false);
   assert.equal(ids.includes("collection_decade_1990s"), false);
   assert.equal(ids.includes("action"), false);
   assert.equal(ids.includes("custom_keep"), true);
@@ -142,7 +142,7 @@ test("Decades Home rail uses the same German label as Android", async () => {
 test("Web fallback catalogs follow the current Android order", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
 
-  assert.equal(defaultCatalogs.length, 100);
+  assert.equal(defaultCatalogs.length, 96);
   assert.deepEqual(
     defaultCatalogs.slice(0, 15).map((catalog) => catalog.id),
     [
@@ -260,23 +260,18 @@ test("Marvel release-order sources and chronology timeline retain fallbacks", as
       (source) =>
         source.kind === "ADDON_CATALOG" &&
         source.addonCatalogId === "marvel-mcu" &&
-        source.addonCatalogType === "all" &&
+        source.addonCatalogType === "Marvel" &&
         source.collectionTab === "timeline",
     ),
     true,
   );
   assert.equal(
-    sources.some((source) => source.kind === "CURATED_IDS"),
+    sources.some((source) => source.kind === "CURATED_IDS" && source.addonFallback),
     true,
   );
   assert.equal(
-    sources.some(
-      (source) =>
-        source.kind === "MDBLIST_PUBLIC" &&
-        source.mdblistSlug ===
-          "lt3dave/marvel-cinematic-universe-mcu-collection",
-    ),
-    true,
+    sources.some((source) => source.kind === "MDBLIST_PUBLIC"),
+    false,
   );
 });
 
@@ -287,6 +282,7 @@ test("DC and Star Wars use their MystreamNet chronological manifests", async () 
       id: "collection_franchise_dc_universe",
       manifestId: "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
       catalogId: "dc-chronological",
+      catalogType: "DC",
       manifestUrl:
         "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
     },
@@ -295,6 +291,7 @@ test("DC and Star Wars use their MystreamNet chronological manifests", async () 
       manifestId:
         "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
       catalogId: "sw-movies-series-chronological",
+      catalogType: "StarWars",
       manifestUrl:
         "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
     },
@@ -310,7 +307,7 @@ test("DC and Star Wars use their MystreamNet chronological manifests", async () 
     assert.equal(timeline?.kind, "ADDON_CATALOG");
     assert.equal(timeline?.addonId, expected.manifestId);
     assert.equal(timeline?.addonCatalogId, expected.catalogId);
-    assert.equal(timeline?.addonCatalogType, "all");
+    assert.equal(timeline?.addonCatalogType, expected.catalogType);
     assert.equal(timeline?.addonManifestUrl, expected.manifestUrl);
     assert.equal(
       sources.some((source) => source.collectionTab === "movie"),
@@ -558,4 +555,42 @@ test("catalogs without a row override inherit the global card layout", async () 
   assert.equal(resolveRailPosterMode("landscape"), false);
   assert.equal(resolveRailPosterMode("poster", false), false);
   assert.equal(resolveRailPosterMode("landscape", true), true);
+});
+
+test("standard collections do not depend on addons the user has to install", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  for (const catalog of defaultCatalogs.filter((c) => c.kind === "COLLECTION")) {
+    for (const source of catalog.collectionSources ?? []) {
+      if (source.kind !== "ADDON_CATALOG") continue;
+      assert.ok(source.addonManifestUrl, `${catalog.id} needs an installed addon`);
+    }
+  }
+});
+
+test("Marvel's list fallback only runs while its own addon is down", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const marvel = defaultCatalogs.find((c) => c.id === "collection_franchise_marvel");
+  const addons = marvel.collectionSources.filter((s) => s.kind === "ADDON_CATALOG");
+  const fallbacks = marvel.collectionSources.filter((s) => s.addonFallback);
+  assert.equal(addons.length, 3);
+  assert.equal(fallbacks.length, 2);
+  assert.ok(fallbacks.every((s) => s.kind === "CURATED_IDS"));
+  assert.equal(marvel.collectionSources.length, 5);
+});
+
+test("streaming services use the country of the language as watch region", async () => {
+  const { watchRegionForLanguage } = await import(
+    pathToFileURL(path.resolve(__dirname, "../lib/tmdb.ts")).href
+  );
+  assert.equal(watchRegionForLanguage("de-DE"), "DE");
+  assert.equal(watchRegionForLanguage("pt-BR"), "BR");
+  assert.equal(watchRegionForLanguage("en"), "US");
+});
+test("an explicit watch region wins over the language and automatic follows the language", async () => {
+  const { watchRegionForLanguage } = await import(
+    pathToFileURL(path.resolve(__dirname, "../lib/tmdb.ts")).href
+  );
+  assert.equal(watchRegionForLanguage("de-DE", "auto"), "DE");
+  assert.equal(watchRegionForLanguage("de-DE", "ch"), "CH");
+  assert.equal(watchRegionForLanguage("en-US", "ZZ"), "US");
 });

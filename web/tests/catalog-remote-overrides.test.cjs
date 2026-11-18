@@ -46,7 +46,7 @@ test("remote-managed lists, slugs and addon catalogs replace the defaults and ma
   const badSlug = merged({ ...xmen, remoteManaged: true, remoteSlugOverrides: { "jxduffy/x-men-chronological-order": "not a slug" } });
   assert.equal(badSlug.collectionSources[slugSource].mdblistSlug, "jxduffy/x-men-chronological-order");
 
-  const lotr = byId("collection_franchise_lord_of_the_rings");
+  const lotr = byId("collection_franchise_dc_universe");
   const addonIndex = lotr.collectionSources.findIndex((source) => source.kind === "ADDON_CATALOG");
   const bundled = lotr.collectionSources[addonIndex];
   const key = `${bundled.addonCatalogType}|${bundled.addonCatalogId}`;

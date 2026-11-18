@@ -65,6 +65,12 @@ import { accentColor } from "@/lib/accent";
 import { formatTime24Hour } from "@/lib/dateTime";
 import { defaultSettings, useApp } from "@/lib/store";
 import { localize, t, translateUiText } from "@/lib/i18n";
+import {
+  STREAMING_REGION_AUTO,
+  STREAMING_REGION_CODES,
+  effectiveStreamingRegion,
+  streamingRegionDisplayName,
+} from "@/lib/streamingRegion";
 import webPackage from "../../package.json";
 import type {
   AppSettings,
@@ -884,6 +890,41 @@ function SectionBody({ section }: { section: SectionId }) {
                 ? "Deutsch (Fallback: Englisch)"
                 : "English"}
             </span>
+          </Row>
+          <Row
+            label={
+              settings.uiLanguage === "de"
+                ? "Streaming-Region"
+                : "Streaming region"
+            }
+            hint={
+              settings.uiLanguage === "de"
+                ? "Land, nach dem das Angebot der Streamingdienste ermittelt wird"
+                : "Country used to find what streaming services offer"
+            }
+          >
+            <Select
+              value={settings.streamingRegion || STREAMING_REGION_AUTO}
+              onChange={(v) => set({ streamingRegion: v })}
+              options={[
+                [
+                  STREAMING_REGION_AUTO,
+                  `${settings.uiLanguage === "de" ? "Automatisch" : "Automatic"} (${streamingRegionDisplayName(
+                    effectiveStreamingRegion(
+                      STREAMING_REGION_AUTO,
+                      settings.language,
+                    ),
+                    settings.language,
+                  )})`,
+                ],
+                ...STREAMING_REGION_CODES.map(
+                  (code): [string, string] => [
+                    code,
+                    streamingRegionDisplayName(code, settings.language),
+                  ],
+                ),
+              ]}
+            />
           </Row>
           <Row
             label={

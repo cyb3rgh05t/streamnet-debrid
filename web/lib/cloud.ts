@@ -12,6 +12,7 @@ import { mergeTvSessions, normalizeTvSession } from "./iptvSession";
 import { normalizeIptvPlaylist as normalizeRuntimeIptvPlaylist } from "./iptv";
 import { tmdbImageUrl } from "./mediaImages";
 import { loadStored, saveStored } from "./storage";
+import { normalizeStreamingRegionSetting } from "./streamingRegion";
 import type { TraktToken } from "./trakt";
 import type { SimklToken } from "./simkl";
 import type { TrackingPreferences, TrackingReadMode } from "./sync";
@@ -559,6 +560,7 @@ function androidProfileSettings(settings: AppSettings) {
     defaultSubtitle: settings.defaultSubtitle || "Off",
     defaultAudioLanguage: settings.audioLanguage || "Auto (Original)",
     contentLanguage: settings.language || "en-US",
+    streamingRegion: normalizeStreamingRegionSetting(settings.streamingRegion),
     trailerAutoPlay: settings.trailerAutoPlay,
     trailerSoundEnabled: settings.trailerSound,
     trailerDelaySeconds: settings.trailerDelaySeconds,
@@ -611,6 +613,10 @@ export function settingsFromAndroidProfile(
     partial.audioLanguage = String(state.defaultAudioLanguage || "");
   if ("contentLanguage" in state)
     partial.language = String(state.contentLanguage || "en-US");
+  if ("streamingRegion" in state && state.streamingRegion != null)
+    partial.streamingRegion = normalizeStreamingRegionSetting(
+      state.streamingRegion,
+    );
   if ("trailerAutoPlay" in state)
     partial.trailerAutoPlay = Boolean(state.trailerAutoPlay);
   if ("trailerSoundEnabled" in state)
