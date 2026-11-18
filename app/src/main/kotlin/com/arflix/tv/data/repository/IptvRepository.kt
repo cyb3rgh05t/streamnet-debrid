@@ -382,6 +382,19 @@ internal fun iptvVodTitlesMatchExactly(providerName: String, queryTitle: String)
     return provider.isNotBlank() && provider == iptvVodTitleKey(queryTitle)
 }
 
+private val iptvVodSubtitleSeparator = Regex("""\s*:\s*|\s+[-–—]\s+""")
+
+/**
+ * The part of a title before its subtitle ("Supernatural: Zur Hölle mit dem Bösen" -> "supernatural"),
+ * or null when there is no subtitle or the main title is too short to be a safe key.
+ */
+internal fun iptvVodMainTitleKey(value: String): String? {
+    val head = iptvVodSubtitleSeparator.split(value.trim(), limit = 2).firstOrNull().orEmpty()
+    if (head.length == value.trim().length) return null
+    val key = iptvVodTitleKey(head)
+    return key.takeIf { it.length >= 4 && it != iptvVodTitleKey(value) }
+}
+
 private fun String.withoutInnerSequelNumber(): String {
     val tokens = split(' ')
     if (tokens.size < 3) return this
@@ -9425,6 +9438,8 @@ class IptvRepository @Inject constructor(
         val tmdbId: String? = null,
         val imdbId: String? = null,
         val year: Int? = null,
+        // Provider title without its subtitle; lets a TMDB title match "Show: Subtitle (2005)".
+        val mainTitle: String? = null,
     )
 
     data class XtreamVodAvailability(
@@ -9463,10 +9478,28 @@ class IptvRepository @Inject constructor(
                 }
                 if (hit) return true
             }
-            if (itemTitleKey.isBlank()) return false
-            return index.byTitle(type, itemTitleKey).any { key ->
-                iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId)
-                    ?: iptvVodYearsCompatible(itemYear, key.year)
+            // The localized TMDB title and the original title are both tried: a provider may list either
+            // ("Tote Mädchen lügen nicht" vs "13 Reasons Why"). Each goes through the same checks.
+            val titleKeys = listOfNotNull(
+                itemTitleKey,
+                item.originalTitle?.let(::iptvVodTitleKey),
+            ).filter { it.isNotBlank() }.distinct()
+            if (titleKeys.isEmpty()) return false
+            fun yearConfirmed(key: XtreamVodAvailabilityKey): Boolean =
+                itemYear != null && key.year != null && iptvVodYearsCompatible(itemYear, key.year) &&
+                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId) != false
+            return titleKeys.any { titleKey ->
+                val exact = index.byTitle(type, titleKey).any { key ->
+                    iptvVodIdentityMatch(itemTmdbId, itemImdbId, key.tmdbId, key.imdbId)
+                        ?: iptvVodYearsCompatible(itemYear, key.year)
+                }
+                // Provider names often carry a subtitle ("Supernatural: Zur Hölle mit dem Bösen (2005)")
+                // that TMDB titles lack, or the other way round. Match on the main title, but only when
+                // both sides state a compatible year so "Alien" never matches "Alien: Romulus".
+                exact ||
+                    index.byMainTitle(type, titleKey).any(::yearConfirmed) ||
+                    (iptvVodMainTitleKey(item.title.takeIf { titleKey == itemTitleKey } ?: item.originalTitle.orEmpty())
+                        ?.let { main -> index.byTitle(type, main).any(::yearConfirmed) } == true)
             }
         }
     }
@@ -9475,6 +9508,7 @@ class IptvRepository @Inject constructor(
         private val tmdb = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
         private val imdb = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
         private val title = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
+        private val mainTitle = HashMap<String, MutableList<XtreamVodAvailabilityKey>>()
 
         init {
             keys.forEach { key ->
@@ -9483,6 +9517,7 @@ class IptvRepository @Inject constructor(
                 if (key.normalizedTitle.isNotBlank()) {
                     title.getOrPut(slot(key.mediaType, key.normalizedTitle)) { mutableListOf() }.add(key)
                 }
+                key.mainTitle?.let { mainTitle.getOrPut(slot(key.mediaType, it)) { mutableListOf() }.add(key) }
             }
         }
 
@@ -9491,6 +9526,7 @@ class IptvRepository @Inject constructor(
         fun byTmdb(type: MediaType, id: String): List<XtreamVodAvailabilityKey> = tmdb[slot(type, id)].orEmpty()
         fun byImdb(type: MediaType, id: String): List<XtreamVodAvailabilityKey> = imdb[slot(type, id)].orEmpty()
         fun byTitle(type: MediaType, key: String): List<XtreamVodAvailabilityKey> = title[slot(type, key)].orEmpty()
+        fun byMainTitle(type: MediaType, key: String): List<XtreamVodAvailabilityKey> = mainTitle[slot(type, key)].orEmpty()
     }
 
     // ── Private wire models for categories ──────────────────────────────────
@@ -9737,6 +9773,7 @@ class IptvRepository @Inject constructor(
             tmdbId = normalizeTmdbId(tmdbId),
             imdbId = normalizeImdbId(imdbId)?.takeIf { it != IptvIdSentinels.IMDB_NONE },
             year = year?.takeIf { it in 1870..2100 } ?: parseYear(title),
+            mainTitle = iptvVodMainTitleKey(title),
         )
     }
 

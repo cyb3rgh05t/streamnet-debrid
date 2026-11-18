@@ -181,6 +181,67 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `subtitle in the provider name still matches the plain TMDB title when the year agrees`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(
+                repository.xtreamVodAvailabilityKey("Supernatural: Zur Hölle mit dem Bösen (2005)", MediaType.TV)!!,
+                repository.xtreamVodAvailabilityKey("Alien: Romulus (2024)", MediaType.MOVIE)!!,
+                repository.xtreamVodAvailabilityKey("Hell - The Series (2010)", MediaType.TV)!!,
+            ),
+        )
+        assertEquals(true, availability.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.TV, year = "2005")))
+        assertEquals(true, availability.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.TV, releaseDate = "2005-09-13")))
+        // Year missing, wrong year, other media type or a conflicting id: no match.
+        assertEquals(false, availability.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.TV)))
+        assertEquals(false, availability.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.TV, year = "2012")))
+        assertEquals(false, availability.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.MOVIE, year = "2005")))
+        assertEquals(false, availability.contains(MediaItem(348, "Alien", mediaType = MediaType.MOVIE, year = "1979")))
+        // A title that merely starts with the same word is not the subtitle form.
+        assertEquals(false, availability.contains(MediaItem(1, "Hell", mediaType = MediaType.TV, year = "2012")))
+    }
+
+    @Test
+    fun `provider id decides over the subtitle match and a subtitle on the TMDB side is tolerated`() {
+        val withOtherId = IptvRepository.XtreamVodAvailability(
+            setOf(repository.xtreamVodAvailabilityKey("Supernatural: Zur Hölle mit dem Bösen (2005)", MediaType.TV, tmdbId = "999")!!),
+        )
+        assertEquals(false, withOtherId.contains(MediaItem(1622, "Supernatural", mediaType = MediaType.TV, year = "2005")))
+        val plain = IptvRepository.XtreamVodAvailability(
+            setOf(repository.xtreamVodAvailabilityKey("Supernatural (2005)", MediaType.TV)!!),
+        )
+        assertEquals(true, plain.contains(MediaItem(1622, "Supernatural: Season One", mediaType = MediaType.TV, year = "2005")))
+        assertEquals(null, iptvVodMainTitleKey("Supernatural"))
+        assertEquals(null, iptvVodMainTitleKey("DE - Film (2020)"))
+        assertEquals("supernatural", iptvVodMainTitleKey("Supernatural: Zur Hölle mit dem Bösen (2005)"))
+        assertEquals("pacific rim", iptvVodMainTitleKey("Pacific Rim – Uprising"))
+    }
+
+    @Test
+    fun `original title matches a provider that lists the original name, with the same safeguards`() {
+        val availability = IptvRepository.XtreamVodAvailability(
+            setOf(
+                repository.xtreamVodAvailabilityKey("13 Reasons Why (2017)", MediaType.TV)!!,
+                repository.xtreamVodAvailabilityKey("Money Heist: Part 5 (2021)", MediaType.TV)!!,
+            ),
+        )
+        val localized = MediaItem(
+            1, "Tote Mädchen lügen nicht", mediaType = MediaType.TV, year = "2017", originalTitle = "13 Reasons Why",
+        )
+        assertEquals(true, availability.contains(localized))
+        assertEquals(false, availability.contains(localized.copy(originalTitle = null)))
+        // Same names do not make another year match, and another media type never matches.
+        assertEquals(true, availability.contains(localized.copy(year = "2018")))
+        assertEquals(false, availability.contains(localized.copy(year = "2010")))
+        assertEquals(false, availability.contains(localized.copy(mediaType = MediaType.MOVIE)))
+        // Original title with a subtitle on the provider side still needs the year.
+        val heist = MediaItem(2, "Haus des Geldes", mediaType = MediaType.TV, year = "2021", originalTitle = "Money Heist")
+        assertEquals(true, availability.contains(heist))
+        assertEquals(false, availability.contains(heist.copy(year = "")))
+        // Scripts that normalize to nothing are ignored instead of matching everything.
+        assertEquals(false, availability.contains(MediaItem(3, "Anime", mediaType = MediaType.TV, year = "2017", originalTitle = "進撃の巨人")))
+    }
+
+    @Test
     fun `indexed availability gives the same answer as the per-key reference on mixed data`() {
         val rnd = java.util.Random(42)
         val titles = listOf("alpha", "beta", "gamma", "delta", "the matrix", "heat", "ronin", "up")

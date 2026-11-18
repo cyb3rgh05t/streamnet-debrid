@@ -4,6 +4,17 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.016] - 2026-11-18
+
+- Android-Version: `2.6.016` / Code `517`.
+- Android, Suche und Home im reinen IPTV-Modus: Titel, die im Anbieterkatalog vorhanden sind, wurden teils nicht gefunden (Beispiel: die Serie „Supernatural“). Der Anbieter nennt sie „Supernatural: Zur Hölle mit dem Bösen (2005)“, TMDB „Supernatural“; der Abgleich verglich nur den ganzen Titel. Im geprüften Anbieterkatalog hat keine der 2606 Serien eine TMDB- oder IMDb-ID, der Abgleich hängt daher am Titel und Jahr. Neu:
+  - Der Haupttitel vor dem Untertitel („Titel: Untertitel“ oder „Titel – Untertitel“) wird verglichen, in beide Richtungen. Das gilt nur, wenn beide Seiten ein Jahr haben, das höchstens 1 abweicht, und eine vorhandene ID nicht widerspricht. „Alien“ trifft damit nicht „Alien: Romulus“. Haupttitel unter 4 Zeichen zählen nicht.
+  - Der TMDB-Originaltitel wird zusätzlich zum lokalisierten Titel verglichen (z. B. „Tote Mädchen lügen nicht“ gegen „13 Reasons Why (2017)“). Er kommt aus den TMDB-Listen und braucht keine zusätzliche Abfrage; `MediaItem` hat dafür das neue optionale Feld `originalTitle`. Titel in Schriften, die zu nichts normalisieren, werden ignoriert.
+  - Gleiche Regeln für Suche, Home-Reihen und Discover. Grenze: Heißt ein Titel beim Anbieter komplett anders (eigene Übersetzung, Zusatzwörter) und ist auch der Originaltitel anders, wird er weiter nicht gefunden.
+- Android-Validierung: 935 Unit-Tests ohne Fehler, davon einer übersprungen, darunter neue Tests für Untertitel, Originaltitel und Falschtreffer. Auf dem Emulator erscheint „Supernatural“ nach dem Untertitel-Fix in der Suche; der Originaltitel-Fall wurde nur per Test geprüft. Nicht geprüft: echte TV-Hardware.
+- Media3 bleibt unverändert auf 1.10.1. Die Untersuchung zum Rauschen bei VOD-Ton (Google TV Streamer) ist offen und in dieser Version nicht geändert.
+- Backend und Web unverändert.
+
 ## [Backend 1.0.049] - 2026-11-17
 
 - Adminpanel, Remote Config → Standard-Kataloge: Jeder Eintrag der Auswahl nennt jetzt die Collection (z. B. „Netflix · movie · mdblist.88328 · aio-metadata (94 Accounts)“ bzw. „Harry Potter · thebirdod/harry-potter-collection (125 Accounts)“), damit gleiche Katalog-IDs oder Listen in mehreren Collections eindeutig sind. Reine Anzeige im Admin (`admin.js`); keine Änderung an Daten, Endpunkten oder Prüfungen. Backend-Suite 165 von 166 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser nicht angesehen. Keine neue Datenbankmigration.

@@ -76,6 +76,9 @@ data class MediaItem(
     val homeServerSourceRef: String? = null,
     val homeServerProvider: String? = null,
     val homeServerImdbId: String? = null,
+    // TMDB original title, set only when it differs from `title`. Lets IPTV-only availability match a
+    // provider that lists the original (e.g. English) name while `title` is localized.
+    val originalTitle: String? = null,
 ) : Serializable
 
 internal val MediaItem.collectionCardKey: String

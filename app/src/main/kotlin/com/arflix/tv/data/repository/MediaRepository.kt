@@ -5142,7 +5142,8 @@ private fun TmdbMediaItem.toMediaItem(defaultType: MediaType): MediaItem {
         genreIds = genreIds,
         originalLanguage = originalLanguage,
         character = character ?: "",
-        popularity = popularity
+        popularity = popularity,
+        originalTitle = (originalTitle ?: originalName)?.takeIf { it.isNotBlank() }
     )
 }
 
@@ -5175,7 +5176,8 @@ internal fun TmdbMovieDetails.toMediaItem(): MediaItem {
         certification = certification.takeIf { it.isNotEmpty() },
         budget = budget,
         genreIds = genres.map { it.id },
-        popularity = popularity
+        popularity = popularity,
+        originalTitle = originalTitle?.takeIf { it.isNotBlank() }
     )
 }
 
@@ -5217,7 +5219,8 @@ internal fun TmdbMovieDetails.toMediaItem(): MediaItem {
         seriesEpisodeCount = numberOfEpisodes.takeIf { it > 0 },
         status = status,
         genreIds = genres.map { it.id },
-        popularity = popularity
+        popularity = popularity,
+        originalTitle = originalName?.takeIf { it.isNotBlank() }
     )
 }
 
