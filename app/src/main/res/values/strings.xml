@@ -195,7 +195,7 @@
     <string name="add_catalog">Add Catalog</string>
     <string name="rename_catalog">Rename Catalog</string>
     <string name="addons">Addons</string>
-    <string name="services">Services</string>
+    <string name="services">Streaming Services</string>
     <string name="genres">Genres</string>
     <string name="movie_genres">Movie Genres</string>
     <string name="tv_genres">TV Genres</string>
@@ -215,6 +215,10 @@
 
     <!-- Settings subtitles / descriptions -->
     <string name="app_language_desc">App text, titles, descriptions and metadata</string>
+    <string name="streaming_region">Streaming Region</string>
+    <string name="streaming_region_desc">Country used to find what streaming services offer</string>
+    <string name="streaming_region_auto_format">Automatic (%1$s)</string>
+    <string name="settings_help_streaming_region_desc">Decides which country\'s offering is shown in streaming-service collections such as Netflix or Disney+. Services not available there fall back to the US catalog.</string>
     <string name="subtitle_desc">Auto-select subtitle language</string>
     <string name="audio_desc">Preferred audio track</string>
     <string name="subtitle_size_desc">Text size for subtitles</string>

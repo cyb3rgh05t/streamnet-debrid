@@ -10,10 +10,13 @@ class HarryPotterCollectionTest {
     fun `Harry Potter retains film catalog and explicitly includes new TV series`() {
         val entry = CollectionTemplateManifest.entries.single { it.title == "Harry Potter" }
 
+        assertEquals(
+            setOf(1241, 435259),
+            entry.sources.filter { it.kind == CollectionSourceKind.TMDB_COLLECTION }
+                .mapNotNull { it.tmdbCollectionId }.toSet()
+        )
         assertTrue(entry.sources.any {
-            it.kind == CollectionSourceKind.ADDON_CATALOG &&
-                it.addonCatalogId == "mdblist.102972" &&
-                it.addonCatalogType == "movie"
+            it.kind == CollectionSourceKind.MDBLIST_PUBLIC && it.mdblistSlug == "thebirdod/harry-potter-collection"
         })
         assertEquals(
             listOf("tv:224377"),

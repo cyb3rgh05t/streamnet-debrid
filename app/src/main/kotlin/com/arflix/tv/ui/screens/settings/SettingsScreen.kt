@@ -215,6 +215,10 @@ import com.arflix.tv.data.repository.HomeServerCodeAuthPhase
 import com.arflix.tv.data.repository.HomeServerKind
 import com.arflix.tv.data.repository.isHomeServerVideoLibraryType
 import com.arflix.tv.data.repository.IptvRepository
+import com.arflix.tv.data.repository.STREAMING_REGION_AUTO
+import com.arflix.tv.data.repository.STREAMING_REGION_CODES
+import com.arflix.tv.data.repository.effectiveStreamingRegion
+import com.arflix.tv.data.repository.streamingRegionDisplayName
 import com.arflix.tv.data.repository.IptvPlaylistEntry
 import com.arflix.tv.data.repository.offline.OfflineDownloadItem
 import com.arflix.tv.data.repository.configuredIptvPlaylistCount
@@ -300,9 +304,22 @@ internal fun settingsSectionOrder(includePlugins: Boolean): List<String> = build
 internal fun settingsAddonIndex(rowIndex: Int, addonCount: Int): Int? =
     (rowIndex - 2).takeIf { it in 0 until addonCount }
 
+/** Picker entries as (stored value, label): the automatic choice first, then the countries by name. */
+internal fun buildStreamingRegionOptions(context: Context, contentLanguage: String): List<Pair<String, String>> {
+    val locale = java.util.Locale.forLanguageTag(contentLanguage)
+    val auto = context.getString(
+        R.string.streaming_region_auto_format,
+        streamingRegionDisplayName(effectiveStreamingRegion(STREAMING_REGION_AUTO, contentLanguage), locale)
+    )
+    val countries = STREAMING_REGION_CODES
+        .map { it to streamingRegionDisplayName(it, locale) }
+        .sortedBy { it.second }
+    return listOf(STREAMING_REGION_AUTO to auto) + countries
+}
+
 internal fun tvGeneralRowsForSection(section: String): List<Int> {
     return when (section) {
-        "language" -> listOf(0, 3, 1, 2)
+        "language" -> listOf(0, 56, 3, 1, 2)
         "subtitles" -> listOf(4, 5, 6, 7, 43, 8, 38, 39, 9)
         "ai_subtitles" -> listOf(28, 29, 30, 31, 32, 33)
         "playback" -> listOf(10, 11, 12, 13, 14, 37, 34, 16, 15, 40, 27)
@@ -564,6 +581,8 @@ fun SettingsScreen(
     var dnsProviderPickerIndex by remember { mutableIntStateOf(0) }
     var showContentLanguagePicker by remember { mutableStateOf(false) }
     var contentLanguagePickerIndex by remember { mutableIntStateOf(0) }
+    var showStreamingRegionPicker by remember { mutableStateOf(false) }
+    var streamingRegionPickerIndex by remember { mutableIntStateOf(0) }
     var showUiModeWarningDialog by remember { mutableStateOf(false) }
     var showSettingsPinSetup by remember { mutableStateOf(false) }
     var nextUiMode by remember { mutableStateOf("") }
@@ -668,6 +687,14 @@ fun SettingsScreen(
     val openContentLanguagePicker = {
         contentLanguagePickerIndex = TMDB_LANGUAGES.indexOfFirst { it.first == uiState.contentLanguage }.coerceAtLeast(0)
         showContentLanguagePicker = true
+    }
+    val streamingRegionOptions = remember(uiState.contentLanguage, context) {
+        buildStreamingRegionOptions(context, uiState.contentLanguage)
+    }
+    val streamingRegionLabel = streamingRegionOptions.firstOrNull { it.first == uiState.streamingRegion }?.second.orEmpty()
+    val openStreamingRegionPicker = {
+        streamingRegionPickerIndex = streamingRegionOptions.indexOfFirst { it.first == uiState.streamingRegion }.coerceAtLeast(0)
+        showStreamingRegionPicker = true
     }
     val openUiModeWarningDialog = {
         nextUiMode = when (uiState.deviceModeOverride) {
@@ -849,6 +876,7 @@ fun SettingsScreen(
         showAudioLanguagePicker ||
         showDnsProviderPicker ||
         showContentLanguagePicker ||
+        showStreamingRegionPicker ||
         showUiModeWarningDialog ||
         showAiModelDialog ||
         showAiApiKeyDialog ||
@@ -1118,6 +1146,7 @@ fun SettingsScreen(
                                         in tvGeneralSectionIds -> {
                                             when (tvGeneralRowsForSection(currentSection).getOrNull(contentFocusIndex)) {
                                                 0 -> openContentLanguagePicker()
+                                                56 -> openStreamingRegionPicker()
                                                 1 -> openSubtitlePicker()
                                                 2 -> openSecondarySubtitlePicker()
                                                 3 -> openAudioLanguagePicker()
@@ -1530,6 +1559,8 @@ fun SettingsScreen(
                 stremioAddons = stremioAddons,
                 onSwitchProfile = onSwitchProfile,
                 openContentLanguagePicker = openContentLanguagePicker,
+                openStreamingRegionPicker = openStreamingRegionPicker,
+                streamingRegionLabel = streamingRegionLabel,
                 openSubtitlePicker = openSubtitlePicker,
                 openSecondarySubtitlePicker = openSecondarySubtitlePicker,
                 openAudioLanguagePicker = openAudioLanguagePicker,
@@ -1721,7 +1752,9 @@ fun SettingsScreen(
                             openAudioLanguagePicker = openAudioLanguagePicker,
                             openDnsProviderPicker = openDnsProviderPicker,
                             openUiModeWarningDialog = openUiModeWarningDialog,
-                            openContentLanguagePicker = openContentLanguagePicker
+                            openContentLanguagePicker = openContentLanguagePicker,
+                            openStreamingRegionPicker = openStreamingRegionPicker,
+                            streamingRegionLabel = streamingRegionLabel
                         )
                         } // end "general" block
                         "iptv" -> if (showIptvCategoriesSettings) {
@@ -2390,6 +2423,21 @@ fun SettingsScreen(
                     showContentLanguagePicker = false
                 },
                 onDismiss = { showContentLanguagePicker = false }
+            )
+        }
+
+        if (showStreamingRegionPicker) {
+            SubtitlePickerModal(
+                title = stringResource(R.string.streaming_region),
+                options = streamingRegionOptions.map { it.second },
+                selected = streamingRegionLabel,
+                focusedIndex = streamingRegionPickerIndex,
+                onFocusChange = { streamingRegionPickerIndex = it },
+                onSelect = { label ->
+                    streamingRegionOptions.firstOrNull { it.second == label }?.first?.let(viewModel::setStreamingRegion)
+                    showStreamingRegionPicker = false
+                },
+                onDismiss = { showStreamingRegionPicker = false }
             )
         }
 
@@ -4650,6 +4698,8 @@ private fun MobileSettingsLayout(
     stremioAddons: List<com.arflix.tv.data.model.Addon>,
     onSwitchProfile: () -> Unit,
     openContentLanguagePicker: () -> Unit,
+    openStreamingRegionPicker: () -> Unit,
+    streamingRegionLabel: String,
     openSubtitlePicker: () -> Unit,
     openSecondarySubtitlePicker: () -> Unit = {},
     openAudioLanguagePicker: () -> Unit,
@@ -4728,6 +4778,8 @@ private fun MobileSettingsLayout(
                 viewModel = viewModel,
                 onNavigate = onNavigate,
                 openContentLanguagePicker = openContentLanguagePicker,
+                openStreamingRegionPicker = openStreamingRegionPicker,
+                streamingRegionLabel = streamingRegionLabel,
                 openSubtitlePicker = openSubtitlePicker,
                 openSecondarySubtitlePicker = openSecondarySubtitlePicker,
                 openAudioLanguagePicker = openAudioLanguagePicker,
@@ -4832,6 +4884,8 @@ private fun MobileSettingsMainPage(
     viewModel: SettingsViewModel,
     onNavigate: (String) -> Unit,
     openContentLanguagePicker: () -> Unit,
+    openStreamingRegionPicker: () -> Unit,
+    streamingRegionLabel: String,
     openSubtitlePicker: () -> Unit,
     openSecondarySubtitlePicker: () -> Unit = {},
     openAudioLanguagePicker: () -> Unit,
@@ -4854,6 +4908,14 @@ private fun MobileSettingsMainPage(
                     isToggle = false,
                     isFocused = false,
                     onClick = openContentLanguagePicker
+                )
+                MobileSettingsRow(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.streaming_region),
+                    value = streamingRegionLabel,
+                    isToggle = false,
+                    isFocused = false,
+                    onClick = openStreamingRegionPicker
                 )
                 MobileSettingsRow(
                     icon = Icons.Default.VolumeUp,
@@ -6020,7 +6082,9 @@ private fun TvGeneralSettingsSection(
     openAudioLanguagePicker: () -> Unit,
     openDnsProviderPicker: () -> Unit,
     openUiModeWarningDialog: () -> Unit,
-    openContentLanguagePicker: () -> Unit
+    openContentLanguagePicker: () -> Unit,
+    openStreamingRegionPicker: () -> Unit,
+    streamingRegionLabel: String
 ) {
     TvGeneralSettingsRows(
         section = section,
@@ -6081,6 +6145,8 @@ private fun TvGeneralSettingsSection(
         onTrailerDelayClick = { viewModel.cycleTrailerDelay() },
         onDeviceModeClick = openUiModeWarningDialog,
         onContentLanguageClick = openContentLanguagePicker,
+        streamingRegionLabel = streamingRegionLabel,
+        onStreamingRegionClick = openStreamingRegionPicker,
         onSkipProfileSelectionToggle = { viewModel.setSkipProfileSelection(it) },
         onSettingsLockToggle = { enabled ->
             if (enabled && !uiState.hasSettingsPin) {
@@ -6653,6 +6719,7 @@ private fun tvSettingsFocusedHelp(section: String, focusedIndex: Int): TvSetting
     return when (section) {
         "language" -> when (focusedIndex) {
             0 -> TvSettingsHelp(stringResource(R.string.settings_fact_app_language), stringResource(R.string.settings_help_app_language_desc))
+            1 -> TvSettingsHelp(stringResource(R.string.streaming_region), stringResource(R.string.settings_help_streaming_region_desc))
             else -> TvSettingsHelp(stringResource(R.string.default_audio), stringResource(R.string.settings_help_default_audio_desc))
         }
         "subtitles" -> when (focusedIndex) {
@@ -6779,6 +6846,8 @@ private fun TvGeneralSettingsRows(
     onAutoPlayMinQualityClick: () -> Unit,
     onDeviceModeClick: () -> Unit = {},
     onContentLanguageClick: () -> Unit = {},
+    streamingRegionLabel: String = "",
+    onStreamingRegionClick: () -> Unit = {},
     onSkipProfileSelectionToggle: (Boolean) -> Unit = {},
     onSettingsLockToggle: (Boolean) -> Unit = {},
     onSetupSettingsPin: () -> Unit = {},
@@ -6847,6 +6916,15 @@ private fun TvGeneralSettingsRows(
                     value = TMDB_LANGUAGES.firstOrNull { it.first == contentLanguage }?.second ?: contentLanguage,
                     isFocused = focusedIndex == localIndex,
                     onClick = onContentLanguageClick,
+                    modifier = Modifier.settingsFocusSlot(localIndex)
+                )
+                56 -> SettingsRow(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.streaming_region),
+                    subtitle = stringResource(R.string.streaming_region_desc),
+                    value = streamingRegionLabel,
+                    isFocused = focusedIndex == localIndex,
+                    onClick = onStreamingRegionClick,
                     modifier = Modifier.settingsFocusSlot(localIndex)
                 )
                 1 -> SettingsRow(

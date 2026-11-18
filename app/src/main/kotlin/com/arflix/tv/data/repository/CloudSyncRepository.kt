@@ -827,6 +827,8 @@ class CloudSyncRepository @Inject constructor(
         val defaultSubtitle: String = "Off",
         val defaultAudioLanguage: String = "Auto (Original)",
         val contentLanguage: String = "de-DE",
+        // Null while no device has stored one: a missing value must not reset the local choice.
+        val streamingRegion: String? = null,
         val subtitleSize: String = "Medium",
         val subtitleColor: String = "White",
         val subtitleStyle: String = "Bold",
@@ -872,6 +874,8 @@ class CloudSyncRepository @Inject constructor(
 
     private fun contentLanguageKeyFor(profileId: String) =
         profileManager.profileStringKeyFor(profileId, "content_language")
+    private fun streamingRegionKeyFor(profileId: String) =
+        profileManager.profileStringKeyFor(profileId, "streaming_region")
     private fun trailerAutoPlayKeyFor(profileId: String) =
         profileManager.profileBooleanKeyFor(profileId, "trailer_auto_play")
     private fun trailerSoundEnabledKeyFor(profileId: String) =
@@ -1254,6 +1258,7 @@ class CloudSyncRepository @Inject constructor(
                         defaultSubtitle = prefs[defaultSubtitleKeyFor(profile.id)] ?: "Off",
                         defaultAudioLanguage = prefs[defaultAudioLanguageKeyFor(profile.id)] ?: "Auto (Original)",
                         contentLanguage = prefs[contentLanguageKeyFor(profile.id)] ?: "de-DE",
+                        streamingRegion = normalizeStreamingRegionSetting(prefs[streamingRegionKeyFor(profile.id)]),
 
                         trailerAutoPlay = prefs[trailerAutoPlayKeyFor(profile.id)] ?: false,
                         trailerSoundEnabled = prefs[trailerSoundEnabledKeyFor(profile.id)] ?: false,
@@ -2210,6 +2215,9 @@ class CloudSyncRepository @Inject constructor(
                         }
                         prefs[defaultAudioLanguageKeyFor(profileId)] = state.defaultAudioLanguage
                         prefs[contentLanguageKeyFor(profileId)] = state.contentLanguage
+                        state.streamingRegion?.let {
+                            prefs[streamingRegionKeyFor(profileId)] = normalizeStreamingRegionSetting(it)
+                        }
                         if (profileId == activeProfileId) {
                             prefs[LAST_APP_LANGUAGE_KEY] = state.contentLanguage
                             context.getSharedPreferences("app_locale", Context.MODE_PRIVATE)

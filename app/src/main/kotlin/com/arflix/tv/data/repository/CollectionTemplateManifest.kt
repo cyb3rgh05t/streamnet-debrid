@@ -28,7 +28,8 @@ internal data class CollectionTemplateEntry(
     val hideTitle: Boolean,
     val heroVideoUrl: String?,
     val sources: List<CollectionSourceConfig>,
-    val listMetadata: List<CollectionSourceListMetadata>
+    val listMetadata: List<CollectionSourceListMetadata>,
+    val description: String? = null
 )
 
 internal object CollectionTemplateManifest {
@@ -59,73 +60,25 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.DECADE
     )
 
+    // Timeline order (not release order): Clone Wars sits between Eps II and III, Rogue One right before A New Hope.
+    private val STAR_WARS_CURATED_REFS = listOf(
+        "movie:1893", "movie:1894", "movie:12180", "tv:4194", "movie:1895", "tv:105971", "tv:60554", "movie:348350", "tv:83867", "tv:92830", "movie:330459", "movie:11", "movie:1891", "movie:1892", "tv:82856", "tv:115036", "tv:114461", "tv:202879", "tv:203085", "tv:251091", "movie:140607", "movie:181808", "movie:181812", "tv:114479", "tv:79093", "tv:114410"
+    )
+
+    private val DC_CURATED_REFS = listOf(
+        "movie:49521", "movie:209112", "movie:297761", "movie:297762", "movie:141052", "movie:297802", "movie:287947", "movie:495764", "movie:464052", "movie:791373", "movie:436270", "movie:594767", "movie:298618", "movie:565770", "movie:572802", "movie:414906", "movie:475557", "movie:698687", "movie:1287536", "tv:1435", "tv:62688", "tv:1412", "tv:60735", "tv:62286", "tv:105248", "tv:116244"
+    )
+
     private val legacyEntries: List<CollectionTemplateEntry> = listOf(
         entry(
-            title = "Latest Movies",
-            group = CollectionGroupKind.FEATURED,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Latest-Movies.jpg",
-            tileShape = CollectionTileShape.LANDSCAPE,
-            hideTitle = true,
-            heroVideoUrl = null,
-            sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.86934")
-            ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "mdblist.86934", sourceAddonId = "aio-metadata", sourceName = "Latest Digital Release", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 498, author = "snoak", url = "https://mdblist.com/lists/snoak/latest-movies-digital-release")
-            )
-        ),
-        entry(
-            title = "Latest Shows",
-            group = CollectionGroupKind.FEATURED,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Latest-Shows.jpg",
-            tileShape = CollectionTileShape.LANDSCAPE,
-            hideTitle = true,
-            heroVideoUrl = null,
-            sources = listOf(
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.86710")
-            ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "mdblist.86710", sourceAddonId = "aio-metadata", sourceName = "Latest Airing", sourceLabel = "MDBLIST", mediaType = "series", itemCount = 200, author = "snoak", url = "https://mdblist.com/lists/snoak/latest-tv-shows")
-            )
-        ),
-        entry(
-            title = "Trending Movies",
-            group = CollectionGroupKind.FEATURED,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Trending-Movies.jpg",
-            tileShape = CollectionTileShape.LANDSCAPE,
-            hideTitle = true,
-            heroVideoUrl = null,
-            sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.87667")
-            ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "mdblist.87667", sourceAddonId = "aio-metadata", sourceName = "Trending Movies", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 250, author = "snoak", url = "https://mdblist.com/lists/snoak/trending-movies")
-            )
-        ),
-        entry(
-            title = "Trending Shows",
-            group = CollectionGroupKind.FEATURED,
-            coverImageUrl = "${TEMPLATE_IMAGE_BASE}Trending-Shows.jpg",
-            tileShape = CollectionTileShape.LANDSCAPE,
-            hideTitle = true,
-            heroVideoUrl = null,
-            sources = listOf(
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.88434")
-            ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "mdblist.88434", sourceAddonId = "aio-metadata", sourceName = "Trending Shows", sourceLabel = "MDBLIST", mediaType = "series", itemCount = 250, author = "snoak", url = "https://mdblist.com/lists/snoak/trakt-s-trending-shows")
-            )
-        ),
-        entry(
             title = "Netflix",
+            description = "Trending movies and series on Netflix.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}netflix.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}netflix.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.nfx"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.nfx"),
                 watchProviderSource(type = "movie", providerId = 8),
                 watchProviderSource(type = "series", providerId = 8)
             ),
@@ -136,16 +89,16 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Disney+",
+            description = "Trending movies and series on Disney+.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}disney.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}disneyplus.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.dnp"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.dnp"),
                 watchProviderSource(type = "movie", providerId = 337),
-                watchProviderSource(type = "series", providerId = 337)
+                watchProviderSource(type = "series", providerId = 337),
+                mdblistSource("garycrawfordgc/disney-shows")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "streaming.dnp", sourceAddonId = "aio-metadata", sourceName = "Disney+", sourceLabel = "AIO", mediaType = "movie", itemCount = null, author = null, url = null),
@@ -154,14 +107,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Apple TV+",
+            description = "Trending movies and series on Apple TV+.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}apple.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}appletv.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.atp"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.atp"),
                 watchProviderSource(type = "movie", providerId = 350),
                 watchProviderSource(type = "series", providerId = 350)
             ),
@@ -172,14 +124,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Prime Video",
+            description = "Trending movies and series on Prime Video.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}prime.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}amazonprime.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.amp"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.amp"),
                 watchProviderSource(type = "movie", providerId = 9),
                 watchProviderSource(type = "series", providerId = 9)
             ),
@@ -190,14 +141,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "HBO Max",
+            description = "Trending movies and series on HBO Max.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}hbo.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}hbomax.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.hbm"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.hbm"),
                 watchProviderSource(type = "movie", providerId = 1899),
                 watchProviderSource(type = "series", providerId = 1899)
             ),
@@ -208,14 +158,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Hulu",
+            description = "Trending movies and series on Hulu.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}hulu.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}hulu.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.hlu"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.hlu"),
                 watchProviderSource(type = "movie", providerId = 15),
                 watchProviderSource(type = "series", providerId = 15)
             ),
@@ -226,14 +175,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Paramount+",
+            description = "Trending movies and series on Paramount+.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}paramount.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}paramount.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.pmp"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.pmp"),
                 watchProviderSource(type = "movie", providerId = 2303),
                 watchProviderSource(type = "series", providerId = 2303),
                 watchProviderSource(type = "movie", providerId = 2616),
@@ -252,8 +200,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}peacock.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.pcp"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.pcp"),
                 watchProviderSource(type = "movie", providerId = 386),
                 watchProviderSource(type = "series", providerId = 386),
                 watchProviderSource(type = "movie", providerId = 387),
@@ -272,8 +218,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}starz.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.sta"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.sta"),
                 watchProviderSource(type = "movie", providerId = 43),
                 watchProviderSource(type = "series", providerId = 43)
             ),
@@ -284,14 +228,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Shudder",
+            description = "Horror & thriller picks from Shudder.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "${STREAMING_SERVICE_IMAGE_BASE}Shudder.jpegli.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}shudder.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.8862"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.8861"),
                 watchProviderSource(type = "movie", providerId = 99),
                 watchProviderSource(type = "series", providerId = 99)
             ),
@@ -308,8 +251,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}mgm.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.48305"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.48306"),
                 watchProviderSource(type = "movie", providerId = 34),
                 watchProviderSource(type = "series", providerId = 34)
             ),
@@ -326,8 +267,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}discovery.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.dpe"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.dpe"),
                 watchProviderSource(type = "movie", providerId = 520),
                 watchProviderSource(type = "series", providerId = 520)
             ),
@@ -338,14 +277,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Crunchyroll",
+            description = "Anime on Crunchyroll.",
             group = CollectionGroupKind.SERVICE,
             coverImageUrl = "https://mir-s3-cdn-cf.behance.net/project_modules/fs_webp/380e75223389683.67f7c1dc0669a.png",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = "${VIDEO_BASE}crunchyroll.mp4",
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "streaming.cru_movie"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "streaming.cru_series"),
                 watchProviderSource(type = "movie", providerId = 283),
                 watchProviderSource(type = "series", providerId = 283)
             ),
@@ -362,7 +300,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.59779")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.59779", sourceAddonId = "aio-metadata", sourceName = "Adult Swim", sourceLabel = "MDBLIST", mediaType = "series", itemCount = 156, author = "ppboy", url = "https://mdblist.com/lists/ppboy/adult-swim")
@@ -376,8 +313,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91211"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91213"),
                 tmdbGenreSource(type = "movie", genreId = 28),
                 tmdbGenreSource(type = "series", genreId = 10759)
             ),
@@ -394,8 +329,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91223"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91224"),
                 tmdbGenreSource(type = "movie", genreId = 35),
                 tmdbGenreSource(type = "series", genreId = 35)
             ),
@@ -412,8 +345,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91220"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91221"),
                 tmdbGenreSource(type = "movie", genreId = 878),
                 tmdbGenreSource(type = "series", genreId = 10765)
             ),
@@ -430,8 +361,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91893"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91894"),
                 tmdbGenreSource(type = "movie", genreId = 53),
                 tmdbKeywordSource(type = "series", keywordId = 316362)
             ),
@@ -448,8 +377,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91296"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91297"),
                 tmdbGenreSource(type = "movie", genreId = 18),
                 tmdbGenreSource(type = "series", genreId = 18)
             ),
@@ -466,9 +393,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.91215"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.91217"),
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.102554"),
                 tmdbGenreSource(type = "movie", genreId = 27),
                 tmdbKeywordSource(type = "series", keywordId = 315058)
             ),
@@ -486,8 +410,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.128051"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.128052"),
                 tmdbGenreSource(type = "movie", genreId = 99),
                 tmdbGenreSource(type = "series", genreId = 99)
             ),
@@ -504,8 +426,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.128262"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.128265"),
                 tmdbGenreSource(type = "movie", genreId = 10749),
                 tmdbKeywordSource(type = "series", keywordId = 9840)
             ),
@@ -522,8 +442,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.121922"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.121921"),
                 tmdbGenreSource(type = "movie", genreId = 16),
                 tmdbGenreSource(type = "series", genreId = 16)
             ),
@@ -540,8 +458,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.43249"),
-                source(addonId = "aio-metadata", type = "series", catalogId = "mdblist.43251"),
                 tmdbGenreSource(type = "movie", genreId = 10751),
                 tmdbGenreSource(type = "series", genreId = 10751)
             ),
@@ -702,6 +618,7 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Marvel",
+            description = "The Marvel Cinematic Universe.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Marvel.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
@@ -710,7 +627,8 @@ internal object CollectionTemplateManifest {
             sources = listOf(
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "movie", catalogId = "movies", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "movie"),
                 source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "series", catalogId = "series", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                marvelTimelineSource()
+                marvelTimelineSource(),
+                marvelFallbackSource()
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
@@ -718,6 +636,7 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "DC Universe",
+            description = "Heroes and villains across the DC multiverse.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}DC.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
@@ -726,7 +645,9 @@ internal object CollectionTemplateManifest {
             sources = listOf(
                 source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "movie", catalogId = "dc-movies", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "movie"),
                 source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "series", catalogId = "dc-series", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL, collectionTab = "timeline")
+                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL, collectionTab = "timeline"),
+                curatedSource(DC_CURATED_REFS),
+                mdblistSource("kraftynic/dc-tv-shows1", mediaType = "series")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "dc-chronological", sourceAddonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", sourceName = "DC Universe", sourceLabel = "ADDON", mediaType = "dc", itemCount = null, author = null, url = DC_ADDON_URL)
@@ -734,6 +655,7 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Star Wars",
+            description = "A galaxy far, far away.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Star-Wars.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
@@ -742,7 +664,9 @@ internal object CollectionTemplateManifest {
             sources = listOf(
                 source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "movie", catalogId = "movies", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "movie"),
                 source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "series", catalogId = "series", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "series"),
-                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "timeline")
+                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "timeline"),
+                curatedSource(STAR_WARS_CURATED_REFS),
+                mdblistSource("jxduffy/star-wars-chronological-order", collectionTab = "timeline")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "sw-movies-series-chronological", sourceAddonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", sourceName = "Star Wars", sourceLabel = "ADDON", mediaType = "starwars", itemCount = null, author = null, url = STAR_WARS_ADDON_URL)
@@ -750,13 +674,14 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "James Bond",
+            description = "The James Bond saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}007.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.7947")
+                tmdbCollectionSource(645)
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.7947", sourceAddonId = "aio-metadata", sourceName = "James Bond Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 27, author = "hdlists", url = "https://mdblist.com/lists/hdlists/james-bond-movies")
@@ -778,17 +703,20 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Harry Potter",
+            description = "The Harry Potter and Fantastic Beasts saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Harry-Potter.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.102972"),
                 CollectionSourceConfig(
                     kind = CollectionSourceKind.CURATED_IDS,
                     curatedRefs = listOf("tv:224377")
-                )
+                ),
+                tmdbCollectionSource(1241),
+                tmdbCollectionSource(435259),
+                mdblistSource("thebirdod/harry-potter-collection")
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.102972", sourceAddonId = "aio-metadata", sourceName = "Harry Potter Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 11, author = "thebirdod", url = "https://mdblist.com/lists/thebirdod/harry-potter-collection"),
@@ -803,7 +731,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "all", catalogId = "mdblist.101434"),
                 tmdbCollectionSource(8091),
                 tmdbCollectionSource(399),
                 tmdbCollectionSource(115762)
@@ -814,13 +741,13 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Pirates of the Caribbean",
+            description = "Captain Jack Sparrow's swashbuckling saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}pirates.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.82145"),
                 tmdbCollectionSource(295)
             ),
             listMetadata = listOf(
@@ -835,7 +762,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "all", catalogId = "mdblist.125458"),
                 tmdbCollectionSource(528)
             ),
             listMetadata = listOf(
@@ -844,13 +770,14 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Mission Impossible",
+            description = "The Mission: Impossible saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}mission-impossible.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.42716")
+                tmdbCollectionSource(87359)
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.42716", sourceAddonId = "aio-metadata", sourceName = "Mission Impossible Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 8, author = "nammel", url = "https://mdblist.com/lists/nammel/mission-impossible-saga")
@@ -858,13 +785,14 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Jurassic Park",
+            description = "The Jurassic Park / World saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}jurrasic-park.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "all", catalogId = "mdblist.120197")
+                tmdbCollectionSource(328)
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.120197", sourceAddonId = "aio-metadata", sourceName = "Jurassic Park Collection", sourceLabel = "MDBLIST", mediaType = "all", itemCount = 12, author = "purple_smurf", url = "https://mdblist.com/lists/purple_smurf/jurassic-park")
@@ -878,7 +806,6 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.125142"),
                 tmdbCollectionSource(2344)
             ),
             listMetadata = listOf(
@@ -887,13 +814,17 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "Lord of the Rings",
+            description = "Middle-earth on film.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}lotr.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "aio-metadata", type = "movie", catalogId = "mdblist.94304")
+                tmdbCollectionSource(119),
+                tmdbCollectionSource(121938),
+                mdblistSource("spudhead15/lord-of-the-rings-and-hobbit-collection"),
+                curatedSource(listOf("tv:84773")) // The Lord of the Rings: The Rings of Power
             ),
             listMetadata = listOf(
                 metadata(sourceCatalogId = "mdblist.94304", sourceAddonId = "aio-metadata", sourceName = "Lord of the Rings and Hobbit Collection", sourceLabel = "MDBLIST", mediaType = "movie", itemCount = 6, author = "spudhead15", url = "https://mdblist.com/lists/spudhead15/lord-of-the-rings-and-hobbit-collection")
@@ -901,82 +832,109 @@ internal object CollectionTemplateManifest {
         ),
         entry(
             title = "X-Men",
+            description = "The X-Men film saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}X-Men.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(748),
+                tmdbCollectionSource(453993),
+                tmdbCollectionSource(556),
+                mdblistSource("jxduffy/x-men-chronological-order")
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "Hunger Games",
+            description = "The Hunger Games saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Hunger-Games.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(131635)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "Avatar",
+            description = "James Cameron's Pandora saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}AVATAR.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(87096)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "Dune",
+            description = "The Dune saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Dune.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(726871)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "Indiana Jones",
+            description = "The Indiana Jones saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Indiana-Jo.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(84)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "The Godfather",
+            description = "The Godfather trilogy.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}The-Godfather.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(230)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "John Wick",
+            description = "The John Wick saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}JW.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(404609)
+            ),
             listMetadata = emptyList()
         ),
         entry(
             title = "Transformers",
+            description = "The Transformers saga.",
             group = CollectionGroupKind.FRANCHISE,
             coverImageUrl = "${FRANCHISE_IMAGE_BASE}Transformers.jpg",
             tileShape = CollectionTileShape.LANDSCAPE,
             hideTitle = true,
             heroVideoUrl = null,
-            sources = emptyList(),
+            sources = listOf(
+                tmdbCollectionSource(8650)
+            ),
             listMetadata = emptyList()
         ),
         entry(
@@ -1126,6 +1084,23 @@ internal object CollectionTemplateManifest {
         collectionTab = "timeline"
     )
 
+    /** Standard MCU order, used only while the Marvel addon returns nothing. */
+    fun marvelFallbackSource(): CollectionSourceConfig = CollectionSourceConfig(
+        kind = CollectionSourceKind.CURATED_IDS,
+        curatedRefs = listOf(
+            "movie:1726", "movie:1724", "movie:10138", "movie:10195", "movie:1771", "movie:24428",
+            "movie:68721", "movie:76338", "movie:100402", "movie:118340", "movie:99861", "movie:102899",
+            "movie:271110", "movie:284052", "movie:283995", "movie:315635", "movie:284053", "movie:284054",
+            "movie:299536", "movie:363088", "movie:299537", "movie:299534", "movie:429617",
+            "tv:85271", "tv:88396", "tv:84958", "movie:497698", "tv:92749", "movie:566525", "tv:88329",
+            "movie:524434", "movie:634649", "tv:92782", "movie:453395", "tv:92783", "movie:616037",
+            "tv:92785", "movie:505642", "movie:640146", "tv:114472", "movie:447365", "movie:609681",
+            "tv:138501", "movie:533535", "tv:202412", "tv:202555", "movie:822119", "movie:986056", "tv:114471",
+            "movie:617126"
+        ),
+        addonFallback = true
+    )
+
     fun migrateMarvelTimelineSource(source: CollectionSourceConfig): CollectionSourceConfig =
         if (source.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE) marvelTimelineSource() else source
 
@@ -1143,7 +1118,7 @@ internal object CollectionTemplateManifest {
 
     fun railTitle(group: CollectionGroupKind): String = when (group) {
         CollectionGroupKind.FEATURED -> "Featured"
-        CollectionGroupKind.SERVICE -> "Services"
+        CollectionGroupKind.SERVICE -> "Streaming Services"
         CollectionGroupKind.GENRE -> "Genres"
         CollectionGroupKind.MOVIE_GENRE -> "Movie Genres"
         CollectionGroupKind.TV_GENRE -> "TV Genres"
@@ -1207,7 +1182,7 @@ internal object CollectionTemplateManifest {
         STAR_WARS_ADDON_URL
     )
 
-    fun descriptionFor(entry: CollectionTemplateEntry): String = when (entry.group) {
+    fun descriptionFor(entry: CollectionTemplateEntry): String = entry.description ?: when (entry.group) {
         CollectionGroupKind.FEATURED -> "Curated spotlight picks sourced from the latest public lists."
         CollectionGroupKind.SERVICE -> "Browse movies and series grouped by streaming service."
         CollectionGroupKind.GENRE -> "A themed mix of movies and series built around a single genre mood."
@@ -1221,6 +1196,7 @@ internal object CollectionTemplateManifest {
 
     private fun entry(
         title: String,
+        description: String? = null,
         group: CollectionGroupKind,
         coverImageUrl: String,
         tileShape: CollectionTileShape,
@@ -1238,7 +1214,8 @@ internal object CollectionTemplateManifest {
             hideTitle = hideTitle,
             heroVideoUrl = heroVideoUrl,
             sources = sources,
-            listMetadata = listMetadata
+            listMetadata = listMetadata,
+            description = description
         )
     }
 
@@ -1271,10 +1248,16 @@ internal object CollectionTemplateManifest {
         addonCatalogId = catalogId
     )
 
-    private fun mdblistSource(slug: String, mediaType: String? = null) = CollectionSourceConfig(
+    private fun mdblistSource(slug: String, mediaType: String? = null, collectionTab: String? = null) = CollectionSourceConfig(
         kind = CollectionSourceKind.MDBLIST_PUBLIC,
+        collectionTab = collectionTab,
         mediaType = mediaType,
         mdblistSlug = slug
+    )
+
+    private fun curatedSource(refs: List<String>) = CollectionSourceConfig(
+        kind = CollectionSourceKind.CURATED_IDS,
+        curatedRefs = refs
     )
 
     private fun tmdbCollectionSource(collectionId: Int) = CollectionSourceConfig(

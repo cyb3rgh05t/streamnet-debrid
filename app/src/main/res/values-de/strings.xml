@@ -249,6 +249,10 @@
     <string name="in_cinema">Im Kino</string>
     <string name="included_with_prime">In Prime enthalten</string>
     <string name="app_language_desc">App-Texte, Titel, Beschreibungen und Metadaten</string>
+    <string name="streaming_region">Streaming-Region</string>
+    <string name="streaming_region_desc">Land, nach dem das Angebot der Streamingdienste ermittelt wird</string>
+    <string name="streaming_region_auto_format">Automatisch (%1$s)</string>
+    <string name="settings_help_streaming_region_desc">Bestimmt, welches Länder-Angebot in den Streamingdienst-Collections (z. B. Netflix, Disney+) gezeigt wird. Dienste, die dort nicht verfügbar sind, nutzen ersatzweise den US-Katalog.</string>
     <string name="audio_desc">Bevorzugte Audiospur</string>
     <string name="subtitle_font_desc">Schriftart für Untertitel</string>
     <string name="auto_play_desc">Nächste Folge automatisch starten</string>

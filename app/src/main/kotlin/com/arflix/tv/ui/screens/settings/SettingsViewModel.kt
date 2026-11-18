@@ -64,6 +64,8 @@ import com.arflix.tv.data.repository.offline.OfflineDownloadItem
 import com.arflix.tv.data.repository.offline.OfflineDownloadRepository
 import com.arflix.tv.network.OkHttpProvider
 import com.arflix.tv.data.repository.SyncProgress
+import com.arflix.tv.data.repository.STREAMING_REGION_AUTO
+import com.arflix.tv.data.repository.normalizeStreamingRegionSetting
 import com.arflix.tv.data.repository.SyncStatus
 import com.arflix.tv.data.repository.SyncResult
 import com.arflix.tv.ui.components.CARD_LAYOUT_MODE_LANDSCAPE
@@ -254,6 +256,7 @@ data class SettingsUiState(
     val homeServerCodeAuthPhase: HomeServerCodeAuthPhase? = null,
     // Content language (TMDB metadata)
     val contentLanguage: String = "de-DE",
+    val streamingRegion: String = STREAMING_REGION_AUTO,
     // Device mode override
     val deviceModeOverride: String = "auto",
     // Skip profile selection
@@ -350,6 +353,7 @@ class SettingsViewModel @Inject constructor(
     val uiState: StateFlow<SettingsUiState> = _uiState.asStateFlow()
 
     private fun contentLanguageKey() = profileManager.profileStringKey("content_language")
+    private fun streamingRegionKey() = profileManager.profileStringKey("streaming_region")
 
     private fun defaultSubtitleKey() = profileManager.profileStringKey("default_subtitle")
     private fun defaultSubtitleKeyFor(profileId: String) = profileManager.profileStringKeyFor(profileId, "default_subtitle")
@@ -670,6 +674,8 @@ class SettingsViewModel @Inject constructor(
             val contentLang = com.arflix.tv.util.normalizeAppLanguage(prefs[contentLanguageKey()])
             // Apply content language to MediaRepository immediately
             mediaRepository.contentLanguage = contentLang
+            val streamingRegion = normalizeStreamingRegionSetting(prefs[streamingRegionKey()])
+            mediaRepository.streamingRegionSetting = streamingRegion
             var autoPlay = prefs[autoPlayNextKey()] ?: true
             var autoPlaySingleSource = prefs[autoPlaySingleSourceKey()] ?: true
             // Ensure defaults are persisted on first launch so they're never ambiguous
@@ -843,6 +849,7 @@ class SettingsViewModel @Inject constructor(
                 syncedEpisodes = 0,
                 catalogs = existingCatalogs,
                 contentLanguage = contentLang,
+                streamingRegion = streamingRegion,
                 deviceModeOverride = deviceModeOverride,
                 skipProfileSelection = skipProfileSelection,
                 oledBlackBackground = oledBlackBackground,
@@ -1584,6 +1591,17 @@ class SettingsViewModel @Inject constructor(
                 .edit().putString("locale_tag", lang).apply()
             mediaRepository.contentLanguage = lang
             _uiState.value = _uiState.value.copy(contentLanguage = lang)
+            syncLocalStateToCloud(silent = true)
+        }
+    }
+
+    /** Set the region TMDB uses for streaming-service collections ("auto" or an ISO country code). */
+    fun setStreamingRegion(region: String) {
+        val value = normalizeStreamingRegionSetting(region)
+        viewModelScope.launch {
+            context.settingsDataStore.edit { prefs -> prefs[streamingRegionKey()] = value }
+            mediaRepository.streamingRegionSetting = value
+            _uiState.value = _uiState.value.copy(streamingRegion = value)
             syncLocalStateToCloud(silent = true)
         }
     }

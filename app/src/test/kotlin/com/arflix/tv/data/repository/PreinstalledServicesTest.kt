@@ -150,14 +150,51 @@ class PreinstalledServicesTest {
             manifestUrl = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
             catalogs = listOf("movie" to "movies", "series" to "series", "StarWars" to "sw-movies-series-chronological")
         )
-        assertEquals("Marvel should not restore legacy fallback sources", 3,
-            collections.getValue("Marvel").collectionSources.size)
+        val marvelSources = collections.getValue("Marvel").collectionSources
+        assertEquals("Marvel keeps its three addon sources plus one addon-only fallback", 4, marvelSources.size)
+        assertEquals(listOf(CollectionSourceKind.CURATED_IDS), marvelSources.filter { it.addonFallback }.map { it.kind })
         val dcSources = collections.getValue("DC Universe").collectionSources
         assertEquals("series", dcSources.single { it.mdblistSlug == "kraftynic/dc-tv-shows1" }.mediaType)
         assertFalse("DC should not add the removed movie MDBList",
             dcSources.any { it.mdblistSlug == "kingkearney/dc-universe" })
         assertEquals("timeline", collections.getValue("Star Wars").collectionSources
             .single { it.mdblistSlug == "jxduffy/star-wars-chronological-order" }.collectionTab)
+    }
+
+    @Test
+    fun `standard collections do not depend on addons the user has to install`() {
+        val collections = MediaRepository.buildPreinstalledDefaults().filter { it.kind == CatalogKind.COLLECTION }
+        collections.forEach { catalog ->
+            val needsInstalledAddon = catalog.collectionSources.filter {
+                it.kind == CollectionSourceKind.ADDON_CATALOG && it.addonManifestUrl.isNullOrBlank()
+            }
+            val independent = catalog.collectionSources.any {
+                !(it.kind == CollectionSourceKind.ADDON_CATALOG && it.addonManifestUrl.isNullOrBlank())
+            }
+            // Only collections that never had another source may keep an installed-addon source.
+            assertTrue(
+                "${catalog.id} keeps installed-addon sources next to independent ones",
+                needsInstalledAddon.isEmpty() || !independent,
+            )
+        }
+        val services = collections.filter { it.id.startsWith("collection_service_") }
+        assertEquals(13, services.size)
+        services.forEach { service ->
+            assertTrue("${service.id} lost its TMDB providers",
+                service.collectionSources.any { it.kind == CollectionSourceKind.TMDB_WATCH_PROVIDER && it.mediaType == "movie" })
+            assertTrue("${service.id} lost its TMDB providers",
+                service.collectionSources.any { it.kind == CollectionSourceKind.TMDB_WATCH_PROVIDER && it.mediaType == "series" })
+            assertFalse(service.collectionSources.any { it.addonId == "aio-metadata" || it.addonId == "org.kris.ultra.max.all.v5" })
+        }
+        // Collections served by the project's own addons keep them (they carry their manifest URL).
+        listOf("Marvel", "DC Universe", "Star Wars").forEach { title ->
+            assertTrue("$title lost its own addon sources",
+                collections.single { it.title == title }.collectionSources.count {
+                    it.kind == CollectionSourceKind.ADDON_CATALOG && !it.addonManifestUrl.isNullOrBlank()
+                } >= 3)
+        }
+        // A collection with only installed-addon sources is not emptied.
+        assertTrue(collections.all { it.collectionSources.isNotEmpty() })
     }
 
     private val serviceOrder = listOf(
@@ -276,12 +313,9 @@ class PreinstalledServicesTest {
             .filter { it.kind == CollectionSourceKind.TMDB_WATCH_PROVIDER }
             .mapNotNull { it.tmdbWatchProviderId }
             .toSet()
-        val aioCatalogIds = paramount.collectionSources
-            .filter { it.kind == CollectionSourceKind.ADDON_CATALOG }
-            .mapNotNull { it.addonCatalogId }
-            .toSet()
 
-        assertTrue("Paramount should use the AIO streaming.pmp catalog", "streaming.pmp" in aioCatalogIds)
+        assertFalse("Paramount should not depend on an installed addon catalog",
+            paramount.collectionSources.any { it.kind == CollectionSourceKind.ADDON_CATALOG })
         assertTrue("Paramount Premium provider missing", 2303 in providerIds)
         assertTrue("Paramount Essential provider missing", 2616 in providerIds)
         assertFalse("Legacy provider 531 returns wrong US content", 531 in providerIds)

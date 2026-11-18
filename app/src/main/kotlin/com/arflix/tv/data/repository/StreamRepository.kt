@@ -950,30 +950,6 @@ class StreamRepository @Inject constructor(
         return newAddon
     }
 
-    suspend fun ensureCustomAddons(urls: List<String>): List<Result<Addon>> = withContext(Dispatchers.IO) {
-        val requested = urls
-            .map { resolveAddonInstallUrl(it) }
-            .filter { it.isNotBlank() }
-            .distinct()
-        if (requested.isEmpty()) return@withContext emptyList()
-
-        val installedByUrl = installedAddons.first()
-            .mapNotNull { addon ->
-                val url = addon.url?.let { normalizeAddonInputUrl(it) } ?: return@mapNotNull null
-                url to addon
-            }
-            .toMap()
-
-        requested.map { normalizedUrl ->
-            val existing = installedByUrl[normalizedUrl]
-            if (existing != null) {
-                Result.success(existing)
-            } else {
-                addCustomAddon(normalizedUrl)
-            }
-        }
-    }
-
     suspend fun removeCustomAddonsByUrl(urls: List<String>): Boolean = withContext(Dispatchers.IO) {
         val normalizedUrls = urls
             .mapNotNull { url ->

@@ -397,6 +397,15 @@ class MediaRepository @Inject constructor(
             field = value.ifBlank { "en-US" }.replace("iw", "he").replace('_', '-')
         }
 
+    /** User's streaming-region choice ([STREAMING_REGION_AUTO] or an ISO country code). */
+    @Volatile
+    var streamingRegionSetting: String = STREAMING_REGION_AUTO
+        set(value) {
+            field = normalizeStreamingRegionSetting(value)
+        }
+
+    private fun currentStreamingRegion(): String = effectiveStreamingRegion(streamingRegionSetting, contentLanguage)
+
     // === IN-MEMORY CACHE FOR PERFORMANCE ===
     private data class CacheEntry<T>(val data: T, val timestamp: Long)
     private val CACHE_TTL_MS = 5 * 60 * 1000L // 5 minutes
@@ -542,13 +551,15 @@ class MediaRepository @Inject constructor(
                 append(':')
                 append(source.tmdbNetworkId ?: -1)
                 append(':')
-                append(source.watchRegion.orEmpty())
+                append(if (source.tmdbWatchProviderId != null) currentStreamingRegion() else source.watchRegion.orEmpty())
                 append(':')
                 append(source.sortBy.orEmpty())
                 append(':')
                 append(source.mdblistSlug.orEmpty())
                 append(':')
                 append(source.curatedRefs?.joinToString(",").orEmpty())
+                append(':')
+                append(source.addonFallback)
                 append(';')
             }
         }
@@ -595,18 +606,15 @@ class MediaRepository @Inject constructor(
                 else -> (targetCount + 8).coerceAtLeast(24).coerceAtMost(72)
             }
         }
-        val perSourceRefs: List<List<Pair<MediaType, Int>>> = coroutineScope {
-            catalog.collectionSources.mapIndexed { index, source ->
-                async {
-                    runCatching {
-                        resolveCollectionSourceRefs(
-                            source,
-                            offset = 0,
-                            limit = sourceBudgets[index]
-                        )
-                    }.getOrDefault(emptyList())
-                }
-            }.map { it.await() }
+        val sources = catalog.collectionSources
+        val perSourceRefs: List<List<Pair<MediaType, Int>>> = resolveSourcesWithAddonFallback(sources) { index ->
+            runCatching {
+                resolveCollectionSourceRefs(
+                    sources[index],
+                    offset = 0,
+                    limit = sourceBudgets[index]
+                )
+            }.getOrDefault(emptyList())
         }
 
         val refs = LinkedHashSet<Pair<MediaType, Int>>()
@@ -1122,914 +1130,6 @@ class MediaRepository @Inject constructor(
                 CatalogConfig("new_kdramas", "New in K-Dramas", CatalogSourceType.MDBLIST, isPreinstalled = true, sourceUrl = "https://mdblist.com/lists/snoak/latest-kdrama-shows", sourceRef = "mdblist:https://mdblist.com/lists/snoak/latest-kdrama-shows")
             )
 
-            fun addonCollectionSource(addonId: String?, type: String, id: String) = CollectionSourceConfig(
-                kind = CollectionSourceKind.ADDON_CATALOG,
-                addonId = addonId,
-                addonCatalogType = type,
-                addonCatalogId = id
-            )
-            /** Streaming-service trending via TMDB watch-providers. */
-            fun watchProviderSource(mediaType: MediaType, providerId: Int) = CollectionSourceConfig(
-                kind = CollectionSourceKind.TMDB_WATCH_PROVIDER,
-                mediaType = if (mediaType == MediaType.MOVIE) "movie" else "series",
-                tmdbWatchProviderId = providerId,
-                watchRegion = "US",
-                sortBy = "popularity.desc"
-            )
-            fun tmdbCollectionSource(collectionId: Int) = CollectionSourceConfig(
-                kind = CollectionSourceKind.TMDB_COLLECTION,
-                tmdbCollectionId = collectionId
-            )
-            fun tmdbKeywordSource(mediaType: MediaType?, keywordId: Int) = CollectionSourceConfig(
-                kind = CollectionSourceKind.TMDB_KEYWORD,
-                mediaType = when (mediaType) {
-                    MediaType.MOVIE -> "movie"
-                    MediaType.TV -> "series"
-                    else -> null
-                },
-                tmdbKeywordId = keywordId,
-                sortBy = "popularity.desc"
-            )
-            fun tmdbGenreSource(mediaType: MediaType, genreId: Int) = CollectionSourceConfig(
-                kind = CollectionSourceKind.TMDB_GENRE,
-                mediaType = if (mediaType == MediaType.MOVIE) "movie" else "series",
-                tmdbGenreId = genreId,
-                sortBy = "popularity.desc"
-            )
-            fun curatedSource(vararg refs: String) = CollectionSourceConfig(
-                kind = CollectionSourceKind.CURATED_IDS,
-                curatedRefs = refs.toList()
-            )
-            // Public mdblist list (anonymous JSON endpoint). `slug` is everything
-            // after /lists/ — e.g. "jxduffy/star-wars-chronological-order". Used
-            // as a completeness fill-in behind curated lists: curated entries win
-            // the ordering; mdblist-only items get appended at the end.
-            fun mdblistSource(
-                slug: String,
-                mediaType: String? = null,
-                collectionTab: String? = null
-            ) = CollectionSourceConfig(
-                kind = CollectionSourceKind.MDBLIST_PUBLIC,
-                collectionTab = collectionTab,
-                mediaType = mediaType,
-                mdblistSlug = slug
-            )
-            fun collection(
-                id: String,
-                title: String,
-                group: CollectionGroupKind,
-                description: String,
-                cover: String? = null,
-                focusGif: String? = null,
-                hero: String? = null,
-                heroVideo: String? = null,
-                clearLogo: String? = null,
-                sources: List<CollectionSourceConfig>,
-                requiredAddons: List<String> = emptyList()
-            ) = CatalogConfig(
-                id = id,
-                title = title,
-                sourceType = CatalogSourceType.PREINSTALLED,
-                isPreinstalled = true,
-                kind = CatalogKind.COLLECTION,
-                collectionGroup = group,
-                collectionDescription = description,
-                collectionCoverImageUrl = cover,
-                collectionFocusGifUrl = focusGif ?: cover,
-                collectionHeroImageUrl = hero ?: cover,
-                collectionHeroGifUrl = focusGif ?: hero ?: cover,
-                collectionHeroVideoUrl = heroVideo,
-                collectionClearLogoUrl = clearLogo,
-                collectionSources = sources,
-                requiredAddonUrls = requiredAddons
-            )
-
-        // ──────────────────────────────────────────────────────────────
-        // Streaming Services (12 total)
-        //
-        // Premium 7 (Netflix, Prime, Apple TV+, Disney+, HBO Max, Hulu,
-        // Paramount+) lead the list and use the mrtxiv networks-video-
-        // collection assets: static PNG cover + MP4 hero loop. `focusGif` is
-        // null so `collection()`'s `focusGif ?: cover` fallback keeps the
-        // cover displayed on focus (no GIF swap, since we rely on the video
-        // loop for motion). `clearLogo` is null across all 12 services — the
-        // PNG cover already carries the service wordmark and layering a
-        // separate clearLogo on top would double-stamp the branding.
-        //
-        // The remaining 5 services keep their existing community cover + TMDB
-        // hero while adopting the same null-focusGif / null-clearLogo shape.
-        //
-        // Addon catalogs (aio-metadata / org.kris.ultra.max.all.v5 /
-        // community.bharatbinge / community-provided pastebin) win when the
-        // user has them installed; the TMDB watch-provider source is the
-        // out-of-the-box fallback so the rail populates on a fresh profile.
-        // ──────────────────────────────────────────────────────────────
-        val mrtxivBase = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/"
-        val services = listOf(
-            // ── Premium 7 (mrtxiv assets + motion hero) ──
-            collection(
-                id = "collection_service_netflix",
-                title = "Netflix",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Netflix.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/netflix.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/netflix.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.88328"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.86751"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "netflix_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "netflix_series"),
-                    addonCollectionSource(null, "movie", "nfx"),
-                    addonCollectionSource(null, "series", "nfx"),
-                    watchProviderSource(MediaType.MOVIE, 8),
-                    watchProviderSource(MediaType.TV, 8)
-                ),
-                requiredAddons = listOf(STREAMING_COLLECTION_ADDON_URL)
-            ),
-            collection(
-                id = "collection_service_prime",
-                title = "Prime Video",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Prime Video.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/prime.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/amazonprime.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.86755"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.86753"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "amazon_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "amazon_series"),
-                    addonCollectionSource(null, "movie", "amp"),
-                    addonCollectionSource(null, "series", "amp"),
-                    watchProviderSource(MediaType.MOVIE, 9),
-                    watchProviderSource(MediaType.TV, 9)
-                ),
-                requiredAddons = listOf(STREAMING_COLLECTION_ADDON_URL)
-            ),
-            collection(
-                id = "collection_service_appletv",
-                title = "Apple TV+",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Apple TV+.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/apple.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/appletv.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "apple_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "apple_series"),
-                    watchProviderSource(MediaType.MOVIE, 350),
-                    watchProviderSource(MediaType.TV, 350)
-                )
-            ),
-            collection(
-                id = "collection_service_disney",
-                title = "Disney+",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Disney+.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/disney.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/disneyplus.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    mdblistSource("garycrawfordgc/disney-shows")
-                )
-            ),
-            collection(
-                id = "collection_service_hbo",
-                title = "HBO Max",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on HBO Max.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/hbo.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/hbomax.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.89647"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.89649"),
-                    addonCollectionSource(null, "movie", "hbm"),
-                    addonCollectionSource(null, "series", "hbm"),
-                    watchProviderSource(MediaType.MOVIE, 1899),
-                    watchProviderSource(MediaType.TV, 1899)
-                ),
-                requiredAddons = listOf(STREAMING_COLLECTION_ADDON_URL)
-            ),
-            collection(
-                id = "collection_service_hulu",
-                title = "Hulu",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Hulu.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/hulu.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/hulu.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "series", "mdblist.88327"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "hulu_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "hulu_series"),
-                    watchProviderSource(MediaType.MOVIE, 15),
-                    watchProviderSource(MediaType.TV, 15)
-                )
-            ),
-            collection(
-                id = "collection_service_paramount",
-                title = "Paramount+",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Paramount+.",
-                cover = "${mrtxivBase}artworks/streaming%20services/streaming%20services%20landscape/paramount.jpegli.jpg",
-                focusGif = null,
-                hero = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/paramount.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.86762"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.86761"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "paramount_movies"),
-                    watchProviderSource(MediaType.MOVIE, 2303),
-                    watchProviderSource(MediaType.TV, 2303),
-                    watchProviderSource(MediaType.MOVIE, 2616),
-                    watchProviderSource(MediaType.TV, 2616)
-                )
-            ),
-            // ── Extras (keep existing cover/hero, strip GIF + clearLogo) ──
-            collection(
-                id = "collection_service_shudder",
-                title = "Shudder",
-                group = CollectionGroupKind.SERVICE,
-                description = "Horror & thriller picks from Shudder.",
-                cover = "${UPLOADED_COVER_BASE}9a804000-5337-4031-9669-7be45c213f6a.gif",
-                focusGif = null,
-                hero = "https://image.tmdb.org/t/p/original/ecKQlAEG95k62SMGhvX83oEqANK.jpg",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "shudder_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "shudder_series"),
-                    watchProviderSource(MediaType.MOVIE, 99),
-                    watchProviderSource(MediaType.TV, 99)
-                )
-            ),
-            collection(
-                id = "collection_service_jiohotstar",
-                title = "JioHotstar",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on JioHotstar.",
-                cover = "https://i.postimg.cc/Pr4XcqRq/ezgif-com-video-to-gif-converter.gif",
-                focusGif = null,
-                hero = "https://image.tmdb.org/t/p/original/askg3SMvhqEl4OL52YuvdtY40Yb.jpg",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("community.bharatbinge", "movie", "flixpatrol-netflix-movies"),
-                    addonCollectionSource("community.bharatbinge", "series", "flixpatrol-netflix-series"),
-                    addonCollectionSource("org.hilay.tv.maldivesnet", "tv", "hilay_catalog"),
-                    watchProviderSource(MediaType.MOVIE, 122),
-                    watchProviderSource(MediaType.TV, 122)
-                )
-            ),
-            collection(
-                id = "collection_service_sonyliv",
-                title = "SonyLiv",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on SonyLiv.",
-                cover = "https://cdn.postimage.me/2026/04/11/1000046089.gif",
-                focusGif = null,
-                hero = "https://image.tmdb.org/t/p/original/uDgy6hyPd82kOHh6I95FLtLnj6p.jpg",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("community.bharatbinge", "movie", "provider-sonyliv-movies"),
-                    addonCollectionSource("community.bharatbinge", "series", "provider-sonyliv-series"),
-                    watchProviderSource(MediaType.MOVIE, 237),
-                    watchProviderSource(MediaType.TV, 237)
-                )
-            ),
-            collection(
-                id = "collection_service_sky",
-                title = "Sky",
-                group = CollectionGroupKind.SERVICE,
-                description = "Trending movies and series on Sky.",
-                cover = "${UPLOADED_COVER_BASE}be914269-f8c5-4c51-8aa5-86581074c10f.png",
-                focusGif = null,
-                hero = "https://image.tmdb.org/t/p/original/pwGmXVKUgKN13psUjlhC9zBcq1o.jpg",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.38516"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.74627"),
-                    watchProviderSource(MediaType.MOVIE, 29),
-                    watchProviderSource(MediaType.TV, 29)
-                )
-            ),
-            collection(
-                id = "collection_service_crunchyroll",
-                title = "Crunchyroll",
-                group = CollectionGroupKind.SERVICE,
-                description = "Anime on Crunchyroll.",
-                cover = "https://mir-s3-cdn-cf.behance.net/project_modules/fs_webp/380e75223389683.67f7c1dc0669a.png",
-                focusGif = null,
-                heroVideo = "${mrtxivBase}videos/networks%20videos/crunchyroll.mp4",
-                clearLogo = null,
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "streaming.cru_movie"),
-                    addonCollectionSource("aio-metadata", "series", "streaming.cru_series"),
-                    watchProviderSource(MediaType.MOVIE, 283),
-                    watchProviderSource(MediaType.TV, 283)
-                )
-            )
-        )
-
-        // ──────────────────────────────────────────────────────────────
-        // Franchises (17 franchises)
-        // Primary: mdblist via aio-metadata addon.
-        // Fallback: known TMDB collection / keyword IDs so the row still
-        // populates when the aio-metadata addon isn't installed.
-        // ──────────────────────────────────────────────────────────────
-        val franchises = listOf(
-            collection(
-                id = "collection_franchise_wizarding_world",
-                title = "Wizarding World",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Harry Potter and Fantastic Beasts saga.",
-                cover = "https://comicbook.com/wp-content/uploads/sites/4/2024/10/Harry-Potter-logo-Wizarding-World-logo.png",
-                hero = "https://image.tmdb.org/t/p/original/hziiv14OpD73u9gAak4XDDfBKa2.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/n7Pj4doQ1yfElCiGTGFTvzoQkpf.png",
-                // TMDB collections: 1241 = Harry Potter, 435259 = Fantastic
-                // Beasts. Plus community list for anything the TMDB collection
-                // forgot (e.g. HBO's Harry Potter reboot series).
-                sources = listOf(
-                    tmdbCollectionSource(1241),
-                    tmdbCollectionSource(435259),
-                    mdblistSource("thebirdod/harry-potter-collection")
-                )
-            ),
-            collection(
-                id = "collection_franchise_dc",
-                title = "DC Universe",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "Heroes and villains across the DC multiverse.",
-                cover = "https://i.postimg.cc/zGMpg1RJ/DC-Universe.jpg",
-                focusGif = "https://i.ibb.co/chw2zR64/dc-superhero-films-opening-introduction-t9kpwalz3ep57s9i.gif",
-                hero = "https://image.tmdb.org/t/p/original/5UQsZrfbfG2dYJbx8DxfoTr2Bve.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/qBtAryVKg11iEOmxeb31fxIHuvN.png",
-                // Keyword 9715 is "superhero" — it pulls every superhero movie
-                // including Marvel entries, which is how unrelated films ended
-                // up in DC. Use curated DCEU/DC cinematic content in release
-                // order, plus addon fallback for users who have aio-metadata.
-                sources = listOf(
-                    curatedSource(
-                        // DCEU
-                        "movie:49521",   // Man of Steel (2013)
-                        "movie:209112",  // Batman v Superman (2016)
-                        "movie:297761",  // Suicide Squad (2016)
-                        "movie:297762",  // Wonder Woman (2017)
-                        "movie:141052",  // Justice League (2017)
-                        "movie:297802",  // Aquaman (2018)
-                        "movie:287947",  // Shazam! (2019)
-                        "movie:495764",  // Birds of Prey (2020)
-                        "movie:464052",  // Wonder Woman 1984 (2020)
-                        "movie:791373",  // Zack Snyder's Justice League (2021)
-                        "movie:436270",  // Black Adam (2022)
-                        "movie:594767",  // Shazam! Fury of the Gods (2023)
-                        "movie:298618",  // The Flash (2023)
-                        "movie:565770",  // Blue Beetle (2023)
-                        "movie:572802",  // Aquaman and the Lost Kingdom (2023)
-                        // Matt Reeves Batman
-                        "movie:414906",  // The Batman (2022)
-                        // Non-DCEU standalones & DCU (new Gunn era)
-                        "movie:475557",  // Joker (2019)
-                        "movie:698687",  // Joker: Folie à Deux (2024)
-                        "movie:1287536", // Superman (2025)
-                        // DC TV series
-                        "tv:1435",       // Smallville
-                        "tv:62688",      // Supergirl
-                        "tv:1412",       // Arrow
-                        "tv:60735",      // The Flash
-                        "tv:62286",      // DC's Legends of Tomorrow
-                        "tv:105248",     // Peacemaker
-                        "tv:116244"      // The Penguin
-                    ),
-                    // Community-curated DC TV list, matching the Web fallback.
-                    mdblistSource("kraftynic/dc-tv-shows1", mediaType = "series")
-                )
-            ),
-            collection(
-                id = "collection_franchise_mcu",
-                title = "MCU Universe",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Marvel Cinematic Universe.",
-                cover = "https://i.ibb.co/zHbdGxHT/marvel-studios.gif",
-                focusGif = "https://giffiles.alphacoders.com/127/12700.gif",
-                hero = "https://image.tmdb.org/t/p/original/9BBTo63ANSmhC4e6r62OJFuK2GL.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/hUzeosd33nzE5MCNsZxCGEKTXaQ.png",
-                // Phase-order release sequence blending theatrical films with
-                // Disney+ series slotted where they aired relative to the MCU
-                // continuity (e.g. WandaVision after Endgame, She-Hulk after
-                // Shang-Chi). Keyword 180547 was dropped — returned unrelated
-                // "cinematic universe" items that polluted the row.
-                sources = listOf(
-                    curatedSource(
-                        // Phase 1
-                        "movie:1726",    // Iron Man (2008)
-                        "movie:1724",    // The Incredible Hulk (2008)
-                        "movie:10138",   // Iron Man 2 (2010)
-                        "movie:10195",   // Thor (2011)
-                        "movie:1771",    // Captain America: The First Avenger (2011)
-                        "movie:24428",   // The Avengers (2012)
-                        // Phase 2
-                        "movie:68721",   // Iron Man 3 (2013)
-                        "movie:76338",   // Thor: The Dark World (2013)
-                        "movie:100402",  // Captain America: The Winter Soldier (2014)
-                        "movie:118340",  // Guardians of the Galaxy (2014)
-                        "movie:99861",   // Avengers: Age of Ultron (2015)
-                        "movie:102899",  // Ant-Man (2015)
-                        // Phase 3
-                        "movie:271110",  // Captain America: Civil War (2016)
-                        "movie:284052",  // Doctor Strange (2016)
-                        "movie:283995",  // Guardians of the Galaxy Vol. 2 (2017)
-                        "movie:315635",  // Spider-Man: Homecoming (2017)
-                        "movie:284053",  // Thor: Ragnarok (2017)
-                        "movie:284054",  // Black Panther (2018)
-                        "movie:299536",  // Avengers: Infinity War (2018)
-                        "movie:363088",  // Ant-Man and the Wasp (2018)
-                        "movie:299537",  // Captain Marvel (2019)
-                        "movie:299534",  // Avengers: Endgame (2019)
-                        "movie:429617",  // Spider-Man: Far From Home (2019)
-                        // Phase 4 — Disney+ series start here
-                        "tv:85271",      // WandaVision
-                        "tv:88396",      // The Falcon and the Winter Soldier
-                        "tv:84958",      // Loki
-                        "movie:497698",  // Black Widow
-                        "tv:92749",      // What If...?
-                        "movie:566525",  // Shang-Chi and the Legend of the Ten Rings
-                        "tv:88329",      // Hawkeye
-                        "movie:524434",  // Eternals
-                        "movie:634649",  // Spider-Man: No Way Home
-                        "tv:92782",      // Moon Knight
-                        "movie:453395",  // Doctor Strange in the Multiverse of Madness
-                        "tv:92783",      // Ms. Marvel
-                        "movie:616037",  // Thor: Love and Thunder
-                        "tv:92785",      // She-Hulk: Attorney at Law
-                        "movie:505642",  // Black Panther: Wakanda Forever
-                        // Phase 5
-                        "movie:640146",  // Ant-Man and the Wasp: Quantumania
-                        "tv:114472",     // Secret Invasion
-                        "movie:447365",  // Guardians of the Galaxy Vol. 3
-                        "movie:609681",  // The Marvels
-                        "tv:138501",     // Echo
-                        "movie:533535",  // Deadpool & Wolverine
-                        "tv:202412",     // Agatha All Along
-                        "tv:202555",     // (kept for MCU timeline coverage)
-                        // Phase 6
-                        "movie:822119",  // Captain America: Brave New World
-                        "movie:986056",  // Thunderbolts*
-                        "tv:114471",     // Ironheart
-                        "movie:617126"   // The Fantastic Four: First Steps
-                    ),
-                    tmdbCollectionSource(86311),
-                    // Fill-in from mdblist — covers late-phase releases and
-                    // the live-action MCU TV catalog (separate list so both
-                    // flows populate from community-curated sources).
-                    mdblistSource("lt3dave/marvel-cinematic-universe-mcu-collection", mediaType = "movie"),
-                    mdblistSource("at0microuton/mcu-tv-shows", mediaType = "series")
-                )
-            ),
-            collection(
-                id = "collection_franchise_xmen",
-                title = "X-Men",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The X-Men film saga.",
-                cover = "https://i.postimg.cc/RC2Ny8Ds/X-Men.jpg",
-                hero = "https://image.tmdb.org/t/p/original/pIajnwDRDH3OJ25bp1Oqvmk2mrS.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/qkDbPsV76eU9ldQsHhjmEzjeeox.png",
-                // TMDB 748 = X-Men, 453993 = Deadpool, 556 = Wolverine. Plus
-                // the community "chronological order" list to catch Gifted,
-                // Legion, and any non-Fox spinoffs the collections miss.
-                sources = listOf(
-                    tmdbCollectionSource(748),
-                    tmdbCollectionSource(453993),
-                    tmdbCollectionSource(556),
-                    mdblistSource("jxduffy/x-men-chronological-order")
-                )
-            ),
-            collection(
-                id = "collection_franchise_star_wars",
-                title = "Star Wars",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "A galaxy far, far away.",
-                cover = "https://i.pinimg.com/originals/d0/45/6e/d0456e80877753487e03deaab16c3d26.gif",
-                focusGif = "https://i.postimg.cc/Wz08p7rv/Star-Wars.jpg",
-                hero = "https://image.tmdb.org/t/p/original/d8duYyyC9J5T825Hg7grmaabfxQ.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/vswPivs3yuUsk5aW6DbnyeNQ4GX.png",
-                // Timeline (in-universe) order, not release order — Clone Wars
-                // sits between Eps II and III, Rogue One immediately precedes
-                // A New Hope, Mandalorian/Ahsoka follow Return of the Jedi.
-                sources = listOf(
-                    curatedSource(
-                        "movie:1893",    // Ep I: The Phantom Menace
-                        "movie:1894",    // Ep II: Attack of the Clones
-                        "movie:12180",   // The Clone Wars (2008 film)
-                        "tv:4194",       // Star Wars: The Clone Wars
-                        "movie:1895",    // Ep III: Revenge of the Sith
-                        "tv:105971",     // The Bad Batch
-                        "tv:60554",      // Star Wars Rebels
-                        "movie:348350",  // Solo
-                        "tv:83867",      // Andor
-                        "tv:92830",      // Obi-Wan Kenobi
-                        "movie:330459",  // Rogue One
-                        "movie:11",      // Ep IV: A New Hope
-                        "movie:1891",    // Ep V: The Empire Strikes Back
-                        "movie:1892",    // Ep VI: Return of the Jedi
-                        "tv:82856",      // The Mandalorian
-                        "tv:115036",     // The Book of Boba Fett
-                        "tv:114461",     // Ahsoka
-                        "tv:202879",     // Skeleton Crew (was 202555 — wrong id)
-                        "tv:203085",     // Tales of the Jedi
-                        "tv:251091",     // Tales of the Empire
-                        "movie:140607",  // Ep VII: The Force Awakens
-                        "movie:181808",  // Ep VIII: The Last Jedi
-                        "movie:181812",  // Ep IX: The Rise of Skywalker
-                        "tv:114479",     // The Acolyte (Hi-Republic era)
-                        "tv:79093",      // Star Wars Resistance
-                        "tv:114410"      // Star Wars: Visions (anthology)
-                    ),
-                    // Fill-in from the community-maintained Star Wars list so
-                    // upcoming titles (Mandalorian & Grogu, Starfighter etc.)
-                    // show up without a code change each time one is added.
-                    mdblistSource("jxduffy/star-wars-chronological-order", collectionTab = "timeline")
-                )
-            ),
-            collection(
-                id = "collection_franchise_lotr",
-                title = "Lord of the Rings & Hobbit",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "Middle-earth on film.",
-                cover = "https://i.postimg.cc/d1bnKfh6/Lordoftherings.jpg",
-                hero = "https://image.tmdb.org/t/p/original/bccR2CGTWVVSZAG0yqmy3DIvhTX.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/dMAXhf7jVsc8Qsx26wsoOmoQh3r.png",
-                sources = listOf(
-                    tmdbCollectionSource(119),
-                    tmdbCollectionSource(121938),
-                    mdblistSource("spudhead15/lord-of-the-rings-and-hobbit-collection")
-                )
-            ),
-            collection(
-                id = "collection_franchise_pirates",
-                title = "Pirates of the Caribbean",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "Captain Jack Sparrow's swashbuckling saga.",
-                cover = "https://i.postimg.cc/Gmwdxn5R/Pirates.jpg",
-                hero = "https://image.tmdb.org/t/p/original/1Ds7xy7ILo8u2WWxdnkJth1jQVT.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/o0s0xqUcaWWv0Kh3QYmfxSQjmPD.png",
-                sources = listOf(
-                    tmdbCollectionSource(295)
-                )
-            ),
-            collection(
-                id = "collection_franchise_hunger_games",
-                title = "Hunger Games",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Hunger Games saga.",
-                cover = "https://i.postimg.cc/FzfKsZ29/Hunger-Games.jpg",
-                hero = "https://image.tmdb.org/t/p/original/b9aCOHFj0zNuwujAag7BFenZ3hF.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/jgEGp0adB6fGfILwoPB9lAyc38x.png",
-                sources = listOf(
-                    tmdbCollectionSource(131635)
-                )
-            ),
-            collection(
-                id = "collection_franchise_jurassic",
-                title = "Jurassic World",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Jurassic Park / World saga.",
-                cover = "https://i.postimg.cc/hjJDMNJn/JWorld.jpg",
-                hero = "https://image.tmdb.org/t/p/original/9xDQLI2rMokcQe4bJnb2optuuOO.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/ec4wy0iZFkHTxw04HyX4r06DwrH.png",
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "all", "mdblist.120197"),
-                    tmdbCollectionSource(328)
-                )
-            ),
-            collection(
-                id = "collection_franchise_avatar",
-                title = "Avatar",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "James Cameron's Pandora saga.",
-                cover = "https://i.postimg.cc/nLSV4nhT/AVATAR.jpg",
-                hero = "https://image.tmdb.org/t/p/original/Yc6c6BB8eSpjcd4f4E4mVqnSVe.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/bET8bJdM8diTCpUVilWqqu0M3EJ.png",
-                sources = listOf(
-                    tmdbCollectionSource(87096)
-                )
-            ),
-            collection(
-                id = "collection_franchise_dune",
-                title = "Dune",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Dune saga.",
-                cover = "https://i.postimg.cc/HnrT6frm/Dune.jpg",
-                hero = "https://image.tmdb.org/t/p/original/5p1tenxJ4ad8yplzBkOvv5K7Tqo.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/woifx7xduIyJYq8ktCiN36zt9Xu.png",
-                sources = listOf(
-                    tmdbCollectionSource(726871)
-                )
-            ),
-            collection(
-                id = "collection_franchise_indiana_jones",
-                title = "Indiana Jones",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Indiana Jones saga.",
-                cover = "https://i.postimg.cc/tCbrtFwS/Indiana-Jo.jpg",
-                hero = "https://image.tmdb.org/t/p/original/sRLex7fDc3OzjcghJIjnPYjslC2.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/yCZMIJaNriW79rR8NL4Kiq1mvWr.png",
-                sources = listOf(
-                    tmdbCollectionSource(84)
-                )
-            ),
-            collection(
-                id = "collection_franchise_007",
-                title = "007",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The James Bond saga.",
-                cover = "https://i.postimg.cc/L5LHFfB0/007.jpg",
-                hero = "https://image.tmdb.org/t/p/original/etoMLWs4TOJxqPBi8Y5oVFw8mCt.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/pxvf5usDNAzPEc9j0yluQA2I2Ud.png",
-                sources = listOf(
-                    tmdbCollectionSource(645)
-                )
-            ),
-            collection(
-                id = "collection_franchise_mission_impossible",
-                title = "Mission Impossible",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Mission: Impossible saga.",
-                cover = "https://i.postimg.cc/sfpWfstZ/MI.jpg",
-                hero = "https://image.tmdb.org/t/p/original/628Dep6AxEtDxjZoGP78TsOxYbK.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/d4Nk4FAlEoHLNEny88SQ7Jk9ZsZ.png",
-                sources = listOf(
-                    tmdbCollectionSource(87359)
-                )
-            ),
-            collection(
-                id = "collection_franchise_godfather",
-                title = "The Godfather",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Godfather trilogy.",
-                cover = "https://i.postimg.cc/X7YwbzbT/The-Godfather.jpg",
-                hero = "https://image.tmdb.org/t/p/original/mItOpbeYTu9IuQPCnZZbyTZjt4u.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/kysDTCloxUPJ1BILI4f8gs74fcr.png",
-                sources = listOf(
-                    tmdbCollectionSource(230)
-                )
-            ),
-            collection(
-                id = "collection_franchise_john_wick",
-                title = "John Wick",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The John Wick saga.",
-                cover = "https://i.postimg.cc/W14q7rtM/JW.jpg",
-                hero = "https://image.tmdb.org/t/p/original/5vUux2vNtzV8mnTHJ2dZztnRUhR.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/eVXvH6j4qM8ZEqZfw5bZ6JGQxqZ.png",
-                sources = listOf(
-                    tmdbCollectionSource(404609)
-                )
-            ),
-            collection(
-                id = "collection_franchise_transformers",
-                title = "Transformers",
-                group = CollectionGroupKind.FRANCHISE,
-                description = "The Transformers saga.",
-                cover = "https://i.postimg.cc/CLw3Lyhx/Transformers.jpg",
-                hero = "https://image.tmdb.org/t/p/original/srYya1ZlI97Au4jUYAktDe3avyA.jpg",
-                clearLogo = "https://image.tmdb.org/t/p/original/sRdt54X9wXUvCEwG4CdVyxFcC8y.png",
-                sources = listOf(
-                    tmdbCollectionSource(8650)
-                )
-            )
-        )
-
-        // ──────────────────────────────────────────────────────────────
-        // Genres (11 genres)
-        // Primary: addon catalogs when available; fallback to TMDB
-        // discover-by-genre. "New" = latest action (as configured by
-        // source list). Superhero & Crime get keyword + genre fallbacks.
-        // ──────────────────────────────────────────────────────────────
-        val genres = listOf(
-            collection(
-                id = "collection_genre_new",
-                title = "New",
-                group = CollectionGroupKind.GENRE,
-                description = "Fresh action releases.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/action-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/628Dep6AxEtDxjZoGP78TsOxYbK.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/action-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "action_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "action_series"),
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.91211"),
-                    tmdbGenreSource(MediaType.MOVIE, 28),
-                    tmdbGenreSource(MediaType.TV, 10759)
-                )
-            ),
-            collection(
-                id = "collection_genre_scifi",
-                title = "Sci-Fi",
-                group = CollectionGroupKind.GENRE,
-                description = "Science fiction movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/sci-fi-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/5p1tenxJ4ad8yplzBkOvv5K7Tqo.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/sci-fi-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "scifi_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "scifi_series"),
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.91220"),
-                    addonCollectionSource("aio-metadata", "series", "mdblist.91221"),
-                    tmdbGenreSource(MediaType.MOVIE, 878),
-                    tmdbGenreSource(MediaType.TV, 10765)
-                )
-            ),
-            collection(
-                id = "collection_genre_horror",
-                title = "Horror",
-                group = CollectionGroupKind.GENRE,
-                description = "Horror movies and thrillers.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/horror-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/nCbkOyOMTEwlEV0LtCOvCnwEONA.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/horror-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "horror_movies"),
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.91215"),
-                    tmdbGenreSource(MediaType.MOVIE, 27)
-                )
-            ),
-            collection(
-                id = "collection_genre_thriller",
-                title = "Thriller",
-                group = CollectionGroupKind.GENRE,
-                description = "Thriller movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/thriller-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/pwGmXVKUgKN13psUjlhC9zBcq1o.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/thriller-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "thriller_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "thriller_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 53)
-                )
-            ),
-            collection(
-                id = "collection_genre_fantasy",
-                title = "Fantasy",
-                group = CollectionGroupKind.GENRE,
-                description = "Fantasy movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/fantasy-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/bccR2CGTWVVSZAG0yqmy3DIvhTX.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/fantasy-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "fantasy_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "fantasy_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 14),
-                    tmdbGenreSource(MediaType.TV, 10765)
-                )
-            ),
-            collection(
-                id = "collection_genre_animation",
-                title = "Animation",
-                group = CollectionGroupKind.GENRE,
-                description = "Animated movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/animation-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/askg3SMvhqEl4OL52YuvdtY40Yb.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/animation-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "animation_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "animation_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 16),
-                    tmdbGenreSource(MediaType.TV, 16)
-                )
-            ),
-            collection(
-                id = "collection_genre_adventure",
-                title = "Adventure",
-                group = CollectionGroupKind.GENRE,
-                description = "Adventure movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/adventure-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/sRLex7fDc3OzjcghJIjnPYjslC2.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/adventure-wide.png",
-                sources = listOf(
-                    addonCollectionSource("aio-metadata", "movie", "mdblist.123222"),
-                    tmdbGenreSource(MediaType.MOVIE, 12),
-                    tmdbGenreSource(MediaType.TV, 10759)
-                )
-            ),
-            collection(
-                id = "collection_genre_comedy",
-                title = "Comedy",
-                group = CollectionGroupKind.GENRE,
-                description = "Comedy movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/comedy-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/uDgy6hyPd82kOHh6I95FLtLnj6p.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/comedy-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "comedy_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "comedy_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 35),
-                    tmdbGenreSource(MediaType.TV, 35)
-                )
-            ),
-            collection(
-                id = "collection_genre_family",
-                title = "Family Movie Night",
-                group = CollectionGroupKind.GENRE,
-                description = "Family friendly picks.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/family-movie-night-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/askg3SMvhqEl4OL52YuvdtY40Yb.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/family-movie-night-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "family_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "family_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 10751),
-                    tmdbGenreSource(MediaType.TV, 10751)
-                )
-            ),
-            collection(
-                id = "collection_genre_superhero",
-                title = "Superhero & Villains",
-                group = CollectionGroupKind.GENRE,
-                description = "Superheroes and their arch enemies.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/superheroes-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/9BBTo63ANSmhC4e6r62OJFuK2GL.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/superheroes-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "theme_superhero"),
-                    tmdbKeywordSource(MediaType.MOVIE, 9715),
-                    tmdbKeywordSource(MediaType.TV, 9715)
-                )
-            ),
-            collection(
-                id = "collection_genre_crime",
-                title = "Crime",
-                group = CollectionGroupKind.GENRE,
-                description = "Crime movies and series.",
-                cover = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/crime-wide.png",
-                hero = "https://image.tmdb.org/t/p/original/mItOpbeYTu9IuQPCnZZbyTZjt4u.jpg",
-                clearLogo = "https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/crime-wide.png",
-                sources = listOf(
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "theme_serialkiller"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "movie", "crime_movies"),
-                    addonCollectionSource("org.kris.ultra.max.all.v5", "series", "crime_series"),
-                    tmdbGenreSource(MediaType.MOVIE, 80),
-                    tmdbGenreSource(MediaType.TV, 80)
-                )
-            )
-        )
-
-            val legacyCollectionsByTitle = (services + franchises + genres)
-                .associateBy { it.title.trim().lowercase(Locale.US) }
-            val legacyCollectionAliases = mapOf(
-                "marvel" to "mcu universe",
-                "harry potter" to "wizarding world",
-                "james bond" to "007",
-                "jurassic park" to "jurassic world",
-                "lord of the rings" to "lord of the rings & hobbit",
-                "family" to "family movie night",
-                "superhero" to "superhero & villains"
-            )
-            fun resolveLegacyCollection(title: String): CatalogConfig? {
-                val normalizedTitle = title.trim().lowercase(Locale.US)
-                return legacyCollectionsByTitle[normalizedTitle]
-                    ?: legacyCollectionAliases[normalizedTitle]?.let(legacyCollectionsByTitle::get)
-            }
-            fun mergeCollectionSources(
-                primary: List<CollectionSourceConfig>,
-                fallback: List<CollectionSourceConfig>
-            ): List<CollectionSourceConfig> {
-                return (primary + fallback).distinctBy { source ->
-                    listOf(
-                        source.kind.name,
-                        source.collectionTab.orEmpty(),
-                        source.mediaType.orEmpty(),
-                        source.addonId.orEmpty(),
-                        source.addonManifestUrl.orEmpty(),
-                        source.addonCatalogType.orEmpty(),
-                        source.addonCatalogId.orEmpty(),
-                        source.tmdbGenreId?.toString().orEmpty(),
-                        source.tmdbPersonId?.toString().orEmpty(),
-                        source.tmdbCollectionId?.toString().orEmpty(),
-                        source.tmdbKeywordId?.toString().orEmpty(),
-                        source.tmdbWatchProviderId?.toString().orEmpty(),
-                        source.tmdbStudioId?.toString().orEmpty(),
-                        source.tmdbNetworkId?.toString().orEmpty(),
-                        source.watchRegion.orEmpty(),
-                        source.sortBy.orEmpty(),
-                        source.curatedRefs?.joinToString(",").orEmpty(),
-                        source.mdblistSlug.orEmpty()
-                    ).joinToString("|")
-                }
-            }
             val collectionRails = CollectionTemplateManifest.railOrder.map { group ->
                 CatalogConfig(
                     id = CollectionTemplateManifest.railCatalogId(group),
@@ -2042,24 +1142,8 @@ class MediaRepository @Inject constructor(
             }
 
             val templateCollections = CollectionTemplateManifest.entries.map { entry ->
-                val legacy = if (
-                    entry.group == CollectionGroupKind.MOVIE_GENRE ||
-                    entry.group == CollectionGroupKind.TV_GENRE
-                ) null else resolveLegacyCollection(entry.title)
-                val legacyHeroCover = legacy?.collectionHeroImageUrl?.takeUnless {
-                    it.contains(".gif", ignoreCase = true) || it.contains("gifv", ignoreCase = true)
-                }
                 val preferredCover = entry.coverImageUrl
-                val preferredHero = when (entry.group) {
-                    CollectionGroupKind.SERVICE,
-                    CollectionGroupKind.GENRE,
-                    CollectionGroupKind.MOVIE_GENRE,
-                    CollectionGroupKind.TV_GENRE,
-                    CollectionGroupKind.STUDIO,
-                    CollectionGroupKind.NETWORK,
-                    CollectionGroupKind.FRANCHISE -> preferredCover
-                    else -> legacy?.collectionHeroImageUrl ?: preferredCover
-                }
+                val preferredHero = preferredCover
                 CatalogConfig(
                     id = entry.id,
                     title = entry.title,
@@ -2067,13 +1151,12 @@ class MediaRepository @Inject constructor(
                     isPreinstalled = true,
                     kind = CatalogKind.COLLECTION,
                     collectionGroup = entry.group,
-                    collectionDescription = legacy?.collectionDescription
-                        ?: CollectionTemplateManifest.descriptionFor(entry),
+                    collectionDescription = CollectionTemplateManifest.descriptionFor(entry),
                     collectionCoverImageUrl = preferredCover,
                     collectionFocusGifUrl = preferredCover,
                     collectionHeroImageUrl = preferredHero,
                     collectionHeroGifUrl = preferredHero,
-                    collectionHeroVideoUrl = entry.heroVideoUrl ?: legacy?.collectionHeroVideoUrl,
+                    collectionHeroVideoUrl = entry.heroVideoUrl,
                     collectionClearLogoUrl = null,
                     collectionTileShape = if (
                         entry.group == CollectionGroupKind.GENRE ||
@@ -2085,13 +1168,7 @@ class MediaRepository @Inject constructor(
                         entry.tileShape
                     },
                     collectionHideTitle = entry.hideTitle,
-                    collectionSources = CollectionTemplateManifest.normalizeCollectionSources(
-                        entry.id,
-                        mergeCollectionSources(
-                            primary = entry.sources,
-                            fallback = legacy?.collectionSources.orEmpty()
-                        )
-                    ),
+                    collectionSources = CollectionTemplateManifest.normalizeCollectionSources(entry.id, entry.sources),
                     requiredAddonUrls = emptyList()
                 )
             }
@@ -2582,7 +1659,15 @@ class MediaRepository @Inject constructor(
                 it.addonManifestUrl == CollectionTemplateManifest.marvelTimelineSource().addonManifestUrl
         }
         if (marvelSource != null) {
-            return@coroutineScope loadMarvelAddonTimelinePage(marvelSource, offset, limit)
+            // The bundled snapshot keeps the timeline usable when the addon is unreachable.
+            return@coroutineScope try {
+                loadMarvelAddonTimelinePage(marvelSource, offset, limit)
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                Log.w("MarvelTimeline", "Addon timeline unavailable, using bundled snapshot", e)
+                loadMarvelWatchlistTimelinePage(offset, limit)
+            }
         }
         if (catalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }) {
             return@coroutineScope loadCollectionCatalogPage(
@@ -3071,15 +2156,26 @@ class MediaRepository @Inject constructor(
     /**
      * Streaming-service trending via `with_watch_providers`. Used for services
      * that don't have a dedicated addon catalog (Apple TV+, Paramount+, Hulu,
-     * Peacock). Region defaults to US if not provided — TMDB requires a region
-     * for watch-provider queries.
+     * Peacock). The region comes from the user's streaming-region setting; services
+     * that are not offered there (e.g. Peacock outside the US) fall back to the US
+     * catalog instead of showing an empty collection.
      */
     private suspend fun loadCollectionWatchProviderRefs(
         source: CollectionSourceConfig,
         limit: Int
     ): List<Pair<MediaType, Int>> {
+        val region = currentStreamingRegion()
+        val refs = loadCollectionWatchProviderRefsForRegion(source, limit, region)
+        if (refs.isNotEmpty() || region == "US") return refs
+        return loadCollectionWatchProviderRefsForRegion(source, limit, "US")
+    }
+
+    private suspend fun loadCollectionWatchProviderRefsForRegion(
+        source: CollectionSourceConfig,
+        limit: Int,
+        region: String
+    ): List<Pair<MediaType, Int>> {
         val providerId = source.tmdbWatchProviderId ?: return emptyList()
-        val region = source.watchRegion?.takeIf { it.isNotBlank() } ?: "US"
         val sortBy = source.sortBy ?: "popularity.desc"
         return when (source.mediaType?.lowercase(Locale.US)) {
             "movie" -> loadPagedTmdbDiscoverRefs(

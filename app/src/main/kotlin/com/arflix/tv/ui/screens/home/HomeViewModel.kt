@@ -3215,6 +3215,7 @@ class HomeViewModel @Inject constructor(
     private val collectionTitleResById: Map<String, Int> = mapOf(
         "Featured" to R.string.featured,
         "Services" to R.string.services,
+        "Streaming Services" to R.string.services,
         "Genres" to R.string.genres,
         "Movie Genres" to R.string.movie_genres,
         "TV Genres" to R.string.tv_genres,

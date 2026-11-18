@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -20,7 +21,11 @@ import com.arflix.tv.ui.skin.resolveAccentColor
 import com.arflix.tv.ui.theme.ArflixTypography
 
 @Composable
-internal fun HeroMetadataBadge(text: String) {
+internal fun HeroMetadataBadge(
+    text: String,
+    modifier: Modifier = Modifier,
+    onTextLayout: (TextLayoutResult) -> Unit = {},
+) {
     val accent = resolveAccentColor(ArvioSkin.colors.accent)
     val shape = RoundedCornerShape(6.dp)
     Text(
@@ -29,7 +34,8 @@ internal fun HeroMetadataBadge(text: String) {
         color = Color.White.copy(alpha = 0.94f),
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier
+        onTextLayout = onTextLayout,
+        modifier = modifier
             .background(Color.Black.copy(alpha = 0.62f), shape)
             .border(1.dp, accent.copy(alpha = 0.3f), shape)
             .padding(horizontal = 8.dp, vertical = 4.dp),

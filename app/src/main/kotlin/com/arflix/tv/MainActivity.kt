@@ -376,6 +376,21 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(appLanguage) {
                 mediaRepository.get().contentLanguage = appLanguage
             }
+            val streamingRegionSetting by remember(activeProfileId) {
+                this@MainActivity.settingsDataStore.data.map { prefs ->
+                    val profileId = activeProfileId
+                    if (profileId.isNullOrBlank()) {
+                        com.arflix.tv.data.repository.STREAMING_REGION_AUTO
+                    } else {
+                        com.arflix.tv.data.repository.normalizeStreamingRegionSetting(
+                            prefs[stringPreferencesKey("profile_${profileId}_streaming_region")]
+                        )
+                    }
+                }
+            }.collectAsStateWithLifecycle(initialValue = com.arflix.tv.data.repository.STREAMING_REGION_AUTO)
+            LaunchedEffect(streamingRegionSetting) {
+                mediaRepository.get().streamingRegionSetting = streamingRegionSetting
+            }
             val currentConfiguration = LocalConfiguration.current
             val autoDeviceType = remember(
                 currentConfiguration.smallestScreenWidthDp,

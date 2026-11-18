@@ -359,7 +359,7 @@ private fun localizedCategoryTitle(category: Category): String = when (category.
         "Trending Shows", "Trending in Shows" -> stringResource(R.string.trending_in_shows)
         "Trending Anime", "Trending in Anime" -> stringResource(R.string.trending_anime)
         "Featured" -> stringResource(R.string.featured)
-        "Services" -> stringResource(R.string.services)
+        "Services", "Streaming Services" -> stringResource(R.string.services)
         "Genres" -> stringResource(R.string.genres)
         "Movie Genres" -> stringResource(R.string.movie_genres)
         "TV Genres" -> stringResource(R.string.tv_genres)
@@ -2434,8 +2434,12 @@ internal fun HeroSection(
                     }
                 } else {
                     // Get actual genre names from genre IDs (memoized to avoid list allocations per recomposition)
-                    val genreText = context.genreNames(currentItem.mediaType, currentItem.genreIds)
-                        .take(2)
+                    val genreNames = context.genreNames(currentItem.mediaType, currentItem.genreIds)
+                    // The first badge row stays on one line: with two genres that don't fit next to
+                    // the date and runtime, only the first genre is shown.
+                    var visibleGenreCount by remember(currentItem.mediaType, currentItem.genreIds) { mutableIntStateOf(2) }
+                    val genreText = genreNames
+                        .take(visibleGenreCount)
                         .joinToString(" / ")
                     val displayDate = currentItem.releaseDate?.takeIf { it.isNotEmpty() } ?: currentItem.year
                     val hasDuration = currentItem.duration.isNotEmpty() && currentItem.duration != "0m"
@@ -2465,13 +2469,20 @@ internal fun HeroSection(
                         modifier = Modifier.width(heroTextWidth),
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        FlowRow(
+                        Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             if (hasGenre) {
-                                HeroMetadataBadge(genreText)
+                                HeroMetadataBadge(
+                                    text = genreText,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                    onTextLayout = { layout ->
+                                        if (layout.lineCount > 0 && layout.isLineEllipsized(0) && visibleGenreCount > 1) {
+                                            visibleGenreCount = 1
+                                        }
+                                    }
+                                )
                             }
 
                             if (displayDate.isNotEmpty()) {

@@ -85,7 +85,10 @@ data class CollectionSourceConfig(
     val curatedRefs: List<String>? = null,
     // Path component after /lists/, e.g. "jxduffy/star-wars-chronological-order".
     // Resolved against the public mdblist JSON endpoint at runtime.
-    val mdblistSlug: String? = null
+    val mdblistSlug: String? = null,
+    // Only resolved when none of the catalog's addon sources returned anything, so a
+    // working addon is never mixed with fallback titles.
+    val addonFallback: Boolean = false
 ) : Serializable
 
 data class CatalogConfig(

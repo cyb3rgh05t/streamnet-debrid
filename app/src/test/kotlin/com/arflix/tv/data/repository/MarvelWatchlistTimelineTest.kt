@@ -12,18 +12,18 @@ import java.security.MessageDigest
 
 class MarvelWatchlistTimelineTest {
     @Test
-    fun `Marvel persisted legacy lists are replaced with only the three official addon sources`() {
+    fun `Marvel persisted legacy lists are replaced with the addon sources and the addon-only fallback`() {
         val marvel = MediaRepository.buildPreinstalledDefaults().single { it.title == "Marvel" }
         val polluted = marvel.collectionSources + com.arflix.tv.data.model.CollectionSourceConfig(
             kind = CollectionSourceKind.CURATED_IDS,
             curatedRefs = listOf("tv:202412", "tv:92785")
         )
         val restored = CollectionTemplateManifest.normalizeCollectionSources(marvel.id, polluted)
-        assertEquals(3, restored.size)
-        assertTrue(restored.all { it.kind == CollectionSourceKind.ADDON_CATALOG })
-        assertEquals(listOf("movie", "series", "timeline"), restored.map { it.collectionTab })
+        assertEquals(4, restored.size)
+        assertEquals(listOf(CollectionSourceKind.ADDON_CATALOG), restored.take(3).map { it.kind }.distinct())
+        assertEquals(listOf("movie", "series", "timeline"), restored.take(3).map { it.collectionTab })
+        assertTrue(restored.last().addonFallback)
         assertEquals(restored, marvel.collectionSources)
-        assertTrue(restored.none { it.curatedRefs.orEmpty().contains("tv:202412") })
         assertEquals(polluted, CollectionTemplateManifest.normalizeCollectionSources("custom-collection", polluted))
     }
 

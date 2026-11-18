@@ -207,4 +207,40 @@ class CollectionOrderingTest {
             sortFranchiseReleaseRefs(refs, dates)
         )
     }
+
+    private fun addonSource() = CollectionSourceConfig(
+        kind = CollectionSourceKind.ADDON_CATALOG,
+        addonManifestUrl = "https://example.invalid/manifest.json",
+        addonCatalogType = "movie",
+        addonCatalogId = "movies"
+    )
+
+    private fun fallbackSource() = CollectionSourceConfig(
+        kind = CollectionSourceKind.CURATED_IDS,
+        curatedRefs = listOf("movie:1"),
+        addonFallback = true
+    )
+
+    @Test
+    fun `fallback source is skipped while the addon returns titles`() {
+        val resolved = mutableListOf<Int>()
+        val result = kotlinx.coroutines.runBlocking {
+            resolveSourcesWithAddonFallback(listOf(addonSource(), fallbackSource())) { index ->
+                resolved += index
+                if (index == 0) listOf(MediaType.MOVIE to 10) else listOf(MediaType.MOVIE to 1)
+            }
+        }
+        assertEquals(listOf(listOf(MediaType.MOVIE to 10), emptyList<Pair<MediaType, Int>>()), result)
+        assertEquals(listOf(0), resolved)
+    }
+
+    @Test
+    fun `fallback source is used when the addon fails or returns nothing`() {
+        val result = kotlinx.coroutines.runBlocking {
+            resolveSourcesWithAddonFallback(listOf(addonSource(), fallbackSource())) { index ->
+                if (index == 0) emptyList() else listOf(MediaType.MOVIE to 1)
+            }
+        }
+        assertEquals(listOf(emptyList<Pair<MediaType, Int>>(), listOf(MediaType.MOVIE to 1)), result)
+    }
 }
