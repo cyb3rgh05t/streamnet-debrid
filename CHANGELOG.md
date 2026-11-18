@@ -4,6 +4,36 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.017] - 2026-11-18
+
+- Android-Version: `2.6.017` / Code `518`.
+- Android, Standard-Kataloge bereinigt: Streamingdienste und Franchises nutzen keine Quellen mehr, die ein Addon voraussetzen, das der Nutzer erst selbst installieren müsste (`aio-metadata`, `ultra.max`, „Streaming Catalogs“). Die App installiert solche Addons ohnehin nicht, die Quellen lieferten daher nichts. Die Collections laufen jetzt über TMDB, MDBList, feste Listen und die eigenen Addons für Marvel, DC und Star Wars. Eigene Addons und eigene Kataloge der Nutzer bleiben unberührt. Bestehende Installationen übernehmen die neuen Standards beim Start.
+- Android, Standard-Kataloge: Die ältere zweite Definition der Collections in `MediaRepository` ist entfernt; Quellen und Beschreibungen stehen jetzt nur noch im Manifest (`CollectionTemplateManifest`). Das Ergebnis (Quellen, Reihenfolge, Titel) wurde vor und nach dem Umbau gegen eine gemeinsame Vertragsdatei verglichen und ist unverändert.
+- Android, „Featured“: Die vier Collections „Latest/Trending Movies/Shows“ sind entfernt; sie hatten keine Reihe auf Home. Geräte mit gespeicherten Einträgen verwerfen sie beim Start.
+- Android, Marvel: Fällt das Marvel-Addon aus oder liefert es nichts, zeigt die Collection ersatzweise eine feste Liste (50 Titel, Reihenfolge des Kinouniversums); die Timeline nutzt die eingebaute Liste mit Phasen. Antwortet das Addon, wird nichts dazugemischt.
+- Android, neue Einstellung „Streaming-Region“ (Einstellungen → Sprache, TV und Mobil): Das Land, nach dem das Angebot der Streamingdienste ermittelt wird. Bisher war es fest `US`. Standard ist „Automatisch“ (Land der Inhaltssprache, z. B. de-DE → DE); wählbar sind 22 Länder. Hat ein Dienst dort keine Titel (z. B. Peacock oder Starz außerhalb der USA), zeigt die Collection ersatzweise den US-Katalog. Die Region wird pro Profil gespeichert und über die Cloud mit App und Web synchronisiert; fehlt sie in einem älteren Stand, bleibt die lokale Wahl.
+- Android, Home: Die Collection-Reihe heißt „Streaming Services“ wie im Web (deutsch weiter „Streamingdienste“).
+- Android, Herr der Ringe: Die Collection enthält jetzt auch die Serie „Die Ringe der Macht“. Im reinen IPTV-Modus erscheint sie wie jeder Titel nur, wenn der Anbieter sie im Katalog hat.
+- Android, Home-Hero: Genre, Datum und Laufzeit stehen immer in einer Zeile. Passen zwei Genres nicht neben Datum und Laufzeit, wird nur das erste gezeigt (Beispiel: „Action & Abenteuer“ statt „Action & Abenteuer / Sci-Fi & Fantasy“, die „45m“ in die zweite Zeile schob). Auf dem Emulator mit „Die Ringe der Macht“ und „Die Odyssee“ geprüft.
+- Neu: Vertragstest `catalog-contract/standard-catalogs.txt`. Android (`StandardCatalogContractTest`) und Web (`catalog-contract.test.cjs`) rendern jeden Standardkatalog in eine Zeile und vergleichen mit derselben Datei; Abweichungen zwischen App und Web fallen damit in den Tests auf.
+- Android-Validierung: 941 Unit-Tests ohne Fehler, davon einer übersprungen, darunter neue Tests für Region, Marvel-Rückfall und den Vertragstest. Nicht geprüft: die Einstellung „Streaming-Region“ und der Sync in der Oberfläche, ein Marvel-Ausfall in der echten Oberfläche (nur per Test), Geräte mit alten gespeicherten Einträgen und echte TV-Hardware.
+- Web 1.0.077 und Backend 1.0.050 erscheinen mit dieser Version.
+
+## [Web 1.0.077] - 2026-11-18
+
+- Web-Version: `1.0.077`.
+- Web, Standard-Kataloge: Gleiche Quellen wie in der Android-App. Die Fremd-Addon-Quellen (`aio-metadata`) sind entfernt; Disney+, Harry Potter und Herr der Ringe haben die bisher nur in der App vorhandenen Listen bekommen, Marvel hat wie in der App nur sein Addon plus eine Ersatzliste, die nur bei einem Ausfall greift. Die Addon-Typen von Marvel, DC und Star Wars entsprechen den echten Manifesten (`Marvel`, `DC`, `StarWars`).
+- Web, Herr der Ringe: Die Collection enthält jetzt auch die Serie „Die Ringe der Macht“.
+- Web, neue Einstellung „Streaming-Region“ (Einstellungen → Sprache & Audio) mit derselben Länderliste wie die App, Standard „Automatisch“ (Land der Sprache). Dienste ohne Titel in der Region zeigen den US-Katalog. Der Wert wird mit der App synchronisiert. Auf bereits geladene Collections wirkt eine Änderung erst beim nächsten Laden.
+- Web, Franchises ohne Timeline (z. B. Harry Potter, Herr der Ringe) werden nach Erscheinungsdatum sortiert wie in der App; eine feste Liste mit einem Spin-off schaltet sie nicht mehr auf Beliebtheit um.
+- Tests: 124 Web-Tests ohne Fehler, darunter der gemeinsame Vertragstest mit der Android-App, die Region und der Sync-Wert; Typprüfung ohne Fehler. Nicht geprüft: Build und Darstellung im Browser.
+- Backend und Android: siehe 1.0.050 und 2.6.017.
+
+## [Backend 1.0.050] - 2026-11-18
+
+- Adminpanel, Remote Config: Die gestrichenen „Featured“-Collections (`collection_featured_*`) erscheinen nicht mehr in der Liste der Standard-Kataloge. Die Aktion „Obsolete Kataloge bereinigen“ entfernt sie jetzt zusammen mit den Netzwerk- und Studio-Collections aus den Accounts; der Hinweistext nennt das. Das Backend speichert den Profil-Block unverändert, das neue Feld „Streaming-Region“ der App braucht keine Änderung.
+- Backend-Suite: 165 von 166 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser nicht angesehen. Keine neue Datenbankmigration.
+
 ## [2.6.016] - 2026-11-18
 
 - Android-Version: `2.6.016` / Code `517`.

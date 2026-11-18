@@ -1706,7 +1706,7 @@ function updateGlobalFields() {
   const noSettings = byId("global-no-settings");
   noSettings.dataset.defaultText ??= noSettings.textContent;
   noSettings.textContent = operation === "remove_obsolete_catalogs"
-    ? "Entfernt aus allen Accounts Netzwerk- und Studio-Collections (collection_network_*, collection_studio_*) " +
+    ? "Entfernt aus allen Accounts Netzwerk-, Studio- und Featured-Collections (collection_network_*, collection_studio_*, collection_featured_*) " +
       "sowie die ersetzte Liste kingkearney/dc-universe aus Collections, die noch eine andere Liste haben. " +
       "Die aktuelle App liefert diese Einträge nicht mehr aus und verwirft sie selbst; alle anderen Kataloge, " +
       "Titel und Einstellungen bleiben unverändert. Prüfe die Anzahl in der Vorschau."

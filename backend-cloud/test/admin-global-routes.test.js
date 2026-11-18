@@ -596,7 +596,8 @@ test("removing obsolete catalogs keeps everything the app still ships", async (t
   };
   const disney = { id: "collection_network_disneyplus", title: "Disney+", isPreinstalled: true, kind: "COLLECTION" };
   const studio = { id: "collection_studio_pixar", title: "Pixar", isPreinstalled: true, kind: "COLLECTION" };
-  rows[0].payload.catalogsByProfile = { main: [keep, disney, dc, solo, studio] };
+  const featured = { id: "collection_featured_trending_movies", title: "Trending Movies", isPreinstalled: true, kind: "COLLECTION" };
+  rows[0].payload.catalogsByProfile = { main: [keep, disney, dc, solo, studio, featured] };
   rows[0].payload.hiddenPreinstalledByProfile = { main: ["collection_network_disneyplus", "trending_movies"] };
   rows[1].payload.catalogsByProfile = { main: [keep] };
 

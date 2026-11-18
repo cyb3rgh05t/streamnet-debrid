@@ -779,7 +779,7 @@ export function normalizeTmdbRef(value) {
 
 // Collections the app no longer ships (dropped 2026-09-02; the app discards them on its next start)
 // and MDBList lists it replaced. Accounts last written by an older app version still carry them.
-const obsoleteCatalogIdPattern = /^collection_(network|studio)_/;
+const obsoleteCatalogIdPattern = /^collection_(network|studio|featured)_/;
 const obsoleteMdblistSlugs = new Set(["kingkearney/dc-universe"]);
 
 function isObsoleteCatalog(catalog) {
@@ -1122,9 +1122,9 @@ export function adminEditableDefaultCatalogs(payload) {
     for (const catalog of catalogsForProfile(payload, profileId)) {
       if (!catalog?.id || catalog.isPreinstalled !== true) continue;
       const id = String(catalog.id);
-      // The app no longer ships studio or network collections; accounts that still hold them were
-      // last written by an old app version and drop them on their next update.
-      if (id.startsWith("collection_network_") || id.startsWith("collection_studio_")) continue;
+      // The app no longer ships studio, network or featured collections; accounts that still hold them
+      // were last written by an old app version and drop them on their next update.
+      if (obsoleteCatalogIdPattern.test(id)) continue;
       const entry = found.get(id) || { id, title: String(catalog.title || catalog.name || id), sources: new Map() };
       if (bundledMdblistHomeIds.has(id) && catalogType(catalog) === "MDBLIST" &&
           typeof catalog.sourceUrl === "string" && catalog.sourceUrl) {
