@@ -518,10 +518,17 @@ function formatAuditOperation(operation) {
     add_addon: "Add-on hinzugefügt / aktualisiert",
     edit_addon: "Add-on bearbeitet",
     clear_addons: "Alle Add-ons entfernt",
-    add_catalog: "Katalog hinzugefügt / aktualisiert",
-    rename_catalog: "Katalog umbenannt",
-    set_catalog_enabled: "Katalogaktivierung geändert",
-    delete_catalog: "Katalog entfernt / ausgeblendet",
+    add_catalog: "Katalog verteilt / aktualisiert",
+    rename_catalog: "Katalog-Titel geändert",
+    set_catalog_enabled: "Katalog ein- / ausgeblendet",
+    delete_catalog: "Katalog gelöscht / ausgeblendet",
+    set_catalog_source: "Home-Reihe: MDBList-Liste ausgetauscht",
+    set_catalog_slug: "Collection: MDBList-Liste ausgetauscht",
+    set_catalog_addon: "Collection: Addon-Quelle ausgetauscht",
+    clear_catalog_source: "Ausgetauschte Listen zurückgesetzt",
+    remove_obsolete_catalogs: "Veraltete Kataloge bereinigt",
+    add_catalog_item: "Franchise: Titel ergänzt",
+    remove_catalog_item: "Franchise: Titel entfernt",
   };
   const global = typeof operation === "string" && operation.startsWith("global_");
   const key = global ? operation.slice(7) : operation;

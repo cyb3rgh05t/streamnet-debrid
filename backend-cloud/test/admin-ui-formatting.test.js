@@ -145,8 +145,11 @@ test("memory formatting uses readable units and German decimals", () => {
 test("audit operation labels are readable and retain global scope", () => {
   assert.equal(context.formatAuditOperation("clear_streamnet_host_override"), "StreamNet-TV-Server zurückgesetzt");
   assert.equal(context.formatAuditOperation("change_streamnet_host"), "StreamNet-TV-Server geändert");
-  assert.equal(context.formatAuditOperation("global_add_catalog"), "Global: Katalog hinzugefügt / aktualisiert");
-  assert.equal(context.formatAuditOperation("global_set_catalog_enabled"), "Global: Katalogaktivierung geändert");
+  assert.equal(context.formatAuditOperation("global_add_catalog"), "Global: Katalog verteilt / aktualisiert");
+  assert.equal(context.formatAuditOperation("global_set_catalog_enabled"), "Global: Katalog ein- / ausgeblendet");
+  assert.equal(context.formatAuditOperation("global_delete_catalog"), "Global: Katalog gelöscht / ausgeblendet");
+  assert.equal(context.formatAuditOperation("global_set_catalog_slug"), "Global: Collection: MDBList-Liste ausgetauscht");
+  assert.equal(context.formatAuditOperation("global_remove_obsolete_catalogs"), "Global: Veraltete Kataloge bereinigt");
   assert.equal(context.formatAuditOperation("revoke_sessions"), "Alle Logins widerrufen");
   assert.equal(context.formatAuditOperation("unknown_operation"), "unknown_operation");
   assert.equal(context.formatAuditOperation("global_future_operation"), "global_future_operation");

@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.051] - 2026-11-18
+
+- Adminpanel, Remote Config: Die Katalog-Aktionen im Dropdown heißen jetzt so, wie sie wirken, statt irreführend „global entfernen / ausblenden“ o. Ä.: „Katalog an alle Accounts verteilen (neu / aktualisieren)“, „Katalog: Titel bei allen Accounts ändern“, „Katalog: bei allen Accounts ein- / ausblenden“, „Eigenen Katalog bei allen Accounts löschen (Standard-Kataloge: nur ausblenden)“, „Home-Reihe / Collection: MDBList-Liste austauschen“, „Collection: Addon-Quelle austauschen (nur Marvel / DC / Star Wars)“, „Austauschte Listen auf Standard zurücksetzen“, „Veraltetes bereinigen (Netzwerk-, Studio-, Featured-Collections)“ und „Franchise: ergänzten Titel wieder entfernen“. Das Verhalten der Aktionen ist unverändert.
+- Adminpanel, Protokoll: Die Katalog-Aktionen für Listen, Addon-Quelle, Zurücksetzen, Bereinigen und Franchise-Titel erscheinen jetzt mit lesbarem Namen statt mit dem internen Namen; die übrigen Katalog-Texte sind an die neuen Namen angepasst.
+- Backend-Suite: 165 von 166 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser nicht angesehen. Keine neue Datenbankmigration. Android und Web unverändert.
+
 ## [2.6.017] - 2026-11-18
 
 - Android-Version: `2.6.017` / Code `518`.
