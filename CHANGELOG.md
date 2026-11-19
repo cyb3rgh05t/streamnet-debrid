@@ -4,8 +4,24 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
-- Android und Web (noch nicht veröffentlicht, Quelltext liegt im Repository): Marvel, DC und Star Wars laufen ohne Addon über feste, im Admin bearbeitbare Titellisten (Filme, Serien, Timeline); die Marvel-Timeline zeigt Serien pro Staffel mehrfach, die Tabs Filme und Serien jeden Titel einmal. Collections, Cover, Quellen und Home-Reihen kommen aus der zentralen Konfiguration des Backends (`GET /catalog-config`), eigene Franchises erscheinen auf allen Geräten. Die Apps tragen die eingebauten Werte weiter als Rückfall.
+## [2.6.018] - 2026-11-19
 
+- Android-Version: `2.6.018` / Code `519`.
+- Android, Marvel, DC und Star Wars ohne Addon: Die drei Collections laufen jetzt über feste Titellisten (Filme, Serien, Timeline) statt über die eigenen Addons. Die Listen sind in der App eingebaut und lassen sich im Admin ändern. Das Marvel-Addon, sein Rückfall und die Star-Wars-Liste von MDBList entfallen; DC behält zusätzlich die MDBList-Serienliste.
+- Android, Marvel-Timeline: Serien erscheinen pro Staffel mehrfach („What If…? – Staffel 1/2/3“), jede Zeile mit eigenem Namen. Die Tabs Filme und Serien zeigen jeden Titel einmal. „I Am Groot“ hatte die falsche TMDB-ID (`226976`), richtig ist `232125`.
+- Android, Franchise-Tabs: Eine feste Titelliste wird nicht mehr bei 72 Titeln abgeschnitten (Marvel hat 120 Filme, bisher kamen nur 72 an). Star Wars hat jetzt Inhalt in den Tabs Filme und Serien. Eine gemischte MDBList-Liste (Filme und Serien) bringt im Filme-Tab nur Filme und im Serien-Tab nur Serien, wie im Web.
+- Android, zentrale Konfiguration für alle Geräte (auch Neuinstallationen und Geräte ohne Cloud-Konto): Die App lädt beim Start und danach alle 10 Minuten `GET /catalog-config` vom Backend, ohne Anmeldung. Der Admin kann damit Cover, TMDB-Collections, MDBList-Listen und feste Titel jeder Collection ändern, eigene Franchises anlegen, Home-Reihen für alle ein- oder ausblenden, den MDBList-Link einer Reihe tauschen und eigene Reihen hinzufügen. Ohne Verbindung gelten die zuletzt geladenen oder die eingebauten Werte. Eine Änderung kommt nach spätestens ca. 15 Minuten an, ohne App-Update.
+- Android, IPTV-Modus: Im normalen Modus wird alles gezeigt; nur im reinen IPTV-Modus gilt der Anbieterfilter, jetzt auch in der Marvel-Timeline (vorher war sie davon ausgenommen).
+- Android-Validierung: 944 Unit-Tests ohne Fehler, davon einer übersprungen, darunter neue Tests für die zentrale Konfiguration, die Tab-Trennung und den Vertrag mit Web und Backend. Auf dem Emulator im normalen Modus gesehen: Marvel- und Star-Wars-Tabs, Staffel-Einträge der Marvel-Timeline, eine eigene Franchise mit Cover, ein ausgetauschtes Cover und eine ausgetauschte Quelle (mit einer lokal eingespielten Testkonfiguration). Nicht geprüft: der reine IPTV-Modus, ausgeblendete und eigene Home-Reihen auf dem Gerät (nur per Test), echte TV-Hardware.
+- Backend 1.0.052 bis 1.0.055 und Web 1.0.078 gehören dazu. Das Backend braucht die Migration `npm run migrate` (Tabelle `catalog_config`), sonst gelten überall die eingebauten Werte.
+
+## [Web 1.0.078] - 2026-11-19
+
+- Web-Version: `1.0.078`.
+- Web, Marvel, DC und Star Wars: Gleiche festen Titellisten wie in der App (Filme, Serien, Timeline) statt der Addon-Kataloge. Die Marvel-Timeline zeigt Serien pro Staffel mehrfach mit eigenem Namen, Filme- und Serien-Tab jeden Titel einmal; „I Am Groot“ mit der richtigen ID `232125`. Star Wars hat Inhalt in den Tabs Filme und Serien.
+- Web, zentrale Konfiguration: Das Web lädt `GET /catalog-config` (alle 10 Minuten, ohne Anmeldung) und wendet Cover, TMDB-Collections, MDBList-Listen, feste Titel, eigene Franchises und die Home-Reihen aus dem Admin an, auch bei neuen Nutzern. Die zuletzt geladene Fassung bleibt im Browser gespeichert; ohne Verbindung gelten die eingebauten Werte.
+- Tests: 127 Web-Tests ohne Fehler, darunter der gemeinsame Vertragstest mit der Android-App und neue Tests für die zentrale Konfiguration; Typprüfung ohne Fehler. Nicht geprüft: Build und Darstellung im Browser; die Tab-Trennung nur über den Code und die bestehenden Tests.
+- Android und Backend: siehe 2.6.018 und Backend 1.0.055.
 ## [Backend 1.0.055] - 2026-11-19
 
 - Fix, Marvel-Timeline: „I Am Groot“ hatte die falsche TMDB-ID (`tv:226976`, kam aus dem Addon), richtig ist `tv:232125`. Korrigiert in der gelieferten Standardliste (`franchise-lists.seed.json`, `standard-catalogs.txt`) und in den Quellen von Android und Web. Wurde im Admin schon eine eigene Marvel-Liste gespeichert, muss die ID dort von Hand getauscht werden.
