@@ -223,7 +223,51 @@ export async function readConfig(pool) {
     updatedAt: stamps.length ? new Date(Math.max(...stamps)).toISOString() : null };
 }
 
-export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin }) {
+const listInfoCache = new Map();
+const listInfoTtlMs = 6 * 60 * 60_000;
+
+/** What a public MDBList list contains (movies / shows) and its name; null fields when MDBList cannot be read. */
+export async function mdblistListInfo(slug, listTitle) {
+  const cached = listInfoCache.get(slug);
+  if (cached && Date.now() - cached.at < (cached.info.total === null ? 5 * 60_000 : listInfoTtlMs)) return cached.info;
+  const info = { title: null, movies: null, shows: null, total: null };
+  try {
+    const response = await fetch(`https://mdblist.com/lists/${slug}/json`, {
+      headers: { "User-Agent": "Mozilla/5.0 (StreamNet admin)", Accept: "application/json" },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (response.ok) {
+      const items = await response.json();
+      if (Array.isArray(items)) {
+        info.movies = items.filter((item) => item?.mediatype === "movie").length;
+        info.shows = items.filter((item) => item?.mediatype === "show").length;
+        info.total = items.length;
+      }
+    }
+  } catch {
+    // Left unknown: the admin shows the list without a type.
+  }
+  info.title = await listTitle?.(slug).catch(() => null) ?? null;
+  listInfoCache.set(slug, { info, at: Date.now() });
+  return info;
+}
+
+export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin, listTitle }) {
+  app.get("/admin-api/catalog-config/list-info", async (request, reply) => {
+    reply.header("Cache-Control", "no-store");
+    await authenticateAdmin(request);
+    const slugs = [...new Set(String(request.query?.slugs || "").split(",").map((value) => value.trim()))]
+      .filter((value) => mdblistSlugPattern.test(value))
+      .slice(0, 30);
+    const lists = {};
+    for (let index = 0; index < slugs.length; index += 4) {
+      const batch = slugs.slice(index, index + 4);
+      const resolved = await Promise.all(batch.map((slug) => mdblistListInfo(slug, listTitle)));
+      batch.forEach((slug, position) => { lists[slug] = resolved[position]; });
+    }
+    return { lists };
+  });
+
   // Read by every app. Short cache: an edit reaches devices within minutes; the apps keep the last copy and ship
   // a bundled one, so an outage of this endpoint changes nothing for users.
   app.get("/catalog-config", async (_request, reply) => {

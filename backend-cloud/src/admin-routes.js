@@ -592,6 +592,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   registerCatalogConfigRoutes(app, {
     pool,
     authenticateAdmin: (request) => authenticatedAdmin(request, pool, jwtKey),
+    listTitle: mdblistListTitle,
   });
 
   app.get("/admin", async (_request, reply) => {

@@ -550,7 +550,15 @@ internal fun collectionCatalogForTab(catalog: CatalogConfig, tab: CollectionTab)
             }
             if (refs.isEmpty()) emptyList() else listOf(source.copy(curatedRefs = refs))
         } else if (collectionSourceMatchesTab(source, tab)) {
-            listOf(source)
+            // A mixed MDBList list (movies and shows) only contributes the titles of the tab's own type.
+            val mixedList = source.kind == CollectionSourceKind.MDBLIST_PUBLIC && source.mediaType.isNullOrBlank()
+            listOf(
+                when {
+                    mixedList && tab == CollectionTab.MOVIES -> source.copy(mediaType = "movie")
+                    mixedList && tab == CollectionTab.SERIES -> source.copy(mediaType = "series")
+                    else -> source
+                }
+            )
         } else {
             emptyList()
         }

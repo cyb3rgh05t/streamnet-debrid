@@ -598,16 +598,31 @@
                     <p id="rc-f-cover-hint" class="rc-hint rc-wide"></p>
                   </div>
                   <img id="rc-f-cover-preview" class="rc-cover-preview hidden" alt="Cover-Vorschau" />
-                  <div id="rc-f-sources" class="rc-form-grid">
-                    <label id="rc-f-tmdb-field">TMDB-Collections (IDs, getrennt durch Komma)<input id="rc-f-tmdb" autocomplete="off" placeholder="z. B. 8091, 399" /></label>
-                    <label>MDBList-Listen (user/liste, getrennt durch Komma)<input id="rc-f-mdblist" autocomplete="off" placeholder="z. B. snoak/top-2020s-movies" /></label>
-                    <p id="rc-f-tmdb-hint" class="rc-hint"></p>
-                    <p id="rc-f-mdblist-hint" class="rc-hint"></p>
+                  <div id="rc-f-sources" class="rc-sources">
+                    <section id="rc-f-tmdb-field" class="rc-source-block">
+                      <h4>TMDB-Collections <span class="rc-badge">nur Filme</span></h4>
+                      <div id="rc-f-tmdb-rows" class="rc-source-rows"></div>
+                      <div class="rc-add-row">
+                        <input id="rc-f-tmdb-add" inputmode="numeric" autocomplete="off" placeholder="TMDB-Collection-ID, z. B. 645" />
+                        <button id="rc-f-tmdb-add-btn" class="button secondary" type="button">Hinzufügen</button>
+                      </div>
+                      <p id="rc-f-tmdb-hint" class="rc-hint"></p>
+                    </section>
+                    <section class="rc-source-block">
+                      <h4>MDBList-Listen</h4>
+                      <div id="rc-f-mdblist-rows" class="rc-source-rows"></div>
+                      <div class="rc-add-row">
+                        <input id="rc-f-mdblist-add" autocomplete="off" placeholder="user/liste oder https://mdblist.com/lists/user/liste" />
+                        <button id="rc-f-mdblist-add-btn" class="button secondary" type="button">Hinzufügen</button>
+                      </div>
+                      <p id="rc-f-mdblist-hint" class="rc-hint"></p>
+                    </section>
                   </div>
                   <p id="rc-f-other" class="rc-hint"></p>
                   <label id="rc-f-extras-field">Zusätzliche Titel (eine Zeile pro Titel: movie:ID oder tv:ID, höchstens 30)
                     <textarea id="rc-f-extras" rows="4" spellcheck="false" class="franchise-text"></textarea>
                   </label>
+                  <p id="rc-f-extras-summary" class="rc-hint"></p>
                   <div id="rc-f-tabs">
                     <div class="rc-tab-switch" role="group" aria-label="Tab">
                       <button type="button" class="button secondary" data-rc-ftab="movie" aria-pressed="true">Filme</button>

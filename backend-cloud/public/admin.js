@@ -1703,7 +1703,7 @@ async function loadGlobal() {
 // ---- Remote Config: central catalog configuration (collections, home rows) ----
 const rcTabs = ["movie", "series", "timeline"];
 const rcNewKey = "__new__";
-const rc = { data: null, tab: "overview", ftab: "movie", current: null, drafts: {}, group: "FRANCHISE" };
+const rc = { data: null, tab: "overview", ftab: "movie", current: null, drafts: {}, group: "FRANCHISE", src: { tmdb: [], mdblist: [] }, listInfo: {} };
 const rcTabHelp = {
   movie: "Filme – eine Zeile pro Titel: movie:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
   series: "Serien – eine Zeile pro Titel: tv:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
@@ -1955,12 +1955,117 @@ function stashRcDraft() {
   draft.title = byId("rc-f-title").value;
   draft.id = byId("rc-f-id").value;
   draft.cover = byId("rc-f-cover").value;
-  draft.tmdb = byId("rc-f-tmdb").value;
-  draft.mdblist = byId("rc-f-mdblist").value;
+  draft.tmdb = [...rc.src.tmdb];
+  draft.mdblist = [...rc.src.mdblist];
   draft.extras = byId("rc-f-extras").value;
   if (!byId("rc-f-tabs").classList.contains("hidden")) draft.tabs[rc.ftab] = byId("rc-f-text").value;
   draft.reason = byId("rc-f-reason").value;
   rc.drafts[key] = draft;
+}
+
+// "user/liste" from a pasted MDBList link or slug; empty when it is neither.
+function rcNormalizeSlug(value) {
+  const slug = String(value || "").trim().replace(/^https?:\/\/(www\.)?mdblist\.com\/lists\//i, "").replace(/\/+(json)?$/, "");
+  return /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(slug) ? slug : "";
+}
+
+function rcListBadge(info) {
+  if (!info || info.total === null) return ["Typ unbekannt", ""];
+  if (info.movies && info.shows) return ["Filme + Serien", "is-movie"];
+  if (info.shows) return ["Serien", "is-show"];
+  if (info.movies) return ["Filme", "is-movie"];
+  return ["leer", ""];
+}
+
+function rcListInfoText(info) {
+  if (!info) return "Wird geladen…";
+  const name = info.title ? `${info.title} · ` : "";
+  if (info.total === null) return `${name}Inhalt konnte nicht gelesen werden`;
+  return `${name}${info.movies} Filme, ${info.shows} Serien`;
+}
+
+async function loadRcListInfo(slugs) {
+  const missing = slugs.filter((slug) => !(slug in rc.listInfo));
+  if (!missing.length) return;
+  try {
+    const result = await api(`/admin-api/catalog-config/list-info?slugs=${encodeURIComponent(missing.join(","))}`);
+    Object.assign(rc.listInfo, result.lists);
+  } catch {
+    for (const slug of missing) rc.listInfo[slug] = { title: null, movies: null, shows: null, total: null };
+  }
+  renderRcSourceRows();
+}
+
+function rcSourceRow(badgeText, badgeClass, value, placeholder, infoText, onChange, onRemove) {
+  const row = rcElement("div", null, "rc-source-row");
+  const input = document.createElement("input");
+  input.value = value;
+  input.placeholder = placeholder;
+  input.autocomplete = "off";
+  input.addEventListener("change", () => onChange(input.value));
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "button secondary";
+  remove.textContent = "Entfernen";
+  remove.addEventListener("click", onRemove);
+  row.append(rcElement("span", badgeText, `rc-badge ${badgeClass}`.trim()), input, rcElement("span", infoText, "rc-source-info"), remove);
+  return row;
+}
+
+function renderRcSourceRows() {
+  byId("rc-f-tmdb-rows").replaceChildren(...rc.src.tmdb.map((id, index) => rcSourceRow(
+    "Film", "is-movie", id, "TMDB-Collection-ID", "TMDB-Collection (enthält nur Filme)",
+    (value) => {
+      const clean = String(value).trim();
+      if (!/^\d{1,9}$/.test(clean)) { showToast("TMDB-Collection-ID: nur Ziffern", true); renderRcSourceRows(); return; }
+      rc.src.tmdb[index] = clean;
+      renderRcSourceRows();
+    },
+    () => { rc.src.tmdb.splice(index, 1); renderRcSourceRows(); },
+  )));
+  byId("rc-f-mdblist-rows").replaceChildren(...rc.src.mdblist.map((slug, index) => {
+    const [badge, badgeClass] = rcListBadge(rc.listInfo[slug]);
+    return rcSourceRow(
+      badge, badgeClass, slug, "user/liste", rcListInfoText(rc.listInfo[slug]),
+      (value) => {
+        const clean = rcNormalizeSlug(value);
+        if (!clean) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); renderRcSourceRows(); return; }
+        rc.src.mdblist[index] = clean;
+        renderRcSourceRows();
+        void loadRcListInfo([clean]);
+      },
+      () => { rc.src.mdblist.splice(index, 1); renderRcSourceRows(); },
+    );
+  }));
+  void loadRcListInfo(rc.src.mdblist.filter((slug) => !(slug in rc.listInfo)));
+}
+
+function addRcTmdb() {
+  const input = byId("rc-f-tmdb-add");
+  const value = input.value.trim();
+  if (!/^\d{1,9}$/.test(value)) { showToast("TMDB-Collection-ID: nur Ziffern", true); return; }
+  if (!rc.src.tmdb.includes(value)) rc.src.tmdb.push(value);
+  input.value = "";
+  renderRcSourceRows();
+}
+
+function addRcMdblist() {
+  const input = byId("rc-f-mdblist-add");
+  const slug = rcNormalizeSlug(input.value);
+  if (!slug) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); return; }
+  if (!rc.src.mdblist.includes(slug)) rc.src.mdblist.push(slug);
+  input.value = "";
+  renderRcSourceRows();
+}
+
+function updateRcExtrasSummary() {
+  const refs = rcList(String(byId("rc-f-extras").value).replace(/\n/g, " "));
+  const movies = refs.filter((ref) => /^movie:\d+$/i.test(ref)).length;
+  const shows = refs.filter((ref) => /^tv:\d+$/i.test(ref)).length;
+  const invalid = refs.length - movies - shows;
+  byId("rc-f-extras-summary").textContent = refs.length
+    ? `${movies} Filme (movie:), ${shows} Serien (tv:)${invalid ? `, ${invalid} ungültig` : ""}`
+    : "movie:ID = Film, tv:ID = Serie";
 }
 
 function rcHint(node, label, value) {
@@ -1986,9 +2091,10 @@ function renderRcFranchiseForm() {
   byId("rc-f-title").value = draft.title ?? item?.title ?? "";
   byId("rc-f-id").value = draft.id ?? franchise?.id ?? "";
   byId("rc-f-cover").value = draft.cover ?? effective.cover;
-  byId("rc-f-tmdb").value = draft.tmdb ?? effective.tmdb.join(", ");
-  byId("rc-f-mdblist").value = draft.mdblist ?? effective.mdblist.join(", ");
+  rc.src = { tmdb: [...(draft.tmdb ?? effective.tmdb)], mdblist: [...(draft.mdblist ?? effective.mdblist)] };
+  renderRcSourceRows();
   byId("rc-f-extras").value = draft.extras ?? effective.extras.join("\n");
+  updateRcExtrasSummary();
   byId("rc-f-reason").value = draft.reason ?? "";
   byId("rc-f-title").disabled = !custom;
   byId("rc-f-id").disabled = !isNew;
@@ -2056,14 +2162,15 @@ async function saveRcFranchise(event) {
   const reason = byId("rc-f-reason").value;
   try {
     const cover = String(draft.cover ?? "").trim();
-    const mdblist = rcList(draft.mdblist);
+    const mdblist = (draft.mdblist ?? []).map(rcNormalizeSlug).filter(Boolean);
+    const tmdbIds = rcNumberList((draft.tmdb ?? []).join(","));
     if (!item?.standard) {
       const id = isNew ? String(draft.id || "").trim().toLowerCase() : item.franchise.id;
       setMessage(message, "Wird gespeichert…", "info");
       const saved = (await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify({
-          title: String(draft.title ?? "").trim(), coverUrl: cover, tmdbCollections: rcNumberList(draft.tmdb),
+          title: String(draft.title ?? "").trim(), coverUrl: cover, tmdbCollections: tmdbIds,
           mdblist, tabs: rcTabsFromDraft(draft, item?.franchise), reason,
         }),
       })).franchise;
@@ -2077,8 +2184,7 @@ async function saveRcFranchise(event) {
       const sources = {};
       if (mdblist.length) sources.mdblist = mdblist;
       if (item.group === "FRANCHISE") {
-        const tmdb = rcNumberList(draft.tmdb);
-        if (tmdb.length) sources.tmdbCollections = tmdb;
+        if (tmdbIds.length) sources.tmdbCollections = tmdbIds;
         const extras = rcList(String(draft.extras ?? "").replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
         if (extras.length) overrides.extras[standard.id] = extras; else delete overrides.extras[standard.id];
       }
@@ -2199,6 +2305,14 @@ byId("rc-new-franchise").addEventListener("click", () => {
   renderRcFranchiseList();
   renderRcFranchiseForm();
 });
+byId("rc-f-extras").addEventListener("input", updateRcExtrasSummary);
+byId("rc-f-tmdb-add-btn").addEventListener("click", addRcTmdb);
+byId("rc-f-mdblist-add-btn").addEventListener("click", addRcMdblist);
+for (const [id, handler] of [["rc-f-tmdb-add", addRcTmdb], ["rc-f-mdblist-add", addRcMdblist]]) {
+  byId(id).addEventListener("keydown", (event) => {
+    if (event.key === "Enter") { event.preventDefault(); handler(); }
+  });
+}
 byId("rc-f-text").addEventListener("input", () => {
   byId("rc-f-count").textContent = `${rcLineCount(byId("rc-f-text").value)} Einträge in diesem Tab`;
 });

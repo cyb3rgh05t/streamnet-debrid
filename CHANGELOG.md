@@ -6,6 +6,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 - Android und Web (noch nicht veröffentlicht, Quelltext liegt im Repository): Marvel, DC und Star Wars laufen ohne Addon über feste, im Admin bearbeitbare Titellisten (Filme, Serien, Timeline); die Marvel-Timeline zeigt Serien pro Staffel mehrfach, die Tabs Filme und Serien jeden Titel einmal. Collections, Cover, Quellen und Home-Reihen kommen aus der zentralen Konfiguration des Backends (`GET /catalog-config`), eigene Franchises erscheinen auf allen Geräten. Die Apps tragen die eingebauten Werte weiter als Rückfall.
 
+## [Backend 1.0.053] - 2026-11-19
+
+- Adminpanel, Remote Config → Collections: Die Quellen einer Collection stehen jetzt als Zeilen statt als Textfeld mit Kommas. Jede MDBList-Liste zeigt Name, Typ (Filme / Serien / Filme + Serien) und Anzahl der Titel, TMDB-Collections sind als „nur Filme“ gekennzeichnet. Listen lassen sich ersetzen (Feld ändern), entfernen und hinzufügen (`user/liste` oder ein mdblist.com-Link). Bei den zusätzlichen Titeln zeigt eine Zeile unter dem Feld, wie viele Filme (`movie:`) und Serien (`tv:`) es sind.
+- Neu: `GET /admin-api/catalog-config/list-info?slugs=…` liest Name und Inhalt öffentlicher MDBList-Listen (6 Stunden im Speicher gehalten); ist MDBList nicht erreichbar, bleibt der Typ „unbekannt“.
+- Die Apps rufen `GET /catalog-config` ohne Login ab; auch Installationen ohne Cloud-Konto bekommen die zentralen Werte, solange die App eine Backend-Adresse hat.
+- Backend-Suite: 175 von 176 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Android (Quelltext, noch nicht veröffentlicht): Eine gemischte MDBList-Liste zeigt im Filme-Tab nur Filme und im Serien-Tab nur Serien wie im Web.
+
 ## [Backend 1.0.052] - 2026-11-19
 
 - Neu: Zentrale Katalog-Konfiguration für alle Geräte, auch Neuinstallationen und neue Accounts (bisher wirkten die Remote-Config-Aktionen nur auf bestehende Accounts). Öffentlicher Endpunkt `GET /catalog-config` (5 Minuten Cache), Admin-Endpunkte `GET /admin-api/catalog-config`, `PUT`/`DELETE /admin-api/catalog-config/franchises/:id` und `PUT /admin-api/catalog-config/overrides`. Gespeichert wird in der neuen Tabelle `catalog_config` (Migration `014_catalog_config.sql`). Ohne die Tabelle antwortet `GET /catalog-config` mit den eingebauten Werten statt mit einem Fehler; Speichern im Admin geht erst nach der Migration.

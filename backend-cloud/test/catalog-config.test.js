@@ -191,6 +191,25 @@ test("the public config still answers with the built-in values before the migrat
   assert.deepEqual(response.json().franchises.map((f) => f.id), ["marvel", "dc", "starwars"]);
 });
 
+test("list info tells whether an MDBList list holds movies or shows, and survives an unreachable MDBList", async (t) => {
+  const { app, call } = await fixture(t);
+  const original = globalThis.fetch;
+  t.after(() => { globalThis.fetch = original; });
+  globalThis.fetch = async (url) => {
+    if (String(url).includes("/lists/me/mixed/json")) {
+      return new Response(JSON.stringify([{ mediatype: "movie" }, { mediatype: "show" }, { mediatype: "show" }]), { status: 200 });
+    }
+    if (String(url).includes("/lists/me/shows/json")) return new Response(JSON.stringify([{ mediatype: "show" }]), { status: 200 });
+    throw new Error("offline");
+  };
+  assert.equal((await app.inject({ method: "GET", url: "/admin-api/catalog-config/list-info?slugs=me/mixed" })).statusCode, 401);
+  const { lists } = (await call("GET", "/admin-api/catalog-config/list-info?slugs=me/mixed,me/shows,me/down,bad%20slug")).json();
+  assert.deepEqual([lists["me/mixed"].movies, lists["me/mixed"].shows, lists["me/mixed"].total], [1, 2, 3]);
+  assert.deepEqual([lists["me/shows"].movies, lists["me/shows"].shows], [0, 1]);
+  assert.equal(lists["me/down"].total, null);
+  assert.equal("bad slug" in lists, false);
+});
+
 test("the admin overview lists the standard catalogs with their lists", async (t) => {
   const { call } = await fixture(t);
   const overview = (await call("GET", "/admin-api/catalog-config")).json();

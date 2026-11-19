@@ -183,6 +183,15 @@ class CatalogConfigRepositoryTest {
     }
 
     @Test
+    fun `a mixed MDBList list only brings the titles of the tab it is shown in`() {
+        val catalog = defaults.single { it.id == "collection_franchise_harry_potter" }
+        fun lists(tab: CollectionTab) = collectionCatalogForTab(catalog, tab).collectionSources
+            .filter { it.kind == CollectionSourceKind.MDBLIST_PUBLIC }.map { it.mediaType }
+        assertEquals(listOf<String?>("movie"), lists(CollectionTab.MOVIES))
+        assertEquals(listOf<String?>("series"), lists(CollectionTab.SERIES))
+    }
+
+    @Test
     fun `admin-added titles still split by type across the movie and series tabs`() {
         val catalog = defaults.single { it.id == "collection_franchise_lord_of_the_rings" }
             .let { it.copy(collectionSources = it.collectionSources + CollectionSourceConfig(kind = CollectionSourceKind.CURATED_IDS, curatedRefs = listOf("movie:1", "tv:2"))) }

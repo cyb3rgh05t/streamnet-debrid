@@ -2,7 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { catalogIdFor, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
+import { catalogIdFor, mdblistListInfo, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
 
 // Demo state of the central catalog configuration (not persisted).
 const franchiseSaved = new Map();
@@ -373,6 +373,12 @@ const server = createServer(async (request, reply) => {
             standards: standards.filter((item) => item.kind !== "COLLECTION_RAIL").map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
               ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources, sourceCount: sources.length })),
           });
+        }
+        if (parts[2] === "list-info" && request.method === "GET") {
+          const slugs = String(url.searchParams.get("slugs") || "").split(",").filter(Boolean).slice(0, 30);
+          const lists = {};
+          for (const slug of slugs) lists[slug] = await mdblistListInfo(slug, async () => null);
+          return json(reply, 200, { lists });
         }
         if (parts[2] === "overrides" && request.method === "PUT") {
           overridesSaved = validateOverrides(await readBody(request), standards);
