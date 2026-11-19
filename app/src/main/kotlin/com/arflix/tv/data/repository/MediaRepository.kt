@@ -377,7 +377,8 @@ class MediaRepository @Inject constructor(
     private val traktApi: TraktApi,
     private val okHttpClient: OkHttpClient,
     private val streamRepository: StreamRepository,
-    private val homeServerRepository: HomeServerRepository
+    private val homeServerRepository: HomeServerRepository,
+    private val catalogConfig: CatalogConfigRepository
 ) {
 
     data class CategoryPageResult(
@@ -426,7 +427,6 @@ class MediaRepository @Inject constructor(
         synchronized(logoCache) { logoCache.clear() }
         homeServerLogoRefCache.clear()
         collectionRefsCache.clear()
-        marvelAddonCatalogCache.clear()
         franchiseReleaseCache.clear()
         synchronized(reviewsCache) { reviewsCache.clear() }
         synchronized(seasonEpisodesCache) { seasonEpisodesCache.clear() }
@@ -460,7 +460,6 @@ class MediaRepository @Inject constructor(
     private val addonTitleToTmdbCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val homeServerLogoRefCache = ConcurrentHashMap<String, CacheEntry<Pair<MediaType, Int>?>>()
     private val collectionRefsCache = ConcurrentHashMap<String, CacheEntry<List<Pair<MediaType, Int>>>>()
-    private val marvelAddonCatalogCache = ConcurrentHashMap<String, CacheEntry<List<StremioMetaPreview>>>()
     private data class FranchiseReleaseDate(
         val date: java.time.LocalDate?
     )
@@ -558,8 +557,6 @@ class MediaRepository @Inject constructor(
                 append(source.mdblistSlug.orEmpty())
                 append(':')
                 append(source.curatedRefs?.joinToString(",").orEmpty())
-                append(':')
-                append(source.addonFallback)
                 append(';')
             }
         }
@@ -607,14 +604,18 @@ class MediaRepository @Inject constructor(
             }
         }
         val sources = catalog.collectionSources
-        val perSourceRefs: List<List<Pair<MediaType, Int>>> = resolveSourcesWithAddonFallback(sources) { index ->
-            runCatching {
-                resolveCollectionSourceRefs(
-                    sources[index],
-                    offset = 0,
-                    limit = sourceBudgets[index]
-                )
-            }.getOrDefault(emptyList())
+        val perSourceRefs: List<List<Pair<MediaType, Int>>> = coroutineScope {
+            sources.mapIndexed { index, _ ->
+                async {
+                    runCatching {
+                        resolveCollectionSourceRefs(
+                            sources[index],
+                            offset = 0,
+                            limit = sourceBudgets[index]
+                        )
+                    }.getOrDefault(emptyList())
+                }
+            }.map { it.await() }
         }
 
         val refs = LinkedHashSet<Pair<MediaType, Int>>()
@@ -1094,7 +1095,7 @@ class MediaRepository @Inject constructor(
         items.forEach { cacheItem(it) }
     }
 
-    fun getDefaultCatalogConfigs(): List<CatalogConfig> = buildPreinstalledDefaults()
+    fun getDefaultCatalogConfigs(): List<CatalogConfig> = catalogConfig.applyToDefaults(buildPreinstalledDefaults())
 
     companion object {
         private const val POPULAR_TITLE_POOL_PAGES = 10
@@ -1650,34 +1651,13 @@ class MediaRepository @Inject constructor(
         offset: Int,
         limit: Int
     ): CategoryPageResult = coroutineScope {
+        val catalog = catalogConfig.apply(catalog)
         if (catalog.collectionSources.isEmpty() || limit <= 0 || offset < 0) {
             return@coroutineScope CategoryPageResult(emptyList(), hasMore = false)
         }
-        val marvelSource = catalog.collectionSources.singleOrNull()?.takeIf {
-            it.collectionTab == "timeline" &&
-                it.addonCatalogId == "marvel-mcu" &&
-                it.addonManifestUrl == CollectionTemplateManifest.marvelTimelineSource().addonManifestUrl
-        }
-        if (marvelSource != null) {
-            // The bundled snapshot keeps the timeline usable when the addon is unreachable.
-            return@coroutineScope try {
-                loadMarvelAddonTimelinePage(marvelSource, offset, limit)
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                Log.w("MarvelTimeline", "Addon timeline unavailable, using bundled snapshot", e)
-                loadMarvelWatchlistTimelinePage(offset, limit)
-            }
-        }
-        if (catalog.collectionSources.all { it.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE }) {
-            return@coroutineScope loadCollectionCatalogPage(
-                catalog.copy(collectionSources = catalog.collectionSources.map(
-                    CollectionTemplateManifest::migrateMarvelTimelineSource
-                )),
-                offset,
-                limit
-            )
-        }
+        catalog.collectionSources.singleOrNull()
+            ?.takeIf { it.kind == CollectionSourceKind.CURATED_IDS && it.collectionTab == "timeline" && it.curatedTitles != null }
+            ?.let { return@coroutineScope loadCuratedTimelinePage(catalog.id, it, offset, limit) }
 
         val resolvedRefs = resolveCollectionCatalogRefs(
             catalog = catalog,
@@ -1728,147 +1708,59 @@ class MediaRepository @Inject constructor(
         )
     }
 
-    private suspend fun loadMarvelAddonTimelinePage(
+    /**
+     * A franchise timeline lists titles in a fixed order and may repeat one (a series once per season), so it
+     * bypasses the de-duplicating ref resolution: every entry becomes its own card with its own label.
+     */
+    private suspend fun loadCuratedTimelinePage(
+        catalogId: String,
         source: CollectionSourceConfig,
         offset: Int,
         limit: Int
     ): CategoryPageResult = coroutineScope {
-        val descriptor = AddonCatalogDescriptor(
-            addonId = null,
-            catalogType = requireNotNull(source.addonCatalogType),
-            catalogId = requireNotNull(source.addonCatalogId),
-            manifestUrl = requireNotNull(source.addonManifestUrl)
-        )
-        val snapshotKey = requireNotNull(source.addonManifestUrl)
-        val metas = (if (offset > 0) getFromCache(marvelAddonCatalogCache, snapshotKey) else null) ?: run {
-            // The addon advertises 21 days of freshness, even when the timeline changes.
-            val response = streamRepository.getAddonCatalogPageFromUrl(
-                manifestUrl = snapshotKey,
-                catalogType = descriptor.catalogType,
-                catalogId = descriptor.catalogId,
-                revalidate = true
-            )
-            (response.metas ?: response.items.orEmpty()).also {
-                if (it.isEmpty()) error("Marvel timeline returned an empty catalog")
-                marvelAddonCatalogCache[snapshotKey] = CacheEntry(it, System.currentTimeMillis())
-                if (com.arflix.tv.BuildConfig.DEBUG) {
-                    Log.d("MarvelTimeline", "SNAPSHOT revalidated count=${it.size} source=$snapshotKey")
-                    it.forEachIndexed { index, meta ->
-                        Log.d("MarvelTimeline", "RAW position=$index id=${meta.id} type=${meta.type} tmdb=${meta.tmdbId} title=${meta.name}")
-                    }
-                }
+        val labels = source.curatedTitles.orEmpty()
+        val entries = source.curatedRefs.orEmpty().mapIndexedNotNull { index, raw ->
+            val parts = raw.split(":", limit = 2)
+            val type = when (parts.getOrNull(0)?.lowercase(Locale.US)) {
+                "movie" -> MediaType.MOVIE
+                "tv" -> MediaType.TV
+                else -> return@mapIndexedNotNull null
             }
+            val id = parts.getOrNull(1)?.toIntOrNull() ?: return@mapIndexedNotNull null
+            Triple(type, id, labels.getOrNull(index)?.takeIf { it.isNotBlank() })
         }
-        val semaphore = Semaphore(4)
-        val page = metas.withIndex().drop(offset).take(limit).map { (position, meta) ->
+        val pageEntries = entries.drop(offset).take(limit)
+        val semaphore = Semaphore(2)
+        val details = pageEntries.map { it.first to it.second }.distinct().map { ref ->
             async {
-                semaphore.withPermit {
-                    val direct = parseTmdbRefFromAddonMeta(meta, null)
-                    val ref = direct ?: extractImdbId(meta)?.let { imdbId ->
-                        getAddonImdbLookupEntry(imdbId)?.data ?: try {
-                            marvelTimelineImdbRef(tmdbApi.findByExternalId(
-                                externalId = imdbId, apiKey = apiKey, externalSource = "imdb_id"
-                            )).also { resolved -> cacheAddonImdbLookup(imdbId, resolved) }
-                        } catch (e: java.io.IOException) {
-                            Log.w("MarvelTimeline", "IMDb lookup failed at $position id=$imdbId", e)
-                            null
-                        } catch (e: retrofit2.HttpException) {
-                            Log.w("MarvelTimeline", "IMDb lookup failed at $position id=$imdbId", e)
-                            null
+                ref to (getCachedItem(ref.first, ref.second) ?: semaphore.withPermit {
+                    runCatching {
+                        when (ref.first) {
+                            MediaType.MOVIE -> getMovieDetails(ref.second)
+                            MediaType.TV -> getTvDetails(ref.second)
                         }
-                    }
-                    if (ref == null) {
-                        Log.w("MediaRepository", "Marvel timeline identity unresolved at $position: ${meta.id}")
-                    }
-                    val details = ref?.let {
-                        try {
-                            getFromCache(detailsCache, detailsCacheKey(it.first, it.second))
-                                ?.takeIf { cached -> !cached.backdrop.isNullOrBlank() }
-                                ?: when (it.first) {
-                                    MediaType.MOVIE -> tmdbApi.getMovieDetails(
-                                        it.second, apiKey, language = contentLanguage
-                                    ).toMediaItem()
-                                    MediaType.TV -> tmdbApi.getTvDetails(
-                                        it.second, apiKey, language = contentLanguage
-                                    ).toMediaItem()
-                                }.let { artwork ->
-                                    if (!artwork.backdrop.isNullOrBlank()) artwork else {
-                                        val images = tmdbApi.getImages(
-                                            mediaType = if (it.first == MediaType.TV) "tv" else "movie",
-                                            id = it.second,
-                                            apiKey = apiKey
-                                        )
-                                        val landscape = images.backdrops
-                                            .filter { image ->
-                                                !image.filePath.isNullOrBlank() &&
-                                                    image.height > 0 && image.width.toFloat() / image.height >= 1.4f
-                                            }
-                                            .maxWithOrNull(compareBy<TmdbImage> { image -> image.voteAverage }
-                                                .thenBy { image -> image.width })
-                                        artwork.copy(backdrop = landscape?.filePath?.let { path ->
-                                            "${Constants.BACKDROP_BASE}$path"
-                                        })
-                                    }
-                                }.also { artwork -> cacheItem(artwork) }
-                        } catch (e: java.io.IOException) {
-                            Log.w("MediaRepository", "Marvel artwork unavailable for $ref", e)
-                            null
-                        } catch (e: retrofit2.HttpException) {
-                            Log.w("MediaRepository", "Marvel artwork unavailable for $ref", e)
-                            null
-                        }
-                    }
-                    val card = marvelAddonTimelineCard(meta, ref, position, details)
-                    if (com.arflix.tv.BuildConfig.DEBUG) {
-                        Log.d("MarvelTimeline", "CARD position=$position id=${meta.id} resolved=$ref artwork=${if (card.backdrop.isNullOrBlank()) "missing-landscape" else "landscape"} title=${card.title}")
-                    }
-                    card
-                }
+                    }.onFailure { if (it is kotlinx.coroutines.CancellationException) throw it }.getOrNull()
+                })
             }
-        }.awaitAll()
-        val nextOffset = offset + page.size
-        if (com.arflix.tv.BuildConfig.DEBUG) {
-            Log.d("MarvelTimeline", "PAGE offset=$offset count=${page.size} next=$nextOffset total=${metas.size} positions=${page.map { it.sourceOrder }}")
-        }
-        CategoryPageResult(items = page, hasMore = nextOffset < metas.size, nextOffset = nextOffset)
-    }
-
-    private suspend fun loadMarvelWatchlistTimelinePage(offset: Int, limit: Int): CategoryPageResult =
-        coroutineScope {
-            val pageEntries = MarvelWatchlistTimeline.page(offset, limit)
-            val semaphore = Semaphore(2)
-            val metadata = pageEntries.map { it.value.mediaType to it.value.tmdbId }.distinct().map { ref ->
-                async {
-                    val item = getCachedItem(ref.first, ref.second)
-                        ?: getCachedItemFromDisk(ref.first, ref.second)
-                        ?: semaphore.withPermit {
-                            try {
-                                when (ref.first) {
-                                    MediaType.MOVIE -> getMovieDetails(ref.second)
-                                    MediaType.TV -> getTvDetails(ref.second)
-                                }
-                            } catch (e: java.io.IOException) {
-                                Log.w("MediaRepository", "Marvel timeline metadata failed for $ref", e)
-                                null
-                            } catch (e: retrofit2.HttpException) {
-                                Log.w("MediaRepository", "Marvel timeline metadata failed for $ref", e)
-                                null
-                            }
-                        }
-                    ref to item
-                }
-            }.awaitAll().toMap()
-            cacheItems(metadata.values.filterNotNull())
-            val items = pageEntries.map { (position, entry) ->
-                MarvelWatchlistTimeline.card(metadata[entry.mediaType to entry.tmdbId], position)
-            }
-            val nextOffset = collectionPageNextOffset(offset, pageEntries.size)
-            CategoryPageResult(
-                items = items,
-                hasMore = nextOffset < MarvelWatchlistTimeline.entries.size,
-                nextOffset = nextOffset
+        }.awaitAll().toMap()
+        val items = pageEntries.mapIndexed { index, (type, id, label) ->
+            val position = offset + index
+            val item = details[type to id] ?: MediaItem(
+                id = id,
+                title = label.orEmpty(),
+                mediaType = type,
+                timelineMetadataUnavailable = true
+            )
+            item.copy(
+                timelineLabel = label,
+                timelineEntryId = "franchise-timeline:$catalogId:$position",
+                sourceOrder = position
             )
         }
+        cacheItems(details.values.filterNotNull())
+        val nextOffset = collectionPageNextOffset(offset, pageEntries.size)
+        CategoryPageResult(items = items, hasMore = nextOffset < entries.size, nextOffset = nextOffset)
+    }
 
     private suspend fun rankFranchiseRefsByReleaseDate(
         refs: List<Pair<MediaType, Int>>
@@ -1929,9 +1821,7 @@ class MediaRepository @Inject constructor(
                 CollectionSourceKind.TMDB_KEYWORD -> loadCollectionKeywordRefs(source, limit)
                 CollectionSourceKind.TMDB_WATCH_PROVIDER -> loadCollectionWatchProviderRefs(source, limit)
                 CollectionSourceKind.CURATED_IDS -> loadCollectionCuratedRefs(source, limit)
-                CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE -> loadCollectionAddonRefs(
-                    CollectionTemplateManifest.marvelTimelineSource(), offset, limit
-                )
+                CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE -> emptyList()
                 CollectionSourceKind.MDBLIST_PUBLIC -> loadCollectionMdblistPublicRefs(source, limit)
                 CollectionSourceKind.VODWISHARR_STUDIO,
                 CollectionSourceKind.VODWISHARR_NETWORK -> loadVodwisharrCompanyRefs(source, limit)

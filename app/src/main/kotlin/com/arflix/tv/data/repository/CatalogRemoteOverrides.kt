@@ -1,6 +1,7 @@
 package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.model.CatalogConfig
+import com.arflix.tv.data.model.CatalogKind
 import com.arflix.tv.data.model.CatalogSourceType
 import com.arflix.tv.data.model.CollectionGroupKind
 import com.arflix.tv.data.model.CollectionSourceConfig
@@ -53,6 +54,66 @@ internal fun applyRemoteCatalogOverrides(bundled: CatalogConfig, stored: Catalog
         remoteSlugOverrides = stored.remoteSlugOverrides,
         remoteExtraRefs = stored.remoteExtraRefs,
         remoteAddonOverrides = stored.remoteAddonOverrides,
+    )
+}
+
+/**
+ * Applies the central overrides (valid for every device, unlike the stored per-account ones) to a bundled
+ * catalog: the list URL of an MDBList home row, MDBList slugs of collection sources and added franchise titles.
+ */
+internal fun applyCentralOverrides(bundled: CatalogConfig, overrides: CentralOverrides): CatalogConfig {
+    val rowUrl = overrides.rows[bundled.id]?.trim()
+        ?.takeIf { bundled.sourceType == CatalogSourceType.MDBLIST && isValidRemoteMdblistUrl(it) }
+    val withRow = if (rowUrl != null) bundled.copy(sourceUrl = rowUrl, sourceRef = "mdblist:$rowUrl") else bundled
+    val coverUrl = overrides.covers[bundled.id]?.trim()?.takeIf(::isPlainHttpsUrl)
+    val withCover = if (coverUrl != null && bundled.kind == CatalogKind.COLLECTION) {
+        withRow.copy(
+            collectionCoverImageUrl = coverUrl,
+            collectionFocusGifUrl = coverUrl,
+            collectionHeroImageUrl = coverUrl,
+            collectionHeroGifUrl = coverUrl
+        )
+    } else withRow
+    val withSources = overrides.sources[bundled.id]?.let {
+        withCover.copy(collectionSources = replaceListSources(withCover.collectionSources, it))
+    } ?: withCover
+    return appendRemoteExtraRefs(withSources, overrides.extras[bundled.id])
+}
+
+private fun isPlainHttpsUrl(url: String): Boolean {
+    if (url.isEmpty() || url.length > 500) return false
+    val uri = runCatching { URI(url) }.getOrNull() ?: return false
+    return uri.scheme?.lowercase() == "https" && uri.userInfo == null && !uri.host.isNullOrBlank()
+}
+
+/** Swaps all TMDB-collection / MDBList sources by the admin's list, at the position of the first one of that kind. */
+private fun replaceListSources(sources: List<CollectionSourceConfig>, lists: CentralSources): List<CollectionSourceConfig> {
+    fun swap(
+        current: List<CollectionSourceConfig>,
+        kind: CollectionSourceKind,
+        replacement: List<CollectionSourceConfig>?
+    ): List<CollectionSourceConfig> {
+        if (replacement == null) return current
+        val at = current.indexOfFirst { it.kind == kind }.let { if (it < 0) current.size else it }
+        val rest = current.filterNot { it.kind == kind }
+        val insertAt = minOf(at, rest.size)
+        return rest.take(insertAt) + replacement + rest.drop(insertAt)
+    }
+    val mdblistTemplate = sources.firstOrNull { it.kind == CollectionSourceKind.MDBLIST_PUBLIC }
+    val withTmdb = swap(
+        sources, CollectionSourceKind.TMDB_COLLECTION,
+        lists.tmdbCollections?.map { CollectionSourceConfig(kind = CollectionSourceKind.TMDB_COLLECTION, tmdbCollectionId = it) }
+    )
+    return swap(
+        withTmdb, CollectionSourceKind.MDBLIST_PUBLIC,
+        lists.mdblist?.map {
+            CollectionSourceConfig(
+                kind = CollectionSourceKind.MDBLIST_PUBLIC,
+                collectionTab = mdblistTemplate?.collectionTab,
+                mediaType = mdblistTemplate?.mediaType,
+                mdblistSlug = it
+            )
+        }
     )
 }
 

@@ -170,6 +170,8 @@ export interface CatalogConfig {
     }
   >;
   remoteExtraRefs?: string[];
+  // Created by the admin in the central catalog configuration (see lib/catalogConfig.ts).
+  remoteFranchise?: boolean;
   kind?:
     | "STANDARD"
     | "COLLECTION"
@@ -211,13 +213,13 @@ export interface CollectionSourceConfig {
   watchRegion?: string | null;
   sortBy?: string | null;
   curatedRefs?: string[] | null;
+  // Labels of the timeline tab, parallel to curatedRefs (blank = the title's own name); a timeline keeps repeats.
+  curatedTitles?: string[] | null;
   mdblistSlug?: string | null;
   homeServerId?: string | null;
   homeServerLibraryKey?: string | null;
   // Set on the source the admin's added titles produce; it must not switch a franchise to popularity order.
   remoteExtra?: boolean;
-  // Only resolved while none of the collection's addon sources returned titles.
-  addonFallback?: boolean;
 }
 
 export interface StreamBehaviorHints {

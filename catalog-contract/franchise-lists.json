@@ -1,0 +1,1656 @@
+{
+  "version": 2,
+  "lists": {
+    "marvel": {
+      "id": "marvel",
+      "title": "Marvel",
+      "catalogId": "collection_franchise_marvel",
+      "tabs": {
+        "movie": [
+          {
+            "ref": "movie:106355",
+            "title": "Captian America"
+          },
+          {
+            "ref": "movie:65294",
+            "title": "The Incredible Hulk"
+          },
+          {
+            "ref": "movie:50468",
+            "title": "Dr. Strange"
+          },
+          {
+            "ref": "movie:197467",
+            "title": "Captain America"
+          },
+          {
+            "ref": "movie:197481",
+            "title": "Captain America II: Death Too Soon"
+          },
+          {
+            "ref": "movie:9626",
+            "title": "Red Sonja"
+          },
+          {
+            "ref": "movie:10658",
+            "title": "Howard the Duck"
+          },
+          {
+            "ref": "movie:26881",
+            "title": "The Incredible Hulk Returns"
+          },
+          {
+            "ref": "movie:26883",
+            "title": "The Trial of the Incredible Hulk"
+          },
+          {
+            "ref": "movie:8867",
+            "title": "The Punisher"
+          },
+          {
+            "ref": "movie:13995",
+            "title": "Captain America"
+          },
+          {
+            "ref": "movie:517485",
+            "title": "Firearm"
+          },
+          {
+            "ref": "movie:26623",
+            "title": "Generation X"
+          },
+          {
+            "ref": "movie:607",
+            "title": "Men in Black"
+          },
+          {
+            "ref": "movie:27460",
+            "title": "Nick Fury: Agent of S.H.I.E.L.D"
+          },
+          {
+            "ref": "movie:36647",
+            "title": "Blade"
+          },
+          {
+            "ref": "movie:36657",
+            "title": "X-Men"
+          },
+          {
+            "ref": "movie:36586",
+            "title": "Blade II"
+          },
+          {
+            "ref": "movie:557",
+            "title": "Spider-Man"
+          },
+          {
+            "ref": "movie:608",
+            "title": "Men in Black II'"
+          },
+          {
+            "ref": "movie:9480",
+            "title": "Daredevil"
+          },
+          {
+            "ref": "movie:36658",
+            "title": "X2: X-Men United"
+          },
+          {
+            "ref": "movie:1927",
+            "title": "Hulk"
+          },
+          {
+            "ref": "movie:7220",
+            "title": "The Punisher"
+          },
+          {
+            "ref": "movie:558",
+            "title": "Spider-Man 2"
+          },
+          {
+            "ref": "movie:36648",
+            "title": "Blade: Trinity"
+          },
+          {
+            "ref": "movie:9947",
+            "title": "Elektra"
+          },
+          {
+            "ref": "movie:18882",
+            "title": "Man-Thing"
+          },
+          {
+            "ref": "movie:9738",
+            "title": "Fantastic Four"
+          },
+          {
+            "ref": "movie:36668",
+            "title": "X-Men: The Last Stand"
+          },
+          {
+            "ref": "movie:1250",
+            "title": "Ghost Rider"
+          },
+          {
+            "ref": "movie:559",
+            "title": "Spider-Man 3"
+          },
+          {
+            "ref": "movie:1979",
+            "title": "Fantastic Four: Rise of the Silver Surfer"
+          },
+          {
+            "ref": "movie:1726",
+            "title": "Iron Man"
+          },
+          {
+            "ref": "movie:1724",
+            "title": "The Incredible Hulk"
+          },
+          {
+            "ref": "movie:13056",
+            "title": "Punisher: War Zone"
+          },
+          {
+            "ref": "movie:2080",
+            "title": "X-Men Origins: Wolverine"
+          },
+          {
+            "ref": "movie:23483",
+            "title": "Kick-Ass"
+          },
+          {
+            "ref": "movie:10138",
+            "title": "Iron Man 2"
+          },
+          {
+            "ref": "movie:10195",
+            "title": "Thor"
+          },
+          {
+            "ref": "movie:49538",
+            "title": "X-Men: First Class"
+          },
+          {
+            "ref": "movie:1771",
+            "title": "Captain America: The First Avenger"
+          },
+          {
+            "ref": "movie:71676",
+            "title": "Ghost Rider: Spirit of Vengeance"
+          },
+          {
+            "ref": "movie:76122",
+            "title": "Marvel One-Shot: The Consultant"
+          },
+          {
+            "ref": "movie:76535",
+            "title": "Marvel One-Shot: A Funny Thing Happened on the Way to Thor's Hammer"
+          },
+          {
+            "ref": "movie:24428",
+            "title": "The Avengers"
+          },
+          {
+            "ref": "movie:41154",
+            "title": "Men in Black 3"
+          },
+          {
+            "ref": "movie:1930",
+            "title": "The Amazing Spider-Man"
+          },
+          {
+            "ref": "movie:119569",
+            "title": "Marvel One-Shot: Item 47"
+          },
+          {
+            "ref": "movie:68721",
+            "title": "Iron Man 3"
+          },
+          {
+            "ref": "movie:59859",
+            "title": "Kick-Ass 2"
+          },
+          {
+            "ref": "movie:76170",
+            "title": "The Wolverine"
+          },
+          {
+            "ref": "movie:211387",
+            "title": "Marvel One-Shot: Agent Carter"
+          },
+          {
+            "ref": "movie:76338",
+            "title": "Thor: The Dark World"
+          },
+          {
+            "ref": "movie:253980",
+            "title": "Marvel One-Shot: All Hail the King"
+          },
+          {
+            "ref": "movie:259910",
+            "title": "Marvel Studios: Assembling a Universe"
+          },
+          {
+            "ref": "movie:100402",
+            "title": "Captain America: The Winter Soldier"
+          },
+          {
+            "ref": "movie:102382",
+            "title": "The Amazing Spider-Man 2"
+          },
+          {
+            "ref": "movie:127585",
+            "title": "X-Men: Days of Future Past"
+          },
+          {
+            "ref": "movie:118340",
+            "title": "Guardians of the Galaxy"
+          },
+          {
+            "ref": "movie:299969",
+            "title": "Marvel 75 Years: From Pulp to Pop!"
+          },
+          {
+            "ref": "movie:207703",
+            "title": "Kingsman: The Secret Service"
+          },
+          {
+            "ref": "movie:99861",
+            "title": "Avengers: Age of Ultron"
+          },
+          {
+            "ref": "movie:102899",
+            "title": "Ant-Man"
+          },
+          {
+            "ref": "movie:166424",
+            "title": "Fantastic Four"
+          },
+          {
+            "ref": "movie:379040",
+            "title": "Captain America: 75 Heroic Years"
+          },
+          {
+            "ref": "movie:293660",
+            "title": "Deadpool"
+          },
+          {
+            "ref": "movie:271110",
+            "title": "Captain America: Civil War"
+          },
+          {
+            "ref": "movie:413279",
+            "title": "Marvel One-Shot: Team Thor"
+          },
+          {
+            "ref": "movie:246655",
+            "title": "X-Men: Apocalypse"
+          },
+          {
+            "ref": "movie:284052",
+            "title": "Doctor Strange"
+          },
+          {
+            "ref": "movie:441829",
+            "title": "Marvel One-Shot: Team Thor: Part 2"
+          },
+          {
+            "ref": "movie:263115",
+            "title": "Logan"
+          },
+          {
+            "ref": "movie:283995",
+            "title": "Guardians of the Galaxy Vol. 2"
+          },
+          {
+            "ref": "movie:315635",
+            "title": "Spider-Man: Homecoming"
+          },
+          {
+            "ref": "movie:343668",
+            "title": "Kingsman: The Golden Circle"
+          },
+          {
+            "ref": "movie:284053",
+            "title": "Thor: Ragnarok"
+          },
+          {
+            "ref": "movie:505945",
+            "title": "Marvel One-Shot: Team Darryl"
+          },
+          {
+            "ref": "movie:284054",
+            "title": "Black Panther"
+          },
+          {
+            "ref": "movie:299536",
+            "title": "Avengers: Infinity War"
+          },
+          {
+            "ref": "movie:383498",
+            "title": "Deadpool 2"
+          },
+          {
+            "ref": "movie:363088",
+            "title": "Ant-Man and the Wasp"
+          },
+          {
+            "ref": "movie:335983",
+            "title": "Venom"
+          },
+          {
+            "ref": "movie:299537",
+            "title": "Captain Marvel"
+          },
+          {
+            "ref": "movie:299534",
+            "title": "Avengers: Endgame"
+          },
+          {
+            "ref": "movie:320288",
+            "title": "Dark Phoenix"
+          },
+          {
+            "ref": "movie:479455",
+            "title": "Men in Black: International"
+          },
+          {
+            "ref": "movie:429617",
+            "title": "Spider-Man: Far From Home"
+          },
+          {
+            "ref": "movie:758025",
+            "title": "Marvel One-Shot: Peter's To-Do List"
+          },
+          {
+            "ref": "movie:647375",
+            "title": "Expanding the Universe"
+          },
+          {
+            "ref": "movie:340102",
+            "title": "The New Mutants"
+          },
+          {
+            "ref": "movie:497698",
+            "title": "Black Widow"
+          },
+          {
+            "ref": "movie:566525",
+            "title": "Shang-Chi and the Legend of the Ten Rings"
+          },
+          {
+            "ref": "movie:580489",
+            "title": "Venom: Let There Be Carnage"
+          },
+          {
+            "ref": "movie:524434",
+            "title": "Eternals"
+          },
+          {
+            "ref": "movie:634649",
+            "title": "Spider-Man: No Way Home"
+          },
+          {
+            "ref": "movie:476669",
+            "title": "The King's Man"
+          },
+          {
+            "ref": "movie:526896",
+            "title": "Morbius"
+          },
+          {
+            "ref": "movie:453395",
+            "title": "Doctor Strange in the Multiverse of Madness"
+          },
+          {
+            "ref": "movie:616037",
+            "title": "Thor: Love and Thunder"
+          },
+          {
+            "ref": "movie:894205",
+            "title": "Werewolf by Night"
+          },
+          {
+            "ref": "movie:505642",
+            "title": "Black Panther: Wakanda Forever"
+          },
+          {
+            "ref": "movie:774752",
+            "title": "The Guardians of the Galaxy Holiday Special"
+          },
+          {
+            "ref": "movie:640146",
+            "title": "Ant-Man and the Wasp: Quantumania"
+          },
+          {
+            "ref": "movie:447365",
+            "title": "Guardians of the Galaxy Vol. 3"
+          },
+          {
+            "ref": "movie:609681",
+            "title": "The Marvels"
+          },
+          {
+            "ref": "movie:848538",
+            "title": "Argylle"
+          },
+          {
+            "ref": "movie:634492",
+            "title": "Madame Web"
+          },
+          {
+            "ref": "movie:533535",
+            "title": "Deadpool & Wolverine"
+          },
+          {
+            "ref": "movie:912649",
+            "title": "Venom: The Last Dance"
+          },
+          {
+            "ref": "movie:539972",
+            "title": "Kraven the Hunter"
+          },
+          {
+            "ref": "movie:822119",
+            "title": "Captain America: Brave New World"
+          },
+          {
+            "ref": "movie:986056",
+            "title": "Thunderbolts*"
+          },
+          {
+            "ref": "movie:617126",
+            "title": "The Fantastic Four: First Steps"
+          },
+          {
+            "ref": "movie:969681",
+            "title": "Spider-Man: Brand New Day"
+          },
+          {
+            "ref": "movie:1003596",
+            "title": "Avengers: Doomsday"
+          },
+          {
+            "ref": "movie:911916",
+            "title": "Spider-Man: Brand New Day"
+          },
+          {
+            "ref": "movie:1003598",
+            "title": "Avengers: Secret Wars"
+          },
+          {
+            "ref": "movie:1386618",
+            "title": "Black Panther 3"
+          },
+          {
+            "ref": "movie:1827939",
+            "title": "Armor Wars"
+          }
+        ],
+        "series": [
+          {
+            "ref": "tv:15178",
+            "title": "Spidey Super Stories"
+          },
+          {
+            "ref": "tv:4552",
+            "title": "The Amazing Spider-Man"
+          },
+          {
+            "ref": "tv:648",
+            "title": "The Incredible Hulk"
+          },
+          {
+            "ref": "tv:13084",
+            "title": "Night Man"
+          },
+          {
+            "ref": "tv:1449",
+            "title": "Mutant X"
+          },
+          {
+            "ref": "tv:4619",
+            "title": "Blade: The Series"
+          },
+          {
+            "ref": "tv:1403",
+            "title": "Marvel's Agents of S.H.I.E.L.D."
+          },
+          {
+            "ref": "tv:69069",
+            "title": "WHIH Newsfront"
+          },
+          {
+            "ref": "tv:61550",
+            "title": "Marvel's Agent Carter"
+          },
+          {
+            "ref": "tv:42531",
+            "title": "Powers"
+          },
+          {
+            "ref": "tv:61889",
+            "title": "Daredevil"
+          },
+          {
+            "ref": "tv:38472",
+            "title": "Jessica Jones"
+          },
+          {
+            "ref": "tv:62126",
+            "title": "Luke Cage"
+          },
+          {
+            "ref": "tv:69088",
+            "title": "Marvel's Agents of S.H.I.E.L.D.: Slingshot"
+          },
+          {
+            "ref": "tv:67195",
+            "title": "Legion"
+          },
+          {
+            "ref": "tv:62127",
+            "title": "Iron Fist"
+          },
+          {
+            "ref": "tv:62285",
+            "title": "The Defenders"
+          },
+          {
+            "ref": "tv:68716",
+            "title": "Inhumans"
+          },
+          {
+            "ref": "tv:69629",
+            "title": "The Gifted"
+          },
+          {
+            "ref": "tv:67178",
+            "title": "The Punisher"
+          },
+          {
+            "ref": "tv:67466",
+            "title": "Runaways"
+          },
+          {
+            "ref": "tv:66190",
+            "title": "Cloak & Dagger"
+          },
+          {
+            "ref": "tv:88987",
+            "title": "Helstrom"
+          },
+          {
+            "ref": "tv:114695",
+            "title": "Marvel Studios: Legends"
+          },
+          {
+            "ref": "tv:85271",
+            "title": "WandaVision"
+          },
+          {
+            "ref": "tv:88396",
+            "title": "The Falcon and the Winter Soldier"
+          },
+          {
+            "ref": "tv:118924",
+            "title": "Marvel Studios Assembled"
+          },
+          {
+            "ref": "tv:84958",
+            "title": "Loki"
+          },
+          {
+            "ref": "tv:88329",
+            "title": "Hawkeye"
+          },
+          {
+            "ref": "tv:212423",
+            "title": "Marvel Lucha Libre Edition: El origen de la mascara"
+          },
+          {
+            "ref": "tv:92749",
+            "title": "Moon Knight"
+          },
+          {
+            "ref": "tv:92782",
+            "title": "Ms. Marvel"
+          },
+          {
+            "ref": "tv:92783",
+            "title": "She-Hulk: Attorney at Law"
+          },
+          {
+            "ref": "tv:114472",
+            "title": "Secret Invasion"
+          },
+          {
+            "ref": "tv:122226",
+            "title": "Echo"
+          },
+          {
+            "ref": "tv:138501",
+            "title": "Agatha All Along"
+          },
+          {
+            "ref": "tv:202555",
+            "title": "Daredevil: Born Again"
+          },
+          {
+            "ref": "tv:114471",
+            "title": "Ironheart"
+          },
+          {
+            "ref": "tv:198178",
+            "title": "Wonder Man"
+          },
+          {
+            "ref": "tv:213375",
+            "title": "VisionQuest"
+          }
+        ],
+        "timeline": [
+          {
+            "ref": "tv:241388",
+            "title": "Eyes of Wakanda"
+          },
+          {
+            "ref": "movie:1771",
+            "title": "Captain America: The First Avenger"
+          },
+          {
+            "ref": "movie:211387",
+            "title": "Marvel One-Shot: Agent Carter"
+          },
+          {
+            "ref": "tv:61550",
+            "title": "Marvel's Agent Carter"
+          },
+          {
+            "ref": "movie:299537",
+            "title": "Captain Marvel"
+          },
+          {
+            "ref": "movie:1726",
+            "title": "Iron Man"
+          },
+          {
+            "ref": "movie:10138",
+            "title": "Iron Man 2"
+          },
+          {
+            "ref": "movie:1724",
+            "title": "Der unglaubliche Hulk"
+          },
+          {
+            "ref": "movie:76535",
+            "title": "Marvel One-Shot: A Funny Thing Happened on the Way to Thor's Hammer"
+          },
+          {
+            "ref": "movie:10195",
+            "title": "Thor"
+          },
+          {
+            "ref": "movie:76122",
+            "title": "Marvel One-Shot: The Consultant"
+          },
+          {
+            "ref": "movie:24428",
+            "title": "Marvel’s The Avengers"
+          },
+          {
+            "ref": "movie:119569",
+            "title": "Marvel One-Shot: Item 47"
+          },
+          {
+            "ref": "movie:76338",
+            "title": "Thor: The Dark Kingdom"
+          },
+          {
+            "ref": "movie:68721",
+            "title": "Iron Man 3"
+          },
+          {
+            "ref": "movie:253980",
+            "title": "Marvel One-Shot: All Hail the King"
+          },
+          {
+            "ref": "movie:100402",
+            "title": "The Return of the First Avenger"
+          },
+          {
+            "ref": "movie:118340",
+            "title": "Guardians of the Galaxy"
+          },
+          {
+            "ref": "movie:283995",
+            "title": "Guardians of the Galaxy Vol. 2"
+          },
+          {
+            "ref": "tv:226976",
+            "title": "I Am Groot – Staffel 1"
+          },
+          {
+            "ref": "tv:226976",
+            "title": "I Am Groot – Staffel 2"
+          },
+          {
+            "ref": "tv:61889",
+            "title": "Daredevil – Staffel 1"
+          },
+          {
+            "ref": "tv:38472",
+            "title": "Jessica Jones – Staffel 1"
+          },
+          {
+            "ref": "movie:99861",
+            "title": "Avengers: Age of Ultron"
+          },
+          {
+            "ref": "movie:102899",
+            "title": "Ant-Man"
+          },
+          {
+            "ref": "tv:61889",
+            "title": "Daredevil – Staffel 2"
+          },
+          {
+            "ref": "tv:62126",
+            "title": "Luke Cage – Staffel 1"
+          },
+          {
+            "ref": "tv:62127",
+            "title": "Iron Fist – Staffel 1"
+          },
+          {
+            "ref": "tv:62285",
+            "title": "The Defenders"
+          },
+          {
+            "ref": "movie:271110",
+            "title": "The First Avenger: Civil War"
+          },
+          {
+            "ref": "movie:497698",
+            "title": "Black Widow"
+          },
+          {
+            "ref": "movie:413279",
+            "title": "Marvel One-Shot: Team Thor"
+          },
+          {
+            "ref": "movie:441829",
+            "title": "Marvel One-Shot: Team Thor: Part 2"
+          },
+          {
+            "ref": "movie:284054",
+            "title": "Black Panther"
+          },
+          {
+            "ref": "movie:315635",
+            "title": "Spider-Man: Homecoming"
+          },
+          {
+            "ref": "tv:67178",
+            "title": "The Punisher – Staffel 1"
+          },
+          {
+            "ref": "movie:284052",
+            "title": "Doctor Strange"
+          },
+          {
+            "ref": "tv:38472",
+            "title": "Jessica Jones – Staffel 2"
+          },
+          {
+            "ref": "tv:62126",
+            "title": "Luke Cage – Staffel 2"
+          },
+          {
+            "ref": "tv:62127",
+            "title": "Iron Fist – Staffel 2"
+          },
+          {
+            "ref": "tv:61889",
+            "title": "Daredevil – Staffel 3"
+          },
+          {
+            "ref": "movie:284053",
+            "title": "Thor: Tag der Entscheidung"
+          },
+          {
+            "ref": "movie:505945",
+            "title": "Marvel One-Shot: Team Darryl"
+          },
+          {
+            "ref": "tv:67178",
+            "title": "The Punisher – Staffel 2"
+          },
+          {
+            "ref": "tv:38472",
+            "title": "Jessica Jones – Staffel 3"
+          },
+          {
+            "ref": "movie:363088",
+            "title": "Ant-Man and the Wasp"
+          },
+          {
+            "ref": "movie:299536",
+            "title": "Avengers: Infinity War"
+          },
+          {
+            "ref": "movie:299534",
+            "title": "Avengers: Endgame"
+          },
+          {
+            "ref": "tv:84958",
+            "title": "Loki – Staffel 1"
+          },
+          {
+            "ref": "tv:91363",
+            "title": "What If…? – Staffel 1"
+          },
+          {
+            "ref": "tv:138505",
+            "title": "Marvel Zombies"
+          },
+          {
+            "ref": "tv:85271",
+            "title": "WandaVision"
+          },
+          {
+            "ref": "movie:566525",
+            "title": "Shang-Chi and the Legend of the Ten Rings"
+          },
+          {
+            "ref": "tv:88396",
+            "title": "The Falcon and the Winter Soldier"
+          },
+          {
+            "ref": "movie:429617",
+            "title": "Spider-Man: Far From Home"
+          },
+          {
+            "ref": "movie:524434",
+            "title": "Eternals"
+          },
+          {
+            "ref": "movie:634649",
+            "title": "Spider-Man: No Way Home"
+          },
+          {
+            "ref": "movie:453395",
+            "title": "Doctor Strange in the Multiverse of Madness"
+          },
+          {
+            "ref": "tv:88329",
+            "title": "Hawkeye"
+          },
+          {
+            "ref": "tv:92749",
+            "title": "Moon Knight"
+          },
+          {
+            "ref": "movie:505642",
+            "title": "Black Panther: Wakanda Forever"
+          },
+          {
+            "ref": "tv:122226",
+            "title": "Echo"
+          },
+          {
+            "ref": "tv:92783",
+            "title": "She-Hulk: Die Anwältin"
+          },
+          {
+            "ref": "tv:92782",
+            "title": "Ms. Marvel"
+          },
+          {
+            "ref": "movie:616037",
+            "title": "Thor: Love and Thunder"
+          },
+          {
+            "ref": "tv:114471",
+            "title": "Ironheart"
+          },
+          {
+            "ref": "movie:894205",
+            "title": "Werewolf by Night"
+          },
+          {
+            "ref": "movie:774752",
+            "title": "The Guardians of the Galaxy Holiday Special"
+          },
+          {
+            "ref": "movie:640146",
+            "title": "Ant-Man and the Wasp: Quantumania"
+          },
+          {
+            "ref": "movie:447365",
+            "title": "Guardians of the Galaxy Vol. 3"
+          },
+          {
+            "ref": "tv:114472",
+            "title": "Secret Invasion"
+          },
+          {
+            "ref": "movie:609681",
+            "title": "The Marvels"
+          },
+          {
+            "ref": "tv:84958",
+            "title": "Loki – Staffel 2"
+          },
+          {
+            "ref": "tv:91363",
+            "title": "What If…? – Staffel 2"
+          },
+          {
+            "ref": "movie:533535",
+            "title": "Deadpool & Wolverine"
+          },
+          {
+            "ref": "tv:138501",
+            "title": "Agatha All Along"
+          },
+          {
+            "ref": "tv:91363",
+            "title": "What If…? – Staffel 3"
+          },
+          {
+            "ref": "tv:202555",
+            "title": "Daredevil: Born Again – Staffel 1"
+          },
+          {
+            "ref": "movie:822119",
+            "title": "Captain America: Brave New World"
+          },
+          {
+            "ref": "movie:986056",
+            "title": "Thunderbolts*"
+          },
+          {
+            "ref": "movie:617126",
+            "title": "The Fantastic Four: First Steps"
+          },
+          {
+            "ref": "tv:198178",
+            "title": "Wonder Man"
+          },
+          {
+            "ref": "tv:202555",
+            "title": "Daredevil: Born Again – Staffel 2"
+          },
+          {
+            "ref": "movie:969681",
+            "title": "Spider-Man: Brand New Day"
+          },
+          {
+            "ref": "tv:213375",
+            "title": "VisionQuest"
+          },
+          {
+            "ref": "movie:1003596",
+            "title": "Avengers: Doomsday"
+          }
+        ]
+      }
+    },
+    "dc": {
+      "id": "dc",
+      "title": "DC Universe",
+      "catalogId": "collection_franchise_dc_universe",
+      "tabs": {
+        "movie": [
+          {
+            "ref": "movie:1924",
+            "title": "Superman"
+          },
+          {
+            "ref": "movie:8536",
+            "title": "Superman II"
+          },
+          {
+            "ref": "movie:9531",
+            "title": "Superman III"
+          },
+          {
+            "ref": "movie:11411",
+            "title": "Superman IV: The Quest for Peace"
+          },
+          {
+            "ref": "movie:268",
+            "title": "Batman"
+          },
+          {
+            "ref": "movie:364",
+            "title": "Batman Returns"
+          },
+          {
+            "ref": "movie:414",
+            "title": "Batman Forever"
+          },
+          {
+            "ref": "movie:415",
+            "title": "Batman & Robin"
+          },
+          {
+            "ref": "movie:8854",
+            "title": "Steel"
+          },
+          {
+            "ref": "movie:314",
+            "title": "Catwoman"
+          },
+          {
+            "ref": "movie:272",
+            "title": "Batman Begins"
+          },
+          {
+            "ref": "movie:561",
+            "title": "Constantine"
+          },
+          {
+            "ref": "movie:1452",
+            "title": "Superman Returns"
+          },
+          {
+            "ref": "movie:155",
+            "title": "The Dark Knight"
+          },
+          {
+            "ref": "movie:13183",
+            "title": "Watchmen"
+          },
+          {
+            "ref": "movie:20533",
+            "title": "Jonah Hex"
+          },
+          {
+            "ref": "movie:44912",
+            "title": "Green Lantern"
+          },
+          {
+            "ref": "movie:49026",
+            "title": "The Dark Knight Rises"
+          },
+          {
+            "ref": "movie:49521",
+            "title": "Man of Steel"
+          },
+          {
+            "ref": "movie:209112",
+            "title": "Batman v Superman: Dawn of Justice"
+          },
+          {
+            "ref": "movie:297761",
+            "title": "Suicide Squad"
+          },
+          {
+            "ref": "movie:297762",
+            "title": "Wonder Woman"
+          },
+          {
+            "ref": "movie:141052",
+            "title": "Justice League"
+          },
+          {
+            "ref": "movie:297802",
+            "title": "Aquaman"
+          },
+          {
+            "ref": "movie:287947",
+            "title": "Shazam!"
+          },
+          {
+            "ref": "movie:475557",
+            "title": "Joker"
+          },
+          {
+            "ref": "movie:495764",
+            "title": "Birds of Prey (and the Fantabulous Emancipation of One Harley Quinn)"
+          },
+          {
+            "ref": "movie:464052",
+            "title": "Wonder Woman 1984"
+          },
+          {
+            "ref": "movie:791373",
+            "title": "Zack Snyder's Justice League"
+          },
+          {
+            "ref": "movie:436969",
+            "title": "The Suicide Squad"
+          },
+          {
+            "ref": "movie:436270",
+            "title": "Black Adam"
+          },
+          {
+            "ref": "movie:414906",
+            "title": "The Batman"
+          },
+          {
+            "ref": "movie:594767",
+            "title": "Shazam! Fury of the Gods"
+          },
+          {
+            "ref": "movie:298618",
+            "title": "The Flash"
+          },
+          {
+            "ref": "movie:565770",
+            "title": "Blue Beetle"
+          },
+          {
+            "ref": "movie:572802",
+            "title": "Aquaman and the Lost Kingdom"
+          },
+          {
+            "ref": "movie:889737",
+            "title": "Joker: Folie à Deux"
+          },
+          {
+            "ref": "movie:800788",
+            "title": "Superman"
+          }
+        ],
+        "series": [
+          {
+            "ref": "tv:12662",
+            "title": "Adventures of Superman"
+          },
+          {
+            "ref": "tv:2287",
+            "title": "Batman"
+          },
+          {
+            "ref": "tv:10444",
+            "title": "Shazam!"
+          },
+          {
+            "ref": "tv:12072",
+            "title": "Isis"
+          },
+          {
+            "ref": "tv:4331",
+            "title": "Wonder Woman"
+          },
+          {
+            "ref": "tv:4532",
+            "title": "Superboy"
+          },
+          {
+            "ref": "tv:236",
+            "title": "The Flash"
+          },
+          {
+            "ref": "tv:31919",
+            "title": "Human Target"
+          },
+          {
+            "ref": "tv:4515",
+            "title": "Lois & Clark: The New Adventures of Superman"
+          },
+          {
+            "ref": "tv:4604",
+            "title": "Smallville"
+          },
+          {
+            "ref": "tv:1469",
+            "title": "Birds of Prey"
+          },
+          {
+            "ref": "tv:18653",
+            "title": "Human Target"
+          },
+          {
+            "ref": "tv:1412",
+            "title": "Arrow"
+          },
+          {
+            "ref": "tv:60708",
+            "title": "Gotham"
+          },
+          {
+            "ref": "tv:60735",
+            "title": "The Flash"
+          },
+          {
+            "ref": "tv:60743",
+            "title": "Constantine"
+          },
+          {
+            "ref": "tv:62688",
+            "title": "Supergirl"
+          },
+          {
+            "ref": "tv:62643",
+            "title": "DC's Legends of Tomorrow"
+          },
+          {
+            "ref": "tv:63174",
+            "title": "Lucifer"
+          },
+          {
+            "ref": "tv:68001",
+            "title": "Powerless"
+          },
+          {
+            "ref": "tv:71663",
+            "title": "Black Lightning"
+          },
+          {
+            "ref": "tv:71340",
+            "title": "Krypton"
+          },
+          {
+            "ref": "tv:75450",
+            "title": "Titans"
+          },
+          {
+            "ref": "tv:79501",
+            "title": "Doom Patrol"
+          },
+          {
+            "ref": "tv:79240",
+            "title": "Swamp Thing"
+          },
+          {
+            "ref": "tv:80986",
+            "title": "DC's Stargirl"
+          },
+          {
+            "ref": "tv:96195",
+            "title": "Paradise Lost"
+          },
+          {
+            "ref": "tv:95057",
+            "title": "Superman & Lois"
+          },
+          {
+            "ref": "tv:125474",
+            "title": "Naomi"
+          },
+          {
+            "ref": "tv:110492",
+            "title": "Peacemaker"
+          },
+          {
+            "ref": "tv:90802",
+            "title": "The Sandman"
+          },
+          {
+            "ref": "tv:195868",
+            "title": "Gotham Knights"
+          },
+          {
+            "ref": "tv:132750",
+            "title": "Dead Boy Detectives"
+          },
+          {
+            "ref": "tv:194764",
+            "title": "The Penguin"
+          }
+        ],
+        "timeline": [
+          {
+            "ref": "movie:297762",
+            "title": "Wonder Woman"
+          },
+          {
+            "ref": "movie:464052",
+            "title": "Wonder Woman 1984"
+          },
+          {
+            "ref": "movie:49521",
+            "title": "Man of Steel"
+          },
+          {
+            "ref": "movie:209112",
+            "title": "Batman v Superman: Dawn of Justice"
+          },
+          {
+            "ref": "movie:297761",
+            "title": "Suicide Squad"
+          },
+          {
+            "ref": "movie:141052",
+            "title": "Justice League"
+          },
+          {
+            "ref": "movie:791373",
+            "title": "Zack Snyder's Justice League"
+          },
+          {
+            "ref": "movie:297802",
+            "title": "Aquaman"
+          },
+          {
+            "ref": "movie:287947",
+            "title": "Shazam!"
+          },
+          {
+            "ref": "movie:495764",
+            "title": "Birds of Prey (and the Fantabulous Emancipation of One Harley Quinn)"
+          },
+          {
+            "ref": "movie:436969",
+            "title": "The Suicide Squad"
+          },
+          {
+            "ref": "tv:110492",
+            "title": "Peacemaker"
+          },
+          {
+            "ref": "movie:436270",
+            "title": "Black Adam"
+          },
+          {
+            "ref": "movie:594767",
+            "title": "Shazam! Fury of the Gods"
+          },
+          {
+            "ref": "movie:298618",
+            "title": "The Flash"
+          },
+          {
+            "ref": "movie:572802",
+            "title": "Aquaman and the Lost Kingdom"
+          }
+        ]
+      }
+    },
+    "starwars": {
+      "id": "starwars",
+      "title": "Star Wars",
+      "catalogId": "collection_franchise_star_wars",
+      "tabs": {
+        "movie": [
+          {
+            "ref": "movie:1893",
+            "title": "Star Wars: Episode I - The Phantom Menace"
+          },
+          {
+            "ref": "movie:1894",
+            "title": "Star Wars: Episode II - Attack of the Clones"
+          },
+          {
+            "ref": "movie:12180",
+            "title": "Star Wars: The Clone Wars"
+          },
+          {
+            "ref": "movie:1895",
+            "title": "Star Wars: Episode III - Revenge of the Sith"
+          },
+          {
+            "ref": "movie:348350",
+            "title": "Solo: A Star Wars Story"
+          },
+          {
+            "ref": "movie:330459",
+            "title": "Rogue One: A Star Wars Story"
+          },
+          {
+            "ref": "movie:11",
+            "title": "Star Wars"
+          },
+          {
+            "ref": "movie:1891",
+            "title": "The Empire Strikes Back"
+          },
+          {
+            "ref": "movie:1892",
+            "title": "Return of the Jedi"
+          },
+          {
+            "ref": "movie:140607",
+            "title": "Star Wars: The Force Awakens"
+          },
+          {
+            "ref": "movie:181808",
+            "title": "Star Wars: The Last Jedi"
+          },
+          {
+            "ref": "movie:181812",
+            "title": "Star Wars: The Rise of Skywalker"
+          }
+        ],
+        "series": [
+          {
+            "ref": "tv:114479",
+            "title": "The Acolyte"
+          },
+          {
+            "ref": "tv:4194",
+            "title": "Star Wars: The Clone Wars"
+          },
+          {
+            "ref": "tv:203085",
+            "title": "Star Wars: Tales of the Jedi"
+          },
+          {
+            "ref": "tv:251091",
+            "title": "Star Wars: Tales of the Empire"
+          },
+          {
+            "ref": "tv:105971",
+            "title": "Star Wars: The Bad Batch"
+          },
+          {
+            "ref": "tv:92830",
+            "title": "Obi-Wan Kenobi"
+          },
+          {
+            "ref": "tv:60554",
+            "title": "Star Wars Rebels"
+          },
+          {
+            "ref": "tv:83867",
+            "title": "Andor"
+          },
+          {
+            "ref": "tv:82856",
+            "title": "The Mandalorian"
+          },
+          {
+            "ref": "tv:115036",
+            "title": "The Book of Boba Fett"
+          },
+          {
+            "ref": "tv:114461",
+            "title": "Ahsoka"
+          },
+          {
+            "ref": "tv:202879",
+            "title": "Star Wars: Skeleton Crew"
+          },
+          {
+            "ref": "tv:79093",
+            "title": "Star Wars Resistance"
+          },
+          {
+            "ref": "tv:25",
+            "title": "Star Wars: Droids"
+          },
+          {
+            "ref": "tv:3478",
+            "title": "Ewoks"
+          },
+          {
+            "ref": "tv:63722",
+            "title": "LEGO Star Wars: Droid Tales"
+          },
+          {
+            "ref": "tv:66837",
+            "title": "LEGO Star Wars: The Freemaker Adventures"
+          },
+          {
+            "ref": "tv:66487",
+            "title": "LEGO Star Wars : The Resistance Rises"
+          },
+          {
+            "ref": "tv:114478",
+            "title": "Star Wars: Visions"
+          },
+          {
+            "ref": "tv:202998",
+            "title": "Star Wars: Young Jedi Adventures"
+          },
+          {
+            "ref": "tv:114969",
+            "title": "Star Wars Detours"
+          },
+          {
+            "ref": "tv:288055",
+            "title": "Star Wars: Tales of the Underworld"
+          },
+          {
+            "ref": "tv:289411",
+            "title": "LEGO Star Wars: Rebuild the Galaxy - Pieces of the Past"
+          },
+          {
+            "ref": "tv:72244",
+            "title": "Star Wars: Clone Wars"
+          },
+          {
+            "ref": "tv:105106",
+            "title": "Star Wars Blips"
+          },
+          {
+            "ref": "tv:71412",
+            "title": "Star Wars: Forces of Destiny"
+          },
+          {
+            "ref": "tv:85536",
+            "title": "Star Wars Galaxy of Adventures"
+          },
+          {
+            "ref": "tv:124868",
+            "title": "Star Wars: Roll Out"
+          },
+          {
+            "ref": "tv:136429",
+            "title": "Star Wars: Galaxy of Creatures"
+          },
+          {
+            "ref": "tv:197443",
+            "title": "Star Wars Galactic Pals"
+          },
+          {
+            "ref": "tv:256901",
+            "title": "Star Wars: Fun with Nubs"
+          },
+          {
+            "ref": "tv:289219",
+            "title": "Star Wars: Maul - Shadow Lord"
+          }
+        ],
+        "timeline": [
+          {
+            "ref": "tv:114479",
+            "title": "The Acolyte"
+          },
+          {
+            "ref": "movie:1893",
+            "title": "Star Wars: Episode I - The Phantom Menace"
+          },
+          {
+            "ref": "movie:1894",
+            "title": "Star Wars: Episode II - Attack of the Clones"
+          },
+          {
+            "ref": "movie:12180",
+            "title": "Star Wars: The Clone Wars"
+          },
+          {
+            "ref": "tv:4194",
+            "title": "Star Wars: The Clone Wars"
+          },
+          {
+            "ref": "tv:203085",
+            "title": "Star Wars: Tales of the Jedi"
+          },
+          {
+            "ref": "movie:1895",
+            "title": "Star Wars: Episode III - Revenge of the Sith"
+          },
+          {
+            "ref": "tv:251091",
+            "title": "Star Wars: Tales of the Empire"
+          },
+          {
+            "ref": "tv:105971",
+            "title": "Star Wars: The Bad Batch"
+          },
+          {
+            "ref": "movie:348350",
+            "title": "Solo: A Star Wars Story"
+          },
+          {
+            "ref": "tv:92830",
+            "title": "Obi-Wan Kenobi"
+          },
+          {
+            "ref": "tv:60554",
+            "title": "Star Wars Rebels"
+          },
+          {
+            "ref": "tv:83867",
+            "title": "Andor"
+          },
+          {
+            "ref": "movie:330459",
+            "title": "Rogue One: A Star Wars Story"
+          },
+          {
+            "ref": "movie:11",
+            "title": "Star Wars"
+          },
+          {
+            "ref": "movie:1891",
+            "title": "The Empire Strikes Back"
+          },
+          {
+            "ref": "movie:1892",
+            "title": "Return of the Jedi"
+          },
+          {
+            "ref": "tv:82856",
+            "title": "The Mandalorian"
+          },
+          {
+            "ref": "tv:115036",
+            "title": "The Book of Boba Fett"
+          },
+          {
+            "ref": "tv:114461",
+            "title": "Ahsoka"
+          },
+          {
+            "ref": "tv:202879",
+            "title": "Star Wars: Skeleton Crew"
+          },
+          {
+            "ref": "tv:79093",
+            "title": "Star Wars Resistance"
+          },
+          {
+            "ref": "movie:140607",
+            "title": "Star Wars: The Force Awakens"
+          },
+          {
+            "ref": "movie:181808",
+            "title": "Star Wars: The Last Jedi"
+          },
+          {
+            "ref": "movie:181812",
+            "title": "Star Wars: The Rise of Skywalker"
+          }
+        ]
+      }
+    }
+  }
+}

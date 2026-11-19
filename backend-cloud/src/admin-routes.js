@@ -8,6 +8,7 @@ import { normalizeAdminUsername } from "./admin-username.js";
 import { verifyScryptPassword } from "./passwords.js";
 import { payloadMetrics, payloadUpdatedAtMillis } from "./snapshots.js";
 import { deleteAccountData } from "./account-deletion.js";
+import { registerCatalogConfigRoutes } from "./catalog-config.js";
 import {
   applyAdminSnapshotMutation,
   adminGlobalInventory,
@@ -222,7 +223,7 @@ function setAdminSecurityHeaders(reply) {
     .header("Referrer-Policy", "no-referrer")
     .header(
       "Content-Security-Policy",
-      "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+      "default-src 'self'; img-src 'self' https:; style-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
     );
 }
 
@@ -587,6 +588,11 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
   app.patch("/admin-api/global/snapshot", (request, reply) =>
     globalMutation(request, reply, false),
   );
+
+  registerCatalogConfigRoutes(app, {
+    pool,
+    authenticateAdmin: (request) => authenticatedAdmin(request, pool, jwtKey),
+  });
 
   app.get("/admin", async (_request, reply) => {
     setAdminSecurityHeaders(reply);

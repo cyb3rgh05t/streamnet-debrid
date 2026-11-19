@@ -2,6 +2,12 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { catalogIdFor, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
+
+// Demo state of the central catalog configuration (not persisted).
+const franchiseSaved = new Map();
+let overridesSaved = { rows: {}, slugs: {}, extras: {} };
+let overridesUpdatedAt = null;
 
 const publicDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -330,7 +336,73 @@ const server = createServer(async (request, reply) => {
         ],
       });
     }
-    if (request.method === "GET" && url.pathname === "/admin-api/global") {
+    if (url.pathname.startsWith("/admin-api/catalog-config")) {
+      const seed = await loadSeed();
+      const standards = await loadStandards();
+      const view = (entry, builtin) => {
+        const saved = franchiseSaved.get(entry.id);
+        const payload = saved?.payload ?? {};
+        return {
+          id: entry.id,
+          title: builtin ? entry.title : payload.title,
+          catalogId: builtin ? entry.catalogId : catalogIdFor(entry.id),
+          builtin,
+          custom: Boolean(saved),
+          coverUrl: builtin ? "" : payload.coverUrl ?? "",
+          tabs: payload.tabs ?? entry.tabs,
+          tmdbCollections: payload.tmdbCollections ?? [],
+          mdblist: payload.mdblist ?? [],
+          revision: saved?.revision ?? 0,
+          updatedAt: saved?.updatedAt ?? null,
+        };
+      };
+      const franchises = () => [
+        ...Object.values(seed).map((entry) => view(entry, true)),
+        ...[...franchiseSaved.keys()].filter((id) => !seed[id]).map((id) => view({ id }, false)),
+      ];
+      const parts = url.pathname.split("/").filter(Boolean);
+      try {
+        if (parts.length === 2 && request.method === "GET") {
+          const stamps = [...franchiseSaved.values()].map((item) => item.updatedAt).concat(overridesUpdatedAt ?? []).sort();
+          return json(reply, 200, {
+            franchises: franchises(),
+            overrides: overridesSaved,
+            overridesUpdatedAt,
+            updatedAt: stamps.at(-1) ?? null,
+            builtinFranchiseIds: Object.keys(seed),
+            standards: standards.filter((item) => item.kind !== "COLLECTION_RAIL").map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
+              ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources, sourceCount: sources.length })),
+          });
+        }
+        if (parts[2] === "overrides" && request.method === "PUT") {
+          overridesSaved = validateOverrides(await readBody(request), standards);
+          overridesUpdatedAt = new Date().toISOString();
+          return json(reply, 200, { overrides: overridesSaved });
+        }
+        if (parts[2] === "franchises" && parts[3]) {
+          const id = decodeURIComponent(parts[3]);
+          const builtin = Boolean(seed[id]);
+          if (request.method === "DELETE") {
+            if (!builtin && !franchiseSaved.has(id)) return json(reply, 404, { error: "Unknown franchise" });
+            franchiseSaved.delete(id);
+            return json(reply, 200, { deleted: !builtin, franchise: builtin ? view(seed[id], true) : null });
+          }
+          if (request.method === "PUT") {
+            if (!builtin && !/^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/.test(id)) {
+              return json(reply, 400, { error: "Id: 3-40 characters, lowercase letters, digits and hyphens" });
+            }
+            if (!builtin && standards.some((item) => item.id === catalogIdFor(id))) {
+              return json(reply, 400, { error: "This id belongs to a built-in franchise" });
+            }
+            const payload = validateFranchise(id, builtin, await readBody(request));
+            franchiseSaved.set(id, { payload, revision: (franchiseSaved.get(id)?.revision ?? 0) + 1, updatedAt: new Date().toISOString() });
+            return json(reply, 200, { franchise: view(builtin ? seed[id] : { id }, builtin) });
+          }
+        }
+      } catch (error) {
+        return json(reply, error.statusCode || 500, { error: error.message });
+      }
+    }    if (request.method === "GET" && url.pathname === "/admin-api/global") {
       return json(reply, 200, {
         total: 128,
         configurable: 116,

@@ -348,7 +348,9 @@ class CatalogRepository @Inject constructor(
     }
 
     private fun refreshBundledPreinstalledCatalog(config: CatalogConfig): CatalogConfig {
-        val bundled = bundledPreinstalledCatalogsById[config.id] ?: return config
+        val bundled = bundledPreinstalledCatalogsById[config.id]
+            ?.let { CatalogConfigRepository.applyToBundled(it, CurrentCentralConfig.value) }
+            ?: return config
         val shouldRefresh = config.isPreinstalled ||
             config.sourceType == CatalogSourceType.PREINSTALLED ||
             config.kind == CatalogKind.COLLECTION ||

@@ -232,102 +232,6 @@ test("disabled Decades rail is not recreated from its enabled collection cards",
   );
 });
 
-test("Marvel release-order sources and chronology timeline retain fallbacks", async () => {
-  const { defaultCatalogs } = await import(moduleUrl);
-  const rail = defaultCatalogs.find(
-    (catalog) => catalog.id === "collection_franchise_marvel",
-  );
-  const sources = rail?.collectionSources ?? [];
-
-  assert.equal(sources[0]?.kind, "ADDON_CATALOG");
-  assert.equal(sources[0]?.addonCatalogId, "movies");
-  assert.equal(sources[0]?.collectionTab, "movie");
-  assert.equal(
-    sources[0]?.addonManifestUrl,
-    "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
-  );
-  assert.equal(
-    sources.some(
-      (source) =>
-        source.kind === "ADDON_CATALOG" &&
-        source.addonCatalogId === "series" &&
-        source.collectionTab === "series",
-    ),
-    true,
-  );
-  assert.equal(
-    sources.some(
-      (source) =>
-        source.kind === "ADDON_CATALOG" &&
-        source.addonCatalogId === "marvel-mcu" &&
-        source.addonCatalogType === "Marvel" &&
-        source.collectionTab === "timeline",
-    ),
-    true,
-  );
-  assert.equal(
-    sources.some((source) => source.kind === "CURATED_IDS" && source.addonFallback),
-    true,
-  );
-  assert.equal(
-    sources.some((source) => source.kind === "MDBLIST_PUBLIC"),
-    false,
-  );
-});
-
-test("DC and Star Wars use their MystreamNet chronological manifests", async () => {
-  const { defaultCatalogs } = await import(moduleUrl);
-  const cases = [
-    {
-      id: "collection_franchise_dc_universe",
-      manifestId: "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-      catalogId: "dc-chronological",
-      catalogType: "DC",
-      manifestUrl:
-        "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
-    },
-    {
-      id: "collection_franchise_star_wars",
-      manifestId:
-        "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-      catalogId: "sw-movies-series-chronological",
-      catalogType: "StarWars",
-      manifestUrl:
-        "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
-    },
-  ];
-
-  for (const expected of cases) {
-    const sources =
-      defaultCatalogs.find((catalog) => catalog.id === expected.id)
-        ?.collectionSources ?? [];
-    const timeline = sources.find(
-      (source) => source.collectionTab === "timeline",
-    );
-    assert.equal(timeline?.kind, "ADDON_CATALOG");
-    assert.equal(timeline?.addonId, expected.manifestId);
-    assert.equal(timeline?.addonCatalogId, expected.catalogId);
-    assert.equal(timeline?.addonCatalogType, expected.catalogType);
-    assert.equal(timeline?.addonManifestUrl, expected.manifestUrl);
-    assert.equal(
-      sources.some((source) => source.collectionTab === "movie"),
-      true,
-    );
-    assert.equal(
-      sources.some((source) => source.collectionTab === "series"),
-      true,
-    );
-    assert.equal(
-      sources.some((source) => source.kind === "CURATED_IDS"),
-      true,
-    );
-    assert.equal(
-      sources.some((source) => source.kind === "MDBLIST_PUBLIC"),
-      true,
-    );
-  }
-});
-
 test("direct franchise IMDb entries use localized TMDB overviews and landscape artwork", async () => {
   const { loadCatalog } = await import(
     pathToFileURL(path.join(__dirname, "..", "lib", "tmdb.ts")).href
@@ -567,17 +471,103 @@ test("standard collections do not depend on addons the user has to install", asy
   }
 });
 
-test("Marvel's list fallback only runs while its own addon is down", async () => {
+test("Marvel, DC and Star Wars run on bundled title lists with movie, series and timeline tabs", async () => {
   const { defaultCatalogs } = await import(moduleUrl);
-  const marvel = defaultCatalogs.find((c) => c.id === "collection_franchise_marvel");
-  const addons = marvel.collectionSources.filter((s) => s.kind === "ADDON_CATALOG");
-  const fallbacks = marvel.collectionSources.filter((s) => s.addonFallback);
-  assert.equal(addons.length, 3);
-  assert.equal(fallbacks.length, 2);
-  assert.ok(fallbacks.every((s) => s.kind === "CURATED_IDS"));
-  assert.equal(marvel.collectionSources.length, 5);
+  for (const id of ["collection_franchise_marvel", "collection_franchise_dc_universe", "collection_franchise_star_wars"]) {
+    const sources = defaultCatalogs.find((c) => c.id === id).collectionSources;
+    assert.equal(sources.some((s) => s.kind === "ADDON_CATALOG"), false, id);
+    for (const tab of ["movie", "series", "timeline"]) {
+      const list = sources.find((s) => s.kind === "CURATED_IDS" && s.collectionTab === tab);
+      assert.ok(list && list.curatedRefs.length > 0, id + " " + tab);
+    }
+  }
 });
 
+test("the bundled franchise lists are exactly the shared franchise-lists json", async () => {
+  const { bundledFranchiseLists } = await import(pathToFileURL(path.resolve(__dirname, "../lib/franchiseListSeed.ts")).href);
+  const master = JSON.parse(require("node:fs").readFileSync(path.resolve(__dirname, "../../catalog-contract/franchise-lists.json"), "utf8")).lists;
+  for (const list of Object.values(master)) {
+    const bundled = bundledFranchiseLists[list.catalogId];
+    assert.deepEqual(bundled.movie.map((e) => e.ref), list.tabs.movie.map((e) => e.ref), list.id + " movie");
+    assert.deepEqual(bundled.series.map((e) => e.ref), list.tabs.series.map((e) => e.ref), list.id + " series");
+    assert.deepEqual(bundled.timeline, list.tabs.timeline.map((e) => ({ ref: e.ref, title: e.title })), list.id + " timeline");
+  }
+  const marvel = bundledFranchiseLists.collection_franchise_marvel.timeline;
+  assert.ok(marvel.length > new Set(marvel.map((e) => e.ref)).size, "season entries repeat in the Marvel timeline");
+});
+
+test("the central config is parsed, malformed entries are dropped and the timeline keeps repeats", async () => {
+  const { parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const parsed = parseCatalogConfig({
+    franchises: [
+      { id: "marvel", title: "Marvel", catalogId: "collection_franchise_marvel", builtin: true, tabs: {
+        movie: [{ ref: "movie:1" }, { ref: "MOVIE:2" }, { ref: "movie:1" }, { ref: "x" }],
+        series: [{ ref: "tv:3" }],
+        timeline: [{ ref: "tv:3", title: "Staffel 1" }, { ref: "tv:3", title: "Staffel 2" }] } },
+      { id: "ghibli", title: "Ghibli", builtin: false, coverUrl: "https://example.com/g.jpg", tabs: { movie: [{ ref: "movie:129" }] },
+        tmdbCollections: [8, 0, "x"], mdblist: ["me/list", "bad slug"] },
+      { id: "oops", title: "Cover", builtin: false, coverUrl: "http://example.com/a.jpg", tabs: {} },
+      { id: "x", title: "Short id", builtin: false, tabs: {} },
+      { id: "other", title: "Other", catalogId: "collection_franchise_other", builtin: true, tabs: {} },
+    ],
+    overrides: { rows: { trending_movies: "https://mdblist.com/lists/me/x" }, covers: { collection_service_netflix: "https://example.com/n.jpg", x: "http://bad" }, sources: { c: { tmdbCollections: [8, 0], mdblist: ["me/a", "bad slug"] }, d: { tmdbCollections: [] } }, extras: { c: ["tv:1"] } },
+  });
+  assert.deepEqual(parsed.franchises.map((f) => f.catalogId), ["collection_franchise_marvel", "collection_franchise_ghibli", "collection_franchise_oops"]);
+  const [marvel, ghibli, oops] = parsed.franchises;
+  assert.deepEqual(marvel.tabs.movie.map((e) => e.ref), ["movie:1", "movie:2"]);
+  assert.deepEqual(marvel.tabs.timeline, [{ ref: "tv:3", title: "Staffel 1" }, { ref: "tv:3", title: "Staffel 2" }]);
+  assert.equal(ghibli.coverUrl, "https://example.com/g.jpg");
+  assert.deepEqual(ghibli.tmdbCollections, [8]);
+  assert.deepEqual(ghibli.mdblist, ["me/list"]);
+  assert.equal(oops.coverUrl, null);
+  assert.equal(parsed.overrides.rows.trending_movies, "https://mdblist.com/lists/me/x");
+  assert.deepEqual(parsed.overrides.sources, { c: { tmdbCollections: [8], mdblist: ["me/a"] } });
+  assert.equal(parsed.overrides.covers.collection_service_netflix, "https://example.com/n.jpg");
+  assert.equal(parseCatalogConfig("nope"), null);
+});
+
+test("the central config replaces the tab lists, adds franchises and applies the overrides to the defaults", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const { applyCentralConfig, withFranchiseLists, getCentralConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const tabs = (movie, timeline = []) => ({ movie, series: [], timeline });
+  const result = applyCentralConfig(defaultCatalogs, {
+    franchises: [
+      { id: "marvel", title: "Marvel", catalogId: "collection_franchise_marvel", builtin: true, coverUrl: null, tabs: tabs([{ ref: "movie:1" }]), tmdbCollections: [], mdblist: [] },
+      { id: "ghibli", title: "Ghibli", catalogId: "collection_franchise_ghibli", builtin: false, coverUrl: "https://example.com/g.jpg", tabs: tabs([{ ref: "movie:129" }]), tmdbCollections: [8], mdblist: ["me/list"] },
+    ],
+    overrides: {
+      rows: { trending_movies: "https://mdblist.com/lists/me/trending", recent_tv: "https://mdblist.com/lists/me/ignored" },
+      covers: { collection_service_netflix: "https://example.com/netflix.jpg", collection_service_hulu: "http://insecure" },
+      sources: { collection_franchise_harry_potter: { tmdbCollections: [7, 9], mdblist: ["me/hp"] } },
+      extras: { collection_franchise_james_bond: ["TV:84773", "bogus"] },
+    },
+  });
+  const marvel = result.find((c) => c.id === "collection_franchise_marvel").collectionSources;
+  assert.deepEqual(marvel.find((s) => s.collectionTab === "movie").curatedRefs, ["movie:1"]);
+  assert.equal(marvel.some((s) => s.collectionTab === "series"), false, "an emptied tab disappears");
+  assert.equal(result.find((c) => c.id === "trending_movies").sourceUrl, "https://mdblist.com/lists/me/trending");
+  assert.equal(result.find((c) => c.id === "recent_tv").sourceUrl, undefined);
+  const hp = result.find((c) => c.id === "collection_franchise_harry_potter").collectionSources;
+  assert.deepEqual(hp.filter((s) => s.tmdbCollectionId).map((s) => s.tmdbCollectionId), [7, 9]);
+  assert.deepEqual(hp.filter((s) => s.mdblistSlug).map((s) => s.mdblistSlug), ["me/hp"]);
+  assert.ok(hp.some((s) => String(s.curatedRefs) === "tv:224377"), "added titles of the app stay");
+  const netflix = result.find((c) => c.id === "collection_service_netflix");
+  assert.equal(netflix.collectionCoverImageUrl, "https://example.com/netflix.jpg");
+  assert.equal(netflix.collectionHeroImageUrl, "https://example.com/netflix.jpg");
+  assert.equal(result.find((c) => c.id === "collection_service_hulu").collectionCoverImageUrl, defaultCatalogs.find((c) => c.id === "collection_service_hulu").collectionCoverImageUrl);
+  assert.ok(result.find((c) => c.id === "collection_franchise_james_bond").collectionSources.some((s) => String(s.curatedRefs) === "tv:84773"));
+  const ghibli = result.find((c) => c.id === "collection_franchise_ghibli");
+  assert.equal(ghibli.remoteFranchise, true);
+  assert.ok(ghibli.collectionSources.some((s) => s.tmdbCollectionId === 8));
+  const franchises = result.filter((c) => c.kind === "COLLECTION" && c.collectionGroup === "FRANCHISE");
+  assert.equal(franchises.at(-1).id, "collection_franchise_ghibli");
+  assert.equal(result.length, defaultCatalogs.length + 1);
+
+  // With nothing fetched or stored, the sources of any collection (also a tab view) are returned unchanged.
+  getCentralConfig();
+  const own = [{ kind: "CURATED_IDS", collectionTab: "movie", curatedRefs: ["movie:5"] }];
+  assert.deepEqual(withFranchiseLists("collection_service_netflix", own), own);
+});
 test("streaming services use the country of the language as watch region", async () => {
   const { watchRegionForLanguage } = await import(
     pathToFileURL(path.resolve(__dirname, "../lib/tmdb.ts")).href

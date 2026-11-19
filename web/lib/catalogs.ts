@@ -1,3 +1,5 @@
+import { applyCentralConfig, curatedTabSource, getCentralConfig } from "./catalogConfig";
+import { bundledFranchiseLists } from "./franchiseListSeed";
 import type { CatalogConfig } from "./types";
 import type { UiLanguage } from "./i18n";
 import { applyRemoteCatalogOverrides } from "./catalogRemoteOverrides.ts";
@@ -172,12 +174,6 @@ function serviceSources(providerId: number, extraProviderIds: number[] = []) {
   ]);
 }
 
-// Only used while the collection's addon sources return nothing (see loadCollectionCatalog).
-function addonFallbackSource(
-  source: NonNullable<CatalogConfig["collectionSources"]>[number],
-) {
-  return { ...source, addonFallback: true };
-}
 function mdblistPublicSource(
   mdblistSlug: string,
   collectionTab?: "movie" | "series" | "timeline",
@@ -186,123 +182,19 @@ function mdblistPublicSource(
   return { kind: "MDBLIST_PUBLIC", mdblistSlug, collectionTab, mediaType };
 }
 
+// The three title lists (movie, series, timeline tab) of Marvel, DC and Star Wars. The tab marks them as
+// replaceable by the backend copy (see catalogConfig.ts).
+function bundledFranchiseSources(catalogId: string) {
+  const lists = bundledFranchiseLists[catalogId];
+  return (["movie", "series", "timeline"] as const).map((tab) => curatedTabSource(lists[tab], tab));
+}
+
 function curatedSource(
   curatedRefs: string[],
   collectionTab?: "movie" | "series" | "timeline",
 ) {
   return { kind: "CURATED_IDS", curatedRefs, collectionTab };
 }
-
-const marvelCuratedRefs = [
-  "movie:1726",
-  "movie:1724",
-  "movie:10138",
-  "movie:10195",
-  "movie:1771",
-  "movie:24428",
-  "movie:68721",
-  "movie:76338",
-  "movie:100402",
-  "movie:118340",
-  "movie:99861",
-  "movie:102899",
-  "movie:271110",
-  "movie:284052",
-  "movie:283995",
-  "movie:315635",
-  "movie:284053",
-  "movie:284054",
-  "movie:299536",
-  "movie:363088",
-  "movie:299537",
-  "movie:299534",
-  "movie:429617",
-  "tv:85271",
-  "tv:88396",
-  "tv:84958",
-  "movie:497698",
-  "tv:92749",
-  "movie:566525",
-  "tv:88329",
-  "movie:524434",
-  "movie:634649",
-  "tv:92782",
-  "movie:453395",
-  "tv:92783",
-  "movie:616037",
-  "tv:92785",
-  "movie:505642",
-  "movie:640146",
-  "tv:114472",
-  "movie:447365",
-  "movie:609681",
-  "tv:138501",
-  "movie:533535",
-  "tv:202412",
-  "tv:202555",
-  "movie:822119",
-  "movie:986056",
-  "tv:114471",
-  "movie:617126",
-];
-
-const dcCuratedRefs = [
-  "movie:49521",
-  "movie:209112",
-  "movie:297761",
-  "movie:297762",
-  "movie:141052",
-  "movie:297802",
-  "movie:287947",
-  "movie:495764",
-  "movie:464052",
-  "movie:791373",
-  "movie:436270",
-  "movie:594767",
-  "movie:298618",
-  "movie:565770",
-  "movie:572802",
-  "movie:414906",
-  "movie:475557",
-  "movie:698687",
-  "movie:1287536",
-  "tv:1435",
-  "tv:62688",
-  "tv:1412",
-  "tv:60735",
-  "tv:62286",
-  "tv:105248",
-  "tv:116244",
-];
-
-const starWarsCuratedRefs = [
-  "movie:1893",
-  "movie:1894",
-  "movie:12180",
-  "tv:4194",
-  "movie:1895",
-  "tv:105971",
-  "tv:60554",
-  "movie:348350",
-  "tv:83867",
-  "tv:92830",
-  "movie:330459",
-  "movie:11",
-  "movie:1891",
-  "movie:1892",
-  "tv:82856",
-  "tv:115036",
-  "tv:114461",
-  "tv:202879",
-  "tv:203085",
-  "tv:251091",
-  "movie:140607",
-  "movie:181808",
-  "movie:181812",
-  "tv:114479",
-  "tv:79093",
-  "tv:114410",
-];
 
 const androidAssetBase =
   "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/";
@@ -571,106 +463,14 @@ const androidCollectionDefaults: CatalogConfig[] = [
   ].map((title) => {
     const sources = {
       Marvel: [
-        addonSource(
-          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-          "movie",
-          "movies",
-          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
-          "movie",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-          "series",
-          "series",
-          "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
-          "series",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-          "Marvel",
-          "marvel-mcu",
-          "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json",
-          "timeline",
-        ),
-        addonFallbackSource(
-          curatedSource(
-            marvelCuratedRefs.filter((ref) => ref.startsWith("movie:")),
-            "movie",
-          ),
-        ),
-        addonFallbackSource(
-          curatedSource(
-            marvelCuratedRefs.filter((ref) => ref.startsWith("tv:")),
-            "series",
-          ),
-        ),
+        ...bundledFranchiseSources("collection_franchise_marvel"),
       ],
       "DC Universe": [
-        addonSource(
-          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-          "movie",
-          "dc-movies",
-          "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
-          "movie",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-          "series",
-          "dc-series",
-          "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
-          "series",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-          "DC",
-          "dc-chronological",
-          "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json",
-          "timeline",
-        ),
-        curatedSource(
-          dcCuratedRefs.filter((ref) => ref.startsWith("movie:")),
-          "movie",
-        ),
-        curatedSource(
-          dcCuratedRefs.filter((ref) => ref.startsWith("tv:")),
-          "series",
-        ),
+        ...bundledFranchiseSources("collection_franchise_dc_universe"),
         mdblistPublicSource("kraftynic/dc-tv-shows1", "series"),
       ],
       "Star Wars": [
-        addonSource(
-          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-          "movie",
-          "movies",
-          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
-          "movie",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-          "series",
-          "series",
-          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
-          "series",
-        ),
-        addonSource(
-          "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-          "StarWars",
-          "sw-movies-series-chronological",
-          "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
-          "timeline",
-        ),
-        curatedSource(
-          starWarsCuratedRefs.filter((ref) => ref.startsWith("movie:")),
-          "movie",
-        ),
-        curatedSource(
-          starWarsCuratedRefs.filter((ref) => ref.startsWith("tv:")),
-          "series",
-        ),
-        mdblistPublicSource(
-          "jxduffy/star-wars-chronological-order",
-          "timeline",
-        ),
+        ...bundledFranchiseSources("collection_franchise_star_wars"),
       ],
       "James Bond": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 645 }],
       "Fast & Furious": [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 9485 }],
@@ -1043,9 +843,11 @@ export function mergeCatalogs(
     .map(normalizedCatalog)
     .filter((catalog) => !isRetiredCatalog(catalog))
     .filter((catalog) => !isLegacyServiceCatalog(catalog));
+  const defaults = applyCentralConfig(defaultCatalogs, getCentralConfig());
+  const defaultIds = new Set(defaults.map((catalog) => catalog.id));
   const savedById = new Map(cleaned.map((catalog) => [catalog.id, catalog]));
-  const result = cleaned.map((catalog) => {
-    const currentDefault = defaultCatalogs.find(
+  const result = cleaned.filter((catalog) => !catalog.remoteFranchise || defaultIds.has(catalog.id)).map((catalog) => {
+    const currentDefault = defaults.find(
       (candidate) => candidate.id === catalog.id,
     );
     const withDefault: CatalogConfig = {
@@ -1063,7 +865,7 @@ export function mergeCatalogs(
       enabled: !hiddenIds.includes(catalog.id) && catalog.enabled !== false,
     };
   });
-  for (const catalog of defaultCatalogs) {
+  for (const catalog of defaults) {
     if (savedById.has(catalog.id)) continue;
     const rank = defaultCatalogRank.get(catalog.id) ?? Number.MAX_SAFE_INTEGER;
     const successor = result.findIndex(
@@ -1081,7 +883,7 @@ export function mergeCatalogs(
   // preinstalled collection cards back into the canonical Android order so a
   // newly added franchise cannot appear at the end of the rail only on Web.
   const canonicalCollections = new Set(
-    defaultCatalogs
+    defaults
       .filter((catalog) => {
         const kind = String(catalog.kind ?? "").toUpperCase();
         return kind === "COLLECTION" && catalog.isPreinstalled;
@@ -1095,9 +897,9 @@ export function mergeCatalogs(
     .map(({ catalog }) => catalog)
     .sort(
       (left, right) =>
-        (defaultCatalogs.findIndex((catalog) => catalog.id === left.id) ??
+        (defaults.findIndex((catalog) => catalog.id === left.id) ??
           Number.MAX_SAFE_INTEGER) -
-        (defaultCatalogs.findIndex((catalog) => catalog.id === right.id) ??
+        (defaults.findIndex((catalog) => catalog.id === right.id) ??
           Number.MAX_SAFE_INTEGER),
     );
   collectionSlots.forEach(({ index }, slotIndex) => {

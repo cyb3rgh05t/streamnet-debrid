@@ -29,6 +29,7 @@ class MediaRepositoryLogoTest {
         okHttpClient = mockk(),
         streamRepository = mockk(),
         homeServerRepository = mockk(),
+        catalogConfig = mockk(relaxed = true),
     )
 
     @Test

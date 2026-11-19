@@ -25,6 +25,15 @@ export function isValidRemoteMdblistUrl(value: unknown) {
   }
 }
 
+function isPlainHttps(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 /** The app fetches the manifest itself, so only a plain https manifest link without credentials qualifies. */
 export function isValidRemoteManifestUrl(value: unknown) {
   const text = String(value ?? "").trim();
@@ -101,6 +110,77 @@ function appendExtraRefs(
   return valid.length
     ? [...sources, { kind: "CURATED_IDS", curatedRefs: valid, remoteExtra: true }]
     : sources;
+}
+
+export type CentralSources = { tmdbCollections?: number[]; mdblist?: string[] };
+
+/** Swaps all sources of one kind by the admin's list, at the position of the first one of that kind. */
+function swapSources(
+  sources: CollectionSourceConfig[],
+  kind: string,
+  replacement: CollectionSourceConfig[] | undefined,
+) {
+  if (!replacement) return sources;
+  const at = sources.findIndex((source) => String(source.kind).toUpperCase() === kind);
+  const rest = sources.filter((source) => String(source.kind).toUpperCase() !== kind);
+  const insertAt = at < 0 ? rest.length : Math.min(at, rest.length);
+  return [...rest.slice(0, insertAt), ...replacement, ...rest.slice(insertAt)];
+}
+
+function replaceListSources(sources: CollectionSourceConfig[], lists: CentralSources) {
+  const template = sources.find((source) => String(source.kind).toUpperCase() === "MDBLIST_PUBLIC");
+  const withTmdb = swapSources(
+    sources,
+    "TMDB_COLLECTION",
+    lists.tmdbCollections?.map((tmdbCollectionId) => ({ kind: "TMDB_COLLECTION", tmdbCollectionId })),
+  );
+  return swapSources(
+    withTmdb,
+    "MDBLIST_PUBLIC",
+    lists.mdblist?.map((mdblistSlug) => ({
+      kind: "MDBLIST_PUBLIC",
+      mdblistSlug,
+      collectionTab: template?.collectionTab,
+      mediaType: template?.mediaType,
+    })),
+  );
+}
+
+/**
+ * Applies the central overrides (valid for every device, unlike the saved per-account ones) to a default
+ * catalog: the list URL of an MDBList home row, the cover and the TMDB / MDBList lists of a collection, and
+ * added franchise titles.
+ */
+export function applyCentralOverrides(
+  base: CatalogConfig,
+  overrides: {
+    rows?: Record<string, string>;
+    covers?: Record<string, string>;
+    sources?: Record<string, CentralSources>;
+    extras?: Record<string, string[]>;
+  },
+): CatalogConfig {
+  const rowUrl = String(overrides.rows?.[base.id] ?? "").trim();
+  const result: CatalogConfig = { ...base };
+  if (base.sourceType === "mdblist" && base.sourceUrl && isValidRemoteMdblistUrl(rowUrl)) {
+    result.sourceUrl = rowUrl;
+    if (base.sourceRef) result.sourceRef = `mdblist:${rowUrl}`;
+  }
+  const cover = String(overrides.covers?.[base.id] ?? "").trim();
+  if (String(base.kind ?? "").toUpperCase() === "COLLECTION" && cover.length <= 500 && isPlainHttps(cover)) {
+    result.collectionCoverImageUrl = cover;
+    result.collectionFocusGifUrl = cover;
+    result.collectionHeroImageUrl = cover;
+  }
+  const sources = base.collectionSources ?? [];
+  const lists = overrides.sources?.[base.id];
+  const next = appendExtraRefs(
+    lists ? replaceListSources(sources, lists) : sources,
+    overrides.extras?.[base.id],
+    base.collectionGroup,
+  );
+  if (next !== sources) result.collectionSources = next;
+  return result;
 }
 
 /**

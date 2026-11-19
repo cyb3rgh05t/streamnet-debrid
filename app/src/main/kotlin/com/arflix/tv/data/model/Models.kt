@@ -55,6 +55,9 @@ data class MediaItem(
     val timelineEntryId: String? = null,
     val timelineSection: String? = null,
     val timelineMetadataUnavailable: Boolean = false,
+    // Display name of a timeline entry (e.g. "What If...? - Staffel 2"); the title stays the title's own, so
+    // availability matching and the details page keep using it.
+    val timelineLabel: String? = null,
     // Placeholder card - shows skeleton loading animation
     val isPlaceholder: Boolean = false,
     // Continue Watching: formatted time remaining (e.g., "23min left", "1hr 15min left")

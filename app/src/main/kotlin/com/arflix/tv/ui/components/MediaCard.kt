@@ -166,7 +166,7 @@ fun MediaCard(
     val baseImageUrl = if (isCollectionTile) {
         item.image.takeIf { it.isNotBlank() } ?: item.backdrop?.takeIf { it.isNotBlank() }
     } else if (isLandscape) {
-        if (item.timelineEntryId?.startsWith("marvel-addon:") == true) {
+        if (item.timelineEntryId?.startsWith("franchise-timeline:") == true) {
             item.backdrop?.takeIf { it.isNotBlank() }
         } else {
             (item.backdrop ?: item.image).takeIf { it.isNotBlank() }

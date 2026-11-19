@@ -529,6 +529,10 @@ function formatAuditOperation(operation) {
     remove_obsolete_catalogs: "Veraltete Kataloge bereinigt",
     add_catalog_item: "Franchise: Titel ergänzt",
     remove_catalog_item: "Franchise: Titel entfernt",
+    catalog_franchise_save: "Franchise gespeichert",
+    catalog_franchise_reset: "Franchise auf eingebaute Listen zurückgesetzt",
+    catalog_franchise_delete: "Franchise gelöscht",
+    catalog_overrides_save: "Standard-Listen gespeichert",
   };
   const global = typeof operation === "string" && operation.startsWith("global_");
   const key = global ? operation.slice(7) : operation;
@@ -1682,6 +1686,7 @@ function selectGlobalCategory(category) {
 
 async function loadGlobal() {
   state.global = await api("/admin-api/global");
+  void loadCatalogConfig();
   try {
     state.defaultCatalogs = (await api("/admin-api/global/default-catalogs")).catalogs;
   } catch (error) {
@@ -1694,6 +1699,519 @@ async function loadGlobal() {
     `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
   updateGlobalFields();
 }
+
+// ---- Remote Config: central catalog configuration (collections, home rows) ----
+const rcTabs = ["movie", "series", "timeline"];
+const rcNewKey = "__new__";
+const rc = { data: null, tab: "overview", ftab: "movie", current: null, drafts: {}, group: "FRANCHISE" };
+const rcTabHelp = {
+  movie: "Filme – eine Zeile pro Titel: movie:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
+  series: "Serien – eine Zeile pro Titel: tv:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
+  timeline: "Timeline (Filme und Serien gemischt) – eine Zeile pro Eintrag, die Reihenfolge ist die Reihenfolge in der App. Titel dürfen mehrfach vorkommen, z. B. eine Zeile pro Staffel: tv:91363 | What If…? – Staffel 2. Der Text nach | ist der angezeigte Name.",
+};
+const rcGroupNames = {
+  FRANCHISE: "Franchise", SERVICE: "Streamingdienst", DECADE: "Jahrzehnt", MOVIE_GENRE: "Film-Genre", TV_GENRE: "Serien-Genre",
+};
+
+function rcEntriesToText(entries) {
+  return (entries || []).map((entry) => (entry.title ? `${entry.ref} | ${entry.title}` : entry.ref)).join("\n");
+}
+
+function rcTextToEntries(text, tab) {
+  const entries = [];
+  String(text || "").split(/\r?\n/).forEach((raw, index) => {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) return;
+    const separator = line.indexOf("|");
+    const ref = (separator < 0 ? line : line.slice(0, separator)).trim().toLowerCase();
+    const title = separator < 0 ? "" : line.slice(separator + 1).trim();
+    if (!/^(movie|tv):\d{1,9}$/.test(ref)) {
+      throw new Error(`${tab}, Zeile ${index + 1}: „${line.slice(0, 40)}“ ist kein gültiger Eintrag (movie:ID oder tv:ID)`);
+    }
+    entries.push(title ? { ref, title } : { ref });
+  });
+  return entries;
+}
+
+function rcLineCount(text) {
+  return String(text || "").split(/\r?\n/).filter((line) => line.trim() && !line.trim().startsWith("#")).length;
+}
+
+function rcList(text) {
+  return String(text || "").split(/[,\s]+/).filter(Boolean);
+}
+
+function rcNumberList(text) {
+  return rcList(text).map((value) => {
+    if (!/^\d{1,9}$/.test(value)) throw new Error(`„${value}“ ist keine gültige TMDB-Collection-ID`);
+    return Number(value);
+  });
+}
+
+function rcElement(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text !== undefined && text !== null) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+
+function rcStandard(catalogId) {
+  return rc.data?.standards.find((item) => item.id === catalogId) ?? null;
+}
+
+function rcStandardTitle(catalogId) {
+  return rcStandard(catalogId)?.title ?? catalogId;
+}
+
+// Everything the form can edit: the app's collections plus the franchises the admin created.
+function rcItems() {
+  const { standards, franchises } = rc.data;
+  const items = standards.filter((item) => item.kind === "COLLECTION").map((standard) => ({
+    key: standard.id,
+    standard,
+    group: standard.group,
+    title: standard.title,
+    // The three franchises with their own tab lists (Marvel, DC, Star Wars).
+    franchise: franchises.find((item) => item.builtin && item.catalogId === standard.id) ?? null,
+  }));
+  for (const franchise of franchises.filter((item) => !item.builtin)) {
+    items.push({ key: `custom:${franchise.id}`, standard: null, group: "FRANCHISE", title: franchise.title, franchise });
+  }
+  return items;
+}
+
+function rcItem(key) {
+  return rcItems().find((item) => item.key === key) ?? null;
+}
+
+function rcEffective(item) {
+  const overrides = rc.data.overrides;
+  const standard = item.standard;
+  if (!standard) {
+    return {
+      cover: item.franchise.coverUrl || "", tmdb: item.franchise.tmdbCollections, mdblist: item.franchise.mdblist, extras: [],
+    };
+  }
+  return {
+    cover: overrides.covers?.[standard.id] ?? standard.coverUrl,
+    tmdb: overrides.sources?.[standard.id]?.tmdbCollections ?? standard.tmdbCollections,
+    mdblist: overrides.sources?.[standard.id]?.mdblist ?? standard.mdblist,
+    extras: overrides.extras?.[standard.id] ?? [],
+  };
+}
+
+function rcIsChanged(item) {
+  if (!item.standard) return true;
+  const { overrides } = rc.data;
+  const id = item.standard.id;
+  return Boolean(overrides.covers?.[id] || overrides.sources?.[id] || overrides.extras?.[id] || item.franchise?.custom);
+}
+
+function selectRcTab(tab) {
+  rc.tab = tab;
+  document.querySelectorAll("[data-rc-tab]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.rcTab === tab));
+  });
+  document.querySelectorAll("[data-rc-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.rcPanel !== tab);
+  });
+}
+
+async function loadCatalogConfig() {
+  try {
+    rc.data = await api("/admin-api/catalog-config");
+  } catch (error) {
+    showToast(`Zentrale Konfiguration konnte nicht geladen werden: ${error.message}`, true);
+    return;
+  }
+  if (rc.current !== rcNewKey && !rcItem(rc.current)) rc.current = rcItems().find((item) => item.group === rc.group)?.key ?? null;
+  renderRcOverview();
+  renderRcFranchiseList();
+  renderRcFranchiseForm();
+  renderRcStandards();
+}
+
+function rcMetric(label, value) {
+  const item = rcElement("div", null, "metric");
+  const body = rcElement("div", null, "metric-body");
+  body.append(rcElement("span", label, "metric-label"), rcElement("strong", value, "metric-value"));
+  item.append(body);
+  return item;
+}
+
+function rcEditButton(key) {
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = "button secondary";
+  action.textContent = "Bearbeiten";
+  action.addEventListener("click", () => {
+    const item = rcItem(key);
+    stashRcDraft();
+    rc.group = item?.group ?? rc.group;
+    byId("rc-group-filter").value = rc.group;
+    rc.current = key;
+    renderRcFranchiseList();
+    renderRcFranchiseForm();
+    selectRcTab("franchises");
+  });
+  const cell = document.createElement("td");
+  cell.append(action);
+  return cell;
+}
+
+function renderRcOverview() {
+  const { franchises, overrides } = rc.data;
+  const custom = franchises.filter((item) => !item.builtin);
+  const changedLists = franchises.filter((item) => item.builtin && item.custom);
+  const count = (map) => Object.keys(map || {}).length;
+  byId("rc-metrics").replaceChildren(
+    rcMetric("Eigene Franchises", custom.length),
+    rcMetric("Geänderte Franchise-Listen", changedLists.length),
+    rcMetric("Eigene Cover", count(overrides.covers)),
+    rcMetric("Ersetzte Quellen", count(overrides.sources)),
+    rcMetric("Zusätzliche Titel", Object.values(overrides.extras || {}).reduce((sum, refs) => sum + refs.length, 0)),
+    rcMetric("Home-Reihen geändert", count(overrides.rows)),
+    rcMetric("Letzte Änderung", rc.data.updatedAt ? formatDate(rc.data.updatedAt) : "—"),
+  );
+
+  const listed = franchises.filter((item) => !item.builtin || item.custom);
+  byId("rc-franchise-rows").replaceChildren(...(listed.length ? listed.map((item) => {
+    const row = document.createElement("tr");
+    const sources = [
+      item.tmdbCollections.length ? `${item.tmdbCollections.length} TMDB` : null,
+      item.mdblist.length ? `${item.mdblist.length} MDBList` : null,
+    ].filter(Boolean).join(" · ");
+    row.append(
+      textCell(item.title),
+      textCell(item.builtin ? "Eingebaut · geändert" : "Eigene"),
+      textCell(item.tabs.movie.length),
+      textCell(item.tabs.series.length),
+      textCell(item.tabs.timeline.length),
+      textCell(sources || "—"),
+      textCell(item.updatedAt ? formatDate(item.updatedAt) : "—"),
+      rcEditButton(item.builtin ? item.catalogId : `custom:${item.id}`),
+    );
+    return row;
+  }) : [(() => {
+    const row = document.createElement("tr");
+    const cell = textCell("Keine eigenen oder geänderten Franchise-Listen – es gelten die Listen der App.");
+    cell.colSpan = 8;
+    row.append(cell);
+    return row;
+  })()]));
+
+  const rows = [];
+  for (const [catalogId, url] of Object.entries(overrides.rows || {})) rows.push([rcStandardTitle(catalogId), "Home-Reihe", url, null]);
+  for (const [catalogId, url] of Object.entries(overrides.covers || {})) rows.push([rcStandardTitle(catalogId), "Cover", url, catalogId]);
+  for (const [catalogId, value] of Object.entries(overrides.sources || {})) {
+    const parts = [
+      value.tmdbCollections ? `TMDB ${value.tmdbCollections.join(", ")}` : null,
+      value.mdblist ? `MDBList ${value.mdblist.join(", ")}` : null,
+    ].filter(Boolean);
+    rows.push([rcStandardTitle(catalogId), "Quellen", parts.join(" · "), catalogId]);
+  }
+  for (const [catalogId, refs] of Object.entries(overrides.extras || {})) {
+    rows.push([rcStandardTitle(catalogId), "Zusätzliche Titel", `${refs.length}: ${refs.join(", ")}`, catalogId]);
+  }
+  byId("rc-override-rows").replaceChildren(...(rows.length ? rows.map(([title, kind, value, key]) => {
+    const row = document.createElement("tr");
+    row.append(textCell(title), textCell(kind), textCell(value));
+    if (key) row.append(rcEditButton(key));
+    return row;
+  }) : [(() => {
+    const row = document.createElement("tr");
+    const cell = textCell("Keine Abweichungen – es gelten die Standards der App.");
+    cell.colSpan = 4;
+    row.append(cell);
+    return row;
+  })()]));
+}
+
+function renderRcFranchiseList() {
+  const container = byId("rc-franchise-items");
+  const items = rcItems().filter((item) => item.group === rc.group);
+  container.replaceChildren(...items.map((item) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "rc-franchise-item";
+    button.setAttribute("aria-pressed", String(rc.current === item.key));
+    const note = item.standard ? (rcIsChanged(item) ? "geändert" : "Standard") : "Eigene";
+    button.append(rcElement("strong", item.title), rcElement("small", note));
+    button.addEventListener("click", () => {
+      stashRcDraft();
+      rc.current = item.key;
+      renderRcFranchiseList();
+      renderRcFranchiseForm();
+    });
+    return button;
+  }));
+  byId("rc-new-franchise").classList.toggle("is-active", rc.current === rcNewKey);
+}
+
+function stashRcDraft() {
+  const key = rc.current;
+  if (!key || byId("rc-franchise-form").classList.contains("hidden")) return;
+  const draft = rc.drafts[key] ?? { tabs: {} };
+  draft.title = byId("rc-f-title").value;
+  draft.id = byId("rc-f-id").value;
+  draft.cover = byId("rc-f-cover").value;
+  draft.tmdb = byId("rc-f-tmdb").value;
+  draft.mdblist = byId("rc-f-mdblist").value;
+  draft.extras = byId("rc-f-extras").value;
+  if (!byId("rc-f-tabs").classList.contains("hidden")) draft.tabs[rc.ftab] = byId("rc-f-text").value;
+  draft.reason = byId("rc-f-reason").value;
+  rc.drafts[key] = draft;
+}
+
+function rcHint(node, label, value) {
+  node.textContent = `Standard${label ? ` ${label}` : ""}: ${value || "—"}`;
+}
+
+function renderRcFranchiseForm() {
+  const key = rc.current;
+  const isNew = key === rcNewKey;
+  const item = isNew ? null : rcItem(key);
+  const form = byId("rc-franchise-form");
+  form.classList.toggle("hidden", !isNew && !item);
+  if (!isNew && !item) return;
+  const standard = item?.standard ?? null;
+  const franchise = item?.franchise ?? null;
+  const custom = isNew || !standard;
+  const isFranchiseGroup = isNew || item.group === "FRANCHISE";
+  const hasTabs = isNew || Boolean(franchise);
+  const draft = rc.drafts[key] ?? { tabs: {} };
+  const effective = item ? rcEffective(item) : { cover: "", tmdb: [], mdblist: [], extras: [] };
+
+  byId("rc-f-heading").textContent = isNew ? "Neue Franchise" : item.title;
+  byId("rc-f-title").value = draft.title ?? item?.title ?? "";
+  byId("rc-f-id").value = draft.id ?? franchise?.id ?? "";
+  byId("rc-f-cover").value = draft.cover ?? effective.cover;
+  byId("rc-f-tmdb").value = draft.tmdb ?? effective.tmdb.join(", ");
+  byId("rc-f-mdblist").value = draft.mdblist ?? effective.mdblist.join(", ");
+  byId("rc-f-extras").value = draft.extras ?? effective.extras.join("\n");
+  byId("rc-f-reason").value = draft.reason ?? "";
+  byId("rc-f-title").disabled = !custom;
+  byId("rc-f-id").disabled = !isNew;
+  byId("rc-f-id").closest("label").classList.toggle("hidden", !custom);
+  byId("rc-f-tmdb-field").classList.toggle("hidden", !isFranchiseGroup);
+  byId("rc-f-tmdb-hint").classList.toggle("hidden", !isFranchiseGroup);
+  byId("rc-f-extras-field").classList.toggle("hidden", !(isFranchiseGroup && standard));
+  byId("rc-f-tabs").classList.toggle("hidden", !hasTabs);
+
+  if (standard) {
+    rcHint(byId("rc-f-cover-hint"), "", standard.coverUrl);
+    rcHint(byId("rc-f-tmdb-hint"), "", standard.tmdbCollections.join(", "));
+    rcHint(byId("rc-f-mdblist-hint"), "", standard.mdblist.join(", "));
+    const other = standard.sources.filter((source) => !/^(mdblist|tmdbCollection):/.test(source) && !source.startsWith("curated@"));
+    byId("rc-f-other").textContent = other.length
+      ? `Weitere feste Quellen der App (nicht änderbar): ${other.join(" · ")}`
+      : "";
+  } else {
+    byId("rc-f-cover-hint").textContent = "Ohne Cover erscheint die Collection ohne Bild.";
+    byId("rc-f-tmdb-hint").textContent = "";
+    byId("rc-f-mdblist-hint").textContent = "";
+    byId("rc-f-other").textContent = "";
+  }
+  const preview = byId("rc-f-cover-preview");
+  const coverValue = byId("rc-f-cover").value.trim();
+  preview.classList.toggle("hidden", !/^https:\/\//.test(coverValue));
+  if (/^https:\/\//.test(coverValue)) preview.src = coverValue;
+
+  if (hasTabs) {
+    byId("rc-f-text").value = draft.tabs[rc.ftab] ?? rcEntriesToText(franchise?.tabs[rc.ftab]);
+    byId("rc-f-tab-help").textContent = rcTabHelp[rc.ftab];
+    byId("rc-f-count").textContent = `${rcLineCount(byId("rc-f-text").value)} Einträge in diesem Tab`;
+  }
+  const changed = item ? rcIsChanged(item) : false;
+  byId("rc-f-state").textContent = isNew
+    ? "Wird nach dem Speichern für alle Geräte als Collection in der Franchise-Reihe angezeigt."
+    : standard
+      ? (changed ? "Mit Änderungen gegenüber dem Standard der App." : "Standard der App (noch nicht geändert).")
+      : `Eigene Franchise (Stand ${franchise.revision}, gespeichert ${formatDate(franchise.updatedAt)}).`;
+  byId("rc-f-reset").classList.toggle("hidden", !standard);
+  byId("rc-f-reset").disabled = !changed;
+  byId("rc-f-delete").classList.toggle("hidden", isNew || Boolean(standard));
+  document.querySelectorAll("[data-rc-ftab]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.rcFtab === rc.ftab));
+  });
+  setMessage(byId("rc-f-message"), "");
+}
+
+function rcTabsFromDraft(draft, franchise) {
+  const tabs = {};
+  for (const tab of rcTabs) {
+    tabs[tab] = draft.tabs[tab] === undefined ? (franchise?.tabs[tab] ?? []) : rcTextToEntries(draft.tabs[tab], tab);
+  }
+  return tabs;
+}
+
+async function saveRcFranchise(event) {
+  event.preventDefault();
+  const message = byId("rc-f-message");
+  stashRcDraft();
+  const key = rc.current;
+  const isNew = key === rcNewKey;
+  const item = isNew ? null : rcItem(key);
+  const draft = rc.drafts[key] ?? { tabs: {} };
+  const reason = byId("rc-f-reason").value;
+  try {
+    const cover = String(draft.cover ?? "").trim();
+    const mdblist = rcList(draft.mdblist);
+    if (!item?.standard) {
+      const id = isNew ? String(draft.id || "").trim().toLowerCase() : item.franchise.id;
+      setMessage(message, "Wird gespeichert…", "info");
+      const saved = (await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          title: String(draft.title ?? "").trim(), coverUrl: cover, tmdbCollections: rcNumberList(draft.tmdb),
+          mdblist, tabs: rcTabsFromDraft(draft, item?.franchise), reason,
+        }),
+      })).franchise;
+      delete rc.drafts[key];
+      rc.current = `custom:${saved.id}`;
+    } else {
+      const standard = item.standard;
+      const overrides = structuredClone(rc.data.overrides);
+      for (const name of ["covers", "sources", "extras", "rows"]) overrides[name] ??= {};
+      if (cover) overrides.covers[standard.id] = cover; else delete overrides.covers[standard.id];
+      const sources = {};
+      if (mdblist.length) sources.mdblist = mdblist;
+      if (item.group === "FRANCHISE") {
+        const tmdb = rcNumberList(draft.tmdb);
+        if (tmdb.length) sources.tmdbCollections = tmdb;
+        const extras = rcList(String(draft.extras ?? "").replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
+        if (extras.length) overrides.extras[standard.id] = extras; else delete overrides.extras[standard.id];
+      }
+      if (Object.keys(sources).length) overrides.sources[standard.id] = sources; else delete overrides.sources[standard.id];
+      setMessage(message, "Wird gespeichert…", "info");
+      if (item.franchise && Object.keys(draft.tabs).length) {
+        await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(item.franchise.id)}`, {
+          method: "PUT", body: JSON.stringify({ tabs: rcTabsFromDraft(draft, item.franchise), reason }),
+        });
+      }
+      await api("/admin-api/catalog-config/overrides", { method: "PUT", body: JSON.stringify({ ...overrides, reason }) });
+      delete rc.drafts[key];
+    }
+    await loadCatalogConfig();
+    setMessage(byId("rc-f-message"), "Gespeichert und protokolliert. Die Geräte laden die Änderung innerhalb von ca. 15 Minuten.", "success");
+  } catch (error) {
+    setMessage(message, error.message, "error");
+  }
+}
+
+async function removeRcFranchise() {
+  const item = rcItem(rc.current);
+  if (!item) return;
+  const reason = byId("rc-f-reason").value;
+  const text = item.standard
+    ? `„${item.title}“ auf den Standard der App zurücksetzen? Deine Änderungen gehen verloren.`
+    : `„${item.title}“ löschen? Die Collection verschwindet aus allen Apps.`;
+  if (!window.confirm(text)) return;
+  const message = byId("rc-f-message");
+  try {
+    if (item.standard) {
+      const overrides = structuredClone(rc.data.overrides);
+      for (const name of ["covers", "sources", "extras"]) delete overrides[name]?.[item.standard.id];
+      await api("/admin-api/catalog-config/overrides", { method: "PUT", body: JSON.stringify({ ...overrides, reason }) });
+      if (item.franchise?.custom) {
+        await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(item.franchise.id)}`, {
+          method: "DELETE", body: JSON.stringify({ reason }),
+        });
+      }
+    } else {
+      await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(item.franchise.id)}`, {
+        method: "DELETE", body: JSON.stringify({ reason }),
+      });
+      rc.current = null;
+    }
+    delete rc.drafts[item.key];
+    await loadCatalogConfig();
+    setMessage(byId("rc-f-message"), item.standard ? "Zurückgesetzt und protokolliert." : "Gelöscht und protokolliert.", "success");
+  } catch (error) {
+    setMessage(message, error.message, "error");
+  }
+}
+
+function renderRcStandards() {
+  const { standards, overrides } = rc.data;
+  const rows = standards.filter((item) => item.kind === "STANDARD" && String(item.sourceUrl).includes("mdblist.com/lists/"));
+  byId("rc-rows").replaceChildren(...rows.map((item) => {
+    const label = document.createElement("label");
+    label.className = "rc-list-row";
+    const text = rcElement("span", null, "rc-list-label");
+    text.append(rcElement("strong", item.title), rcElement("small", `Standard: ${item.sourceUrl}`));
+    const input = document.createElement("input");
+    input.value = overrides.rows?.[item.id] ?? item.sourceUrl;
+    input.placeholder = item.sourceUrl;
+    input.autocomplete = "off";
+    input.maxLength = 300;
+    input.dataset.rcRow = item.id;
+    input.dataset.rcDefault = item.sourceUrl;
+    label.append(text, input);
+    return label;
+  }));
+}
+
+async function saveRcStandards(event) {
+  event.preventDefault();
+  const message = byId("rc-s-message");
+  try {
+    const rows = {};
+    document.querySelectorAll("[data-rc-row]").forEach((input) => {
+      const value = input.value.trim();
+      if (value && value !== input.dataset.rcDefault) rows[input.dataset.rcRow] = value;
+    });
+    setMessage(message, "Wird gespeichert…", "info");
+    await api("/admin-api/catalog-config/overrides", {
+      method: "PUT",
+      body: JSON.stringify({ ...rc.data.overrides, rows, reason: byId("rc-s-reason").value }),
+    });
+    await loadCatalogConfig();
+    setMessage(byId("rc-s-message"), "Gespeichert und protokolliert. Die Geräte laden die Änderung innerhalb von ca. 15 Minuten.", "success");
+  } catch (error) {
+    setMessage(message, error.message, "error");
+  }
+}
+
+document.querySelectorAll("[data-rc-tab]").forEach((button) => {
+  button.addEventListener("click", () => selectRcTab(button.dataset.rcTab));
+});
+document.querySelectorAll("[data-rc-ftab]").forEach((button) => {
+  button.addEventListener("click", () => {
+    stashRcDraft();
+    rc.ftab = button.dataset.rcFtab;
+    renderRcFranchiseForm();
+  });
+});
+byId("rc-group-filter").addEventListener("change", () => {
+  stashRcDraft();
+  rc.group = byId("rc-group-filter").value;
+  rc.current = rcItems().find((item) => item.group === rc.group)?.key ?? null;
+  renderRcFranchiseList();
+  renderRcFranchiseForm();
+});
+byId("rc-new-franchise").addEventListener("click", () => {
+  stashRcDraft();
+  rc.group = "FRANCHISE";
+  byId("rc-group-filter").value = "FRANCHISE";
+  rc.current = rcNewKey;
+  rc.ftab = "movie";
+  renderRcFranchiseList();
+  renderRcFranchiseForm();
+});
+byId("rc-f-text").addEventListener("input", () => {
+  byId("rc-f-count").textContent = `${rcLineCount(byId("rc-f-text").value)} Einträge in diesem Tab`;
+});
+byId("rc-f-cover").addEventListener("change", () => {
+  const value = byId("rc-f-cover").value.trim();
+  const preview = byId("rc-f-cover-preview");
+  preview.classList.toggle("hidden", !/^https:\/\//.test(value));
+  if (/^https:\/\//.test(value)) preview.src = value;
+});
+byId("rc-franchise-form").addEventListener("submit", saveRcFranchise);
+byId("rc-f-reset").addEventListener("click", removeRcFranchise);
+byId("rc-f-delete").addEventListener("click", removeRcFranchise);
+byId("rc-standards-form").addEventListener("submit", saveRcStandards);
 
 function updateGlobalFields() {
   const operation = byId("global-operation").value;

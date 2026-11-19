@@ -470,10 +470,10 @@
           <section class="editor-panel" aria-labelledby="global-title">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">ALLE REGISTRIERTEN ACCOUNTS</p>
+                <p class="eyebrow">ZENTRALE KONFIGURATION</p>
                 <h2 id="global-title">Remote Config</h2>
                 <p class="global-intro">
-                  Playlists, Add-ons und Kataloge zentral verwalten.
+                  Collections und Home-Reihen für alle Geräte, dazu Einzelaktionen für bestehende Accounts.
                 </p>
               </div>
               <button
@@ -500,7 +500,158 @@
               </button>
             </div>
             <p id="global-summary" class="filter-note" role="status"></p>
-            <nav class="global-categories" aria-label="Remote-Config-Bereiche">
+            <nav class="rc-tabs" aria-label="Remote-Config-Bereiche">
+              <button type="button" class="global-category" data-rc-tab="overview" aria-pressed="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 5h16M4 12h16M4 19h10" />
+                </svg>
+                <span><strong>Übersicht</strong><small>Was gilt gerade für alle Geräte</small></span>
+              </button>
+              <button type="button" class="global-category" data-rc-tab="franchises" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="3" y="4" width="18" height="16" rx="2" />
+                  <path d="M3 9h18M9 9v11" />
+                </svg>
+                <span><strong>Collections</strong><small>Franchises, Dienste, Jahrzehnte, Genres</small></span>
+              </button>
+              <button type="button" class="global-category" data-rc-tab="standards" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M4 6h16M4 12h16M4 18h16" />
+                  <circle cx="9" cy="6" r="2" />
+                  <circle cx="15" cy="12" r="2" />
+                  <circle cx="8" cy="18" r="2" />
+                </svg>
+                <span><strong>Home-Reihen</strong><small>MDBList-Listen der Reihen</small></span>
+              </button>
+              <button type="button" class="global-category" data-rc-tab="actions" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M12 3v18M3 12h18" />
+                </svg>
+                <span><strong>Einzelaktionen</strong><small>Playlists, Add-ons, Kataloge · nur bestehende Accounts</small></span>
+              </button>
+            </nav>
+
+            <div id="rc-overview" class="rc-panel" data-rc-panel="overview">
+              <p class="rc-intro">
+                Collections und Home-Reihen gelten für <strong>alle Geräte</strong> –
+                auch für Neuinstallationen und neue Accounts. Die Apps laden sie beim Start
+                und danach alle 10 Minuten (der Server hält sie 5 Minuten vor), eine Änderung
+                kommt also nach spätestens ca. 15 Minuten an, ohne App-Update. Ohne Verbindung
+                nutzt die App die zuletzt geladene oder die eingebaute Fassung.
+              </p>
+              <div id="rc-metrics" class="metrics compact"></div>
+              <h3 class="rc-heading">Eigene und geänderte Franchise-Listen</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Franchise</th>
+                      <th>Art</th>
+                      <th>Filme</th>
+                      <th>Serien</th>
+                      <th>Timeline</th>
+                      <th>Weitere Quellen</th>
+                      <th>Stand</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody id="rc-franchise-rows"></tbody>
+                </table>
+              </div>
+              <h3 class="rc-heading">Weitere Abweichungen vom Standard</h3>
+              <div class="table-wrap">
+                <table>
+                  <thead>
+                    <tr><th>Katalog</th><th>Art</th><th>Änderung</th></tr>
+                  </thead>
+                  <tbody id="rc-override-rows"></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div id="rc-franchises" class="rc-panel hidden" data-rc-panel="franchises">
+              <p class="rc-intro">
+                Alle Collections der App mit dem Wert, der gerade gilt. Unter jedem Feld steht der
+                Standard der App; leeres Feld oder „Auf Standard“ stellt ihn wieder her.
+              </p>
+              <div class="rc-split">
+                <aside class="rc-franchise-list" aria-label="Collections">
+                  <button id="rc-new-franchise" class="button primary" type="button">Neue Franchise anlegen</button>
+                  <label>Bereich
+                    <select id="rc-group-filter">
+                      <option value="FRANCHISE">Franchises</option>
+                      <option value="SERVICE">Streamingdienste</option>
+                      <option value="DECADE">Jahrzehnte</option>
+                      <option value="MOVIE_GENRE">Film-Genres</option>
+                      <option value="TV_GENRE">Serien-Genres</option>
+                    </select>
+                  </label>
+                  <div id="rc-franchise-items"></div>
+                </aside>
+                <form id="rc-franchise-form" class="rc-franchise-form">
+                  <h3 id="rc-f-heading">Collection</h3>
+                  <p id="rc-f-state" class="global-confirm-note"></p>
+                  <div class="rc-form-grid">
+                    <label>Name<input id="rc-f-title" maxlength="60" autocomplete="off" /></label>
+                    <label>ID (kann später nicht geändert werden)<input id="rc-f-id" maxlength="40" autocomplete="off" placeholder="z. B. studio-ghibli" /></label>
+                    <label class="rc-wide">Cover-Bild (https-Link)<input id="rc-f-cover" maxlength="500" autocomplete="off" placeholder="https://…/cover.jpg" /></label>
+                    <p id="rc-f-cover-hint" class="rc-hint rc-wide"></p>
+                  </div>
+                  <img id="rc-f-cover-preview" class="rc-cover-preview hidden" alt="Cover-Vorschau" />
+                  <div id="rc-f-sources" class="rc-form-grid">
+                    <label id="rc-f-tmdb-field">TMDB-Collections (IDs, getrennt durch Komma)<input id="rc-f-tmdb" autocomplete="off" placeholder="z. B. 8091, 399" /></label>
+                    <label>MDBList-Listen (user/liste, getrennt durch Komma)<input id="rc-f-mdblist" autocomplete="off" placeholder="z. B. snoak/top-2020s-movies" /></label>
+                    <p id="rc-f-tmdb-hint" class="rc-hint"></p>
+                    <p id="rc-f-mdblist-hint" class="rc-hint"></p>
+                  </div>
+                  <p id="rc-f-other" class="rc-hint"></p>
+                  <label id="rc-f-extras-field">Zusätzliche Titel (eine Zeile pro Titel: movie:ID oder tv:ID, höchstens 30)
+                    <textarea id="rc-f-extras" rows="4" spellcheck="false" class="franchise-text"></textarea>
+                  </label>
+                  <div id="rc-f-tabs">
+                    <div class="rc-tab-switch" role="group" aria-label="Tab">
+                      <button type="button" class="button secondary" data-rc-ftab="movie" aria-pressed="true">Filme</button>
+                      <button type="button" class="button secondary" data-rc-ftab="series" aria-pressed="false">Serien</button>
+                      <button type="button" class="button secondary" data-rc-ftab="timeline" aria-pressed="false">Timeline</button>
+                    </div>
+                    <label>
+                      <span id="rc-f-tab-help"></span>
+                      <textarea id="rc-f-text" rows="16" spellcheck="false" class="franchise-text"></textarea>
+                    </label>
+                    <p id="rc-f-count" class="global-confirm-note"></p>
+                  </div>
+                  <label>Kommentar (optional)<input id="rc-f-reason" maxlength="500" /></label>
+                  <div class="rc-actions-row">
+                    <button class="button primary" type="submit">Speichern</button>
+                    <button id="rc-f-reset" class="button secondary" type="button">Auf Standard zurücksetzen</button>
+                    <button id="rc-f-delete" class="button danger" type="button">Franchise löschen</button>
+                  </div>
+                  <p id="rc-f-message" class="message" role="status"></p>
+                </form>
+              </div>
+            </div>
+
+            <div id="rc-standards" class="rc-panel hidden" data-rc-panel="standards">
+              <p class="rc-intro">
+                MDBList-Liste der Home-Reihen. Das Feld zeigt die Liste, die gerade gilt; darunter steht
+                der Standard der App. Cover, Listen und Titel der Collections stehen unter „Collections“.
+              </p>
+              <form id="rc-standards-form">
+                <div id="rc-rows" class="rc-list"></div>
+                <label>Kommentar (optional)<input id="rc-s-reason" maxlength="500" /></label>
+                <div class="rc-actions-row">
+                  <button class="button primary" type="submit">Speichern</button>
+                </div>
+                <p id="rc-s-message" class="message" role="status"></p>
+              </form>
+            </div>
+            <div id="rc-actions" class="rc-panel hidden" data-rc-panel="actions">
+              <p class="rc-intro">
+                Diese Aktionen ändern die gespeicherten Daten bereits registrierter Accounts.
+                Neue Installationen und neue Accounts bekommen sie <strong>nicht</strong> –
+                dafür sind „Collections“ und „Home-Reihen“ da.
+              </p>
+            <nav class="global-categories" aria-label="Aktionsbereiche">
               <button
                 type="button"
                 class="global-category"
@@ -959,6 +1110,7 @@
                 </section>
               </aside>
             </form>
+            </div>
           </section>
         </section>
 

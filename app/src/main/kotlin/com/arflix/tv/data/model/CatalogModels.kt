@@ -83,12 +83,12 @@ data class CollectionSourceConfig(
     // Encoded as e.g. "movie:11" / "tv:82856". Preserves order — the list is
     // rendered in exactly this sequence in collection detail screens.
     val curatedRefs: List<String>? = null,
+    // Display labels for the timeline tab, parallel to curatedRefs (blank = the title's own name). A timeline
+    // keeps repeated titles, e.g. one entry per season of a series.
+    val curatedTitles: List<String>? = null,
     // Path component after /lists/, e.g. "jxduffy/star-wars-chronological-order".
     // Resolved against the public mdblist JSON endpoint at runtime.
-    val mdblistSlug: String? = null,
-    // Only resolved when none of the catalog's addon sources returned anything, so a
-    // working addon is never mixed with fallback titles.
-    val addonFallback: Boolean = false
+    val mdblistSlug: String? = null
 ) : Serializable
 
 data class CatalogConfig(

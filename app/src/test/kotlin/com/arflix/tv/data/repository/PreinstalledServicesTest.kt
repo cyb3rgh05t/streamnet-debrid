@@ -102,66 +102,6 @@ class PreinstalledServicesTest {
     }
 
     @Test
-    fun `franchise addon sources and supported fallbacks are assigned to the correct tabs`() {
-        val collections = MediaRepository.buildPreinstalledDefaults()
-            .filter { it.kind == CatalogKind.COLLECTION }
-            .associateBy { it.title }
-
-        fun assertAddonTabs(
-            title: String,
-            addonId: String,
-            manifestUrl: String,
-            catalogs: List<Pair<String, String>>,
-            timelineManifestUrl: String = manifestUrl
-        ) {
-            val sources = collections.getValue(title).collectionSources.filter {
-                it.kind == CollectionSourceKind.ADDON_CATALOG
-            }
-            assertEquals("$title should expose its three addon sources", 3, sources.size)
-            assertEquals(listOf("movie", "series", "timeline"), sources.map { it.collectionTab })
-            sources.forEachIndexed { index, source ->
-                assertEquals("$title tab ${source.collectionTab}", CollectionSourceKind.ADDON_CATALOG, source.kind)
-                assertEquals(addonId, source.addonId)
-                assertEquals(catalogs[index].first, source.addonCatalogType)
-                assertEquals(catalogs[index].second, source.addonCatalogId)
-                assertEquals(if (index == 2) timelineManifestUrl else manifestUrl, source.addonManifestUrl)
-                assertNull(source.mdblistSlug)
-                assertNull(source.tmdbCollectionId)
-            }
-        }
-
-        assertAddonTabs(
-            title = "Marvel",
-            addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-            manifestUrl = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json",
-            catalogs = listOf("movie" to "movies", "series" to "series", "Marvel" to "marvel-mcu"),
-            timelineManifestUrl = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
-        )
-        assertAddonTabs(
-            title = "DC Universe",
-            addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological",
-            manifestUrl = "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json",
-            catalogs = listOf("movie" to "dc-movies", "series" to "dc-series", "DC" to "dc-chronological"),
-            timelineManifestUrl = "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json"
-        )
-        assertAddonTabs(
-            title = "Star Wars",
-            addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological",
-            manifestUrl = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json",
-            catalogs = listOf("movie" to "movies", "series" to "series", "StarWars" to "sw-movies-series-chronological")
-        )
-        val marvelSources = collections.getValue("Marvel").collectionSources
-        assertEquals("Marvel keeps its three addon sources plus one addon-only fallback", 4, marvelSources.size)
-        assertEquals(listOf(CollectionSourceKind.CURATED_IDS), marvelSources.filter { it.addonFallback }.map { it.kind })
-        val dcSources = collections.getValue("DC Universe").collectionSources
-        assertEquals("series", dcSources.single { it.mdblistSlug == "kraftynic/dc-tv-shows1" }.mediaType)
-        assertFalse("DC should not add the removed movie MDBList",
-            dcSources.any { it.mdblistSlug == "kingkearney/dc-universe" })
-        assertEquals("timeline", collections.getValue("Star Wars").collectionSources
-            .single { it.mdblistSlug == "jxduffy/star-wars-chronological-order" }.collectionTab)
-    }
-
-    @Test
     fun `standard collections do not depend on addons the user has to install`() {
         val collections = MediaRepository.buildPreinstalledDefaults().filter { it.kind == CatalogKind.COLLECTION }
         collections.forEach { catalog ->
@@ -186,12 +126,10 @@ class PreinstalledServicesTest {
                 service.collectionSources.any { it.kind == CollectionSourceKind.TMDB_WATCH_PROVIDER && it.mediaType == "series" })
             assertFalse(service.collectionSources.any { it.addonId == "aio-metadata" || it.addonId == "org.kris.ultra.max.all.v5" })
         }
-        // Collections served by the project's own addons keep them (they carry their manifest URL).
+        // Marvel, DC and Star Wars run on bundled lists a backend copy can replace, not on addons.
         listOf("Marvel", "DC Universe", "Star Wars").forEach { title ->
-            assertTrue("$title lost its own addon sources",
-                collections.single { it.title == title }.collectionSources.count {
-                    it.kind == CollectionSourceKind.ADDON_CATALOG && !it.addonManifestUrl.isNullOrBlank()
-                } >= 3)
+            val sources = collections.single { it.title == title }.collectionSources
+            assertTrue("$title lists", sources.count { it.kind == CollectionSourceKind.CURATED_IDS && it.collectionTab != null } == 3)
         }
         // A collection with only installed-addon sources is not emptied.
         assertTrue(collections.all { it.collectionSources.isNotEmpty() })

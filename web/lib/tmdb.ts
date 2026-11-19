@@ -9,6 +9,7 @@ import type {
   ProviderPriorityConfig,
 } from "./metadata/types";
 import { tmdbImageUrl } from "./mediaImages";
+import { withFranchiseLists } from "./catalogConfig";
 import { loadStored, saveStored } from "./storage";
 import {
   STREAMING_REGION_AUTO,
@@ -553,33 +554,22 @@ async function loadCollectionCatalog(
   addons: InstalledAddon[],
   homeServers: HomeServerConfig[] = [],
 ) {
-  const sources = catalog.collectionSources ?? [];
+  const sources = withFranchiseLists(catalog.id, catalog.collectionSources ?? []);
   if (!sources.length) {
     if (catalog.sourceType === "mdblist" && catalog.sourceUrl)
       return loadMdblist(catalog, language);
     return [];
   }
-  const loadSource = (source: CollectionSourceConfig) =>
-    loadCollectionSource(source, language, addons, homeServers).catch(
-      () => [] as MediaItem[],
-    );
-  const primary = sources.map((source) =>
-    source.addonFallback ? null : loadSource(source),
-  );
-  const primaryBatches = await Promise.all(primary);
-  const addonAnswered = sources.some(
-    (source, index) =>
-      !source.addonFallback &&
-      String(source.kind ?? "").toUpperCase() === "ADDON_CATALOG" &&
-      (primaryBatches[index]?.length ?? 0) > 0,
-  );
   const batches = await Promise.all(
-    sources.map(async (source, index) => {
-      if (!source.addonFallback) return primaryBatches[index] ?? [];
-      return addonAnswered ? [] : loadSource(source);
-    }),
+    sources.map((source) =>
+      loadCollectionSource(source, language, addons, homeServers).catch(
+        () => [] as MediaItem[],
+      ),
+    ),
   );
-  const items = dedupeItems(batches.flat()).map((item) =>
+  // A timeline lists titles in a fixed order and repeats one (a series once per season), so it is not de-duplicated.
+  const isTimeline = sources.every((source) => source.collectionTab === "timeline" && source.curatedTitles);
+  const items = (isTimeline ? batches.flat() : dedupeItems(batches.flat())).map((item) =>
     item.image || !catalog.collectionCoverImageUrl
       ? item
       : { ...item, image: catalog.collectionCoverImageUrl },
@@ -620,13 +610,25 @@ async function loadCollectionSource(
   const kind = String(source.kind ?? "").toUpperCase();
   const mediaType = sourceMediaType(source);
   if (kind === "CURATED_IDS") {
-    const refs = (source.curatedRefs ?? [])
-      .map(parseCuratedRef)
-      .filter(<T>(ref: T | null): ref is NonNullable<T> => Boolean(ref));
+    const entries = (source.curatedRefs ?? [])
+      .map((raw, index) => ({
+        ref: parseCuratedRef(raw),
+        label: source.curatedTitles?.[index]?.trim(),
+      }))
+      .filter(<T extends { ref: unknown }>(entry: T): entry is T & { ref: NonNullable<T["ref"]> } =>
+        Boolean(entry.ref),
+      );
+    const lookups = new Map<string, Promise<MediaItem | null>>();
     const items = await Promise.all(
-      refs.map((ref) =>
-        getBasicItem(ref.type, ref.id, language).catch(() => null),
-      ),
+      entries.map(({ ref, label }) => {
+        const key = `${ref.type}:${ref.id}`;
+        if (!lookups.has(key)) {
+          lookups.set(key, getBasicItem(ref.type, ref.id, language).catch(() => null));
+        }
+        return lookups.get(key)!.then((item) =>
+          item && label ? { ...item, title: label } : item,
+        );
+      }),
     );
     return items.filter((item): item is MediaItem => Boolean(item));
   }

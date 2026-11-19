@@ -30,6 +30,21 @@ class StandardCatalogContractTest {
         )
     }
 
+    // The admin shows each collection's default cover; the backend ships this list (catalog-contract/standard-covers.txt).
+    @Test
+    fun `Android collection covers match the list the admin shows as defaults`() {
+        val actual = MediaRepository.buildPreinstalledDefaults()
+            .filter { it.kind == com.arflix.tv.data.model.CatalogKind.COLLECTION }
+            .joinToString("\n", postfix = "\n") { "${it.id} | ${it.collectionCoverImageUrl.orEmpty()}" }
+        val file = File("../catalog-contract/standard-covers.txt")
+        if (System.getenv("UPDATE_CATALOG_CONTRACT") == "1") file.writeText(actual)
+        assertEquals(
+            "Covers differ from catalog-contract/standard-covers.txt; regenerate with UPDATE_CATALOG_CONTRACT=1 and copy the file to backend-cloud/src.",
+            file.readText().replace("\r\n", "\n"),
+            actual
+        )
+    }
+
     private fun contractLine(catalog: CatalogConfig): String {
         val sources = contractSources(catalog.collectionSources.orEmpty()).sorted().joinToString(" ; ")
         return listOf(
@@ -42,13 +57,14 @@ class StandardCatalogContractTest {
         ).joinToString(" | ")
     }
 
-    // Curated lists are merged per fallback flag: Android keeps one mixed list, web one per tab.
+    // Curated lists are merged per tab (Android keeps one source per list, web may split them); the order of
+    // the titles is part of the contract because it is the order shown in the app.
     private fun contractSources(sources: List<CollectionSourceConfig>): List<String> {
         val curated = sources.filter { it.kind == CollectionSourceKind.CURATED_IDS }
-            .groupBy { it.addonFallback }
-            .map { (fallback, group) ->
-                val refs = group.flatMap { it.curatedRefs.orEmpty() }.distinct().sorted().joinToString(",")
-                "curated${if (fallback) "+fallback" else ""}:$refs"
+            .groupBy { it.collectionTab.orEmpty() }
+            .map { (tab, group) ->
+                val refs = group.flatMap { it.curatedRefs.orEmpty() }
+                "curated@$tab:" + (if (tab == "timeline") refs else refs.distinct()).joinToString(",")
             }
         val others = sources.filter { it.kind != CollectionSourceKind.CURATED_IDS }.map { source ->
             when (source.kind) {

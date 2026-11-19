@@ -1,0 +1,77 @@
+collection_service_netflix | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/netflix.jpegli.jpg
+collection_service_disneyplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/disney.jpegli.jpg
+collection_service_apple_tvplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/apple.jpegli.jpg
+collection_service_prime_video | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/prime.jpegli.jpg
+collection_service_hbo_max | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/hbo.jpegli.jpg
+collection_service_hulu | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/hulu.jpegli.jpg
+collection_service_paramountplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/paramount.jpegli.jpg
+collection_service_peacock | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/peacock.jpegli.jpg
+collection_service_starz | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/Starz.jpegli.jpg
+collection_service_shudder | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/Shudder.jpegli.jpg
+collection_service_mgmplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/mgmplus.jpegli.jpg
+collection_service_discoveryplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/streaming%20services/streaming%20services%20landscape/discovery.jpegli.jpg
+collection_service_crunchyroll | https://mir-s3-cdn-cf.behance.net/project_modules/fs_webp/380e75223389683.67f7c1dc0669a.png
+collection_decade_20s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/20snew.jpg
+collection_decade_10s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/10snew.jpg
+collection_decade_00s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/00snew.jpg
+collection_decade_90s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/90snew.jpg
+collection_decade_80s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/80snew.jpg
+collection_decade_70s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/70snew.png
+collection_decade_60s_movies | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/decades/60snew.png
+collection_franchise_marvel | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Marvel.jpg
+collection_franchise_dc_universe | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/DC.jpg
+collection_franchise_star_wars | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Star-Wars.jpg
+collection_franchise_james_bond | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/007.jpg
+collection_franchise_fast_and_furious | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Fast-and-Furious.jpg
+collection_franchise_harry_potter | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Harry-Potter.jpg
+collection_franchise_alien_vs_predator | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/avp.jpg
+collection_franchise_pirates_of_the_caribbean | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/pirates.jpg
+collection_franchise_terminator | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Terminator.jpg
+collection_franchise_mission_impossible | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/mission-impossible.jpg
+collection_franchise_jurassic_park | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/jurrasic-park.jpg
+collection_franchise_the_matrix | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/matrix.jpg
+collection_franchise_lord_of_the_rings | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/lotr.jpg
+collection_franchise_x_men | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/X-Men.jpg
+collection_franchise_hunger_games | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Hunger-Games.jpg
+collection_franchise_avatar | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/AVATAR.jpg
+collection_franchise_dune | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Dune.jpg
+collection_franchise_indiana_jones | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Indiana-Jo.jpg
+collection_franchise_the_godfather | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/The-Godfather.jpg
+collection_franchise_john_wick | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/JW.jpg
+collection_franchise_transformers | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Transformers.jpg
+collection_franchise_scream | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/afacc40e5ab7202219749aaec497c5a4bdf3e27b/artworks/franchises/Scream.jpg
+collection_movie_genre_action | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/ACTION.jpegli.jpg
+collection_movie_genre_adventure | https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/adventure-wide.png
+collection_movie_genre_animation | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/ANIMATION.jpegli.jpg
+collection_movie_genre_comedy | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/COMEDY.jpegli.jpg
+collection_movie_genre_crime | 
+collection_movie_genre_documentary | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/DOC.jpegli.jpg
+collection_movie_genre_drama | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/DRAMA.jpegli.jpg
+collection_movie_genre_family | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/KIDS%20AND%20FAMILY.jpegli.jpg
+collection_movie_genre_fantasy | https://raw.githubusercontent.com/itsrenoria/fusion-starter-kit/refs/heads/main/resources/widgets/genres/wide/dannyrutledge/fantasy-wide.png
+collection_movie_genre_history | 
+collection_movie_genre_horror | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/HORROR.jpegli.jpg
+collection_movie_genre_music | 
+collection_movie_genre_mystery | 
+collection_movie_genre_romance | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/ROMANCE.jpegli.jpg
+collection_movie_genre_science_fiction | 
+collection_movie_genre_tv_movie | 
+collection_movie_genre_thriller | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/THRILLER.jpegli.jpg
+collection_movie_genre_war | 
+collection_movie_genre_western | 
+collection_tv_genre_action_and_adventure | 
+collection_tv_genre_animation | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/ANIMATION.jpegli.jpg
+collection_tv_genre_comedy | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/COMEDY.jpegli.jpg
+collection_tv_genre_crime | 
+collection_tv_genre_documentary | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/DOC.jpegli.jpg
+collection_tv_genre_drama | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/DRAMA.jpegli.jpg
+collection_tv_genre_family | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/artworks/genres/genres%20landscape/genres%20landscape%201/KIDS%20AND%20FAMILY.jpegli.jpg
+collection_tv_genre_kids | 
+collection_tv_genre_mystery | 
+collection_tv_genre_news | 
+collection_tv_genre_reality | 
+collection_tv_genre_sci_fi_and_fantasy | 
+collection_tv_genre_soap | 
+collection_tv_genre_talk | 
+collection_tv_genre_war_and_politics | 
+collection_tv_genre_western | 

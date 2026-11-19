@@ -739,7 +739,7 @@ export function prepareAdminGlobalMutation(request) {
   return { operation, targetId, data };
 }
 
-const mdblistSlugPattern = /^(?!\.+\/)[A-Za-z0-9_.-]{1,100}\/(?!\.+$)[A-Za-z0-9_.-]{1,100}$/;
+export const mdblistSlugPattern = /^(?!\.+\/)[A-Za-z0-9_.-]{1,100}\/(?!\.+$)[A-Za-z0-9_.-]{1,100}$/;
 const franchiseCatalogPattern = /^collection_franchise_[A-Za-z0-9_.-]{1,100}$/;
 const addonTokenPattern = /^[A-Za-z0-9_.:-]{1,100}$/;
 const addonTypePattern = /^[a-z]{1,20}$/;
@@ -810,7 +810,7 @@ function mdblistUrlInput(value) {
   return mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw;
 }
 
-function normalizeAdminListUrl(sourceType, rawValue) {
+export function normalizeAdminListUrl(sourceType, rawValue) {
   if (!["TRAKT", "MDBLIST"].includes(sourceType)) throw new Error("Catalog source type is invalid");
   let url;
   try {

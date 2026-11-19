@@ -46,11 +46,21 @@ test("remote-managed lists, slugs and addon catalogs replace the defaults and ma
   const badSlug = merged({ ...xmen, remoteManaged: true, remoteSlugOverrides: { "jxduffy/x-men-chronological-order": "not a slug" } });
   assert.equal(badSlug.collectionSources[slugSource].mdblistSlug, "jxduffy/x-men-chronological-order");
 
-  const lotr = byId("collection_franchise_dc_universe");
+  // No standard collection carries an addon source any more; the override logic still serves a user's own.
+  const dcBase = byId("collection_franchise_dc_universe");
+  const lotr = {
+    ...dcBase,
+    collectionSources: [
+      { kind: "ADDON_CATALOG", addonId: "com.example.addon", addonCatalogType: "movie", addonCatalogId: "dc-movies", addonManifestUrl: "https://example.com/original/manifest.json", collectionTab: "movie" },
+      ...dcBase.collectionSources,
+    ],
+  };
   const addonIndex = lotr.collectionSources.findIndex((source) => source.kind === "ADDON_CATALOG");
   const bundled = lotr.collectionSources[addonIndex];
   const key = `${bundled.addonCatalogType}|${bundled.addonCatalogId}`;
-  const replaced = merged({
+  const { applyRemoteCatalogOverrides } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogRemoteOverrides.ts")).href);
+  const merged2 = (saved) => applyRemoteCatalogOverrides(lotr, saved);
+  const replaced = merged2({
     ...lotr, remoteManaged: true,
     remoteAddonOverrides: { [key]: { addonCatalogId: "mdblist.99999", addonManifestUrl: "https://example.com/abc/manifest.json" } },
   }).collectionSources[addonIndex];
@@ -58,13 +68,13 @@ test("remote-managed lists, slugs and addon catalogs replace the defaults and ma
   assert.equal(replaced.addonId, bundled.addonId);
   assert.equal(replaced.addonCatalogType, bundled.addonCatalogType);
   assert.equal(replaced.addonManifestUrl, "https://example.com/abc/manifest.json");
-  const bad = merged({
+  const bad = merged2({
     ...lotr, remoteManaged: true,
     remoteAddonOverrides: { [key]: { addonCatalogId: "mdblist.99999", addonManifestUrl: "http://example.com/manifest.json" } },
   }).collectionSources[addonIndex];
   assert.equal(bad.addonCatalogId, "mdblist.99999");
   assert.equal(bad.addonManifestUrl, bundled.addonManifestUrl);
-  const unmanaged = merged({ ...lotr, remoteAddonOverrides: { [key]: { addonCatalogId: "mdblist.99999" } } });
+  const unmanaged = merged2({ ...lotr, remoteAddonOverrides: { [key]: { addonCatalogId: "mdblist.99999" } } });
   assert.deepEqual(unmanaged.collectionSources[addonIndex], bundled);
 });
 

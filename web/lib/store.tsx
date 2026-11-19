@@ -27,6 +27,7 @@ import {
   defaultCatalogs,
   mergeCatalogs,
 } from "./catalogs";
+import { subscribeCentralConfig } from "./catalogConfig";
 import {
   getContinueWatching,
   isLiveStreamOrSportsItem,
@@ -915,6 +916,12 @@ export function AppProvider({
       : [],
   );
   const [catalogConfigs, setCatalogConfigs] = useState<CatalogConfig[]>([]);
+  // Bumped when the central catalog configuration (lists, extra franchises, overrides) arrives from the backend.
+  const [centralConfigVersion, setCentralConfigVersion] = useState(0);
+  useEffect(
+    () => subscribeCentralConfig(() => setCentralConfigVersion((version) => version + 1)),
+    [],
+  );
   const [homeServerRows, setHomeServerRows] = useState<Category[]>([]);
   const [continueWatching, setContinueWatching] =
     useState<MediaItem[]>(initialCw);
@@ -1143,7 +1150,7 @@ export function AppProvider({
         return !railId || enabledIds.has(railId);
       }),
     );
-  }, [settings.catalogs, settings.hiddenCatalogIds]);
+  }, [settings.catalogs, settings.hiddenCatalogIds, centralConfigVersion]);
 
   useEffect(() => {
     let cancelled = false;

@@ -495,11 +495,7 @@ class CollectionDetailsViewModel @Inject constructor(
     ): CollectionPage {
         val pageCatalog = catalogForTab(catalog, tab)
         val availability = iptvVodAvailability
-        if (!iptvOnlyMode || availability == null ||
-            pageCatalog.collectionSources.any {
-                it.collectionTab == "timeline" && it.addonCatalogId == "marvel-mcu"
-            }
-        ) {
+        if (!iptvOnlyMode || availability == null) {
             val page = mediaRepository.loadCollectionCatalogPage(pageCatalog, offset, limit)
             return CollectionPage(page.items, page.hasMore, page.nextOffset ?: (offset + page.items.size))
         }
@@ -527,69 +523,76 @@ class CollectionDetailsViewModel @Inject constructor(
         return CollectionPage(availableItems, hasMore, sourceOffset)
     }
 
-    private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {
-        val filteredSources = catalog.collectionSources.flatMap { source ->
-            if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank()) {
-                val refs = source.curatedRefs.orEmpty().filter { ref ->
-                    when (ref.substringBefore(':').lowercase()) {
-                        "movie" -> tab == CollectionTab.MOVIES
-                        "tv", "series", "show" -> tab == CollectionTab.SERIES
-                        else -> false
-                    }
-                }
-                if (refs.isEmpty()) emptyList() else listOf(source.copy(curatedRefs = refs))
-            } else if (sourceMatchesTab(source, tab)) {
-                listOf(source)
-            } else {
-                emptyList()
-            }
-        }
-        return catalog.copy(collectionSources = filteredSources)
-    }
+    private fun catalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig =
+        collectionCatalogForTab(catalog, tab)
 
     private fun supportsTab(catalog: CatalogConfig, tab: CollectionTab): Boolean {
         if (catalog.collectionGroup == CollectionGroupKind.NETWORK) {
             return tab == CollectionTab.SERIES
         }
-        return catalog.collectionSources.any { sourceMatchesTab(it, tab) }
+        return catalog.collectionSources.any { collectionSourceMatchesTab(it, tab) }
     }
 
-    private fun sourceMatchesTab(source: com.arflix.tv.data.model.CollectionSourceConfig, tab: CollectionTab): Boolean {
-        // A mixed curated list (e.g. admin-added titles) only counts for the tabs it has titles for.
+}
+
+internal fun collectionCatalogForTab(catalog: CatalogConfig, tab: CollectionTab): CatalogConfig {
+    val filteredSources = catalog.collectionSources.flatMap { source ->
+        // A tab-bound list (the Marvel/DC/Star Wars lists) belongs to exactly its tab; only mixed lists are split by title type.
         if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank() &&
             source.collectionTab.isNullOrBlank()
         ) {
-            return source.curatedRefs.orEmpty().any { ref ->
+            val refs = source.curatedRefs.orEmpty().filter { ref ->
                 when (ref.substringBefore(':').lowercase()) {
                     "movie" -> tab == CollectionTab.MOVIES
                     "tv", "series", "show" -> tab == CollectionTab.SERIES
                     else -> false
                 }
             }
+            if (refs.isEmpty()) emptyList() else listOf(source.copy(curatedRefs = refs))
+        } else if (collectionSourceMatchesTab(source, tab)) {
+            listOf(source)
+        } else {
+            emptyList()
         }
-        source.collectionTab?.trim()?.lowercase()?.let { configuredTab ->
-            return when (tab) {
-                CollectionTab.MOVIES -> configuredTab == "movie"
-                CollectionTab.SERIES -> configuredTab == "series"
-                CollectionTab.TIMELINE -> configuredTab == "timeline"
-            }
-        }
-        val mediaType = source.mediaType?.trim()?.lowercase()
-        if (mediaType != null) {
-            if (mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed") {
-                return true
-            }
-            return when (tab) {
-                CollectionTab.MOVIES -> mediaType == "movie" || mediaType == "film"
-                CollectionTab.SERIES -> mediaType == "series" || mediaType == "tv" || mediaType == "show" || mediaType == "anime"
-                CollectionTab.TIMELINE -> mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed"
-            }
-        }
+    }
+    return catalog.copy(collectionSources = filteredSources)
+}
 
-        return when (source.kind) {
-            com.arflix.tv.data.model.CollectionSourceKind.TMDB_COLLECTION -> tab == CollectionTab.MOVIES
-            else -> tab != CollectionTab.TIMELINE
+internal fun collectionSourceMatchesTab(source: com.arflix.tv.data.model.CollectionSourceConfig, tab: CollectionTab): Boolean {
+    // A mixed curated list (e.g. admin-added titles) only counts for the tabs it has titles for.
+    if (source.kind == CollectionSourceKind.CURATED_IDS && source.mediaType.isNullOrBlank() &&
+        source.collectionTab.isNullOrBlank()
+    ) {
+        return source.curatedRefs.orEmpty().any { ref ->
+            when (ref.substringBefore(':').lowercase()) {
+                "movie" -> tab == CollectionTab.MOVIES
+                "tv", "series", "show" -> tab == CollectionTab.SERIES
+                else -> false
+            }
         }
+    }
+    source.collectionTab?.trim()?.lowercase()?.let { configuredTab ->
+        return when (tab) {
+            CollectionTab.MOVIES -> configuredTab == "movie"
+            CollectionTab.SERIES -> configuredTab == "series"
+            CollectionTab.TIMELINE -> configuredTab == "timeline"
+        }
+    }
+    val mediaType = source.mediaType?.trim()?.lowercase()
+    if (mediaType != null) {
+        if (mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed") {
+            return true
+        }
+        return when (tab) {
+            CollectionTab.MOVIES -> mediaType == "movie" || mediaType == "film"
+            CollectionTab.SERIES -> mediaType == "series" || mediaType == "tv" || mediaType == "show" || mediaType == "anime"
+            CollectionTab.TIMELINE -> mediaType == "all" || mediaType == "any" || mediaType == "both" || mediaType == "mixed"
+        }
+    }
+
+    return when (source.kind) {
+        com.arflix.tv.data.model.CollectionSourceKind.TMDB_COLLECTION -> tab == CollectionTab.MOVIES
+        else -> tab != CollectionTab.TIMELINE
     }
 }
 
@@ -1293,7 +1296,8 @@ private fun CollectionItemsGrid(
 
                     MediaCard(
                         item = if (item.timelineEntryId != null) item.copy(
-                            title = localizedTimelineLabel(item.title, timelineMovieLabel, timelineEpisodesLabel),
+                            title = item.timelineLabel
+                                ?: localizedTimelineLabel(item.title, timelineMovieLabel, timelineEpisodesLabel),
                             subtitle = if (item.timelineMetadataUnavailable) {
                                 stringResource(R.string.marvel_timeline_metadata_unavailable)
                             } else item.subtitle

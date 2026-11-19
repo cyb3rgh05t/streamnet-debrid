@@ -44,10 +44,7 @@ internal object CollectionTemplateManifest {
     private const val GENRE_IMAGE_BASE = "${ASSET_BASE}artworks/genres/genres%20landscape/genres%20landscape%201/"
     private const val FRANCHISE_IMAGE_BASE = "https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/$FRANCHISE_ASSET_COMMIT/artworks/franchises/"
     private const val STREAMING_ADDON_URL = "https://7a82163c306e-stremio-netflix-catalog-addon.baby-beamup.club/bmZ4LGRucCxhbXAsYXRwLGhibSxwbXAscGNwLGhsdSxzdHo6OlVTOjE3NzYzMjQxMDg4OTM6MDowOkdU/manifest.json"
-    private const val MARVEL_MANIFEST_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu/manifest.json"
-    private const val MARVEL_COMBINED_MANIFEST_URL = "https://marvel.mystreamnet.club/catalog/marvel-mcu%2Cmovies%2Cseries/manifest.json"
     private const val DC_ADDON_URL = "https://dc.mystreamnet.club/catalog/dc-chronological/manifest.json"
-    private const val DC_COMBINED_MANIFEST_URL = "https://dc.mystreamnet.club/catalog/dc-chronological%2Cdc-movies%2Cdc-series/manifest.json"
     private const val STAR_WARS_ADDON_URL = "https://starwars.mystreamnet.club/catalog/sw-movies-series-chronological/manifest.json"
     private const val TEMPLATE_IMAGE_BASE = IMAGE_BASE
     private val UPLOADED_COVER_BASE = "https://" + "nu" + "vioapp.space/uploads/covers/"
@@ -58,15 +55,6 @@ internal object CollectionTemplateManifest {
         CollectionGroupKind.TV_GENRE,
         CollectionGroupKind.FRANCHISE,
         CollectionGroupKind.DECADE
-    )
-
-    // Timeline order (not release order): Clone Wars sits between Eps II and III, Rogue One right before A New Hope.
-    private val STAR_WARS_CURATED_REFS = listOf(
-        "movie:1893", "movie:1894", "movie:12180", "tv:4194", "movie:1895", "tv:105971", "tv:60554", "movie:348350", "tv:83867", "tv:92830", "movie:330459", "movie:11", "movie:1891", "movie:1892", "tv:82856", "tv:115036", "tv:114461", "tv:202879", "tv:203085", "tv:251091", "movie:140607", "movie:181808", "movie:181812", "tv:114479", "tv:79093", "tv:114410"
-    )
-
-    private val DC_CURATED_REFS = listOf(
-        "movie:49521", "movie:209112", "movie:297761", "movie:297762", "movie:141052", "movie:297802", "movie:287947", "movie:495764", "movie:464052", "movie:791373", "movie:436270", "movie:594767", "movie:298618", "movie:565770", "movie:572802", "movie:414906", "movie:475557", "movie:698687", "movie:1287536", "tv:1435", "tv:62688", "tv:1412", "tv:60735", "tv:62286", "tv:105248", "tv:116244"
     )
 
     private val legacyEntries: List<CollectionTemplateEntry> = listOf(
@@ -625,14 +613,11 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "movie", catalogId = "movies", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "movie"),
-                source(addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", type = "series", catalogId = "series", manifestUrl = MARVEL_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                marvelTimelineSource(),
-                marvelFallbackSource()
+                franchiseListSource(BundledFranchiseLists.marvel.movie, "movie"),
+                franchiseListSource(BundledFranchiseLists.marvel.series, "series"),
+                franchiseListSource(BundledFranchiseLists.marvel.timeline, "timeline")
             ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "marvel-mcu", sourceAddonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu", sourceName = "Marvel", sourceLabel = "ADDON", mediaType = "marvel", itemCount = null, author = null, url = MARVEL_MANIFEST_URL)
-            )
+            listMetadata = emptyList()
         ),
         entry(
             title = "DC Universe",
@@ -643,15 +628,12 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "movie", catalogId = "dc-movies", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "movie"),
-                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "series", catalogId = "dc-series", manifestUrl = DC_COMBINED_MANIFEST_URL, collectionTab = "series"),
-                source(addonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", type = "DC", catalogId = "dc-chronological", manifestUrl = DC_ADDON_URL, collectionTab = "timeline"),
-                curatedSource(DC_CURATED_REFS),
+                franchiseListSource(BundledFranchiseLists.dc.movie, "movie"),
+                franchiseListSource(BundledFranchiseLists.dc.series, "series"),
+                franchiseListSource(BundledFranchiseLists.dc.timeline, "timeline"),
                 mdblistSource("kraftynic/dc-tv-shows1", mediaType = "series")
             ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "dc-chronological", sourceAddonId = "com.cyb3rgh05t.dcaddon.custom.dc-chronological", sourceName = "DC Universe", sourceLabel = "ADDON", mediaType = "dc", itemCount = null, author = null, url = DC_ADDON_URL)
-            )
+            listMetadata = emptyList()
         ),
         entry(
             title = "Star Wars",
@@ -662,15 +644,11 @@ internal object CollectionTemplateManifest {
             hideTitle = true,
             heroVideoUrl = null,
             sources = listOf(
-                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "movie", catalogId = "movies", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "movie"),
-                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "series", catalogId = "series", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "series"),
-                source(addonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", type = "StarWars", catalogId = "sw-movies-series-chronological", manifestUrl = STAR_WARS_ADDON_URL, collectionTab = "timeline"),
-                curatedSource(STAR_WARS_CURATED_REFS),
-                mdblistSource("jxduffy/star-wars-chronological-order", collectionTab = "timeline")
+                franchiseListSource(BundledFranchiseLists.starWars.movie, "movie"),
+                franchiseListSource(BundledFranchiseLists.starWars.series, "series"),
+                franchiseListSource(BundledFranchiseLists.starWars.timeline, "timeline")
             ),
-            listMetadata = listOf(
-                metadata(sourceCatalogId = "sw-movies-series-chronological", sourceAddonId = "com.cyb3rgh05t.starwarsaddon.custom.sw-movies-series-chronological", sourceName = "Star Wars", sourceLabel = "ADDON", mediaType = "starwars", itemCount = null, author = null, url = STAR_WARS_ADDON_URL)
-            )
+            listMetadata = emptyList()
         ),
         entry(
             title = "James Bond",
@@ -1076,37 +1054,10 @@ internal object CollectionTemplateManifest {
     private val entryIds: Set<String> = entriesById.keys
     private val validRailGroups: Set<CollectionGroupKind> = railOrder.toSet()
 
-    fun marvelTimelineSource(): CollectionSourceConfig = source(
-        addonId = "com.cyb3rgh05t.marveladdon.custom.marvel-mcu",
-        type = "Marvel",
-        catalogId = "marvel-mcu",
-        manifestUrl = MARVEL_MANIFEST_URL,
-        collectionTab = "timeline"
-    )
-
-    /** Standard MCU order, used only while the Marvel addon returns nothing. */
-    fun marvelFallbackSource(): CollectionSourceConfig = CollectionSourceConfig(
-        kind = CollectionSourceKind.CURATED_IDS,
-        curatedRefs = listOf(
-            "movie:1726", "movie:1724", "movie:10138", "movie:10195", "movie:1771", "movie:24428",
-            "movie:68721", "movie:76338", "movie:100402", "movie:118340", "movie:99861", "movie:102899",
-            "movie:271110", "movie:284052", "movie:283995", "movie:315635", "movie:284053", "movie:284054",
-            "movie:299536", "movie:363088", "movie:299537", "movie:299534", "movie:429617",
-            "tv:85271", "tv:88396", "tv:84958", "movie:497698", "tv:92749", "movie:566525", "tv:88329",
-            "movie:524434", "movie:634649", "tv:92782", "movie:453395", "tv:92783", "movie:616037",
-            "tv:92785", "movie:505642", "movie:640146", "tv:114472", "movie:447365", "movie:609681",
-            "tv:138501", "movie:533535", "tv:202412", "tv:202555", "movie:822119", "movie:986056", "tv:114471",
-            "movie:617126"
-        ),
-        addonFallback = true
-    )
-
-    fun migrateMarvelTimelineSource(source: CollectionSourceConfig): CollectionSourceConfig =
-        if (source.kind == CollectionSourceKind.MARVEL_WATCHLIST_TIMELINE) marvelTimelineSource() else source
-
+    /** The franchise collections take their lists from the manifest; stored copies (old addon sources) are dropped. */
     fun normalizeCollectionSources(catalogId: String, sources: List<CollectionSourceConfig>): List<CollectionSourceConfig> {
         val template = entryForCatalog(catalogId)
-        return if (template?.title == "Marvel") template.sources else sources.map(::migrateMarvelTimelineSource)
+        return if (template != null && BundledFranchiseLists.byCatalogId.containsKey(catalogId)) template.sources else sources
     }
 
     fun entryForCatalog(catalogId: String?): CollectionTemplateEntry? = catalogId?.let(entriesById::get)
@@ -1132,7 +1083,7 @@ internal object CollectionTemplateManifest {
         entries.any { it.group == group }
 
     fun isValidCollectionConfig(config: CatalogConfig): Boolean = when (config.kind) {
-        CatalogKind.COLLECTION -> entryIds.contains(config.id)
+        CatalogKind.COLLECTION -> entryIds.contains(config.id) || RemoteFranchiseIds.ids.contains(config.id)
         CatalogKind.COLLECTION_RAIL -> {
             val group = config.collectionGroup ?: return false
             group in validRailGroups && hasEntriesFor(group)
@@ -1259,6 +1210,10 @@ internal object CollectionTemplateManifest {
         kind = CollectionSourceKind.CURATED_IDS,
         curatedRefs = refs
     )
+
+    /** A title list that the backend can replace (see CatalogConfigRepository); the tab marks it as such. */
+    private fun franchiseListSource(entries: List<FranchiseListEntry>, tab: String) =
+        franchiseListCuratedSource(entries, tab)
 
     private fun tmdbCollectionSource(collectionId: Int) = CollectionSourceConfig(
         kind = CollectionSourceKind.TMDB_COLLECTION,

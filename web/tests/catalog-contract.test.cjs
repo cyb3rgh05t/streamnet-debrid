@@ -14,8 +14,8 @@ function contractSources(sources) {
   for (const source of sources ?? []) {
     switch (source.kind) {
       case "CURATED_IDS": {
-        const fallback = Boolean(source.addonFallback);
-        curatedGroups.set(fallback, [...(curatedGroups.get(fallback) ?? []), ...(source.curatedRefs ?? [])]);
+        const tab = source.collectionTab ?? "";
+        curatedGroups.set(tab, [...(curatedGroups.get(tab) ?? []), ...(source.curatedRefs ?? [])]);
         break;
       }
       case "ADDON_CATALOG":
@@ -29,9 +29,9 @@ function contractSources(sources) {
       default: others.push(String(source.kind));
     }
   }
-  const curated = [...curatedGroups.entries()].map(([fallback, refs]) =>
-    `curated${fallback ? "+fallback" : ""}:${[...new Set(refs)].sort(compareCodePoints).join(",")}`,
-  );
+  // Same as the Android test: curated lists merge per tab and keep their order (it is the order in the app);
+  // only the timeline keeps repeated titles.
+  const curated = [...curatedGroups.entries()].map(([tab, refs]) => `curated@${tab}:${(tab === "timeline" ? refs : [...new Set(refs)]).join(",")}`);
   return [...curated, ...others].sort(compareCodePoints);
 }
 
