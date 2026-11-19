@@ -6,6 +6,13 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 - Android und Web (noch nicht veröffentlicht, Quelltext liegt im Repository): Marvel, DC und Star Wars laufen ohne Addon über feste, im Admin bearbeitbare Titellisten (Filme, Serien, Timeline); die Marvel-Timeline zeigt Serien pro Staffel mehrfach, die Tabs Filme und Serien jeden Titel einmal. Collections, Cover, Quellen und Home-Reihen kommen aus der zentralen Konfiguration des Backends (`GET /catalog-config`), eigene Franchises erscheinen auf allen Geräten. Die Apps tragen die eingebauten Werte weiter als Rückfall.
 
+## [Backend 1.0.055] - 2026-11-19
+
+- Fix, Marvel-Timeline: „I Am Groot“ hatte die falsche TMDB-ID (`tv:226976`, kam aus dem Addon), richtig ist `tv:232125`. Korrigiert in der gelieferten Standardliste (`franchise-lists.seed.json`, `standard-catalogs.txt`) und in den Quellen von Android und Web. Wurde im Admin schon eine eigene Marvel-Liste gespeichert, muss die ID dort von Hand getauscht werden.
+- Adminpanel, Collections: Die Titel, die eine Franchise fest in der App trägt (z. B. die Serie „Harry Potter“, `tv:224377`, und „Die Ringe der Macht“, `tv:84773`), sind jetzt als „Feste Titel“ ersetzbar und entfernbar. Das Feld zeigt den geltenden Wert, darunter steht der Standard. Gespeichert wird in `overrides.sources.<Collection>.curated`; ein leeres Feld entfernt die Titel, ein Wert gleich dem Standard wird nicht gespeichert. Ersetzt die bisherigen „Zusätzlichen Titel“ (schon gespeicherte wirken weiter).
+- Adminpanel, Home-Reihen: Statt Haken gibt es Schalter (Toggles); die Reihentitel stehen in der Akzentfarbe. Beschriftungen haben mehr Abstand zu ihren Feldern, Hinweiszeilen sitzen direkt unter dem Feld, der Speichern-Knopf hat Abstand zum Kommentarfeld; leere Hinweiszeilen verschwinden.
+- Backend-Suite: 177 von 178 Tests erfolgreich, der eine fehlschlagende (`admin-account-filter`) schlägt nur unter Windows wegen der Zeilenenden fehl. Oberfläche im Browser mit dem Vorschau-Server (Demo-Modus) geprüft. Android und Web (Quelltext, nicht veröffentlicht): „Feste Titel“ werden angewendet und per Test geprüft.
+
 ## [Backend 1.0.054] - 2026-11-19
 
 - Adminpanel, Remote Config → Home-Reihen: Alle Home-Reihen der App stehen mit einem Haken (für alle Geräte anzeigen oder überall ausblenden), dem geltenden MDBList-Link und darunter dem Standard der App. Neu: eigene Home-Reihen für alle (Titel, MDBList-Liste, Inhalt Filme / Serien / gemischt, Position nach einer bestehenden Reihe), auch für Neuinstallationen. Ausgeblendete Reihen und eigene Reihen stehen in der Übersicht unter „Weitere Abweichungen“.

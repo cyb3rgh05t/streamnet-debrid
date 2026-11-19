@@ -2434,9 +2434,18 @@ tbody tr[data-account-id]:focus .account-primary {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  margin-top: 22px;
+  padding-top: 4px;
+}
+#rc-standards-form > label,
+#rc-franchise-form > label {
+  margin-top: 16px;
+}
+#rc-standards-form .rc-heading {
+  margin-top: 28px;
 }
 .rc-hint {
-  margin: 0;
+  margin: 8px 0 14px;
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
@@ -2463,7 +2472,7 @@ tbody tr[data-account-id]:focus .account-primary {
   gap: 18px;
 }
 .rc-source-block h4 {
-  margin: 0 0 8px;
+  margin: 0 0 12px;
   font-size: 13px;
 }
 .rc-source-rows {
@@ -2519,15 +2528,80 @@ tbody tr[data-account-id]:focus .account-primary {
   align-items: flex-start;
   gap: 10px;
 }
-.rc-row-check input[type="checkbox"] {
-  width: auto;
-  margin-top: 3px;
+.rc-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: none;
+  position: relative;
+  width: 40px;
+  height: 22px;
+  margin: 2px 0 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #2a2620;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.rc-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--muted);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.rc-switch:checked {
+  border-color: var(--line-strong);
+  background: var(--accent-soft);
+}
+.rc-switch:checked::after {
+  background: var(--accent);
+  transform: translateX(18px);
+}
+.rc-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.rc-row-check {
+  gap: 14px;
 }
 .rc-newrow {
   display: grid;
   grid-template-columns: 110px minmax(120px, 1fr) minmax(160px, 2fr) minmax(0, 1fr) auto;
   gap: 10px;
   align-items: center;
+}
+.rc-hint:empty {
+  display: none;
+}
+/* The caption sits clearly above its input; the hint below hugs the input it belongs to. */
+.rc-form-grid label,
+.rc-franchise-form > label,
+.rc-newrow-form label,
+#rc-standards-form > label {
+  gap: 12px;
+}
+.rc-franchise-form > .rc-hint {
+  margin: -10px 0 0;
+}
+.rc-form-grid > .rc-hint {
+  margin: -6px 0 4px;
+}
+.rc-source-block .rc-hint {
+  margin: 6px 0 0;
+}
+.rc-source-block h4 {
+  margin-bottom: 12px;
+}
+.rc-list-label strong {
+  color: var(--accent);
+}
+.rc-source-block + .rc-source-block {
+  margin-top: 6px;
 }
 .rc-cover-preview {
   max-width: 320px;

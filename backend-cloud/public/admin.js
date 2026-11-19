@@ -1796,7 +1796,8 @@ function rcEffective(item) {
     cover: overrides.covers?.[standard.id] ?? standard.coverUrl,
     tmdb: overrides.sources?.[standard.id]?.tmdbCollections ?? standard.tmdbCollections,
     mdblist: overrides.sources?.[standard.id]?.mdblist ?? standard.mdblist,
-    extras: overrides.extras?.[standard.id] ?? [],
+    // The fixed titles: the replacement if there is one, else the app's own plus titles added earlier.
+    extras: overrides.sources?.[standard.id]?.curated ?? [...(standard.curated ?? []), ...(overrides.extras?.[standard.id] ?? [])],
   };
 }
 
@@ -1804,7 +1805,7 @@ function rcIsChanged(item) {
   if (!item.standard) return true;
   const { overrides } = rc.data;
   const id = item.standard.id;
-  return Boolean(overrides.covers?.[id] || overrides.sources?.[id] || overrides.extras?.[id] || item.franchise?.custom);
+  return Boolean(overrides.covers?.[id] || overrides.sources?.[id] || overrides.extras?.[id]?.length || item.franchise?.custom);
 }
 
 function selectRcTab(tab) {
@@ -1909,6 +1910,7 @@ function renderRcOverview() {
     const parts = [
       value.tmdbCollections ? `TMDB ${value.tmdbCollections.join(", ")}` : null,
       value.mdblist ? `MDBList ${value.mdblist.join(", ")}` : null,
+      value.curated ? `Feste Titel ${value.curated.join(", ") || "keine"}` : null,
     ].filter(Boolean);
     rows.push([rcStandardTitle(catalogId), "Quellen", parts.join(" · "), catalogId]);
   }
@@ -2043,20 +2045,6 @@ function renderRcSourceRows() {
   updateRcComposition();
 }
 
-// Titles the app itself ships in the collection ("curated@:tv:224377" in the standards), by type.
-function rcBuiltinTitles(standard) {
-  const refs = { movie: [], tv: [] };
-  for (const source of standard?.sources ?? []) {
-    const match = /^curated@(movie|series|timeline)?:(.*)$/.exec(source);
-    if (!match || match[1]) continue;
-    for (const ref of match[2].split(",")) {
-      if (ref.startsWith("movie:")) refs.movie.push(ref);
-      else if (ref.startsWith("tv:")) refs.tv.push(ref);
-    }
-  }
-  return refs;
-}
-
 // What the Movies and Series tab of the collection contain, from the values currently in the form.
 function updateRcComposition() {
   const box = byId("rc-f-composition");
@@ -2080,14 +2068,11 @@ function updateRcComposition() {
     if (info.movies) parts.movie.push(`${name}: ${info.movies} Filme`);
     if (info.shows) parts.series.push(`${name}: ${info.shows} Serien`);
   }
-  const built = rcBuiltinTitles(item?.standard);
-  if (built.movie.length) parts.movie.push(`fest in der App: ${built.movie.join(", ")}`);
-  if (built.tv.length) parts.series.push(`fest in der App: ${built.tv.join(", ")} (Serie)`);
   const extras = rcList(String(byId("rc-f-extras").value).replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
   const extraMovies = extras.filter((ref) => /^movie:\d+$/.test(ref));
   const extraShows = extras.filter((ref) => /^tv:\d+$/.test(ref));
-  if (extraMovies.length) parts.movie.push(`zusätzlich: ${extraMovies.join(", ")}`);
-  if (extraShows.length) parts.series.push(`zusätzlich: ${extraShows.join(", ")}`);
+  if (extraMovies.length) parts.movie.push(`feste Titel: ${extraMovies.join(", ")}`);
+  if (extraShows.length) parts.series.push(`feste Titel: ${extraShows.join(", ")}`);
   const line = (label, list) => {
     const row = rcElement("div");
     row.append(rcElement("strong", `${label}: `), rcElement("span", list.length ? list.join(" · ") : "nichts", list.length ? "" : "rc-composition-empty"));
@@ -2163,13 +2148,16 @@ function renderRcFranchiseForm() {
   byId("rc-f-id").closest("label").classList.toggle("hidden", !custom);
   byId("rc-f-tmdb-field").classList.toggle("hidden", !isFranchiseGroup);
   byId("rc-f-tmdb-hint").classList.toggle("hidden", !isFranchiseGroup);
-  byId("rc-f-extras-field").classList.toggle("hidden", !(isFranchiseGroup && standard));
+  for (const id of ["rc-f-extras-field", "rc-f-extras-summary", "rc-f-extras-hint"]) {
+    byId(id).classList.toggle("hidden", !(isFranchiseGroup && standard));
+  }
   byId("rc-f-tabs").classList.toggle("hidden", !hasTabs);
 
   if (standard) {
     rcHint(byId("rc-f-cover-hint"), "", standard.coverUrl);
     rcHint(byId("rc-f-tmdb-hint"), "", standard.tmdbCollections.join(", "));
     rcHint(byId("rc-f-mdblist-hint"), "", standard.mdblist.join(", "));
+    byId("rc-f-extras-hint").textContent = `Standard: ${(standard.curated ?? []).join(", ") || "keine"}`;
     const other = standard.sources.filter((source) => !/^(mdblist|tmdbCollection):/.test(source) && !source.startsWith("curated@"));
     byId("rc-f-other").textContent = other.length
       ? `Weitere feste Quellen der App (nicht änderbar): ${other.join(" · ")}`
@@ -2179,6 +2167,7 @@ function renderRcFranchiseForm() {
     byId("rc-f-tmdb-hint").textContent = "";
     byId("rc-f-mdblist-hint").textContent = "";
     byId("rc-f-other").textContent = "";
+    byId("rc-f-extras-hint").textContent = "";
   }
   const preview = byId("rc-f-cover-preview");
   const coverValue = byId("rc-f-cover").value.trim();
@@ -2247,8 +2236,11 @@ async function saveRcFranchise(event) {
       if (mdblist.length) sources.mdblist = mdblist;
       if (item.group === "FRANCHISE") {
         if (tmdbIds.length) sources.tmdbCollections = tmdbIds;
-        const extras = rcList(String(draft.extras ?? "").replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
-        if (extras.length) overrides.extras[standard.id] = extras; else delete overrides.extras[standard.id];
+        // The field holds all fixed titles; it only counts as a change when it differs from what the app ships.
+        const fixed = [...new Set(rcList(String(draft.extras ?? "").replace(/\n/g, " ")).map((ref) => ref.toLowerCase()))];
+        const shipped = standard.curated ?? [];
+        if (fixed.join() !== shipped.join()) sources.curated = fixed;
+        delete overrides.extras[standard.id];
       }
       if (Object.keys(sources).length) overrides.sources[standard.id] = sources; else delete overrides.sources[standard.id];
       setMessage(message, "Wird gespeichert…", "info");
@@ -2315,6 +2307,8 @@ function renderRcStandards() {
     const text = rcElement("label", null, "rc-list-label rc-row-check");
     const check = document.createElement("input");
     check.type = "checkbox";
+    check.className = "rc-switch";
+    check.setAttribute("role", "switch");
     check.checked = !hidden.has(item.id);
     check.dataset.rcShow = item.id;
     const names = rcElement("span");

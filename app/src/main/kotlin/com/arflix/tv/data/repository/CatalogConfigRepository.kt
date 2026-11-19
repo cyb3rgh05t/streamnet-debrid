@@ -56,7 +56,9 @@ internal data class RemoteFranchise(
 /** Replacement lists of a collection; null keeps the app's own list of that kind. */
 internal data class CentralSources(
     val tmdbCollections: List<Int>? = null,
-    val mdblist: List<String>? = null
+    val mdblist: List<String>? = null,
+    // The titles the app ships outside the tab lists (e.g. the Harry Potter series); empty removes them.
+    val curated: List<String>? = null
 )
 
 internal const val CENTRAL_ROW_PREFIX = "central_row_"
@@ -254,7 +256,9 @@ class CatalogConfigRepository @Inject constructor(
                         ?.distinct()?.take(10)?.takeIf { it.isNotEmpty() }
                     val mdblist = item.getAsJsonArray("mdblist")?.mapNotNull { runCatching { it.asString.trim() }.getOrNull()?.takeIf(mdblistSlugPattern::matches) }
                         ?.distinct()?.take(10)?.takeIf { it.isNotEmpty() }
-                    if (tmdb == null && mdblist == null) null else catalogId to CentralSources(tmdb, mdblist)
+                    val curated = item.getAsJsonArray("curated")?.mapNotNull { runCatching { it.asString.trim().lowercase() }.getOrNull()?.takeIf(franchiseRefPattern::matches) }
+                        ?.distinct()?.take(30)
+                    if (tmdb == null && mdblist == null && curated == null) null else catalogId to CentralSources(tmdb, mdblist, curated)
                 }?.toMap().orEmpty(),
                 extras = overrides.getAsJsonObject("extras")?.entrySet()?.mapNotNull { (catalogId, value) ->
                     val refs = runCatching { value.asJsonArray.map { it.asString } }.getOrNull() ?: return@mapNotNull null

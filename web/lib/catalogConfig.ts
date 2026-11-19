@@ -144,7 +144,7 @@ export function parseCatalogConfig(body: unknown): CentralConfig | null {
   for (const [catalogId, value] of Object.entries(
     (root.overrides?.sources && typeof root.overrides.sources === "object" ? root.overrides.sources : {}) as Record<string, unknown>,
   )) {
-    const item = (value ?? {}) as { tmdbCollections?: unknown; mdblist?: unknown };
+    const item = (value ?? {}) as { tmdbCollections?: unknown; mdblist?: unknown; curated?: unknown };
     const tmdb = [
       ...new Set(
         (Array.isArray(item.tmdbCollections) ? item.tmdbCollections : [])
@@ -159,10 +159,18 @@ export function parseCatalogConfig(body: unknown): CentralConfig | null {
           .filter((slug) => slugPattern.test(slug)),
       ),
     ].slice(0, 10);
-    if (tmdb.length || lists.length) {
+    const curated = Array.isArray(item.curated)
+      ? [
+          ...new Set(
+            item.curated.map((ref) => String(ref).trim().toLowerCase()).filter((ref) => refPattern.test(ref)),
+          ),
+        ].slice(0, 30)
+      : undefined;
+    if (tmdb.length || lists.length || curated) {
       sources[catalogId] = {
         ...(tmdb.length ? { tmdbCollections: tmdb } : {}),
         ...(lists.length ? { mdblist: lists } : {}),
+        ...(curated ? { curated } : {}),
       };
     }
   }  const extras: Record<string, string[]> = {};

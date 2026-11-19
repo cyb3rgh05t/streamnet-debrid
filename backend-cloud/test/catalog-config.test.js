@@ -181,6 +181,27 @@ test("overrides accept only known rows, collections and franchises, drop values 
   assert.deepEqual(saved.json().overrides.extras[bond.id], ["tv:84773"]);
   assert.equal(saved.json().overrides.covers[netflix.id], "https://example.com/n.jpg");
 });
+test("the titles a franchise ships outside its lists can be replaced or removed, others stay untouched", async () => {
+  const standards = await loadStandards();
+  const hp = standards.find((s) => s.id === "collection_franchise_harry_potter");
+  const bond = standards.find((s) => s.id === "collection_franchise_james_bond");
+  const netflix = standards.find((s) => s.id === "collection_service_netflix");
+  assert.deepEqual(hp.curated, ["tv:224377"]);
+  assert.deepEqual(bond.curated, []);
+
+  const same = validateOverrides({ sources: { [hp.id]: { curated: ["TV:224377"] } } }, standards);
+  assert.deepEqual(same.sources, {}, "the app's own titles are not stored as an override");
+  const replaced = validateOverrides({ sources: { [hp.id]: { curated: ["tv:1", "movie:2", "tv:1"] } } }, standards);
+  assert.deepEqual(replaced.sources[hp.id].curated, ["tv:1", "movie:2"]);
+  const removed = validateOverrides({ sources: { [hp.id]: { curated: [] } } }, standards);
+  assert.deepEqual(removed.sources[hp.id].curated, [], "an empty list removes the shipped titles");
+  assert.deepEqual(validateOverrides({ sources: { [bond.id]: { curated: ["tv:9"] } } }, standards).sources[bond.id].curated, ["tv:9"]);
+
+  assert.throws(() => validateOverrides({ sources: { [netflix.id]: { curated: ["tv:1"] } } }, standards), /only for franchises/);
+  assert.throws(() => validateOverrides({ sources: { [hp.id]: { curated: ["tv:x"] } } }, standards), /is not movie:ID or tv:ID/);
+  assert.throws(() => validateOverrides({ sources: { [hp.id]: { curated: Array.from({ length: 31 }, (_, i) => `tv:${i + 1}`) } } }, standards), /at most 30/);
+});
+
 test("home rows: standard rows can be hidden for everyone and new MDBList rows added, with validation", async (t) => {
   const standards = await loadStandards();
   const row = standards.find((s) => s.kind === "STANDARD" && s.sourceUrl.includes("mdblist.com"));

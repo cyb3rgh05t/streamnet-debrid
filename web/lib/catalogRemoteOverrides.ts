@@ -112,7 +112,8 @@ function appendExtraRefs(
     : sources;
 }
 
-export type CentralSources = { tmdbCollections?: number[]; mdblist?: string[] };
+// curated: the titles the app ships outside the tab lists (e.g. the Harry Potter series); empty removes them.
+export type CentralSources = { tmdbCollections?: number[]; mdblist?: string[]; curated?: string[] };
 
 /** Swaps all sources of one kind by the admin's list, at the position of the first one of that kind. */
 function swapSources(
@@ -129,8 +130,19 @@ function swapSources(
 
 function replaceListSources(sources: CollectionSourceConfig[], lists: CentralSources) {
   const template = sources.find((source) => String(source.kind).toUpperCase() === "MDBLIST_PUBLIC");
+  const withCurated = lists.curated
+    ? (() => {
+        const isOwn = (source: CollectionSourceConfig) =>
+          String(source.kind).toUpperCase() === "CURATED_IDS" && !source.collectionTab && !source.remoteExtra;
+        const at = sources.findIndex(isOwn);
+        const rest = sources.filter((source) => !isOwn(source));
+        const insert: CollectionSourceConfig[] = lists.curated!.length ? [{ kind: "CURATED_IDS", curatedRefs: lists.curated }] : [];
+        const position = at < 0 ? rest.length : Math.min(at, rest.length);
+        return [...rest.slice(0, position), ...insert, ...rest.slice(position)];
+      })()
+    : sources;
   const withTmdb = swapSources(
-    sources,
+    withCurated,
     "TMDB_COLLECTION",
     lists.tmdbCollections?.map((tmdbCollectionId) => ({ kind: "TMDB_COLLECTION", tmdbCollectionId })),
   );

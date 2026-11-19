@@ -568,6 +568,20 @@ test("the central config replaces the tab lists, adds franchises and applies the
   const own = [{ kind: "CURATED_IDS", collectionTab: "movie", curatedRefs: ["movie:5"] }];
   assert.deepEqual(withFranchiseLists("collection_service_netflix", own), own);
 });
+test("the titles a franchise ships outside its lists can be replaced or removed centrally", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const own = (curated) => {
+    const central = parseCatalogConfig({ franchises: [], overrides: { sources: { collection_franchise_harry_potter: { curated } } } });
+    const hp = applyCentralConfig(defaultCatalogs, central).find((c) => c.id === "collection_franchise_harry_potter");
+    return hp.collectionSources.filter((s) => s.kind === "CURATED_IDS" && !s.collectionTab).flatMap((s) => s.curatedRefs);
+  };
+  assert.deepEqual(own(["TV:1", "movie:2", "bogus"]), ["tv:1", "movie:2"]);
+  assert.deepEqual(own([]), []);
+  const untouched = applyCentralConfig(defaultCatalogs, parseCatalogConfig({ franchises: [], overrides: {} }));
+  assert.deepEqual(untouched.find((c) => c.id === "collection_franchise_harry_potter").collectionSources.filter((s) => s.kind === "CURATED_IDS").flatMap((s) => s.curatedRefs), ["tv:224377"]);
+});
+
 test("home rows can be hidden for everyone and added with a position, and saved copies follow the central config", async () => {
   const { defaultCatalogs, mergeCatalogs } = await import(moduleUrl);
   const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);

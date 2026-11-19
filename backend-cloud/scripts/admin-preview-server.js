@@ -370,8 +370,8 @@ const server = createServer(async (request, reply) => {
             overridesUpdatedAt,
             updatedAt: stamps.at(-1) ?? null,
             builtinFranchiseIds: Object.keys(seed),
-            standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
-              ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources, sourceCount: sources.length })),
+            standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources }) =>
+              ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources, sourceCount: sources.length })),
           });
         }
         if (parts[2] === "list-info" && request.method === "GET") {

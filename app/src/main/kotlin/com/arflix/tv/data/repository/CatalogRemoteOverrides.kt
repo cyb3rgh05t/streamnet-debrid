@@ -100,8 +100,15 @@ private fun replaceListSources(sources: List<CollectionSourceConfig>, lists: Cen
         return rest.take(insertAt) + replacement + rest.drop(insertAt)
     }
     val mdblistTemplate = sources.firstOrNull { it.kind == CollectionSourceKind.MDBLIST_PUBLIC }
+    val withCurated = lists.curated?.let { refs ->
+        val at = sources.indexOfFirst { it.kind == CollectionSourceKind.CURATED_IDS && it.collectionTab == null }
+        val rest = sources.filterNot { it.kind == CollectionSourceKind.CURATED_IDS && it.collectionTab == null }
+        val insert = if (refs.isEmpty()) emptyList() else listOf(CollectionSourceConfig(kind = CollectionSourceKind.CURATED_IDS, curatedRefs = refs))
+        val position = if (at < 0) rest.size else minOf(at, rest.size)
+        rest.take(position) + insert + rest.drop(position)
+    } ?: sources
     val withTmdb = swap(
-        sources, CollectionSourceKind.TMDB_COLLECTION,
+        withCurated, CollectionSourceKind.TMDB_COLLECTION,
         lists.tmdbCollections?.map { CollectionSourceConfig(kind = CollectionSourceKind.TMDB_COLLECTION, tmdbCollectionId = it) }
     )
     return swap(

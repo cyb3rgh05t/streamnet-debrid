@@ -210,6 +210,21 @@ class CatalogConfigRepositoryTest {
     }
 
     @Test
+    fun `the titles a franchise ships outside its lists can be replaced or removed centrally`() {
+        val hp = defaults.single { it.id == "collection_franchise_harry_potter" }
+        fun curated(sources: CentralSources) = CatalogConfigRepository.applyToBundled(
+            hp, CentralCatalogConfig(overrides = CentralOverrides(sources = mapOf(hp.id to sources)))
+        ).collectionSources.filter { it.kind == CollectionSourceKind.CURATED_IDS && it.collectionTab == null }.flatMap { it.curatedRefs.orEmpty() }
+        assertEquals(listOf("tv:224377"), hp.collectionSources.filter { it.kind == CollectionSourceKind.CURATED_IDS }.flatMap { it.curatedRefs.orEmpty() })
+        assertEquals(listOf("tv:1", "movie:2"), curated(CentralSources(curated = listOf("tv:1", "movie:2"))))
+        assertEquals(emptyList<String>(), curated(CentralSources(curated = emptyList())))
+        assertEquals(listOf("tv:224377"), curated(CentralSources(tmdbCollections = listOf(7))))
+        val parsed = CatalogConfigRepository.parseCatalogConfig("""{"franchises":[],"overrides":{"sources":{"a":{"curated":["TV:5","bogus"]},"b":{"curated":[]}}}}""")!!
+        assertEquals(listOf("tv:5"), parsed.overrides.sources["a"]?.curated)
+        assertEquals(emptyList<String>(), parsed.overrides.sources["b"]?.curated)
+    }
+
+    @Test
     fun `a mixed MDBList list only brings the titles of the tab it is shown in`() {
         val catalog = defaults.single { it.id == "collection_franchise_harry_potter" }
         fun lists(tab: CollectionTab) = collectionCatalogForTab(catalog, tab).collectionSources

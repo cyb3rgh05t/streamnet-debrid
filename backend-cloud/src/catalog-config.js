@@ -36,6 +36,8 @@ async function loadStatic() {
         coverUrl: covers.get(id) ?? "",
         mdblist: parts.filter((s) => s.startsWith("mdblist:")).map((s) => s.slice(8)),
         tmdbCollections: parts.filter((s) => s.startsWith("tmdbCollection:")).map((s) => Number(s.slice(15))),
+        // Titles the app ships outside the Movies / Series / Timeline lists (e.g. the Harry Potter series).
+        curated: parts.filter((s) => s.startsWith("curated@:")).flatMap((s) => s.slice(9).split(",")).filter(Boolean),
         sources: parts,
       };
     });
@@ -169,6 +171,14 @@ export function validateOverrides(body, standards) {
     }
     const lists = cleanSlugs(value?.mdblist, `${standard.title}: MDBList lists`, 10);
     if (lists.length && lists.join() !== standard.mdblist.join()) entry.mdblist = lists;
+    if (value?.curated !== undefined) {
+      if (standard.group !== "FRANCHISE") throw fail(`${standard.title}: fixed titles are only for franchises`);
+      const refs = [...new Set((Array.isArray(value.curated) ? value.curated : []).map((ref) => String(ref).trim().toLowerCase()))];
+      if (refs.length > maxExtraRefs) throw fail(`${standard.title}: at most ${maxExtraRefs} fixed titles`);
+      for (const ref of refs) if (!refPattern.test(ref)) throw fail(`${standard.title}: "${ref.slice(0, 30)}" is not movie:ID or tv:ID`);
+      // An empty list is a real override: it removes the titles the app ships.
+      if (refs.join() !== standard.curated.join()) entry.curated = refs;
+    }
     if (Object.keys(entry).length) sources[catalogId] = entry;
   }
   const extras = {};
@@ -313,8 +323,8 @@ export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin, list
     return {
       ...config,
       builtinFranchiseIds: Object.keys(seed),
-      standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
-        ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources: sources.map((source) => source.slice(0, 300)), sourceCount: sources.length })),
+      standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources }) =>
+        ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources: sources.map((source) => source.slice(0, 300)), sourceCount: sources.length })),
     };
   });
 
