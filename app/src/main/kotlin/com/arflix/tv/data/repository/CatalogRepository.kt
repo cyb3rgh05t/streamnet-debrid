@@ -561,6 +561,8 @@ class CatalogRepository @Inject constructor(
             decodeHiddenCustom(profileId, prefs)
         val defaultIds = defaultPreinstalled.map { it.id }.toSet()
         val existing = allStoredCatalogs.mapNotNull { cfg ->
+            // A row the admin added for everyone disappears as soon as the central configuration drops it.
+            if (cfg.id.startsWith(CENTRAL_ROW_PREFIX) && !defaultIds.contains(cfg.id)) return@mapNotNull null
             if ((cfg.kind == CatalogKind.COLLECTION || cfg.kind == CatalogKind.COLLECTION_RAIL) &&
                 !defaultIds.contains(cfg.id)
             ) {
@@ -591,6 +593,10 @@ class CatalogRepository @Inject constructor(
             effectiveDefaults
         } else {
             val kept = existing.mapNotNull { config ->
+                if (config.id.startsWith(CENTRAL_ROW_PREFIX)) {
+                    // Title and list of an admin-added row always come from the current central configuration.
+                    return@mapNotNull defaultMap[config.id]?.copy(enabled = config.enabled)
+                }
                 if (config.isPreinstalled) {
                     val defaultCfg = defaultMap[config.id] ?: return@mapNotNull null
                     // Preserve user-renamed titles: if the user changed the title

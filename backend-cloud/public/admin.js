@@ -1870,7 +1870,7 @@ function renderRcOverview() {
     rcMetric("Eigene Cover", count(overrides.covers)),
     rcMetric("Ersetzte Quellen", count(overrides.sources)),
     rcMetric("Zusätzliche Titel", Object.values(overrides.extras || {}).reduce((sum, refs) => sum + refs.length, 0)),
-    rcMetric("Home-Reihen geändert", count(overrides.rows)),
+    rcMetric("Home-Reihen geändert", count(overrides.rows) + (overrides.hidden || []).length + (overrides.newRows || []).length),
     rcMetric("Letzte Änderung", rc.data.updatedAt ? formatDate(rc.data.updatedAt) : "—"),
   );
 
@@ -1902,6 +1902,8 @@ function renderRcOverview() {
 
   const rows = [];
   for (const [catalogId, url] of Object.entries(overrides.rows || {})) rows.push([rcStandardTitle(catalogId), "Home-Reihe", url, null]);
+  for (const catalogId of overrides.hidden || []) rows.push([rcStandardTitle(catalogId), "Home-Reihe", "Für alle ausgeblendet", null]);
+  for (const row of overrides.newRows || []) rows.push([row.title, "Eigene Home-Reihe", row.url, null]);
   for (const [catalogId, url] of Object.entries(overrides.covers || {})) rows.push([rcStandardTitle(catalogId), "Cover", url, catalogId]);
   for (const [catalogId, value] of Object.entries(overrides.sources || {})) {
     const parts = [
@@ -2038,6 +2040,65 @@ function renderRcSourceRows() {
     );
   }));
   void loadRcListInfo(rc.src.mdblist.filter((slug) => !(slug in rc.listInfo)));
+  updateRcComposition();
+}
+
+// Titles the app itself ships in the collection ("curated@:tv:224377" in the standards), by type.
+function rcBuiltinTitles(standard) {
+  const refs = { movie: [], tv: [] };
+  for (const source of standard?.sources ?? []) {
+    const match = /^curated@(movie|series|timeline)?:(.*)$/.exec(source);
+    if (!match || match[1]) continue;
+    for (const ref of match[2].split(",")) {
+      if (ref.startsWith("movie:")) refs.movie.push(ref);
+      else if (ref.startsWith("tv:")) refs.tv.push(ref);
+    }
+  }
+  return refs;
+}
+
+// What the Movies and Series tab of the collection contain, from the values currently in the form.
+function updateRcComposition() {
+  const box = byId("rc-f-composition");
+  const key = rc.current;
+  const isNew = key === rcNewKey;
+  const item = isNew ? null : rcItem(key);
+  if (!isNew && !item) { box.replaceChildren(); return; }
+  const parts = { movie: [], series: [] };
+  const franchise = item?.franchise ?? null;
+  if (franchise) {
+    const draft = rc.drafts[key]?.tabs ?? {};
+    const count = (tab) => (draft[tab] !== undefined ? rcLineCount(draft[tab]) : franchise.tabs[tab].length);
+    if (count("movie")) parts.movie.push(`eigene Liste: ${count("movie")} Filme`);
+    if (count("series")) parts.series.push(`eigene Liste: ${count("series")} Serien`);
+  }
+  if (rc.src.tmdb.length) parts.movie.push(`TMDB-Collections ${rc.src.tmdb.join(", ")} (Filme)`);
+  for (const slug of rc.src.mdblist) {
+    const info = rc.listInfo[slug];
+    const name = info?.title || slug;
+    if (!info || info.total === null) { parts.movie.push(`${name} (Typ unbekannt)`); parts.series.push(`${name} (Typ unbekannt)`); continue; }
+    if (info.movies) parts.movie.push(`${name}: ${info.movies} Filme`);
+    if (info.shows) parts.series.push(`${name}: ${info.shows} Serien`);
+  }
+  const built = rcBuiltinTitles(item?.standard);
+  if (built.movie.length) parts.movie.push(`fest in der App: ${built.movie.join(", ")}`);
+  if (built.tv.length) parts.series.push(`fest in der App: ${built.tv.join(", ")} (Serie)`);
+  const extras = rcList(String(byId("rc-f-extras").value).replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
+  const extraMovies = extras.filter((ref) => /^movie:\d+$/.test(ref));
+  const extraShows = extras.filter((ref) => /^tv:\d+$/.test(ref));
+  if (extraMovies.length) parts.movie.push(`zusätzlich: ${extraMovies.join(", ")}`);
+  if (extraShows.length) parts.series.push(`zusätzlich: ${extraShows.join(", ")}`);
+  const line = (label, list) => {
+    const row = rcElement("div");
+    row.append(rcElement("strong", `${label}: `), rcElement("span", list.length ? list.join(" · ") : "nichts", list.length ? "" : "rc-composition-empty"));
+    return row;
+  };
+  const rows = [line("Filme-Tab", parts.movie), line("Serien-Tab", parts.series)];
+  if (franchise && (franchise.tabs.timeline.length || rc.drafts[key]?.tabs?.timeline)) {
+    const timeline = rc.drafts[key]?.tabs?.timeline !== undefined ? rcLineCount(rc.drafts[key].tabs.timeline) : franchise.tabs.timeline.length;
+    rows.push(line("Timeline-Tab", [`${timeline} Einträge`]));
+  }
+  box.replaceChildren(...rows);
 }
 
 function addRcTmdb() {
@@ -2059,6 +2120,7 @@ function addRcMdblist() {
 }
 
 function updateRcExtrasSummary() {
+  updateRcComposition();
   const refs = rcList(String(byId("rc-f-extras").value).replace(/\n/g, " "));
   const movies = refs.filter((ref) => /^movie:\d+$/i.test(ref)).length;
   const shows = refs.filter((ref) => /^tv:\d+$/i.test(ref)).length;
@@ -2092,8 +2154,8 @@ function renderRcFranchiseForm() {
   byId("rc-f-id").value = draft.id ?? franchise?.id ?? "";
   byId("rc-f-cover").value = draft.cover ?? effective.cover;
   rc.src = { tmdb: [...(draft.tmdb ?? effective.tmdb)], mdblist: [...(draft.mdblist ?? effective.mdblist)] };
-  renderRcSourceRows();
   byId("rc-f-extras").value = draft.extras ?? effective.extras.join("\n");
+  renderRcSourceRows();
   updateRcExtrasSummary();
   byId("rc-f-reason").value = draft.reason ?? "";
   byId("rc-f-title").disabled = !custom;
@@ -2238,24 +2300,96 @@ async function removeRcFranchise() {
   }
 }
 
+function rcRowIdFor(title) {
+  return String(title).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+}
+
 function renderRcStandards() {
   const { standards, overrides } = rc.data;
-  const rows = standards.filter((item) => item.kind === "STANDARD" && String(item.sourceUrl).includes("mdblist.com/lists/"));
+  rc.newRows = (overrides.newRows || []).map((row) => ({ ...row }));
+  const rows = standards.filter((item) => item.kind === "STANDARD" || item.kind === "COLLECTION_RAIL");
+  const hidden = new Set(overrides.hidden || []);
   byId("rc-rows").replaceChildren(...rows.map((item) => {
-    const label = document.createElement("label");
-    label.className = "rc-list-row";
-    const text = rcElement("span", null, "rc-list-label");
-    text.append(rcElement("strong", item.title), rcElement("small", `Standard: ${item.sourceUrl}`));
-    const input = document.createElement("input");
-    input.value = overrides.rows?.[item.id] ?? item.sourceUrl;
-    input.placeholder = item.sourceUrl;
-    input.autocomplete = "off";
-    input.maxLength = 300;
-    input.dataset.rcRow = item.id;
-    input.dataset.rcDefault = item.sourceUrl;
-    label.append(text, input);
-    return label;
+    const line = document.createElement("div");
+    line.className = "rc-list-row";
+    const text = rcElement("label", null, "rc-list-label rc-row-check");
+    const check = document.createElement("input");
+    check.type = "checkbox";
+    check.checked = !hidden.has(item.id);
+    check.dataset.rcShow = item.id;
+    const names = rcElement("span");
+    names.append(
+      rcElement("strong", item.title),
+      rcElement("small", item.kind === "COLLECTION_RAIL" ? "Reihe mit Collections" : (item.sourceUrl ? `Standard: ${item.sourceUrl}` : "Reihe der App")),
+    );
+    text.append(check, names);
+    line.append(text);
+    if (item.kind === "STANDARD" && String(item.sourceUrl).includes("mdblist.com/lists/")) {
+      const input = document.createElement("input");
+      input.value = overrides.rows?.[item.id] ?? item.sourceUrl;
+      input.placeholder = item.sourceUrl;
+      input.autocomplete = "off";
+      input.maxLength = 300;
+      input.dataset.rcRow = item.id;
+      input.dataset.rcDefault = item.sourceUrl;
+      line.append(input);
+    } else {
+      line.append(rcElement("span", "", "rc-source-info"));
+    }
+    return line;
   }));
+  renderRcNewRows();
+  byId("rc-nr-after").replaceChildren(
+    new Option("Am Ende", ""),
+    ...rows.filter((item) => item.kind === "STANDARD").map((item) => new Option(`nach „${item.title}“`, item.id)),
+  );
+}
+
+function renderRcNewRows() {
+  byId("rc-newrows").replaceChildren(...rc.newRows.map((row, index) => {
+    const slug = rcNormalizeSlug(row.url);
+    const [badge, badgeClass] = rcListBadge(rc.listInfo[slug]);
+    const line = rcElement("div", null, "rc-newrow");
+    const title = document.createElement("input");
+    title.value = row.title;
+    title.maxLength = 60;
+    title.addEventListener("change", () => { row.title = title.value.trim(); });
+    const url = document.createElement("input");
+    url.value = row.url;
+    url.addEventListener("change", () => {
+      const clean = rcNormalizeSlug(url.value);
+      if (!clean) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); renderRcNewRows(); return; }
+      row.url = `https://mdblist.com/lists/${clean}`;
+      renderRcNewRows();
+    });
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "button secondary";
+    remove.textContent = "Entfernen";
+    remove.addEventListener("click", () => { rc.newRows.splice(index, 1); renderRcNewRows(); });
+    const anchor = rcStandard(row.after)?.title ?? rc.newRows.find((other) => other.id === row.after)?.title;
+    const position = row.after && anchor ? `nach ${anchor}` : "am Ende";
+    line.append(
+      rcElement("span", badge, `rc-badge ${badgeClass}`.trim()), title, url,
+      rcElement("span", `${rcListInfoText(rc.listInfo[slug])} · ${position}`, "rc-source-info"), remove,
+    );
+    return line;
+  }));
+  void loadRcListInfo(rc.newRows.map((row) => rcNormalizeSlug(row.url)).filter(Boolean).filter((slug) => !(slug in rc.listInfo)));
+}
+
+function addRcNewRow() {
+  const title = byId("rc-nr-title").value.trim();
+  const slug = rcNormalizeSlug(byId("rc-nr-url").value);
+  if (title.length < 2) { showToast("Titel: mindestens 2 Zeichen", true); return; }
+  if (!slug) { showToast("MDBList: user/liste oder ein mdblist.com-Link", true); return; }
+  let id = rcRowIdFor(title);
+  if (id.length < 3) id = `${id}-reihe`.replace(/^-/, "");
+  const base = id;
+  for (let n = 2; rc.newRows.some((row) => row.id === id); n += 1) id = `${base}-${n}`;
+  rc.newRows.push({ id, title, url: `https://mdblist.com/lists/${slug}`, mediaType: byId("rc-nr-type").value, after: byId("rc-nr-after").value });
+  for (const field of ["rc-nr-title", "rc-nr-url"]) byId(field).value = "";
+  renderRcNewRows();
 }
 
 async function saveRcStandards(event) {
@@ -2267,10 +2401,12 @@ async function saveRcStandards(event) {
       const value = input.value.trim();
       if (value && value !== input.dataset.rcDefault) rows[input.dataset.rcRow] = value;
     });
+    const hidden = [...document.querySelectorAll("[data-rc-show]")].filter((box) => !box.checked).map((box) => box.dataset.rcShow);
+    const newRows = rc.newRows.map((row) => ({ id: row.id, title: row.title, url: row.url, mediaType: row.mediaType || "", after: row.after || "" }));
     setMessage(message, "Wird gespeichert…", "info");
     await api("/admin-api/catalog-config/overrides", {
       method: "PUT",
-      body: JSON.stringify({ ...rc.data.overrides, rows, reason: byId("rc-s-reason").value }),
+      body: JSON.stringify({ ...rc.data.overrides, rows, hidden, newRows, reason: byId("rc-s-reason").value }),
     });
     await loadCatalogConfig();
     setMessage(byId("rc-s-message"), "Gespeichert und protokolliert. Die Geräte laden die Änderung innerhalb von ca. 15 Minuten.", "success");
@@ -2326,6 +2462,7 @@ byId("rc-franchise-form").addEventListener("submit", saveRcFranchise);
 byId("rc-f-reset").addEventListener("click", removeRcFranchise);
 byId("rc-f-delete").addEventListener("click", removeRcFranchise);
 byId("rc-standards-form").addEventListener("submit", saveRcStandards);
+byId("rc-nr-add").addEventListener("click", addRcNewRow);
 
 function updateGlobalFields() {
   const operation = byId("global-operation").value;

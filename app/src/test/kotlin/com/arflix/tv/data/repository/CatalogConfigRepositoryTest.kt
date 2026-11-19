@@ -131,6 +131,33 @@ class CatalogConfigRepositoryTest {
     }
 
     @Test
+    fun `home rows can be hidden for everyone and added with a position`() {
+        val parsed = CatalogConfigRepository.parseCatalogConfig(
+            """{"franchises":[],"overrides":{"hidden":["new_kdramas","collection_rail_tv_genre"],
+                "newRows":[
+                  {"id":"top-horror","title":"Top Horror","url":"https://mdblist.com/lists/snoak/top-horror","after":"trending_movies"},
+                  {"id":"kids","title":"Kids","url":"https://mdblist.com/lists/me/kids","after":"top-horror"},
+                  {"id":"bad","title":"Bad","url":"https://evil.example/lists/a/b"},
+                  {"id":"x","title":"Short id","url":"https://mdblist.com/lists/a/b"}]}}"""
+        )!!
+        assertEquals(setOf("new_kdramas", "collection_rail_tv_genre"), parsed.overrides.hidden)
+        assertEquals(listOf("top-horror", "kids"), parsed.overrides.newRows.map { it.id })
+
+        val result = CatalogConfigRepository.applyCentralConfig(defaults, parsed)
+        val ids = result.map { it.id }
+        assertTrue("new_kdramas" !in ids && "collection_rail_tv_genre" !in ids)
+        assertEquals(
+            listOf("trending_movies", "central_row_top_horror", "central_row_kids"),
+            ids.subList(ids.indexOf("trending_movies"), ids.indexOf("trending_movies") + 3)
+        )
+        val row = result.single { it.id == "central_row_top_horror" }
+        assertEquals("https://mdblist.com/lists/snoak/top-horror", row.sourceUrl)
+        assertEquals("mdblist:https://mdblist.com/lists/snoak/top-horror", row.sourceRef)
+        assertTrue(row.isPreinstalled)
+        assertEquals(defaults.size - 2 + 2, result.size)
+    }
+
+    @Test
     fun `a created franchise is a valid collection only while the central config lists it`() {
         val ghibli = defaults.single { it.id == marvelId }.copy(id = "collection_franchise_ghibli")
         assertFalse(CollectionTemplateManifest.isValidCollectionConfig(ghibli))

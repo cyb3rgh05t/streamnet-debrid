@@ -2,6 +2,7 @@ package com.arflix.tv.data.repository
 
 import com.arflix.tv.data.model.CatalogConfig
 import com.arflix.tv.data.model.CollectionGroupKind
+import com.arflix.tv.data.model.CollectionSourceKind
 import com.arflix.tv.data.model.MediaType
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -11,6 +12,17 @@ import java.util.Locale
 internal fun usesFranchiseReleaseOrder(catalog: CatalogConfig): Boolean =
     catalog.collectionGroup == CollectionGroupKind.FRANCHISE &&
         catalog.collectionSources.none { it.collectionTab?.trim()?.lowercase() == "timeline" }
+
+/**
+ * How many titles of one source a franchise collection resolves before it is sorted by release date. A fixed
+ * title list (Marvel has 120 films) must not be cut: the cap only exists for open-ended list sources.
+ */
+internal fun franchiseSourceBudget(kind: CollectionSourceKind): Int = when (kind) {
+    CollectionSourceKind.CURATED_IDS -> 500
+    CollectionSourceKind.ADDON_CATALOG -> 120
+    CollectionSourceKind.MDBLIST_PUBLIC -> 96
+    else -> 72
+}
 
 internal fun mergeAddonRefsInCatalogOrder(
     direct: List<Pair<MediaType, Int>?>,

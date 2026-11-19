@@ -2442,6 +2442,22 @@ tbody tr[data-account-id]:focus .account-primary {
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
+.rc-composition {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #14120f;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.rc-composition strong {
+  color: var(--accent);
+}
+.rc-composition .rc-composition-empty {
+  color: var(--muted);
+}
 .rc-sources {
   display: grid;
   gap: 18px;
@@ -2491,6 +2507,28 @@ tbody tr[data-account-id]:focus .account-primary {
   border-color: rgba(120, 190, 255, 0.45);
   color: #8ec5ff;
 }
+.rc-newrow-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(180px, 2fr) 120px minmax(160px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 10px 0 18px;
+}
+.rc-row-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+.rc-row-check input[type="checkbox"] {
+  width: auto;
+  margin-top: 3px;
+}
+.rc-newrow {
+  display: grid;
+  grid-template-columns: 110px minmax(120px, 1fr) minmax(160px, 2fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
 .rc-cover-preview {
   max-width: 320px;
   max-height: 160px;
@@ -2527,6 +2565,8 @@ tbody tr[data-account-id]:focus .account-primary {
   .rc-tabs,
   .rc-split,
   .rc-form-grid,
+  .rc-newrow-form,
+  .rc-newrow,
   .rc-list-row,
   .rc-source-row {
     grid-template-columns: minmax(0, 1fr);

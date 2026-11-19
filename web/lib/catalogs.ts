@@ -1,4 +1,4 @@
-import { applyCentralConfig, curatedTabSource, getCentralConfig } from "./catalogConfig";
+import { applyCentralConfig, centralRowPrefix, curatedTabSource, getCentralConfig } from "./catalogConfig";
 import { bundledFranchiseLists } from "./franchiseListSeed";
 import type { CatalogConfig } from "./types";
 import type { UiLanguage } from "./i18n";
@@ -843,10 +843,17 @@ export function mergeCatalogs(
     .map(normalizedCatalog)
     .filter((catalog) => !isRetiredCatalog(catalog))
     .filter((catalog) => !isLegacyServiceCatalog(catalog));
-  const defaults = applyCentralConfig(defaultCatalogs, getCentralConfig());
+  const central = getCentralConfig();
+  const defaults = applyCentralConfig(defaultCatalogs, central);
   const defaultIds = new Set(defaults.map((catalog) => catalog.id));
+  const centrallyHidden = new Set(central.overrides.hidden ?? []);
   const savedById = new Map(cleaned.map((catalog) => [catalog.id, catalog]));
-  const result = cleaned.filter((catalog) => !catalog.remoteFranchise || defaultIds.has(catalog.id)).map((catalog) => {
+  // Rows and franchises the admin created vanish with the central configuration; hidden standard rows too.
+  const result = cleaned
+    .filter((catalog) => !catalog.remoteFranchise || defaultIds.has(catalog.id))
+    .filter((catalog) => !catalog.id.startsWith(centralRowPrefix) || defaultIds.has(catalog.id))
+    .filter((catalog) => !centrallyHidden.has(catalog.id))
+    .map((catalog) => {
     const currentDefault = defaults.find(
       (candidate) => candidate.id === catalog.id,
     );

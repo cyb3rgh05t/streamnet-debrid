@@ -59,9 +59,18 @@ internal data class CentralSources(
     val mdblist: List<String>? = null
 )
 
+internal const val CENTRAL_ROW_PREFIX = "central_row_"
+
+/** A Home row the admin added for everyone: an MDBList list, optionally placed after another row. */
+internal data class CentralRow(val id: String, val title: String, val url: String, val after: String) {
+    val catalogId: String get() = CENTRAL_ROW_PREFIX + id.replace('-', '_')
+}
+
 /** Admin overrides of the standard catalogs, valid for every device. */
 internal data class CentralOverrides(
     val rows: Map<String, String> = emptyMap(),
+    val hidden: Set<String> = emptySet(),
+    val newRows: List<CentralRow> = emptyList(),
     val covers: Map<String, String> = emptyMap(),
     val sources: Map<String, CentralSources> = emptyMap(),
     val extras: Map<String, List<String>> = emptyMap()
@@ -229,6 +238,15 @@ class CatalogConfigRepository @Inject constructor(
                 ?.mapNotNull { (key, value) -> runCatching { key to value.asString }.getOrNull() }?.toMap().orEmpty()
             return CentralOverrides(
                 rows = strings("rows"),
+                hidden = overrides.getAsJsonArray("hidden").orEmpty().mapNotNull { runCatching { it.asString }.getOrNull() }.toSet(),
+                newRows = overrides.getAsJsonArray("newRows").orEmpty().mapNotNull { element ->
+                    val row = runCatching { element.asJsonObject }.getOrNull() ?: return@mapNotNull null
+                    val id = row.get("id")?.asString?.trim().orEmpty()
+                    val title = row.get("title")?.asString?.trim().orEmpty().take(MAX_TITLE_LENGTH)
+                    val url = row.get("url")?.asString?.trim().orEmpty()
+                    if (!franchiseIdPattern.matches(id) || title.isBlank() || !isValidRemoteMdblistUrl(url)) return@mapNotNull null
+                    CentralRow(id, title, url, row.get("after")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty())
+                }.take(20),
                 covers = strings("covers"),
                 sources = overrides.getAsJsonObject("sources")?.entrySet()?.mapNotNull { (catalogId, value) ->
                     val item = runCatching { value.asJsonObject }.getOrNull() ?: return@mapNotNull null
@@ -255,7 +273,8 @@ class CatalogConfigRepository @Inject constructor(
 
         /** Applies the central lists and overrides to the bundled catalogs and adds the admin-created franchises. */
         internal fun applyCentralConfig(defaults: List<CatalogConfig>, config: CentralCatalogConfig): List<CatalogConfig> {
-            val adjusted = defaults.map { applyToBundled(it, config) }
+            val adjusted = defaults.filterNot { it.id in config.overrides.hidden }.map { applyToBundled(it, config) }
+                .let { withCentralRows(it, config.overrides.newRows) }
             val created = config.franchises.filterNot { it.builtin }
                 .filter { franchise -> adjusted.none { it.id == franchise.catalogId } }
                 .map { applyCentralOverrides(franchiseCatalog(it), config.overrides) }
@@ -265,6 +284,25 @@ class CatalogConfigRepository @Inject constructor(
             }
             val insertAt = if (lastFranchise >= 0) lastFranchise + 1 else adjusted.size
             return adjusted.take(insertAt) + created + adjusted.drop(insertAt)
+        }
+
+        /** Adds the rows the admin created, each after the row it names (or at the end). */
+        private fun withCentralRows(catalogs: List<CatalogConfig>, rows: List<CentralRow>): List<CatalogConfig> {
+            val result = catalogs.toMutableList()
+            for (row in rows) {
+                if (result.any { it.id == row.catalogId }) continue
+                val catalog = CatalogConfig(
+                    id = row.catalogId,
+                    title = row.title,
+                    sourceType = CatalogSourceType.MDBLIST,
+                    sourceUrl = row.url,
+                    sourceRef = "mdblist:${row.url}",
+                    isPreinstalled = true
+                )
+                val anchor = result.indexOfFirst { it.id == row.after || it.id == CENTRAL_ROW_PREFIX + row.after.replace('-', '_') }
+                if (row.after.isNotBlank() && anchor >= 0) result.add(anchor + 1, catalog) else result.add(catalog)
+            }
+            return result
         }
 
         /** One bundled catalog with the central tab lists and overrides applied. */

@@ -15,6 +15,13 @@ import java.time.LocalDate
 
 class CollectionOrderingTest {
     @Test
+    fun `a franchise title list is not cut at the list cap and covers the longest bundled list`() {
+        val longest = BundledFranchiseLists.byCatalogId.values.maxOf { it.movie.size }
+        assertTrue("Marvel has more films than the cap of open lists", longest > franchiseSourceBudget(CollectionSourceKind.TMDB_COLLECTION))
+        assertTrue(franchiseSourceBudget(CollectionSourceKind.CURATED_IDS) >= longest)
+    }
+
+    @Test
     fun `mixed direct and IMDb resolved entries keep the addon order`() {
         val wakanda = MediaType.TV to 283378
         val captainAmerica = MediaType.MOVIE to 1771

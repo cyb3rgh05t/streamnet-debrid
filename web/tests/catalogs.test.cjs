@@ -568,6 +568,34 @@ test("the central config replaces the tab lists, adds franchises and applies the
   const own = [{ kind: "CURATED_IDS", collectionTab: "movie", curatedRefs: ["movie:5"] }];
   assert.deepEqual(withFranchiseLists("collection_service_netflix", own), own);
 });
+test("home rows can be hidden for everyone and added with a position, and saved copies follow the central config", async () => {
+  const { defaultCatalogs, mergeCatalogs } = await import(moduleUrl);
+  const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const central = parseCatalogConfig({ franchises: [], overrides: {
+    hidden: ["new_kdramas", "collection_rail_tv_genre"],
+    newRows: [
+      { id: "top-horror", title: "Top Horror", url: "https://mdblist.com/lists/snoak/top-horror", mediaType: "movie", after: "trending_movies" },
+      { id: "kids", title: "Kids", url: "https://mdblist.com/lists/me/kids", after: "top-horror" },
+      { id: "bad", title: "Bad", url: "https://evil.example/lists/a/b" },
+    ],
+  } });
+  assert.deepEqual(central.overrides.newRows.map((row) => row.id), ["top-horror", "kids"]);
+  const result = applyCentralConfig(defaultCatalogs, central);
+  const ids = result.map((catalog) => catalog.id);
+  assert.ok(!ids.includes("new_kdramas") && !ids.includes("collection_rail_tv_genre"));
+  const at = ids.indexOf("trending_movies");
+  assert.deepEqual(ids.slice(at, at + 3), ["trending_movies", "central_row_top_horror", "central_row_kids"]);
+  const row = result.find((catalog) => catalog.id === "central_row_top_horror");
+  assert.equal(row.sourceUrl, "https://mdblist.com/lists/snoak/top-horror");
+  assert.equal(row.sourceType, "mdblist");
+  assert.equal(row.mediaType, "movie");
+  assert.equal(result.length, defaultCatalogs.length);
+
+  // With nothing fetched, a saved copy of an admin-added row no longer in the central config is dropped.
+  const saved = [{ id: "central_row_old", name: "Old", sourceType: "mdblist", sourceUrl: "https://mdblist.com/lists/a/b", enabled: true, isPreinstalled: true }];
+  assert.equal(mergeCatalogs(saved).some((catalog) => catalog.id === "central_row_old"), false);
+});
+
 test("streaming services use the country of the language as watch region", async () => {
   const { watchRegionForLanguage } = await import(
     pathToFileURL(path.resolve(__dirname, "../lib/tmdb.ts")).href

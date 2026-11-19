@@ -70,7 +70,7 @@ test("device events have readable labels without hiding unknown event types", ()
   assert.equal(context.formatDeviceEvent(""), "—");
 });
 
-test("Remote Config assigns every existing action to exactly one area", async () => {
+test("Remote Config offers only the per-account actions; lists, covers and added titles live in the central areas", async () => {
   const html = await readFile(new URL("../public/admin.html", import.meta.url), "utf8");
   const select = html.match(/<select id="global-operation">([^]*?)<\/select>/)[1];
   const operations = [...select.matchAll(/value="([^"]+)"/g)].map(match => match[1]);
@@ -81,8 +81,7 @@ test("Remote Config assigns every existing action to exactly one area", async ()
     addons: ["add_addon", "edit_addon", "delete_addon", "clear_addons"],
     catalogs: [
       "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
-      "set_catalog_source", "set_catalog_slug", "set_catalog_addon", "clear_catalog_source", "remove_obsolete_catalogs",
-      "add_catalog_item", "remove_catalog_item",
+      "clear_catalog_source", "remove_obsolete_catalogs",
     ],
   });
   for (const group of Object.keys(groups)) {

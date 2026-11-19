@@ -370,7 +370,7 @@ const server = createServer(async (request, reply) => {
             overridesUpdatedAt,
             updatedAt: stamps.at(-1) ?? null,
             builtinFranchiseIds: Object.keys(seed),
-            standards: standards.filter((item) => item.kind !== "COLLECTION_RAIL").map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
+            standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
               ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources, sourceCount: sources.length })),
           });
         }

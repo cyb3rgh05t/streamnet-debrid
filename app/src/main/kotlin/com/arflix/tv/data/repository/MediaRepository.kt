@@ -590,11 +590,7 @@ class MediaRepository @Inject constructor(
         val sourceBudgets = catalog.collectionSources.map { source ->
             if (usesFranchiseReleaseOrder(catalog)) {
                 // Resolve the fixed franchise budget before sorting to keep page offsets stable.
-                when (source.kind) {
-                    CollectionSourceKind.ADDON_CATALOG -> 120
-                    CollectionSourceKind.MDBLIST_PUBLIC -> 96
-                    else -> 72
-                }
+                franchiseSourceBudget(source.kind)
             } else if (unlimitedGroup) {
                 (targetCount + 20).coerceAtLeast(40)
             } else when (source.kind) {

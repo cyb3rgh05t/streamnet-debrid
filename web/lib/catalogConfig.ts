@@ -1,6 +1,6 @@
 import { config, hasCloudBackendConfig } from "./config";
 import { jsonRequest } from "./http";
-import { applyCentralOverrides, type CentralSources } from "./catalogRemoteOverrides";
+import { applyCentralOverrides, isValidRemoteMdblistUrl, type CentralSources } from "./catalogRemoteOverrides";
 import {
   bundledFranchiseLists,
   type FranchiseEntry,
@@ -31,8 +31,15 @@ export type RemoteFranchise = {
   mdblist: string[];
 };
 
+export const centralRowPrefix = "central_row_";
+
+/** A Home row the admin added for everyone: an MDBList list, optionally placed after another row. */
+export type CentralRow = { id: string; title: string; url: string; mediaType: "movie" | "tv" | ""; after: string };
+
 export type CentralOverrides = {
   rows: Record<string, string>;
+  hidden: string[];
+  newRows: CentralRow[];
   covers: Record<string, string>;
   sources: Record<string, CentralSources>;
   extras: Record<string, string[]>;
@@ -45,7 +52,7 @@ export type CentralConfig = {
 
 export const emptyCentralConfig: CentralConfig = {
   franchises: [],
-  overrides: { rows: {}, covers: {}, sources: {}, extras: {} },
+  overrides: { rows: {}, hidden: [], newRows: [], covers: {}, sources: {}, extras: {} },
 };
 
 let current: CentralConfig | undefined;
@@ -90,7 +97,7 @@ function stringRecord(value: unknown): Record<string, string> {
 export function parseCatalogConfig(body: unknown): CentralConfig | null {
   const root = body as {
     franchises?: unknown;
-    overrides?: { rows?: unknown; covers?: unknown; sources?: unknown; extras?: unknown };
+    overrides?: { rows?: unknown; hidden?: unknown; newRows?: unknown; covers?: unknown; sources?: unknown; extras?: unknown };
   } | null;
   if (!root || !Array.isArray(root.franchises)) return null;
   const franchises = new Map<string, RemoteFranchise>();
@@ -168,11 +175,31 @@ export function parseCatalogConfig(body: unknown): CentralConfig | null {
     franchises: [...franchises.values()],
     overrides: {
       rows: stringRecord(root.overrides?.rows),
+      hidden: (Array.isArray(root.overrides?.hidden) ? root.overrides.hidden : []).map(String),
+      newRows: parseRows(root.overrides?.newRows),
       covers: stringRecord(root.overrides?.covers),
       sources,
       extras,
     },
   };
+}
+
+function parseRows(value: unknown): CentralRow[] {
+  const rows: CentralRow[] = [];
+  for (const raw of (Array.isArray(value) ? value : []) as Array<Record<string, unknown>>) {
+    const id = String(raw?.id ?? "").trim();
+    const title = String(raw?.title ?? "").trim().slice(0, 120);
+    const url = String(raw?.url ?? "").trim();
+    if (!idPattern.test(id) || !title || !isValidRemoteMdblistUrl(url)) continue;
+    rows.push({
+      id,
+      title,
+      url,
+      mediaType: raw?.mediaType === "movie" || raw?.mediaType === "tv" ? raw.mediaType : "",
+      after: String(raw?.after ?? "").trim(),
+    });
+  }
+  return rows.slice(0, 20);
 }
 
 async function refresh() {
@@ -269,10 +296,39 @@ function franchiseCatalog(franchise: RemoteFranchise): CatalogConfig {
   };
 }
 
+function centralRowId(row: CentralRow) {
+  return centralRowPrefix + row.id.replace(/-/g, "_");
+}
+
+/** Adds the rows the admin created, each after the row it names (or at the end). */
+function withCentralRows(catalogs: CatalogConfig[], rows: CentralRow[]): CatalogConfig[] {
+  const result = [...catalogs];
+  for (const row of rows) {
+    const id = centralRowId(row);
+    if (result.some((catalog) => catalog.id === id)) continue;
+    const added: CatalogConfig = {
+      id,
+      name: row.title,
+      title: row.title,
+      sourceType: "mdblist",
+      mediaType: row.mediaType || undefined,
+      sourceUrl: row.url,
+      sourceRef: `mdblist:${row.url}`,
+      enabled: true,
+      isPreinstalled: true,
+    };
+    const anchor = result.findIndex((catalog) => catalog.id === row.after || catalog.id === centralRowPrefix + row.after.replace(/-/g, "_"));
+    if (row.after && anchor >= 0) result.splice(anchor + 1, 0, added);
+    else result.push(added);
+  }
+  return result;
+}
+
 /** The default catalogs with the central lists and overrides applied, plus the admin-created franchises. */
 export function applyCentralConfig(defaults: CatalogConfig[], central: CentralConfig): CatalogConfig[] {
   const lists = new Map(central.franchises.filter((item) => item.builtin).map((item) => [item.catalogId, item.tabs]));
-  const adjusted = defaults.map((catalog) => {
+  const hidden = new Set(central.overrides.hidden ?? []);
+  const adjusted = withCentralRows(defaults.filter((catalog) => !hidden.has(catalog.id)), central.overrides.newRows ?? []).map((catalog) => {
     const tabs = lists.get(catalog.id);
     const withTabs = tabs
       ? { ...catalog, collectionSources: replaceTabLists(catalog.collectionSources ?? [], tabs) }

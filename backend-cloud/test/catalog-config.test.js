@@ -75,7 +75,7 @@ test("the public config serves the seed, then prefers saved and created franchis
   assert.equal(seeded.version, 2);
   assert.deepEqual(seeded.franchises.map((f) => f.id), ["marvel", "dc", "starwars"]);
   assert.ok(seeded.franchises.every((f) => f.builtin && f.revision === 0));
-  assert.deepEqual(seeded.overrides, { rows: {}, covers: {}, sources: {}, extras: {} });
+  assert.deepEqual(seeded.overrides, { rows: {}, covers: {}, sources: {}, extras: {}, hidden: [], newRows: [] });
 
   const saved = [
     { id: "franchise:dc", payload: { tabs: { movie: [{ ref: "movie:1" }], series: [], timeline: [] } }, revision: "3", updated_at: "2026-11-19T07:00:00Z" },
@@ -181,6 +181,38 @@ test("overrides accept only known rows, collections and franchises, drop values 
   assert.deepEqual(saved.json().overrides.extras[bond.id], ["tv:84773"]);
   assert.equal(saved.json().overrides.covers[netflix.id], "https://example.com/n.jpg");
 });
+test("home rows: standard rows can be hidden for everyone and new MDBList rows added, with validation", async (t) => {
+  const standards = await loadStandards();
+  const row = standards.find((s) => s.kind === "STANDARD" && s.sourceUrl.includes("mdblist.com"));
+  const rail = standards.find((s) => s.kind === "COLLECTION_RAIL");
+  const collection = standards.find((s) => s.kind === "COLLECTION");
+  assert.ok(rail, "collection rails are known standards");
+
+  const clean = validateOverrides({
+    hidden: [row.id, rail.id, row.id],
+    newRows: [
+      { id: "top-horror", title: "  Top Horror ", url: "snoak/top-horror", mediaType: "movie", after: row.id },
+      { id: "kids", title: "Kids", url: "https://mdblist.com/lists/me/kids", mediaType: "bogus", after: "top-horror" },
+    ],
+  }, standards);
+  assert.deepEqual(clean.hidden, [row.id, rail.id]);
+  assert.equal(clean.newRows[0].title, "Top Horror");
+  assert.equal(clean.newRows[0].url, "https://mdblist.com/lists/snoak/top-horror");
+  assert.equal(clean.newRows[1].mediaType, "");
+
+  assert.throws(() => validateOverrides({ hidden: [collection.id] }, standards), /Unknown home row/);
+  assert.throws(() => validateOverrides({ newRows: [{ id: "x", title: "Row", url: "me/x" }] }, standards), /Row id/);
+  assert.throws(() => validateOverrides({ newRows: [{ id: "good-id", title: "A", url: "me/x" }] }, standards), /Row title/);
+  assert.throws(() => validateOverrides({ newRows: [{ id: "good-id", title: "Row", url: "https://evil.example/lists/a/b" }] }, standards), /not an MDBList link/);
+  assert.throws(() => validateOverrides({ newRows: [{ id: "good-id", title: "Row", url: "me/x", after: "nope" }] }, standards), /Unknown row to place after/);
+  assert.throws(() => validateOverrides({ newRows: [{ id: "good-id", title: "Row", url: "me/x" }, { id: "good-id", title: "Row2", url: "me/y" }] }, standards), /used twice/);
+
+  const { call } = await fixture(t);
+  const saved = await call("PUT", "/admin-api/catalog-config/overrides", { hidden: [rail.id], newRows: [{ id: "top-horror", title: "Top Horror", url: "snoak/top-horror" }] });
+  assert.equal(saved.statusCode, 200);
+  assert.deepEqual(saved.json().overrides.hidden, [rail.id]);
+});
+
 test("the public config still answers with the built-in values before the migration created the table", async (t) => {
   const app = Fastify();
   const pool = { query: async () => { throw Object.assign(new Error("relation does not exist"), { code: "42P01" }); } };

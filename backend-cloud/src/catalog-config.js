@@ -17,6 +17,7 @@ const tabs = ["movie", "series", "timeline"];
 const maxEntries = 500;
 const maxTitle = 120;
 const maxExtraRefs = 30;
+const maxNewRows = 20;
 const customIdPattern = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 
 let cached = null;
@@ -179,9 +180,32 @@ export function validateOverrides(body, standards) {
     for (const ref of list) if (!refPattern.test(ref)) throw fail(`${standard.title}: "${ref.slice(0, 30)}" is not movie:ID or tv:ID`);
     if (list.length) extras[catalogId] = list;
   }
-  return { rows, covers, sources, extras };
+  // Standard rows (and collection rails) switched off for everyone; the app drops them from its defaults.
+  const hiddenable = new Set(standards.filter((s) => s.kind === "STANDARD" || s.kind === "COLLECTION_RAIL").map((s) => s.id));
+  const hidden = [...new Set((Array.isArray(body?.hidden) ? body.hidden : []).map((id) => String(id)))];
+  for (const id of hidden) if (!hiddenable.has(id)) throw fail(`Unknown home row: ${id.slice(0, 40)}`);
+  // Rows the admin adds for everyone; each is an MDBList list shown on Home.
+  const newRowsInput = Array.isArray(body?.newRows) ? body.newRows : [];
+  if (newRowsInput.length > maxNewRows) throw fail(`At most ${maxNewRows} added rows`);
+  const seenRows = new Set();
+  const newRows = newRowsInput.map((row) => {
+    const id = String(row?.id ?? "").trim().toLowerCase();
+    if (!customIdPattern.test(id)) throw fail("Row id: 3-40 characters, lowercase letters, digits and hyphens");
+    if (seenRows.has(id)) throw fail(`Row id used twice: ${id}`);
+    seenRows.add(id);
+    const title = String(row?.title ?? "").replace(/[\u0000-\u001f]/g, " ").trim();
+    if (title.length < 2 || title.length > 60) throw fail("Row title needs 2 to 60 characters");
+    const raw = String(row?.url ?? "").trim();
+    let url;
+    try { url = normalizeAdminListUrl("MDBLIST", mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw).sourceUrl; } catch { throw fail(`Row "${title.slice(0, 30)}": the list is not an MDBList link`); }
+    const mediaType = ["movie", "tv"].includes(row?.mediaType) ? row.mediaType : "";
+    const after = String(row?.after ?? "").trim();
+    if (after && !byId.has(after) && !newRowsInput.some((other) => String(other?.id ?? "").trim().toLowerCase() === after)) throw fail(`Unknown row to place after: ${after.slice(0, 40)}`);
+    return { id, title, url, mediaType, after };
+  });
+  return { rows, covers, sources, extras, hidden, newRows };
 }
-const emptyOverrides = () => ({ rows: {}, covers: {}, sources: {}, extras: {} });
+const emptyOverrides = () => ({ rows: {}, covers: {}, sources: {}, extras: {}, hidden: [], newRows: [] });
 
 function franchiseView(entry, row, builtin) {
   const payload = row?.payload ?? {};
@@ -289,7 +313,7 @@ export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin, list
     return {
       ...config,
       builtinFranchiseIds: Object.keys(seed),
-      standards: standards.filter((s) => s.kind !== "COLLECTION_RAIL").map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
+      standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources }) =>
         ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, sources: sources.map((source) => source.slice(0, 300)), sourceCount: sources.length })),
     };
   });
@@ -364,7 +388,7 @@ export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin, list
     await authenticateAdmin(request);
     const overrides = validateOverrides(request.body, await loadStandards());
     await write(request, "catalog_overrides_save", {
-      rows: Object.keys(overrides.rows).length, covers: Object.keys(overrides.covers).length, sources: Object.keys(overrides.sources).length, extras: Object.keys(overrides.extras).length,
+      rows: Object.keys(overrides.rows).length, hidden: overrides.hidden.length, newRows: overrides.newRows.length, covers: Object.keys(overrides.covers).length, sources: Object.keys(overrides.sources).length, extras: Object.keys(overrides.extras).length,
     }, (client) => upsert(client, "overrides", overrides));
     return { overrides };
   });

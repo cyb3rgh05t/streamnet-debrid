@@ -591,6 +591,7 @@
                 <form id="rc-franchise-form" class="rc-franchise-form">
                   <h3 id="rc-f-heading">Collection</h3>
                   <p id="rc-f-state" class="global-confirm-note"></p>
+                  <div id="rc-f-composition" class="rc-composition" aria-live="polite"></div>
                   <div class="rc-form-grid">
                     <label>Name<input id="rc-f-title" maxlength="60" autocomplete="off" /></label>
                     <label>ID (kann später nicht geändert werden)<input id="rc-f-id" maxlength="40" autocomplete="off" placeholder="z. B. studio-ghibli" /></label>
@@ -648,11 +649,29 @@
 
             <div id="rc-standards" class="rc-panel hidden" data-rc-panel="standards">
               <p class="rc-intro">
-                MDBList-Liste der Home-Reihen. Das Feld zeigt die Liste, die gerade gilt; darunter steht
-                der Standard der App. Cover, Listen und Titel der Collections stehen unter „Collections“.
+                Alle Home-Reihen der App. Der Haken bestimmt, ob die Reihe für <strong>alle Geräte</strong>
+                angezeigt wird (auch bei Neuinstallationen); ohne Haken verschwindet sie überall. Das Feld
+                zeigt die MDBList-Liste, die gerade gilt, darunter steht der Standard der App. Eigene Reihen
+                erscheinen ebenfalls auf allen Geräten.
               </p>
               <form id="rc-standards-form">
+                <h3 class="rc-heading">Reihen der App</h3>
                 <div id="rc-rows" class="rc-list"></div>
+                <h3 class="rc-heading">Eigene Reihen für alle</h3>
+                <div id="rc-newrows" class="rc-source-rows"></div>
+                <div class="rc-newrow-form">
+                  <label>Titel<input id="rc-nr-title" maxlength="60" autocomplete="off" placeholder="z. B. Top Horror" /></label>
+                  <label>MDBList-Liste<input id="rc-nr-url" autocomplete="off" placeholder="user/liste oder https://mdblist.com/lists/user/liste" /></label>
+                  <label>Inhalt
+                    <select id="rc-nr-type">
+                      <option value="">Gemischt</option>
+                      <option value="movie">Filme</option>
+                      <option value="tv">Serien</option>
+                    </select>
+                  </label>
+                  <label>Position<select id="rc-nr-after"></select></label>
+                  <button id="rc-nr-add" class="button secondary" type="button">Reihe hinzufügen</button>
+                </div>
                 <label>Kommentar (optional)<input id="rc-s-reason" maxlength="500" /></label>
                 <div class="rc-actions-row">
                   <button class="button primary" type="submit">Speichern</button>
@@ -801,26 +820,11 @@
                       <option value="delete_catalog">
                         Eigenen Katalog bei allen Accounts löschen (Standard-Kataloge: nur ausblenden)
                       </option>
-                      <option value="set_catalog_source">
-                        Home-Reihe: MDBList-Liste austauschen
-                      </option>
-                      <option value="set_catalog_slug">
-                        Collection: MDBList-Liste austauschen
-                      </option>
-                      <option value="set_catalog_addon">
-                        Collection: Addon-Quelle austauschen (nur Marvel / DC / Star Wars)
-                      </option>
                       <option value="clear_catalog_source">
-                        Austauschte Listen auf Standard zurücksetzen
+                        Alte Austausche bei Accounts zurücksetzen (zentrale Werte gelten wieder)
                       </option>
                       <option value="remove_obsolete_catalogs">
                         Veraltetes bereinigen (Netzwerk-, Studio-, Featured-Collections)
-                      </option>
-                      <option value="add_catalog_item">
-                        Franchise: Film oder Serie ergänzen
-                      </option>
-                      <option value="remove_catalog_item">
-                        Franchise: ergänzten Titel wieder entfernen
                       </option>
                     </select></label
                   >
