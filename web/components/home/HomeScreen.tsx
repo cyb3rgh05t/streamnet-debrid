@@ -9,6 +9,7 @@ import { loadGenreFanart } from "@/lib/genreFanart";
 import { tmdbOriginalBackdropUrl } from "@/lib/mediaImages";
 import { useApp } from "@/lib/store";
 import { buildHomeCatalogEntries } from "@/lib/catalogs";
+import { getCentralConfig } from "@/lib/catalogConfig";
 import { LazyRail } from "@/components/media/LazyRail";
 import { MediaRail } from "@/components/media/MediaRail";
 import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
@@ -621,7 +622,10 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                             const genreId = catalog.collectionSources?.find(
                               (source) => source.tmdbGenreId,
                             )?.tmdbGenreId;
+                            // A cover the admin set centrally wins over the genre artwork.
+                            const centralCover = getCentralConfig().overrides.covers[catalog.id];
                             const artwork =
+                              centralCover ??
                               (genreId
                                 ? genreFanart.get(
                                     `${"group" in rail.entry ? rail.entry.group : ""}:${genreId}`,

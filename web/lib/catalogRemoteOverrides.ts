@@ -168,6 +168,8 @@ export function applyCentralOverrides(
   overrides: {
     rows?: Record<string, string>;
     covers?: Record<string, string>;
+    intros?: Record<string, string>;
+    titles?: Record<string, string>;
     sources?: Record<string, CentralSources>;
     extras?: Record<string, string[]>;
   },
@@ -183,6 +185,14 @@ export function applyCentralOverrides(
     result.collectionCoverImageUrl = cover;
     result.collectionFocusGifUrl = cover;
     result.collectionHeroImageUrl = cover;
+  }
+  const isCollection = String(base.kind ?? "").toUpperCase() === "COLLECTION";
+  const intro = String(overrides.intros?.[base.id] ?? "").trim();
+  if (isCollection && intro.length <= 500 && isPlainHttps(intro)) result.collectionHeroVideoUrl = intro;
+  const title = String(overrides.titles?.[base.id] ?? "").trim();
+  if (isCollection && title.length >= 2 && title.length <= 60) {
+    result.title = title;
+    result.name = title;
   }
   const sources = base.collectionSources ?? [];
   const lists = overrides.sources?.[base.id];

@@ -36,11 +36,32 @@ export const centralRowPrefix = "central_row_";
 /** A Home row the admin added for everyone: an MDBList list, optionally placed after another row. */
 export type CentralRow = { id: string; title: string; url: string; mediaType: "movie" | "tv" | ""; after: string };
 
+export type CentralCollectionGroup = "SERVICE" | "DECADE";
+
+/** A collection the admin added for everyone: a streaming service (TMDB watch providers, MDBList lists) or a decade (MDBList lists). */
+export type CentralCollection = {
+  id: string;
+  group: CentralCollectionGroup;
+  title: string;
+  coverUrl: string | null;
+  introUrl: string | null;
+  providers: number[];
+  mdblist: string[];
+  region: string;
+};
+
+export function centralCollectionCatalogId(group: CentralCollectionGroup, id: string) {
+  return `collection_${group.toLowerCase()}_${id.replace(/-/g, "_")}`;
+}
+
 export type CentralOverrides = {
   rows: Record<string, string>;
   hidden: string[];
   newRows: CentralRow[];
   covers: Record<string, string>;
+  intros: Record<string, string>;
+  titles: Record<string, string>;
+  newCollections: CentralCollection[];
   sources: Record<string, CentralSources>;
   extras: Record<string, string[]>;
 };
@@ -52,7 +73,7 @@ export type CentralConfig = {
 
 export const emptyCentralConfig: CentralConfig = {
   franchises: [],
-  overrides: { rows: {}, hidden: [], newRows: [], covers: {}, sources: {}, extras: {} },
+  overrides: { rows: {}, hidden: [], newRows: [], covers: {}, intros: {}, titles: {}, newCollections: [], sources: {}, extras: {} },
 };
 
 let current: CentralConfig | undefined;
@@ -97,7 +118,7 @@ function stringRecord(value: unknown): Record<string, string> {
 export function parseCatalogConfig(body: unknown): CentralConfig | null {
   const root = body as {
     franchises?: unknown;
-    overrides?: { rows?: unknown; hidden?: unknown; newRows?: unknown; covers?: unknown; sources?: unknown; extras?: unknown };
+    overrides?: { rows?: unknown; hidden?: unknown; newRows?: unknown; covers?: unknown; intros?: unknown; titles?: unknown; newCollections?: unknown; sources?: unknown; extras?: unknown };
   } | null;
   if (!root || !Array.isArray(root.franchises)) return null;
   const franchises = new Map<string, RemoteFranchise>();
@@ -186,10 +207,51 @@ export function parseCatalogConfig(body: unknown): CentralConfig | null {
       hidden: (Array.isArray(root.overrides?.hidden) ? root.overrides.hidden : []).map(String),
       newRows: parseRows(root.overrides?.newRows),
       covers: stringRecord(root.overrides?.covers),
+      intros: stringRecord(root.overrides?.intros),
+      titles: stringRecord(root.overrides?.titles),
+      newCollections: parseCollections(root.overrides?.newCollections),
       sources,
       extras,
     },
   };
+}
+
+function parseCollections(value: unknown): CentralCollection[] {
+  const services = new Map<string, CentralCollection>();
+  for (const raw of (Array.isArray(value) ? value : []) as Array<Record<string, unknown>>) {
+    const group = String(raw?.group ?? "SERVICE").trim().toUpperCase();
+    if (group !== "SERVICE" && group !== "DECADE") continue;
+    const id = String(raw?.id ?? "").trim();
+    const title = String(raw?.title ?? "").trim().slice(0, 120);
+    const providers = [
+      ...new Set((Array.isArray(raw?.providers) ? raw.providers : []).map(Number).filter((n) => Number.isInteger(n) && n > 0)),
+    ].slice(0, 10);
+    const mdblist = [
+      ...new Set(
+        (Array.isArray(raw?.mdblist) ? raw.mdblist : []).map((item) => String(item).trim()).filter((item) => slugPattern.test(item)),
+      ),
+    ].slice(0, 5);
+    const hasSources = group === "DECADE" ? mdblist.length > 0 : providers.length > 0 || mdblist.length > 0;
+    if (!idPattern.test(id) || !title || !hasSources) continue;
+    const link = (field: unknown) => {
+      const text = String(field ?? "").trim();
+      return text.length <= 500 && isPlainHttps(text) ? text : null;
+    };
+    const region = String(raw?.region ?? "").trim().toUpperCase();
+    const catalogId = centralCollectionCatalogId(group, id);
+    if (services.has(catalogId)) continue;
+    services.set(catalogId, {
+      id,
+      group,
+      title,
+      coverUrl: link(raw?.coverUrl),
+      introUrl: group === "SERVICE" ? link(raw?.introUrl) : null,
+      providers: group === "SERVICE" ? providers : [],
+      mdblist,
+      region: /^[A-Z]{2}$/.test(region) ? region : "US",
+    });
+  }
+  return [...services.values()].slice(0, 20);
 }
 
 function parseRows(value: unknown): CentralRow[] {
@@ -304,6 +366,40 @@ function franchiseCatalog(franchise: RemoteFranchise): CatalogConfig {
   };
 }
 
+function collectionCatalog(service: CentralCollection): CatalogConfig {
+  const sources: CollectionSourceConfig[] = [
+    ...service.providers.flatMap((tmdbWatchProviderId) =>
+      ["movie", "series"].map((mediaType) => ({
+        kind: "TMDB_WATCH_PROVIDER",
+        mediaType,
+        tmdbWatchProviderId,
+        watchRegion: service.region,
+        sortBy: "popularity.desc",
+      })),
+    ),
+    ...service.mdblist.map((mdblistSlug) => ({ kind: "MDBLIST_PUBLIC", mdblistSlug })),
+  ];
+  return {
+    id: centralCollectionCatalogId(service.group, service.id),
+    name: service.title,
+    title: service.title,
+    sourceType: "preinstalled",
+    enabled: true,
+    isPreinstalled: true,
+    remoteFranchise: true,
+    kind: "COLLECTION",
+    collectionGroup: service.group,
+    ...(service.group === "SERVICE" ? { collectionDescription: `Trending movies and series on ${service.title}.` } : {}),
+    collectionTileShape: "LANDSCAPE",
+    collectionCoverImageUrl: service.coverUrl,
+    collectionFocusGifUrl: service.coverUrl,
+    collectionHeroImageUrl: service.coverUrl,
+    collectionHeroVideoUrl: service.introUrl,
+    collectionHideTitle: Boolean(service.coverUrl),
+    collectionSources: sources,
+  };
+}
+
 function centralRowId(row: CentralRow) {
   return centralRowPrefix + row.id.replace(/-/g, "_");
 }
@@ -343,19 +439,31 @@ export function applyCentralConfig(defaults: CatalogConfig[], central: CentralCo
       : catalog;
     return applyCentralOverrides(withTabs, central.overrides);
   });
+  const addedCollections = (central.overrides.newCollections ?? [])
+    .filter((item) => !adjusted.some((catalog) => catalog.id === centralCollectionCatalogId(item.group, item.id)))
+    .map((item) => applyCentralOverrides(collectionCatalog(item), central.overrides));
+  const withCollections = (["SERVICE", "DECADE"] as const).reduce(
+    (list, group) => insertAfterGroup(list, group, addedCollections.filter((catalog) => catalog.collectionGroup === group)),
+    adjusted,
+  );
   const created = central.franchises
     .filter((item) => !item.builtin && !adjusted.some((catalog) => catalog.id === item.catalogId))
     .map((item) => applyCentralOverrides(franchiseCatalog(item), central.overrides));
-  if (!created.length) return adjusted;
+  return insertAfterGroup(withCollections, "FRANCHISE", created);
+}
+
+/** Places [added] behind the last collection of [group], or at the end when the group has none. */
+function insertAfterGroup(catalogs: CatalogConfig[], group: string, added: CatalogConfig[]): CatalogConfig[] {
+  if (!added.length) return catalogs;
   let last = -1;
-  adjusted.forEach((catalog, index) => {
+  catalogs.forEach((catalog, index) => {
     if (
       String(catalog.kind ?? "").toUpperCase() === "COLLECTION" &&
-      String(catalog.collectionGroup ?? "").toUpperCase() === "FRANCHISE"
+      String(catalog.collectionGroup ?? "").toUpperCase() === group
     ) {
       last = index;
     }
   });
-  const insertAt = last >= 0 ? last + 1 : adjusted.length;
-  return [...adjusted.slice(0, insertAt), ...created, ...adjusted.slice(insertAt)];
+  const insertAt = last >= 0 ? last + 1 : catalogs.length;
+  return [...catalogs.slice(0, insertAt), ...added, ...catalogs.slice(insertAt)];
 }

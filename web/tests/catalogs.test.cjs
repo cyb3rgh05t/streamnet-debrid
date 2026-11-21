@@ -610,6 +610,51 @@ test("home rows can be hidden for everyone and added with a position, and saved 
   assert.equal(mergeCatalogs(saved).some((catalog) => catalog.id === "central_row_old"), false);
 });
 
+test("services are added behind the last service and collections can get another name, intro and cover", async () => {
+  const { defaultCatalogs } = await import(moduleUrl);
+  const { applyCentralConfig, parseCatalogConfig } = await import(pathToFileURL(path.resolve(__dirname, "../lib/catalogConfig.ts")).href);
+  const central = parseCatalogConfig({ franchises: [], overrides: {
+    titles: { collection_movie_genre_action: "Action & Spannung", collection_service_netflix: "Netflix HD" },
+    intros: { collection_service_netflix: "https://example.com/n.mp4", collection_service_hulu: "http://example.com/h.mp4" },
+    covers: { collection_movie_genre_action: "https://example.com/a.jpg" },
+    newCollections: [
+      { id: "arte-tv", title: "Arte", coverUrl: "https://example.com/arte.jpg", introUrl: "https://example.com/arte.mp4", providers: [234, 234], mdblist: ["me/arte"], region: "fr" },
+      { id: "50s", group: "DECADE", title: "50's Movies", coverUrl: "https://example.com/50s.jpg", introUrl: "https://example.com/ignored.mp4", providers: [7], mdblist: ["snoak/popular-1950s-movies"] },
+      { id: "empty-decade", group: "DECADE", title: "No list", providers: [7] },
+      { id: "odd", group: "GENRE", title: "Odd", mdblist: ["me/x"] },
+      { id: "bad", title: "Nothing", providers: [], mdblist: [] },
+      { id: "x", title: "Short id", providers: [1] },
+    ],
+  } });
+  assert.deepEqual(central.overrides.newCollections.map((service) => service.id), ["arte-tv", "50s"]);
+  assert.equal(central.overrides.newCollections[0].region, "FR");
+  const result = applyCentralConfig(defaultCatalogs, central);
+  const services = result.filter((catalog) => catalog.kind === "COLLECTION" && catalog.collectionGroup === "SERVICE");
+  const arte = services[services.length - 1];
+  assert.equal(arte.id, "collection_service_arte_tv");
+  assert.equal(arte.collectionHeroVideoUrl, "https://example.com/arte.mp4");
+  assert.deepEqual(arte.collectionSources.filter((s) => s.kind === "TMDB_WATCH_PROVIDER").map((s) => [s.tmdbWatchProviderId, s.mediaType, s.watchRegion]),
+    [[234, "movie", "FR"], [234, "series", "FR"]]);
+  assert.deepEqual(arte.collectionSources.filter((s) => s.kind === "MDBLIST_PUBLIC").map((s) => s.mdblistSlug), ["me/arte"]);
+  const action = result.find((catalog) => catalog.id === "collection_movie_genre_action");
+  assert.equal(action.title, "Action & Spannung");
+  assert.equal(action.collectionCoverImageUrl, "https://example.com/a.jpg");
+  const netflix = result.find((catalog) => catalog.id === "collection_service_netflix");
+  assert.equal(netflix.title, "Netflix HD");
+  assert.equal(netflix.collectionHeroVideoUrl, "https://example.com/n.mp4");
+  assert.equal(
+    result.find((catalog) => catalog.id === "collection_service_hulu").collectionHeroVideoUrl,
+    defaultCatalogs.find((catalog) => catalog.id === "collection_service_hulu").collectionHeroVideoUrl,
+  );
+  const decades = result.filter((catalog) => catalog.kind === "COLLECTION" && catalog.collectionGroup === "DECADE");
+  const decade = decades[decades.length - 1];
+  assert.equal(decade.id, "collection_decade_50s");
+  assert.equal(decade.title, "50's Movies");
+  assert.deepEqual(decade.collectionSources.map((s) => [s.kind, s.mdblistSlug]), [["MDBLIST_PUBLIC", "snoak/popular-1950s-movies"]]);
+  assert.equal(decade.collectionHeroVideoUrl, null);
+  assert.equal(result.length, defaultCatalogs.length + 2);
+});
+
 test("streaming services use the country of the language as watch region", async () => {
   const { watchRegionForLanguage } = await import(
     pathToFileURL(path.resolve(__dirname, "../lib/tmdb.ts")).href
