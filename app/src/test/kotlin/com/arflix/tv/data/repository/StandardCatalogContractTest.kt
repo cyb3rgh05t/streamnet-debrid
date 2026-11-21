@@ -45,6 +45,21 @@ class StandardCatalogContractTest {
         )
     }
 
+    // The admin shows each collection's intro video (the hero clip on the collection page) as the default.
+    @Test
+    fun `Android collection intros match the list the admin shows as defaults`() {
+        val actual = MediaRepository.buildPreinstalledDefaults()
+            .filter { it.kind == com.arflix.tv.data.model.CatalogKind.COLLECTION && !it.collectionHeroVideoUrl.isNullOrBlank() }
+            .joinToString("\n", postfix = "\n") { "${it.id} | ${it.collectionHeroVideoUrl}" }
+        val file = File("../catalog-contract/standard-intros.txt")
+        if (System.getenv("UPDATE_CATALOG_CONTRACT") == "1") file.writeText(actual)
+        assertEquals(
+            "Intros differ from catalog-contract/standard-intros.txt; regenerate with UPDATE_CATALOG_CONTRACT=1 and copy the file to backend-cloud/src.",
+            file.readText().replace("\r\n", "\n"),
+            actual
+        )
+    }
+
     private fun contractLine(catalog: CatalogConfig): String {
         val sources = contractSources(catalog.collectionSources.orEmpty()).sorted().joinToString(" ; ")
         return listOf(

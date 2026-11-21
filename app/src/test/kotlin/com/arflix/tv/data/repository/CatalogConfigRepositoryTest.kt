@@ -158,6 +158,60 @@ class CatalogConfigRepositoryTest {
     }
 
     @Test
+    fun `services and decades are added behind the last one of their group and collections can get another name, intro and cover`() {
+        val parsed = CatalogConfigRepository.parseCatalogConfig(
+            """{"franchises":[],"overrides":{
+                "titles":{"collection_movie_genre_action":"Action & Spannung","collection_service_netflix":"Netflix HD"},
+                "intros":{"collection_service_netflix":"https://example.com/n.mp4","collection_service_hulu":"http://example.com/h.mp4"},
+                "covers":{"collection_movie_genre_action":"https://example.com/a.jpg"},
+                "newCollections":[
+                  {"id":"arte-tv","title":"Arte","coverUrl":"https://example.com/arte.jpg","introUrl":"https://example.com/arte.mp4","providers":[234,234],"mdblist":["me/arte"],"region":"fr"},
+                  {"id":"50s","group":"DECADE","title":"50's Movies","coverUrl":"https://example.com/50s.jpg","introUrl":"https://example.com/ignored.mp4","providers":[7],"mdblist":["snoak/popular-1950s-movies"]},
+                  {"id":"empty-decade","group":"DECADE","title":"No list","providers":[7]},
+                  {"id":"odd","group":"GENRE","title":"Odd","mdblist":["me/x"]},
+                  {"id":"bad","title":"Nothing","providers":[],"mdblist":[]},
+                  {"id":"x","title":"Short id","providers":[1]}]}}"""
+        )!!
+        assertEquals(listOf("arte-tv", "50s"), parsed.overrides.newCollections.map { it.id })
+        assertEquals("FR", parsed.overrides.newCollections.first().region)
+
+        val result = CatalogConfigRepository.applyCentralConfig(defaults, parsed)
+        val ids = result.map { it.id }
+        val lastService = ids.indexOfLast { id -> result.first { it.id == id }.collectionGroup == com.arflix.tv.data.model.CollectionGroupKind.SERVICE && result.first { it.id == id }.kind == CatalogKind.COLLECTION }
+        assertEquals("collection_service_arte_tv", ids[lastService])
+        val arte = result[lastService]
+        assertEquals("Arte", arte.title)
+        assertEquals("https://example.com/arte.mp4", arte.collectionHeroVideoUrl)
+        assertEquals(listOf(234, 234), arte.collectionSources.mapNotNull { it.tmdbWatchProviderId })
+        assertEquals(listOf("movie", "series"), arte.collectionSources.mapNotNull { it.mediaType }.take(2))
+        assertEquals("FR", arte.collectionSources.first().watchRegion)
+        assertEquals(listOf("me/arte"), arte.collectionSources.mapNotNull { it.mdblistSlug })
+
+        val action = result.single { it.id == "collection_movie_genre_action" }
+        assertEquals("Action & Spannung", action.title)
+        assertEquals("https://example.com/a.jpg", action.collectionCoverImageUrl)
+        val netflix = result.single { it.id == "collection_service_netflix" }
+        assertEquals("Netflix HD", netflix.title)
+        assertEquals("https://example.com/n.mp4", netflix.collectionHeroVideoUrl)
+        // A non-https intro is ignored and keeps the bundled clip.
+        assertEquals(
+            defaults.single { it.id == "collection_service_hulu" }.collectionHeroVideoUrl,
+            result.single { it.id == "collection_service_hulu" }.collectionHeroVideoUrl
+        )
+        val decade = result[result.indexOfLast { it.kind == CatalogKind.COLLECTION && it.collectionGroup == com.arflix.tv.data.model.CollectionGroupKind.DECADE }]
+        assertEquals("collection_decade_50s", decade.id)
+        assertEquals("50's Movies", decade.title)
+        assertEquals(listOf("snoak/popular-1950s-movies"), decade.collectionSources.mapNotNull { it.mdblistSlug })
+        assertTrue(decade.collectionSources.none { it.kind == CollectionSourceKind.TMDB_WATCH_PROVIDER })
+        assertNull(decade.collectionHeroVideoUrl)
+        assertEquals(defaults.size + 2, result.size)
+
+        RemoteFranchiseIds.ids = parsed.overrides.newCollections.map { it.catalogId }.toSet()
+        assertTrue(CollectionTemplateManifest.isValidCollectionConfig(decade))
+        assertTrue(CollectionTemplateManifest.isValidCollectionConfig(arte))
+    }
+
+    @Test
     fun `a created franchise is a valid collection only while the central config lists it`() {
         val ghibli = defaults.single { it.id == marvelId }.copy(id = "collection_franchise_ghibli")
         assertFalse(CollectionTemplateManifest.isValidCollectionConfig(ghibli))

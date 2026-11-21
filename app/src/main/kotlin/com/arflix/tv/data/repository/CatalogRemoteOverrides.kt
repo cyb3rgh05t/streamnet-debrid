@@ -77,7 +77,12 @@ internal fun applyCentralOverrides(bundled: CatalogConfig, overrides: CentralOve
     val withSources = overrides.sources[bundled.id]?.let {
         withCover.copy(collectionSources = replaceListSources(withCover.collectionSources, it))
     } ?: withCover
-    return appendRemoteExtraRefs(withSources, overrides.extras[bundled.id])
+    val isCollection = bundled.kind == CatalogKind.COLLECTION
+    val introUrl = overrides.intros[bundled.id]?.trim()?.takeIf(::isPlainHttpsUrl)
+    val withIntro = if (introUrl != null && isCollection) withSources.copy(collectionHeroVideoUrl = introUrl) else withSources
+    val title = overrides.titles[bundled.id]?.trim()?.takeIf { it.length in 2..60 }
+    val withTitle = if (title != null && isCollection) withIntro.copy(title = title) else withIntro
+    return appendRemoteExtraRefs(withTitle, overrides.extras[bundled.id])
 }
 
 private fun isPlainHttpsUrl(url: String): Boolean {

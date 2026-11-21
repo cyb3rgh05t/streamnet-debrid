@@ -51,6 +51,7 @@ class GenreFanartRepository @Inject constructor(
         val movieById = movieEntries.await().associateBy { it.id }
         val tvById = tvEntries.await().associateBy { it.id }
 
+        val central = CurrentCentralConfig.value.overrides
         catalogs.map { catalog ->
             val entries = when (catalog.collectionGroup) {
                 CollectionGroupKind.MOVIE_GENRE -> movieById
@@ -60,9 +61,12 @@ class GenreFanartRepository @Inject constructor(
             val genreId = catalog.collectionSources.firstNotNullOfOrNull { it.tmdbGenreId }
                 ?: return@map catalog
             val entry = entries[genreId] ?: return@map catalog
-            val artworkUrl = tmdbGenreFanartUrl(entry.backdrops, genreId)
+            // A name or cover the admin set centrally wins over what the genre API delivers.
+            val keepTitle = !central.titles[catalog.id].isNullOrBlank()
+            val keepCover = !central.covers[catalog.id].isNullOrBlank()
+            val artworkUrl = if (keepCover) null else tmdbGenreFanartUrl(entry.backdrops, genreId)
             catalog.copy(
-                title = entry.name.trim().ifBlank { catalog.title },
+                title = if (keepTitle) catalog.title else entry.name.trim().ifBlank { catalog.title },
                 collectionCoverImageUrl = artworkUrl ?: catalog.collectionCoverImageUrl,
                 collectionFocusGifUrl = artworkUrl ?: catalog.collectionFocusGifUrl,
                 collectionHeroImageUrl = artworkUrl ?: catalog.collectionHeroImageUrl,

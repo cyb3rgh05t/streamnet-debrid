@@ -68,12 +68,29 @@ internal data class CentralRow(val id: String, val title: String, val url: Strin
     val catalogId: String get() = CENTRAL_ROW_PREFIX + id.replace('-', '_')
 }
 
+/** A collection the admin added for everyone: a streaming service (TMDB watch providers, MDBList lists) or a decade (MDBList lists). */
+internal data class CentralCollection(
+    val id: String,
+    val group: CollectionGroupKind,
+    val title: String,
+    val coverUrl: String?,
+    val introUrl: String?,
+    val providers: List<Int>,
+    val mdblist: List<String>,
+    val region: String = "US"
+) {
+    val catalogId: String get() = "collection_${group.name.lowercase()}_" + id.replace('-', '_')
+}
+
 /** Admin overrides of the standard catalogs, valid for every device. */
 internal data class CentralOverrides(
     val rows: Map<String, String> = emptyMap(),
     val hidden: Set<String> = emptySet(),
     val newRows: List<CentralRow> = emptyList(),
     val covers: Map<String, String> = emptyMap(),
+    val intros: Map<String, String> = emptyMap(),
+    val titles: Map<String, String> = emptyMap(),
+    val newCollections: List<CentralCollection> = emptyList(),
     val sources: Map<String, CentralSources> = emptyMap(),
     val extras: Map<String, List<String>> = emptyMap()
 )
@@ -131,7 +148,8 @@ class CatalogConfigRepository @Inject constructor(
     private fun publish(parsed: CentralCatalogConfig) {
         config = parsed
         CurrentCentralConfig.value = parsed
-        RemoteFranchiseIds.ids = parsed.franchises.filterNot { it.builtin }.mapTo(HashSet()) { it.catalogId }
+        RemoteFranchiseIds.ids = parsed.franchises.filterNot { it.builtin }.mapTo(HashSet()) { it.catalogId } +
+            parsed.overrides.newCollections.map { it.catalogId }
     }
 
     private fun refreshIfDue() {
@@ -250,6 +268,38 @@ class CatalogConfigRepository @Inject constructor(
                     CentralRow(id, title, url, row.get("after")?.takeIf { !it.isJsonNull }?.asString?.trim().orEmpty())
                 }.take(20),
                 covers = strings("covers"),
+                intros = strings("intros"),
+                titles = strings("titles"),
+                newCollections = overrides.getAsJsonArray("newCollections").orEmpty().mapNotNull { element ->
+                    val entry = runCatching { element.asJsonObject }.getOrNull() ?: return@mapNotNull null
+                    val group = when (entry.get("group")?.takeIf { !it.isJsonNull }?.asString?.trim()?.uppercase() ?: "SERVICE") {
+                        "SERVICE" -> CollectionGroupKind.SERVICE
+                        "DECADE" -> CollectionGroupKind.DECADE
+                        else -> return@mapNotNull null
+                    }
+                    val id = entry.get("id")?.asString?.trim().orEmpty()
+                    val title = entry.get("title")?.asString?.trim().orEmpty().take(MAX_TITLE_LENGTH)
+                    val providers = entry.getAsJsonArray("providers").orEmpty()
+                        .mapNotNull { runCatching { it.asInt }.getOrNull()?.takeIf { value -> value > 0 } }.distinct().take(10)
+                    val lists = entry.getAsJsonArray("mdblist").orEmpty()
+                        .mapNotNull { runCatching { it.asString.trim() }.getOrNull()?.takeIf(mdblistSlugPattern::matches) }
+                        .distinct().take(5)
+                    val hasSources = if (group == CollectionGroupKind.DECADE) lists.isNotEmpty() else providers.isNotEmpty() || lists.isNotEmpty()
+                    if (!franchiseIdPattern.matches(id) || title.isBlank() || !hasSources) return@mapNotNull null
+                    CentralCollection(
+                        id = id,
+                        group = group,
+                        title = title,
+                        coverUrl = entry.get("coverUrl")?.takeIf { !it.isJsonNull }?.asString?.trim()?.takeIf(::isPlainHttps),
+                        introUrl = if (group == CollectionGroupKind.SERVICE) {
+                            entry.get("introUrl")?.takeIf { !it.isJsonNull }?.asString?.trim()?.takeIf(::isPlainHttps)
+                        } else null,
+                        providers = if (group == CollectionGroupKind.SERVICE) providers else emptyList(),
+                        mdblist = lists,
+                        region = entry.get("region")?.takeIf { !it.isJsonNull }?.asString?.trim()?.uppercase()
+                            ?.takeIf { it.matches(Regex("^[A-Z]{2}$")) } ?: "US"
+                    )
+                }.distinctBy { it.catalogId }.take(20),
                 sources = overrides.getAsJsonObject("sources")?.entrySet()?.mapNotNull { (catalogId, value) ->
                     val item = runCatching { value.asJsonObject }.getOrNull() ?: return@mapNotNull null
                     val tmdb = item.getAsJsonArray("tmdbCollections")?.mapNotNull { runCatching { it.asInt }.getOrNull()?.takeIf { id -> id > 0 } }
@@ -279,15 +329,64 @@ class CatalogConfigRepository @Inject constructor(
         internal fun applyCentralConfig(defaults: List<CatalogConfig>, config: CentralCatalogConfig): List<CatalogConfig> {
             val adjusted = defaults.filterNot { it.id in config.overrides.hidden }.map { applyToBundled(it, config) }
                 .let { withCentralRows(it, config.overrides.newRows) }
+            val addedCollections = config.overrides.newCollections
+                .filter { entry -> adjusted.none { it.id == entry.catalogId } }
+                .map { applyCentralOverrides(collectionCatalog(it), config.overrides) }
             val created = config.franchises.filterNot { it.builtin }
                 .filter { franchise -> adjusted.none { it.id == franchise.catalogId } }
                 .map { applyCentralOverrides(franchiseCatalog(it), config.overrides) }
-            if (created.isEmpty()) return adjusted
-            val lastFranchise = adjusted.indexOfLast {
-                it.kind == CatalogKind.COLLECTION && it.collectionGroup == CollectionGroupKind.FRANCHISE
+            val withCollections = listOf(CollectionGroupKind.SERVICE, CollectionGroupKind.DECADE).fold(adjusted) { list, group ->
+                insertAfterGroup(list, group, addedCollections.filter { it.collectionGroup == group })
             }
-            val insertAt = if (lastFranchise >= 0) lastFranchise + 1 else adjusted.size
-            return adjusted.take(insertAt) + created + adjusted.drop(insertAt)
+            return insertAfterGroup(withCollections, CollectionGroupKind.FRANCHISE, created)
+        }
+
+        /** Places [added] behind the last collection of [group], or at the end when the group has none. */
+        private fun insertAfterGroup(
+            catalogs: List<CatalogConfig>,
+            group: CollectionGroupKind,
+            added: List<CatalogConfig>
+        ): List<CatalogConfig> {
+            if (added.isEmpty()) return catalogs
+            val last = catalogs.indexOfLast { it.kind == CatalogKind.COLLECTION && it.collectionGroup == group }
+            val insertAt = if (last >= 0) last + 1 else catalogs.size
+            return catalogs.take(insertAt) + added + catalogs.drop(insertAt)
+        }
+
+        private fun collectionCatalog(service: CentralCollection): CatalogConfig {
+            val sources = buildList {
+                service.providers.forEach { provider ->
+                    for (type in listOf("movie", "series")) {
+                        add(
+                            CollectionSourceConfig(
+                                kind = CollectionSourceKind.TMDB_WATCH_PROVIDER,
+                                mediaType = type,
+                                tmdbWatchProviderId = provider,
+                                watchRegion = service.region,
+                                sortBy = "popularity.desc"
+                            )
+                        )
+                    }
+                }
+                service.mdblist.forEach { add(CollectionSourceConfig(kind = CollectionSourceKind.MDBLIST_PUBLIC, mdblistSlug = it)) }
+            }
+            return CatalogConfig(
+                id = service.catalogId,
+                title = service.title,
+                sourceType = CatalogSourceType.PREINSTALLED,
+                isPreinstalled = true,
+                kind = CatalogKind.COLLECTION,
+                collectionGroup = service.group,
+                collectionDescription = if (service.group == CollectionGroupKind.SERVICE) "Trending movies and series on ${service.title}." else null,
+                collectionCoverImageUrl = service.coverUrl,
+                collectionFocusGifUrl = service.coverUrl,
+                collectionHeroImageUrl = service.coverUrl,
+                collectionHeroGifUrl = service.coverUrl,
+                collectionHeroVideoUrl = service.introUrl,
+                collectionTileShape = CollectionTileShape.LANDSCAPE,
+                collectionHideTitle = service.coverUrl != null,
+                collectionSources = sources
+            )
         }
 
         /** Adds the rows the admin created, each after the row it names (or at the end). */
