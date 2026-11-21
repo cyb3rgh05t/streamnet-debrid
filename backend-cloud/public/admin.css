@@ -2350,7 +2350,7 @@ tbody tr[data-account-id]:focus .account-primary {
 /* Remote Config: central catalog configuration */
 .rc-tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 22px 0;
 }
@@ -2366,6 +2366,86 @@ tbody tr[data-account-id]:focus .account-primary {
 .rc-heading {
   margin: 28px 0 10px;
   font-size: 15px;
+}
+.rc-help {
+  max-width: none;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.rc-help strong,
+.rc-help code {
+  color: var(--text);
+}
+.rc-help ul,
+.rc-help ol {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+.rc-help li {
+  margin-bottom: 6px;
+}
+.rc-help-table {
+  width: 100%;
+  table-layout: fixed;
+  white-space: normal;
+  margin: 8px 0 12px;
+  border-collapse: collapse;
+}
+.rc-help .rc-heading {
+  color: var(--text);
+}
+.rc-help-table th,
+.rc-help-table td {
+  padding: 8px 12px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.12));
+  text-align: left;
+  vertical-align: top;
+}
+.rc-account-slot {
+  margin-top: 12px;
+}
+.rc-inventory {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.rc-inventory > .rc-hint,
+.rc-inventory > .button {
+  grid-column: 1 / -1;
+  justify-self: start;
+}
+.rc-inv-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+.rc-inv-head {
+  display: grid;
+  gap: 2px;
+}
+.rc-inv-head strong {
+  color: var(--accent);
+  font-size: 15px;
+}
+.rc-inv-head small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.rc-inv-card progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--accent);
+}
+.rc-inv-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
 }
 .rc-split {
   display: grid;
@@ -2612,17 +2692,83 @@ tbody tr[data-account-id]:focus .account-primary {
 }
 .rc-list {
   display: grid;
+  gap: 22px;
+}
+.rc-list-section {
+  display: grid;
   gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.02);
+}
+.rc-list-section h4 {
+  margin: 0;
+  font-size: 14px;
+}
+.rc-list-section > .rc-hint {
+  margin: 0 0 8px;
 }
 .rc-list-row {
   display: grid;
-  grid-template-columns: minmax(160px, 1fr) minmax(0, 2fr);
-  gap: 12px;
+  grid-template-columns: minmax(200px, 280px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.rc-list-section > .rc-hint + .rc-list-row {
+  border-top: 0;
+}
+.rc-list-row .rc-row-check {
   align-items: center;
+  min-height: 38px;
+}
+.rc-list-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.rc-list-input {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+}
+.rc-copy {
+  margin-left: 4px;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rc-list-input .rc-copy {
+  margin-left: 0;
+  padding: 0 14px;
+}
+.rc-copy:hover {
+  border-color: var(--line-strong);
+}
+.rc-hint a {
+  color: var(--accent);
+}
+
+.rc-source-info.is-changed {
+  color: var(--accent);
 }
 .rc-list-label strong,
 .rc-list-label small {
   display: block;
+  overflow-wrap: anywhere;
+}
+.rc-help-table td,
+.rc-help-table th {
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 .rc-list-label small {
@@ -2643,6 +2789,22 @@ tbody tr[data-account-id]:focus .account-primary {
   .rc-newrow,
   .rc-list-row,
   .rc-source-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Account page tabs */
+.account-tabs {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 8px;
+}
+@media (max-width: 1100px) {
+  .account-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 800px) {
+  .account-tabs {
     grid-template-columns: minmax(0, 1fr);
   }
 }

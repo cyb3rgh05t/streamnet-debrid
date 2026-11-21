@@ -628,54 +628,16 @@ export function prepareAdminGlobalMutation(request) {
     "add_playlist", "edit_playlist", "delete_playlist", "clear_playlists",
     "change_xtream_host", "clear_streamnet_host_override",
     "add_catalog", "rename_catalog", "set_catalog_enabled", "delete_catalog",
-    "set_catalog_source", "clear_catalog_source", "set_catalog_slug", "remove_obsolete_catalogs",
-    "add_catalog_item", "remove_catalog_item", "set_catalog_addon",
+    "clear_catalog_source", "remove_obsolete_catalogs",
   ]);
   if (!allowed.has(operation)) throw new Error("Unsupported operation");
   const targetId = operation === "clear_streamnet_host_override"
     ? "streamnet_tv"
     : /^(edit|delete|rename|set)_/.test(operation) || operation === "clear_catalog_source" ||
-        operation === "change_xtream_host" || operation.endsWith("_catalog_item")
+        operation === "change_xtream_host"
     ? cleanIdentifier(request.targetId, operation.endsWith("addon") ? "Addon id" : operation.includes("catalog") ? "Catalog id" : "Playlist id")
     : null;
   let data = null;
-  if (operation === "set_catalog_addon") {
-    const input = isPlainObject(request.data) ? request.data : {};
-    const token = (value, label) => {
-      const text = String(value ?? "").trim();
-      if (!addonTokenPattern.test(text)) throw new Error(`${label} is invalid`);
-      return text;
-    };
-    data = {
-      fromType: String(input.fromType || "").trim(),
-      fromCatalogId: token(input.fromCatalogId, "Current addon catalog"),
-      addonCatalogId: token(input.addonCatalogId, "Addon catalog"),
-    };
-    if (!addonTypePattern.test(data.fromType)) throw new Error("Current addon catalog type is invalid");
-    const type = String(input.addonCatalogType || "").trim();
-    if (type) {
-      if (!addonTypePattern.test(type)) throw new Error("Addon catalog type is invalid");
-      data.addonCatalogType = type;
-    }
-    if (String(input.addonId || "").trim()) data.addonId = token(input.addonId, "Addon id");
-    if (String(input.addonManifestUrl || "").trim()) {
-      data.addonManifestUrl = normalizeAddonManifestUrl(input.addonManifestUrl);
-    }
-  }
-  if (operation.endsWith("_catalog_item")) {
-    if (!franchiseCatalogPattern.test(targetId)) throw new Error("Titles can only be added to franchise collections");
-    data = { ref: normalizeTmdbRef(request.data?.ref) };
-  }
-  if (operation === "set_catalog_source") {
-    data = { sourceUrl: normalizeAdminListUrl("MDBLIST", mdblistUrlInput(request.data?.sourceUrl)).sourceUrl.replace(/^http:/i, "https:") };
-  }
-  if (operation === "set_catalog_slug") {
-    const fromSlug = String(request.data?.fromSlug || "").trim();
-    if (!mdblistSlugPattern.test(fromSlug)) throw new Error("Current MDBList list is invalid");
-    // Accepts a full list URL or "user/list"; both name the same list.
-    const { parts } = normalizeAdminListUrl("MDBLIST", mdblistUrlInput(request.data?.mdblistSlug));
-    data = { fromSlug, mdblistSlug: `${parts[1]}/${parts[2]}` };
-  }
   if (operation === "rename_catalog") {
     data = { title: cleanIdentifier(request.data?.title, "Catalog title") };
   }
@@ -744,39 +706,6 @@ const franchiseCatalogPattern = /^collection_franchise_[A-Za-z0-9_.-]{1,100}$/;
 const addonTokenPattern = /^[A-Za-z0-9_.:-]{1,100}$/;
 const addonTypePattern = /^[a-z]{1,20}$/;
 
-/** The app fetches this manifest itself, so only a plain https manifest link without credentials is accepted. */
-function normalizeAddonManifestUrl(value) {
-  let url;
-  try {
-    url = new URL(String(value || "").trim());
-  } catch {
-    throw new Error("Addon manifest URL is invalid");
-  }
-  if (url.protocol !== "https:" || url.username || url.password || !url.pathname.endsWith("manifest.json") ||
-      url.toString().length > 500) {
-    throw new Error("Addon manifest URL is invalid");
-  }
-  return url.toString();
-}
-const maxExtraRefs = 30;
-
-/** A TMDB title as the admin wrote it: "tv:84773", "movie:120" or a themoviedb.org title URL. */
-export function normalizeTmdbRef(value) {
-  const raw = String(value || "").trim();
-  const short = /^(movie|tv):(\d{1,9})$/i.exec(raw);
-  if (short) return `${short[1].toLowerCase()}:${Number(short[2])}`;
-  try {
-    const url = new URL(raw);
-    const match = /^\/(movie|tv)\/(\d{1,9})(?:-[^/]*)?\/?$/.exec(url.pathname);
-    if (url.protocol === "https:" && (url.hostname === "themoviedb.org" || url.hostname === "www.themoviedb.org") && match) {
-      return `${match[1]}:${Number(match[2])}`;
-    }
-  } catch {
-    // Falls through to the error below.
-  }
-  throw new Error("TMDB title is invalid (use tv:ID, movie:ID or a themoviedb.org link)");
-}
-
 // Collections the app no longer ships (dropped 2026-09-02; the app discards them on its next start)
 // and MDBList lists it replaced. Accounts last written by an older app version still carry them.
 const obsoleteCatalogIdPattern = /^collection_(network|studio|featured)_/;
@@ -802,12 +731,6 @@ function withoutObsoleteSources(catalog) {
   const next = { ...catalog, collectionSources: kept };
   if (overrides !== undefined) next.remoteSlugOverrides = overrides;
   return next;
-}
-
-/** A MDBList list as the admin typed it: full URL or "user/list". */
-function mdblistUrlInput(value) {
-  const raw = String(value || "").trim();
-  return mdblistSlugPattern.test(raw) ? `https://mdblist.com/lists/${raw}` : raw;
 }
 
 export function normalizeAdminListUrl(sourceType, rawValue) {
@@ -938,15 +861,6 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
           payload[root] = { ...payload[root], [profileId]: ids.filter((id) => !obsoleteCatalogIdPattern.test(String(id))) };
         }
       }
-    } else if (operation === "add_catalog_item" || operation === "remove_catalog_item") {
-      if (!franchiseCatalogPattern.test(String(targetId))) continue;
-      const refs = Array.isArray(target.remoteExtraRefs) ? target.remoteExtraRefs.map(String) : [];
-      const updated = operation === "add_catalog_item"
-        ? [...new Set([...refs, data.ref])].slice(0, maxExtraRefs)
-        : refs.filter((ref) => ref !== data.ref);
-      const { remoteExtraRefs: _previous, ...rest } = target;
-      // Not remoteManaged: that flag would also freeze the collection's title and visibility.
-      next = upsertById(current, updated.length ? { ...rest, remoteExtraRefs: updated } : rest);
     } else if (operation === "add_catalog") {
       if (!data.id) throw new Error("Catalog template is unavailable");
       assertSafeKeys(data);
@@ -965,66 +879,10 @@ function applyGlobalCatalogMutation(payload, mutation, now) {
       const catalog = { ...target, enabled: data.enabled, remoteManaged: true };
       next = upsertById(current, catalog);
       setCatalogHidden(payload, profileId, catalog, !data.enabled);
-    } else if (operation === "set_catalog_source") {
-      // Only list-backed bundled rows carry a list URL; anything else is skipped for this account.
-      if (!bundledMdblistHomeIds.has(String(targetId)) || catalogType(target) !== "MDBLIST" || !target.sourceUrl) continue;
-      next = upsertById(current, {
-        ...target, sourceUrl: data.sourceUrl, sourceRef: `mdblist:${data.sourceUrl}`,
-        remoteSourceUrl: data.sourceUrl, remoteManaged: true,
-      });
-    } else if (operation === "set_catalog_slug") {
-      const sources = Array.isArray(target.collectionSources) ? target.collectionSources : [];
-      const matches = (source) => source?.kind === "MDBLIST_PUBLIC" && source.mdblistSlug === data.fromSlug;
-      if (!sources.some(matches)) continue;
-      const nextSources = sources.map((source) =>
-        matches(source) ? { ...source, mdblistSlug: data.mdblistSlug } : source);
-      // Overrides map the app's bundled slug to the new one. A chained change (A->B, then B->C)
-      // updates the existing entry instead of adding B->C, which the app could never match.
-      const overrides = { ...(isPlainObject(target.remoteSlugOverrides) ? target.remoteSlugOverrides : {}) };
-      const chained = Object.keys(overrides).filter((key) => overrides[key] === data.fromSlug);
-      for (const key of chained.length ? chained : [data.fromSlug]) overrides[key] = data.mdblistSlug;
-      for (const key of Object.keys(overrides)) if (key === overrides[key]) delete overrides[key];
-      const { remoteCollectionSources: _legacy, ...rest } = target;
-      next = upsertById(current, {
-        ...rest, collectionSources: nextSources, remoteSlugOverrides: overrides, remoteManaged: true,
-      });
-    } else if (operation === "set_catalog_addon") {
-      const sources = Array.isArray(target.collectionSources) ? target.collectionSources : [];
-      const matches = (source) => source?.kind === "ADDON_CATALOG" &&
-        source.addonCatalogType === data.fromType && source.addonCatalogId === data.fromCatalogId;
-      if (!sources.some(matches)) continue;
-      const replacement = {
-        addonCatalogId: data.addonCatalogId,
-        ...(data.addonCatalogType ? { addonCatalogType: data.addonCatalogType } : {}),
-        ...(data.addonId ? { addonId: data.addonId } : {}),
-        ...(data.addonManifestUrl ? { addonManifestUrl: data.addonManifestUrl } : {}),
-      };
-      const nextSources = sources.map((source) => matches(source) ? { ...source, ...replacement } : source);
-      // Overrides map the app's bundled "type|catalogId" to the new target. A chained change updates
-      // the existing entry, because the app can only match the bundled key.
-      const overrides = { ...(isPlainObject(target.remoteAddonOverrides) ? target.remoteAddonOverrides : {}) };
-      const chained = Object.keys(overrides).filter((key) => {
-        const value = overrides[key] || {};
-        return (value.addonCatalogType || key.split("|")[0]) === data.fromType && value.addonCatalogId === data.fromCatalogId;
-      });
-      for (const key of chained.length ? chained : [`${data.fromType}|${data.fromCatalogId}`]) {
-        overrides[key] = { ...(overrides[key] || {}), ...replacement };
-      }
-      for (const key of Object.keys(overrides)) {
-        const value = overrides[key];
-        const [type, catalogId] = key.split("|");
-        if ((value.addonCatalogType || type) === type && value.addonCatalogId === catalogId &&
-            !value.addonId && !value.addonManifestUrl) delete overrides[key];
-      }
-      const { remoteAddonOverrides: _oldAddons, ...base } = target;
-      next = upsertById(current, {
-        ...base, collectionSources: nextSources, remoteManaged: true,
-        ...(Object.keys(overrides).length ? { remoteAddonOverrides: overrides } : {}),
-      });
     } else if (operation === "clear_catalog_source") {
       const {
         remoteSourceUrl: _url, remoteSlugOverrides: _slugs, remoteCollectionSources: _legacy,
-        remoteAddonOverrides: _addons, ...rest
+        remoteAddonOverrides: _addons, remoteExtraRefs: _extras, ...rest
       } = target;
       // The app restores the bundled list on its next sync; the stored values stay until then.
       next = upsertById(current, rest);

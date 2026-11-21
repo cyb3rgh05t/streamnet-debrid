@@ -1,0 +1,13 @@
+collection_service_netflix | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/netflix.mp4
+collection_service_disneyplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/disneyplus.mp4
+collection_service_apple_tvplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/appletv.mp4
+collection_service_prime_video | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/amazonprime.mp4
+collection_service_hbo_max | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/hbomax.mp4
+collection_service_hulu | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/hulu.mp4
+collection_service_paramountplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/paramount.mp4
+collection_service_peacock | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/peacock.mp4
+collection_service_starz | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/starz.mp4
+collection_service_shudder | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/shudder.mp4
+collection_service_mgmplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/mgm.mp4
+collection_service_discoveryplus | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/discovery.mp4
+collection_service_crunchyroll | https://raw.githubusercontent.com/cyb3rgh05t/networks-video-collection/3b8094a6d97084a54dfbe7779f904886e801a3fb/videos/networks%20videos/crunchyroll.mp4

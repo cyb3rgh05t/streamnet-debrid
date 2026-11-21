@@ -6,8 +6,19 @@ import { catalogIdFor, mdblistListInfo, loadSeed, loadStandards, validateFranchi
 
 // Demo state of the central catalog configuration (not persisted).
 const franchiseSaved = new Map();
-let overridesSaved = { rows: {}, slugs: {}, extras: {} };
-let overridesUpdatedAt = null;
+let overridesSaved = {
+  rows: { trending_movies: "https://mdblist.com/lists/demo/trending-now" },
+  slugs: {},
+  extras: {},
+  covers: { collection_franchise_james_bond: "https://image.tmdb.org/t/p/w500/demo-bond.jpg" },
+  sources: {
+    collection_franchise_terminator: { curated: ["tv:433"] },
+    collection_franchise_hunger_games: { curated: ["movie:101299", "movie:101300"] },
+  },
+  hidden: ["just_added"],
+  newRows: [{ id: "top-horror", title: "Top Horror", url: "https://mdblist.com/lists/demo/top-horror", mediaType: "movie", after: "trending_movies" }],
+};
+let overridesUpdatedAt = new Date().toISOString();
 
 const publicDirectory = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -370,8 +381,8 @@ const server = createServer(async (request, reply) => {
             overridesUpdatedAt,
             updatedAt: stamps.at(-1) ?? null,
             builtinFranchiseIds: Object.keys(seed),
-            standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources }) =>
-              ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources, sourceCount: sources.length })),
+            standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, introUrl, mdblist, tmdbCollections, providers, curated, sources }) =>
+              ({ id, title, kind, group, sourceUrl, coverUrl, introUrl, mdblist, tmdbCollections, providers, curated, sources, sourceCount: sources.length })),
           });
         }
         if (parts[2] === "list-info" && request.method === "GET") {
@@ -408,7 +419,14 @@ const server = createServer(async (request, reply) => {
       } catch (error) {
         return json(reply, error.statusCode || 500, { error: error.message });
       }
-    }    if (request.method === "GET" && url.pathname === "/admin-api/global") {
+    }
+    if (request.method === "GET" && url.pathname === "/admin-api/global/default-catalogs") {
+      return json(reply, 200, { catalogs: [] });
+    }
+    if (request.method === "GET" && url.pathname === "/admin-api/global/mdblist-titles") {
+      return json(reply, 200, { titles: {} });
+    }
+    if (request.method === "GET" && url.pathname === "/admin-api/global") {
       return json(reply, 200, {
         total: 128,
         configurable: 116,
@@ -417,7 +435,10 @@ const server = createServer(async (request, reply) => {
           { id: "streamnet_tv", name: "StreamNet TV", accountCount: 84 },
           { id: "demo-playlist", name: "Demo-Playlist", accountCount: 32 },
         ],
-        addons: [{ id: "demo-addon", name: "Demo-Add-on", accountCount: 72 }],
+        addons: [
+          { id: "opensubtitles", name: "OpenSubtitles v3", accountCount: 110 },
+          { id: "demo-addon", name: "Demo-Add-on", accountCount: 72 },
+        ],
         catalogs: [
           {
             id: "demo-trakt",

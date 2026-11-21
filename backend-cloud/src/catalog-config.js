@@ -11,6 +11,7 @@ import { mdblistSlugPattern, normalizeAdminListUrl } from "./admin-snapshots.js"
 const seedUrl = new URL("./franchise-lists.seed.json", import.meta.url);
 const standardsUrl = new URL("./standard-catalogs.txt", import.meta.url);
 const coversUrl = new URL("./standard-covers.txt", import.meta.url);
+const introsUrl = new URL("./standard-intros.txt", import.meta.url);
 
 const refPattern = /^(movie|tv):\d{1,9}$/;
 const tabs = ["movie", "series", "timeline"];
@@ -18,24 +19,31 @@ const maxEntries = 500;
 const maxTitle = 120;
 const maxExtraRefs = 30;
 const maxNewRows = 20;
+const maxNewCollections = 20;
+const newCollectionGroups = ["SERVICE", "DECADE"];
 const customIdPattern = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;
 
 let cached = null;
 async function loadStatic() {
   cached ??= (async () => {
     const seed = JSON.parse(await readFile(seedUrl, "utf8")).lists;
-    const covers = new Map((await readFile(coversUrl, "utf8")).split(/\r?\n/).filter(Boolean).map((line) => {
-      const [id, ...url] = line.split(" | ");
-      return [id, url.join(" | ")];
+    const pairs = async (url) => new Map((await readFile(url, "utf8")).split(/\r?\n/).filter(Boolean).map((line) => {
+      const [id, ...value] = line.split(" | ");
+      return [id, value.join(" | ")];
     }));
+    const covers = await pairs(coversUrl);
+    const intros = await pairs(introsUrl);
     const standards = (await readFile(standardsUrl, "utf8")).split(/\r?\n/).filter(Boolean).map((line) => {
       const [id, title, kind, group, sourceUrl, sources = ""] = line.split(" | ");
       const parts = sources.split(" ; ").filter(Boolean);
       return {
         id, title, kind, group, sourceUrl,
         coverUrl: covers.get(id) ?? "",
+        introUrl: intros.get(id) ?? "",
         mdblist: parts.filter((s) => s.startsWith("mdblist:")).map((s) => s.slice(8)),
         tmdbCollections: parts.filter((s) => s.startsWith("tmdbCollection:")).map((s) => Number(s.slice(15))),
+        // TMDB watch providers of a streaming service (the same id usually appears for movies and series).
+        providers: [...new Set(parts.filter((s) => s.startsWith("provider:")).map((s) => Number(s.split(":")[1])))],
         // Titles the app ships outside the Movies / Series / Timeline lists (e.g. the Harry Potter series).
         curated: parts.filter((s) => s.startsWith("curated@:")).flatMap((s) => s.slice(9).split(",")).filter(Boolean),
         sources: parts,
@@ -160,6 +168,22 @@ export function validateOverrides(body, standards) {
     const cover = cleanCoverUrl(url);
     if (cover && cover !== standard.coverUrl) covers[catalogId] = cover;
   }
+  // Intro clip (hero video) of a collection, e.g. the streaming service clips.
+  const intros = {};
+  for (const [catalogId, url] of Object.entries(body?.intros ?? {})) {
+    const standard = collection(catalogId);
+    const intro = cleanCoverUrl(url);
+    if (intro && intro !== standard.introUrl) intros[catalogId] = intro;
+  }
+  // Display name of a collection (the genre names are otherwise delivered by the genre API in the app's language).
+  const titles = {};
+  for (const [catalogId, value] of Object.entries(body?.titles ?? {})) {
+    const standard = collection(catalogId);
+    const title = String(value ?? "").replace(/[\u0000-\u001f]/g, " ").trim();
+    if (!title) continue;
+    if (title.length < 2 || title.length > 60) throw fail(`${standard.title}: name needs 2 to 60 characters`);
+    if (title !== standard.title) titles[catalogId] = title;
+  }
   const sources = {};
   for (const [catalogId, value] of Object.entries(body?.sources ?? {})) {
     const standard = collection(catalogId);
@@ -213,9 +237,42 @@ export function validateOverrides(body, standards) {
     if (after && !byId.has(after) && !newRowsInput.some((other) => String(other?.id ?? "").trim().toLowerCase() === after)) throw fail(`Unknown row to place after: ${after.slice(0, 40)}`);
     return { id, title, url, mediaType, after };
   });
-  return { rows, covers, sources, extras, hidden, newRows };
+  // Collections the admin adds for everyone: a streaming service (TMDB watch providers and/or MDBList lists) or a decade (MDBList lists).
+  const newCollectionsInput = Array.isArray(body?.newCollections) ? body.newCollections : [];
+  if (newCollectionsInput.length > maxNewCollections) throw fail(`At most ${maxNewCollections} added collections`);
+  const seenCollections = new Set();
+  const newCollections = newCollectionsInput.map((entry) => {
+    const group = String(entry?.group ?? "SERVICE").trim().toUpperCase();
+    if (!newCollectionGroups.includes(group)) throw fail(`Collections can only be added to: ${newCollectionGroups.join(", ")}`);
+    const id = String(entry?.id ?? "").trim().toLowerCase();
+    if (!customIdPattern.test(id)) throw fail("Collection id: 3-40 characters, lowercase letters, digits and hyphens");
+    const catalogId = newCollectionCatalogId(group, id);
+    if (seenCollections.has(catalogId) || byId.has(catalogId)) throw fail(`Collection id already used: ${id}`);
+    seenCollections.add(catalogId);
+    const title = String(entry?.title ?? "").replace(/[\u0000-\u001f]/g, " ").trim();
+    if (title.length < 2 || title.length > 60) throw fail("Collection name needs 2 to 60 characters");
+    const providers = cleanIntList(entry?.providers, `${title}: TMDB providers`, 10);
+    const lists = cleanSlugs(entry?.mdblist, `${title}: MDBList lists`, 5);
+    if (group === "DECADE") {
+      if (providers.length) throw fail(`${title}: decades take MDBList lists, not TMDB providers`);
+      if (!lists.length) throw fail(`${title}: add an MDBList list`);
+    } else if (!providers.length && !lists.length) {
+      throw fail(`${title}: add a TMDB provider id or an MDBList list`);
+    }
+    const region = String(entry?.region ?? "US").trim().toUpperCase() || "US";
+    if (!/^[A-Z]{2}$/.test(region)) throw fail(`${title}: region must be a 2-letter country code`);
+    return {
+      id, group, title, coverUrl: cleanCoverUrl(entry?.coverUrl),
+      introUrl: group === "SERVICE" ? cleanCoverUrl(entry?.introUrl) : "", providers, mdblist: lists, region,
+    };
+  });
+  return { rows, covers, intros, titles, sources, extras, hidden, newRows, newCollections };
 }
-const emptyOverrides = () => ({ rows: {}, covers: {}, sources: {}, extras: {}, hidden: [], newRows: [] });
+const emptyOverrides = () => ({ rows: {}, covers: {}, intros: {}, titles: {}, sources: {}, extras: {}, hidden: [], newRows: [], newCollections: [] });
+
+export function newCollectionCatalogId(group, id) {
+  return `collection_${group.toLowerCase()}_${id.replace(/-/g, "_")}`;
+}
 
 function franchiseView(entry, row, builtin) {
   const payload = row?.payload ?? {};
@@ -323,8 +380,8 @@ export function registerCatalogConfigRoutes(app, { pool, authenticateAdmin, list
     return {
       ...config,
       builtinFranchiseIds: Object.keys(seed),
-      standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources }) =>
-        ({ id, title, kind, group, sourceUrl, coverUrl, mdblist, tmdbCollections, curated, sources: sources.map((source) => source.slice(0, 300)), sourceCount: sources.length })),
+      standards: standards.map(({ id, title, kind, group, sourceUrl, coverUrl, introUrl, mdblist, tmdbCollections, providers, curated, sources }) =>
+        ({ id, title, kind, group, sourceUrl, coverUrl, introUrl, mdblist, tmdbCollections, providers, curated, sources: sources.map((source) => source.slice(0, 300)), sourceCount: sources.length })),
     };
   });
 

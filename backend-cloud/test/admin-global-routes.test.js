@@ -422,28 +422,8 @@ test("MDBList list titles are read from the page title, cached, validated and to
   assert.deepEqual(failed.json().titles, { "title-user/down-list": null });
 });
 
-test("catalog list changes accept a MDBList URL or user/list and store the same list", async (t) => {
+test("bundled catalog lists are listed across accounts without rows the app no longer ships", async (t) => {
   const { send, rows } = await fixture(t);
-  const catalog = {
-    id: "collection_decade_20s_movies", title: "20's", isPreinstalled: true, kind: "COLLECTION",
-    collectionSources: [{ kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/top-2020s-movies" }],
-  };
-  rows[0].payload.catalogsByProfile = { main: [catalog] };
-  for (const input of ["me/new-list", "https://mdblist.com/lists/me/new-list?x=1", "mdblist.com/lists/me/new-list"]) {
-    const preview = await send("POST", "/admin-api/global/preview", {
-      operation: "set_catalog_slug", targetId: catalog.id, data: { fromSlug: "snoak/top-2020s-movies", mdblistSlug: input },
-    });
-    assert.equal(preview.statusCode, 200, input);
-    assert.equal(preview.json().changed, 1, input);
-  }
-  const home = await send("POST", "/admin-api/global/preview", {
-    operation: "set_catalog_source", targetId: "trending_movies", data: { sourceUrl: "me/new-list" },
-  });
-  assert.equal(home.statusCode, 200);
-});
-
-test("bundled catalog lists can be redirected, listed and reset across accounts", async (t) => {
-  const { send, rows, queries } = await fixture(t);
   const homeRow = () => ({
     id: "trending_movies", title: "Trending", sourceType: "MDBLIST", isPreinstalled: true, enabled: true,
     sourceUrl: "https://mdblist.com/lists/snoak/trending-movies",
@@ -484,101 +464,33 @@ test("bundled catalog lists can be redirected, listed and reset across accounts"
   assert.deepEqual(byId.collection_decade_2020s.sources[0].variants, [
     { value: "snoak/top-2020s-movies", accounts: 2 },
   ]);
-
-  const request = {
-    operation: "set_catalog_source", targetId: "trending_movies",
-    data: { sourceUrl: "http://www.mdblist.com/lists/me/new-list?x=1" },
-  };
-  const preview = await send("POST", "/admin-api/global/preview", request);
-  assert.equal(preview.statusCode, 200);
-  assert.equal(preview.json().changed, 2);
-  const applied = await send("PATCH", "/admin-api/global/snapshot", {
-    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  assert.equal(applied.statusCode, 200);
-  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
-  assert.equal(updates.length, 2);
-  for (const { values } of updates) {
-    const next = JSON.parse(values[1]);
-    for (const profile of ["main", "kids"]) {
-      const row = next.catalogsByProfile[profile].find((item) => item.id === "trending_movies");
-      assert.equal(row.sourceUrl, "https://www.mdblist.com/lists/me/new-list");
-      assert.equal(row.sourceRef, "mdblist:https://www.mdblist.com/lists/me/new-list");
-      assert.equal(row.remoteSourceUrl, "https://www.mdblist.com/lists/me/new-list");
-      assert.equal(row.remoteManaged, true);
-    }
-    assert.ok(next.catalogsUpdatedAtByProfile.main > 0);
-  }
 });
 
-test("collection MDBList slugs are replaced by slug, whatever the source order, and chain correctly", async (t) => {
-  const { send, rows, queries } = await fixture(t);
-  const catalog = (sources) => ({
-    id: "collection_decade_2020s", title: "2020s", isPreinstalled: true, kind: "COLLECTION", collectionSources: sources,
-  });
-  const genre = { kind: "TMDB_GENRE", tmdbGenreId: 28 };
-  const mdb = (slug) => ({ kind: "MDBLIST_PUBLIC", mdblistSlug: slug });
-  rows[0].payload.catalogsByProfile = { main: [catalog([genre, mdb("snoak/old"), mdb("snoak/other")])] };
-  // Same list at another position in an account written by another app version.
-  rows[1].payload.catalogsByProfile = { main: [catalog([mdb("snoak/old"), genre, mdb("snoak/old")])] };
-  const request = {
-    operation: "set_catalog_slug", targetId: "collection_decade_2020s",
-    data: { fromSlug: "snoak/old", mdblistSlug: "me/new" },
-  };
-  const preview = await send("POST", "/admin-api/global/preview", request);
-  assert.equal(preview.json().changed, 2);
-  const applied = await send("PATCH", "/admin-api/global/snapshot", {
-    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  assert.equal(applied.statusCode, 200);
-  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"))
-    .map(({ values }) => JSON.parse(values[1]).catalogsByProfile.main[0]);
-  assert.deepEqual(updates[0].collectionSources.map((s) => s.mdblistSlug), [undefined, "me/new", "snoak/other"]);
-  assert.deepEqual(updates[1].collectionSources.map((s) => s.mdblistSlug), ["me/new", undefined, "me/new"]);
-  assert.deepEqual(updates[0].remoteSlugOverrides, { "snoak/old": "me/new" });
-  assert.equal(updates[0].collectionSources[0].tmdbGenreId, 28);
-
-  // A second change of the already changed list updates the override instead of adding one the app cannot match.
-  rows[0].payload.catalogsByProfile = { main: [updates[0]] };
-  const chain = { ...request, data: { fromSlug: "me/new", mdblistSlug: "me/newer" } };
-  const chainPreview = await send("POST", "/admin-api/global/preview", chain);
-  assert.equal(chainPreview.json().changed, 2 - 1);
-  await send("PATCH", "/admin-api/global/snapshot", {
-    ...chain, expectedState: chainPreview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  const chained = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).at(-1).values[1])
-    .catalogsByProfile.main[0];
-  assert.deepEqual(chained.remoteSlugOverrides, { "snoak/old": "me/newer" });
-
-  const unknown = await send("POST", "/admin-api/global/preview", { ...request, data: { fromSlug: "x/none", mdblistSlug: "a/b" } });
-  assert.equal(unknown.json().changed, 0);
-  for (const data of [{ fromSlug: "snoak/old", mdblistSlug: "no slug" }, { fromSlug: "bad", mdblistSlug: "a/b" }]) {
-    assert.equal((await send("POST", "/admin-api/global/preview", { ...request, data })).statusCode, 400);
-  }
-  for (const sourceUrl of ["https://evil.example/lists/a/b", "https://mdblist.com/lists/a"]) {
-    const bad = await send("POST", "/admin-api/global/preview", {
-      operation: "set_catalog_source", targetId: "trending_movies", data: { sourceUrl },
-    });
-    assert.equal(bad.statusCode, 400);
-  }
-});
-
-test("clearing a catalog source override removes only the override fields", async (t) => {
+test("clearing a catalog source override removes only the override fields, including titles added per account", async (t) => {
   const { send, rows, queries } = await fixture(t);
   rows[0].payload.catalogsByProfile = { main: [{
     id: "trending_movies", title: "Trending", sourceType: "MDBLIST", isPreinstalled: true, remoteManaged: true,
     sourceUrl: "https://mdblist.com/lists/me/new", remoteSourceUrl: "https://mdblist.com/lists/me/new",
+  }, {
+    id: "collection_franchise_lotr", title: "LotR", isPreinstalled: true, kind: "COLLECTION", remoteExtraRefs: ["tv:84773"],
   }] };
-  const request = { operation: "clear_catalog_source", targetId: "trending_movies" };
-  const preview = await send("POST", "/admin-api/global/preview", request);
-  const applied = await send("PATCH", "/admin-api/global/snapshot", {
-    ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  assert.equal(applied.statusCode, 200);
-  const row = JSON.parse(queries.find(({ sql }) => sql.includes("update account_sync_snapshots")).values[1])
-    .catalogsByProfile.main[0];
+  for (const targetId of ["trending_movies", "collection_franchise_lotr"]) {
+    const request = { operation: "clear_catalog_source", targetId };
+    const preview = await send("POST", "/admin-api/global/preview", request);
+    const applied = await send("PATCH", "/admin-api/global/snapshot", {
+      ...request, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
+    });
+    assert.equal(applied.statusCode, 200, targetId);
+  }
+  const updates = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"));
+  assert.equal(updates.length, 2);
+  // The fixture does not keep state between requests, so each update shows the effect of its own request.
+  const row = JSON.parse(updates[0].values[1]).catalogsByProfile.main[0];
+  const lotr = JSON.parse(updates[1].values[1]).catalogsByProfile.main[1];
   assert.equal("remoteSourceUrl" in row, false);
   assert.equal(row.title, "Trending");
+  assert.equal("remoteExtraRefs" in lotr, false);
+  assert.equal(lotr.title, "LotR");
 });
 
 test("removing obsolete catalogs keeps everything the app still ships", async (t) => {
@@ -623,137 +535,6 @@ test("removing obsolete catalogs keeps everything the app still ships", async (t
   rows[0].payload = saved;
   const again = await send("POST", "/admin-api/global/preview", request);
   assert.equal(again.json().changed, 0);
-});
-
-test("franchise collections take admin-added TMDB titles that are listed, titled and removable", async (t) => {
-  const { send, rows, queries } = await fixture(t);
-  const lotr = () => ({
-    id: "collection_franchise_lotr", title: "LOTR", isPreinstalled: true, kind: "COLLECTION", enabled: true,
-    collectionSources: [{ kind: "TMDB_COLLECTION", tmdbCollectionId: 119 }],
-  });
-  rows[0].payload.catalogsByProfile = { main: [lotr(), { id: "collection_decade_20s_movies", title: "20s", isPreinstalled: true, kind: "COLLECTION" }] };
-  rows[1].payload.catalogsByProfile = { main: [lotr()] };
-
-  for (const input of ["tv:84773", "TV:84773", "https://www.themoviedb.org/tv/84773-the-lord-of-the-rings-the-rings-of-power?language=de"]) {
-    const preview = await send("POST", "/admin-api/global/preview", {
-      operation: "add_catalog_item", targetId: "collection_franchise_lotr", data: { ref: input },
-    });
-    assert.equal(preview.statusCode, 200, input);
-    assert.equal(preview.json().changed, 2, input);
-  }
-  for (const [targetId, ref] of [
-    ["collection_franchise_lotr", "tv:abc"], ["collection_franchise_lotr", "https://evil.example/tv/84773"],
-    ["collection_franchise_lotr", "tv:1; drop"], ["collection_decade_20s_movies", "tv:84773"], ["trending_movies", "tv:84773"],
-  ]) {
-    const bad = await send("POST", "/admin-api/global/preview", { operation: "add_catalog_item", targetId, data: { ref } });
-    assert.equal(bad.statusCode, 400, `${targetId} ${ref}`);
-  }
-
-  const add = { operation: "add_catalog_item", targetId: "collection_franchise_lotr", data: { ref: "tv:84773" } };
-  const preview = await send("POST", "/admin-api/global/preview", add);
-  const applied = await send("PATCH", "/admin-api/global/snapshot", {
-    ...add, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  assert.equal(applied.statusCode, 200);
-  const saved = queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"))
-    .map(({ values }) => JSON.parse(values[1]).catalogsByProfile.main[0]);
-  assert.equal(saved.length, 2);
-  for (const catalog of saved) {
-    assert.deepEqual(catalog.remoteExtraRefs, ["tv:84773"]);
-    assert.equal("remoteManaged" in catalog, false);
-    assert.deepEqual(catalog.collectionSources, lotr().collectionSources);
-  }
-
-  rows[0].payload.catalogsByProfile.main[0] = saved[0];
-  const again = await send("POST", "/admin-api/global/preview", add);
-  assert.equal(again.json().changed, 1);
-
-  const list = await send("GET", "/admin-api/global/default-catalogs");
-  const byId = Object.fromEntries(list.json().catalogs.map((item) => [item.id, item]));
-  assert.deepEqual(byId.collection_franchise_lotr.extraRefs, [{ ref: "tv:84773", accounts: 1 }]);
-
-  const remove = { operation: "remove_catalog_item", targetId: "collection_franchise_lotr", data: { ref: "tv:84773" } };
-  const removePreview = await send("POST", "/admin-api/global/preview", remove);
-  assert.equal(removePreview.json().changed, 1);
-  await send("PATCH", "/admin-api/global/snapshot", {
-    ...remove, expectedState: removePreview.json().state, confirmation: "ALLE ACCOUNTS",
-  });
-  const removed = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).at(-1).values[1])
-    .catalogsByProfile.main[0];
-  assert.equal("remoteExtraRefs" in removed, false);
-});
-
-test("collection addon catalogs can be replaced, chained, listed and reset without touching other sources", async (t) => {
-  const { send, rows, queries } = await fixture(t);
-  const service = () => ({
-    id: "collection_service_netflix", title: "Netflix", isPreinstalled: true, kind: "COLLECTION",
-    collectionSources: [
-      { kind: "ADDON_CATALOG", addonId: "aio-metadata", addonCatalogType: "movie", addonCatalogId: "mdblist.88328" },
-      { kind: "ADDON_CATALOG", addonId: "aio-metadata", addonCatalogType: "series", addonCatalogId: "mdblist.86751" },
-      { kind: "MDBLIST_PUBLIC", mdblistSlug: "snoak/x" },
-    ],
-  });
-  rows[0].payload.catalogsByProfile = { main: [service()] };
-  rows[1].payload.catalogsByProfile = { main: [service()] };
-
-  const list = await send("GET", "/admin-api/global/default-catalogs");
-  const listed = list.json().catalogs.find((item) => item.id === "collection_service_netflix");
-  assert.deepEqual(listed.sources.map((source) => source.key), ["addon:movie|mdblist.88328", "addon:series|mdblist.86751", "slug:snoak/x"]);
-  assert.deepEqual(listed.sources[0].variants, [{ value: "movie|mdblist.88328|aio-metadata|", accounts: 2 }]);
-
-  const change = {
-    operation: "set_catalog_addon", targetId: "collection_service_netflix",
-    data: { fromType: "movie", fromCatalogId: "mdblist.88328", addonCatalogId: "mdblist.99999" },
-  };
-  const preview = await send("POST", "/admin-api/global/preview", change);
-  assert.equal(preview.statusCode, 200);
-  assert.equal(preview.json().changed, 2);
-  await send("PATCH", "/admin-api/global/snapshot", { ...change, expectedState: preview.json().state, confirmation: "ALLE ACCOUNTS" });
-  const first = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots"))[0].values[1])
-    .catalogsByProfile.main[0];
-  assert.deepEqual(first.collectionSources.map((s) => s.addonCatalogId), ["mdblist.99999", "mdblist.86751", undefined]);
-  assert.equal(first.collectionSources[0].addonId, "aio-metadata");
-  assert.deepEqual(first.remoteAddonOverrides, { "movie|mdblist.88328": { addonCatalogId: "mdblist.99999" } });
-  assert.equal(first.remoteManaged, true);
-
-  // A second change of the changed source keeps the bundled key, and adds the manifest URL.
-  rows[0].payload.catalogsByProfile = { main: [first] };
-  const chain = {
-    operation: "set_catalog_addon", targetId: "collection_service_netflix",
-    data: {
-      fromType: "movie", fromCatalogId: "mdblist.99999", addonCatalogId: "cat.new",
-      addonManifestUrl: "https://example.com/abc/manifest.json",
-    },
-  };
-  const chainPreview = await send("POST", "/admin-api/global/preview", chain);
-  assert.equal(chainPreview.json().changed, 1);
-  await send("PATCH", "/admin-api/global/snapshot", { ...chain, expectedState: chainPreview.json().state, confirmation: "ALLE ACCOUNTS" });
-  const chained = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).at(-1).values[1])
-    .catalogsByProfile.main[0];
-  assert.deepEqual(chained.remoteAddonOverrides, {
-    "movie|mdblist.88328": { addonCatalogId: "cat.new", addonManifestUrl: "https://example.com/abc/manifest.json" },
-  });
-
-  const unknown = await send("POST", "/admin-api/global/preview", { ...change, data: { ...change.data, fromCatalogId: "none.1" } });
-  assert.equal(unknown.json().changed, 0);
-  for (const data of [
-    { ...change.data, addonCatalogId: "bad id; drop" },
-    { ...change.data, fromType: "Movie!" },
-    { ...change.data, addonManifestUrl: "http://example.com/manifest.json" },
-    { ...change.data, addonManifestUrl: "https://user:pw@example.com/manifest.json" },
-    { ...change.data, addonManifestUrl: "https://example.com/other.json" },
-    { ...change.data, addonId: "a b" },
-  ]) {
-    assert.equal((await send("POST", "/admin-api/global/preview", { ...change, data })).statusCode, 400, JSON.stringify(data));
-  }
-
-  rows[0].payload.catalogsByProfile = { main: [chained] };
-  const clear = { operation: "clear_catalog_source", targetId: "collection_service_netflix" };
-  const clearPreview = await send("POST", "/admin-api/global/preview", clear);
-  await send("PATCH", "/admin-api/global/snapshot", { ...clear, expectedState: clearPreview.json().state, confirmation: "ALLE ACCOUNTS" });
-  const cleared = JSON.parse(queries.filter(({ sql }) => sql.includes("update account_sync_snapshots")).at(-1).values[1])
-    .catalogsByProfile.main[0];
-  assert.equal("remoteAddonOverrides" in cleared, false);
 });
 
 test("unavailable catalog templates are rejected without snapshot writes", async (t) => {

@@ -5,11 +5,12 @@ import vm from "node:vm";
 
 const source = await readFile(new URL("../public/admin.js", import.meta.url), "utf8");
 const context = vm.createContext({});
-for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent", "liveDeviceEntries", "jsonItemTitle", "jsonContainerSummary", "jsonSnapshotSections", "jsonQueryMatches"]) {
+for (const name of ["formatBytes", "formatAuditOperation", "versionReleaseUrl", "latestDeviceEntries", "globalOperationCategory", "formatDeviceEvent", "liveDeviceEntries", "jsonItemTitle", "jsonContainerSummary", "jsonSnapshotSections", "jsonQueryMatches", "isAppOwnedItem", "rcDescribeRefs"]) {
   const definition = source.match(new RegExp(`function ${name}\\([^]*?\\n\\}`));
   assert.ok(definition, `Missing ${name}`);
   vm.runInContext(definition[0], context);
 }
+vm.runInContext(source.match(/const appOwnedAddonIds[^\n]*\nconst appOwnedPlaylistIds[^\n]*/)[0].replace(/\bconst (\w+)/g, "var $1"), context);
 
 test("snapshot explorer labels list items by name and type", () => {
   assert.equal(context.jsonItemTitle({ id: "a", name: "OpenSubtitles", type: "SUBTITLE" }), "OpenSubtitles · SUBTITLE");
@@ -84,9 +85,27 @@ test("Remote Config offers only the per-account actions; lists, covers and added
       "clear_catalog_source", "remove_obsolete_catalogs",
     ],
   });
-  for (const group of Object.keys(groups)) {
-    assert.ok(html.includes(`data-global-category="${group}"`));
+  for (const [tab, slot] of [["standards", "catalogs"], ["playlists", "playlists"], ["addons", "addons"]]) {
+    assert.ok(html.includes(`data-rc-tab="${tab}"`));
+    assert.ok(html.includes(`id="rc-slot-${slot}"`));
   }
+  assert.equal(html.includes('data-rc-tab="actions"'), false);
+});
+
+test("Remote Config lists only add-ons, playlists and catalogs that ship with the app", () => {
+  assert.equal(context.isAppOwnedItem({ id: "streamnet_tv", name: "StreamNet TV" }), true);
+  assert.equal(context.isAppOwnedItem({ id: "opensubtitles", name: "OpenSubtitles v3" }), true);
+  assert.equal(context.isAppOwnedItem({ id: "my_iptv", name: "Mein Anbieter" }), false);
+  assert.equal(context.isAppOwnedItem({ id: "trending_movies", sourceType: "PREINSTALLED" }), true);
+  for (const sourceType of ["TRAKT", "MDBLIST", "ADDON", "HOME_SERVER"]) {
+    assert.equal(context.isAppOwnedItem({ id: "mine", sourceType }), false);
+  }
+});
+
+test("single titles are described as movies and series, not as collections", () => {
+  assert.equal(context.rcDescribeRefs(["tv:433"], "keine"), "1 Serie (tv:433)");
+  assert.equal(context.rcDescribeRefs(["movie:1", "movie:2", "tv:3"], "keine"), "2 Filme (movie:1, movie:2) · 1 Serie (tv:3)");
+  assert.equal(context.rcDescribeRefs([], "keine"), "keine");
 });
 
 test("device list keeps the latest entry per kind, platform and device type", () => {
@@ -117,8 +136,9 @@ test("individual account actions share the category layout without adding unsupp
     assert.ok(html.includes(`aria-labelledby="${id}"`));
   }
   assert.ok(html.includes('id="mutation-form" class="global-config-layout"'));
-  assert.ok(html.includes('data-account-category="playlists"'));
-  assert.ok(html.includes('data-account-category="addons"'));
+  for (const tab of ["overview", "devices", "playlists", "addons", "snapshot", "audit", "danger"]) {
+    assert.ok(html.includes(`data-acc-tab="${tab}"`), tab);
+  }
 });
 
 test("version cards link to component changelogs and the published Android release", () => {

@@ -4,6 +4,34 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [2.6.019] - 2026-11-21
+
+- Android-Version: `2.6.019` / Code `520`.
+- Android, zentrale Konfiguration, neue Collections: Der Admin kann jetzt für alle Geräte neue Streamingdienste (über TMDB-Anbieter-IDs und optional MDBList-Listen, mit Cover, Intro-Video und Land der Verfügbarkeit) und neue Jahrzehnte (über MDBList-Listen, mit Cover) hinzufügen. Sie erscheinen hinter dem letzten bestehenden Dienst bzw. Jahrzehnt. Ältere App-Versionen ignorieren die neuen Felder.
+- Android, zentrale Konfiguration, Name, Cover und Intro: Der Admin kann Name, Cover und Intro-Video jeder Collection ändern. Bei Film- und Serien-Genres gilt ein dort gesetzter Name oder ein Cover vor den Werten der Vodwisharr-API; ohne Eintrag bleibt es bei den API-Werten (Name in der App-Sprache, Hintergrundbild mit Farbfilter).
+- Android-Validierung: 946 Unit-Tests ohne Fehler, darunter neue Tests für neue Dienste und Jahrzehnte, Namen, Intros und Cover sowie der Vertrag zu den Intro-Videos der 13 Dienste (`standard-intros.txt`). Nicht geprüft: die App auf Emulator oder Gerät mit den neuen Admin-Funktionen (nur per Unit-Test), der reine IPTV-Modus, echte TV-Hardware.
+- Web 1.0.079 und Backend 1.0.056 gehören dazu.
+
+## [Web 1.0.079] - 2026-11-21
+
+- Web-Version: `1.0.079`.
+- Web, zentrale Konfiguration: Gleiche neue Funktionen wie in der App: neue Streamingdienste und Jahrzehnte aus dem Admin sowie geänderter Name, Cover und Intro-Video jeder Collection. Bei Film- und Serien-Genres gewinnt ein im Admin gesetztes Cover vor dem Hintergrundbild der Genre-API.
+- Tests: 128 Web-Tests ohne Fehler, darunter ein neuer Test für neue Dienste, Jahrzehnte, Namen, Intros und Cover; Typprüfung ohne Fehler. Nicht geprüft: Build und Darstellung im Browser.
+- Android und Backend: siehe 2.6.019 und Backend 1.0.056.
+
+## [Backend 1.0.056] - 2026-11-21
+
+- Adminpanel, Remote Config neu geordnet: Tabs Übersicht, Collections, Home-Kataloge, Playlists, Add-ons und Anleitung. „Einzelaktionen“ gibt es nicht mehr: Die Katalog-Aktionen stehen im Tab Home-Kataloge, Playlists und Add-ons haben je einen eigenen Tab mit Bestandsübersicht (z. B. „StreamNet TV · 84 von 116 Accounts“) und Schnellaktionen. Die Listen zeigen nur Einträge der App (StreamNet-TV-Playlist, OpenSubtitles, vorinstallierte Kataloge), keine, die Nutzer selbst installiert haben.
+- Adminpanel, Übersicht: Die Tabelle „Weitere Änderungen gegenüber der App“ hat die Spalte „Aktion“ in jeder Zeile. Statt „Feste Titel“ steht dort „Einzelne Filme / Serien“ mit Anzahl und Art; TMDB-Collections (Filmreihe mit mehreren Filmen) sind von einzelnen Filmen und Serien unterscheidbar.
+- Adminpanel, Collections: Die Zusammensetzung zeigt auch, was die App selbst liefert (z. B. „TMDB-Streaming-Anbieter 8“, „beliebte Filme dieses TMDB-Genres“). Name, Cover und Intro-Video sind für jede Collection änderbar; neben jedem Standardwert steht „Kopieren“. Bei Streamingdiensten ist das Intro sichtbar und per Link ansehbar. Ein Button legt je nach Bereich eine neue Franchise, einen neuen Streamingdienst oder ein neues Jahrzehnt an.
+- Adminpanel, Genres: Name und Cover der Film- und Serien-Genres liefert die App normalerweise von der Vodwisharr-API. Ein Eintrag im Admin ersetzt diese Werte für alle Geräte; leer lassen heißt weiter API.
+- Adminpanel, Home-Kataloge: Aufgeteilt in Reihen mit MDBList-Liste, Reihen mit Collections und persönliche Reihen; pro Liste Status („Standard“ oder „Geändert“, Inhalt der Liste), „Standard“ zum Zurücksetzen und „Standard kopieren“. Die Anleitung nutzt die volle Breite und die Tabelle läuft nicht mehr über.
+- Adminpanel, Account-Seite: Tabs Übersicht, Geräte, Playlists, Add-ons, Snapshot, Protokoll und Aktionen statt einer langen Seite. Nach einer Aktion bleibt der Tab, ein anderer Account startet auf der Übersicht; ohne Snapshot entfallen Playlists, Add-ons und Snapshot.
+- Backend, Schema der zentralen Konfiguration: Neue Felder `intros`, `titles` und `newCollections` (Gruppe `SERVICE` oder `DECADE`) in `overrides`, mit Prüfung (https-Links, Namenslänge, eindeutige IDs, Land mit 2 Buchstaben, Jahrzehnte nur mit MDBList-Liste). Neue Vertragsdatei `standard-intros.txt`; die Standards liefern zusätzlich Intro-Video und Streaming-Anbieter. Die Migration ist nicht nötig.
+- Entfernt: Die fünf alten Pro-Account-Operationen `set_catalog_source`, `set_catalog_slug`, `add_catalog_item`, `remove_catalog_item` und `set_catalog_addon` samt Code im Admin, Hilfsfunktionen und Tests. Die zentrale Konfiguration ersetzt sie. „Alte Austausche bei Accounts zurücksetzen“ entfernt jetzt zusätzlich pro Account ergänzte Titel; die Protokolleinträge alter Aktionen bleiben lesbar.
+- Tests: 176 von 177 Backend-Tests ohne Fehler; der eine Fehler ist der bekannte, nur unter Windows (Test „dashboard online shortcut …“). Nicht geprüft: das Admin-Panel gegen die echte Datenbank (nur im Demo-Server gesehen, Screenshots waren dort veraltet).
+- Android und Web: siehe 2.6.019 und Web 1.0.079.
+
 ## [2.6.018] - 2026-11-19
 
 - Android-Version: `2.6.018` / Code `519`.
@@ -22,6 +50,7 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 - Web, zentrale Konfiguration: Das Web lädt `GET /catalog-config` (alle 10 Minuten, ohne Anmeldung) und wendet Cover, TMDB-Collections, MDBList-Listen, feste Titel, eigene Franchises und die Home-Reihen aus dem Admin an, auch bei neuen Nutzern. Die zuletzt geladene Fassung bleibt im Browser gespeichert; ohne Verbindung gelten die eingebauten Werte.
 - Tests: 127 Web-Tests ohne Fehler, darunter der gemeinsame Vertragstest mit der Android-App und neue Tests für die zentrale Konfiguration; Typprüfung ohne Fehler. Nicht geprüft: Build und Darstellung im Browser; die Tab-Trennung nur über den Code und die bestehenden Tests.
 - Android und Backend: siehe 2.6.018 und Backend 1.0.055.
+
 ## [Backend 1.0.055] - 2026-11-19
 
 - Fix, Marvel-Timeline: „I Am Groot“ hatte die falsche TMDB-ID (`tv:226976`, kam aus dem Addon), richtig ist `tv:232125`. Korrigiert in der gelieferten Standardliste (`franchise-lists.seed.json`, `standard-catalogs.txt`) und in den Quellen von Android und Web. Wurde im Admin schon eine eigene Marvel-Liste gespeichert, muss die ID dort von Hand getauscht werden.

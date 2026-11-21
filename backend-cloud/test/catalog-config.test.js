@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import Fastify from "fastify";
 import { SignJWT } from "jose";
 import { registerAdminRoutes } from "../src/admin-routes.js";
-import { validateTabs, validateOverrides, catalogIdFor, loadStandards } from "../src/catalog-config.js";
+import { validateTabs, validateOverrides, catalogIdFor, loadStandards, newCollectionCatalogId } from "../src/catalog-config.js";
 
 const key = new TextEncoder().encode("test-admin-key-not-for-production");
 
@@ -51,7 +51,7 @@ test("the bundled seed meets the rules an admin edit is held to and keeps the Ma
 });
 
 test("the shipped copies equal the shared contract files of the apps", async () => {
-  for (const [local, shared] of [["franchise-lists.seed.json", "franchise-lists.json"], ["standard-catalogs.txt", "standard-catalogs.txt"], ["standard-covers.txt", "standard-covers.txt"]]) {
+  for (const [local, shared] of [["franchise-lists.seed.json", "franchise-lists.json"], ["standard-catalogs.txt", "standard-catalogs.txt"], ["standard-covers.txt", "standard-covers.txt"], ["standard-intros.txt", "standard-intros.txt"]]) {
     const a = (await readFile(new URL(`../src/${local}`, import.meta.url), "utf8")).replace(/\r\n/g, "\n");
     const b = (await readFile(new URL(`../../catalog-contract/${shared}`, import.meta.url), "utf8")).replace(/\r\n/g, "\n");
     assert.equal(a, b, `${local} is out of date; copy it from catalog-contract/${shared}`);
@@ -75,7 +75,7 @@ test("the public config serves the seed, then prefers saved and created franchis
   assert.equal(seeded.version, 2);
   assert.deepEqual(seeded.franchises.map((f) => f.id), ["marvel", "dc", "starwars"]);
   assert.ok(seeded.franchises.every((f) => f.builtin && f.revision === 0));
-  assert.deepEqual(seeded.overrides, { rows: {}, covers: {}, sources: {}, extras: {}, hidden: [], newRows: [] });
+  assert.deepEqual(seeded.overrides, { rows: {}, covers: {}, intros: {}, titles: {}, sources: {}, extras: {}, hidden: [], newRows: [], newCollections: [] });
 
   const saved = [
     { id: "franchise:dc", payload: { tabs: { movie: [{ ref: "movie:1" }], series: [], timeline: [] } }, revision: "3", updated_at: "2026-11-19T07:00:00Z" },
@@ -234,6 +234,49 @@ test("home rows: standard rows can be hidden for everyone and new MDBList rows a
   assert.deepEqual(saved.json().overrides.hidden, [rail.id]);
 });
 
+test("services and decades can be added for everyone and collections renamed or given another intro, with validation", async () => {
+  const standards = await loadStandards();
+  const netflix = standards.find((s) => s.id === "collection_service_netflix");
+  const action = standards.find((s) => s.id === "collection_movie_genre_action");
+  assert.deepEqual(netflix.providers, [8]);
+  assert.match(netflix.introUrl, /netflix\.mp4$/);
+  assert.equal(action.introUrl, "");
+
+  const clean = validateOverrides({
+    titles: { [action.id]: "Action & Spannung", [netflix.id]: netflix.title },
+    intros: { [netflix.id]: "https://example.com/n.mp4" },
+    covers: { [action.id]: "https://example.com/action.jpg" },
+    newCollections: [
+      { id: "arte-tv", title: "Arte", providers: [234, 234], coverUrl: "https://example.com/arte.jpg", introUrl: "", mdblist: [] },
+      { id: "50s", group: "decade", title: "50's Movies", mdblist: ["snoak/popular-1950s-movies"], introUrl: "https://example.com/ignored.mp4" },
+    ],
+  }, standards);
+  assert.deepEqual(clean.titles, { [action.id]: "Action & Spannung" });
+  assert.deepEqual(clean.intros, { [netflix.id]: "https://example.com/n.mp4" });
+  assert.deepEqual(clean.covers, { [action.id]: "https://example.com/action.jpg" });
+  assert.deepEqual(clean.newCollections, [
+    { id: "arte-tv", group: "SERVICE", title: "Arte", coverUrl: "https://example.com/arte.jpg", introUrl: "", providers: [234], mdblist: [], region: "US" },
+    { id: "50s", group: "DECADE", title: "50's Movies", coverUrl: "", introUrl: "", providers: [], mdblist: ["snoak/popular-1950s-movies"], region: "US" },
+  ]);
+  assert.equal(newCollectionCatalogId("DECADE", "50s"), "collection_decade_50s");
+  assert.deepEqual(validateOverrides({ intros: { [netflix.id]: netflix.introUrl } }, standards).intros, {});
+
+  assert.throws(() => validateOverrides({ titles: { [action.id]: "x" } }, standards), /name needs/);
+  assert.throws(() => validateOverrides({ titles: { nope: "Name" } }, standards), /Unknown collection/);
+  assert.throws(() => validateOverrides({ intros: { [netflix.id]: "http://example.com/n.mp4" } }, standards), /plain https/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "Bad Id", title: "Arte", providers: [1] }] }, standards), /Collection id/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "arte-tv", title: "A", providers: [1] }] }, standards), /Collection name/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "arte-tv", title: "Arte" }] }, standards), /provider id or an MDBList/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "arte-tv", title: "Arte", providers: [1], region: "FRA" }] }, standards), /2-letter/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "netflix", title: "Netflix 2", providers: [8] }] }, standards), /already used/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "20s-movies", group: "DECADE", title: "Again", mdblist: ["me/x"] }] }, standards), /already used/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "50s", group: "DECADE", title: "50's", providers: [1], mdblist: ["me/x"] }] }, standards), /not TMDB providers/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "50s", group: "DECADE", title: "50's" }] }, standards), /add an MDBList list/);
+  assert.throws(() => validateOverrides({ newCollections: [{ id: "x-genre", group: "MOVIE_GENRE", title: "Genre", mdblist: ["me/x"] }] }, standards), /can only be added to/);
+  assert.throws(() => validateOverrides({ newCollections: [
+    { id: "arte-tv", title: "Arte", providers: [1] }, { id: "arte-tv", title: "Arte 2", providers: [2] },
+  ] }, standards), /already used/);
+});
 test("the public config still answers with the built-in values before the migration created the table", async (t) => {
   const app = Fastify();
   const pool = { query: async () => { throw Object.assign(new Error("relation does not exist"), { code: "42P01" }); } };
@@ -272,4 +315,7 @@ test("the admin overview lists the standard catalogs with their lists", async (t
   const bond = overview.standards.find((s) => s.id === "collection_franchise_james_bond");
   assert.deepEqual(bond.tmdbCollections, [645]);
   assert.ok(bond.coverUrl.startsWith("https://"));
+  const netflix = overview.standards.find((s) => s.id === "collection_service_netflix");
+  assert.deepEqual(netflix.providers, [8]);
+  assert.ok(netflix.introUrl.endsWith("netflix.mp4"));
 });

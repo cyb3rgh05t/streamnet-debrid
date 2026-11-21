@@ -1214,6 +1214,7 @@ async function openAccount(accountId) {
   const data = await api(
     `/admin-api/accounts/${encodeURIComponent(accountId)}`,
   );
+  const sameAccount = state.selectedAccount?.account.id === data.account.id;
   state.selectedAccount = data;
   byId("accounts-view").classList.add("hidden");
   byId("global-view").classList.add("hidden");
@@ -1259,8 +1260,10 @@ async function openAccount(accountId) {
   byId("edit-payload-button").classList.toggle("hidden", !snapshot);
   renderProfiles(snapshot?.profiles || []);
   byId("mutation-form").classList.toggle("hidden", !snapshot);
-  byId("account-config-categories").classList.toggle("hidden", !snapshot);
+  document.querySelectorAll("[data-needs-snapshot]").forEach((button) => button.classList.toggle("hidden", !snapshot));
   if (snapshot) updateOperationFields();
+  // A refresh after an action keeps the tab; opening another account starts on the overview.
+  selectAccountTab(sameAccount && (snapshot || !accountTabNeedsSnapshot(state.accountTab)) ? state.accountTab : "overview");
   state.accountAudits.offset = 0;
   await loadAccountAudits(data.account.id);
 }
@@ -1422,6 +1425,21 @@ function populatePlaylistSelect() {
 
 const accountOperationOptions = [...byId("mutation-operation").options].map(option => option.cloneNode(true));
 
+// Account page tabs: playlists and add-ons share one action form, the others each have a panel of their own.
+const accountTabPanels = { overview: "overview", devices: "devices", playlists: "config", addons: "config", snapshot: "snapshot", audit: "audit", danger: "danger" };
+const accountTabNeedsSnapshot = (tab) => ["playlists", "addons", "snapshot"].includes(tab);
+
+function selectAccountTab(tab) {
+  state.accountTab = tab;
+  document.querySelectorAll("[data-acc-tab]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(button.dataset.accTab === tab));
+  });
+  document.querySelectorAll("[data-acc-panel]").forEach((panel) => {
+    panel.classList.toggle("hidden", panel.dataset.accPanel !== accountTabPanels[tab]);
+  });
+  if (tab === "playlists" || tab === "addons") selectAccountCategory(tab);
+}
+
 function selectAccountCategory(category) {
   const select = byId("mutation-operation");
   const previous = select.value;
@@ -1435,9 +1453,6 @@ function selectAccountCategory(category) {
 function updateOperationFields() {
   const operation = byId("mutation-operation").value;
   const category = globalOperationCategory(operation);
-  document.querySelectorAll("[data-account-category]").forEach(button => {
-    button.setAttribute("aria-pressed", String(button.dataset.accountCategory === category));
-  });
   byId("account-settings-title").textContent = category === "addons" ? "Add-on-Einstellungen" : "Playlist-Einstellungen";
   byId("account-category-description").textContent = category === "addons"
     ? "Add-ons accountweit für alle Profile verwalten."
@@ -1698,12 +1713,14 @@ async function loadGlobal() {
     `${state.global.total} registrierte Accounts · ${state.global.configurable} konfigurierbar · ` +
     `${state.global.skipped} ohne Snapshot/Profile (werden übersprungen)`;
   updateGlobalFields();
+  renderRcInventory();
 }
-
-// ---- Remote Config: central catalog configuration (collections, home rows) ----
 const rcTabs = ["movie", "series", "timeline"];
 const rcNewKey = "__new__";
-const rc = { data: null, tab: "overview", ftab: "movie", current: null, drafts: {}, group: "FRANCHISE", src: { tmdb: [], mdblist: [] }, listInfo: {} };
+const rcNewCollectionKey = "__new_collection__";
+// The area a new collection is created in: the one currently chosen in the area dropdown.
+const rcNewGroup = () => (rc.group === "DECADE" ? "DECADE" : "SERVICE");
+const rc = { data: null, tab: "overview", ftab: "movie", current: null, drafts: {}, group: "FRANCHISE", src: { tmdb: [], providers: [], mdblist: [] }, listInfo: {} };
 const rcTabHelp = {
   movie: "Filme – eine Zeile pro Titel: movie:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
   series: "Serien – eine Zeile pro Titel: tv:ID, optional „| Notiz“. Die App sortiert diesen Tab nach Erscheinungsdatum, jeder Titel nur einmal.",
@@ -1741,13 +1758,6 @@ function rcList(text) {
   return String(text || "").split(/[,\s]+/).filter(Boolean);
 }
 
-function rcNumberList(text) {
-  return rcList(text).map((value) => {
-    if (!/^\d{1,9}$/.test(value)) throw new Error(`„${value}“ ist keine gültige TMDB-Collection-ID`);
-    return Number(value);
-  });
-}
-
 function rcElement(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined && text !== null) node.textContent = text;
@@ -1763,19 +1773,22 @@ function rcStandardTitle(catalogId) {
   return rcStandard(catalogId)?.title ?? catalogId;
 }
 
-// Everything the form can edit: the app's collections plus the franchises the admin created.
+// Everything the form can edit: the app's collections plus the franchises and services the admin created.
 function rcItems() {
-  const { standards, franchises } = rc.data;
+  const { standards, franchises, overrides } = rc.data;
   const items = standards.filter((item) => item.kind === "COLLECTION").map((standard) => ({
     key: standard.id,
     standard,
     group: standard.group,
-    title: standard.title,
+    title: overrides.titles?.[standard.id] ?? standard.title,
     // The three franchises with their own tab lists (Marvel, DC, Star Wars).
     franchise: franchises.find((item) => item.builtin && item.catalogId === standard.id) ?? null,
   }));
   for (const franchise of franchises.filter((item) => !item.builtin)) {
     items.push({ key: `custom:${franchise.id}`, standard: null, group: "FRANCHISE", title: franchise.title, franchise });
+  }
+  for (const added of overrides.newCollections ?? []) {
+    items.push({ key: `added:${added.group}:${added.id}`, standard: null, group: added.group, title: added.title, franchise: null, added });
   }
   return items;
 }
@@ -1784,29 +1797,129 @@ function rcItem(key) {
   return rcItems().find((item) => item.key === key) ?? null;
 }
 
+function rcIsGenreGroup(group) {
+  return group === "MOVIE_GENRE" || group === "TV_GENRE";
+}
+
 function rcEffective(item) {
   const overrides = rc.data.overrides;
   const standard = item.standard;
+  if (item.added) {
+    const { added } = item;
+    return {
+      title: added.title, cover: added.coverUrl || "", intro: added.introUrl || "", region: added.region || "US",
+      tmdb: [], providers: added.providers, mdblist: added.mdblist, extras: [],
+    };
+  }
   if (!standard) {
     return {
-      cover: item.franchise.coverUrl || "", tmdb: item.franchise.tmdbCollections, mdblist: item.franchise.mdblist, extras: [],
+      title: item.franchise.title, cover: item.franchise.coverUrl || "", intro: "", region: "US",
+      tmdb: item.franchise.tmdbCollections, providers: [], mdblist: item.franchise.mdblist, extras: [],
     };
   }
   return {
-    cover: overrides.covers?.[standard.id] ?? standard.coverUrl,
+    title: overrides.titles?.[standard.id] ?? "",
+    // The genre cover comes from the genre API unless one is set here, so the shipped archive cover is not "the value".
+    cover: overrides.covers?.[standard.id] ?? (rcIsGenreGroup(standard.group) ? "" : standard.coverUrl),
+    intro: overrides.intros?.[standard.id] ?? standard.introUrl ?? "",
+    region: "US",
     tmdb: overrides.sources?.[standard.id]?.tmdbCollections ?? standard.tmdbCollections,
+    providers: [],
     mdblist: overrides.sources?.[standard.id]?.mdblist ?? standard.mdblist,
     // The fixed titles: the replacement if there is one, else the app's own plus titles added earlier.
     extras: overrides.sources?.[standard.id]?.curated ?? [...(standard.curated ?? []), ...(overrides.extras?.[standard.id] ?? [])],
   };
 }
 
+// "genre:28:movie" -> "beliebte Filme dieses TMDB-Genres (ID 28)", "provider:8:series" -> "Streaming-Anbieter 8 (Serien)"
+function rcDescribeSource(source) {
+  const genre = /^genre:(\d+):(movie|series)$/.exec(source);
+  if (genre) return `beliebte ${genre[2] === "movie" ? "Filme" : "Serien"} dieses TMDB-Genres (ID ${genre[1]})`;
+  const provider = /^provider:(\d+):(movie|series)$/.exec(source);
+  if (provider) return `TMDB-Streaming-Anbieter ${provider[1]} (${provider[2] === "movie" ? "Filme" : "Serien"})`;
+  return source;
+}
+
+// The media type a bundled source of a collection feeds: "movie", "series" or "" when it is not tied to one.
+function rcSourceType(source) {
+  return /^(genre|provider|keyword):\d+:(movie|series)$/.exec(source)?.[2] ?? "";
+}
+
 function rcIsChanged(item) {
-  if (!item.standard) return true;
+  if (item.added || !item.standard) return true;
   const { overrides } = rc.data;
   const id = item.standard.id;
-  return Boolean(overrides.covers?.[id] || overrides.sources?.[id] || overrides.extras?.[id]?.length || item.franchise?.custom);
+  return Boolean(
+    overrides.covers?.[id] || overrides.intros?.[id] || overrides.titles?.[id] || overrides.sources?.[id] ||
+    overrides.extras?.[id]?.length || item.franchise?.custom,
+  );
 }
+
+// Overview of what the app ships per area, with one-click shortcuts that preselect the action in the form below.
+const rcInventories = {
+  playlists: {
+    key: "playlists", noun: "Playlist",
+    actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"], ["Entfernen", "delete_playlist"]],
+    extra: { streamnet_tv: [["Host zurücksetzen", "clear_streamnet_host_override"]] },
+    add: ["Playlist hinzufügen", "add_playlist"],
+  },
+  addons: {
+    key: "addons", noun: "Add-on",
+    actions: [["Bearbeiten", "edit_addon"], ["Entfernen", "delete_addon"]],
+    extra: {},
+    add: ["Add-on hinzufügen", "add_addon"],
+  },
+};
+
+function rcRunAction(category, operation, targetId) {
+  const select = byId("global-operation");
+  select.value = operation;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  if (targetId) {
+    const target = byId("global-target");
+    target.value = targetId;
+    target.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  byId(`rc-slot-${category}`).scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function renderRcInventory() {
+  const configurable = state.global?.configurable ?? 0;
+  for (const [category, setup] of Object.entries(rcInventories)) {
+    const box = byId(`rc-inventory-${category}`);
+    const items = (state.global?.[setup.key] || []).filter(isAppOwnedItem);
+    const cards = items.map((item) => {
+      const card = rcElement("div", null, "rc-inv-card");
+      const head = rcElement("div", null, "rc-inv-head");
+      head.append(rcElement("strong", item.name), rcElement("small", item.id));
+      const meter = document.createElement("progress");
+      meter.max = Math.max(configurable, item.accountCount, 1);
+      meter.value = item.accountCount;
+      const count = rcElement("span", `${item.accountCount} von ${configurable} Accounts`, "rc-source-info");
+      const actions = rcElement("div", null, "rc-inv-actions");
+      for (const [label, operation] of [...setup.actions, ...(setup.extra[item.id] ?? [])]) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = `button secondary${operation.startsWith("delete") ? " danger" : ""}`;
+        button.textContent = label;
+        button.addEventListener("click", () => rcRunAction(category, operation, item.id));
+        actions.append(button);
+      }
+      card.append(head, meter, count, actions);
+      return card;
+    });
+    if (!cards.length) cards.push(rcElement("p", `Keine ${setup.noun}s der App in den Accounts gefunden.`, "rc-hint"));
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "button primary";
+    add.textContent = setup.add[0];
+    add.addEventListener("click", () => rcRunAction(category, setup.add[1]));
+    box.replaceChildren(...cards, add);
+  }
+}
+
+// The per-account action form is shared: it moves into the tab it belongs to and shows that tab's actions.
+const rcAccountTabs = { standards: "catalogs", playlists: "playlists", addons: "addons" };
 
 function selectRcTab(tab) {
   rc.tab = tab;
@@ -1816,6 +1929,11 @@ function selectRcTab(tab) {
   document.querySelectorAll("[data-rc-panel]").forEach((panel) => {
     panel.classList.toggle("hidden", panel.dataset.rcPanel !== tab);
   });
+  const category = rcAccountTabs[tab];
+  if (category) {
+    byId(`rc-slot-${category}`).append(byId("global-form"));
+    selectGlobalCategory(category);
+  }
 }
 
 async function loadCatalogConfig() {
@@ -1867,11 +1985,14 @@ function renderRcOverview() {
   const count = (map) => Object.keys(map || {}).length;
   byId("rc-metrics").replaceChildren(
     rcMetric("Eigene Franchises", custom.length),
+    rcMetric("Neue Dienste / Jahrzehnte", (overrides.newCollections || []).length),
     rcMetric("Geänderte Franchise-Listen", changedLists.length),
     rcMetric("Eigene Cover", count(overrides.covers)),
     rcMetric("Ersetzte Quellen", count(overrides.sources)),
-    rcMetric("Zusätzliche Titel", Object.values(overrides.extras || {}).reduce((sum, refs) => sum + refs.length, 0)),
-    rcMetric("Home-Reihen geändert", count(overrides.rows) + (overrides.hidden || []).length + (overrides.newRows || []).length),
+    rcMetric("Einzelne Filme / Serien ergänzt",
+      Object.values(overrides.extras || {}).reduce((sum, refs) => sum + refs.length, 0) +
+      Object.values(overrides.sources || {}).reduce((sum, value) => sum + (value.curated?.length ?? 0), 0)),
+    rcMetric("Home-Kataloge geändert", count(overrides.rows) + (overrides.hidden || []).length + (overrides.newRows || []).length),
     rcMetric("Letzte Änderung", rc.data.updatedAt ? formatDate(rc.data.updatedAt) : "—"),
   );
 
@@ -1902,33 +2023,68 @@ function renderRcOverview() {
   })()]));
 
   const rows = [];
-  for (const [catalogId, url] of Object.entries(overrides.rows || {})) rows.push([rcStandardTitle(catalogId), "Home-Reihe", url, null]);
-  for (const catalogId of overrides.hidden || []) rows.push([rcStandardTitle(catalogId), "Home-Reihe", "Für alle ausgeblendet", null]);
-  for (const row of overrides.newRows || []) rows.push([row.title, "Eigene Home-Reihe", row.url, null]);
+  const standardsTab = "tab:standards";
+  for (const [catalogId, url] of Object.entries(overrides.rows || {})) {
+    rows.push([rcStandardTitle(catalogId), "Home-Katalog", `Andere MDBList-Liste: ${rcNormalizeSlug(url) || url}`, standardsTab]);
+  }
+  for (const catalogId of overrides.hidden || []) rows.push([rcStandardTitle(catalogId), "Home-Katalog", "Für alle Geräte ausgeblendet", standardsTab]);
+  for (const row of overrides.newRows || []) {
+    rows.push([row.title, "Zusätzlicher Home-Katalog", `MDBList-Liste ${rcNormalizeSlug(row.url) || row.url}`, standardsTab]);
+  }
   for (const [catalogId, url] of Object.entries(overrides.covers || {})) rows.push([rcStandardTitle(catalogId), "Cover", url, catalogId]);
+  for (const [catalogId, url] of Object.entries(overrides.intros || {})) rows.push([rcStandardTitle(catalogId), "Intro-Video", url, catalogId]);
+  for (const [catalogId, name] of Object.entries(overrides.titles || {})) rows.push([rcStandardTitle(catalogId), "Anderer Name", name, catalogId]);
+  for (const service of overrides.newCollections || []) {
+    const sources = [
+      service.providers.length ? `TMDB-Anbieter ${service.providers.join(", ")}` : null,
+      service.mdblist.length ? `MDBList ${service.mdblist.join(", ")}` : null,
+    ].filter(Boolean).join(" · ");
+    rows.push([service.title, service.group === "DECADE" ? "Neues Jahrzehnt" : "Neuer Streamingdienst", sources, `added:${service.group}:${service.id}`]);
+  }
   for (const [catalogId, value] of Object.entries(overrides.sources || {})) {
-    const parts = [
-      value.tmdbCollections ? `TMDB ${value.tmdbCollections.join(", ")}` : null,
-      value.mdblist ? `MDBList ${value.mdblist.join(", ")}` : null,
-      value.curated ? `Feste Titel ${value.curated.join(", ") || "keine"}` : null,
-    ].filter(Boolean);
-    rows.push([rcStandardTitle(catalogId), "Quellen", parts.join(" · "), catalogId]);
+    const title = rcStandardTitle(catalogId);
+    if (value.tmdbCollections) {
+      rows.push([title, "TMDB-Collections", value.tmdbCollections.length ? `Collection ${value.tmdbCollections.join(", ")} (Filmreihen mit mehreren Filmen)` : "Keine (Standard entfernt)", catalogId]);
+    }
+    if (value.mdblist) rows.push([title, "MDBList-Listen", value.mdblist.length ? value.mdblist.join(", ") : "Keine (Standard entfernt)", catalogId]);
+    if (value.curated) rows.push([title, "Einzelne Filme / Serien", rcDescribeRefs(value.curated, "Keine (Standard entfernt)"), catalogId]);
   }
   for (const [catalogId, refs] of Object.entries(overrides.extras || {})) {
-    rows.push([rcStandardTitle(catalogId), "Zusätzliche Titel", `${refs.length}: ${refs.join(", ")}`, catalogId]);
+    rows.push([rcStandardTitle(catalogId), "Einzelne Filme / Serien", rcDescribeRefs(refs, "Keine"), catalogId]);
   }
   byId("rc-override-rows").replaceChildren(...(rows.length ? rows.map(([title, kind, value, key]) => {
     const row = document.createElement("tr");
     row.append(textCell(title), textCell(kind), textCell(value));
-    if (key) row.append(rcEditButton(key));
+    row.append(key === standardsTab ? rcTabButton("standards") : rcEditButton(key));
     return row;
   }) : [(() => {
     const row = document.createElement("tr");
-    const cell = textCell("Keine Abweichungen – es gelten die Standards der App.");
+    const cell = textCell("Keine Änderungen – es gelten die Standards der App.");
     cell.colSpan = 4;
     row.append(cell);
     return row;
   })()]));
+}
+
+// "2 Filme (movie:1, movie:2) · 1 Serie (tv:433)": single titles, as opposed to TMDB collections.
+function rcDescribeRefs(refs, empty) {
+  const movies = refs.filter((ref) => String(ref).startsWith("movie:"));
+  const shows = refs.filter((ref) => String(ref).startsWith("tv:"));
+  const parts = [];
+  if (movies.length) parts.push(`${movies.length} ${movies.length === 1 ? "Film" : "Filme"} (${movies.join(", ")})`);
+  if (shows.length) parts.push(`${shows.length} ${shows.length === 1 ? "Serie" : "Serien"} (${shows.join(", ")})`);
+  return parts.join(" · ") || empty;
+}
+
+function rcTabButton(tab) {
+  const action = document.createElement("button");
+  action.type = "button";
+  action.className = "button secondary";
+  action.textContent = "Bearbeiten";
+  action.addEventListener("click", () => selectRcTab(tab));
+  const cell = document.createElement("td");
+  cell.append(action);
+  return cell;
 }
 
 function renderRcFranchiseList() {
@@ -1949,7 +2105,11 @@ function renderRcFranchiseList() {
     });
     return button;
   }));
-  byId("rc-new-franchise").classList.toggle("is-active", rc.current === rcNewKey);
+  const add = byId("rc-new-item");
+  const addLabels = { FRANCHISE: "Neue Franchise anlegen", SERVICE: "Neuen Streamingdienst anlegen", DECADE: "Neues Jahrzehnt anlegen" };
+  add.classList.toggle("hidden", !addLabels[rc.group]);
+  add.textContent = addLabels[rc.group] ?? "";
+  add.classList.toggle("is-active", rc.current === (rc.group === "FRANCHISE" ? rcNewKey : rcNewCollectionKey));
 }
 
 function stashRcDraft() {
@@ -1959,7 +2119,10 @@ function stashRcDraft() {
   draft.title = byId("rc-f-title").value;
   draft.id = byId("rc-f-id").value;
   draft.cover = byId("rc-f-cover").value;
+  draft.intro = byId("rc-f-intro").value;
+  draft.region = byId("rc-f-region").value;
   draft.tmdb = [...rc.src.tmdb];
+  draft.providers = [...rc.src.providers];
   draft.mdblist = [...rc.src.mdblist];
   draft.extras = byId("rc-f-extras").value;
   if (!byId("rc-f-tabs").classList.contains("hidden")) draft.tabs[rc.ftab] = byId("rc-f-text").value;
@@ -1998,6 +2161,7 @@ async function loadRcListInfo(slugs) {
     for (const slug of missing) rc.listInfo[slug] = { title: null, movies: null, shows: null, total: null };
   }
   renderRcSourceRows();
+  if (document.querySelector("[data-rc-row]")) refreshRcRowInfo();
 }
 
 function rcSourceRow(badgeText, badgeClass, value, placeholder, infoText, onChange, onRemove) {
@@ -2018,7 +2182,7 @@ function rcSourceRow(badgeText, badgeClass, value, placeholder, infoText, onChan
 
 function renderRcSourceRows() {
   byId("rc-f-tmdb-rows").replaceChildren(...rc.src.tmdb.map((id, index) => rcSourceRow(
-    "Film", "is-movie", id, "TMDB-Collection-ID", "TMDB-Collection (enthält nur Filme)",
+    "Collection", "is-movie", id, "TMDB-Collection-ID", "Filmreihe bei TMDB (mehrere Filme)",
     (value) => {
       const clean = String(value).trim();
       if (!/^\d{1,9}$/.test(clean)) { showToast("TMDB-Collection-ID: nur Ziffern", true); renderRcSourceRows(); return; }
@@ -2026,6 +2190,16 @@ function renderRcSourceRows() {
       renderRcSourceRows();
     },
     () => { rc.src.tmdb.splice(index, 1); renderRcSourceRows(); },
+  )));
+  byId("rc-f-provider-rows").replaceChildren(...rc.src.providers.map((id, index) => rcSourceRow(
+    "Anbieter", "is-movie", id, "TMDB-Anbieter-ID", "Streaming-Anbieter bei TMDB (Filme und Serien)",
+    (value) => {
+      const clean = String(value).trim();
+      if (!/^\d{1,9}$/.test(clean)) { showToast("TMDB-Anbieter-ID: nur Ziffern", true); renderRcSourceRows(); return; }
+      rc.src.providers[index] = clean;
+      renderRcSourceRows();
+    },
+    () => { rc.src.providers.splice(index, 1); renderRcSourceRows(); },
   )));
   byId("rc-f-mdblist-rows").replaceChildren(...rc.src.mdblist.map((slug, index) => {
     const [badge, badgeClass] = rcListBadge(rc.listInfo[slug]);
@@ -2049,36 +2223,49 @@ function renderRcSourceRows() {
 function updateRcComposition() {
   const box = byId("rc-f-composition");
   const key = rc.current;
-  const isNew = key === rcNewKey;
-  const item = isNew ? null : rcItem(key);
-  if (!isNew && !item) { box.replaceChildren(); return; }
+  const isNewFranchise = key === rcNewKey;
+  const isNewCollection = key === rcNewCollectionKey;
+  const item = isNewFranchise || isNewCollection ? null : rcItem(key);
+  if (!item && !isNewFranchise && !isNewCollection) { box.replaceChildren(); return; }
+  const group = item?.group ?? (isNewCollection ? rcNewGroup() : "FRANCHISE");
   const parts = { movie: [], series: [] };
   const franchise = item?.franchise ?? null;
   if (franchise) {
     const draft = rc.drafts[key]?.tabs ?? {};
     const count = (tab) => (draft[tab] !== undefined ? rcLineCount(draft[tab]) : franchise.tabs[tab].length);
-    if (count("movie")) parts.movie.push(`eigene Liste: ${count("movie")} Filme`);
-    if (count("series")) parts.series.push(`eigene Liste: ${count("series")} Serien`);
+    if (count("movie")) parts.movie.push(`${count("movie")} Filme`);
+    if (count("series")) parts.series.push(`${count("series")} Serien`);
   }
-  if (rc.src.tmdb.length) parts.movie.push(`TMDB-Collections ${rc.src.tmdb.join(", ")} (Filme)`);
+  // What the app ships for this collection besides the editable lists (genre, streaming provider).
+  for (const source of item?.standard?.sources ?? []) {
+    const type = rcSourceType(source);
+    if (type) parts[type].push(rcDescribeSource(source));
+  }
+  for (const id of rc.src.providers) {
+    parts.movie.push(`TMDB-Streaming-Anbieter ${id}`);
+    parts.series.push(`TMDB-Streaming-Anbieter ${id}`);
+  }
+  for (const id of rc.src.tmdb) parts.movie.push(`TMDB-Collection ${id}`);
   for (const slug of rc.src.mdblist) {
     const info = rc.listInfo[slug];
     const name = info?.title || slug;
-    if (!info || info.total === null) { parts.movie.push(`${name} (Typ unbekannt)`); parts.series.push(`${name} (Typ unbekannt)`); continue; }
-    if (info.movies) parts.movie.push(`${name}: ${info.movies} Filme`);
-    if (info.shows) parts.series.push(`${name}: ${info.shows} Serien`);
+    if (!info || info.total === null) { parts.movie.push(`Liste ${name} (Typ unbekannt)`); parts.series.push(`Liste ${name} (Typ unbekannt)`); continue; }
+    if (info.movies) parts.movie.push(`Liste ${name}: ${info.movies} Filme`);
+    if (info.shows) parts.series.push(`Liste ${name}: ${info.shows} Serien`);
   }
   const extras = rcList(String(byId("rc-f-extras").value).replace(/\n/g, " ")).map((ref) => ref.toLowerCase());
   const extraMovies = extras.filter((ref) => /^movie:\d+$/.test(ref));
   const extraShows = extras.filter((ref) => /^tv:\d+$/.test(ref));
-  if (extraMovies.length) parts.movie.push(`feste Titel: ${extraMovies.join(", ")}`);
-  if (extraShows.length) parts.series.push(`feste Titel: ${extraShows.join(", ")}`);
+  if (extraMovies.length) parts.movie.push(`${extraMovies.length === 1 ? "1 einzelner Film" : `${extraMovies.length} einzelne Filme`} (${extraMovies.join(", ")})`);
+  if (extraShows.length) parts.series.push(`${extraShows.length === 1 ? "1 einzelne Serie" : `${extraShows.length} einzelne Serien`} (${extraShows.join(", ")})`);
   const line = (label, list) => {
     const row = rcElement("div");
     row.append(rcElement("strong", `${label}: `), rcElement("span", list.length ? list.join(" · ") : "nichts", list.length ? "" : "rc-composition-empty"));
     return row;
   };
-  const rows = [line("Filme-Tab", parts.movie), line("Serien-Tab", parts.series)];
+  const rows = [];
+  if (group !== "TV_GENRE") rows.push(line("Filme-Tab", parts.movie));
+  if (group !== "MOVIE_GENRE") rows.push(line("Serien-Tab", parts.series));
   if (franchise && (franchise.tabs.timeline.length || rc.drafts[key]?.tabs?.timeline)) {
     const timeline = rc.drafts[key]?.tabs?.timeline !== undefined ? rcLineCount(rc.drafts[key].tabs.timeline) : franchise.tabs.timeline.length;
     rows.push(line("Timeline-Tab", [`${timeline} Einträge`]));
@@ -2091,6 +2278,15 @@ function addRcTmdb() {
   const value = input.value.trim();
   if (!/^\d{1,9}$/.test(value)) { showToast("TMDB-Collection-ID: nur Ziffern", true); return; }
   if (!rc.src.tmdb.includes(value)) rc.src.tmdb.push(value);
+  input.value = "";
+  renderRcSourceRows();
+}
+
+function addRcProvider() {
+  const input = byId("rc-f-provider-add");
+  const value = input.value.trim();
+  if (!/^\d{1,9}$/.test(value)) { showToast("TMDB-Anbieter-ID: nur Ziffern", true); return; }
+  if (!rc.src.providers.includes(value)) rc.src.providers.push(value);
   input.value = "";
   renderRcSourceRows();
 }
@@ -2111,64 +2307,137 @@ function updateRcExtrasSummary() {
   const shows = refs.filter((ref) => /^tv:\d+$/i.test(ref)).length;
   const invalid = refs.length - movies - shows;
   byId("rc-f-extras-summary").textContent = refs.length
-    ? `${movies} Filme (movie:), ${shows} Serien (tv:)${invalid ? `, ${invalid} ungültig` : ""}`
+    ? `${movies} ${movies === 1 ? "Film" : "Filme"} (movie:), ${shows} ${shows === 1 ? "Serie" : "Serien"} (tv:)${invalid ? `, ${invalid} ungültig` : ""}`
     : "movie:ID = Film, tv:ID = Serie";
 }
 
+function rcCopyText(text) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.setAttribute("readonly", "");
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  try { document.execCommand("copy"); } finally { area.remove(); }
+  return Promise.resolve();
+}
+
+// Small "Kopieren" button that puts [value] on the clipboard, for the standard values shown next to the fields.
+function rcCopyButton(value, label = "Kopieren") {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "rc-copy";
+  button.textContent = label;
+  button.addEventListener("click", () => {
+    void rcCopyText(String(value)).then(() => {
+      button.textContent = "Kopiert";
+      setTimeout(() => { button.textContent = label; }, 1500);
+    }).catch(() => showToast("Kopieren nicht möglich", true));
+  });
+  return button;
+}
+
 function rcHint(node, label, value) {
-  node.textContent = `Standard${label ? ` ${label}` : ""}: ${value || "—"}`;
+  node.replaceChildren(`Standard${label ? ` ${label}` : ""}: ${value || "—"}`);
+  if (value) node.append(" ", rcCopyButton(value));
+}
+
+// Standard intro plus a link to the intro that is currently entered.
+function updateRcIntroHint() {
+  const item = rc.current === rcNewKey || rc.current === rcNewCollectionKey ? null : rcItem(rc.current);
+  const standardIntro = item?.standard?.introUrl ?? "";
+  const hint = byId("rc-f-intro-hint");
+  if (standardIntro) rcHint(hint, "", standardIntro);
+  else hint.replaceChildren();
+  const current = byId("rc-f-intro").value.trim();
+  if (/^https:\/\//.test(current)) {
+    const link = document.createElement("a");
+    link.href = current;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.textContent = "Aktuelles Intro ansehen";
+    if (standardIntro) hint.append(" · ");
+    hint.append(link);
+  }
 }
 
 function renderRcFranchiseForm() {
   const key = rc.current;
-  const isNew = key === rcNewKey;
+  const isNewFranchise = key === rcNewKey;
+  const isNewCollection = key === rcNewCollectionKey;
+  const isNew = isNewFranchise || isNewCollection;
   const item = isNew ? null : rcItem(key);
   const form = byId("rc-franchise-form");
   form.classList.toggle("hidden", !isNew && !item);
   if (!isNew && !item) return;
   const standard = item?.standard ?? null;
   const franchise = item?.franchise ?? null;
+  const added = item?.added ?? null;
+  const isAddedForm = isNewCollection || Boolean(added);
   const custom = isNew || !standard;
-  const isFranchiseGroup = isNew || item.group === "FRANCHISE";
-  const hasTabs = isNew || Boolean(franchise);
+  const group = item?.group ?? (isNewCollection ? rcNewGroup() : "FRANCHISE");
+  const isFranchiseGroup = group === "FRANCHISE";
+  const genre = rcIsGenreGroup(group);
+  const hasTabs = isNewFranchise || Boolean(franchise);
   const draft = rc.drafts[key] ?? { tabs: {} };
-  const effective = item ? rcEffective(item) : { cover: "", tmdb: [], mdblist: [], extras: [] };
+  const effective = item ? rcEffective(item) : { title: "", cover: "", intro: "", region: "US", tmdb: [], providers: [], mdblist: [], extras: [] };
 
-  byId("rc-f-heading").textContent = isNew ? "Neue Franchise" : item.title;
-  byId("rc-f-title").value = draft.title ?? item?.title ?? "";
-  byId("rc-f-id").value = draft.id ?? franchise?.id ?? "";
+  byId("rc-f-heading").textContent = isNewFranchise ? "Neue Franchise" : isNewCollection ? (group === "DECADE" ? "Neues Jahrzehnt" : "Neuer Streamingdienst") : item.title;
+  const shownTitle = standard ? (effective.title || (genre ? "" : standard.title)) : effective.title;
+  byId("rc-f-title").value = draft.title ?? shownTitle;
+  byId("rc-f-id").value = draft.id ?? franchise?.id ?? added?.id ?? "";
   byId("rc-f-cover").value = draft.cover ?? effective.cover;
-  rc.src = { tmdb: [...(draft.tmdb ?? effective.tmdb)], mdblist: [...(draft.mdblist ?? effective.mdblist)] };
+  byId("rc-f-intro").value = draft.intro ?? effective.intro;
+  byId("rc-f-region").value = draft.region ?? effective.region;
+  rc.src = {
+    tmdb: [...(draft.tmdb ?? effective.tmdb)],
+    providers: [...(draft.providers ?? effective.providers)],
+    mdblist: [...(draft.mdblist ?? effective.mdblist)],
+  };
   byId("rc-f-extras").value = draft.extras ?? effective.extras.join("\n");
   renderRcSourceRows();
   updateRcExtrasSummary();
   byId("rc-f-reason").value = draft.reason ?? "";
-  byId("rc-f-title").disabled = !custom;
   byId("rc-f-id").disabled = !isNew;
   byId("rc-f-id").closest("label").classList.toggle("hidden", !custom);
+  byId("rc-f-region-field").classList.toggle("hidden", !(isAddedForm && group === "SERVICE"));
+  byId("rc-f-intro-field").classList.toggle("hidden", !(group === "SERVICE" || Boolean(standard?.introUrl)));
+  byId("rc-f-intro-hint").classList.toggle("hidden", byId("rc-f-intro-field").classList.contains("hidden"));
   byId("rc-f-tmdb-field").classList.toggle("hidden", !isFranchiseGroup);
   byId("rc-f-tmdb-hint").classList.toggle("hidden", !isFranchiseGroup);
+  byId("rc-f-provider-field").classList.toggle("hidden", !(isAddedForm && group === "SERVICE"));
   for (const id of ["rc-f-extras-field", "rc-f-extras-summary", "rc-f-extras-hint"]) {
     byId(id).classList.toggle("hidden", !(isFranchiseGroup && standard));
   }
   byId("rc-f-tabs").classList.toggle("hidden", !hasTabs);
 
+  const genreNote = byId("rc-f-genre-note");
+  genreNote.classList.toggle("hidden", !genre);
+  genreNote.textContent = genre
+    ? "Ohne Eintrag lädt die App Name und Cover dieses Genres automatisch von der Vodwisharr-API " +
+      "(TMDB-Hintergrundbild mit Farbfilter, Name in der App-Sprache). Ein Name oder Cover hier gilt für alle Geräte und ersetzt die API-Werte."
+    : "";
   if (standard) {
-    rcHint(byId("rc-f-cover-hint"), "", standard.coverUrl);
+    rcHint(byId("rc-f-title-hint"), genre ? "(Ersatzname, falls die API nicht antwortet)" : "", standard.title);
+    rcHint(byId("rc-f-cover-hint"), genre ? "(Ersatz-Cover, falls die API nicht antwortet)" : "", standard.coverUrl);
     rcHint(byId("rc-f-tmdb-hint"), "", standard.tmdbCollections.join(", "));
     rcHint(byId("rc-f-mdblist-hint"), "", standard.mdblist.join(", "));
-    byId("rc-f-extras-hint").textContent = `Standard: ${(standard.curated ?? []).join(", ") || "keine"}`;
+    rcHint(byId("rc-f-extras-hint"), "", (standard.curated ?? []).join(", "));
     const other = standard.sources.filter((source) => !/^(mdblist|tmdbCollection):/.test(source) && !source.startsWith("curated@"));
-    byId("rc-f-other").textContent = other.length
-      ? `Weitere feste Quellen der App (nicht änderbar): ${other.join(" · ")}`
-      : "";
+    const otherNode = byId("rc-f-other");
+    otherNode.replaceChildren(other.length ? `Weitere Quellen der App (nicht änderbar): ${other.map(rcDescribeSource).join(" · ")}` : "");
+    if (other.length && standard.providers?.length) otherNode.append(" ", rcCopyButton(standard.providers.join(", "), "Anbieter-IDs kopieren"));
   } else {
+    byId("rc-f-title-hint").replaceChildren();
     byId("rc-f-cover-hint").textContent = "Ohne Cover erscheint die Collection ohne Bild.";
-    byId("rc-f-tmdb-hint").textContent = "";
-    byId("rc-f-mdblist-hint").textContent = "";
-    byId("rc-f-other").textContent = "";
-    byId("rc-f-extras-hint").textContent = "";
+    byId("rc-f-tmdb-hint").replaceChildren();
+    byId("rc-f-mdblist-hint").replaceChildren();
+    byId("rc-f-other").replaceChildren();
+    byId("rc-f-extras-hint").replaceChildren();
   }
+  updateRcIntroHint();
   const preview = byId("rc-f-cover-preview");
   const coverValue = byId("rc-f-cover").value.trim();
   preview.classList.toggle("hidden", !/^https:\/\//.test(coverValue));
@@ -2180,14 +2449,19 @@ function renderRcFranchiseForm() {
     byId("rc-f-count").textContent = `${rcLineCount(byId("rc-f-text").value)} Einträge in diesem Tab`;
   }
   const changed = item ? rcIsChanged(item) : false;
-  byId("rc-f-state").textContent = isNew
+  byId("rc-f-state").textContent = isNewFranchise
     ? "Wird nach dem Speichern für alle Geräte als Collection in der Franchise-Reihe angezeigt."
-    : standard
-      ? (changed ? "Mit Änderungen gegenüber dem Standard der App." : "Standard der App (noch nicht geändert).")
-      : `Eigene Franchise (Stand ${franchise.revision}, gespeichert ${formatDate(franchise.updatedAt)}).`;
+    : isNewCollection
+      ? group === "DECADE" ? "Wird nach dem Speichern für alle Geräte als Collection in der Jahrzehnte-Reihe angezeigt." : "Wird nach dem Speichern für alle Geräte als Collection in der Streamingdienste-Reihe angezeigt."
+      : standard
+        ? (changed ? "Mit Änderungen gegenüber dem Standard der App." : "Standard der App (noch nicht geändert).")
+        : added
+          ? (group === "DECADE" ? "Eigenes Jahrzehnt, gilt für alle Geräte." : "Eigener Streamingdienst, gilt für alle Geräte.")
+          : `Eigene Franchise (Stand ${franchise.revision}, gespeichert ${formatDate(franchise.updatedAt)}).`;
   byId("rc-f-reset").classList.toggle("hidden", !standard);
   byId("rc-f-reset").disabled = !changed;
   byId("rc-f-delete").classList.toggle("hidden", isNew || Boolean(standard));
+  byId("rc-f-delete").textContent = added ? (group === "DECADE" ? "Jahrzehnt löschen" : "Dienst löschen") : "Franchise löschen";
   document.querySelectorAll("[data-rc-ftab]").forEach((button) => {
     button.setAttribute("aria-pressed", String(button.dataset.rcFtab === rc.ftab));
   });
@@ -2202,26 +2476,56 @@ function rcTabsFromDraft(draft, franchise) {
   return tabs;
 }
 
+function rcNumbers(values, label) {
+  return rcList((values ?? []).join(",")).map((value) => {
+    if (!/^\d{1,9}$/.test(value)) throw new Error(`„${value}“ ist keine gültige ${label}`);
+    return Number(value);
+  });
+}
+
 async function saveRcFranchise(event) {
   event.preventDefault();
   const message = byId("rc-f-message");
   stashRcDraft();
   const key = rc.current;
-  const isNew = key === rcNewKey;
+  const isNewFranchise = key === rcNewKey;
+  const isNewCollection = key === rcNewCollectionKey;
+  const isNew = isNewFranchise || isNewCollection;
   const item = isNew ? null : rcItem(key);
   const draft = rc.drafts[key] ?? { tabs: {} };
   const reason = byId("rc-f-reason").value;
   try {
     const cover = String(draft.cover ?? "").trim();
+    const intro = String(draft.intro ?? "").trim();
+    const title = String(draft.title ?? "").trim();
     const mdblist = (draft.mdblist ?? []).map(rcNormalizeSlug).filter(Boolean);
-    const tmdbIds = rcNumberList((draft.tmdb ?? []).join(","));
-    if (!item?.standard) {
+    const tmdbIds = rcNumbers(draft.tmdb, "TMDB-Collection-ID");
+    if (isNewCollection || item?.added) {
+      const group = item?.group ?? rcNewGroup();
+      const id = isNewCollection ? String(draft.id || "").trim().toLowerCase() : item.added.id;
+      const overrides = structuredClone(rc.data.overrides);
+      const entry = {
+        id, group, title, coverUrl: cover, introUrl: group === "SERVICE" ? intro : "",
+        providers: group === "SERVICE" ? rcNumbers(draft.providers, "TMDB-Anbieter-ID") : [],
+        mdblist, region: String(draft.region || "US").trim().toUpperCase(),
+      };
+      const list = overrides.newCollections ?? [];
+      const at = list.findIndex((entryItem) => entryItem.id === id && entryItem.group === group);
+      if (at >= 0) list[at] = entry; else list.push(entry);
+      overrides.newCollections = list;
+      setMessage(message, "Wird gespeichert…", "info");
+      await api("/admin-api/catalog-config/overrides", { method: "PUT", body: JSON.stringify({ ...overrides, reason }) });
+      delete rc.drafts[key];
+      rc.group = group;
+      byId("rc-group-filter").value = group;
+      rc.current = `added:${group}:${id}`;
+    } else if (!item?.standard) {
       const id = isNew ? String(draft.id || "").trim().toLowerCase() : item.franchise.id;
       setMessage(message, "Wird gespeichert…", "info");
       const saved = (await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(id)}`, {
         method: "PUT",
         body: JSON.stringify({
-          title: String(draft.title ?? "").trim(), coverUrl: cover, tmdbCollections: tmdbIds,
+          title, coverUrl: cover, tmdbCollections: tmdbIds,
           mdblist, tabs: rcTabsFromDraft(draft, item?.franchise), reason,
         }),
       })).franchise;
@@ -2230,8 +2534,11 @@ async function saveRcFranchise(event) {
     } else {
       const standard = item.standard;
       const overrides = structuredClone(rc.data.overrides);
-      for (const name of ["covers", "sources", "extras", "rows"]) overrides[name] ??= {};
+      for (const name of ["covers", "intros", "titles", "sources", "extras", "rows"]) overrides[name] ??= {};
+      // Empty fields mean "keep the app's own"; values equal to the app's own are dropped by the backend.
       if (cover) overrides.covers[standard.id] = cover; else delete overrides.covers[standard.id];
+      if (intro) overrides.intros[standard.id] = intro; else delete overrides.intros[standard.id];
+      if (title && title !== standard.title) overrides.titles[standard.id] = title; else delete overrides.titles[standard.id];
       const sources = {};
       if (mdblist.length) sources.mdblist = mdblist;
       if (item.group === "FRANCHISE") {
@@ -2269,9 +2576,14 @@ async function removeRcFranchise() {
   if (!window.confirm(text)) return;
   const message = byId("rc-f-message");
   try {
-    if (item.standard) {
+    if (item.added) {
       const overrides = structuredClone(rc.data.overrides);
-      for (const name of ["covers", "sources", "extras"]) delete overrides[name]?.[item.standard.id];
+      overrides.newCollections = (overrides.newCollections ?? []).filter((entry) => !(entry.id === item.added.id && entry.group === item.added.group));
+      await api("/admin-api/catalog-config/overrides", { method: "PUT", body: JSON.stringify({ ...overrides, reason }) });
+      rc.current = null;
+    } else if (item.standard) {
+      const overrides = structuredClone(rc.data.overrides);
+      for (const name of ["covers", "intros", "titles", "sources", "extras"]) delete overrides[name]?.[item.standard.id];
       await api("/admin-api/catalog-config/overrides", { method: "PUT", body: JSON.stringify({ ...overrides, reason }) });
       if (item.franchise?.custom) {
         await api(`/admin-api/catalog-config/franchises/${encodeURIComponent(item.franchise.id)}`, {
@@ -2292,6 +2604,7 @@ async function removeRcFranchise() {
   }
 }
 
+
 function rcRowIdFor(title) {
   return String(title).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
 }
@@ -2301,24 +2614,26 @@ function renderRcStandards() {
   rc.newRows = (overrides.newRows || []).map((row) => ({ ...row }));
   const rows = standards.filter((item) => item.kind === "STANDARD" || item.kind === "COLLECTION_RAIL");
   const hidden = new Set(overrides.hidden || []);
-  byId("rc-rows").replaceChildren(...rows.map((item) => {
-    const line = document.createElement("div");
-    line.className = "rc-list-row";
+  const isListRow = (item) => item.kind === "STANDARD" && String(item.sourceUrl).includes("mdblist.com/lists/");
+  const sections = [
+    ["Reihen mit MDBList-Liste", "Der Schalter blendet die Reihe auf allen Geräten ein oder aus. Im Feld steht die Liste, die gerade gilt.", rows.filter(isListRow)],
+    ["Reihen mit Collections", "Der Inhalt dieser Reihen (Streamingdienste, Franchises, Jahrzehnte, Genres) wird im Tab „Collections“ gepflegt. Hier nur ein- oder ausblenden.", rows.filter((item) => item.kind === "COLLECTION_RAIL")],
+    ["Persönliche Reihen", "Kommen aus dem Verlauf und den Favoriten des Nutzers, nicht aus einer Liste.", rows.filter((item) => !isListRow(item) && item.kind !== "COLLECTION_RAIL")],
+  ];
+  const lines = (items) => items.map((item) => {
+    const line = rcElement("div", null, "rc-list-row");
     const text = rcElement("label", null, "rc-list-label rc-row-check");
     const check = document.createElement("input");
     check.type = "checkbox";
     check.className = "rc-switch";
     check.setAttribute("role", "switch");
+    check.setAttribute("aria-label", item.title);
     check.checked = !hidden.has(item.id);
     check.dataset.rcShow = item.id;
-    const names = rcElement("span");
-    names.append(
-      rcElement("strong", item.title),
-      rcElement("small", item.kind === "COLLECTION_RAIL" ? "Reihe mit Collections" : (item.sourceUrl ? `Standard: ${item.sourceUrl}` : "Reihe der App")),
-    );
-    text.append(check, names);
+    text.append(check, rcElement("strong", item.title));
     line.append(text);
-    if (item.kind === "STANDARD" && String(item.sourceUrl).includes("mdblist.com/lists/")) {
+    if (isListRow(item)) {
+      const field = rcElement("div", null, "rc-list-field");
       const input = document.createElement("input");
       input.value = overrides.rows?.[item.id] ?? item.sourceUrl;
       input.placeholder = item.sourceUrl;
@@ -2326,17 +2641,49 @@ function renderRcStandards() {
       input.maxLength = 300;
       input.dataset.rcRow = item.id;
       input.dataset.rcDefault = item.sourceUrl;
-      line.append(input);
-    } else {
-      line.append(rcElement("span", "", "rc-source-info"));
+      const info = rcElement("span", "", "rc-source-info");
+      info.dataset.rcInfo = item.id;
+      const reset = document.createElement("button");
+      reset.type = "button";
+      reset.className = "button secondary rc-reset";
+      reset.textContent = "Standard";
+      reset.addEventListener("click", () => { input.value = item.sourceUrl; refreshRcRowInfo(); });
+      input.addEventListener("input", refreshRcRowInfo);
+      input.addEventListener("change", refreshRcRowInfo);
+      const wrap = rcElement("div", null, "rc-list-input");
+      wrap.append(input, reset, rcCopyButton(item.sourceUrl, "Standard kopieren"));
+      field.append(wrap, info);
+      line.append(field);
     }
     return line;
+  });
+  byId("rc-rows").replaceChildren(...sections.filter(([, , items]) => items.length).map(([title, help, items]) => {
+    const section = rcElement("section", null, "rc-list-section");
+    section.append(rcElement("h4", title), rcElement("p", help, "rc-hint"), ...lines(items));
+    return section;
   }));
+  refreshRcRowInfo();
   renderRcNewRows();
   byId("rc-nr-after").replaceChildren(
     new Option("Am Ende", ""),
     ...rows.filter((item) => item.kind === "STANDARD").map((item) => new Option(`nach „${item.title}“`, item.id)),
   );
+}
+
+// Status line under each list field: standard or changed, plus what the current list contains.
+function refreshRcRowInfo() {
+  const missing = [];
+  document.querySelectorAll("[data-rc-row]").forEach((input) => {
+    const slug = rcNormalizeSlug(input.value);
+    const changed = input.value.trim() !== input.dataset.rcDefault;
+    const info = rcListInfoText(slug ? rc.listInfo[slug] : { title: null, movies: null, shows: null, total: null });
+    if (slug && !(slug in rc.listInfo)) missing.push(slug);
+    const node = document.querySelector(`[data-rc-info="${input.dataset.rcRow}"]`);
+    node.textContent = `${changed ? "Geändert" : "Standard"} · ${slug ? info : "keine gültige MDBList-Liste"}`;
+    node.classList.toggle("is-changed", changed);
+    input.closest(".rc-list-input").querySelector(".rc-reset").classList.toggle("hidden", !changed);
+  });
+  if (missing.length) void loadRcListInfo([...new Set(missing)]);
 }
 
 function renderRcNewRows() {
@@ -2426,19 +2773,20 @@ byId("rc-group-filter").addEventListener("change", () => {
   renderRcFranchiseList();
   renderRcFranchiseForm();
 });
-byId("rc-new-franchise").addEventListener("click", () => {
+// One button whose action follows the chosen area: new franchise, streaming service or decade (genres have no "new").
+byId("rc-new-item").addEventListener("click", () => {
   stashRcDraft();
-  rc.group = "FRANCHISE";
-  byId("rc-group-filter").value = "FRANCHISE";
-  rc.current = rcNewKey;
+  rc.current = rc.group === "FRANCHISE" ? rcNewKey : rcNewCollectionKey;
   rc.ftab = "movie";
   renderRcFranchiseList();
   renderRcFranchiseForm();
 });
 byId("rc-f-extras").addEventListener("input", updateRcExtrasSummary);
 byId("rc-f-tmdb-add-btn").addEventListener("click", addRcTmdb);
+byId("rc-f-provider-add-btn").addEventListener("click", addRcProvider);
 byId("rc-f-mdblist-add-btn").addEventListener("click", addRcMdblist);
-for (const [id, handler] of [["rc-f-tmdb-add", addRcTmdb], ["rc-f-mdblist-add", addRcMdblist]]) {
+byId("rc-f-intro").addEventListener("input", updateRcIntroHint);
+for (const [id, handler] of [["rc-f-tmdb-add", addRcTmdb], ["rc-f-provider-add", addRcProvider], ["rc-f-mdblist-add", addRcMdblist]]) {
   byId(id).addEventListener("keydown", (event) => {
     if (event.key === "Enter") { event.preventDefault(); handler(); }
   });
@@ -2458,17 +2806,23 @@ byId("rc-f-delete").addEventListener("click", removeRcFranchise);
 byId("rc-standards-form").addEventListener("submit", saveRcStandards);
 byId("rc-nr-add").addEventListener("click", addRcNewRow);
 
+// Only what ships with the app is listed; add-ons, playlists and catalogs users installed themselves stay out.
+const appOwnedAddonIds = new Set(["opensubtitles"]);
+const appOwnedPlaylistIds = new Set(["streamnet_tv"]);
+
+function isAppOwnedItem(item) {
+  if (item.sourceType !== undefined) return item.sourceType === "PREINSTALLED";
+  return appOwnedAddonIds.has(item.id) || appOwnedPlaylistIds.has(item.id);
+}
+
 function updateGlobalFields() {
   const operation = byId("global-operation").value;
   const category = globalOperationCategory(operation);
   const descriptions = {
-    playlists: ["Playlist-Einstellungen", "M3U, Xtream und StreamNet TV accountübergreifend verwalten."],
-    addons: ["Add-on-Einstellungen", "Add-ons und ihre Zuordnungen zu bestehenden Profilen verwalten."],
-    catalogs: ["Katalog-Einstellungen", "Trakt, MDBList, System- und Add-on-Kataloge verwalten."],
+    playlists: ["Playlist-Einstellungen", "StreamNet TV (und bei Bedarf M3U/Xtream) bei bestehenden Accounts verwalten."],
+    addons: ["Add-on-Einstellungen", "Add-ons der App und ihre Zuordnung zu bestehenden Profilen verwalten."],
+    catalogs: ["Katalog-Einstellungen", "Kataloge der App bei bestehenden Accounts verwalten."],
   };
-  document.querySelectorAll("[data-global-category]").forEach(button => {
-    button.setAttribute("aria-pressed", String(button.dataset.globalCategory === category));
-  });
   byId("global-settings-title").textContent = descriptions[category][0];
   byId("global-category-description").textContent = descriptions[category][1];
   byId("global-action-summary").textContent = byId("global-operation").selectedOptions[0].textContent;
@@ -2482,7 +2836,7 @@ function updateGlobalFields() {
       "Titel und Einstellungen bleiben unverändert. Prüfe die Anzahl in der Vorschau."
     : noSettings.dataset.defaultText;
   const needsTarget = /^(edit|delete|rename|set)_/.test(operation) || operation === "change_xtream_host" ||
-    operation === "clear_catalog_source" || operation.endsWith("_catalog_item");
+    operation === "clear_catalog_source";
   const editsData = /^(add|edit)_/.test(operation);
   const isAddon = operation.endsWith("addon") || operation === "clear_addons";
   const isCatalog = operation.includes("catalog");
@@ -2496,9 +2850,7 @@ function updateGlobalFields() {
   }
   const hostOnly = operation === "change_xtream_host";
   byId("global-no-settings").classList.toggle("hidden",
-    editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled" ||
-      operation === "set_catalog_source" || operation === "set_catalog_slug" || operation === "add_catalog_item" ||
-      operation === "set_catalog_addon");
+    editsData || hostOnly || operation === "rename_catalog" || operation === "set_catalog_enabled");
   byId("global-host-fields").classList.toggle("hidden", !hostOnly);
   byId("global-host-url").disabled = !hostOnly;
   byId("global-host-url").required = hostOnly;
@@ -2508,7 +2860,7 @@ function updateGlobalFields() {
   const select = byId("global-target");
   const previous = select.value;
   select.replaceChildren();
-  const items = state.global?.[isCatalog ? "catalogs" : isAddon ? "addons" : "playlists"] || [];
+  const items = (state.global?.[isCatalog ? "catalogs" : isAddon ? "addons" : "playlists"] || []).filter(isAppOwnedItem);
   const defaultItems = defaultCatalogTargets(operation);
   const placeholder = document.createElement("option");
   placeholder.value = "";
@@ -2540,13 +2892,6 @@ function shortMdblistValue(value) {
   return String(value).replace(/^https?:\/\/(www\.)?mdblist\.com\/lists\//i, "");
 }
 
-// "Popular 2020s Movies · snoak/top-2020s-movies" when the list name is known, else just the list.
-function mdblistListLabel(value) {
-  const slug = shortMdblistValue(value);
-  const title = state.mdblistTitles?.[slug];
-  return title ? `${title} · ${slug}` : slug;
-}
-
 async function loadMdblistTitles() {
   const slugs = new Set();
   for (const catalog of state.defaultCatalogs || []) {
@@ -2570,87 +2915,22 @@ async function loadMdblistTitles() {
   }
 }
 
-// "movie · mdblist.88328 · aio-metadata" from the listing value "type|catalogId|addonId|manifestUrl".
-function addonVariantLabel(value) {
-  const [type, catalogId, addonId, ...manifest] = String(value).split("|");
-  const manifestUrl = manifest.join("|");
-  return [type, catalogId, addonId || null, manifestUrl ? `Manifest ${manifestUrl}` : null].filter(Boolean).join(" · ");
-}
-
-// The TMDB id as the admin typed it; TMDB blocks automatic title lookups, so there is no name.
-function tmdbRefLabel(ref) {
-  return ref;
-}
-
+// Targets of "reset old swaps": the catalogs that still carry a list swapped per account.
 function defaultCatalogTargets(operation) {
-  if (operation === "add_catalog_item" || operation === "remove_catalog_item") {
-    const targets = [];
-    for (const catalog of state.defaultCatalogs || []) {
-      if (!catalog.id.startsWith("collection_franchise_")) continue;
-      const extras = catalog.extraRefs || [];
-      const details = {
-        title: catalog.title, id: catalog.id, label: "Ergänzte Titel",
-        note: extras.length
-          ? "Von dir ergänzt (zusätzlich zu den fest eingebauten Quellen der App):"
-          : "Noch keine Titel ergänzt.",
-        variants: extras.map(({ ref, accounts }) => ({ value: ref, accounts })),
-      };
-      if (operation === "add_catalog_item") {
-        targets.push({ id: catalog.id, label: `${catalog.title} · ${catalog.id}`, group: "Franchises", details });
-      } else {
-        for (const { ref, accounts } of extras) {
-          targets.push({
-            id: `${catalog.id}#${ref}`,
-            label: `${catalog.title} — ${tmdbRefLabel(ref)} (${accounts} Accounts)`,
-            group: "Franchises", details,
-          });
-        }
-      }
-    }
-    return targets;
-  }
-  if (operation === "set_catalog_addon") {
-    const targets = [];
-    for (const catalog of state.defaultCatalogs || []) {
-      if (catalog.kind !== "collection") continue;
-      for (const source of catalog.sources.filter((item) => item.key.startsWith("addon:"))) {
-        const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
-        const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
-        const first = source.variants[0]?.value || "";
-        const [type, catalogId] = first.split("|");
-        targets.push({
-          id: `${catalog.id}#${type}|${catalogId}`,
-          label: `${catalog.title} · ${addonVariantLabel(first)}${mixed} (${accounts} Accounts)`,
-          group: `${catalog.title} · ${catalog.id}`,
-          details: { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants },
-        });
-      }
-    }
-    return targets;
-  }
-  if (!["set_catalog_source", "set_catalog_slug", "clear_catalog_source"].includes(operation)) return null;
-  const wanted = operation === "set_catalog_source" ? "home" : operation === "set_catalog_slug" ? "collection" : null;
+  if (operation !== "clear_catalog_source") return null;
   const targets = [];
   for (const catalog of state.defaultCatalogs || []) {
-    if (wanted && catalog.kind !== wanted) continue;
-    const group = catalog.kind === "home" ? "Home-Reihen" : `${catalog.title} · ${catalog.id}`;
-    for (const source of catalog.sources) {
-      if (operation === "set_catalog_slug" && !source.key.startsWith("slug:")) continue;
-      if (operation === "clear_catalog_source" && source !== catalog.sources[0]) continue;
-      const accounts = source.variants.reduce((sum, variant) => sum + variant.accounts, 0);
-      const mixed = source.variants.length > 1 ? ` · ${source.variants.length} verschiedene Werte` : "";
-      const current = shortMdblistValue(source.variants[0]?.value || "");
-      let label;
-      if (operation === "clear_catalog_source") label = `${catalog.title} · ${catalog.id}`;
-      else if (catalog.kind === "home") label = `${catalog.title} — ${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
-      else label = `${catalog.title} · ${mdblistListLabel(source.variants[0]?.value || "")}${mixed} (${accounts} Accounts)`;
-      targets.push({
-        id: operation === "set_catalog_slug" ? `${catalog.id}#${source.variants[0]?.value || ""}` : catalog.id,
-        label,
-        group: operation === "clear_catalog_source" ? "Standard-Listen" : group,
-        details: { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants },
-      });
-    }
+    const source = catalog.sources[0];
+    const extras = (catalog.extraRefs || []).map(({ ref, accounts }) => ({ value: ref, accounts }));
+    if (!source && !extras.length) continue;
+    targets.push({
+      id: catalog.id,
+      label: `${catalog.title} · ${catalog.id}`,
+      group: "Standard-Listen",
+      details: source
+        ? { title: catalog.title, id: catalog.id, label: source.label, variants: source.variants }
+        : { title: catalog.title, id: catalog.id, label: "Ergänzte Titel", note: "Pro Account ergänzte Titel:", variants: extras },
+    });
   }
   return targets;
 }
@@ -2674,10 +2954,7 @@ function renderTargetDetails(targets) {
     const item = document.createElement("li");
     const value = document.createElement("code");
     const slug = shortMdblistValue(variant.value);
-    value.textContent = /^(movie|tv):\d+$/.test(variant.value)
-      ? tmdbRefLabel(variant.value)
-      : /^[a-z]+\|/.test(variant.value) && details.label === "Addon-Katalog" ? addonVariantLabel(variant.value)
-      : state.mdblistTitles?.[slug] ? `${state.mdblistTitles[slug]} · ${variant.value}` : variant.value;
+    value.textContent = state.mdblistTitles?.[slug] ? `${state.mdblistTitles[slug]} · ${variant.value}` : variant.value;
     const count = document.createElement("span");
     count.textContent = `${variant.accounts} Account${variant.accounts === 1 ? "" : "s"}`;
     item.append(value, count);
@@ -2691,32 +2968,18 @@ function updateGlobalCatalogFields() {
   const adding = operation === "add_catalog";
   const renaming = operation === "rename_catalog";
   const settingEnabled = operation === "set_catalog_enabled";
-  const settingSource = operation === "set_catalog_source" || operation === "set_catalog_slug";
-  const addingItem = operation === "add_catalog_item";
-  const settingAddon = operation === "set_catalog_addon";
-  const sourceOperation = settingSource || settingAddon || operation === "clear_catalog_source";
-  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !sourceOperation && !addingItem);
-  byId("global-catalog-source-note").classList.toggle("hidden", !sourceOperation);
-  byId("global-catalog-value-label").textContent = addingItem
-    ? "Film oder Serie (TMDB-Link oder tv:ID / movie:ID)"
-    : settingAddon ? "Neue Katalog-ID im Addon (z. B. mdblist.88328)"
-    : "Neue MDBList-Liste (URL oder Benutzer/Liste)";
-  byId("global-catalog-value").placeholder = addingItem
-    ? "https://www.themoviedb.org/tv/84773 oder tv:84773"
-    : settingAddon ? "mdblist.88328"
-    : "https://mdblist.com/lists/snoak/trending-movies oder snoak/trending-movies";
+  const clearing = operation === "clear_catalog_source";
+  byId("global-catalog-fields").classList.toggle("hidden", !adding && !renaming && !settingEnabled && !clearing);
+  byId("global-catalog-source-note").classList.toggle("hidden", !clearing);
   const type = byId("global-catalog-type").value;
   const template = type === "PREINSTALLED" || type === "ADDON";
   for (const [id, visible] of [
     ["type", adding], ["template", adding && template], ["url", adding && !template],
     ["title", adding || renaming], ["enabled", adding || settingEnabled],
-    ["value", settingSource || addingItem || settingAddon],
-    ["addon-id", settingAddon], ["manifest", settingAddon],
   ]) {
     byId(`global-catalog-${id}-field`).classList.toggle("hidden", !visible);
     byId(`global-catalog-${id}`).disabled = !visible;
   }
-  byId("global-catalog-value").required = settingSource || addingItem || settingAddon;
   byId("global-catalog-title").required = renaming || (adding && !template);
   byId("global-catalog-url").required = adding && !template;
   byId("global-catalog-template").required = adding && template;
@@ -2768,30 +3031,7 @@ async function submitGlobalMutation(event) {
       targetId: byId("global-target").value,
       reason: byId("global-reason").value,
     };
-    if (operation === "set_catalog_slug") {
-      const separator = request.targetId.indexOf("#");
-      const fromSlug = request.targetId.slice(separator + 1);
-      request.targetId = request.targetId.slice(0, separator);
-      request.data = { fromSlug, mdblistSlug: byId("global-catalog-value").value.trim() };
-    } else if (operation === "set_catalog_addon") {
-      const separator = request.targetId.indexOf("#");
-      const [fromType, fromCatalogId] = request.targetId.slice(separator + 1).split("|");
-      request.targetId = request.targetId.slice(0, separator);
-      request.data = {
-        fromType, fromCatalogId,
-        addonCatalogId: byId("global-catalog-value").value.trim(),
-        addonId: byId("global-catalog-addon-id").value.trim(),
-        addonManifestUrl: byId("global-catalog-manifest").value.trim(),
-      };
-    } else if (operation === "add_catalog_item") {
-      request.data = { ref: byId("global-catalog-value").value.trim() };
-    } else if (operation === "remove_catalog_item") {
-      const separator = request.targetId.indexOf("#");
-      request.data = { ref: request.targetId.slice(separator + 1) };
-      request.targetId = request.targetId.slice(0, separator);
-    } else if (operation === "set_catalog_source") {
-      request.data = { sourceUrl: byId("global-catalog-value").value.trim() };
-    } else if (operation === "add_catalog") {
+    if (operation === "add_catalog") {
       request.data = {
         sourceType: byId("global-catalog-type").value,
         templateId: byId("global-catalog-template").value,
@@ -2945,9 +3185,6 @@ byId("login-form").addEventListener("submit", async (event) => {
 
 byId("logout-button").addEventListener("click", logout);
 byId("global-operation").addEventListener("change", updateGlobalFields);
-document.querySelectorAll("[data-global-category]").forEach(button => {
-  button.addEventListener("click", () => selectGlobalCategory(button.dataset.globalCategory));
-});
 selectGlobalCategory("playlists");
 byId("global-playlist-type").addEventListener("change", updateGlobalPlaylistFields);
 byId("global-catalog-type").addEventListener("change", updateGlobalCatalogFields);
@@ -2991,8 +3228,8 @@ byId("clear-online-filter").addEventListener("click", () => {
 });
 byId("back-button").addEventListener("click", () => selectView("accounts"));
 byId("mutation-operation").addEventListener("change", updateOperationFields);
-document.querySelectorAll("[data-account-category]").forEach(button => {
-  button.addEventListener("click", () => selectAccountCategory(button.dataset.accountCategory));
+document.querySelectorAll("[data-acc-tab]").forEach((button) => {
+  button.addEventListener("click", () => selectAccountTab(button.dataset.accTab));
 });
 selectAccountCategory("playlists");
 byId("addon-url").addEventListener("blur", () => normalizeAddonLinkField());
