@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   List,
   ListVideo,
+  Loader2,
   Play,
   Plus,
   RefreshCw,
@@ -80,6 +81,7 @@ export function LiveTvScreen() {
     setToast,
     refreshIptv,
     loadIptvGuide,
+    iptvGuideSettled,
     busy,
     auth,
     activeProfile,
@@ -1454,6 +1456,15 @@ export function LiveTvScreen() {
                           <p>{selectedGuide.now.description}</p>
                         )}
                       </div>
+                    ) : !selectedGuide && !iptvGuideSettled.has(selectedChannel.id) ? (
+                      <p className="livetv-detail-empty" role="status">
+                        <Loader2 size={14} className="is-spinning" />{" "}
+                        {localize(
+                          settings.uiLanguage,
+                          "Programmdaten werden geladen …",
+                          "Loading guide data…",
+                        )}
+                      </p>
                     ) : (
                       <p className="livetv-detail-empty">
                         {localize(
@@ -1933,7 +1944,7 @@ function GuideRow({
   onPlay: () => void;
   onCatchup: (program: IptvProgram) => void;
 }) {
-  const { settings } = useApp();
+  const { settings, iptvGuideSettled } = useApp();
   const rowRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const el = rowRef.current;
@@ -2061,15 +2072,28 @@ function GuideRow({
             </button>
           );
         })}
-        {programs.length === 0 && (
-          <span className="livetv-guide-empty">
-            {localize(
-              settings.uiLanguage,
-              "Keine Programmdaten",
-              "No guide data",
-            )}
-          </span>
-        )}
+        {programs.length === 0 &&
+          (!guide && !iptvGuideSettled.has(channel.id) ? (
+            <span
+              className="livetv-guide-empty is-loading"
+              role="status"
+              aria-label={localize(
+                settings.uiLanguage,
+                "Programmdaten werden geladen",
+                "Loading guide data",
+              )}
+            >
+              <Loader2 size={16} className="is-spinning" />
+            </span>
+          ) : (
+            <span className="livetv-guide-empty">
+              {localize(
+                settings.uiLanguage,
+                "Keine Programmdaten",
+                "No guide data",
+              )}
+            </span>
+          ))}
         {nowOffset >= 0 && nowOffset <= totalWidth && (
           <i
             className="livetv-guide-nowline"

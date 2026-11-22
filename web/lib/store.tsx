@@ -801,6 +801,8 @@ export interface AppStore {
   refreshData: (profileIdOverride?: string | null) => Promise<void>;
   refreshIptv: () => Promise<void>;
   loadIptvGuide: (channels: IptvChannel[]) => Promise<void>;
+  // Channels whose guide request has finished (with or without data); a missing guide before that means it is still loading.
+  iptvGuideSettled: ReadonlySet<string>;
   openDetails: (item: MediaItem) => Promise<void>;
   closeDetails: () => void;
   playStream: (
@@ -1037,6 +1039,10 @@ export function AppProvider({
     promise: Promise<void>;
   } | null>(null);
   const iptvGuideInFlightRef = useRef(new Set<string>());
+  const [guideSettledState, setGuideSettledState] = useState<{
+    scope: string;
+    ids: ReadonlySet<string>;
+  }>({ scope: "", ids: new Set() });
   // Snapshot of the settings last known to match the cloud, so the autosave
   // effect can skip pushing settings that just CAME from the cloud (an echo
   // write every app boot = a wasted account-sync-push per user per session).
@@ -2207,16 +2213,30 @@ export function AppProvider({
         for (const [key, expiry] of guideRetryAfter.current)
           if (expiry < Date.now()) guideRetryAfter.current.delete(key);
       try {
-        const guide = await loadIptvGuideForChannels(
-          currentSettings.iptvPlaylists,
-          missing,
-        );
+        const settleScope = `${account}:${profileId}:${signature}`;
+        const markSettled = () =>
+          setGuideSettledState((current) => {
+            const ids = new Set(current.scope === settleScope ? current.ids : []);
+            missing.forEach((channel) => ids.add(channel.id));
+            return { scope: settleScope, ids };
+          });
+        let guide: Awaited<ReturnType<typeof loadIptvGuideForChannels>>;
+        try {
+          guide = await loadIptvGuideForChannels(
+            currentSettings.iptvPlaylists,
+            missing,
+          );
+        } catch (error) {
+          markSettled();
+          throw error;
+        }
         if (
           activeProfileIdRef.current !== profileId ||
           authClient.session?.userId !== account ||
           iptvPlaylistSignature(settingsRef.current.iptvPlaylists) !== signature
         )
           return;
+        markSettled();
         if (!Object.keys(guide).length) return;
         setIptvSnapshot((current) => ({
           ...current,
@@ -4406,6 +4426,7 @@ export function AppProvider({
       refreshData,
       refreshIptv,
       loadIptvGuide,
+      iptvGuideSettled: guideSettledState.ids,
       openDetails,
       closeDetails,
       playStream,
@@ -4502,6 +4523,7 @@ export function AppProvider({
       closePlayer,
       refreshIptv,
       loadIptvGuide,
+      guideSettledState,
       installAddon,
       removeAddon,
       setAddonsState,

@@ -4,6 +4,10 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.085] - 2026-11-22
+
+- Web, Live-TV-Programmführer: Solange die Programmdaten eines Senders noch geladen werden, zeigt die Zeile jetzt einen Lade-Spinner statt „Keine Programmdaten“ (ebenso im Detailbereich). „Keine Programmdaten“ erscheint erst, wenn die Abfrage für den Sender abgeschlossen ist und wirklich nichts geliefert hat, auch nach einem Fehler. Der Store merkt sich dafür pro Konto, Profil und Playlist, welche Sender schon abgefragt wurden (`iptvGuideSettled`). Tests: Web 134 von 134, `tsc` ohne Fehler. Nicht geprüft: im Browser mit echten EPG-Daten.
+
 ## [Web 1.0.084] - 2026-11-22
 
 - Web, Streaming-Fehler (502): Der StreamNet-Server leitet Streams jetzt auf die IP `50.7.28.82` weiter. Diese IP stand nicht in der Relay-Liste, deshalb lehnten sowohl der App-Proxy (`/api/proxy`) als auch der Resolver-Worker den Weg mit 502 ab. Die IP ist in der Web-Relay-Liste, in der Resolver-Worker-Liste (`ALLOWED_MEDIA_HOSTS`, Code-Standard und README) und im Worker-Test ergänzt.

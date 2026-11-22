@@ -14109,6 +14109,11 @@ html {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.25);
 }
+.livetv-guide-empty.is-loading {
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent, rgba(255, 255, 255, 0.6));
+}
 
 /* Catch-up list in the detail panel */
 .livetv-catchup {
