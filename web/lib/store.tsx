@@ -111,6 +111,7 @@ import {
 import { verifyProfilePin } from "./profilePin";
 import { hydratedProfileId } from "./profiles";
 import { localize } from "./i18n";
+import { needsPlaylistSetup, playlistPromptKey } from "./playlistOnboarding";
 import {
   flushSettingsOutbox,
   hasPendingSettings,
@@ -737,6 +738,9 @@ export interface AppStore {
 
   section: NavSection;
   setSection: (section: NavSection) => void;
+  // One-shot request for SettingsScreen to open a specific tab (e.g. "tv").
+  settingsSectionRequest: string | null;
+  clearSettingsSectionRequest: () => void;
   categories: Category[];
   catalogConfigs: CatalogConfig[];
   loadCatalogRow: (catalog: CatalogConfig) => Promise<Category | null>;
@@ -892,6 +896,8 @@ export function AppProvider({
   cloudLoginRequired?: boolean;
 }) {
   const [section, setSection] = useState<NavSection>("home");
+  const [settingsSectionRequest, setSettingsSectionRequest] = useState<string | null>(null);
+  const clearSettingsSectionRequest = useCallback(() => setSettingsSectionRequest(null), []);
   // Seed Continue Watching + Watchlist synchronously from the last-known lists
   // for the active profile so both are on screen the instant the app renders —
   // without this CW stays blank until the ~120-call Trakt up-next fetch returns,
@@ -2354,6 +2360,33 @@ export function AppProvider({
       document.removeEventListener("visibilitychange", refreshOnReturn);
     };
   }, [cloudProfilesHydrated, refreshData, view]);
+
+  // First use: once the profile's settings are synced and no playlist exists yet,
+  // send the user straight to the playlist form (once per account + profile).
+  useEffect(() => {
+    if (view !== "app" || !activeProfileId || !addonsReady) return;
+    if (authClient.session && !cloudProfilesHydrated) return;
+    const key = playlistPromptKey(auth?.userId, activeProfileId);
+    if (loadStored<boolean>(key, false)) return;
+    saveStored(key, true);
+    if (!needsPlaylistSetup(settings.iptvPlaylists)) return;
+    setSettingsSectionRequest("tv");
+    setSection("settings");
+    setToast(
+      localize(
+        settingsRef.current.uiLanguage,
+        "Richte zuerst deine Playlist ein, um loszulegen.",
+        "Set up your playlist first to get started.",
+      ),
+    );
+  }, [
+    view,
+    activeProfileId,
+    addonsReady,
+    cloudProfilesHydrated,
+    auth?.userId,
+    settings.iptvPlaylists,
+  ]);
 
   useEffect(() => {
     if (!auth || view === "login") return undefined;
@@ -4321,6 +4354,8 @@ export function AppProvider({
       backToProfiles,
       section,
       setSection,
+      settingsSectionRequest,
+      clearSettingsSectionRequest,
       categories,
       catalogConfigs,
       loadCatalogRow,
@@ -4419,6 +4454,8 @@ export function AppProvider({
       goToLogin,
       backToProfiles,
       section,
+      settingsSectionRequest,
+      clearSettingsSectionRequest,
       categories,
       catalogConfigs,
       loadCatalogRow,

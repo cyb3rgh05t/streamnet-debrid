@@ -4,6 +4,12 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.080] - 2026-11-22
+
+- Web, erster Start: Hat ein Profil nach dem Öffnen und der ersten Synchronisation noch keine aktive Playlist (keine aktivierte Playlist mit URL), öffnet die App direkt Einstellungen → TV (IPTV) mit dem STREAMNET-TV-Formular und einem Hinweis. Das passiert nur einmal pro Konto und Profil, damit kein Dauer-Redirect entsteht.
+- Einstellungen können jetzt von außen auf einen bestimmten Tab geöffnet werden.
+- Tests: 131 von 131 Web-Tests und 	sc ohne Fehler, darunter 3 neue Tests. Nicht geprüft: der Ablauf im Browser mit einem echten neuen Konto.
+
 ## [Backend 1.0.057] - 2026-11-22
 
 - Adminpanel, Playlists und Add-ons: Die Bestandskarte zeigt „N von M Accounts in der Cloud“ und erklärt, dass die App die StreamNet-TV-Playlist selbst anlegt und sie nicht löschbar ist; gezählt werden nur Accounts mit Cloud-Snapshot, Geräte ohne Cloud-Konto oder ohne Sync sind nicht sichtbar.

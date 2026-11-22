@@ -267,8 +267,17 @@ function qualityPresetFilters(
 }
 
 export function SettingsScreen() {
-  const { settings } = useApp();
-  const [section, setSection] = useState<SectionId>("accounts");
+  const { settings, settingsSectionRequest, clearSettingsSectionRequest } =
+    useApp();
+  const [section, setSection] = useState<SectionId>(() =>
+    SECTIONS.some((item) => item.id === settingsSectionRequest)
+      ? (settingsSectionRequest as SectionId)
+      : "accounts",
+  );
+
+  useEffect(() => {
+    if (settingsSectionRequest) clearSettingsSectionRequest();
+  }, [settingsSectionRequest, clearSettingsSectionRequest]);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
