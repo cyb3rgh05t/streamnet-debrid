@@ -987,10 +987,13 @@ test("summarizes profile-scoped objects without exposing secrets", () => {
   assert.equal(summary.playlistCount, 1);
   assert.equal(summary.profiles[1].watchlistCount, 1);
   assert.deepEqual(summary.profiles[1].playlists, [
-    { id: "family-tv", name: "Family TV", enabled: true },
+    {
+      id: "family-tv", name: "Family TV", enabled: true, host: "provider.example", hostOverride: "",
+      importLiveTv: true, importVod: true, importSeries: true,
+    },
   ]);
   assert.deepEqual(summary.addons, [
-    { id: "example", name: "Example", isEnabled: true },
+    { id: "example", name: "Example", isEnabled: true, version: "", host: "", profileCount: 1 },
   ]);
   assert.equal(
     summary.payload.iptvByProfile.kids.playlists[0].m3uUrl,

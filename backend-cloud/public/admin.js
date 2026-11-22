@@ -1451,8 +1451,113 @@ function selectAccountTab(tab) {
   document.querySelectorAll("[data-acc-panel]").forEach((panel) => {
     panel.classList.toggle("hidden", panel.dataset.accPanel !== accountTabPanels[tab]);
   });
-  if (tab === "playlists" || tab === "addons") selectAccountCategory(tab);
+  if (tab === "playlists" || tab === "addons") {
+    selectAccountCategory(tab);
+    // The action form opens from a card button, not by itself.
+    byId("mutation-form").classList.add("hidden");
+    renderAccountInventory(tab);
+  }
 }
+
+function accountChip(text, className = "") {
+  return rcElement("span", text, `count-badge ${className}`.trim());
+}
+
+function accountCardButton(label, operation, options = {}, danger = false) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = `button ${danger ? "danger" : "secondary"}`;
+  button.textContent = label;
+  button.addEventListener("click", () => accRunAction(operation, options));
+  return button;
+}
+
+// Cards for what this account has installed; the action form below opens from their buttons.
+function renderAccountInventory(tab) {
+  const snapshot = state.selectedAccount?.snapshot;
+  const box = byId("account-inventory");
+  const addBox = byId("account-inventory-add");
+  if (!snapshot) {
+    box.replaceChildren();
+    addBox.replaceChildren();
+    return;
+  }
+  const profiles = snapshot.profiles || [];
+  const cards = [];
+  if (tab === "playlists") {
+    byId("editor-title").textContent = "Playlists dieses Accounts";
+    byId("account-config-intro").textContent = "Pro Profil gespeichert. Aktionen gelten nur für dieses Konto.";
+    for (const profile of profiles) {
+      for (const playlist of profile.playlists || []) {
+        const card = rcElement("div", null, "rc-inv-card");
+        const head = rcElement("div", null, "rc-inv-head");
+        head.append(rcElement("strong", playlist.name), rcElement("small", playlist.id));
+        const chips = rcElement("div", null, "profile-counts");
+        chips.append(accountChip(playlist.enabled ? "Aktiv" : "Deaktiviert"), accountChip(`Profil: ${profile.name}`));
+        if (playlist.id === "streamnet_tv") chips.append(accountChip("Standard der App"));
+        if (playlist.hostOverride) chips.append(accountChip(`Host überschrieben: ${playlist.hostOverride}`));
+        const imports = [["Live-TV", playlist.importLiveTv], ["Filme", playlist.importVod], ["Serien", playlist.importSeries]]
+          .filter(([, on]) => on).map(([label]) => label);
+        const info = [playlist.host ? `Server: ${playlist.host}` : null, imports.length ? `Import: ${imports.join(", ")}` : "Kein Import aktiv"].filter(Boolean).join(" · ");
+        const actions = rcElement("div", null, "rc-inv-actions");
+        const options = { profileId: profile.id, targetId: playlist.id };
+        if (playlist.id === "streamnet_tv") {
+          actions.append(accountCardButton("Host ändern", "change_streamnet_host", options));
+          if (playlist.hostOverride) actions.append(accountCardButton("Host zurücksetzen", "clear_streamnet_host_override", options));
+        }
+        actions.append(accountCardButton("Entfernen", "delete_playlist", options, true));
+        card.append(head, chips, rcElement("span", info, "rc-source-info"), actions);
+        cards.push(card);
+      }
+    }
+    if (!cards.length) cards.push(rcElement("p", "Dieser Account hat noch keine Playlists in der Cloud.", "rc-hint"));
+    const add = accountCardButton("Playlist hinzufügen", "upsert_playlist", { profileId: profiles[0]?.id });
+    add.className = "button primary";
+    addBox.replaceChildren(rcElement("p", "Eine neue M3U-/Xtream-Playlist für ein Profil dieses Accounts anlegen.", "rc-hint"), add);
+  } else {
+    byId("editor-title").textContent = "Add-ons dieses Accounts";
+    byId("account-config-intro").textContent = "Add-ons gelten für alle Profile des Accounts.";
+    for (const addon of snapshot.addons || []) {
+      const card = rcElement("div", null, "rc-inv-card");
+      const head = rcElement("div", null, "rc-inv-head");
+      head.append(rcElement("strong", addon.name), rcElement("small", addon.id));
+      const chips = rcElement("div", null, "profile-counts");
+      chips.append(accountChip(addon.isEnabled ? "Aktiv" : "Deaktiviert"));
+      if (addon.version) chips.append(accountChip(`Version ${addon.version}`));
+      chips.append(accountChip(`In ${addon.profileCount} von ${profiles.length} Profilen`));
+      if (addon.id === "opensubtitles") chips.append(accountChip("Standard der App"));
+      const actions = rcElement("div", null, "rc-inv-actions");
+      actions.append(accountCardButton("Aktualisieren", "upsert_addon"), accountCardButton("Entfernen", "delete_addon", { targetId: addon.id }, true));
+      card.append(head, chips, rcElement("span", addon.host ? `Quelle: ${addon.host}` : "", "rc-source-info"), actions);
+      cards.push(card);
+    }
+    if (!cards.length) cards.push(rcElement("p", "Dieser Account hat noch keine Add-ons in der Cloud.", "rc-hint"));
+    const add = accountCardButton("Add-on hinzufügen", "upsert_addon");
+    add.className = "button primary";
+    addBox.replaceChildren(rcElement("p", "Ein Stremio-Add-on per Manifest-Link für alle Profile dieses Accounts installieren.", "rc-hint"), add);
+  }
+  box.replaceChildren(...cards);
+}
+
+function accRunAction(operation, { profileId, targetId } = {}) {
+  const fire = (element) => element.dispatchEvent(new Event("change", { bubbles: true }));
+  byId("mutation-form").classList.remove("hidden");
+  const profile = byId("mutation-profile");
+  if (profileId) { profile.value = profileId; fire(profile); }
+  const select = byId("mutation-operation");
+  select.value = operation;
+  fire(select);
+  // Host operations offer "all profiles"; the card's profile wins.
+  if (profileId) { profile.value = profileId; fire(profile); }
+  if (targetId && (operation === "delete_addon" || operation === "delete_playlist")) {
+    const target = byId(operation === "delete_addon" ? "delete-addon-select" : "delete-playlist-select");
+    target.value = targetId;
+    fire(target);
+  }
+  byId("mutation-form").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+byId("mutation-form-close").addEventListener("click", () => byId("mutation-form").classList.add("hidden"));
 
 function selectAccountCategory(category) {
   const select = byId("mutation-operation");

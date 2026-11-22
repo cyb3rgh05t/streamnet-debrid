@@ -1285,12 +1285,14 @@
                 <div>
                   <p class="eyebrow">REMOTE STEUERUNG</p>
                   <h2 id="editor-title">Account konfigurieren</h2>
-                  <p class="global-intro">
+                  <p id="account-config-intro" class="global-intro">
                     Playlists und Add-ons für diesen Account verwalten.
                   </p>
                 </div>
               </div>
-              <form id="mutation-form" class="global-config-layout">
+              <div id="account-inventory" class="rc-inventory"></div>
+              <div id="account-inventory-add" class="rc-extra"></div>
+              <form id="mutation-form" class="global-config-layout hidden">
                 <div class="global-editor-main">
                   <section
                     class="global-config-card"
@@ -1480,6 +1482,13 @@
                     <div id="mutation-warning" class="warning"></div>
                     <button class="button primary" type="submit">
                       Änderung anwenden
+                    </button>
+                    <button
+                      id="mutation-form-close"
+                      class="button secondary"
+                      type="button"
+                    >
+                      Schließen
                     </button>
                     <p id="mutation-message" class="message" role="status"></p>
                   </section>

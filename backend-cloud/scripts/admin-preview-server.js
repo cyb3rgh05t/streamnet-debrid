@@ -2,6 +2,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { summarizeAdminPayload } from "../src/admin-snapshots.js";
 import { catalogIdFor, mdblistListInfo, loadSeed, loadStandards, validateFranchise, validateOverrides } from "../src/catalog-config.js";
 
 // Demo state of the central catalog configuration (not persisted).
@@ -132,8 +133,8 @@ function buildDemoPayload(account) {
   const playlist = (id, name, count) => ({
     id,
     name,
-    m3uUrl: "[REDACTED]",
-    epgUrl: "[REDACTED]",
+    m3uUrl: id === "streamnet_tv" ? "https://xui.streamnet.live/get.php?username=demo&password=demo&type=m3u_plus" : "https://provider.example.test/get.php?username=demo&password=demo",
+    epgUrl: "https://provider.example.test/xmltv.php?username=demo&password=demo",
     enabled: true,
     channelCount: count,
     lastRefreshedAt: "2026-10-28T12:30:00.000Z",
@@ -182,7 +183,7 @@ function buildDemoPayload(account) {
         ],
       },
       "profile-kids": {
-        playlists: [playlist("streamnet_tv", "StreamNet TV", 1840)],
+        playlists: [{ ...playlist("streamnet_tv", "StreamNet TV", 1840), streamNetHostOverride: "https://alt.streamnet.test" }],
       },
     },
     catalogs,
@@ -546,19 +547,7 @@ const server = createServer(async (request, reply) => {
         snapshot: {
           revision: account.revision,
           updated_at: account.snapshot_updated_at,
-          profiles: demoPayload.profiles.map((profile) => ({
-            id: profile.id,
-            name: profile.name,
-            addonCount: demoPayload.addonsByProfile[profile.id].length,
-            playlistCount:
-              demoPayload.iptvByProfile[profile.id].playlists.length,
-            catalogCount: demoPayload.catalogsByProfile[profile.id].length,
-            watchlistCount: demoPayload.watchlistByProfile[profile.id].length,
-          })),
-          addons: demoPayload.addons,
-          playlists: [],
-          catalogs: demoPayload.catalogs,
-          payload: demoPayload,
+          ...summarizeAdminPayload(demoPayload),
         },
       });
     }

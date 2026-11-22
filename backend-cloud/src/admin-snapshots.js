@@ -1141,6 +1141,15 @@ export function redactAdminPayload(value, key = "") {
   );
 }
 
+// Only the host name of an address is shown in the admin; paths and query strings can carry credentials.
+function hostOnly(value) {
+  try {
+    return new URL(String(value || "").trim().split(/\s+/)[0]).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export function summarizeAdminPayload(payloadValue) {
   const payload = isPlainObject(payloadValue) ? payloadValue : {};
   const profiles = (
@@ -1167,6 +1176,11 @@ export function summarizeAdminPayload(payloadValue) {
         id: String(playlist?.id || ""),
         name: String(playlist?.name || playlist?.id || "Unnamed"),
         enabled: playlist?.enabled !== false,
+        host: hostOnly(playlist?.m3uUrl),
+        hostOverride: hostOnly(playlist?.streamNetHostOverride) || String(playlist?.streamNetHostOverride || "").slice(0, 120),
+        importLiveTv: playlist?.importLiveTv !== false,
+        importVod: playlist?.importVod !== false,
+        importSeries: playlist?.importSeries !== false,
       })),
     };
   });
@@ -1175,13 +1189,20 @@ export function summarizeAdminPayload(payloadValue) {
     if (!Array.isArray(items)) continue;
     for (const addon of items) {
       const id = String(addon?.id || "");
-      if (id && !addonsById.has(id)) {
-        addonsById.set(id, {
-          id,
-          name: String(addon?.name || id),
-          isEnabled: addon?.isEnabled !== false,
-        });
+      if (!id) continue;
+      const known = addonsById.get(id);
+      if (known) {
+        known.profileCount += 1;
+        continue;
       }
+      addonsById.set(id, {
+        id,
+        name: String(addon?.name || id),
+        isEnabled: addon?.isEnabled !== false,
+        version: String(addon?.version || "").slice(0, 40),
+        host: hostOnly(addon?.url || addon?.manifestUrl || addon?.transportUrl),
+        profileCount: 1,
+      });
     }
   }
   return {

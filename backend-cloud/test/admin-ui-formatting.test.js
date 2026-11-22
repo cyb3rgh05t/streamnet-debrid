@@ -135,7 +135,7 @@ test("individual account actions share the category layout without adding unsupp
   for (const id of ["account-action-title", "account-settings-title", "account-confirm-title", "account-scope-title"]) {
     assert.ok(html.includes(`aria-labelledby="${id}"`));
   }
-  assert.ok(html.includes('id="mutation-form" class="global-config-layout"'));
+  assert.ok(html.includes('id="mutation-form" class="global-config-layout hidden"'));
   for (const tab of ["overview", "devices", "playlists", "addons", "snapshot", "audit", "danger"]) {
     assert.ok(html.includes(`data-acc-tab="${tab}"`), tab);
   }
