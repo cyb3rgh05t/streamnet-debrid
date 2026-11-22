@@ -4,6 +4,16 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.082] - 2026-11-22
+
+- Web, Tipps auf Home: Der Tipp sitzt jetzt als breiter Streifen unter der ersten Home-Reihe (statt als Karte unten rechts), mit halbtransparentem Akzent-Hintergrund, Label „TIPP“, Titel und Text. Der Button heißt „Alles klar!“ und blendet den Tipp aus, danach erscheint der nächste; vorher führte er in die Einstellungen. Dazu ein Schließen-Knopf und „Alle Tipps ausblenden“.
+- Tests: 133 von 133 Web-Tests und `tsc` ohne Fehler. Nicht geprüft: der Streifen im Browser.
+
+## [Web 1.0.081] - 2026-11-22
+
+- Web, Tipps auf Home: Nach dem Start (und einmalig auch bei bestehenden Nutzern) erscheint ein schließbarer Tipp, immer nur einer: Home-Reihen ausblenden/hinzufügen/umsortieren, Add-ons hinzufügen, Live-TV/Playlist einrichten, Cloud-Sync auf allen Geräten. Der Add-on-Tipp erscheint nur ohne eigene Add-ons, der Live-TV-Tipp nur ohne Playlist. Geschlossene Tipps kommen nicht wieder, „Alle Tipps ausblenden“ schaltet sie ab. Die Karte erscheint erst, wenn Home geladen ist.
+- Tests: 133 von 133 Web-Tests und `tsc` ohne Fehler, darunter 2 neue Tests für die Tipp-Auswahl.
+
 ## [Backend 1.0.058] - 2026-11-22
 
 - Adminpanel, Playlists und Add-ons: Das Formular „Änderung an alle Accounts senden“ erscheint erst, wenn eine Aktion oder „Playlist hinzufügen“ / „Add-on hinzufügen“ angeklickt wurde, und lässt sich mit „Schließen“ wieder ausblenden. Die Standard-Playlist (StreamNet TV) und das Standard-Add-on (OpenSubtitles v3) der App stehen getrennt von „Weitere Playlists“ / „Weitere Add-ons“, die an alle Accounts verteilt werden. Die Erklärung zu OpenSubtitles nennt jetzt, warum es nicht bei jedem Account in der Cloud steht (erst nach dem ersten Sync; Accounts ohne Eintrag nutzen es trotzdem als eingebaute Quelle).

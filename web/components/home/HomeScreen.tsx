@@ -1,7 +1,7 @@
 "use client";
 
 import { ArrowLeft, Info, Play } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { IMDB_LOGO } from "@/lib/serviceLogos";
 import { genreNamesFromIds, getCardMeta, getLogoUrl } from "@/lib/tmdb";
 import { getImdbRating } from "@/lib/imdbRatings";
@@ -16,6 +16,7 @@ import type { CatalogConfig, Category, MediaItem } from "@/lib/types";
 import { localize, t, translateUiText } from "@/lib/i18n";
 import type { UiLanguage } from "@/lib/i18n";
 import { RailScroller } from "@/components/media/RailScroller";
+import { HomeTips } from "@/components/shell/HomeTips";
 
 const collectionGroupTitles: Record<string, string> = {
   SERVICE: "Services",
@@ -578,7 +579,9 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
               posterMode={posterModeForHomeRow("continue_watching")}
             />
           ) : null}
-          {orderedHomeRails.map((rail, index) =>
+          {continueWatching.length > 0 && !hasContinueWatchingRail ? <HomeTips /> : null}
+          {orderedHomeRails.map((rail, index) => {
+            const railNode =
             rail.kind === "category" || rail.kind === "server" ? (
               <MediaRail
                 key={rail.category.id}
@@ -659,8 +662,22 @@ export function HomeScreen({ resetKey = 0 }: { resetKey?: number }) {
                 onFocus={onCardFocus}
                 onLoaded={seedHeroFromRow}
               />
-            ),
-          )}
+            );
+            const railKey =
+              rail.kind === "category" || rail.kind === "server"
+                ? rail.category.id
+                : "group" in rail.entry
+                  ? `group-${rail.entry.group}`
+                  : rail.entry.catalog.id;
+            return (
+              <Fragment key={railKey}>
+                {railNode}
+                {index === 0 && !(continueWatching.length > 0 && !hasContinueWatchingRail) ? (
+                  <HomeTips />
+                ) : null}
+              </Fragment>
+            );
+          })}
         </>
       )}
     </div>

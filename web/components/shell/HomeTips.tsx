@@ -19,23 +19,25 @@ export function HomeTips() {
   const {
     view,
     section,
-    selected,
     activeProfile,
     addons,
     addonsReady,
     cloudProfilesHydrated,
     settings,
-    setSection,
-    requestSettingsSection,
   } = useApp();
   const [state, setState] = useState<HomeTipsState | null>(null);
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setState(loadStored<HomeTipsState>(HOME_TIPS_KEY, { dismissed: [], hidden: false }));
+    setState(
+      loadStored<HomeTipsState>(HOME_TIPS_KEY, {
+        dismissed: [],
+        hidden: false,
+      }),
+    );
   }, []);
 
-  const onHome = view === "app" && section === "home" && !selected && Boolean(activeProfile);
+  const onHome = view === "app" && section === "home" && Boolean(activeProfile);
 
   // Wait a moment after Home appears so the tip never competes with the first paint.
   useEffect(() => {
@@ -69,7 +71,11 @@ export function HomeTips() {
   const lang = settings.uiLanguage;
   const copy: Record<HomeTipId, { title: string; text: string }> = {
     rows: {
-      title: localize(lang, "Mach Home zu deinem Home", "Make Home yours"),
+      title: localize(
+        lang,
+        "Personalisiere deine Startseite",
+        "Customize your Home",
+      ),
       text: localize(
         lang,
         "Home-Reihen ausblenden, hinzufügen und umsortieren: Einstellungen → Kataloge.",
@@ -102,38 +108,22 @@ export function HomeTips() {
     },
   };
 
-  const dismiss = () => update({ ...state, dismissed: [...state.dismissed, tip] });
-  const open = () => {
-    dismiss();
-    if (tip === "addons") {
-      setSection("addons");
-      return;
-    }
-    requestSettingsSection(
-      tip === "rows" ? "catalogs" : tip === "live_tv" ? "tv" : "accounts",
-    );
-    setSection("settings");
-  };
+  const dismiss = () =>
+    update({ ...state, dismissed: [...state.dismissed, tip] });
 
   return (
     <aside className="home-tip" role="note" aria-live="polite">
-      <button
-        type="button"
-        className="home-tip-close"
-        onClick={dismiss}
-        aria-label={localize(lang, "Tipp schließen", "Close tip")}
-        title={localize(lang, "Tipp schließen", "Close tip")}
-      >
-        <X size={16} />
-      </button>
-      <div className="home-tip-heading">
-        <Lightbulb size={18} aria-hidden="true" />
+      <div className="home-tip-body">
+        <span className="home-tip-label">
+          <Lightbulb size={14} aria-hidden="true" />
+          {localize(lang, "TIPP", "TIP")}
+        </span>
         <strong>{copy[tip].title}</strong>
+        <p>{copy[tip].text}</p>
       </div>
-      <p>{copy[tip].text}</p>
       <div className="home-tip-actions">
-        <button type="button" className="primary" onClick={open}>
-          {localize(lang, "Zeig mir wie", "Show me")}
+        <button type="button" className="secondary" onClick={dismiss}>
+          {localize(lang, "Alles klar!", "Got it!")}
         </button>
         <button
           type="button"
@@ -143,6 +133,15 @@ export function HomeTips() {
           {localize(lang, "Alle Tipps ausblenden", "Hide all tips")}
         </button>
       </div>
+      <button
+        type="button"
+        className="home-tip-close"
+        onClick={dismiss}
+        aria-label={localize(lang, "Tipp schließen", "Close tip")}
+        title={localize(lang, "Tipp schließen", "Close tip")}
+      >
+        <X size={18} />
+      </button>
     </aside>
   );
 }

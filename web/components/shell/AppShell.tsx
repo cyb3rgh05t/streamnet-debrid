@@ -15,7 +15,6 @@ import { SettingsScreen } from "@/components/settings/SettingsScreen";
 import { WatchlistScreen } from "@/components/watchlist/WatchlistScreen";
 import { BackHandler } from "./BackHandler";
 import { ExternalPlaybackPrompt } from "./ExternalPlaybackPrompt";
-import { HomeTips } from "./HomeTips";
 import { MediaContextMenu } from "./MediaContextMenu";
 import { NoAddonsPrompt } from "./NoAddonsPrompt";
 import { Toast } from "./Toast";
@@ -123,7 +122,6 @@ export function AppShell() {
       <ExternalPlaybackPrompt />
       <MediaContextMenu />
       <NoAddonsPrompt />
-      <HomeTips />
       <BackHandler />
       <Toast />
     </main>

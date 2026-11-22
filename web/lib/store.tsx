@@ -741,7 +741,6 @@ export interface AppStore {
   // One-shot request for SettingsScreen to open a specific tab (e.g. "tv").
   settingsSectionRequest: string | null;
   clearSettingsSectionRequest: () => void;
-  requestSettingsSection: (section: string) => void;
   categories: Category[];
   catalogConfigs: CatalogConfig[];
   loadCatalogRow: (catalog: CatalogConfig) => Promise<Category | null>;
@@ -899,7 +898,6 @@ export function AppProvider({
   const [section, setSection] = useState<NavSection>("home");
   const [settingsSectionRequest, setSettingsSectionRequest] = useState<string | null>(null);
   const clearSettingsSectionRequest = useCallback(() => setSettingsSectionRequest(null), []);
-  const requestSettingsSection = useCallback((id: string) => setSettingsSectionRequest(id), []);
   // Seed Continue Watching + Watchlist synchronously from the last-known lists
   // for the active profile so both are on screen the instant the app renders —
   // without this CW stays blank until the ~120-call Trakt up-next fetch returns,
@@ -4358,7 +4356,6 @@ export function AppProvider({
       setSection,
       settingsSectionRequest,
       clearSettingsSectionRequest,
-      requestSettingsSection,
       categories,
       catalogConfigs,
       loadCatalogRow,
@@ -4459,7 +4456,6 @@ export function AppProvider({
       section,
       settingsSectionRequest,
       clearSettingsSectionRequest,
-      requestSettingsSection,
       categories,
       catalogConfigs,
       loadCatalogRow,
