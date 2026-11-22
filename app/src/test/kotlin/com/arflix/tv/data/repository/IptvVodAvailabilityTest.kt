@@ -217,6 +217,17 @@ class IptvVodAvailabilityTest {
     }
 
     @Test
+    fun `series source lookup accepts the subtitle form that the search filter accepts`() {
+        assertEquals(true, iptvVodSeriesTitlesMatch("Supernatural: Zur Hölle mit dem Bösen (2005)", "Supernatural", 2005, 2005))
+        assertEquals(true, iptvVodSeriesTitlesMatch("Supernatural (2005)", "Supernatural: Season One", 2005, 2006))
+        assertEquals(true, iptvVodSeriesTitlesMatch("Supernatural", "Supernatural", null, null))
+        // Without both years, or with incompatible years, only the exact title counts.
+        assertEquals(false, iptvVodSeriesTitlesMatch("Supernatural: Zur Hölle mit dem Bösen", "Supernatural", null, 2005))
+        assertEquals(false, iptvVodSeriesTitlesMatch("Star Trek: Picard (2020)", "Star Trek", 2020, 1966))
+        assertEquals(false, iptvVodSeriesTitlesMatch("Hell: Something (2005)", "Supernatural", 2005, 2005))
+    }
+
+    @Test
     fun `original title matches a provider that lists the original name, with the same safeguards`() {
         val availability = IptvRepository.XtreamVodAvailability(
             setOf(

@@ -7,6 +7,7 @@ import android.content.Context
 import com.arflix.tv.util.settingsDataStore
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
@@ -6168,6 +6169,34 @@ class HomeViewModel @Inject constructor(
 
     fun dismissToast() {
         _uiState.value = _uiState.value.copy(toastMessage = null)
+    }
+
+    private val _homeTip = MutableStateFlow<HomeTip?>(null)
+    /** The first-start tip currently due on Home, or null. Evaluated on demand, not on every settings change. */
+    val homeTip: StateFlow<HomeTip?> = _homeTip.asStateFlow()
+
+    fun refreshHomeTip() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val prefs = context.settingsDataStore.data.first()
+            val hasUserAddon = streamRepository.installedAddons.first()
+                .any { it.isInstalled && it.isEnabled && it.id != "opensubtitles" }
+            val hasIptvSource = iptvRepository.observeConfig().first().hasConfiguredSource()
+            _homeTip.value = selectHomeTip(
+                dismissedIds = prefs[HOME_TIPS_DISMISSED_KEY].orEmpty(),
+                hasUserAddon = hasUserAddon,
+                hasIptvSource = hasIptvSource,
+            )
+        }
+    }
+
+    fun dismissHomeTip(tip: HomeTip) {
+        _homeTip.value = null
+        viewModelScope.launch(Dispatchers.IO) {
+            context.settingsDataStore.edit { prefs ->
+                prefs[HOME_TIPS_DISMISSED_KEY] = prefs[HOME_TIPS_DISMISSED_KEY].orEmpty() + tip.id
+            }
+            refreshHomeTip()
+        }
     }
 
     suspend fun isInWatchlist(item: MediaItem): Boolean {

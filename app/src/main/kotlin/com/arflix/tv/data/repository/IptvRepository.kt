@@ -395,6 +395,21 @@ internal fun iptvVodMainTitleKey(value: String): String? {
     return key.takeIf { it.length >= 4 && it != iptvVodTitleKey(value) }
 }
 
+/**
+ * Series lookups: the provider name may carry a subtitle that TMDB lacks (provider "Supernatural: Zur Hölle mit dem Bösen (2005)",
+ * TMDB "Supernatural") or the other way round. This is the rule the search availability filter uses, so a show
+ * that search lists is also found when its sources are looked up. Both sides must state a compatible year, so
+ * "Star Trek" never matches "Star Trek: Picard".
+ */
+internal fun iptvVodSeriesTitlesMatch(providerName: String, queryTitle: String, providerYear: Int?, queryYear: Int?): Boolean {
+    if (iptvVodTitlesMatchExactly(providerName, queryTitle)) return true
+    if (providerYear == null || queryYear == null || !iptvVodYearsCompatible(queryYear, providerYear)) return false
+    val provider = iptvVodTitleKey(providerName)
+    val query = iptvVodTitleKey(queryTitle)
+    if (provider.isBlank() || query.isBlank()) return false
+    return iptvVodMainTitleKey(providerName) == query || iptvVodMainTitleKey(queryTitle) == provider
+}
+
 private fun String.withoutInnerSequelNumber(): String {
     val tokens = split(' ')
     if (tokens.size < 3) return this
@@ -4910,7 +4925,7 @@ class IptvRepository @Inject constructor(
                 if (canonicalShow.isNotBlank()) {
                     catalog.canonicalTitleMap[canonicalShow].orEmpty().forEach { entry ->
                         if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, entry.tmdb, entry.imdb) == false ||
-                            !iptvVodTitlesMatchExactly(entry.name, normalizedShow)
+                            !iptvVodSeriesTitlesMatch(entry.name, normalizedShow, entry.year, inputYear)
                         ) return@forEach
                         val yearDelta = when {
                             inputYear == null || entry.year == null -> 0
@@ -4944,7 +4959,7 @@ class IptvRepository @Inject constructor(
                     }
                     candidatePool.values.forEach { entry ->
                         if (iptvVodIdentityMatch(normalizedTmdb, normalizedImdb, entry.tmdb, entry.imdb) == false) return@forEach
-                        if (!iptvVodTitlesMatchExactly(entry.name, normalizedShow)) return@forEach
+                        if (!iptvVodSeriesTitlesMatch(entry.name, normalizedShow, entry.year, inputYear)) return@forEach
                         val overlap = entry.titleTokens.intersect(queryTokens).size
                         if (overlap <= 0) return@forEach
                         val coverage = overlap.toFloat() / queryTokens.size.toFloat()

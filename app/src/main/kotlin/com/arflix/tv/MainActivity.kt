@@ -104,6 +104,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.arflix.tv.data.repository.AuthRepository
 import com.arflix.tv.data.repository.AuthState
+import com.arflix.tv.data.repository.CloudSyncRepository
 import com.arflix.tv.data.repository.LauncherContinueWatchingRepository
 import com.arflix.tv.data.repository.LauncherContinueWatchingRequest
 import com.arflix.tv.data.repository.MediaRepository
@@ -136,6 +137,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import dagger.Lazy
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import kotlin.math.PI
 import kotlin.math.cos
@@ -158,6 +160,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var profileRepository: Lazy<ProfileRepository>
+
+    @Inject
+    lateinit var cloudSyncRepository: Lazy<CloudSyncRepository>
 
     @Inject
     lateinit var traktRepository: Lazy<TraktRepository>
@@ -463,6 +468,7 @@ class MainActivity : ComponentActivity() {
                         watchHistoryRepository = watchHistoryRepository.get(),
                         watchlistRepository = watchlistRepository.get(),
                         iptvRepository = iptvRepository.get(),
+                        cloudSyncRepository = cloudSyncRepository.get(),
                         launcherContinueWatchingRepository = launcherContinueWatchingRepository.get(),
                         offlineDownloadRepository = offlineDownloadRepository.get(),
                         oledBlackBackground = oledBlackBackground,
@@ -718,6 +724,7 @@ fun ArflixApp(
     watchHistoryRepository: WatchHistoryRepository,
     watchlistRepository: WatchlistRepository,
     iptvRepository: com.arflix.tv.data.repository.IptvRepository,
+    cloudSyncRepository: CloudSyncRepository,
     launcherContinueWatchingRepository: LauncherContinueWatchingRepository,
     offlineDownloadRepository: OfflineDownloadRepository,
     oledBlackBackground: Boolean = false,
@@ -770,7 +777,30 @@ fun ArflixApp(
 
     val navController = rememberNavController()
     var showExitConfirmation by remember { mutableStateOf(false) }
+    var showCloudSetupDialog by remember { mutableStateOf(false) }
+    var retryingCloudSetup by remember { mutableStateOf(false) }
     val appCoroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+    // Decides whether the first profile selection should open the TV setup. With a cloud account the playlist
+    // may still be on its way from the cloud, so it decides only after a pull has finished.
+    suspend fun decideTvSetup(): TvSetupDecision {
+        val profileId = profileRepository.getActiveProfile()?.id ?: return TvSetupDecision.Skip
+        val promptedKey = tvSetupPromptedKey(profileId)
+        val alreadyPrompted = context.settingsDataStore.data.first()[promptedKey] ?: false
+        var hasSource = iptvRepository.observeConfig().first().hasConfiguredSource()
+        var cloudSettled = true
+        if (isCloudConnected && !hasSource && !alreadyPrompted) {
+            val pull = withTimeoutOrNull(CLOUD_SETUP_PULL_TIMEOUT_MS) {
+                runCatching { cloudSyncRepository.pullFromCloud() }.getOrNull()
+            }
+            cloudSettled = pull != null && pull != CloudSyncRepository.RestoreResult.FAILED
+            hasSource = iptvRepository.observeConfig().first().hasConfiguredSource()
+        }
+        if (!shouldPromptTvSetup(hasSource, alreadyPrompted)) return TvSetupDecision.Skip
+        if (!cloudSettled) return TvSetupDecision.CloudUnavailable
+        context.settingsDataStore.edit { it[promptedKey] = true }
+        return TvSetupDecision.Open(Screen.Settings.createRoute(initialSection = "iptv", openStreamNetTv = true))
+    }
     var lastAddonsSyncKey by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(authState, activeProfile?.id) {
@@ -905,19 +935,13 @@ fun ArflixApp(
                 currentProfile = activeProfile,
                 isCloudConnected = isCloudConnected,
                 resolveProfileSetupRoute = {
-                    val profileId = profileRepository.getActiveProfile()?.id
-                    if (profileId == null) {
-                        null
-                    } else {
-                        val promptedKey = tvSetupPromptedKey(profileId)
-                        val alreadyPrompted = context.settingsDataStore.data.first()[promptedKey] ?: false
-                        val hasSource = iptvRepository.observeConfig().first().hasConfiguredSource()
-                        if (shouldPromptTvSetup(isCloudConnected, hasSource, alreadyPrompted)) {
-                            context.settingsDataStore.edit { it[promptedKey] = true }
-                            Screen.Settings.createRoute(initialSection = "iptv", openStreamNetTv = true)
-                        } else {
+                    when (val decision = decideTvSetup()) {
+                        is TvSetupDecision.Open -> decision.route
+                        TvSetupDecision.CloudUnavailable -> {
+                            showCloudSetupDialog = true
                             null
                         }
+                        TvSetupDecision.Skip -> null
                     }
                 },
                 onCloudConnectSkipped = {
@@ -941,6 +965,38 @@ fun ArflixApp(
                 },
                 onExitApp = { showExitConfirmation = true }
                 )
+                if (showCloudSetupDialog) {
+                    com.arflix.tv.ui.components.CloudSetupUnavailableDialog(
+                        isRetrying = retryingCloudSetup,
+                        onRetry = {
+                            appCoroutineScope.launch {
+                                retryingCloudSetup = true
+                                val decision = decideTvSetup()
+                                retryingCloudSetup = false
+                                when (decision) {
+                                    is TvSetupDecision.Open -> {
+                                        showCloudSetupDialog = false
+                                        navController.navigate(decision.route) { launchSingleTop = true }
+                                    }
+                                    TvSetupDecision.Skip -> showCloudSetupDialog = false
+                                    TvSetupDecision.CloudUnavailable -> Unit
+                                }
+                            }
+                        },
+                        onSetup = {
+                            appCoroutineScope.launch {
+                                profileRepository.getActiveProfile()?.id?.let { profileId ->
+                                    context.settingsDataStore.edit { it[tvSetupPromptedKey(profileId)] = true }
+                                }
+                                showCloudSetupDialog = false
+                                navController.navigate(
+                                    Screen.Settings.createRoute(initialSection = "iptv", openStreamNetTv = true)
+                                ) { launchSingleTop = true }
+                            }
+                        },
+                        onDismiss = { showCloudSetupDialog = false }
+                    )
+                }
                 if (showExitConfirmation) {
                     com.arflix.tv.ui.components.ExitAppDialog(
                         onDismiss = { showExitConfirmation = false },
@@ -995,6 +1051,14 @@ fun ArflixApp(
         }
         onConsumeInstallPackUrl()
     }
+}
+
+private const val CLOUD_SETUP_PULL_TIMEOUT_MS = 10_000L
+
+private sealed interface TvSetupDecision {
+    data object Skip : TvSetupDecision
+    data object CloudUnavailable : TvSetupDecision
+    data class Open(val route: String) : TvSetupDecision
 }
 
 private fun enqueueFullTraktSync(context: android.content.Context) {

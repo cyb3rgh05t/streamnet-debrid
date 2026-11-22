@@ -4,6 +4,25 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.059] - 2026-11-22
+
+- Adminpanel, Einzel-Account: Die Tabs „Playlists“ und „Add-ons“ zeigen jetzt Karten statt nur eines Formulars. Playlists: Name, ID, Profil, Aktiv/Deaktiviert, „Standard der App“ (StreamNet TV), Server (nur der Host-Name), Import (Live-TV/Filme/Serien) und „Host überschrieben“. Add-ons: Name, ID, Aktiv/Deaktiviert, Version, in wie vielen Profilen, Quelle (Host-Name), „Standard der App“. Die Aktionen sitzen als Knöpfe auf den Karten (Host ändern, Host zurücksetzen, Entfernen, Aktualisieren) oder als „Playlist hinzufügen“ / „Add-on hinzufügen“; das Aktionsformular öffnet erst auf Klick, mit vorgewähltem Profil und Eintrag, und lässt sich mit „Schließen“ wieder ausblenden.
+- Backend: Die Account-Zusammenfassung (`GET /admin-api/accounts/:id`) liefert dafür je Playlist `host`, `hostOverride` und die Import-Schalter und je Add-on `version`, `host` und `profileCount`. Zugangsdaten und Pfade bleiben draußen, es wird nur der Host-Name übertragen. Der Demo-Server nutzt jetzt dieselbe Zusammenfassung.
+- Tests: 178 von 179 Backend-Tests ohne Fehler; der eine Fehler ist der bekannte, nur unter Windows. Im Demo-Server geprüft: Karten, vorgewählte Aktionen, Formular auf Klick. Nicht geprüft: gegen die echte Datenbank.
+
+## [Web 1.0.083] - 2026-11-22
+
+- Web, Tipps: Der Button „Alles klar!“ ist jetzt ein schlanker Button mit Akzent-Rahmen statt eines runden Icon-Knopfs. „Alle Tipps ausblenden“ ist entfernt.
+- Tests: 133 von 133 Web-Tests und `tsc` ohne Fehler. Nicht geprüft: der Button im Browser.
+
+## [2.6.020] - 2026-11-22
+
+- Android, IPTV-only-Filter: Eine Serie, die die Suche anzeigt, wird jetzt auch in der Quellensuche gefunden, wenn der Anbieter sie mit Untertitel führt (z. B. „Supernatural: Zur Hölle mit dem Bösen (2005)“ für TMDB „Supernatural“). Die Quellensuche für Serien nutzt dieselbe Regel wie der Suchfilter: Titel mit Untertitel passen nur, wenn beide Seiten ein kompatibles Jahr nennen (so passt „Star Trek“ weiter nicht zu „Star Trek: Picard“). Vorher verlangte sie den exakten Titel, sodass Treffer in der Suche ohne Quellen blieben. Neuer Test.
+- Android, Tipps auf Home: Nach der Installation (und einmalig auch bei Bestandsnutzern) erscheint unter der ersten Home-Reihe ein breiter, schließbarer Tipp im App-Design (halbtransparenter Akzent-Hintergrund, Label „TIPP“, Titel, Text), immer nur einer: Home-Reihen ausblenden/hinzufügen/umsortieren, Add-ons hinzufügen, Live-TV/Playlist einrichten, Cloud-Sync auf allen Geräten. Der Add-on-Tipp erscheint nur ohne eigene Add-ons, der Live-TV-Tipp nur ohne Playlist. „Alles klar!“ blendet den Tipp aus und zeigt den nächsten; geschlossene Tipps kommen nicht wieder. TV: Mit Pfeil nach unten von der ersten Reihe landet der Fokus auf dem Tipp, OK drückt „Alles klar!“, Pfeil hoch/runter verlässt ihn (Pfeil hoch von der Reihe unter dem Tipp hält zuerst auf dem Tipp an), die Zurück-Taste schließt ihn. Handy: „Alles klar!“, Schließen-Knopf; „Alle Tipps ausblenden“ gibt es nicht mehr.
+- Android, Cloud nicht erreichbar: Kann die Cloud nach der Profilauswahl nicht gelesen werden (offline, Zeitüberschreitung), erscheint ein Dialog im App-Design mit „Erneut versuchen“, „Playlist einrichten“ und „Später“, statt dass die Playlist-Weiterleitung stumm ausbleibt.
+- Android, Playlist-Einrichtung beim ersten Start: Auch mit Cloud-Konto öffnet die Profilauswahl einmal pro Profil die TV-Einstellungen mit dem StreamNet-TV-Formular, wenn danach keine aktive Playlist da ist. Vorher war die Weiterleitung bei verbundener Cloud ganz abgeschaltet, nur der Weg „Cloud überspringen“ führte zur Playlist. Mit Cloud wird erst nach einem abgeschlossenen Cloud-Abgleich entschieden (bis zu 10 Sekunden): Kommt die Playlist aus einem Backup oder von einem anderen Gerät zurück, erscheint die Weiterleitung nicht.
+- Tests: 950 von 950 Android-Tests, darunter neue Tests für die Playlist-Entscheidung, die Tipp-Auswahl und die Titelregel der Serien-Quellensuche. Auf dem Emulator (TV-Profil) mit der Fernbedienung geprüft: Tipp-Banner, Fokus und Scrollen. Nicht geprüft: neues Cloud-Konto, Cloud-Dialog, Handy-Ansicht und die Serien-Quellensuche mit dem echten Anbieter.
+
 ## [Web 1.0.082] - 2026-11-22
 
 - Web, Tipps auf Home: Der Tipp sitzt jetzt als breiter Streifen unter der ersten Home-Reihe (statt als Karte unten rechts), mit halbtransparentem Akzent-Hintergrund, Label „TIPP“, Titel und Text. Der Button heißt „Alles klar!“ und blendet den Tipp aus, danach erscheint der nächste; vorher führte er in die Einstellungen. Dazu ein Schließen-Knopf und „Alle Tipps ausblenden“.

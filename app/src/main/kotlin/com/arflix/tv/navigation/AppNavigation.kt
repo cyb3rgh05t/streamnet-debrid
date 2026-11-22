@@ -143,14 +143,16 @@ internal fun resolveStartDestination(
 }
 
 /**
- * Without a cloud account and without any IPTV source Home has nothing to build from, so the first
- * profile selection opens the TV settings once instead of an empty Home.
+ * Without any IPTV source Home has nothing to build from, so the first profile selection opens the TV
+ * settings once instead of an empty Home. With a cloud account [cloudSettled] must be true: the cloud
+ * state was read, so a playlist restored from a backup or another device is already counted in
+ * [hasIptvSource]; if the cloud could not be read the prompt stays silent.
  */
 internal fun shouldPromptTvSetup(
-    isCloudConnected: Boolean,
     hasIptvSource: Boolean,
     alreadyPrompted: Boolean,
-): Boolean = !isCloudConnected && !hasIptvSource && !alreadyPrompted
+    cloudSettled: Boolean = true,
+): Boolean = !hasIptvSource && !alreadyPrompted && cloudSettled
 
 internal fun NavHostController.navigateToProfileSelection() {
     navigate(Screen.ProfileSelection.route) {

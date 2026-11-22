@@ -41,11 +41,20 @@ class StartDestinationTest {
         )
 
     @Test
-    fun tvSetupIsOfferedOnlyOnceWithoutCloudAndWithoutIptvSource() {
-        assertThat(shouldPromptTvSetup(isCloudConnected = false, hasIptvSource = false, alreadyPrompted = false)).isTrue()
-        assertThat(shouldPromptTvSetup(isCloudConnected = false, hasIptvSource = false, alreadyPrompted = true)).isFalse()
-        assertThat(shouldPromptTvSetup(isCloudConnected = false, hasIptvSource = true, alreadyPrompted = false)).isFalse()
-        assertThat(shouldPromptTvSetup(isCloudConnected = true, hasIptvSource = false, alreadyPrompted = false)).isFalse()
+    fun tvSetupIsOfferedOnlyOnceWithoutIptvSource() {
+        assertThat(shouldPromptTvSetup(hasIptvSource = false, alreadyPrompted = false)).isTrue()
+        assertThat(shouldPromptTvSetup(hasIptvSource = false, alreadyPrompted = true)).isFalse()
+        assertThat(shouldPromptTvSetup(hasIptvSource = true, alreadyPrompted = false)).isFalse()
+    }
+
+    @Test
+    fun tvSetupWaitsForTheCloudStateAndSkipsRestoredPlaylists() {
+        // New cloud account: the pull finished and no playlist came back.
+        assertThat(shouldPromptTvSetup(hasIptvSource = false, alreadyPrompted = false, cloudSettled = true)).isTrue()
+        // Backup or other device restored the playlist.
+        assertThat(shouldPromptTvSetup(hasIptvSource = true, alreadyPrompted = false, cloudSettled = true)).isFalse()
+        // Cloud could not be read (offline, timeout): no guess.
+        assertThat(shouldPromptTvSetup(hasIptvSource = false, alreadyPrompted = false, cloudSettled = false)).isFalse()
     }
 
     @Test

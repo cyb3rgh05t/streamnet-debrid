@@ -62,6 +62,20 @@
     <string name="exit_app_confirm">Schließen</string>
     <string name="confirm">Bestätigen</string>
     <string name="retry">Erneut versuchen</string>
+    <string name="home_tip_rows_title">Personalisiere deine Startseite</string>
+    <string name="home_tip_rows_message">Home-Reihen ausblenden, hinzufügen und umsortieren: Einstellungen → Kataloge.</string>
+    <string name="home_tip_addons_title">Add-ons hinzufügen</string>
+    <string name="home_tip_addons_message">Installiere Stremio-Add-ons für mehr Streams und Untertitel unter Einstellungen → Addons.</string>
+    <string name="home_tip_live_tv_title">Live-TV einrichten</string>
+    <string name="home_tip_live_tv_message">Trage deine Playlist unter Einstellungen → TV ein, um Live-TV mit Programmführer zu sehen.</string>
+    <string name="home_tip_cloud_title">Überall synchron halten</string>
+    <string name="home_tip_cloud_message">Dein StreamNet-Konto hält Playlists, Add-ons und Reihen auf allen Geräten gleich.</string>
+    <string name="home_tip_got_it">Alles klar!</string>
+    <string name="home_tip_label">TIPP</string>
+    <string name="home_tip_close">Tipp schließen</string>
+    <string name="tv_setup_cloud_unavailable_title">Cloud nicht erreichbar</string>
+    <string name="tv_setup_cloud_unavailable_message">Wir konnten deine StreamNet Cloud nicht prüfen und wissen deshalb noch nicht, ob dort schon eine Playlist gespeichert ist. Versuche es erneut oder richte deine Playlist jetzt ein.</string>
+    <string name="tv_setup_cloud_unavailable_setup">Playlist einrichten</string>
     <string name="loading">Laden…</string>
     <string name="loading_label">Laden</string>
     <string name="empty">Leer</string>
@@ -1107,7 +1121,7 @@
     <string name="player_error_generic">Ein unbekannter Fehler ist aufgetreten</string>
     <string name="player_no_media_server_sources">Keine Quellen für diesen Inhalt gefunden. Die konfigurierten Mediaserver enthalten diesen Titel möglicherweise nicht.</string>
     <string name="player_no_vod_sources">Keine Quellen für diesen Inhalt gefunden. Versuche eine andere Quelle oder überprüfe deine konfigurierten Quellen.</string>
-    <string name="player_no_streaming_addons">Keine Streaming-Add-ons eingerichtet.\n\nFüge unter Einstellungen → Add-ons ein Streaming-Add-on hinzu und versuche es erneut.</string>
+    <string name="player_no_streaming_addons">Keine Streaming-Add-ons eingerichtet.\n\nFüge unter Einstellungen → Addons ein Streaming-Add-on hinzu und versuche es erneut.</string>
 
     <!-- UI-Komponenten und Quellenauswahl -->
     <string name="component_qr_code">QR-Code</string>

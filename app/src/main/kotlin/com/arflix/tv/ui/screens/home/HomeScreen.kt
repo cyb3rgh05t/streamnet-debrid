@@ -272,6 +272,8 @@ private class HomeFocusState(
     var currentItemIndex by mutableIntStateOf(initialItemIndex)
     var lastNavEventTime by mutableLongStateOf(0L)
     var userHasNavigated by mutableStateOf(false)
+    // True while the D-pad focus sits on the first-start tip under the first row (not saved across navigation).
+    var isTipFocused by mutableStateOf(false)
     // Per-row item indices — when pressing D-pad Down, we save the current item
     // index for the current row so pressing Up later returns to the same position.
     // Netflix preserves horizontal scroll position across rows; without this,
@@ -1060,6 +1062,29 @@ fun HomeScreen(
         contextMenuIsContinueWatching = false
     }
 
+    // First-start tip: evaluated once Home has settled, so it never competes with startup work.
+    val homeTip by viewModel.homeTip.collectAsStateWithLifecycle()
+    LaunchedEffect(allowHomeBackgroundWork) {
+        if (allowHomeBackgroundWork) viewModel.refreshHomeTip()
+    }
+    val visibleHomeTip = homeTip.takeIf { allowHomeBackgroundWork && !showContextMenu }
+    BackHandler(enabled = visibleHomeTip != null) {
+        visibleHomeTip?.let(viewModel::dismissHomeTip)
+    }
+    // Rendered inside the row list, under the first row.
+    val tipBanner: (@Composable (isFocused: Boolean) -> Unit)? = remember(visibleHomeTip, isMobile) {
+        visibleHomeTip?.let { tip ->
+            { isFocused ->
+                HomeTipBanner(
+                    tip = tip,
+                    isTouchDevice = isMobile,
+                    isFocused = isFocused,
+                    onDismiss = { viewModel.dismissHomeTip(tip) },
+                )
+            }
+        }
+    }
+
     // Preload artwork for the focused row and the next rows soon after DPAD settles.
     LaunchedEffect(allowHomeBackgroundWork) {
         if (!allowHomeBackgroundWork) return@LaunchedEffect
@@ -1318,6 +1343,17 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(appBackgroundDark())
+            .onPreviewKeyEvent { event ->
+                // On TV the tip takes no focus; Back closes it before the rows see the key.
+                if (!isMobile && visibleHomeTip != null && event.type == KeyEventType.KeyDown &&
+                    (event.key == Key.Back || event.key == Key.Escape)
+                ) {
+                    viewModel.dismissHomeTip(visibleHomeTip)
+                    true
+                } else {
+                    false
+                }
+            }
       ) {
         val iptvHeroBackdrop by produceState<String?>(
             null,
@@ -1599,6 +1635,8 @@ fun HomeScreen(
             featuredTrailerKey = if (!isMobile && uiState.trailerInCards && uiState.trailerAutoPlay && !trailerSuppressed && !heroRowIsContinueWatching) uiState.heroTrailerKey else null,
             featuredTrailerDelayMs = uiState.trailerDelaySeconds * 1000L,
             featuredTrailerVolume = if (uiState.trailerSoundEnabled) 1f else 0f,
+            tipBanner = tipBanner,
+            onTipDismiss = { visibleHomeTip?.let(viewModel::dismissHomeTip) },
             onOpenContextMenu = { item, isContinue ->
                 contextMenuItem = item
                 contextMenuIsContinueWatching = isContinue
@@ -3251,6 +3289,8 @@ private fun HomeInputLayer(
     featuredTrailerKey: String? = null,
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
+    tipBanner: (@Composable (isFocused: Boolean) -> Unit)? = null,
+    onTipDismiss: () -> Unit = {},
     onOpenContextMenu: (MediaItem, Boolean) -> Unit,
 ) {
     val focusRequester = remember { FocusRequester() }
@@ -3384,6 +3424,11 @@ private fun HomeInputLayer(
         }
     }
 
+    val tipVisible = tipBanner != null
+    LaunchedEffect(tipVisible) {
+        if (!tipVisible) focusState.isTipFocused = false
+    }
+
     val keyEventModifier = if (isMobile) {
         Modifier // No D-pad key handling on mobile
     } else {
@@ -3447,6 +3492,35 @@ private fun HomeInputLayer(
                 }
             }
 
+            if (focusState.isTipFocused && event.type == KeyEventType.KeyDown) {
+                when (event.key) {
+                    Key.Enter, Key.DirectionCenter -> {
+                        focusState.isTipFocused = false
+                        onTipDismiss()
+                        return@onPreviewKeyEvent true
+                    }
+                    Key.DirectionUp -> {
+                        focusState.isTipFocused = false
+                        focusState.lastNavEventTime = SystemClock.elapsedRealtime()
+                        return@onPreviewKeyEvent true
+                    }
+                    Key.DirectionDown -> {
+                        focusState.isTipFocused = false
+                        if (categories.size > 1) {
+                            focusState.currentRowIndex = 1
+                            val nextCategory = categories.getOrNull(1)
+                            focusState.currentItemIndex = nextCategory
+                                ?.let { clampHomeItemIndex(it.items, focusState.rowItemIndicesByCategoryId[it.id] ?: 0) }
+                                ?: 0
+                        }
+                        focusState.lastNavEventTime = SystemClock.elapsedRealtime()
+                        return@onPreviewKeyEvent true
+                    }
+                    Key.DirectionLeft, Key.DirectionRight -> return@onPreviewKeyEvent true
+                    else -> Unit
+                }
+            }
+
             when (event.type) {
                 KeyEventType.KeyDown -> when (event.key) {
                     Key.Enter, Key.DirectionCenter -> {
@@ -3494,6 +3568,15 @@ private fun HomeInputLayer(
                         focusState.userHasNavigated = true
                         if (focusState.isSidebarFocused) {
                             true
+                        } else if (tipVisible && focusState.currentRowIndex == 1) {
+                            // The tip sits between row 1 and row 2: moving up stops on it first.
+                            categories.getOrNull(1)?.id?.let { categoryId ->
+                                focusState.rowItemIndicesByCategoryId[categoryId] = focusState.currentItemIndex
+                            }
+                            focusState.currentRowIndex = 0
+                            focusState.isTipFocused = true
+                            focusState.lastNavEventTime = SystemClock.elapsedRealtime()
+                            true
                         } else if (focusState.currentRowIndex > 0) {
                             // Save current item position before leaving this row
                             categories.getOrNull(focusState.currentRowIndex)?.id?.let { categoryId ->
@@ -3531,6 +3614,13 @@ private fun HomeInputLayer(
                             focusState.currentItemIndex = targetCategory
                                 ?.let { clampHomeItemIndex(it.items, restoredIndex) }
                                 ?: 0
+                            focusState.lastNavEventTime = SystemClock.elapsedRealtime()
+                            true
+                        } else if (tipVisible && focusState.currentRowIndex == 0) {
+                            categories.getOrNull(0)?.id?.let { categoryId ->
+                                focusState.rowItemIndicesByCategoryId[categoryId] = focusState.currentItemIndex
+                            }
+                            focusState.isTipFocused = true
                             focusState.lastNavEventTime = SystemClock.elapsedRealtime()
                             true
                         } else if (!focusState.isSidebarFocused && focusState.currentRowIndex < categories.size - 1) {
@@ -3692,6 +3782,7 @@ private fun HomeInputLayer(
             featuredTrailerDelayMs = featuredTrailerDelayMs,
             featuredTrailerVolume = featuredTrailerVolume,
             lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
+            tipBanner = tipBanner,
             onItemClick = { item ->
                 if (!isActionableHomeItem(item)) {
                     return@HomeRowsLayer
@@ -3751,6 +3842,7 @@ private fun HomeRowsLayer(
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
     lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
+    tipBanner: (@Composable (isFocused: Boolean) -> Unit)? = null,
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null
 ) {
@@ -3770,6 +3862,7 @@ private fun HomeRowsLayer(
             lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
             onItemClick = onItemClick,
             onItemLongClick = onItemLongClick,
+            tipBanner = tipBanner,
             onCategoryVisiblePosition = { categoryId, lastVisibleItemIndex ->
                 onMobileCategoryVisiblePosition(categoryId, lastVisibleItemIndex)
                 val rowIndex = categories.indexOfFirst { it.id == categoryId }
@@ -3798,6 +3891,7 @@ private fun HomeRowsLayer(
             featuredTrailerDelayMs = featuredTrailerDelayMs,
             featuredTrailerVolume = featuredTrailerVolume,
             lookupIptvProgramBackdrop = lookupIptvProgramBackdrop,
+            tipBanner = tipBanner,
             onItemClick = onItemClick
         )
     }
@@ -3820,6 +3914,7 @@ private fun MobileHomeRowsLayer(
     lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
     onItemClick: (MediaItem) -> Unit,
     onItemLongClick: ((MediaItem, Boolean) -> Unit)? = null,
+    tipBanner: (@Composable (isFocused: Boolean) -> Unit)? = null,
     onCategoryVisiblePosition: (String, Int) -> Unit = { _, _ -> }
 ) {
     val mobileItemSpacing = 14.dp
@@ -3845,7 +3940,7 @@ private fun MobileHomeRowsLayer(
             items = categories,
             key = { _, category -> stableHomeRowKey("mobile", category.id) },
             contentType = { _, _ -> "mobile_home_category_row" }
-        ) { _, category ->
+        ) { rowIndex, category ->
             val isContinueWatching = category.id == "continue_watching"
             val isRecentlyWatchedSeries = category.id == HomeViewModel.RECENTLY_WATCHED_SERIES_CATEGORY_ID
             val isRanked = category.title.contains("Top 10", ignoreCase = true)
@@ -4051,6 +4146,11 @@ private fun MobileHomeRowsLayer(
                         }
                     }
                 }
+                if (rowIndex == 0 && tipBanner != null) {
+                    Box(modifier = Modifier.padding(start = contentStartPadding, end = 16.dp, top = 10.dp)) {
+                        tipBanner(false)
+                    }
+                }
             }
         }
     }
@@ -4075,6 +4175,7 @@ private fun TvHomeRowsLayer(
     featuredTrailerDelayMs: Long = 0L,
     featuredTrailerVolume: Float = 0f,
     lookupIptvProgramBackdrop: (String, Long?, Long?, String?) -> Flow<String?> = { _, _, _, _ -> flowOf(null) },
+    tipBanner: (@Composable (isFocused: Boolean) -> Unit)? = null,
     onItemClick: (MediaItem) -> Unit
 ) = TraceHomeComposition("StreamNet.Home.TVRows.compose") {
     // ── Focus-row stabilizer ──
@@ -4129,10 +4230,16 @@ private fun TvHomeRowsLayer(
         !isFixedLandscapeHomeCategory(category.id) &&
             catalogueLayouts.forRow("home:${category.id}") == CardLayoutMode.POSTER
     } }
-    val categoryHeightsPx = remember(renderedCategories, rowLayoutModes, density) {
+    val showTipUnderFirstRow = tipBanner != null && rowWindowStart == 0
+    // Tile rows without titles leave empty space under their cards; trim it so the tip sits close to them.
+    val tipRowTrim = if (showTipUnderFirstRow &&
+        renderedCategories.firstOrNull()?.items?.firstOrNull()?.collectionHideTitle == true
+    ) 36.dp else 0.dp
+    val categoryHeightsPx = remember(renderedCategories, rowLayoutModes, density, showTipUnderFirstRow) {
         renderedCategories.mapIndexed { idx, _ ->
             val usePoster = rowLayoutModes.getOrNull(idx) ?: false
-            val heightDp = if (usePoster) 245.dp else 202.dp
+            val heightDp = (if (usePoster) 245.dp else 202.dp) +
+                if (idx == 0 && showTipUnderFirstRow) HOME_TIP_TV_HEIGHT - tipRowTrim else 0.dp
             with(density) { heightDp.toPx() }
         }
     }
@@ -4167,6 +4274,7 @@ private fun TvHomeRowsLayer(
         var lastAppliedTargetIndex by remember { mutableIntStateOf(-1) }
         val targetIndex = localCurrentRowIndex.coerceIn(0, (renderedCategories.size - 1).coerceAtLeast(0))
         LaunchedEffect(targetIndex) {
+            if (focusState.isTipFocused) return@LaunchedEffect
             val currentIndex = listState.firstVisibleItemIndex
             val currentOffset = listState.firstVisibleItemScrollOffset
             val initialPlacement = lastAppliedTargetIndex < 0
@@ -4217,6 +4325,21 @@ private fun TvHomeRowsLayer(
             }
             lastAppliedTargetIndex = targetIndex
         }
+        // Focusing the tip scrolls it fully into view (row + tip are taller than the viewport); leaving it scrolls back.
+        LaunchedEffect(focusState.isTipFocused, showTipUnderFirstRow) {
+            if (!showTipUnderFirstRow) return@LaunchedEffect
+            if (focusState.isTipFocused) {
+                val firstRowDp = (if (rowLayoutModes.getOrNull(0) == true) 245.dp else 202.dp) - tipRowTrim
+                val overflowPx = with(density) {
+                    (firstRowDp + HOME_TIP_TV_HEIGHT - rowsViewportHeight).toPx()
+                }
+                listState.animateScrollToItem(0, scrollOffset = overflowPx.coerceAtLeast(0f).toInt())
+            } else if (focusState.currentRowIndex == 0 && listState.firstVisibleItemIndex == 0 &&
+                listState.firstVisibleItemScrollOffset > 0
+            ) {
+                listState.animateScrollToItem(0)
+            }
+        }
         // Rows that load above the initially shown one leave the list anchored on the old row
         // (LazyColumn keeps the first visible key). Until the user navigates, keep the target row on top.
         val renderedRowIds = remember(renderedCategories) { renderedCategories.map { it.id } }
@@ -4257,7 +4380,8 @@ private fun TvHomeRowsLayer(
                     }
                 ) { index, category ->
                     val actualRowIndex = rowWindowStart + index
-                    val rowIsFocused = !focusState.isSidebarFocused && actualRowIndex == focusState.currentRowIndex
+                    val rowIsFocused = !focusState.isSidebarFocused && !focusState.isTipFocused &&
+                        actualRowIndex == focusState.currentRowIndex
                     val rowUsePosterCards = rowLayoutModes.getOrElse(index) { false }
                     val rowHeight = if (rowUsePosterCards) 245.dp else 202.dp
                     val onRowLoadMore = remember(category.id) {
@@ -4272,6 +4396,7 @@ private fun TvHomeRowsLayer(
                             focusState.lastNavEventTime = SystemClock.elapsedRealtime()
                         }
                     }
+                    Column {
                     Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -4298,6 +4423,18 @@ private fun TvHomeRowsLayer(
                             onItemClick = onItemClick,
                             onItemFocused = onRowItemFocused
                         )
+                    }
+                    if (index == 0 && showTipUnderFirstRow) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .offset(y = -tipRowTrim)
+                                .height(HOME_TIP_TV_HEIGHT)
+                                .padding(start = contentStartPadding, end = 48.dp, top = 6.dp, bottom = 8.dp)
+                        ) {
+                            tipBanner?.invoke(focusState.isTipFocused)
+                        }
+                    }
                     }
                 }
             }
