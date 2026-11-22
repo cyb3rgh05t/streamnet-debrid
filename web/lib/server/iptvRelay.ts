@@ -1,5 +1,6 @@
 import { config } from "../config";
 import { streamNetRelayHosts } from "../iptvPlayback";
+import { relaySigningKey, signRelayUrl } from "./relaySignature";
 
 export const STREAMNET_RELAY_HOSTS = streamNetRelayHosts(
   config.streamnetTvXtreamUrl,
@@ -61,6 +62,7 @@ export function rewriteIptvPlaylist(
   headersParam: string | null,
   mode: "streamnet" | "resolver",
   resolverUrl = "",
+  signingKey = relaySigningKey(),
 ) {
   if (mode === "resolver" && !/^https?:\/\//i.test(resolverUrl))
     throw new Error("Media resolver is not configured");
@@ -76,6 +78,9 @@ export function rewriteIptvPlaylist(
       mode === "streamnet" || playlist ? "https://app.invalid" : resolverUrl,
     );
     relay.searchParams.set("url", absolute.toString());
+    const viaApp = mode === "streamnet" || playlist;
+    const signature = signRelayUrl(absolute.toString(), signingKey);
+    if (signature) relay.searchParams.set(viaApp ? "sig" : "s", signature);
     if (headersParam)
       relay.searchParams.set(
         mode === "streamnet" || playlist ? "headers" : "h",

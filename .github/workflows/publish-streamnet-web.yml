@@ -105,6 +105,19 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: npm run deploy
 
+      - name: Set relay signing key
+        working-directory: resolver-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PROXY_SIGNING_KEY: ${{ secrets.PROXY_SIGNING_KEY }}
+        run: |
+          if [ -n "$PROXY_SIGNING_KEY" ]; then
+            printf '%s' "$PROXY_SIGNING_KEY" | npx wrangler secret put PROXY_SIGNING_KEY
+          else
+            echo "PROXY_SIGNING_KEY not configured; the worker relays only listed hosts."
+          fi
+
       - name: Verify resolver
         run: curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 3 "${{ env.STREAMNET_RESOLVER_URL }}/health"
 

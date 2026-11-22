@@ -4,6 +4,11 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Web 1.0.084] - 2026-11-22
+
+- Web, Streaming-Fehler (502): Der StreamNet-Server leitet Streams jetzt auf die IP `50.7.28.82` weiter. Diese IP stand nicht in der Relay-Liste, deshalb lehnten sowohl der App-Proxy (`/api/proxy`) als auch der Resolver-Worker den Weg mit 502 ab. Die IP ist in der Web-Relay-Liste, in der Resolver-Worker-Liste (`ALLOWED_MEDIA_HOSTS`, Code-Standard und README) und im Worker-Test ergänzt.
+- Web und Resolver-Worker, dauerhafte Lösung ohne IP-Pflege: Der Relay signiert (HMAC-SHA256) jede URL, die er in eine Playlist schreibt. Signierte URLs dürfen auch auf Hosts liegen, die nicht in der Liste stehen; Weiterleitungen eines erlaubten oder signierten Starts dürfen zu beliebigen öffentlichen Adressen führen (private/interne Adressen bleiben gesperrt). Unsignierte oder gefälschte URLs auf fremden Hosts werden weiter abgelehnt, es ist also kein offener Proxy. Der Schlüssel ist `PROXY_SIGNING_KEY` und muss in der Web-Umgebung und als Worker-Secret (`wrangler secret put PROXY_SIGNING_KEY`) identisch gesetzt sein; ohne Schlüssel gilt nur die Host-Liste wie bisher. Neue Tests in Web und Worker. Tests: Web 134 von 134, Worker 10 von 10. Nicht geprüft: Wiedergabe im Browser gegen den echten Server.
+
 ## [Backend 1.0.059] - 2026-11-22
 
 - Adminpanel, Einzel-Account: Die Tabs „Playlists“ und „Add-ons“ zeigen jetzt Karten statt nur eines Formulars. Playlists: Name, ID, Profil, Aktiv/Deaktiviert, „Standard der App“ (StreamNet TV), Server (nur der Host-Name), Import (Live-TV/Filme/Serien) und „Host überschrieben“. Add-ons: Name, ID, Aktiv/Deaktiviert, Version, in wie vielen Profilen, Quelle (Host-Name), „Standard der App“. Die Aktionen sitzen als Knöpfe auf den Karten (Host ändern, Host zurücksetzen, Entfernen, Aktualisieren) oder als „Playlist hinzufügen“ / „Add-on hinzufügen“; das Aktionsformular öffnet erst auf Klick, mit vorgewähltem Profil und Eintrag, und lässt sich mit „Schließen“ wieder ausblenden.

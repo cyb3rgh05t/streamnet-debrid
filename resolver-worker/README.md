@@ -12,7 +12,7 @@ Required GitHub Actions secrets:
 The deployment creates the `resolve.streamnet.live` Worker custom domain. Keep `ALLOWED_MEDIA_HOSTS` in `wrangler.toml` synchronized with provider redirect hosts.
 
 The Live TV relay allows `xui.streamnet.live`, `193.200.221.81`,
-`50.7.184.250`, `85.209.176.85`, `193.108.118.53`, and `216.152.154.146` (including extensionless
+`50.7.184.250`, `85.209.176.85`, `193.108.118.53`, `216.152.154.146`, and `50.7.28.82` (including extensionless
 `/hls/` URLs). These match the app relay's built-in hosts. An unlisted host returns
 HTTP 400 with `Media host not allowed` before any upstream request. When adding
 a provider host, update both `wrangler.toml` and the defaults in `src/index.ts`.
@@ -34,3 +34,7 @@ npm ci
 npm test
 npm run typecheck
 ```
+
+### Signed URLs (changing provider hosts)
+
+Provider servers redirect streams to changing IP addresses. Instead of maintaining every IP, the web app signs (HMAC-SHA256, first 32 hex characters) every URL it writes into a playlist. The worker relays an unlisted host only when the `s` parameter matches its `url`, and redirects of an allowed or signed start URL may lead to other hosts. Set the same secret in both places: the web app environment variable `PROXY_SIGNING_KEY` and `npx wrangler secret put PROXY_SIGNING_KEY` for this worker. Without the key nothing is signed and only the host list applies.

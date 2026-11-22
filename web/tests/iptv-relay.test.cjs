@@ -570,3 +570,29 @@ test("Decoder diagnostics retain known status tokens but never raw messages", as
   assert.ok(unknown.includes("track=unknown"));
   assert.equal(unknown.includes("secret"), false);
 });
+
+test("Relay signatures cover exactly the written URL and need the shared key", async () => {
+  const { signRelayUrl, verifyRelaySignature } = await import(
+    pathToFileURL(path.resolve(__dirname, "../lib/server/relaySignature.ts")).href
+  );
+  const { rewriteIptvPlaylist } = await import(moduleUrl);
+  const url = "http://50.7.28.82/live/debrid/seg1.ts";
+  const signature = signRelayUrl(url, "secret");
+  assert.equal(signature.length, 32);
+  assert.equal(verifyRelaySignature(url, signature, "secret"), true);
+  assert.equal(verifyRelaySignature(`${url}x`, signature, "secret"), false);
+  assert.equal(verifyRelaySignature(url, signature, "other"), false);
+  assert.equal(verifyRelaySignature(url, null, "secret"), false);
+  assert.equal(signRelayUrl(url, ""), "");
+  assert.equal(verifyRelaySignature(url, signature, ""), false);
+
+  const base = new URL("http://50.7.28.82/live/debrid/channel.m3u8");
+  const signed = rewriteIptvPlaylist("seg1.ts", base, null, "streamnet", "", "secret");
+  const proxied = new URL(signed, "https://web.streamnet.live");
+  assert.equal(proxied.searchParams.get("url"), url);
+  assert.equal(proxied.searchParams.get("sig"), signature);
+  const unsigned = rewriteIptvPlaylist("seg1.ts", base, null, "streamnet", "", "");
+  assert.equal(new URL(unsigned, "https://web.streamnet.live").searchParams.has("sig"), false);
+  const resolver = rewriteIptvPlaylist("seg1.ts", base, null, "resolver", "https://resolve.streamnet.live", "secret");
+  assert.equal(new URL(resolver).searchParams.get("s"), signature);
+});

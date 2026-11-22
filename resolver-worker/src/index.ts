@@ -1,7 +1,11 @@
 interface Env {
   ALLOWED_ORIGINS?: string;
   ALLOWED_MEDIA_HOSTS?: string;
+  // Same key as PROXY_SIGNING_KEY of the web app (wrangler secret). Without it nothing is signed.
+  PROXY_SIGNING_KEY?: string;
 }
+
+const SIGNATURE_LENGTH = 32;
 
 const DEFAULT_ALLOWED_ORIGINS = ["https://web.streamnet.live"];
 const DEFAULT_ALLOWED_MEDIA_HOSTS = [
@@ -11,6 +15,7 @@ const DEFAULT_ALLOWED_MEDIA_HOSTS = [
   "85.209.176.85",
   "193.108.118.53",
   "216.152.154.146",
+  "50.7.28.82",
 ];
 const FORWARDED_HEADERS =
   /^(accept|authorization|cookie|icy-metadata|origin|referer|user-agent)$/i;
@@ -49,7 +54,14 @@ async function media(request: Request, input: URL, env: Env) {
   }
   if (
     !["http:", "https:"].includes(target.protocol) ||
-    !isAllowedMediaHost(allowedMediaHosts(env), target.hostname)
+    !(
+      isAllowedMediaHost(allowedMediaHosts(env), target.hostname) ||
+      (await hasValidSignature(
+        env,
+        target.toString(),
+        input.searchParams.get("s"),
+      ))
+    )
   ) {
     return json({ error: "Media host not allowed" }, request, env, 400);
   }
@@ -75,8 +87,9 @@ async function media(request: Request, input: URL, env: Env) {
     return json({ error: "Media upstream unavailable" }, request, env, 502);
   }
 
+  // The start URL was validated above; its redirects may lead to any other host (Workers cannot reach private networks).
   const finalUrl = safeUrl(upstream.url) ?? target;
-  if (!isAllowedMediaHost(allowedMediaHosts(env), finalUrl.hostname)) {
+  if (!["http:", "https:"].includes(finalUrl.protocol)) {
     await upstream.body?.cancel();
     return json(
       { error: "Media redirect host not allowed" },
@@ -96,7 +109,7 @@ async function media(request: Request, input: URL, env: Env) {
     if (text.length > 2 * 1024 * 1024) {
       return json({ error: "Playlist exceeds size limit" }, request, env, 502);
     }
-    return new Response(rewritePlaylist(text, finalUrl, input), {
+    return new Response(await rewritePlaylist(text, finalUrl, input, env), {
       status: upstream.status,
       headers: {
         ...corsHeaders(request, env),
@@ -129,9 +142,45 @@ async function media(request: Request, input: URL, env: Env) {
   return new Response(upstream.body, { status: upstream.status, headers });
 }
 
-function rewritePlaylist(text: string, baseUrl: URL, requestUrl: URL) {
+async function hmacHex(key: string, value: string) {
+  const cryptoKey = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(key),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const bytes = new Uint8Array(
+    await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(value)),
+  );
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, SIGNATURE_LENGTH);
+}
+
+// URLs the relay wrote into a playlist are signed (see web/lib/server/relaySignature.ts) and may sit on any host.
+async function hasValidSignature(
+  env: Env,
+  url: string,
+  signature: string | null,
+) {
+  if (!env.PROXY_SIGNING_KEY || signature?.length !== SIGNATURE_LENGTH)
+    return false;
+  const expected = await hmacHex(env.PROXY_SIGNING_KEY, url);
+  let difference = 0;
+  for (let index = 0; index < SIGNATURE_LENGTH; index++)
+    difference |= expected.charCodeAt(index) ^ signature.charCodeAt(index);
+  return difference === 0;
+}
+
+async function rewritePlaylist(
+  text: string,
+  baseUrl: URL,
+  requestUrl: URL,
+  env: Env,
+) {
   const headers = requestUrl.searchParams.get("h");
-  const proxied = (raw: string) => {
+  const proxied = async (raw: string) => {
     const trimmed = raw.trim();
     if (!trimmed || trimmed.startsWith("data:") || trimmed.startsWith("blob:"))
       return raw;
@@ -139,6 +188,11 @@ function rewritePlaylist(text: string, baseUrl: URL, requestUrl: URL) {
       const absolute = new URL(trimmed, baseUrl);
       const target = new URL("/media", requestUrl.origin);
       target.searchParams.set("url", absolute.toString());
+      if (env.PROXY_SIGNING_KEY)
+        target.searchParams.set(
+          "s",
+          await hmacHex(env.PROXY_SIGNING_KEY, absolute.toString()),
+        );
       if (headers) target.searchParams.set("h", headers);
       return target.toString();
     } catch {
@@ -146,18 +200,18 @@ function rewritePlaylist(text: string, baseUrl: URL, requestUrl: URL) {
     }
   };
 
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
+  const lines = await Promise.all(
+    text.split(/\r?\n/).map(async (line) => {
       const trimmed = line.trim();
       if (!trimmed) return line;
       if (!trimmed.startsWith("#")) return proxied(line);
-      return line.replace(
-        /URI="([^"]+)"/g,
-        (_match, uri: string) => `URI="${proxied(uri)}"`,
-      );
-    })
-    .join("\n");
+      const uris = Array.from(line.matchAll(/URI="([^"]+)"/g));
+      const replacements = await Promise.all(uris.map((m) => proxied(m[1])));
+      let index = 0;
+      return line.replace(/URI="([^"]+)"/g, () => `URI="${replacements[index++]}"`);
+    }),
+  );
+  return lines.join("\n");
 }
 
 function decodeHeaders(raw: string | null): Record<string, string> {

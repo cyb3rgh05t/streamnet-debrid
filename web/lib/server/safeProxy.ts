@@ -102,6 +102,8 @@ export async function safeProxyFetch(
     allowInsecureRedirect?: boolean;
     allowMedia?: boolean;
     allowedHosts?: { has(hostname: string): boolean };
+    // The host list then only guards the first hop; redirects of such a host may go to any public address.
+    redirectsToPublicHosts?: boolean;
     streamMedia?: boolean;
   } = {},
 ): Promise<Response> {
@@ -132,6 +134,7 @@ export async function safeProxyFetch(
     const hostname = current.hostname.replace(/^\[|\]$/g, "");
     if (
       options.allowedHosts &&
+      (hop === 0 || !options.redirectsToPublicHosts) &&
       !options.allowedHosts.has(hostname.toLowerCase())
     )
       throw new Error(`Blocked proxy target: host not allowed (${hostname})`);

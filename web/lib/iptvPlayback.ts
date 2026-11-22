@@ -5,6 +5,7 @@ export const STREAMNET_RELAY_HOSTS: ReadonlySet<string> = new Set([
   "193.108.118.53",
   "216.152.154.146",
   "50.7.184.250",
+  "50.7.28.82",
 ]);
 
 export function streamNetRelayHosts(providerUrl: string): ReadonlySet<string> {

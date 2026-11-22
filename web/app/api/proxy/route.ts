@@ -8,6 +8,7 @@ import {
 } from "@/lib/server/iptvRelay";
 import { config } from "@/lib/config";
 import { isStreamNetRelayHost } from "@/lib/iptvPlayback";
+import { verifyRelaySignature } from "@/lib/server/relaySignature";
 import {
   allowsMediaProxy,
   safeProxyFetch,
@@ -48,9 +49,15 @@ export async function GET(request: NextRequest) {
     );
   }
   const rewriteMode = input.searchParams.get("rewrite");
+  // A URL the relay itself wrote into a trusted playlist carries a signature and may sit on any host.
+  const signedRelayTarget = verifyRelaySignature(
+    target.toString(),
+    input.searchParams.get("sig"),
+  );
   const streamNetRelayRequest =
     (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
-    isStreamNetRelayHost(target.hostname, STREAMNET_RELAY_HOSTS);
+    (isStreamNetRelayHost(target.hostname, STREAMNET_RELAY_HOSTS) ||
+      signedRelayTarget);
   if (
     (rewriteMode === "streamnet" || rewriteMode === "resolver") &&
     !streamNetRelayRequest
@@ -96,6 +103,7 @@ export async function GET(request: NextRequest) {
       signal: request.signal,
     },
     streamNetRelayRequest,
+    signedRelayTarget,
   );
 
   const contentType =
@@ -510,6 +518,7 @@ async function fetchWithTimeout(
   target: URL,
   init: RequestInit,
   streamNetRelay = false,
+  signedTarget = false,
 ) {
   try {
     if (streamNetRelay) {
@@ -517,8 +526,11 @@ async function fetchWithTimeout(
         allowMedia: true,
         allowInsecureRedirect: true,
         allowedHosts: {
-          has: (host) => isStreamNetRelayHost(host, STREAMNET_RELAY_HOSTS),
+          has: (host) =>
+            isStreamNetRelayHost(host, STREAMNET_RELAY_HOSTS) ||
+            (signedTarget && host === target.hostname.toLowerCase()),
         },
+        redirectsToPublicHosts: true,
         streamMedia: true,
       });
     }

@@ -144,6 +144,7 @@ for (const [name, env] of [
       "85.209.176.85",
       "193.108.118.53",
       "216.152.154.146",
+      "50.7.28.82",
     ]) {
       const response = await worker.fetch(
         mediaRequest(`http://${host}/hls/test`),
@@ -152,7 +153,7 @@ for (const [name, env] of [
       assert.equal(response.status, 200, host);
       assert.equal(await response.text(), "segment");
     }
-    assert.equal(upstreamFetch.mock.callCount(), 6);
+    assert.equal(upstreamFetch.mock.callCount(), 7);
   });
 }
 
@@ -210,4 +211,59 @@ test("Unknown hosts and disallowed origins remain blocked before upstream fetch"
     error: "Origin not allowed",
   });
   assert.equal(upstreamFetch.mock.callCount(), 0);
+});
+
+test("Signed URLs on unlisted hosts are relayed, forged or unsigned ones are not", async (t) => {
+  const { createHmac } = require("node:crypto");
+  const { default: worker } = await import(workerUrl);
+  const upstreamFetch = t.mock.method(
+    globalThis,
+    "fetch",
+    async () =>
+      new Response("segment", { headers: { "content-type": "video/mp2t" } }),
+  );
+  const key = "shared-secret";
+  const sign = (url) =>
+    createHmac("sha256", key).update(url).digest("hex").slice(0, 32);
+  const env = { ALLOWED_MEDIA_HOSTS: deployedHosts, PROXY_SIGNING_KEY: key };
+  const unlisted = "http://203.0.113.9/hls/segment.ts";
+  const request = (url, signature) => {
+    const requestUrl = new URL("https://resolve.streamnet.live/media");
+    requestUrl.searchParams.set("url", url);
+    if (signature) requestUrl.searchParams.set("s", signature);
+    return new Request(requestUrl, { headers: { origin } });
+  };
+  assert.equal((await worker.fetch(request(unlisted, sign(unlisted)), env)).status, 200);
+  assert.equal((await worker.fetch(request(unlisted), env)).status, 400);
+  assert.equal((await worker.fetch(request(unlisted, sign(`${unlisted}x`)), env)).status, 400);
+  assert.equal(
+    (await worker.fetch(request(unlisted, sign(unlisted)), { ALLOWED_MEDIA_HOSTS: deployedHosts })).status,
+    400,
+  );
+  assert.equal(upstreamFetch.mock.callCount(), 1);
+});
+
+test("Playlists from the worker sign the URLs they write when a key is set", async (t) => {
+  const { createHmac } = require("node:crypto");
+  const { default: worker } = await import(workerUrl);
+  t.mock.method(
+    globalThis,
+    "fetch",
+    async () =>
+      new Response("#EXTM3U\nsegment.ts\n", {
+        headers: { "content-type": "application/vnd.apple.mpegurl" },
+      }),
+  );
+  const key = "shared-secret";
+  const response = await worker.fetch(mediaRequest(target), {
+    ALLOWED_MEDIA_HOSTS: deployedHosts,
+    PROXY_SIGNING_KEY: key,
+  });
+  const line = (await response.text()).split("\n")[1];
+  const relay = new URL(line);
+  const url = relay.searchParams.get("url");
+  assert.equal(
+    relay.searchParams.get("s"),
+    createHmac("sha256", key).update(url).digest("hex").slice(0, 32),
+  );
 });
