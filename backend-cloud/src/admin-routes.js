@@ -205,16 +205,6 @@ function optionalAuditReason(value) {
   );
 }
 
-function requireReason(request, reply) {
-  const reason = String(request.body?.reason || "").trim();
-  if (reason.length < 3 || reason.length > 500) {
-    request.backendFailureReason = "invalid_change_reason";
-    reply.code(400).send({ error: "A change reason is required" });
-    return null;
-  }
-  return reason;
-}
-
 function setAdminSecurityHeaders(reply) {
   reply
     .header("Cache-Control", "no-store")
@@ -320,6 +310,7 @@ function globalSummary(rows, mutation) {
   const withGaps = (map, kind) => {
     for (const [id, name] of appOwnedEntries[kind]) {
       const entry = map.get(id) || { id, name, accountCount: 0 };
+      entry.name = name;
       const have = present[kind].get(id) || new Set();
       entry.missingAccounts = configurableRows.filter((row) => !have.has(row.account_id))
         .map((row) => ({
@@ -1389,8 +1380,7 @@ export function registerAdminRoutes(app, { pool, jwtKey, publicDirectory }) {
     const admin = await authenticatedAdmin(request, pool, jwtKey);
     const accountId = validAccountId(request, reply);
     if (!accountId) return;
-    const reason = requireReason(request, reply);
-    if (!reason) return;
+    const reason = optionalAuditReason(request.body?.reason);
 
     const client = await pool.connect();
     try {

@@ -4,11 +4,20 @@ Alle erwähnenswerten Änderungen an diesem Projekt werden in dieser Datei dokum
 
 ## [Unreleased]
 
+## [Backend 1.0.058] - 2026-11-22
+
+- Adminpanel, Playlists und Add-ons: Das Formular „Änderung an alle Accounts senden“ erscheint erst, wenn eine Aktion oder „Playlist hinzufügen“ / „Add-on hinzufügen“ angeklickt wurde, und lässt sich mit „Schließen“ wieder ausblenden. Die Standard-Playlist (StreamNet TV) und das Standard-Add-on (OpenSubtitles v3) der App stehen getrennt von „Weitere Playlists“ / „Weitere Add-ons“, die an alle Accounts verteilt werden. Die Erklärung zu OpenSubtitles nennt jetzt, warum es nicht bei jedem Account in der Cloud steht (erst nach dem ersten Sync; Accounts ohne Eintrag nutzen es trotzdem als eingebaute Quelle).
+- Adminpanel/Backend, OpenSubtitles: Die Web-ID `org.stremio.opensubtitlesv3` zählt als dasselbe Add-on wie `opensubtitles`: in der Bestandszahl, in der Liste „Accounts ohne …“ sowie beim globalen Bearbeiten und Entfernen. Neuer Test.
+- Adminpanel: Checkboxen, Radiobuttons und Fortschrittsbalken nutzen die Akzentfarbe.
+- Adminpanel, Löschen: Alle Löschaktionen (Konto, mehrere Konten, Profil, Playlist/Add-on je Account, globales Entfernen, Franchise/Collection, Offline-Verlauf, Audit-Protokoll) fragen zweimal per Dialog nach. Es muss weder „LÖSCHEN“, „ALLE ACCOUNTS“ oder eine E-Mail eingetippt noch ein Kommentar angegeben werden.
+- Backend: `DELETE /admin-api/accounts/:id` verlangt keinen Änderungsgrund mehr (ohne Angabe wird „Ohne Kommentar“ protokolliert). Der Server prüft die globale Bestätigung weiterhin, die Oberfläche sendet sie nach den beiden Dialogen selbst.
+- Tests: Backend 178 von 179 (bekannter Fehler nur unter Windows). Geprüft im Demo-Server: Formular ein-/ausblenden, getrennte Bereiche, Akzentfarbe, Zwei-Schritt-Dialog. Nicht geprüft: das echte Löschen und die globale Vorschau gegen die Datenbank (der Demo-Server blockiert diese Aktionen).
+
 ## [Web 1.0.080] - 2026-11-22
 
 - Web, erster Start: Hat ein Profil nach dem Öffnen und der ersten Synchronisation noch keine aktive Playlist (keine aktivierte Playlist mit URL), öffnet die App direkt Einstellungen → TV (IPTV) mit dem STREAMNET-TV-Formular und einem Hinweis. Das passiert nur einmal pro Konto und Profil, damit kein Dauer-Redirect entsteht.
 - Einstellungen können jetzt von außen auf einen bestimmten Tab geöffnet werden.
-- Tests: 131 von 131 Web-Tests und 	sc ohne Fehler, darunter 3 neue Tests. Nicht geprüft: der Ablauf im Browser mit einem echten neuen Konto.
+- Tests: 131 von 131 Web-Tests und `tsc` ohne Fehler, darunter 3 neue Tests. Nicht geprüft: der Ablauf im Browser mit einem echten neuen Konto.
 
 ## [Backend 1.0.057] - 2026-11-22
 

@@ -720,9 +720,10 @@
                 Die eigenen M3U-/Xtream-Playlists der Nutzer werden hier nicht aufgelistet und nie verändert.
                 Änderungen betreffen die <strong>bereits registrierten Accounts</strong>, nicht Neuinstallationen.
               </p>
-              <h3 class="rc-heading">Playlists der App</h3>
+              <h3 class="rc-heading">Standard-Playlist der App</h3>
               <div id="rc-inventory-playlists" class="rc-inventory"></div>
-              <h3 class="rc-heading">Änderung an alle Accounts senden</h3>
+              <h3 class="rc-heading">Weitere Playlists</h3>
+              <div id="rc-extra-playlists" class="rc-extra"></div>
               <div id="rc-slot-playlists" class="rc-account-slot"></div>
             </div>
 
@@ -732,9 +733,10 @@
                 Ein Add-on „hinzufügen“ legt es bei allen <strong>bereits registrierten Accounts</strong> zusätzlich an;
                 Neuinstallationen bekommen es nicht.
               </p>
-              <h3 class="rc-heading">Add-ons der App</h3>
+              <h3 class="rc-heading">Standard-Add-on der App</h3>
               <div id="rc-inventory-addons" class="rc-inventory"></div>
-              <h3 class="rc-heading">Änderung an alle Accounts senden</h3>
+              <h3 class="rc-heading">Weitere Add-ons</h3>
+              <div id="rc-extra-addons" class="rc-extra"></div>
               <div id="rc-slot-addons" class="rc-account-slot"></div>
             </div>
 
@@ -1112,11 +1114,18 @@
                   /></label>
                   <p class="global-confirm-note">
                     Die Vorschau zeigt betroffene, unveränderte und
-                    übersprungene Accounts. Erst nach Eingabe von „ALLE
-                    ACCOUNTS“ wird gespeichert.
+                    übersprungene Accounts. Erst nach deiner Bestätigung wird
+                    gespeichert; Löschaktionen werden zweimal abgefragt.
                   </p>
                   <button class="button primary" type="submit">
                     Vorschau und Bestätigung
+                  </button>
+                  <button
+                    id="global-form-close"
+                    class="button secondary"
+                    type="button"
+                  >
+                    Schließen
                   </button>
                   <p
                     id="global-mutation-message"

@@ -63,6 +63,17 @@ test("global inventory deduplicates playlists and includes top-level addons with
   });
 });
 
+test("the web OpenSubtitles id counts as the app's opensubtitles add-on", () => {
+  const web = snapshot();
+  web.addons = [{ id: "org.stremio.opensubtitlesv3", name: "OpenSubtitles" }];
+  web.addonsByProfile = { "living-room": [{ id: "opensubtitles" }], kids: [] };
+  assert.deepEqual(adminGlobalInventory(web).addons.map((addon) => addon.id), ["opensubtitles"]);
+
+  const removal = prepareAdminGlobalMutation({ operation: "delete_addon", targetId: "opensubtitles" });
+  const result = applyAdminGlobalMutation(web, removal, 9000);
+  assert.deepEqual(adminGlobalInventory(result).addons, []);
+});
+
 test("remote list catalogs add to every profile with Android and web names and timestamps", () => {
   const value = snapshot();
   for (const [sourceType, sourceUrl, sourceRef] of [

@@ -462,6 +462,18 @@ function removeById(items, id) {
   return (Array.isArray(items) ? items : []).filter((item) => item?.id !== id);
 }
 
+// The web app stores the built-in OpenSubtitles add-on under its Stremio id; the admin treats both ids as one add-on.
+const addonIdAliases = new Map([["org.stremio.opensubtitlesv3", "opensubtitles"]]);
+
+export function canonicalAddonId(id) {
+  const value = String(id ?? "");
+  return addonIdAliases.get(value) ?? value;
+}
+
+function isSameAddon(addon, id) {
+  return canonicalAddonId(addon?.id) === canonicalAddonId(id);
+}
+
 const profileScopedRoots = [
   "profileSettingsById",
   "iptvByProfile",
@@ -953,9 +965,10 @@ export function adminGlobalInventory(payload) {
   }
   return {
     profileCount: profileIds(payload).size,
-    addons: sharedAddonsFromPayload(payload).map((addon) => ({
-      id: String(addon.id), name: String(addon.name || addon.id),
-    })),
+    addons: [...new Map(sharedAddonsFromPayload(payload).map((addon) => {
+      const id = canonicalAddonId(addon.id);
+      return [id, { id, name: String(addon.name || id) }];
+    })).values()],
     playlists: [...playlists.values()],
     catalogs: [...catalogs.values()],
   };
@@ -1035,20 +1048,20 @@ export function applyAdminGlobalMutation(payloadValue, mutation, now = Date.now(
     if (!applyGlobalCatalogMutation(payload, mutation, now)) return null;
   } else if (operation.endsWith("addon") || operation === "clear_addons") {
     const current = sharedAddonsFromPayload(payload);
-    if (/^(edit|delete)_addon$/.test(operation) && !current.some((addon) => addon.id === targetId)) {
+    if (/^(edit|delete)_addon$/.test(operation) && !current.some((addon) => isSameAddon(addon, targetId))) {
       return null;
     }
     let next;
     if (operation === "clear_addons") next = [];
-    else if (operation === "delete_addon") next = removeById(current, targetId);
+    else if (operation === "delete_addon") next = current.filter((addon) => !isSameAddon(addon, targetId));
     else if (operation === "add_addon") next = upsertById(current, data);
     else if (operation === "edit_addon") {
-      next = upsertById(removeById(current, targetId), data);
+      next = upsertById(current.filter((addon) => !isSameAddon(addon, targetId)), data);
       // Keep each profile's activation even when a changed URL produces a new ID.
       for (const items of Object.values(payload.addonsByProfile || {})) {
         if (!Array.isArray(items)) continue;
         for (const addon of items) {
-          if (addon?.id === targetId) addon.id = data.id;
+          if (isSameAddon(addon, targetId)) addon.id = data.id;
         }
       }
     } else throw new Error("Unsupported operation");

@@ -654,14 +654,29 @@ async function promptReason(message, danger = false) {
   });
 }
 
-async function confirmAction({ title, message, confirmLabel, danger = false }) {
+async function confirmAction({ title, message, confirmLabel, danger = false, eyebrow }) {
   return openAdminDialog({
     title,
+    eyebrow,
     message,
     confirmLabel,
     danger,
     input: false,
   });
+}
+
+// Every deletion is asked twice: no typed text and no mandatory comment, just two clear dialogs.
+async function confirmDeletion({ title, message, confirmLabel = "Endgültig löschen" }) {
+  const first = await confirmAction({ title, eyebrow: "GEFÄHRLICH", message, confirmLabel: "Ja, weiter", danger: true });
+  if (!first) return false;
+  const second = await confirmAction({
+    title: "Wirklich löschen?",
+    eyebrow: "LETZTE RÜCKFRAGE",
+    message: `${title}: Das lässt sich nicht rückgängig machen. Jetzt wirklich fortfahren?`,
+    confirmLabel,
+    danger: true,
+  });
+  return Boolean(second);
 }
 
 function normalizeStremioManifestUrl(value) {
@@ -1269,11 +1284,10 @@ async function openAccount(accountId) {
 }
 
 async function deleteProfile(profileId, profileName) {
-  const confirmed = await confirmAction({
+  const confirmed = await confirmDeletion({
     title: "Profil löschen",
-    message: `Profil "${profileName}" wirklich unwiderruflich löschen?`,
-    confirmLabel: "Profil löschen",
-    danger: true,
+    message: `Das Profil "${profileName}" wird unwiderruflich gelöscht.`,
+    confirmLabel: "Profil endgültig löschen",
   });
   if (!confirmed) return;
   try {
@@ -1574,6 +1588,17 @@ async function submitMutation(event) {
     } else if (operation === "delete_playlist") {
       request.data = { id: byId("delete-playlist-select").value };
     }
+    if (/^delete_/.test(operation)) {
+      const label = byId("mutation-operation").selectedOptions[0]?.textContent ?? "Eintrag löschen";
+      const confirmed = await confirmDeletion({
+        title: label,
+        message: "Der Eintrag wird bei diesem Account entfernt.",
+      });
+      if (!confirmed) {
+        setMessage(message, "Abgebrochen.", "info");
+        return;
+      }
+    }
     await saveSnapshotMutation(request, message);
     setMessage(message, "Gespeichert und protokolliert.", "success");
     showToast("Änderung gespeichert.");
@@ -1863,17 +1888,20 @@ const rcInventories = {
     actions: [["Bearbeiten", "edit_playlist"], ["Host ändern", "change_xtream_host"], ["Entfernen", "delete_playlist"]],
     extra: { streamnet_tv: [["Host zurücksetzen", "clear_streamnet_host_override"]] },
     add: ["Playlist hinzufügen", "add_playlist"],
+    addNote: "Zusätzliche Playlists (M3U oder Xtream), die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig von der Standard-Playlist der App; Playlists, die Nutzer selbst angelegt haben, bleiben unberührt.",
   },
   addons: {
     key: "addons", noun: "Add-on",
-    note: "Gezählt werden nur Accounts mit Cloud-Snapshot, in dem dieses Add-on steht.",
+    note: "Die App und der Webplayer bringen dieses Add-on fest mit; es lässt sich nicht löschen. Gezählt werden Accounts, in deren Cloud-Snapshot es steht (App-ID opensubtitles oder Web-ID org.stremio.opensubtitlesv3, beides gilt als dasselbe Add-on), also nach dem ersten Sync. Accounts ohne Eintrag nutzen es trotzdem als eingebaute Quelle.",
     actions: [["Bearbeiten", "edit_addon"], ["Entfernen", "delete_addon"]],
     extra: {},
     add: ["Add-on hinzufügen", "add_addon"],
+    addNote: "Zusätzliche Add-ons, die du an alle bereits registrierten Accounts verteilst. Sie sind unabhängig vom Standard-Add-on der App; Add-ons, die Nutzer selbst installiert haben, bleiben unberührt.",
   },
 };
 
 function rcRunAction(category, operation, targetId) {
+  byId("global-form").classList.remove("hidden");
   const select = byId("global-operation");
   select.value = operation;
   select.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1941,24 +1969,17 @@ function rcMissingAccounts(item, setup) {
 }
 
 async function rcDeleteAccounts(accounts, button) {
-  const typed = await openAdminDialog({
-    title: `${accounts.length} Konten löschen`,
-    eyebrow: "GEFÄHRLICH",
-    message: `Es werden ${accounts.length} Konten samt Cloud-Daten, Sitzungen und Verlauf endgültig gelöscht: ${accounts.slice(0, 5).map((a) => a.email || a.id).join(", ")}${accounts.length > 5 ? " …" : ""}. Zum Bestätigen LÖSCHEN eingeben.`,
-    inputLabel: "Bestätigung",
-    requiredText: "LÖSCHEN",
-    requiredTextError: "Bitte LÖSCHEN eingeben.",
-    confirmLabel: "Weiter",
-    danger: true,
+  const confirmed = await confirmDeletion({
+    title: `${accounts.length} ${accounts.length === 1 ? "Konto" : "Konten"} löschen`,
+    message: `Es ${accounts.length === 1 ? "wird 1 Konto" : `werden ${accounts.length} Konten`} samt Cloud-Daten, Sitzungen und Verlauf endgültig gelöscht: ${accounts.slice(0, 5).map((a) => a.email || a.id).join(", ")}${accounts.length > 5 ? " …" : ""}.`,
+    confirmLabel: "Konten endgültig löschen",
   });
-  if (typed !== "LÖSCHEN") return;
-  const reason = await promptReason("Warum sollen diese Konten endgültig gelöscht werden?", true);
-  if (!reason) return;
+  if (!confirmed) return;
   setButtonBusy(button, true, "Wird gelöscht…");
   let deleted = 0;
   try {
     for (const account of accounts) {
-      await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, { method: "DELETE", body: JSON.stringify({ reason }) });
+      await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, { method: "DELETE", body: JSON.stringify({ reason: "" }) });
       deleted += 1;
     }
     showToast(`${deleted} Konten gelöscht.`);
@@ -2003,7 +2024,8 @@ function renderRcInventory() {
     add.className = "button primary";
     add.textContent = setup.add[0];
     add.addEventListener("click", () => rcRunAction(category, setup.add[1]));
-    box.replaceChildren(...cards, add);
+    box.replaceChildren(...cards);
+    byId(`rc-extra-${category}`).replaceChildren(rcElement("p", setup.addNote, "rc-hint"), add);
   }
 }
 
@@ -2022,6 +2044,10 @@ function selectRcTab(tab) {
   if (category) {
     byId(`rc-slot-${category}`).append(byId("global-form"));
     selectGlobalCategory(category);
+    // Playlists and add-ons open the form from their buttons; the catalog tab has no buttons, so it stays open.
+    const hasButtons = category in rcInventories;
+    byId("global-form").classList.toggle("hidden", hasButtons);
+    byId("global-form-close").classList.toggle("hidden", !hasButtons);
   }
 }
 
@@ -2659,10 +2685,18 @@ async function removeRcFranchise() {
   const item = rcItem(rc.current);
   if (!item) return;
   const reason = byId("rc-f-reason").value;
-  const text = item.standard
-    ? `„${item.title}“ auf den Standard der App zurücksetzen? Deine Änderungen gehen verloren.`
-    : `„${item.title}“ löschen? Die Collection verschwindet aus allen Apps.`;
-  if (!window.confirm(text)) return;
+  const confirmed = item.standard
+    ? await confirmAction({
+      title: "Auf Standard zurücksetzen",
+      message: `„${item.title}“ auf den Standard der App zurücksetzen? Deine Änderungen gehen verloren.`,
+      confirmLabel: "Zurücksetzen",
+      danger: true,
+    })
+    : await confirmDeletion({
+      title: `„${item.title}“ löschen`,
+      message: `„${item.title}“ wird gelöscht und verschwindet aus allen Apps.`,
+    });
+  if (!confirmed) return;
   const message = byId("rc-f-message");
   try {
     if (item.added) {
@@ -2903,6 +2937,11 @@ function isAppOwnedItem(item) {
   if (item.sourceType !== undefined) return item.sourceType === "PREINSTALLED";
   return appOwnedAddonIds.has(item.id) || appOwnedPlaylistIds.has(item.id);
 }
+
+function closeGlobalForm() {
+  if (rcAccountTabs[rc.tab] in rcInventories) byId("global-form").classList.add("hidden");
+}
+byId("global-form-close").addEventListener("click", closeGlobalForm);
 
 function updateGlobalFields() {
   const operation = byId("global-operation").value;
@@ -3160,30 +3199,29 @@ async function submitGlobalMutation(event) {
       setMessage(message, `Keine Änderungen erforderlich. ${counts(preview)}`, "info");
       return;
     }
-    const confirmed = await openAdminDialog({
-      title: "Globale Änderung bestätigen",
-      eyebrow: "ALLE ACCOUNTS",
-      message: `${operationLabel}. ` +
-        `${preview.changed} von ${preview.total} Accounts werden geändert; ` +
-        `${preview.unchanged} bleiben unverändert, ${preview.skipped} werden übersprungen. ` +
-        'Zum Anwenden bitte "ALLE ACCOUNTS" eingeben. Entfernen ist nicht rückgängig zu machen.',
-      inputLabel: "Bestätigung",
-      requiredText: "ALLE ACCOUNTS",
-      requiredTextError: 'Bitte exakt "ALLE ACCOUNTS" eingeben.',
-      confirmLabel: "Global anwenden",
-      danger: true,
-    });
-    if (confirmed !== "ALLE ACCOUNTS") {
+    const summary = `${operationLabel}. ${preview.changed} von ${preview.total} Accounts werden geändert; ` +
+      `${preview.unchanged} bleiben unverändert, ${preview.skipped} werden übersprungen.`;
+    const destructive = /^(delete|clear|remove)_/.test(operation);
+    const confirmed = destructive
+      ? await confirmDeletion({ title: "Bei allen Accounts entfernen", message: summary, confirmLabel: "Global entfernen" })
+      : await confirmAction({
+        title: "Globale Änderung bestätigen",
+        eyebrow: "ALLE ACCOUNTS",
+        message: summary,
+        confirmLabel: "Global anwenden",
+      });
+    if (!confirmed) {
       setMessage(message, "Globale Änderung abgebrochen.", "info");
       return;
     }
     const result = await api("/admin-api/global/snapshot", {
       method: "PATCH",
-      body: JSON.stringify({ ...request, expectedState: preview.state, confirmation: confirmed }),
+      body: JSON.stringify({ ...request, expectedState: preview.state, confirmation: "ALLE ACCOUNTS" }),
     });
     setMessage(message, `Gespeichert und pro Account protokolliert. ${counts(result)}`, "success");
     showToast("Globale Änderung gespeichert.");
     await loadGlobal();
+    closeGlobalForm();
   } catch (error) {
     setMessage(message, error.message, "error");
     showToast(error.message, true);
@@ -3355,12 +3393,11 @@ byId("reset-offline-devices-button").addEventListener(
   "click",
   async (event) => {
     const button = event.currentTarget;
-    const confirmed = await confirmAction({
-      title: "Offline-Verlauf zurücksetzen",
+    const confirmed = await confirmDeletion({
+      title: "Offline-Verlauf löschen",
       message:
         "Alle nicht aktuell online gesehenen Geräte werden aus der Gerätehistorie entfernt. Gerade aktive Geräte bleiben erhalten.",
-      confirmLabel: "Offline-Verlauf löschen",
-      danger: true,
+      confirmLabel: "Offline-Verlauf endgültig löschen",
     });
     if (!confirmed) return;
     setButtonBusy(button, true, "Wird zurückgesetzt…");
@@ -3410,30 +3447,17 @@ byId("cleanup-devices-sessions-button").addEventListener(
 byId("delete-account-button").addEventListener("click", async (event) => {
   const button = event.currentTarget;
   const account = state.selectedAccount.account;
-  const typed = await openAdminDialog({
+  const confirmed = await confirmDeletion({
     title: "Konto löschen",
-    eyebrow: "GEFÄHRLICH",
-    message: `Zum Bestätigen bitte die E-Mail-Adresse "${account.email}" eingeben.`,
-    inputLabel: "E-Mail-Adresse",
-    requiredText: account.email,
-    requiredTextError: "E-Mail-Adresse stimmt nicht überein.",
-    confirmLabel: "Weiter",
-    danger: true,
+    message: `Das Konto ${account.email} wird samt Cloud-Daten, Sitzungen und Verlauf endgültig gelöscht.`,
+    confirmLabel: "Konto endgültig löschen",
   });
-  if (typed !== account.email) {
-    if (typed !== null) showToast("E-Mail-Adresse stimmt nicht überein.", true);
-    return;
-  }
-  const reason = await promptReason(
-    "Warum soll dieses Konto endgültig gelöscht werden?",
-    true,
-  );
-  if (!reason) return;
+  if (!confirmed) return;
   setButtonBusy(button, true, "Wird gelöscht…");
   try {
     await api(`/admin-api/accounts/${encodeURIComponent(account.id)}`, {
       method: "DELETE",
-      body: JSON.stringify({ reason }),
+      body: JSON.stringify({ reason: "" }),
     });
     showToast(`Konto ${account.email} wurde gelöscht.`);
     selectView("accounts");
@@ -3522,18 +3546,12 @@ byId("payload-edit-form").addEventListener("submit", async (event) => {
 });
 byId("clear-audits-button").addEventListener("click", async (event) => {
   const button = event.currentTarget;
-  const confirmed = await openAdminDialog({
+  const confirmed = await confirmDeletion({
     title: "Audit-Protokoll leeren",
-    eyebrow: "GEFÄHRLICH",
-    message:
-      'Zum Bestätigen bitte "LEEREN" eingeben. Dadurch werden alle Admin-Audit-Einträge entfernt.',
-    inputLabel: "Bestätigung",
-    requiredText: "LEEREN",
-    requiredTextError: 'Bitte exakt "LEEREN" eingeben.',
-    confirmLabel: "Protokoll leeren",
-    danger: true,
+    message: "Alle Admin-Audit-Einträge werden entfernt.",
+    confirmLabel: "Protokoll endgültig leeren",
   });
-  if (confirmed !== "LEEREN") return;
+  if (!confirmed) return;
   setButtonBusy(button, true, "Wird geleert…");
   try {
     const result = await api("/admin-api/audits", { method: "DELETE" });

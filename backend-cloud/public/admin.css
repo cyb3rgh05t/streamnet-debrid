@@ -61,7 +61,11 @@ button:disabled {
 .hidden {
   display: none !important;
 }
-::-webkit-scrollbar {
+input[type="checkbox"],
+input[type="radio"],
+progress {
+  accent-color: var(--accent);
+}
   width: 10px;
   height: 10px;
 }
@@ -2415,6 +2419,17 @@ tbody tr[data-account-id]:focus .account-primary {
 .rc-inventory > .button {
   grid-column: 1 / -1;
   justify-self: start;
+}
+.rc-extra {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+  padding: 16px 18px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+.rc-extra .rc-hint {
+  margin: 0;
 }
 .rc-inv-card {
   display: grid;
